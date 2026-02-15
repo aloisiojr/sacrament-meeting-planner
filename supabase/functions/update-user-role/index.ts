@@ -115,7 +115,6 @@ Deno.serve(async (req) => {
     const currentRole = targetUser.app_metadata?.role;
 
     // If changing FROM bishopric, check if this is the last Bishopric user
-    let isLastBishopric = false;
     if (currentRole === 'bishopric' && input.newRole !== 'bishopric') {
       // Count Bishopric users in ward
       const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers({
@@ -130,7 +129,10 @@ Deno.serve(async (req) => {
       ).length;
 
       if (bishopricCount <= 1) {
-        isLastBishopric = true;
+        return new Response(
+          JSON.stringify({ error: 'cannot_demote_last_bishopric' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
@@ -158,7 +160,6 @@ Deno.serve(async (req) => {
         success: true,
         previousRole: currentRole,
         newRole: input.newRole,
-        isLastBishopric,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

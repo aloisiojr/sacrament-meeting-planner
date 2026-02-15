@@ -1,0 +1,167 @@
+/**
+ * TanStack Query hooks for meeting actor CRUD operations.
+ * Actors are ward members who can preside, conduct, recognize, or play music.
+ * Business rule: can_conduct=true implies can_preside=true (app-enforced).
+ */
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import type { MeetingActor, CreateActorInput, UpdateActorInput } from '../types/database';
+
+// --- Query Keys ---
+
+export const actorKeys = {
+  all: ['actors'] as const,
+  list: (wardId: string) => ['actors', 'list', wardId] as const,
+  byRole: (wardId: string, role: ActorRoleFilter) =>
+    ['actors', 'byRole', wardId, role] as const,
+};
+
+// --- Types ---
+
+export type ActorRoleFilter =
+  | 'all'
+  | 'can_preside'
+  | 'can_conduct'
+  | 'can_recognize'
+  | 'can_music';
+
+// --- Utilities ---
+
+/**
+ * Enforce business rule: can_conduct=true implies can_preside=true.
+ * This is app-enforced (not DB-enforced) per ARCH_M002.
+ */
+export function enforceActorRules(input: CreateActorInput | UpdateActorInput): typeof input {
+  const result = { ...input };
+  if ('can_conduct' in result && result.can_conduct === true) {
+    result.can_preside = true;
+  }
+  return result;
+}
+
+/**
+ * Filter actors by role capability.
+ */
+export function filterActorsByRole(actors: MeetingActor[], role: ActorRoleFilter): MeetingActor[] {
+  if (role === 'all') return actors;
+  return actors.filter((a) => a[role]);
+}
+
+/**
+ * Sort actors alphabetically by name.
+ */
+export function sortActors(actors: MeetingActor[]): MeetingActor[] {
+  return [...actors].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+}
+
+// --- Hooks ---
+
+/**
+ * Fetch all actors for the current ward, optionally filtered by role.
+ */
+export function useActors(roleFilter: ActorRoleFilter = 'all') {
+  const { wardId } = useAuth();
+
+  return useQuery({
+    queryKey: actorKeys.byRole(wardId, roleFilter),
+    queryFn: async (): Promise<MeetingActor[]> => {
+      let query = supabase
+        .from('meeting_actors')
+        .select('*')
+        .eq('ward_id', wardId)
+        .order('name', { ascending: true });
+
+      // Apply server-side filter for specific roles
+      if (roleFilter !== 'all') {
+        query = query.eq(roleFilter, true);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!wardId,
+  });
+}
+
+/**
+ * Create a new meeting actor.
+ * Enforces can_conduct -> can_preside rule.
+ */
+export function useCreateActor() {
+  const { wardId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateActorInput): Promise<MeetingActor> => {
+      const enforced = enforceActorRules(input);
+      const { data, error } = await supabase
+        .from('meeting_actors')
+        .insert({
+          ward_id: wardId,
+          name: enforced.name,
+          can_preside: enforced.can_preside ?? false,
+          can_conduct: enforced.can_conduct ?? false,
+          can_recognize: enforced.can_recognize ?? false,
+          can_music: enforced.can_music ?? false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: actorKeys.all });
+    },
+  });
+}
+
+/**
+ * Update an existing meeting actor.
+ * Enforces can_conduct -> can_preside rule.
+ */
+export function useUpdateActor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateActorInput): Promise<MeetingActor> => {
+      const enforced = enforceActorRules(input);
+      const { id, ...fields } = enforced;
+      const { data, error } = await supabase
+        .from('meeting_actors')
+        .update(fields)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: actorKeys.all });
+    },
+  });
+}
+
+/**
+ * Delete a meeting actor.
+ * Agenda snapshot fields are preserved (actor_id set to NULL, name preserved).
+ */
+export function useDeleteActor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (actorId: string): Promise<void> => {
+      const { error } = await supabase.from('meeting_actors').delete().eq('id', actorId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: actorKeys.all });
+    },
+  });
+}

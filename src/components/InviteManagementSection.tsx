@@ -37,9 +37,6 @@ export function InviteManagementSection() {
   const locale = getCurrentLanguage();
   const changeStatus = useChangeStatus();
 
-  // Only visible for Secretary
-  if (!hasPermission('home:invite_mgmt')) return null;
-
   const nextSundays = useMemo(() => {
     const today = new Date();
     return getNextSundays(today, LOOK_AHEAD_SUNDAYS).map(toISODateString);
@@ -130,6 +127,9 @@ export function InviteManagementSection() {
     },
     [t, changeStatus, locale]
   );
+
+  // Only visible for Secretary
+  if (!hasPermission('home:invite_mgmt')) return null;
 
   if (inviteItems.length === 0) return null;
 

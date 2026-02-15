@@ -200,8 +200,8 @@ export default function SpeechesTab() {
 
   // Sunday type change
   const handleTypeChange = useCallback(
-    (date: string, type: SundayExceptionReason) => {
-      setSundayType.mutate({ date, reason: type });
+    (date: string, type: SundayExceptionReason, customReason?: string) => {
+      setSundayType.mutate({ date, reason: type, custom_reason: customReason });
     },
     [setSundayType]
   );

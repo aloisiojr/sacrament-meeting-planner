@@ -15,6 +15,7 @@ import {
   Pressable,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -188,7 +189,13 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
     []
   );
 
-  if (!agenda) return null;
+  if (!agenda) {
+    return (
+      <View style={styles.emptyState}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.form}>
@@ -739,6 +746,11 @@ function HymnSelectorModal({
 const styles = StyleSheet.create({
   form: {
     gap: 4,
+  },
+  emptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionHeader: {
     paddingVertical: 8,

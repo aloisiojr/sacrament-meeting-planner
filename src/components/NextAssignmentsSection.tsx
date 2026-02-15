@@ -51,9 +51,6 @@ export function NextAssignmentsSection() {
   const [speakerModalSpeechId, setSpeakerModalSpeechId] = useState<string | null>(null);
   const [topicModalSpeechId, setTopicModalSpeechId] = useState<string | null>(null);
 
-  // Only visible for Bishopric
-  if (!hasPermission('home:next_assignments')) return null;
-
   const canWriteSundayType = hasPermission('sunday_type:write');
 
   const nextSundays = useMemo(() => {
@@ -81,19 +78,14 @@ export function NextAssignmentsSection() {
 
   const next3 = allEntries.slice(0, 3);
   const allAssigned = areNext3FullyAssigned(next3);
-
-  // Only show if all 9 speeches of next 3 sundays are assigned
-  if (!allAssigned) return null;
-
   const pendingEntry = findNextPendingSunday(allEntries);
-  if (!pendingEntry) return null;
 
   const handleToggle = useCallback(() => {
-    if (!expanded) {
+    if (!expanded && pendingEntry) {
       lazyCreate.mutate(pendingEntry.date);
     }
     setExpanded((prev) => !prev);
-  }, [expanded, lazyCreate, pendingEntry.date]);
+  }, [expanded, lazyCreate, pendingEntry]);
 
   const handleAssignSpeaker = useCallback(
     (speechId: string, member: Member) => {
@@ -120,6 +112,14 @@ export function NextAssignmentsSection() {
     },
     [assignTopic]
   );
+
+  // Only visible for Bishopric
+  if (!hasPermission('home:next_assignments')) return null;
+
+  // Only show if all 9 speeches of next 3 sundays are assigned
+  if (!allAssigned) return null;
+
+  if (!pendingEntry) return null;
 
   return (
     <View style={styles.section}>

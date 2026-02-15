@@ -94,15 +94,22 @@ export function ThemeProvider({ children, initialPreference }: ThemeProviderProp
     saveThemePreference(newMode);
   }, []);
 
+  const toggleMode = useCallback(() => {
+    const newMode: ThemeMode = mode === 'light' ? 'dark' : 'light';
+    setPreferenceState(newMode);
+    saveThemePreference(newMode);
+  }, [mode]);
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       mode,
       preference,
       setPreference,
+      toggleMode,
       colors,
       loading,
     }),
-    [mode, preference, setPreference, colors, loading]
+    [mode, preference, setPreference, toggleMode, colors, loading]
   );
 
   return (

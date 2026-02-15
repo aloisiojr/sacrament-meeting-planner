@@ -75,6 +75,7 @@ BEGIN
     SET status = 'cancelled'
     WHERE ward_id = NEW.ward_id
       AND sunday_date = NEW.sunday_date
+      AND speech_position = NEW.position
       AND type = 'designation'
       AND status = 'pending';
   END IF;

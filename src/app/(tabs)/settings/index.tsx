@@ -78,36 +78,21 @@ export default function SettingsScreen() {
           .in('collection_id', oldCollectionIds);
       }
 
-      // 3. Ensure new language collections have config rows (inactive by default)
+      // 3. Upsert new language collection configs (inactive by default)
       const { data: newCollections } = await supabase
         .from('general_collections')
         .select('id')
         .eq('language', newLanguage);
 
       if (newCollections && newCollections.length > 0) {
-        for (const col of newCollections) {
-          // Upsert: create config row if it doesn't exist (defaults to active=false)
-          const { data: existing } = await supabase
-            .from('ward_collection_config')
-            .select('id')
-            .eq('ward_id', wardId)
-            .eq('collection_id', col.id)
-            .single();
-
-          if (!existing) {
-            await supabase.from('ward_collection_config').insert({
-              ward_id: wardId,
-              collection_id: col.id,
-              active: false,
-            });
-          } else {
-            // If config already exists, set to inactive
-            await supabase
-              .from('ward_collection_config')
-              .update({ active: false })
-              .eq('id', existing.id);
-          }
-        }
+        const upsertRows = newCollections.map((col) => ({
+          ward_id: wardId,
+          collection_id: col.id,
+          active: false,
+        }));
+        await supabase
+          .from('ward_collection_config')
+          .upsert(upsertRows, { onConflict: 'ward_id,collection_id' });
       }
 
       // 4. Change UI language immediately
@@ -196,12 +181,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <SettingsItem
-            label={t('settings.language')}
-            value={LANGUAGE_LABELS[currentLanguage]}
-            onPress={() => setLanguageModalVisible(true)}
-            colors={colors}
-          />
+          {hasPermission('settings:language') && (
+            <SettingsItem
+              label={t('settings.language')}
+              value={LANGUAGE_LABELS[currentLanguage]}
+              onPress={() => setLanguageModalVisible(true)}
+              colors={colors}
+            />
+          )}
           {hasPermission('settings:timezone') && (
             <SettingsItem
               label={t('settings.timezone')}

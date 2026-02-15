@@ -88,24 +88,25 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
       return;
     }
 
-    // Create Realtime channel for this ward
-    const channel = supabase
-      .channel(`ward-sync-${wardId}`)
-      .on(
+    // Create Realtime channel for this ward, subscribing per-table
+    const channel = supabase.channel(`ward-sync-${wardId}`);
+
+    for (const table of SYNCED_TABLES) {
+      channel.on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
+          table,
           filter: `ward_id=eq.${wardId}`,
         },
         (payload) => {
-          const table = payload.table;
-          if (table) {
-            invalidateForTable(table);
-          }
+          invalidateForTable(payload.table);
         }
-      )
-      .subscribe((status) => {
+      );
+    }
+
+    channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setWebSocketConnected(true);
           stopPolling();

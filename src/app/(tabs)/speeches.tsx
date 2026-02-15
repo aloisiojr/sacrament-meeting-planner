@@ -161,7 +161,7 @@ export default function SpeechesTab() {
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
-        speakerPhone: member.phone ?? '',
+        speakerPhone: member.phone ?? null,
       });
       setSpeakerModalSpeechId(null);
     },

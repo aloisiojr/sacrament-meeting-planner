@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
 import { useSpeeches, useAssignSpeaker, useLazyCreateSpeeches } from '../hooks/useSpeeches';
 import { useActors } from '../hooks/useActors';
-import { useHymns, useSacramentalHymns, formatHymnDisplay } from '../hooks/useHymns';
+import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
 import { useMembers } from '../hooks/useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { MemberSelectorModal } from './MemberSelectorModal';
@@ -141,7 +141,8 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
                 speechId: newSpeech.id,
                 memberId: member.id,
                 speakerName: member.full_name,
-                speakerPhone: member.phone ?? '',
+                speakerPhone: member.phone ?? null,
+                status: 'assigned_confirmed',
               });
             }
           },
@@ -152,7 +153,8 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
         speechId: speech.id,
         memberId: member.id,
         speakerName: member.full_name,
-        speakerPhone: member.phone ?? '',
+        speakerPhone: member.phone ?? null,
+        status: 'assigned_confirmed',
       });
       setSpeakerModalPosition(null);
     },
@@ -685,7 +687,6 @@ function HymnSelectorModal({
 
   const filtered = useMemo(() => {
     if (!search.trim()) return hymns;
-    const { filterHymns } = require('../hooks/useHymns');
     return filterHymns(hymns, search);
   }, [hymns, search]);
 

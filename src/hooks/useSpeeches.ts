@@ -32,7 +32,8 @@ export interface AssignSpeakerInput {
   speechId: string;
   memberId: string;
   speakerName: string;
-  speakerPhone: string;
+  speakerPhone: string | null;
+  status?: SpeechStatus;
 }
 
 export interface AssignTopicInput {
@@ -188,7 +189,7 @@ export function useAssignSpeaker() {
           member_id: input.memberId,
           speaker_name: input.speakerName,
           speaker_phone: input.speakerPhone,
-          status: 'assigned_not_invited' as SpeechStatus,
+          status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
         })
         .eq('id', input.speechId)
         .select()
@@ -246,6 +247,18 @@ export function useChangeStatus() {
 
   return useMutation({
     mutationFn: async (input: ChangeStatusInput): Promise<Speech> => {
+      // Fetch current speech to validate transition
+      const { data: current, error: fetchErr } = await supabase
+        .from('speeches')
+        .select('status')
+        .eq('id', input.speechId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+      if (!isValidTransition(current.status as SpeechStatus, input.status)) {
+        throw new Error(`Invalid status transition: ${current.status} -> ${input.status}`);
+      }
+
       const { data, error } = await supabase
         .from('speeches')
         .update({ status: input.status })

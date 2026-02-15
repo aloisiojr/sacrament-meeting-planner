@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { ExitConfirmation } from '../../components/ExitConfirmation';
 import { Text } from 'react-native';
 
 export default function TabsLayout() {
@@ -12,7 +13,9 @@ export default function TabsLayout() {
   const isObserver = role === 'observer';
 
   return (
-    <Tabs
+    <>
+      <ExitConfirmation />
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -62,5 +65,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

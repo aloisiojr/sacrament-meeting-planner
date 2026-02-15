@@ -202,6 +202,13 @@ export default function SettingsScreen() {
             onPress={() => setLanguageModalVisible(true)}
             colors={colors}
           />
+          {hasPermission('settings:timezone') && (
+            <SettingsItem
+              label={t('settings.timezone')}
+              onPress={() => router.push('/(tabs)/settings/timezone')}
+              colors={colors}
+            />
+          )}
           <SettingsItem
             label={t('settings.theme')}
             onPress={() => {}}

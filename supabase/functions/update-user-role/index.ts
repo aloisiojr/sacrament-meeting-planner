@@ -116,16 +116,20 @@ Deno.serve(async (req) => {
 
     // If changing FROM bishopric, check if this is the last Bishopric user
     if (currentRole === 'bishopric' && input.newRole !== 'bishopric') {
-      // Count Bishopric users in ward
-      const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
+      // Count Bishopric users in ward via RPC (avoids full-scan of auth.users)
+      const { data: wardUsers, error: rpcError } = await supabaseAdmin
+        .rpc('list_ward_users', { target_ward_id: wardId });
 
-      const bishopricCount = (allUsers || []).filter(
-        (u: any) =>
-          u.app_metadata?.ward_id === wardId &&
-          u.app_metadata?.role === 'bishopric'
+      if (rpcError) {
+        console.error('list_ward_users RPC error:', rpcError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to check ward users' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const bishopricCount = (wardUsers || []).filter(
+        (u: { role: string }) => u.role === 'bishopric'
       ).length;
 
       if (bishopricCount <= 1) {

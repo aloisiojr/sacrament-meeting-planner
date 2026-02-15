@@ -9,12 +9,11 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Pressable,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SectionList,
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -260,88 +259,86 @@ export default function TopicsScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('topics.title')}</Text>
-          {canWrite && (
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={handleAdd}
-              accessibilityRole="button"
-              accessibilityLabel={t('topics.addTopic')}
-            >
-              <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Ward Topics Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            {t('topics.wardTopics')}
-          </Text>
-
-          {isAdding && (
-            <TopicEditor onSave={handleSaveNew} colors={colors} />
-          )}
-
-          <FlatList
-            data={wardTopics}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TopicRow
-                topic={item}
-                isEditing={editingId === item.id}
-                activeSwipeId={activeSwipeId}
-                onSwipeReveal={setActiveSwipeId}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onSave={handleSaveEdit(item.id)}
-                disabled={!canWrite}
-                colors={colors}
-              />
+        <ScrollView
+          style={styles.flex}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => setActiveSwipeId(null)}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>{t('topics.title')}</Text>
+            {canWrite && (
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={handleAdd}
+                accessibilityRole="button"
+                accessibilityLabel={t('topics.addTopic')}
+              >
+                <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
+              </Pressable>
             )}
-            ListEmptyComponent={
+          </View>
+
+          {/* Ward Topics Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              {t('topics.wardTopics')}
+            </Text>
+
+            {isAdding && (
+              <TopicEditor onSave={handleSaveNew} colors={colors} />
+            )}
+
+            {wardTopics && wardTopics.length > 0 ? (
+              wardTopics.map((item) => (
+                <TopicRow
+                  key={item.id}
+                  topic={item}
+                  isEditing={editingId === item.id}
+                  activeSwipeId={activeSwipeId}
+                  onSwipeReveal={setActiveSwipeId}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onSave={handleSaveEdit(item.id)}
+                  disabled={!canWrite}
+                  colors={colors}
+                />
+              ))
+            ) : (
               <View style={styles.empty}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                   {t('common.noResults')}
                 </Text>
               </View>
-            }
-            scrollEnabled={false}
-            onScrollBeginDrag={() => setActiveSwipeId(null)}
-            keyboardShouldPersistTaps="handled"
-          />
-        </View>
-
-        {/* General Collections Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            {t('topics.collections')}
-          </Text>
-
-          <FlatList
-            data={collections}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <CollectionRow
-                name={item.name}
-                active={item.active}
-                onToggle={(active) => handleToggleCollection(item.id, active)}
-                disabled={!canToggle}
-                colors={colors}
-              />
             )}
-            ListEmptyComponent={
+          </View>
+
+          {/* General Collections Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              {t('topics.collections')}
+            </Text>
+
+            {collections && collections.length > 0 ? (
+              collections.map((item) => (
+                <CollectionRow
+                  key={item.id}
+                  name={item.name}
+                  active={item.active}
+                  onToggle={(active) => handleToggleCollection(item.id, active)}
+                  disabled={!canToggle}
+                  colors={colors}
+                />
+              ))
+            ) : (
               <View style={styles.empty}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                   {t('common.noResults')}
                 </Text>
               </View>
-            }
-            scrollEnabled={false}
-          />
-        </View>
+            )}
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

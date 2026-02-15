@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import { DEFAULT_TIMEZONES, LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../../i18n';
+import { DEFAULT_TIMEZONES, LANGUAGE_LABELS, SUPPORTED_LANGUAGES, changeLanguage } from '../../i18n';
 import type { SupportedLanguage } from '../../i18n';
 
 export default function RegisterScreen() {
@@ -102,6 +102,8 @@ export default function RegisterScreen() {
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
+        // Apply the selected language immediately so UI renders correctly
+        changeLanguage(language);
         // Navigation handled by auth state change in root layout
       }
     } catch (err: unknown) {

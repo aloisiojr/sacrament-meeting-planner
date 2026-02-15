@@ -33,7 +33,6 @@ export type AgendaUpdateInput = Partial<Omit<SundayAgenda, 'id' | 'ward_id' | 's
 export const EXCLUDED_EXCEPTION_TYPES = new Set([
   'general_conference',
   'stake_conference',
-  'no_meeting',
 ]);
 
 /**
@@ -50,7 +49,8 @@ export function isSpecialMeeting(reason: string | null): boolean {
   if (!reason) return false;
   return reason === 'testimony_meeting'
     || reason === 'ward_conference'
-    || reason === 'special_program';
+    || reason === 'primary_presentation'
+    || reason === 'other';
 }
 
 // --- Hooks ---

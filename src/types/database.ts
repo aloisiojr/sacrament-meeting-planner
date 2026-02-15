@@ -49,9 +49,8 @@ export type SundayExceptionReason =
   | 'general_conference'
   | 'stake_conference'
   | 'ward_conference'
-  | 'fast_sunday'
-  | 'special_program'
-  | 'no_meeting';
+  | 'primary_presentation'
+  | 'other';
 
 // --- Notification Types ---
 
@@ -126,6 +125,7 @@ export interface SundayException {
   ward_id: string;
   date: string; // ISO date string (YYYY-MM-DD)
   reason: SundayExceptionReason;
+  custom_reason?: string | null;
 }
 
 export interface Speech {

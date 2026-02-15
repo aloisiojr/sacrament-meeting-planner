@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,12 +45,13 @@ export function useActivityLog({ search }: UseActivityLogOptions = {}) {
 
       // Apply search filter (case-insensitive, across datetime, email, description)
       if (search && search.trim()) {
-        const term = search.trim();
-        // Use ilike for case-insensitive match on text fields
-        // For accent-insensitive, we rely on PostgreSQL collation or unaccent extension
-        q = q.or(
-          `user_email.ilike.%${term}%,description.ilike.%${term}%,created_at::text.ilike.%${term}%`
-        );
+        // Sanitize search term: escape PostgREST filter special characters
+        const term = search.trim().replace(/[,.*()%]/g, '');
+        if (term) {
+          q = q.or(
+            `user_email.ilike.%${term}%,description.ilike.%${term}%,created_at::text.ilike.%${term}%`
+          );
+        }
       }
 
       const { data, error } = await q;
@@ -88,20 +89,19 @@ export function useActivityLog({ search }: UseActivityLogOptions = {}) {
 export function useActivityLogSearch(debounceMs = 250) {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateSearch = useCallback(
     (text: string) => {
       setSearchText(text);
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
-      const timer = setTimeout(() => {
+      debounceTimerRef.current = setTimeout(() => {
         setDebouncedSearch(text);
       }, debounceMs);
-      setDebounceTimer(timer);
     },
-    [debounceMs, debounceTimer]
+    [debounceMs]
   );
 
   return {

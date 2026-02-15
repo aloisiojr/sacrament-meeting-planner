@@ -1,17 +1,29 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../../lib/supabase';
+import {
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_LABELS,
+  changeLanguage,
+  getCurrentLanguage,
+} from '../../../i18n';
+import type { SupportedLanguage } from '../../../i18n';
+import { topicKeys } from '../../../hooks/useTopics';
 
 interface SettingsItemProps {
   label: string;
+  value?: string;
   onPress: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function SettingsItem({ label, onPress, colors }: SettingsItemProps) {
+function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
   return (
     <Pressable
       style={[styles.item, { borderBottomColor: colors.divider }]}
@@ -19,7 +31,12 @@ function SettingsItem({ label, onPress, colors }: SettingsItemProps) {
       accessibilityRole="button"
     >
       <Text style={[styles.itemText, { color: colors.text }]}>{label}</Text>
-      <Text style={[styles.itemArrow, { color: colors.textSecondary }]}>{'\u203A'}</Text>
+      <View style={styles.itemRight}>
+        {value ? (
+          <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value}</Text>
+        ) : null}
+        <Text style={[styles.itemArrow, { color: colors.textSecondary }]}>{'\u203A'}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -27,8 +44,101 @@ function SettingsItem({ label, onPress, colors }: SettingsItemProps) {
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission } = useAuth();
+  const { hasPermission, wardId } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const currentLanguage = getCurrentLanguage();
+
+  const languageChangeMutation = useMutation({
+    mutationFn: async (newLanguage: SupportedLanguage) => {
+      const oldLanguage = getCurrentLanguage();
+      if (newLanguage === oldLanguage) return;
+
+      // 1. Update ward.language in Supabase
+      const { error: wardError } = await supabase
+        .from('wards')
+        .update({ language: newLanguage })
+        .eq('id', wardId);
+      if (wardError) throw wardError;
+
+      // 2. Deactivate all collections from the OLD language
+      const { data: oldCollections } = await supabase
+        .from('general_collections')
+        .select('id')
+        .eq('language', oldLanguage);
+
+      if (oldCollections && oldCollections.length > 0) {
+        const oldCollectionIds = oldCollections.map((c) => c.id);
+        await supabase
+          .from('ward_collection_config')
+          .update({ active: false })
+          .eq('ward_id', wardId)
+          .in('collection_id', oldCollectionIds);
+      }
+
+      // 3. Ensure new language collections have config rows (inactive by default)
+      const { data: newCollections } = await supabase
+        .from('general_collections')
+        .select('id')
+        .eq('language', newLanguage);
+
+      if (newCollections && newCollections.length > 0) {
+        for (const col of newCollections) {
+          // Upsert: create config row if it doesn't exist (defaults to active=false)
+          const { data: existing } = await supabase
+            .from('ward_collection_config')
+            .select('id')
+            .eq('ward_id', wardId)
+            .eq('collection_id', col.id)
+            .single();
+
+          if (!existing) {
+            await supabase.from('ward_collection_config').insert({
+              ward_id: wardId,
+              collection_id: col.id,
+              active: false,
+            });
+          } else {
+            // If config already exists, set to inactive
+            await supabase
+              .from('ward_collection_config')
+              .update({ active: false })
+              .eq('id', existing.id);
+          }
+        }
+      }
+
+      // 4. Change UI language immediately
+      changeLanguage(newLanguage);
+    },
+    onSuccess: () => {
+      // Invalidate topic/collection caches
+      queryClient.invalidateQueries({ queryKey: topicKeys.all });
+    },
+  });
+
+  const handleLanguageSelect = useCallback(
+    (newLanguage: SupportedLanguage) => {
+      setLanguageModalVisible(false);
+      if (newLanguage === currentLanguage) return;
+
+      Alert.alert(
+        t('languageChange.warningTitle'),
+        t('languageChange.warningMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('languageChange.confirm'),
+            style: 'destructive',
+            onPress: () => languageChangeMutation.mutate(newLanguage),
+          },
+        ]
+      );
+    },
+    [currentLanguage, t, languageChangeMutation]
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -88,7 +198,8 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsItem
             label={t('settings.language')}
-            onPress={() => {}}
+            value={LANGUAGE_LABELS[currentLanguage]}
+            onPress={() => setLanguageModalVisible(true)}
             colors={colors}
           />
           <SettingsItem
@@ -103,6 +214,47 @@ export default function SettingsScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* Language Selector Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setLanguageModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('settings.language')}
+            </Text>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <Pressable
+                key={lang}
+                style={[
+                  styles.languageOption,
+                  { borderBottomColor: colors.divider },
+                  lang === currentLanguage && { backgroundColor: colors.surfaceVariant },
+                ]}
+                onPress={() => handleLanguageSelect(lang)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: lang === currentLanguage }}
+              >
+                <Text style={[styles.languageText, { color: colors.text }]}>
+                  {LANGUAGE_LABELS[lang]}
+                </Text>
+                {lang === currentLanguage && (
+                  <Text style={[styles.checkmark, { color: colors.primary }]}>
+                    {'\u2713'}
+                  </Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -134,8 +286,50 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: 16,
   },
+  itemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  itemValue: {
+    fontSize: 14,
+  },
   itemArrow: {
     fontSize: 22,
     fontWeight: '300',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    borderRadius: 14,
+    paddingVertical: 12,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  languageText: {
+    fontSize: 16,
+  },
+  checkmark: {
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

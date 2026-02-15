@@ -88,16 +88,6 @@ export default function PresentationScreen() {
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : !agenda ? (
-        <View style={styles.loading}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {t('agenda.notCreatedYet')}
-          </Text>
-        </View>
-      ) : accordionCards.length === 0 ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
       ) : (
         <AccordionCard cards={accordionCards} initialExpanded={0} />
       )}
@@ -166,9 +156,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
   },
   fieldRow: {
     marginBottom: 12,

@@ -92,9 +92,15 @@ describe('getTodaySundayDate', () => {
 });
 
 describe('buildPresentationCards', () => {
-  it('returns empty array when agenda is null', () => {
+  it('returns 4 cards with empty fields when agenda is null', () => {
     const cards = buildPresentationCards(null, [], null, mockHymnLookup, mockT);
-    expect(cards).toEqual([]);
+    expect(cards).toHaveLength(4);
+    // All text values should be empty strings
+    for (const card of cards) {
+      for (const field of card.fields) {
+        expect(typeof field.value).toBe('string');
+      }
+    }
   });
 
   it('returns 4 cards for normal meeting', () => {

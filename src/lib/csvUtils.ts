@@ -1,0 +1,194 @@
+/**
+ * CSV utility functions for member import/export.
+ * Handles CSV parsing, validation, and generation.
+ */
+
+export interface CsvMember {
+  full_name: string;
+  phone: string; // Full phone with country code, e.g., "+5511999999999"
+}
+
+export interface CsvValidationError {
+  line: number;
+  field: string;
+  message: string;
+}
+
+export interface CsvParseResult {
+  success: boolean;
+  members: CsvMember[];
+  errors: CsvValidationError[];
+}
+
+/**
+ * Parse a CSV string into an array of CsvMember.
+ * Expected format: "Nome,Telefone Completo" (header required)
+ * Phone format: +xxyyyyyyyy (country code + number)
+ */
+export function parseCsv(csvContent: string): CsvParseResult {
+  const errors: CsvValidationError[] = [];
+  const members: CsvMember[] = [];
+  const seenPhones = new Set<string>();
+
+  const lines = csvContent.trim().split(/\r?\n/);
+
+  if (lines.length === 0) {
+    errors.push({ line: 0, field: 'file', message: 'Empty CSV file' });
+    return { success: false, members: [], errors };
+  }
+
+  // Validate header
+  const header = lines[0].trim();
+  const headerParts = header.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+
+  if (headerParts.length < 2) {
+    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 2 columns: Nome, Telefone Completo' });
+    return { success: false, members: [], errors };
+  }
+
+  // Parse data rows
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+
+    const parts = parseCsvLine(line);
+
+    if (parts.length < 2) {
+      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 2 columns' });
+      continue;
+    }
+
+    const fullName = parts[0].trim();
+    const fullPhone = parts[1].trim();
+
+    // Validate name
+    if (!fullName) {
+      errors.push({ line: i + 1, field: 'Nome', message: 'Name is required' });
+      continue;
+    }
+
+    // Validate phone format (+xxyyyyyyyy)
+    if (fullPhone && !/^\+\d{8,15}$/.test(fullPhone)) {
+      errors.push({
+        line: i + 1,
+        field: 'Telefone Completo',
+        message: `Invalid phone format: "${fullPhone}". Expected: +xxyyyyyyyy`,
+      });
+      continue;
+    }
+
+    // Check for duplicate phone
+    if (fullPhone && seenPhones.has(fullPhone)) {
+      errors.push({
+        line: i + 1,
+        field: 'Telefone Completo',
+        message: `Duplicate phone: ${fullPhone}`,
+      });
+      continue;
+    }
+
+    if (fullPhone) {
+      seenPhones.add(fullPhone);
+    }
+
+    members.push({ full_name: fullName, phone: fullPhone });
+  }
+
+  if (errors.length > 0) {
+    return { success: false, members: [], errors };
+  }
+
+  if (members.length === 0) {
+    errors.push({ line: 0, field: 'data', message: 'No valid data rows found' });
+    return { success: false, members: [], errors };
+  }
+
+  return { success: true, members, errors: [] };
+}
+
+/**
+ * Parse a single CSV line, handling quoted fields.
+ */
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+        current += '"';
+        i++; // Skip escaped quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+/**
+ * Extract country code and phone number from a full phone string.
+ * E.g., "+5511999999999" -> { countryCode: "+55", phone: "11999999999" }
+ */
+export function splitPhoneNumber(fullPhone: string): { countryCode: string; phone: string } {
+  if (!fullPhone || !fullPhone.startsWith('+')) {
+    return { countryCode: '+55', phone: fullPhone };
+  }
+
+  // Try known country code lengths (longest first to avoid ambiguity)
+  // 3-digit codes: +591, +595, +598, +593, +351, +244, +258
+  // 2-digit codes: +55, +52, +54, +56, +57, +58, +51, +44, +34, +33, +49, +39, +81
+  // 1-digit code:  +1
+  const phone = fullPhone.substring(1); // Remove '+'
+
+  if (phone.length >= 3 && /^(591|595|598|593|351|244|258)/.test(phone)) {
+    const code = phone.substring(0, 3);
+    return { countryCode: `+${code}`, phone: phone.substring(3) };
+  }
+
+  if (phone.length >= 2 && /^(55|52|54|56|57|58|51|44|34|33|49|39|81)/.test(phone)) {
+    const code = phone.substring(0, 2);
+    return { countryCode: `+${code}`, phone: phone.substring(2) };
+  }
+
+  if (phone.startsWith('1')) {
+    return { countryCode: '+1', phone: phone.substring(1) };
+  }
+
+  // Fallback: assume first 2 digits are country code
+  return { countryCode: `+${phone.substring(0, 2)}`, phone: phone.substring(2) };
+}
+
+/**
+ * Generate CSV content from member data.
+ * Format: "Nome,Telefone Completo"
+ */
+export function generateCsv(
+  members: Array<{ full_name: string; country_code: string; phone: string | null }>
+): string {
+  const header = 'Nome,Telefone Completo';
+  const rows = members.map((m) => {
+    const name = escapeCsvField(m.full_name);
+    const fullPhone = m.phone ? `${m.country_code}${m.phone}` : '';
+    return `${name},${fullPhone}`;
+  });
+  return [header, ...rows].join('\n');
+}
+
+/**
+ * Escape a CSV field if it contains special characters.
+ */
+function escapeCsvField(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}

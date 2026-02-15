@@ -130,7 +130,7 @@ export function useUpdateActor() {
 
   return useMutation({
     mutationFn: async (input: UpdateActorInput): Promise<MeetingActor> => {
-      const enforced = enforceActorRules(input);
+      const enforced = enforceActorRules(input) as UpdateActorInput;
       const { id, ...fields } = enforced;
       const { data, error } = await supabase
         .from('meeting_actors')

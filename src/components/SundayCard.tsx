@@ -7,6 +7,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   Pressable,
   Modal,
@@ -44,7 +45,7 @@ export interface SundayCardProps {
   /** Called when a speech LED is pressed. */
   onStatusPress?: (speech: Speech) => void;
   /** Called when the sunday type dropdown changes. */
-  onTypeChange?: (date: string, type: SundayExceptionReason) => void;
+  onTypeChange?: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
   /** Children to render when expanded (speech slots, etc.). */
@@ -81,7 +82,7 @@ function DateBlock({ date, locale }: DateBlockProps) {
 
 interface SundayTypeDropdownProps {
   currentType: SundayTypeOption;
-  onSelect: (type: SundayExceptionReason) => void;
+  onSelect: (type: SundayExceptionReason, customReason?: string) => void;
   disabled?: boolean;
 }
 
@@ -89,17 +90,33 @@ function SundayTypeDropdown({ currentType, onSelect, disabled }: SundayTypeDropd
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
+  const [otherModalVisible, setOtherModalVisible] = useState(false);
+  const [customReason, setCustomReason] = useState('');
 
   const getTypeLabel = (type: SundayTypeOption): string => {
-    if (type === SUNDAY_TYPE_SPEECHES) return t('speechStatus.not_assigned', 'Discursos');
+    if (type === SUNDAY_TYPE_SPEECHES) return t('sundayExceptions.speeches', 'Discursos');
     return t(`sundayExceptions.${type}`, type);
   };
 
   const handleSelect = (type: SundayTypeOption) => {
     setModalVisible(false);
-    if (type !== SUNDAY_TYPE_SPEECHES) {
-      onSelect(type as SundayExceptionReason);
+    if (type === SUNDAY_TYPE_SPEECHES) {
+      // Revert to speeches -- remove exception
+      return;
     }
+    if (type === 'other') {
+      setCustomReason('');
+      setOtherModalVisible(true);
+      return;
+    }
+    onSelect(type as SundayExceptionReason);
+  };
+
+  const handleOtherConfirm = () => {
+    const trimmed = customReason.trim();
+    if (!trimmed) return;
+    setOtherModalVisible(false);
+    onSelect('other', trimmed);
   };
 
   return (
@@ -162,6 +179,63 @@ function SundayTypeDropdown({ currentType, onSelect, disabled }: SundayTypeDropd
           </View>
         </Pressable>
       </Modal>
+
+      {/* "Other" custom reason dialog */}
+      <Modal
+        visible={otherModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOtherModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setOtherModalVisible(false)}
+        >
+          <View
+            style={[styles.otherModalContent, { backgroundColor: colors.card }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.otherModalTitle, { color: colors.text }]}>
+              {t('sundayExceptions.other')}
+            </Text>
+            <TextInput
+              style={[styles.otherModalInput, {
+                color: colors.text,
+                borderColor: colors.border,
+                backgroundColor: colors.inputBackground,
+              }]}
+              value={customReason}
+              onChangeText={setCustomReason}
+              placeholder={t('sundayExceptions.other')}
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+            />
+            <View style={styles.otherModalButtons}>
+              <Pressable
+                style={[styles.otherModalButton, { backgroundColor: colors.surfaceVariant }]}
+                onPress={() => setOtherModalVisible(false)}
+              >
+                <Text style={[styles.otherModalButtonText, { color: colors.text }]}>
+                  {t('common.cancel')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.otherModalButton, {
+                  backgroundColor: customReason.trim() ? colors.primary : colors.surfaceVariant,
+                }]}
+                onPress={handleOtherConfirm}
+                disabled={!customReason.trim()}
+              >
+                <Text style={[styles.otherModalButtonText, {
+                  color: customReason.trim() ? colors.onPrimary : colors.textTertiary,
+                }]}>
+                  {t('common.confirm')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -182,6 +256,7 @@ export function SundayCard({
   children,
 }: SundayCardProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const locale = getCurrentLanguage();
 
   const currentType: SundayTypeOption =
@@ -196,8 +271,8 @@ export function SundayCard({
   });
 
   const handleTypeChange = useCallback(
-    (type: SundayExceptionReason) => {
-      onTypeChange?.(date, type);
+    (type: SundayExceptionReason, customReason?: string) => {
+      onTypeChange?.(date, type, customReason);
     },
     [date, onTypeChange]
   );
@@ -357,5 +432,43 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 16,
+  },
+  otherModalContent: {
+    borderRadius: 14,
+    width: '85%',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  otherModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  otherModalInput: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  otherModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  otherModalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  otherModalButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

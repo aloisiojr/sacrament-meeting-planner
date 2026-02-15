@@ -198,12 +198,12 @@ export default function SettingsScreen() {
           )}
           <SettingsItem
             label={t('settings.theme')}
-            onPress={() => {}}
+            onPress={() => router.push('/(tabs)/settings/theme')}
             colors={colors}
           />
           <SettingsItem
             label={t('settings.about')}
-            onPress={() => {}}
+            onPress={() => router.push('/(tabs)/settings/about')}
             colors={colors}
           />
         </View>

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { I18nextProvider } from 'react-i18next';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import i18n from '../i18n';
 
 const queryClient = new QueryClient({
@@ -76,13 +77,15 @@ function InnerLayout() {
  */
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <I18nextProvider i18n={i18n}>
-        <ThemeProvider>
-          <InnerLayout />
-        </ThemeProvider>
-      </I18nextProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <ThemeProvider>
+            <InnerLayout />
+          </ThemeProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

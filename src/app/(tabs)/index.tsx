@@ -1,22 +1,28 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../contexts/ThemeContext';
+/**
+ * Home tab: shows upcoming sundays, pending assignments, and invite management.
+ * Sections are role-gated:
+ * - NextSundaysSection: all roles
+ * - NextAssignmentsSection: bishopric only (when next 3 fully assigned)
+ * - InviteManagementSection: secretary only
+ */
+
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../contexts/ThemeContext';
+import { NextSundaysSection } from '../../components/NextSundaysSection';
+import { NextAssignmentsSection } from '../../components/NextAssignmentsSection';
+import { InviteManagementSection } from '../../components/InviteManagementSection';
 
 export default function HomeTab() {
-  const { t } = useTranslation();
   const { colors } = useTheme();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {t('tabs.home')}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {t('home.noUpcomingSundays')}
-        </Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <NextSundaysSection />
+        <NextAssignmentsSection />
+        <InviteManagementSection />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -25,19 +31,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
+  scroll: {
+    paddingBottom: 24,
   },
 });

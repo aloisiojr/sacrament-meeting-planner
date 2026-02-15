@@ -112,17 +112,16 @@ describe('PHASE-02: Database type validation', () => {
       expect(exception.reason).toBe('general_conference');
     });
 
-    it('should accept all 7 valid SundayExceptionReason values', () => {
+    it('should accept all 6 valid SundayExceptionReason values', () => {
       const reasons: SundayExceptionReason[] = [
         'testimony_meeting',
         'general_conference',
         'stake_conference',
         'ward_conference',
-        'fast_sunday',
-        'special_program',
-        'no_meeting',
+        'primary_presentation',
+        'other',
       ];
-      expect(reasons).toHaveLength(7);
+      expect(reasons).toHaveLength(6);
       reasons.forEach((reason) => {
         const exception: SundayException = {
           id: 'uuid',

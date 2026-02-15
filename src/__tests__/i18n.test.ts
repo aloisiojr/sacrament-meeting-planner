@@ -142,9 +142,9 @@ describe('i18n locale files', () => {
       'general_conference',
       'stake_conference',
       'ward_conference',
-      'fast_sunday',
-      'special_program',
-      'no_meeting',
+      'primary_presentation',
+      'other',
+      'speeches',
     ];
     for (const exc of exceptions) {
       expect(

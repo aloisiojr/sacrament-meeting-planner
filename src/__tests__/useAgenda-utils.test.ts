@@ -18,10 +18,6 @@ describe('isExcludedFromAgenda', () => {
     expect(isExcludedFromAgenda('stake_conference')).toBe(true);
   });
 
-  it('excludes no_meeting', () => {
-    expect(isExcludedFromAgenda('no_meeting')).toBe(true);
-  });
-
   it('includes testimony_meeting', () => {
     expect(isExcludedFromAgenda('testimony_meeting')).toBe(false);
   });
@@ -30,12 +26,12 @@ describe('isExcludedFromAgenda', () => {
     expect(isExcludedFromAgenda('ward_conference')).toBe(false);
   });
 
-  it('includes special_program', () => {
-    expect(isExcludedFromAgenda('special_program')).toBe(false);
+  it('includes primary_presentation', () => {
+    expect(isExcludedFromAgenda('primary_presentation')).toBe(false);
   });
 
-  it('includes fast_sunday', () => {
-    expect(isExcludedFromAgenda('fast_sunday')).toBe(false);
+  it('includes other', () => {
+    expect(isExcludedFromAgenda('other')).toBe(false);
   });
 
   it('includes unknown types', () => {
@@ -52,8 +48,12 @@ describe('isSpecialMeeting', () => {
     expect(isSpecialMeeting('ward_conference')).toBe(true);
   });
 
-  it('returns true for special_program', () => {
-    expect(isSpecialMeeting('special_program')).toBe(true);
+  it('returns true for primary_presentation', () => {
+    expect(isSpecialMeeting('primary_presentation')).toBe(true);
+  });
+
+  it('returns true for other', () => {
+    expect(isSpecialMeeting('other')).toBe(true);
   });
 
   it('returns false for null', () => {
@@ -67,24 +67,15 @@ describe('isSpecialMeeting', () => {
   it('returns false for stake_conference', () => {
     expect(isSpecialMeeting('stake_conference')).toBe(false);
   });
-
-  it('returns false for no_meeting', () => {
-    expect(isSpecialMeeting('no_meeting')).toBe(false);
-  });
-
-  it('returns false for fast_sunday', () => {
-    expect(isSpecialMeeting('fast_sunday')).toBe(false);
-  });
 });
 
 describe('EXCLUDED_EXCEPTION_TYPES', () => {
-  it('contains exactly 3 types', () => {
-    expect(EXCLUDED_EXCEPTION_TYPES.size).toBe(3);
+  it('contains exactly 2 types', () => {
+    expect(EXCLUDED_EXCEPTION_TYPES.size).toBe(2);
   });
 
   it('contains the expected types', () => {
     expect(EXCLUDED_EXCEPTION_TYPES.has('general_conference')).toBe(true);
     expect(EXCLUDED_EXCEPTION_TYPES.has('stake_conference')).toBe(true);
-    expect(EXCLUDED_EXCEPTION_TYPES.has('no_meeting')).toBe(true);
   });
 });

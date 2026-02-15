@@ -81,26 +81,24 @@ const mockT = (key: string, fallback?: string) => fallback ?? key;
 const mockHymnLookup = (id: string | null) => (id ? `Hymn-${id}` : '');
 
 describe('PHASE-04: Agenda exception filtering exhaustive', () => {
-  // All 7 SundayExceptionReason values
+  // All 6 SundayExceptionReason values
   const ALL_REASONS: SundayExceptionReason[] = [
     'testimony_meeting',
     'general_conference',
     'stake_conference',
     'ward_conference',
-    'fast_sunday',
-    'special_program',
-    'no_meeting',
+    'primary_presentation',
+    'other',
   ];
 
   describe('isExcludedFromAgenda covers all exception types', () => {
     const expectedExclusion: Record<SundayExceptionReason, boolean> = {
       general_conference: true,
       stake_conference: true,
-      no_meeting: true,
       testimony_meeting: false,
       ward_conference: false,
-      fast_sunday: false,
-      special_program: false,
+      primary_presentation: false,
+      other: false,
     };
 
     for (const reason of ALL_REASONS) {
@@ -114,11 +112,10 @@ describe('PHASE-04: Agenda exception filtering exhaustive', () => {
     const expectedSpecial: Record<SundayExceptionReason, boolean> = {
       testimony_meeting: true,
       ward_conference: true,
-      special_program: true,
+      primary_presentation: true,
+      other: true,
       general_conference: false,
       stake_conference: false,
-      no_meeting: false,
-      fast_sunday: false,
     };
 
     for (const reason of ALL_REASONS) {

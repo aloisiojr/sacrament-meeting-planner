@@ -256,6 +256,7 @@ export default function SpeechesTab() {
           typeDisabled={!canWriteSundayType}
         >
           {isExpanded &&
+            !exception &&
             [1, 2, 3].map((pos) => {
               const speech = speechesForDay.find((s) => s.position === pos) ?? null;
               return (

@@ -29,15 +29,20 @@ export default function HomeTab() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         {showMeetingButton && (
-          <Pressable
-            style={[styles.meetingButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/presentation')}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
-              {t('home.startMeeting')}
+          <View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('home.meetingAgendaTitle')}
             </Text>
-          </Pressable>
+            <Pressable
+              style={[styles.meetingButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/presentation')}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
+                {t('home.startMeeting')}
+              </Text>
+            </Pressable>
+          </View>
         )}
         <NextSundaysSection />
         <NextAssignmentsSection />
@@ -53,6 +58,12 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   meetingButton: {
     marginHorizontal: 16,

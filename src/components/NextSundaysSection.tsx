@@ -27,7 +27,7 @@ import {
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
 import { SUNDAY_TYPE_SPEECHES } from '../hooks/useSundayTypes';
-import { useSundayExceptions, useSetSundayType } from '../hooks/useSundayTypes';
+import { useSundayExceptions, useSetSundayType, useRemoveSundayException } from '../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../types/database';
 
@@ -65,6 +65,7 @@ export function NextSundaysSection() {
   const changeStatus = useChangeStatus();
   const removeAssignment = useRemoveAssignment();
   const setSundayType = useSetSundayType();
+  const removeSundayException = useRemoveSundayException();
 
   const speechesBySunday = useMemo(
     () => groupSpeechesBySunday(speeches ?? [], nextSundays, exceptions ?? []),
@@ -130,6 +131,13 @@ export function NextSundaysSection() {
     [setSundayType]
   );
 
+  const handleRemoveException = useCallback(
+    (date: string) => {
+      removeSundayException.mutate(date);
+    },
+    [removeSundayException]
+  );
+
   if (nextSundays.length === 0) return null;
 
   return (
@@ -148,6 +156,7 @@ export function NextSundaysSection() {
           expanded={expandedDate === entry.date}
           onToggle={() => handleToggle(entry.date)}
           onTypeChange={handleTypeChange}
+          onRemoveException={handleRemoveException}
           typeDisabled={!canWriteSundayType}
         >
           {expandedDate === entry.date &&

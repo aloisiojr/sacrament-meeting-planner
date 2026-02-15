@@ -26,6 +26,7 @@ import {
   useRemoveAssignment,
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
+import { SUNDAY_TYPE_SPEECHES } from '../hooks/useSundayTypes';
 import { useSundayExceptions, useSetSundayType } from '../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../types/database';
@@ -150,6 +151,7 @@ export function NextSundaysSection() {
           typeDisabled={!canWriteSundayType}
         >
           {expandedDate === entry.date &&
+            !entry.exception &&
             [1, 2, 3].map((pos) => {
               const speech = entry.speeches.find((s) => s.position === pos) ?? null;
               return (

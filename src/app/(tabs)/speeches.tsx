@@ -32,7 +32,7 @@ import {
   useRemoveAssignment,
   groupSpeechesBySunday,
 } from '../../hooks/useSpeeches';
-import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes } from '../../hooks/useSundayTypes';
+import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
 import { toISODateString } from '../../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../../types/database';
 
@@ -124,6 +124,7 @@ export default function SpeechesTab() {
   const changeStatus = useChangeStatus();
   const removeAssignment = useRemoveAssignment();
   const setSundayType = useSetSundayType();
+  const removeSundayException = useRemoveSundayException();
 
   // Initial scroll to next sunday
   useEffect(() => {
@@ -206,6 +207,14 @@ export default function SpeechesTab() {
     [setSundayType]
   );
 
+  // Revert to speeches (remove exception)
+  const handleRemoveException = useCallback(
+    (date: string) => {
+      removeSundayException.mutate(date);
+    },
+    [removeSundayException]
+  );
+
   // Infinite scroll handlers
   const handleEndReached = useCallback(() => {
     if (hasMoreFuture) {
@@ -253,6 +262,7 @@ export default function SpeechesTab() {
             // Status press handled within SpeechSlot
           }}
           onTypeChange={handleTypeChange}
+          onRemoveException={handleRemoveException}
           typeDisabled={!canWriteSundayType}
         >
           {isExpanded &&
@@ -282,6 +292,7 @@ export default function SpeechesTab() {
       expandedDate,
       handleToggle,
       handleTypeChange,
+      handleRemoveException,
       canWriteSundayType,
       handleChangeStatus,
       handleRemoveAssignment,

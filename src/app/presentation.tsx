@@ -88,11 +88,15 @@ export default function PresentationScreen() {
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : accordionCards.length === 0 ? (
+      ) : !agenda ? (
         <View style={styles.loading}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {t('common.noResults')}
+            {t('agenda.notCreatedYet')}
           </Text>
+        </View>
+      ) : accordionCards.length === 0 ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <AccordionCard cards={accordionCards} initialExpanded={0} />

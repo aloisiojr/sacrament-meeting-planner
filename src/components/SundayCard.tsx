@@ -46,6 +46,8 @@ export interface SundayCardProps {
   onStatusPress?: (speech: Speech) => void;
   /** Called when the sunday type dropdown changes. */
   onTypeChange?: (date: string, type: SundayExceptionReason, customReason?: string) => void;
+  /** Called when the sunday type is reverted to "speeches" (remove exception). */
+  onRemoveException?: (date: string) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
   /** Children to render when expanded (speech slots, etc.). */
@@ -83,10 +85,11 @@ function DateBlock({ date, locale }: DateBlockProps) {
 interface SundayTypeDropdownProps {
   currentType: SundayTypeOption;
   onSelect: (type: SundayExceptionReason, customReason?: string) => void;
+  onRevertToSpeeches: () => void;
   disabled?: boolean;
 }
 
-function SundayTypeDropdown({ currentType, onSelect, disabled }: SundayTypeDropdownProps) {
+function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled }: SundayTypeDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -101,7 +104,7 @@ function SundayTypeDropdown({ currentType, onSelect, disabled }: SundayTypeDropd
   const handleSelect = (type: SundayTypeOption) => {
     setModalVisible(false);
     if (type === SUNDAY_TYPE_SPEECHES) {
-      // Revert to speeches -- remove exception
+      onRevertToSpeeches();
       return;
     }
     if (type === 'other') {
@@ -206,7 +209,7 @@ function SundayTypeDropdown({ currentType, onSelect, disabled }: SundayTypeDropd
               }]}
               value={customReason}
               onChangeText={setCustomReason}
-              placeholder={t('sundayExceptions.other')}
+              placeholder={t('sundayExceptions.otherPlaceholder')}
               placeholderTextColor={colors.textTertiary}
               autoFocus
             />
@@ -252,6 +255,7 @@ export function SundayCard({
   onToggle,
   onStatusPress,
   onTypeChange,
+  onRemoveException,
   typeDisabled = false,
   children,
 }: SundayCardProps) {
@@ -276,6 +280,10 @@ export function SundayCard({
     },
     [date, onTypeChange]
   );
+
+  const handleRemoveException = useCallback(() => {
+    onRemoveException?.(date);
+  }, [date, onRemoveException]);
 
   return (
     <View
@@ -334,6 +342,7 @@ export function SundayCard({
           <SundayTypeDropdown
             currentType={currentType}
             onSelect={handleTypeChange}
+            onRevertToSpeeches={handleRemoveException}
             disabled={typeDisabled}
           />
           {children}

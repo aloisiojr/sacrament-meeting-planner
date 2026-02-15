@@ -26,7 +26,7 @@ import {
   useRemoveAssignment,
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
-import { useSundayExceptions, useSetSundayType } from '../hooks/useSundayTypes';
+import { useSundayExceptions, useSetSundayType, useRemoveSundayException } from '../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../lib/dateUtils';
 import { areNext3FullyAssigned, findNextPendingSunday } from '../lib/speechUtils';
 import type {
@@ -70,6 +70,7 @@ export function NextAssignmentsSection() {
   const changeStatus = useChangeStatus();
   const removeAssignment = useRemoveAssignment();
   const setSundayType = useSetSundayType();
+  const removeSundayException = useRemoveSundayException();
 
   const allEntries = useMemo(
     () => groupSpeechesBySunday(speeches ?? [], nextSundays, exceptions ?? []),
@@ -133,7 +134,8 @@ export function NextAssignmentsSection() {
         exception={pendingEntry.exception}
         expanded={expanded}
         onToggle={handleToggle}
-        onTypeChange={(date, type) => setSundayType.mutate({ date, reason: type })}
+        onTypeChange={(date, type, customReason) => setSundayType.mutate({ date, reason: type, custom_reason: customReason })}
+        onRemoveException={(date) => removeSundayException.mutate(date)}
         typeDisabled={!canWriteSundayType}
       >
         {expanded &&

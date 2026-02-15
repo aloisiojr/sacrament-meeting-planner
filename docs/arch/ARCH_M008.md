@@ -67,10 +67,16 @@ principles:
 
 ```typescript
 // contexts/ThemeContext.ts
+type ThemeMode = 'automatic' | 'light' | 'dark';
+type ResolvedTheme = 'light' | 'dark';
+
 interface ThemeContextValue {
-  mode: 'light' | 'dark';
-  toggleMode(): void;
-  colors: ThemeColors;
+  mode: ResolvedTheme;              // Resolved theme (light or dark)
+  preference: ThemeMode;            // User preference (automatic, light, dark)
+  setPreference(mode: ThemeMode): void;  // Set preference + persist to AsyncStorage
+  toggleMode(): void;               // Convenience: cycle light <-> dark
+  colors: ThemeColors;              // Color palette for current resolved theme
+  loading: boolean;                 // True while loading saved preference from storage
 }
 
 function useTheme(): ThemeContextValue;

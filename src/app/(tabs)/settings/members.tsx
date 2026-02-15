@@ -361,7 +361,7 @@ export default function MembersScreen() {
     }
   }, [members]);
 
-  // CSV Import mutation (total overwrite)
+  // CSV Import mutation (atomic overwrite via RPC)
   const importMutation = useMutation({
     mutationFn: async (csvContent: string) => {
       const result = parseCsv(csvContent);
@@ -373,34 +373,25 @@ export default function MembersScreen() {
         throw new Error(errorMessages);
       }
 
-      // Transaction: DELETE all + INSERT new
-      // Delete all existing members
-      const { error: deleteError } = await supabase
-        .from('members')
-        .delete()
-        .eq('ward_id', wardId);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new members
+      // Build members array for the RPC
       const newMembers = result.members.map((m) => {
         const { countryCode, phone } = splitPhoneNumber(m.phone);
         return {
-          ward_id: wardId,
           full_name: m.full_name,
           country_code: countryCode,
           phone: phone || null,
         };
       });
 
-      if (newMembers.length > 0) {
-        const { error: insertError } = await supabase
-          .from('members')
-          .insert(newMembers);
-        if (insertError) throw insertError;
-      }
+      // Atomic transaction via RPC: DELETE all + INSERT new
+      const { data, error } = await supabase
+        .rpc('import_members', {
+          target_ward_id: wardId,
+          new_members: newMembers,
+        });
 
-      return { imported: result.members.length };
+      if (error) throw error;
+      return { imported: data as number };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });

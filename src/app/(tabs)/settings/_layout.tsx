@@ -9,6 +9,7 @@ export default function SettingsLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
+        animation: 'none',
       }}
     />
   );

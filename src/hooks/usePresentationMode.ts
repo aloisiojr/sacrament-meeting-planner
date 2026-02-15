@@ -69,24 +69,22 @@ export function buildPresentationCards(
   hymnLookup: (id: string | null) => string,
   t: (key: string, fallback?: string) => string
 ): PresentationCard[] {
-  if (!agenda) return [];
-
   const isSpecial = isSpecialMeeting(exception?.reason ?? null);
   const cards: PresentationCard[] = [];
 
   // Card 1: Welcome & Announcements
   const welcomeFields: PresentationField[] = [
-    { label: t('agenda.presiding'), value: agenda.presiding_name ?? '', type: 'text' },
-    { label: t('agenda.conducting'), value: agenda.conducting_name ?? '', type: 'text' },
+    { label: t('agenda.presiding'), value: agenda?.presiding_name ?? '', type: 'text' },
+    { label: t('agenda.conducting'), value: agenda?.conducting_name ?? '', type: 'text' },
   ];
-  if (agenda.recognized_names?.length) {
+  if (agenda?.recognized_names?.length) {
     welcomeFields.push({
       label: t('agenda.recognizing'),
       value: agenda.recognized_names.join(', '),
       type: 'text',
     });
   }
-  if (agenda.announcements) {
+  if (agenda?.announcements) {
     welcomeFields.push({
       label: t('agenda.announcements'),
       value: agenda.announcements,
@@ -94,28 +92,28 @@ export function buildPresentationCards(
     });
   }
   welcomeFields.push(
-    { label: t('agenda.openingHymn'), value: hymnLookup(agenda.opening_hymn_id), type: 'hymn' },
-    { label: t('agenda.openingPrayer'), value: agenda.opening_prayer_name ?? '', type: 'text' },
+    { label: t('agenda.openingHymn'), value: hymnLookup(agenda?.opening_hymn_id ?? null), type: 'hymn' },
+    { label: t('agenda.openingPrayer'), value: agenda?.opening_prayer_name ?? '', type: 'text' },
   );
   cards.push({ title: t('agenda.presiding'), fields: welcomeFields });
 
   // Card 2: Designations & Sacrament
   const designationFields: PresentationField[] = [];
-  if (agenda.sustaining_releasing) {
+  if (agenda?.sustaining_releasing) {
     designationFields.push({
       label: t('agenda.wardBusiness'),
       value: agenda.sustaining_releasing,
       type: 'multiline',
     });
   }
-  if (agenda.has_baby_blessing && agenda.baby_blessing_names) {
+  if (agenda?.has_baby_blessing && agenda?.baby_blessing_names) {
     designationFields.push({
       label: t('agenda.babyBlessing', 'Baby Blessing'),
       value: agenda.baby_blessing_names,
       type: 'text',
     });
   }
-  if (agenda.has_baptism_confirmation && agenda.baptism_confirmation_names) {
+  if (agenda?.has_baptism_confirmation && agenda?.baptism_confirmation_names) {
     designationFields.push({
       label: t('agenda.baptismConfirmation', 'Baptism Confirmation'),
       value: agenda.baptism_confirmation_names,
@@ -124,7 +122,7 @@ export function buildPresentationCards(
   }
   designationFields.push({
     label: t('agenda.sacramentHymn'),
-    value: hymnLookup(agenda.sacrament_hymn_id),
+    value: hymnLookup(agenda?.sacrament_hymn_id ?? null),
     type: 'hymn',
   });
   cards.push({ title: t('agenda.wardBusiness'), fields: designationFields });
@@ -139,16 +137,16 @@ export function buildPresentationCards(
       { label: `2\u00BA ${t('speeches.speaker')}`, value: speech2?.speaker_name ?? '', type: 'text' },
     ];
 
-    if (agenda.has_special_presentation) {
+    if (agenda?.has_special_presentation) {
       speechFields.push({
         label: t('agenda.musicalNumber'),
-        value: agenda.special_presentation_description ?? '',
+        value: agenda?.special_presentation_description ?? '',
         type: 'text',
       });
     } else {
       speechFields.push({
         label: t('agenda.intermediateHymn', 'Intermediate Hymn'),
-        value: hymnLookup(agenda.intermediate_hymn_id),
+        value: hymnLookup(agenda?.intermediate_hymn_id ?? null),
         type: 'hymn',
       });
     }
@@ -158,8 +156,8 @@ export function buildPresentationCards(
     const speech3 = speeches.find((s) => s.position === 3);
     const lastFields: PresentationField[] = [
       { label: `3\u00BA ${t('speeches.speaker')}`, value: speech3?.speaker_name ?? '', type: 'text' },
-      { label: t('agenda.closingHymn'), value: hymnLookup(agenda.closing_hymn_id), type: 'hymn' },
-      { label: t('agenda.closingPrayer'), value: agenda.closing_prayer_name ?? '', type: 'text' },
+      { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
+      { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];
     cards.push({ title: t('agenda.closingHymn'), fields: lastFields });
   } else {
@@ -170,8 +168,8 @@ export function buildPresentationCards(
         value: exception?.reason ? t(`sundayExceptions.${exception.reason}`, exception.reason) : '',
         type: 'text',
       },
-      { label: t('agenda.closingHymn'), value: hymnLookup(agenda.closing_hymn_id), type: 'hymn' },
-      { label: t('agenda.closingPrayer'), value: agenda.closing_prayer_name ?? '', type: 'text' },
+      { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
+      { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];
     cards.push({ title: t('agenda.closingHymn'), fields: specialFields });
   }

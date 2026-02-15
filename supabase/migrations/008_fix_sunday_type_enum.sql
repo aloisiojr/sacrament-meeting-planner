@@ -7,9 +7,13 @@
 ALTER TABLE sunday_exceptions
 ADD COLUMN IF NOT EXISTS custom_reason TEXT;
 
--- Step 2: Preserve original reason as custom_reason BEFORE changing reason to 'other'
+-- Step 2: Preserve original reason as human-readable custom_reason BEFORE changing reason
 UPDATE sunday_exceptions
-SET custom_reason = reason
+SET custom_reason = CASE reason
+  WHEN 'fast_sunday' THEN 'Domingo de Jejum'
+  WHEN 'special_program' THEN 'Programa Especial'
+  WHEN 'no_meeting' THEN 'Sem Reunião'
+END
 WHERE reason IN ('fast_sunday', 'special_program', 'no_meeting');
 
 -- Step 3: Migrate removed enum values to 'other'

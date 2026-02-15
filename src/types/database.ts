@@ -20,6 +20,7 @@ export type Permission =
   | 'settings:access'
   | 'settings:language'
   | 'settings:whatsapp'
+  | 'settings:timezone'
   | 'settings:users'
   | 'invite:manage'
   | 'home:next_assignments'

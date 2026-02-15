@@ -129,10 +129,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create default "Temas da Ala" collection config
-    // Find or note: "Temas da Ala" is a ward-specific concept, not a general collection.
-    // The ward_collection_config tracks activation of general collections for this ward.
-    // For the initial setup, we ensure the ward is ready to use.
+    // Create ward_collection_config entries for all general collections
+    // matching the ward's language (inactive by default).
+    // This makes them visible in the Topics screen for the user to activate.
+    const { data: generalCollections } = await supabaseAdmin
+      .from('general_collections')
+      .select('id')
+      .eq('language', input.language || 'pt-BR');
+
+    if (generalCollections && generalCollections.length > 0) {
+      const configEntries = generalCollections.map((col: { id: string }) => ({
+        ward_id: ward.id,
+        collection_id: col.id,
+        active: false,
+      }));
+
+      const { error: configError } = await supabaseAdmin
+        .from('ward_collection_config')
+        .insert(configEntries);
+
+      if (configError) {
+        console.error('ward_collection_config creation error:', configError);
+        // Non-fatal: ward and user are created, collections can be configured later
+      }
+    }
 
     // Sign in the new user to get a session
     const supabaseClient = createClient(

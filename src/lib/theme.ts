@@ -45,6 +45,8 @@ export interface ThemeContextValue {
   mode: ResolvedTheme;
   preference: ThemeMode;
   setPreference(mode: ThemeMode): void;
+  /** Toggle between light and dark (cycles: light -> dark -> light). Per ARCH_M008 contract. */
+  toggleMode(): void;
   colors: ThemeColors;
   loading: boolean;
 }

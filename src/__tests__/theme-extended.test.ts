@@ -97,6 +97,48 @@ describe('Theme Module', () => {
     });
   });
 
+  describe('ThemeContextValue contract (ARCH_M008)', () => {
+    it('should define toggleMode in the interface', () => {
+      // Verify the interface shape matches ARCH_M008 contract
+      const mockValue: ThemeContextValue = {
+        mode: 'light',
+        preference: 'automatic',
+        setPreference: () => {},
+        toggleMode: () => {},
+        colors: lightColors,
+        loading: false,
+      };
+
+      expect(mockValue.mode).toBe('light');
+      expect(typeof mockValue.toggleMode).toBe('function');
+      expect(typeof mockValue.setPreference).toBe('function');
+    });
+
+    it('should have toggleMode as a required property', () => {
+      // TypeScript ensures this at compile time, but let's verify at runtime
+      const keys: (keyof ThemeContextValue)[] = [
+        'mode',
+        'preference',
+        'setPreference',
+        'toggleMode',
+        'colors',
+        'loading',
+      ];
+      const mockValue: ThemeContextValue = {
+        mode: 'dark',
+        preference: 'dark',
+        setPreference: () => {},
+        toggleMode: () => {},
+        colors: darkColors,
+        loading: false,
+      };
+
+      for (const key of keys) {
+        expect(mockValue[key], `ThemeContextValue should have ${key}`).toBeDefined();
+      }
+    });
+  });
+
   describe('Color palette values differ between light and dark', () => {
     it('should have different background colors', () => {
       expect(lightColors.background).not.toBe(darkColors.background);

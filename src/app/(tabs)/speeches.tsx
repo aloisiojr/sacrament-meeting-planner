@@ -192,8 +192,8 @@ export default function SpeechesTab() {
 
   // Remove assignment
   const handleRemoveAssignment = useCallback(
-    (speechId: string) => {
-      removeAssignment.mutate(speechId);
+    (speechId: string, speakerName?: string) => {
+      removeAssignment.mutate({ speechId, speakerName });
     },
     [removeAssignment]
   );

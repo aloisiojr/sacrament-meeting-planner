@@ -15,18 +15,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SwipeableCard } from '../../../components/SwipeableCard';
+import { supabase } from '../../../lib/supabase';
+import { logAction } from '../../../lib/activityLog';
+import { generateCsv, parseCsv, splitPhoneNumber } from '../../../lib/csvUtils';
 import {
   useMembers,
   useCreateMember,
   useUpdateMember,
   useDeleteMember,
   checkFutureSpeeches,
+  memberKeys,
 } from '../../../hooks/useMembers';
 import type { Member } from '../../../types/database';
 
@@ -243,7 +249,8 @@ function MemberRow({
 export default function MembersScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission } = useAuth();
+  const { hasPermission, wardId, user } = useAuth();
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -312,7 +319,7 @@ export default function MembersScreen() {
           {
             text: t('common.delete'),
             style: 'destructive',
-            onPress: () => deleteMember.mutate(member.id),
+            onPress: () => deleteMember.mutate({ memberId: member.id, memberName: member.full_name }),
           },
         ]);
       } catch {
@@ -321,13 +328,125 @@ export default function MembersScreen() {
           {
             text: t('common.delete'),
             style: 'destructive',
-            onPress: () => deleteMember.mutate(member.id),
+            onPress: () => deleteMember.mutate({ memberId: member.id, memberName: member.full_name }),
           },
         ]);
       }
     },
     [t, deleteMember]
   );
+
+  // CSV Export handler
+  const handleExport = useCallback(async () => {
+    if (!members || members.length === 0) return;
+    const csv = generateCsv(members);
+
+    if (Platform.OS === 'web') {
+      // Web: Blob download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'membros.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // Mobile: Share the CSV content
+      try {
+        const { Share: RNShare } = await import('react-native');
+        await RNShare.share({ message: csv, title: 'membros.csv' });
+      } catch {
+        // User cancelled
+      }
+    }
+  }, [members]);
+
+  // CSV Import mutation (total overwrite)
+  const importMutation = useMutation({
+    mutationFn: async (csvContent: string) => {
+      const result = parseCsv(csvContent);
+
+      if (!result.success) {
+        const errorMessages = result.errors
+          .map((e) => `Line ${e.line}, ${e.field}: ${e.message}`)
+          .join('\n');
+        throw new Error(errorMessages);
+      }
+
+      // Transaction: DELETE all + INSERT new
+      // Delete all existing members
+      const { error: deleteError } = await supabase
+        .from('members')
+        .delete()
+        .eq('ward_id', wardId);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new members
+      const newMembers = result.members.map((m) => {
+        const { countryCode, phone } = splitPhoneNumber(m.phone);
+        return {
+          ward_id: wardId,
+          full_name: m.full_name,
+          country_code: countryCode,
+          phone: phone || null,
+        };
+      });
+
+      if (newMembers.length > 0) {
+        const { error: insertError } = await supabase
+          .from('members')
+          .insert(newMembers);
+        if (insertError) throw insertError;
+      }
+
+      return { imported: result.members.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      Alert.alert(t('common.success'), `${data.imported} members imported`);
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'member:import', `Members imported via CSV: ${data.imported} members`);
+      }
+    },
+    onError: (err: Error) => {
+      Alert.alert(t('common.error'), err.message);
+    },
+  });
+
+  // CSV Import handler
+  const handleImport = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      // Web: file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        const text = await file.text();
+        importMutation.mutate(text);
+      };
+      input.click();
+    } else {
+      // Mobile: DocumentPicker
+      try {
+        const DocumentPicker = await import('expo-document-picker');
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'text/csv',
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled || !result.assets?.[0]) return;
+        const FileSystem = await import('expo-file-system');
+        const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+        importMutation.mutate(content);
+      } catch {
+        Alert.alert(t('common.error'), 'Failed to read file');
+      }
+    }
+  }, [importMutation, t]);
+
+  const canImport = hasPermission('member:import');
 
   const renderItem = useCallback(
     ({ item }: { item: Member }) => (
@@ -379,6 +498,38 @@ export default function MembersScreen() {
             autoCorrect={false}
           />
         </View>
+
+        {/* CSV Import/Export */}
+        {canImport && (
+          <View style={styles.csvActions}>
+            <Pressable
+              style={[styles.csvButton, { borderColor: colors.primary }]}
+              onPress={handleExport}
+              disabled={!members || members.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel={t('members.exportCsv')}
+            >
+              <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                {t('members.exportCsv')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.csvButton, { borderColor: colors.primary }]}
+              onPress={handleImport}
+              disabled={importMutation.isPending}
+              accessibilityRole="button"
+              accessibilityLabel={t('members.importCsv')}
+            >
+              {importMutation.isPending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                  {t('members.importCsv')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
 
         {/* Add new member form */}
         {isAdding && (
@@ -451,6 +602,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 15,
+  },
+  csvActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  csvButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  csvButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   editor: {
     paddingHorizontal: 16,

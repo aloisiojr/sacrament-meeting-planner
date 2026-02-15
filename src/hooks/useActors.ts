@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import type { MeetingActor, CreateActorInput, UpdateActorInput } from '../types/database';
 
 // --- Query Keys ---
@@ -93,7 +94,7 @@ export function useActors(roleFilter: ActorRoleFilter = 'all') {
  * Enforces can_conduct -> can_preside rule.
  */
 export function useCreateActor() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -115,8 +116,11 @@ export function useCreateActor() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'actor:create', `Ator criado: ${data.name}`);
+      }
     },
   });
 }
@@ -126,6 +130,7 @@ export function useCreateActor() {
  * Enforces can_conduct -> can_preside rule.
  */
 export function useUpdateActor() {
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -142,8 +147,11 @@ export function useUpdateActor() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'actor:update', `Ator atualizado: ${data.name}`);
+      }
     },
   });
 }
@@ -153,15 +161,20 @@ export function useUpdateActor() {
  * Agenda snapshot fields are preserved (actor_id set to NULL, name preserved).
  */
 export function useDeleteActor() {
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (actorId: string): Promise<void> => {
+    mutationFn: async ({ actorId, actorName }: { actorId: string; actorName: string }): Promise<string> => {
       const { error } = await supabase.from('meeting_actors').delete().eq('id', actorId);
       if (error) throw error;
+      return actorName;
     },
-    onSuccess: () => {
+    onSuccess: (actorName) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `Ator excluído: ${actorName}`);
+      }
     },
   });
 }

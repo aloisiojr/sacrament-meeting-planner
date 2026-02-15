@@ -116,8 +116,8 @@ export function NextSundaysSection() {
   );
 
   const handleRemoveAssignment = useCallback(
-    (speechId: string) => {
-      removeAssignment.mutate(speechId);
+    (speechId: string, speakerName?: string) => {
+      removeAssignment.mutate({ speechId, speakerName });
     },
     [removeAssignment]
   );

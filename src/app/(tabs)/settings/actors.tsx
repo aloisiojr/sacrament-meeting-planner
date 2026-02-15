@@ -267,7 +267,7 @@ export default function ActorsScreen() {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: () => deleteActor.mutate(actor.id),
+          onPress: () => deleteActor.mutate({ actorId: actor.id, actorName: actor.name }),
         },
       ]);
     },

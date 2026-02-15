@@ -240,7 +240,7 @@ export default function TopicsScreen() {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: () => deleteTopic.mutate(topic.id),
+          onPress: () => deleteTopic.mutate({ topicId: topic.id, topicTitle: topic.title }),
         },
       ]);
     },

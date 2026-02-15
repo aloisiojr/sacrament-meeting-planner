@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
 // --- Query Keys ---
@@ -79,7 +80,7 @@ export function useMembers(search?: string) {
  * Create a new member in the current ward.
  */
 export function useCreateMember() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -98,8 +99,11 @@ export function useCreateMember() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'member:create', `Membro criado: ${data.full_name}`);
+      }
     },
   });
 }
@@ -108,7 +112,7 @@ export function useCreateMember() {
  * Update an existing member.
  */
 export function useUpdateMember() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -124,8 +128,11 @@ export function useUpdateMember() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'member:update', `Membro atualizado: ${data.full_name}`);
+      }
     },
   });
 }
@@ -153,16 +160,20 @@ export async function checkFutureSpeeches(memberId: string): Promise<number> {
  * but snapshot fields (speaker_name, speaker_phone) are preserved.
  */
 export function useDeleteMember() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (memberId: string): Promise<void> => {
+    mutationFn: async ({ memberId, memberName }: { memberId: string; memberName: string }): Promise<string> => {
       const { error } = await supabase.from('members').delete().eq('id', memberId);
       if (error) throw error;
+      return memberName;
     },
-    onSuccess: () => {
+    onSuccess: (memberName) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'member:delete', `Membro excluído: ${memberName}`);
+      }
     },
   });
 }

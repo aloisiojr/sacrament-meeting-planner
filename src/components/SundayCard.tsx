@@ -228,7 +228,9 @@ export function SundayCard({
               numberOfLines={1}
             >
               {exception
-                ? currentType
+                ? (exception.reason === 'other' && exception.custom_reason
+                    ? exception.custom_reason
+                    : t(`sundayExceptions.${currentType}`))
                 : ''}
             </Text>
           )}

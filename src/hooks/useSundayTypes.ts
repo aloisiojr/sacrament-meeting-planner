@@ -37,9 +37,7 @@ export const SUNDAY_TYPE_OPTIONS = [
   'general_conference',
   'stake_conference',
   'ward_conference',
-  'fast_sunday',
-  'special_program',
-  'no_meeting',
+  'primary_presentation',
   'other',
 ] as const;
 
@@ -183,9 +181,11 @@ export function useSetSundayType() {
     mutationFn: async ({
       date,
       reason,
+      custom_reason,
     }: {
       date: string;
       reason: SundayExceptionReason;
+      custom_reason?: string | null;
     }): Promise<void> => {
       // Upsert: if entry exists, update; otherwise insert
       const { data: existing } = await supabase
@@ -195,16 +195,21 @@ export function useSetSundayType() {
         .eq('date', date)
         .single();
 
+      const payload = {
+        reason,
+        custom_reason: reason === 'other' ? (custom_reason ?? null) : null,
+      };
+
       if (existing) {
         const { error } = await supabase
           .from('sunday_exceptions')
-          .update({ reason })
+          .update(payload)
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('sunday_exceptions')
-          .insert({ ward_id: wardId, date, reason });
+          .insert({ ward_id: wardId, date, ...payload });
         if (error) throw error;
       }
     },

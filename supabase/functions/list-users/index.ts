@@ -67,50 +67,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // List all auth users, filter by ward_id in app_metadata
-    // Supabase Admin API returns paginated users; fetch all pages
-    const wardUsers: WardUser[] = [];
-    let page = 1;
-    const perPage = 100;
+    // Query ward users via RPC (efficient: queries auth.users with WHERE ward_id filter)
+    const { data: wardUsers, error: listError } = await supabaseAdmin
+      .rpc('list_ward_users', { target_ward_id: wardId });
 
-    while (true) {
-      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-
-      if (listError) {
-        console.error('List users error:', listError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to list users' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Filter users belonging to this ward
-      for (const u of users) {
-        if (u.app_metadata?.ward_id === wardId) {
-          wardUsers.push({
-            id: u.id,
-            email: u.email ?? '',
-            role: u.app_metadata?.role ?? 'observer',
-            created_at: u.created_at,
-          });
-        }
-      }
-
-      // If we got fewer than perPage, we've reached the end
-      if (users.length < perPage) {
-        break;
-      }
-      page++;
+    if (listError) {
+      console.error('List users error:', listError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to list users' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Sort by creation date (oldest first)
-    wardUsers.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
     return new Response(
-      JSON.stringify({ users: wardUsers }),
+      JSON.stringify({ users: wardUsers ?? [] }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

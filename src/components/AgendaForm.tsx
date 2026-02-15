@@ -13,6 +13,8 @@ import {
   StyleSheet,
   Switch,
   Pressable,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -621,8 +623,6 @@ function ToggleField({
 }
 
 // --- Inline Selector Modals ---
-
-import { Modal, FlatList } from 'react-native';
 
 function ActorSelectorModal({
   visible,

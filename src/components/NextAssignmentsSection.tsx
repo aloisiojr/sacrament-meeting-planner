@@ -145,7 +145,7 @@ export function NextAssignmentsSection() {
                 speech={speech}
                 position={pos}
                 onChangeStatus={(id, status) => changeStatus.mutate({ speechId: id, status })}
-                onRemoveAssignment={(id) => removeAssignment.mutate(id)}
+                onRemoveAssignment={(id) => removeAssignment.mutate({ speechId: id, speakerName: speech?.speaker_name ?? undefined })}
                 onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
                 onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
               />

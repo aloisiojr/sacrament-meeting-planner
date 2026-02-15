@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import type {
   WardTopic,
   GeneralCollection,
@@ -69,7 +70,7 @@ export function useWardTopics(search?: string) {
  * Create a new ward topic.
  */
 export function useCreateWardTopic() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -87,9 +88,12 @@ export function useCreateWardTopic() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema criado: ${data.title}`);
+      }
     },
   });
 }
@@ -98,7 +102,7 @@ export function useCreateWardTopic() {
  * Update an existing ward topic.
  */
 export function useUpdateWardTopic() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -114,9 +118,12 @@ export function useUpdateWardTopic() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema atualizado: ${data.title}`);
+      }
     },
   });
 }
@@ -142,17 +149,21 @@ export async function checkTopicFutureSpeeches(topicTitle: string, wardId: strin
  * Speeches with this topic will preserve snapshot fields (topic_title, topic_link, topic_collection).
  */
 export function useDeleteWardTopic() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (topicId: string): Promise<void> => {
+    mutationFn: async ({ topicId, topicTitle }: { topicId: string; topicTitle: string }): Promise<string> => {
       const { error } = await supabase.from('ward_topics').delete().eq('id', topicId);
       if (error) throw error;
+      return topicTitle;
     },
-    onSuccess: () => {
+    onSuccess: (topicTitle) => {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema excluído: ${topicTitle}`);
+      }
     },
   });
 }
@@ -216,17 +227,19 @@ export function useCollections(language: string) {
  * Toggle a general collection's activation for the current ward.
  */
 export function useToggleCollection() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       collectionId,
+      collectionName,
       active,
     }: {
       collectionId: string;
+      collectionName?: string;
       active: boolean;
-    }): Promise<void> => {
+    }): Promise<{ active: boolean; collectionName?: string }> => {
       // Check if config exists
       const { data: existing } = await supabase
         .from('ward_collection_config')
@@ -251,9 +264,18 @@ export function useToggleCollection() {
           });
         if (error) throw error;
       }
+
+      return { active, collectionName };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: topicKeys.all });
+      if (user && result.collectionName) {
+        const action = result.active ? 'collection:activate' : 'collection:deactivate';
+        const desc = result.active
+          ? `Coleção ativada: ${result.collectionName}`
+          : `Coleção desativada: ${result.collectionName}`;
+        logAction(wardId, user.id, user.email ?? '', action, desc);
+      }
     },
   });
 }

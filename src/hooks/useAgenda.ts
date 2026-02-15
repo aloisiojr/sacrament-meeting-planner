@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import type { SundayAgenda } from '../types/database';
 
 // --- Query Keys ---
@@ -126,7 +127,7 @@ export function useLazyCreateAgenda() {
  * Accepts partial updates - only sends changed fields.
  */
 export function useUpdateAgenda() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -152,6 +153,9 @@ export function useUpdateAgenda() {
         queryKey: agendaKeys.bySunday(wardId, data.sunday_date),
       });
       queryClient.invalidateQueries({ queryKey: agendaKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'agenda:edit', `Agenda editada: ${data.sunday_date}`);
+      }
     },
   });
 }

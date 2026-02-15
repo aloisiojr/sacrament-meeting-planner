@@ -6,6 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import { parseLocalDate } from '../lib/dateUtils';
 import type { SundayException, SundayExceptionReason } from '../types/database';
 
@@ -175,7 +176,7 @@ export function useAutoAssignSundayTypes() {
  * Creates or updates the exception entry.
  */
 export function useSetSundayType() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -207,8 +208,11 @@ export function useSetSundayType() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Tipo de domingo alterado: ${variables.date} -> ${variables.reason}`);
+      }
     },
   });
 }

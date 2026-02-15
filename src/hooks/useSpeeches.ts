@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/activityLog';
 import type {
   Speech,
   SpeechStatus,
@@ -176,6 +177,7 @@ export function useLazyCreateSpeeches() {
  * Bishopric-only operation.
  */
 export function useAssignSpeaker() {
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -195,8 +197,11 @@ export function useAssignSpeaker() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'speech:assign', `Orador designado: ${data.speaker_name} (${data.sunday_date}, posição ${data.position})`);
+      }
     },
   });
 }
@@ -236,6 +241,7 @@ export function useAssignTopic() {
  * Bishopric + Secretary can change status.
  */
 export function useChangeStatus() {
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -250,8 +256,11 @@ export function useChangeStatus() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'speech:status_change', `Status alterado: ${data.speaker_name ?? 'N/A'} -> ${data.status} (${data.sunday_date}, posição ${data.position})`);
+      }
     },
   });
 }
@@ -263,10 +272,11 @@ export function useChangeStatus() {
  * Bishopric-only operation.
  */
 export function useRemoveAssignment() {
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (speechId: string): Promise<Speech> => {
+    mutationFn: async ({ speechId, speakerName }: { speechId: string; speakerName?: string }): Promise<{ speech: Speech; previousSpeaker: string }> => {
       const { data, error } = await supabase
         .from('speeches')
         .update({
@@ -280,10 +290,13 @@ export function useRemoveAssignment() {
         .single();
 
       if (error) throw error;
-      return data;
+      return { speech: data, previousSpeaker: speakerName ?? 'N/A' };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'speech:unassign', `Designação removida: ${result.previousSpeaker} (${result.speech.sunday_date}, posição ${result.speech.position})`);
+      }
     },
   });
 }

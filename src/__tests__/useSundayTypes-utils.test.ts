@@ -111,8 +111,8 @@ describe('useSundayTypes utilities', () => {
   });
 
   describe('SUNDAY_TYPE_OPTIONS', () => {
-    it('should include all 9 options', () => {
-      expect(SUNDAY_TYPE_OPTIONS).toHaveLength(9);
+    it('should include all 7 options', () => {
+      expect(SUNDAY_TYPE_OPTIONS).toHaveLength(7);
     });
 
     it('should include speeches as first option', () => {
@@ -124,10 +124,14 @@ describe('useSundayTypes utilities', () => {
       expect(SUNDAY_TYPE_OPTIONS).toContain('general_conference');
       expect(SUNDAY_TYPE_OPTIONS).toContain('stake_conference');
       expect(SUNDAY_TYPE_OPTIONS).toContain('ward_conference');
-      expect(SUNDAY_TYPE_OPTIONS).toContain('fast_sunday');
-      expect(SUNDAY_TYPE_OPTIONS).toContain('special_program');
-      expect(SUNDAY_TYPE_OPTIONS).toContain('no_meeting');
+      expect(SUNDAY_TYPE_OPTIONS).toContain('primary_presentation');
       expect(SUNDAY_TYPE_OPTIONS).toContain('other');
+    });
+
+    it('should not include removed enum values', () => {
+      expect(SUNDAY_TYPE_OPTIONS).not.toContain('fast_sunday');
+      expect(SUNDAY_TYPE_OPTIONS).not.toContain('special_program');
+      expect(SUNDAY_TYPE_OPTIONS).not.toContain('no_meeting');
     });
   });
 

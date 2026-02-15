@@ -19,9 +19,8 @@ const VALID_DB_REASONS: SundayExceptionReason[] = [
   'general_conference',
   'stake_conference',
   'ward_conference',
-  'fast_sunday',
-  'special_program',
-  'no_meeting',
+  'primary_presentation',
+  'other',
 ];
 
 describe('PHASE-02: Sunday Types extended validation', () => {
@@ -31,13 +30,10 @@ describe('PHASE-02: Sunday Types extended validation', () => {
       expect(VALID_DB_REASONS).not.toContain(SUNDAY_TYPE_SPEECHES);
     });
 
-    it('should have "other" which is NOT in the DB schema', () => {
-      // "other" is in SUNDAY_TYPE_OPTIONS but not in SundayExceptionReason.
-      // This is a known gap: the dropdown shows "Outro" but the DB CHECK constraint
-      // does not allow "other". The SundayTypeDropdown casts it as SundayExceptionReason
-      // which would fail at the DB level.
+    it('should have "other" which IS now in the DB schema', () => {
+      // "other" is in both SUNDAY_TYPE_OPTIONS and SundayExceptionReason now
       expect(SUNDAY_TYPE_OPTIONS).toContain('other');
-      expect(VALID_DB_REASONS).not.toContain('other');
+      expect(VALID_DB_REASONS).toContain('other');
     });
 
     it('all non-virtual/non-other options should match DB SundayExceptionReason values', () => {

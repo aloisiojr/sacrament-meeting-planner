@@ -94,17 +94,16 @@ describe('Database Types', () => {
   });
 
   describe('SundayExceptionReason type', () => {
-    it('should define all 7 exception reasons matching migration CHECK constraint', () => {
+    it('should define all 6 exception reasons matching migration CHECK constraint', () => {
       const reasons: SundayExceptionReason[] = [
         'testimony_meeting',
         'general_conference',
         'stake_conference',
         'ward_conference',
-        'fast_sunday',
-        'special_program',
-        'no_meeting',
+        'primary_presentation',
+        'other',
       ];
-      expect(reasons).toHaveLength(7);
+      expect(reasons).toHaveLength(6);
     });
   });
 

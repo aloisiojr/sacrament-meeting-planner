@@ -36,7 +36,9 @@ export const SUNDAY_TYPE_OPTIONS = [
   'general_conference',
   'stake_conference',
   'ward_conference',
+  'fast_sunday',
   'special_program',
+  'no_meeting',
   'other',
 ] as const;
 

@@ -101,6 +101,7 @@ estimated_iterations: 4
 |----|-------|-----|--------|-----|
 | CR001 | Batch 1 Bug Fixes | CR-01 to CR-10 | Complete | [ARCH_CR001](ARCH_CR001.md) |
 | CR002 | Batch 2 Bug Fixes & Actors Redesign | CR-11 to CR-30 | Complete | [ARCH_CR002](ARCH_CR002.md) |
+| CR003 | Batch 3 Spec Fixes, CSV, About, Logout | CR-31 to CR-43 | Complete | [ARCH_CR003](ARCH_CR003.md) |
 
 ## Module Dependencies
 
@@ -237,6 +238,8 @@ scripts/                          # Admin CLI scripts (not Edge Functions)
 | ADR-011 | ScrollView wrapper for Topics screen | CR001 |
 | ADR-012 | Debounced auto-save for AgendaForm text inputs | CR002 |
 | ADR-013 | Inline actor management via bottom-sheet dialog | CR002 |
+| ADR-017 | Static imports for Expo SDK modules in CSV handlers | CR003 |
+| ADR-018 | Per-screen back buttons instead of global headerLeft | CR003 |
 
 ## Security Model
 

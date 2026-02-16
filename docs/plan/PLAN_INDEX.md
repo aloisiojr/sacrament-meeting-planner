@@ -43,6 +43,7 @@ main_risks:
 |------|-------|-------|--------------|-------------|
 | [PLAN_CR001](PLAN_CR001.md) | Change Requests Batch 1 | 14 | PHASE-01 through PHASE-06 (existing codebase) | CR-01 to CR-10 |
 | [PLAN_CR002](PLAN_CR002.md) | Change Requests Batch 2 | 18 | PLAN_CR001 (existing codebase) | CR-11 to CR-30 |
+| [PLAN_CR003](PLAN_CR003.md) | Spec Corrections Batch 3 | 5 | PLAN_CR002 (documentation-only) | CR-31, CR-34, CR-36, CR-37 |
 
 ## Module-to-Phase Mapping
 

@@ -2,7 +2,7 @@
  * AboutScreen: Static info screen showing app name and version.
  */
 
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ export default function AboutScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const supportUrl = t('about.supportUrl');
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -44,6 +45,27 @@ export default function AboutScreen() {
             {APP_VERSION}
           </Text>
         </View>
+        <View style={[styles.infoRow, { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {t('about.credits')}
+          </Text>
+          <Text style={[styles.value, { color: colors.text }]}>
+            {t('about.creditsValue')}
+          </Text>
+        </View>
+        {supportUrl ? (
+          <Pressable
+            style={[styles.infoRow, { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
+            onPress={() => Linking.openURL(supportUrl)}
+          >
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('about.support')}
+            </Text>
+            <Text style={[styles.value, { color: colors.primary }]}>
+              {supportUrl}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );

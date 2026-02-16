@@ -30,7 +30,10 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const members: CsvMember[] = [];
   const seenPhones = new Set<string>();
 
-  const lines = csvContent.trim().split(/\r?\n/);
+  // Strip UTF-8 BOM if present (common in Excel-exported CSVs)
+  const cleanContent = csvContent.replace(/^\uFEFF/, '');
+
+  const lines = cleanContent.trim().split(/\r?\n/);
 
   if (lines.length === 0) {
     errors.push({ line: 0, field: 'file', message: 'Empty CSV file' });
@@ -180,7 +183,8 @@ export function generateCsv(
     const fullPhone = m.phone ? `${m.country_code}${m.phone}` : '';
     return `${name},${fullPhone}`;
   });
-  return [header, ...rows].join('\n');
+  // Add UTF-8 BOM for Excel compatibility
+  return '\uFEFF' + [header, ...rows].join('\n');
 }
 
 /**

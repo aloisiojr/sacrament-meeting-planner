@@ -298,9 +298,9 @@ describe('STEP-06-07: CSV Import/Export', () => {
   });
 
   describe('generateCsv', () => {
-    it('generates header row first', () => {
+    it('generates header row first with BOM', () => {
       const csv = generateCsv([]);
-      expect(csv).toBe('Nome,Telefone Completo');
+      expect(csv).toBe('\uFEFFNome,Telefone Completo');
     });
 
     it('generates correct data rows', () => {
@@ -309,7 +309,7 @@ describe('STEP-06-07: CSV Import/Export', () => {
       ];
       const csv = generateCsv(members);
       const lines = csv.split('\n');
-      expect(lines[0]).toBe('Nome,Telefone Completo');
+      expect(lines[0]).toBe('\uFEFFNome,Telefone Completo');
       expect(lines[1]).toBe('John,+5511999999999');
     });
 

@@ -353,15 +353,24 @@ export default function MembersScreen() {
       link.click();
       URL.revokeObjectURL(url);
     } else {
-      // Mobile: Share the CSV content
+      // Mobile: Write temp file and share via expo-sharing
       try {
-        const { Share: RNShare } = await import('react-native');
-        await RNShare.share({ message: csv, title: 'membros.csv' });
+        const FileSystem = await import('expo-file-system');
+        const Sharing = await import('expo-sharing');
+        const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, csv, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: t('members.exportCsv'),
+          UTI: 'public.comma-separated-values-text',
+        });
       } catch {
-        // User cancelled
+        // User cancelled or sharing not available
       }
     }
-  }, [members]);
+  }, [members, t]);
 
   // CSV Import mutation (atomic overwrite via RPC)
   const importMutation = useMutation({
@@ -413,7 +422,7 @@ export default function MembersScreen() {
       // Web: file input
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.csv';
+      input.accept = '.csv,text/csv';
       input.onchange = async (e: any) => {
         const file = e.target?.files?.[0];
         if (!file) return;
@@ -426,12 +435,14 @@ export default function MembersScreen() {
       try {
         const DocumentPicker = await import('expo-document-picker');
         const result = await DocumentPicker.getDocumentAsync({
-          type: 'text/csv',
+          type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
           copyToCacheDirectory: true,
         });
         if (result.canceled || !result.assets?.[0]) return;
         const FileSystem = await import('expo-file-system');
-        const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+        const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
         importMutation.mutate(content);
       } catch {
         Alert.alert(t('common.error'), 'Failed to read file');

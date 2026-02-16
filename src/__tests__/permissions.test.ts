@@ -25,7 +25,7 @@ const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
   'settings:language': { bishopric: true, secretary: true, observer: false },
   'settings:whatsapp': { bishopric: true, secretary: true, observer: false },
   'settings:timezone': { bishopric: true, secretary: true, observer: false },
-  'settings:users': { bishopric: true, secretary: false, observer: false },
+  'settings:users': { bishopric: true, secretary: true, observer: false },
   'invite:manage': { bishopric: true, secretary: true, observer: false },
   'home:next_assignments': { bishopric: true, secretary: false, observer: false },
   'home:invite_mgmt': { bishopric: false, secretary: true, observer: false },
@@ -90,11 +90,13 @@ describe('Permissions', () => {
       expect(hasPermission('bishopric', 'home:invite_mgmt')).toBe(false);
     });
 
-    it('should grant Secretary appropriate permissions minus speech:assign and settings:users', () => {
+    it('should grant Secretary appropriate permissions minus speech:assign', () => {
       expect(hasPermission('secretary', 'speech:assign')).toBe(false);
       expect(hasPermission('secretary', 'speech:unassign')).toBe(false);
-      expect(hasPermission('secretary', 'settings:users')).toBe(false);
       expect(hasPermission('secretary', 'home:next_assignments')).toBe(false);
+
+      // CR-23: Secretary now has settings:users
+      expect(hasPermission('secretary', 'settings:users')).toBe(true);
 
       // Secretary-specific permission
       expect(hasPermission('secretary', 'home:invite_mgmt')).toBe(true);
@@ -119,9 +121,9 @@ describe('Permissions', () => {
       expect(perms.length).toBe(23);
     });
 
-    it('should return 20 permissions for Secretary', () => {
+    it('should return 21 permissions for Secretary', () => {
       const perms = getPermissions('secretary');
-      expect(perms.length).toBe(20);
+      expect(perms.length).toBe(21);
     });
 
     it('should return 3 permissions for Observer', () => {

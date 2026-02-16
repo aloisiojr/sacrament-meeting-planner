@@ -16,6 +16,7 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -636,6 +637,8 @@ function ToggleField({
 
 // --- Inline Selector Modals ---
 
+const HYMN_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.67);
+
 function HymnSelectorModal({
   visible,
   hymns,
@@ -657,23 +660,31 @@ function HymnSelectorModal({
   }, [hymns, search]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.bottomSheetOverlay} onPress={onClose}>
         <View
-          style={[styles.modalContent, styles.hymnModal, { backgroundColor: colors.card }]}
+          style={[styles.bottomSheet, { backgroundColor: colors.card }]}
           onStartShouldSetResponder={() => true}
         >
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {t('agenda.openingHymn')}
-          </Text>
-          <TextInput
-            style={[styles.searchInput, { color: colors.text, borderColor: colors.border }]}
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t('common.search')}
-            placeholderTextColor={colors.textTertiary}
-            autoFocus
-          />
+          {/* Handle bar */}
+          <View style={styles.sheetHandleBar}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          </View>
+
+          {/* Search */}
+          <View style={styles.sheetSearchRow}>
+            <TextInput
+              style={[styles.searchInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t('common.search')}
+              placeholderTextColor={colors.textTertiary}
+            />
+            <Pressable onPress={onClose} style={styles.sheetCloseBtn}>
+              <Text style={[styles.sheetCloseText, { color: colors.primary }]}>{t('common.close')}</Text>
+            </Pressable>
+          </View>
+
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id}
@@ -695,6 +706,7 @@ function HymnSelectorModal({
                 {t('common.noResults')}
               </Text>
             }
+            keyboardShouldPersistTaps="handled"
           />
         </View>
       </Pressable>
@@ -762,33 +774,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
-  modalOverlay: {
+  bottomSheetOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    height: HYMN_SHEET_HEIGHT,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  sheetHandleBar: {
     alignItems: 'center',
-    padding: 40,
+    paddingVertical: 10,
   },
-  modalContent: {
-    borderRadius: 12,
-    width: '100%',
-    maxHeight: 400,
-    paddingVertical: 8,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
-  hymnModal: {
-    maxHeight: 500,
-    paddingHorizontal: 12,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  sheetSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 12,
+  },
+  sheetCloseBtn: {
     paddingVertical: 8,
+  },
+  sheetCloseText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   modalItem: {
     paddingHorizontal: 16,
@@ -803,6 +821,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,

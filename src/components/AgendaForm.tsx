@@ -5,7 +5,7 @@
  * Special: Welcome, Designations/Sacrament, Special Meeting.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  type TextInputProps,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -237,10 +238,10 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
       </FieldRow>
 
       <FieldRow label={t('agenda.announcements')} colors={colors}>
-        <TextInput
-          style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+        <DebouncedTextInput
+          style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
           value={agenda.announcements ?? ''}
-          onChangeText={(text) => updateField('announcements', text)}
+          onSave={(text) => updateField('announcements', text)}
           placeholder={t('agenda.announcements')}
           placeholderTextColor={colors.textTertiary}
           multiline
@@ -280,10 +281,10 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
       <SectionHeader title={t('agenda.wardBusiness')} colors={colors} />
 
       <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
-        <TextInput
+        <DebouncedTextInput
           style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
           value={agenda.sustaining_releasing ?? ''}
-          onChangeText={(text) => updateField('sustaining_releasing', text)}
+          onSave={(text) => updateField('sustaining_releasing', text)}
           placeholder={t('agenda.wardBusiness')}
           placeholderTextColor={colors.textTertiary}
           multiline
@@ -299,10 +300,10 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
         colors={colors}
       />
       {agenda.has_baby_blessing && (
-        <TextInput
+        <DebouncedTextInput
           style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
           value={agenda.baby_blessing_names ?? ''}
-          onChangeText={(text) => updateField('baby_blessing_names', text)}
+          onSave={(text) => updateField('baby_blessing_names', text)}
           placeholder={t('agenda.names', 'Names')}
           placeholderTextColor={colors.textTertiary}
           editable={!isObserver}
@@ -317,10 +318,10 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
         colors={colors}
       />
       {agenda.has_baptism_confirmation && (
-        <TextInput
+        <DebouncedTextInput
           style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
           value={agenda.baptism_confirmation_names ?? ''}
-          onChangeText={(text) => updateField('baptism_confirmation_names', text)}
+          onSave={(text) => updateField('baptism_confirmation_names', text)}
           placeholder={t('agenda.names', 'Names')}
           placeholderTextColor={colors.textTertiary}
           editable={!isObserver}
@@ -379,10 +380,10 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
             colors={colors}
           />
           {agenda.has_special_presentation ? (
-            <TextInput
+            <DebouncedTextInput
               style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
               value={agenda.special_presentation_description ?? ''}
-              onChangeText={(text) => updateField('special_presentation_description', text)}
+              onSave={(text) => updateField('special_presentation_description', text)}
               placeholder={t('agenda.musicalNumber')}
               placeholderTextColor={colors.textTertiary}
               editable={!isObserver}
@@ -519,6 +520,67 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
 }
 
 // --- Sub-components ---
+
+/**
+ * DebouncedTextInput: Maintains local state to prevent letter-eating from
+ * mutation-triggered re-renders. Debounces save by 800ms; saves immediately on blur.
+ */
+function DebouncedTextInput({
+  value,
+  onSave,
+  debounceMs = 800,
+  ...props
+}: Omit<TextInputProps, 'value' | 'onChangeText' | 'onBlur'> & {
+  value: string;
+  onSave: (text: string) => void;
+  debounceMs?: number;
+}) {
+  const [localValue, setLocalValue] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const pendingRef = useRef(false);
+
+  useEffect(() => {
+    if (!pendingRef.current) {
+      setLocalValue(value);
+    }
+  }, [value]);
+
+  const handleChange = useCallback(
+    (text: string) => {
+      setLocalValue(text);
+      pendingRef.current = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        pendingRef.current = false;
+        onSave(text);
+      }, debounceMs);
+    },
+    [onSave, debounceMs]
+  );
+
+  const handleBlur = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (pendingRef.current) {
+      pendingRef.current = false;
+      onSave(localValue);
+    }
+  }, [localValue, onSave]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <TextInput
+      value={localValue}
+      onChangeText={handleChange}
+      onBlur={handleBlur}
+      {...props}
+    />
+  );
+}
 
 function SectionHeader({ title, colors }: { title: string; colors: ThemeColors }) {
   return (
@@ -789,6 +851,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 15,
     minHeight: 36,
+  },
+  announcementsInput: {
+    minHeight: 66,
   },
   indented: {
     marginLeft: 16,

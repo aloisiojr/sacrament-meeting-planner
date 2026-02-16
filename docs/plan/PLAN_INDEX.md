@@ -44,6 +44,15 @@ main_risks:
 | [PLAN_CR001](PLAN_CR001.md) | Change Requests Batch 1 | 14 | PHASE-01 through PHASE-06 (existing codebase) | CR-01 to CR-10 |
 | [PLAN_CR002](PLAN_CR002.md) | Change Requests Batch 2 | 18 | PLAN_CR001 (existing codebase) | CR-11 to CR-30 |
 | [PLAN_CR003](PLAN_CR003.md) | Spec Corrections Batch 3 | 5 | PLAN_CR002 (documentation-only) | CR-31, CR-34, CR-36, CR-37 |
+| [PLAN_CR4_F004](PLAN_CR4_F004.md) | Error Handling Overhaul | 7 | PLAN_CR003 (existing codebase) | CR-57, CR-58, CR-59, CR-60, CR-61 |
+| [PLAN_CR4_F005](PLAN_CR4_F005.md) | CSV & Members Screen Fixes | 5 | PLAN_CR003 (existing codebase) | CR-54, CR-55, CR-66 |
+| [PLAN_CR4_F007](PLAN_CR4_F007.md) | Auth Fixes: Users + Forgot Password | 7 | PLAN_CR003 (existing codebase) | CR-64, CR-67 |
+| [PLAN_CR4_F006](PLAN_CR4_F006.md) | UI/UX Small Fixes | 6 | PLAN_CR003 (existing codebase) | CR-62, CR-63, CR-65, CR-69, CR-70 |
+| [PLAN_CR4_F008](PLAN_CR4_F008.md) | Agenda & Actors Enhancements | 10 | PLAN_CR003 (existing codebase) | CR-71, CR-72, CR-73, CR-74, CR-75 |
+| [PLAN_CR4_F001](PLAN_CR4_F001.md) | Documentation Updates | 7 | PLAN_CR003 (documentation-only) | CR-44, CR-45, CR-46, CR-47, CR-48, CR-49, CR-50 |
+| [PLAN_CR4_F002](PLAN_CR4_F002.md) | Speeches Persistence & Sunday Type Revert Fix | 3 | PLAN_CR003 (existing codebase) | CR-56, CR-68 |
+| [PLAN_CR4_F003](PLAN_CR4_F003.md) | Infrastructure Integration (Sync, Offline, Notifications) | 2 | PLAN_CR003 (existing codebase) | CR-52, CR-53 |
+| [PLAN_CR4_F009](PLAN_CR4_F009.md) | Import Hymns CLI Script | 1 | PLAN_CR003 (existing codebase) | CR-51 |
 
 ## Module-to-Phase Mapping
 

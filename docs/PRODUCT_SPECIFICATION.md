@@ -644,8 +644,9 @@ Uma solução digital centralizada permite:
 - **Dado** que o usuário navega para a aba "Agenda"
 - **Então** vê lista de domingos com scroll infinito (12 meses passados + 12 meses futuros)
 - **E** cada domingo mostra apenas DateBlock (sem indicador de completude)
-- **E** domingos com exceções que NÃO têm reunião sacramental (Conferência Geral, Conferência de Estaca, Outro) NÃO aparecem na lista
-- **E** domingos com "Reunião de Testemunho", "Conferência de Ala" ou "Apresentação Especial da Primária" aparecem (formato especial)
+- **E** domingos com exceções que NÃO têm reunião sacramental (Conferência Geral, Conferência de Estaca, Outro) aparecem como cards não-expandíveis com label amarela da exceção
+- **E** domingos com "Reunião de Testemunho", "Conferência de Ala" ou "Apresentação Especial da Primária" aparecem (formato especial, expandíveis)
+- **E** domingos com "Discursos" (tipo padrão) aparecem como cards expandíveis normais
 - **Quando** clica em um domingo
 - **Então** agenda é criada automaticamente (lazy creation) com todos os campos vazios
 - **E** formulário mostra 4 seções para reunião normal: Boas-vindas e Anúncios, Designações e Sacramento, Primeiro e Segundo Discurso, Último Discurso
@@ -663,9 +664,9 @@ Uma solução digital centralizada permite:
 - **Dado** que o formulário da agenda está aberto
 - **Quando** preenche a seção "Boas-vindas e Anúncios"
 - **Então** pode selecionar:
-  - Quem preside: seletor de ator com papel "Presidir" (inclui quem tem "Dirigir")
+  - Quem preside: seletor de ator com papel "Presidir"
   - Quem dirige: seletor de ator com papel "Dirigir"
-  - Reconhecer presença: multi-select de atores com papel "Reconhecer"
+  - Reconhecendo a Presença: seletor de ator com papel "Reconhecer"
   - Anúncios: campo de texto livre multilinha
   - Pianista: seletor de ator com papel "Música"
   - Regente: seletor de ator com papel "Música"
@@ -685,10 +686,10 @@ Uma solução digital centralizada permite:
 - **Dado** que o formulário da agenda está aberto
 - **Quando** preenche a seção "Designações e Sacramento"
 - **Então** pode configurar:
-  - Apoios e desobrigações: campo de texto livre multilinha
+  - Apoios e Agradecimentos: campo de texto livre multilinha
   - Bênção de recém-nascidos: toggle sim/não + campo de texto com nomes (se sim)
   - Confirmação de batismo: toggle sim/não + campo de texto com nomes (se sim)
-  - Anúncios da Estaca: toggle sim/não
+  - Apoios e Agradecimentos da Estaca: toggle sim/não
   - Hino sacramental: busca por número ou título (APENAS hinos com Sacramental=S)
 - **E** nenhum campo é obrigatório
 
@@ -700,7 +701,7 @@ Uma solução digital centralizada permite:
 **Descrição:** Configurar a seção de discursos e encerramento em reuniões normais.
 
 **Critérios de aceitação:**
-- **Dado** que o domingo NÃO tem exceção "Reunião de Testemunho", "Conferência de Ala" nem "Apresentação Especial da Primária"
+- **Dado** que o domingo tem tipo "Discursos" (speeches)
 - **Quando** preenche a seção "Primeiro e Segundo Discurso"
 - **Então** pode configurar:
   - 1º Discurso: mostra discursante da tabela speeches (editável — ao designar, status → assigned_confirmed)
@@ -746,8 +747,8 @@ Uma solução digital centralizada permite:
   - Botão "Adicionar novo ator" ao final da lista
   - Ícone de lixeira ao lado de cada ator para deletar
 - **Quando** clica em "Adicionar novo ator"
-- **Então** campo de nome aparece. Ao salvar, o papel é inferido automaticamente do campo de ator clicado (ex: campo "Pianista" define can_music=true). Ator com papel "Dirigir" automaticamente qualifica para "Presidir".
-- **E** um ator pode ter múltiplos papéis (ex: Presidir + Música)
+- **Então** campo de nome aparece. Ao salvar, o papel é inferido automaticamente do campo de ator clicado (ex: campo "Pianista" define can_music=true). Papel é inferido do campo onde foi adicionado. Papéis são independentes.
+- **E** um ator pode ter múltiplos papéis (ex: Presidir + Música), atribuídos ao ser adicionado em diferentes campos
 - **Quando** clica no ícone de lixeira de um ator
 - **Então** diálogo de confirmação aparece
 - **E** ao confirmar: ator removido da lista; nome preservado como snapshot em agendas existentes (FK vira NULL)
@@ -1116,14 +1117,16 @@ Uma solução digital centralizada permite:
 ## 4. Regras de Negócio
 
 ### RN-01: Auto-atribuição de tipo de domingo
-O sistema auto-atribui o tipo de cada domingo ao carregar a lista, persistindo imediatamente no banco. O primeiro domingo de cada mês é marcado como "Reunião de Testemunho" por padrão (exceto Abril e Outubro, onde o 1º é "Conferência Geral" e o 2º é "Reunião de Testemunho"). Demais domingos são marcados como "Discursos". O usuário pode alterar qualquer valor via dropdown no card expandido.
+O sistema auto-atribui o tipo de cada domingo ao carregar a lista, persistindo imediatamente no banco. O primeiro domingo de cada mês é marcado como `testimony_meeting` (Reunião de Testemunho) por padrão (exceto Abril e Outubro, onde o 1º é `general_conference` (Conferência Geral) e o 2º é `testimony_meeting`). Demais domingos são marcados como `speeches` (Discursos). O usuário pode alterar qualquer valor via dropdown no card expandido.
+
+Valores válidos do enum `reason`: `speeches`, `testimony_meeting`, `general_conference`, `stake_conference`, `ward_conference`, `primary_presentation`, `other`.
 
 **Justificativa:** Prática padrão na Igreja SUD, com valores auto-atribuídos editáveis.
 
 ---
 
 ### RN-02: Domingos com exceções não têm discursos
-Se um domingo tem exceção selecionada no dropdown (qualquer valor exceto "Discursos"), os campos de discurso **somem** do card expandido. Se o domingo tinha discursantes/temas e o usuário seleciona exceção, um diálogo de confirmação aparece antes de apagar os speeches. Ao mudar de exceção para "Discursos", 3 speeches vazios são criados imediatamente.
+Se um domingo tem exceção selecionada no dropdown (qualquer valor exceto `speeches`), os campos de discurso **somem** do card expandido. Se o domingo tinha discursantes/temas e o usuário seleciona exceção, um diálogo de confirmação aparece antes de apagar os speeches. Ao mudar de exceção para `speeches`, 3 speeches vazios são criados imediatamente.
 
 **Justificativa:** Eventos especiais não incluem discursos preparados.
 
@@ -3216,7 +3219,7 @@ type Permission =
 | ASM-006 | Autenticação apenas email/senha. Sem OAuth/Google |
 | ASM-007 | Criação de Alas via self-registration do primeiro usuário. Sem CLI |
 | ASM-008 | Demais usuários convidados por link (deep link) pelo Bispado ou Secretário |
-| ASM-009 | Secretário NÃO designa em nenhuma tela (exceto aba Agenda) |
+| ASM-009 | Secretário NÃO designa pela aba Discursos nem Home, mas PODE designar pela aba Agenda |
 | ASM-010 | Template WhatsApp editável, com default traduzido por idioma |
 | ASM-011 | Discursos criados via lazy creation |
 | ASM-012 | Formato de arquivo para membros: CSV (não Excel nativo) |

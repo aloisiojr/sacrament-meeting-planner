@@ -51,7 +51,7 @@ principles:
 
 | # | Component | Responsibility | Dependencies |
 |---|-----------|----------------|--------------|
-| 1 | AgendaTab | Infinite scroll list of sundays (excludes Gen Conf / Stake Conf / Other) | TanStack Query |
+| 1 | AgendaTab | Infinite scroll list of all sundays; excluded sundays (Gen Conf/Stake Conf/Other) show as non-expandable cards with yellow exception label | TanStack Query |
 | 2 | AgendaForm | Full agenda form with 4 sections (normal) or 3 sections (special) | Field selectors, SpeechModule |
 | 3 | ActorSelectorField | Inline selector for meeting actors filtered by role | useActors hook |
 | 4 | HymnSelectorField | Search by number or title; sacramental filter for sacrament hymn | HymnsCatalog |
@@ -74,8 +74,17 @@ function useUpdateAgenda(): UseMutationResult<SundayAgenda, Error, Partial<Sunda
 
 ```typescript
 // hooks/usePresentationMode.ts
-function usePresentationData(sundayDate: Date): UseQueryResult<PresentationData>;
-function isSunday(): boolean;
+function usePresentationData(sundayDate: string): UseQueryResult<PresentationData>;
+function isTodaySunday(): boolean;
+function getTodaySundayDate(): string;  // Returns YYYY-MM-DD for today if Sunday
+function buildPresentationCards(agenda, speeches, language): PresentationCard[];
+
+// lib/dateUtils.ts (used by PresentationMode for date header)
+function formatFullDate(dateStr: string, language: string): string;
+// Returns localized full date, e.g.:
+//   pt-BR: "Domingo, 15 de Fevereiro de 2026"
+//   en:    "Sunday, February 15, 2026"
+//   es:    "Domingo, 15 de Febrero de 2026"
 ```
 
 ### AgendaForm Types
@@ -163,11 +172,12 @@ tables:
 ```
 1. On Sunday, Home tab shows "Start Sacrament Meeting" button
 2. User taps -> full-screen PresentationMode opens
-3. Data loaded from sunday_agendas + speeches for today
-4. Accordion cards rendered (4 or 3 depending on meeting type)
-5. Welcome section expanded by default
-6. Tap collapsed card -> previous collapses, tapped expands
-7. All fields read-only; close button in header
+3. Date header shows formatFullDate(sundayDate, wardLanguage)
+4. Data loaded from sunday_agendas + speeches for today
+5. Accordion cards rendered (4 or 3 depending on meeting type)
+6. Welcome section expanded by default
+7. Tap collapsed card -> previous collapses, tapped expands
+8. All fields read-only; close button in header
 ```
 
 ## Permission Exception

@@ -108,8 +108,8 @@ User taps "Sair" button
   └─> Alert.alert (confirmation dialog)
       ├─ Cancel → dismiss (no action)
       └─ Confirm → try {
+           queryClient.clear()      // Clear TanStack Query cache first
            await signOut()          // AuthContext → supabase.auth.signOut()
-           queryClient.clear()      // Clear TanStack Query cache
          } catch {
            Alert.alert(error)       // Error → stay on Settings
          }

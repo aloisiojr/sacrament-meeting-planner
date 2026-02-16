@@ -27,19 +27,21 @@ principles:
 │  App Shell (Expo Router)                        │
 │  ┌──────┬──────────┬──────────┬─────────────┐  │
 │  │ Home │  Agenda  │ Speeches │  Settings*  │  │
-│  └──┬───┘          │          │             │  │
-│     │              │          │             │  │
-│     ▼              │          │             │  │
-│  ┌────────────┐    │          │             │  │
-│  │ 3 Sundays  │    │          │  *Observer  │  │
-│  │ (all roles)│    │          │  no access  │  │
-│  ├────────────┤    │          │             │  │
-│  │ Next Asgn  │    │          │             │  │
-│  │ (Bishopric)│    │          │             │  │
-│  ├────────────┤    │          │             │  │
-│  │ Invite Mgmt│    │          │             │  │
-│  │ (Secretary)│    │          │             │  │
-│  └────────────┘    │          │             │  │
+│  └──┬───┘          │          │      │      │  │
+│     │              │          │      │      │  │
+│     ▼              │          │      ▼      │  │
+│  ┌────────────┐    │          │  ┌────────┐ │  │
+│  │ 3 Sundays  │    │          │  │ theme  │ │  │
+│  │ (all roles)│    │          │  │ about  │ │  │
+│  ├────────────┤    │          │  │ history│ │  │
+│  │ Next Asgn  │    │          │  │timezone│ │  │
+│  │ (Bishopric)│    │          │  │members │ │  │
+│  ├────────────┤    │          │  │ topics │ │  │
+│  │ Invite Mgmt│    │          │  │whatsapp│ │  │
+│  │ (Secretary)│    │          │  │ users  │ │  │
+│  └────────────┘    │          │  └────────┘ │  │
+│                    │          │  *Observer   │  │
+│                    │          │  no access   │  │
 └────────────────────┴──────────┴─────────────┘
          │
   ┌──────┴──────┐
@@ -60,6 +62,14 @@ principles:
 | 6 | ThemeContext | Dark/light mode with system detection and manual toggle | React Context |
 | 7 | I18nProvider | react-i18next setup with pt-BR, en, es locale files | react-i18next |
 | 8 | ExitConfirmationDialog | Confirm before closing app | React Native BackHandler |
+| 9 | SettingsThemeScreen | Theme toggle (automatic/light/dark) with instant toggle | ThemeContext, AsyncStorage |
+| 10 | SettingsAboutScreen | App info, credits, church disclaimer, optional support link | AppVersion |
+| 11 | SettingsHistoryScreen | Activity log viewer with search and pagination | useActivityLog |
+| 12 | SettingsTimezoneScreen | Ward timezone selector for notification scheduling | TanStack Query, Supabase |
+| 13 | SettingsMembersScreen | Member CRUD with search, swipe-to-reveal, CSV import/export | useMembers |
+| 14 | SettingsTopicsScreen | Ward topics and general collection management | useTopics |
+| 15 | SettingsWhatsAppScreen | WhatsApp message template editor with preview | TanStack Query, Supabase |
+| 16 | SettingsUsersScreen | User management (invite, role change, delete) with retry on error | useAuth, Supabase Edge Functions |
 
 ## Contracts
 
@@ -144,6 +154,7 @@ app/
     login.tsx          # Login screen
     register.tsx       # Self-registration
     invite/[token].tsx # Invite registration
+    forgot-password.tsx # Password reset via email
   (tabs)/
     _layout.tsx        # Tab navigator
     index.tsx          # Home tab
@@ -154,10 +165,12 @@ app/
       index.tsx        # Settings menu
       members.tsx      # Member management
       topics.tsx       # Topic management
-      actors.tsx       # Actor management
-      users.tsx        # User management
+      users.tsx        # User management (Bishopric/Secretary only)
       history.tsx      # Activity log
       whatsapp.tsx     # WhatsApp template
+      theme.tsx        # Theme toggle (automatic/light/dark)
+      about.tsx        # App info, credits, church disclaimer
+      timezone.tsx     # Ward timezone configuration
   presentation.tsx     # Presentation Mode (modal)
 ```
 

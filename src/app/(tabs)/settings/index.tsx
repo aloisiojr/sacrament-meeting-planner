@@ -44,7 +44,7 @@ function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, wardId } = useAuth();
+  const { hasPermission, wardId, signOut } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -125,6 +125,28 @@ export default function SettingsScreen() {
     [currentLanguage, t, languageChangeMutation]
   );
 
+  const handleSignOut = useCallback(() => {
+    Alert.alert(
+      t('settings.signOutTitle'),
+      t('settings.signOutMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              queryClient.clear();
+              await signOut();
+            } catch (err) {
+              Alert.alert(t('common.error'), String(err));
+            }
+          },
+        },
+      ]
+    );
+  }, [t, signOut, queryClient]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
@@ -200,6 +222,16 @@ export default function SettingsScreen() {
             colors={colors}
           />
         </View>
+
+        <Pressable
+          style={styles.signOutButton}
+          onPress={handleSignOut}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.signOutText, { color: colors.error }]}>
+            {t('settings.signOut')}
+          </Text>
+        </Pressable>
       </ScrollView>
 
       {/* Language Selector Modal */}
@@ -318,5 +350,15 @@ const styles = StyleSheet.create({
   checkmark: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  signOutButton: {
+    paddingVertical: 16,
+    alignItems: 'center' as const,
+    marginHorizontal: 16,
+    marginBottom: 32,
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });

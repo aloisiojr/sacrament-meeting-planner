@@ -86,7 +86,7 @@ Construir um app multi-plataforma (iOS, Android, Web) para gerenciar designacoes
 | Marcar tipo de domingo (dropdown) | ✅ | ✅ | ❌ (visivel, desabilitado) |
 | Gerenciar convites WhatsApp | ❌ | ✅ | ❌ |
 | Configurar idioma da Ala | ✅ | ✅ | ❌ |
-| Gerenciar usuarios (CRUD) | ✅ | ❌ | ❌ |
+| Gerenciar usuarios (CRUD) | ✅ | ✅ | ❌ |
 | Convidar usuarios (link) | ✅ | ✅ | ❌ |
 | Visualizar Historico | ✅ | ✅ | ❌ |
 | Visualizar Home (3 domingos) | ✅ | ✅ | ✅ (read-only) |
@@ -698,8 +698,8 @@ Discursos armazenam `speaker_name`, `speaker_phone`, `topic_title`, `topic_link`
 
 ### 7.8 Configuracoes > Usuarios
 
-- Card "Usuarios" visivel apenas para **Bispado** (permissao `settings:users`)
-- Secretario e Observador NAO veem o card
+- Card "Usuarios" visivel para **Bispado** e **Secretario** (permissao `settings:users`)
+- Observador NAO ve o card
 - **Nota:** Secretario pode convidar usuarios via botao "Convidar" visivel em outro local (permissao `invitation:create`)
 
 #### 7.8.1 Lista de Usuarios
@@ -1803,7 +1803,7 @@ Os seguintes itens ainda nao foram implementados:
 | Item | Descricao | Status |
 |------|-----------|--------|
 | Auto-scroll Home | Auto-scroll para card expandido ficar visivel na tela Home | Pendente |
-| Gerenciar usuarios | Secretario reporta nao ver opcao de gerenciar usuarios (comportamento esperado se nao e Bispado; investigar se e bug real de extracao de papel) | Pendente |
+| Gerenciar usuarios | Resolvido: Secretario agora tem acesso a gerenciamento de usuarios (CR-23). Permissao `settings:users` concedida ao papel Secretario. | Resolvido |
 | Dropdown codigo | Clicar no campo de codigo internacional fecha o card do membro | Pendente |
 | Botao Sair | Botao "Sair" nas Configuracoes nao faz nada | Pendente |
 

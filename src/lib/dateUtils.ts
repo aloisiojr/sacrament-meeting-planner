@@ -20,6 +20,16 @@ const MONTH_FULL: Record<SupportedLanguage, string[]> = {
 };
 
 /**
+ * Day of week names by locale.
+ * Index 0 = Sunday, 1 = Monday, ..., 6 = Saturday.
+ */
+const DAY_NAMES: Record<SupportedLanguage, string[]> = {
+  'pt-BR': ['Domingo', 'Segunda-feira', 'Terca-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sabado'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  es: ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'],
+};
+
+/**
  * Check if a given date is a Sunday.
  * Works with Date objects and ISO date strings (YYYY-MM-DD).
  */
@@ -192,5 +202,29 @@ export function formatDateHumanReadable(dateStr: string, language: SupportedLang
     case 'es':
     default:
       return `${day} de ${month} de ${year}`;
+  }
+}
+
+/**
+ * Format a date with day of week name for display headers.
+ * Uses the ward's configured language (not device locale).
+ * - pt-BR: "Domingo, 16 de Fevereiro de 2026"
+ * - en: "Sunday, February 16, 2026"
+ * - es: "Domingo, 16 de Febrero de 2026"
+ */
+export function formatFullDate(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
+  const d = parseLocalDate(dateStr);
+  const dayName = DAY_NAMES[language][d.getDay()];
+  const day = d.getDate();
+  const month = MONTH_FULL[language][d.getMonth()];
+  const year = d.getFullYear();
+
+  switch (language) {
+    case 'en':
+      return `${dayName}, ${month} ${day}, ${year}`;
+    case 'pt-BR':
+    case 'es':
+    default:
+      return `${dayName}, ${day} de ${month} de ${year}`;
   }
 }

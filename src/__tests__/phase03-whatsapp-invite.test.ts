@@ -68,18 +68,17 @@ function mockFormatDate(date: string, locale: 'pt-BR' | 'en' | 'es'): string {
 
 describe('PHASE-03: WhatsApp URL edge cases', () => {
   describe('resolveTemplate', () => {
-    it('handles all 7 placeholders', () => {
-      const template = '{nome} {data} {posicao} {duracao} {colecao} {titulo} {link}';
+    it('handles all 6 placeholders', () => {
+      const template = '{nome} {data} {posicao} {colecao} {titulo} {link}';
       const result = resolveTemplate(template, {
         speakerName: 'Joao',
         date: '15 FEV',
         position: '1o',
-        duration: '10 min',
         collection: 'Conference',
         topic: 'Faith',
         link: 'https://example.com',
       });
-      expect(result).toBe('Joao 15 FEV 1o 10 min Conference Faith https://example.com');
+      expect(result).toBe('Joao 15 FEV 1o Conference Faith https://example.com');
     });
 
     it('handles template with multiple occurrences of same placeholder', () => {

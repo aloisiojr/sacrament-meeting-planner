@@ -33,7 +33,7 @@ describe('resolveTemplate', () => {
   });
 
   it('cleans up double spaces from empty placeholders', () => {
-    const template = '{nome}  {duracao}  {titulo}';
+    const template = '{nome}  {colecao}  {titulo}';
     const result = resolveTemplate(template, {
       speakerName: 'Pedro',
       date: '',

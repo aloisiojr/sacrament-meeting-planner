@@ -23,9 +23,8 @@ export const sundayTypeKeys = {
 
 /**
  * The default type for regular sundays (speeches).
- * Note: "speeches" is a virtual type - it means NO exception record exists,
- * or after auto-assignment, all sundays have an entry.
- * Per F007: "Discursos" is also stored in sunday_exceptions table.
+ * Per F007/CR-56: "speeches" is stored in sunday_exceptions table
+ * like any other reason. All sundays have an entry after auto-assignment.
  */
 export const SUNDAY_TYPE_SPEECHES = 'speeches' as const;
 
@@ -92,7 +91,7 @@ function getSundayTypeLabel(reason: string, language: string): string {
  * - 1st Sunday of Apr, Oct: "general_conference"
  * - 2nd Sunday of Apr, Oct: "testimony_meeting"
  */
-export function getAutoAssignedType(date: Date): SundayExceptionReason | typeof SUNDAY_TYPE_SPEECHES {
+export function getAutoAssignedType(date: Date): SundayExceptionReason {
   const month = date.getMonth() + 1; // 1-indexed
   const sundayOfMonth = getSundayOfMonth(date);
 
@@ -176,20 +175,15 @@ export function useAutoAssignSundayTypes() {
       if (missingDates.length === 0) return 0;
 
       // Calculate auto-assigned types for missing dates
-      const entries = missingDates
-        .map((dateStr) => {
+      const entries = missingDates.map((dateStr) => {
           const date = parseLocalDate(dateStr);
           const type = getAutoAssignedType(date);
-          // Only create exception entries for non-speeches types
-          // Per F007: "Discursos" is also stored, so actually all sundays get entries
-          if (type === SUNDAY_TYPE_SPEECHES) return null;
           return {
             ward_id: wardId,
             date: dateStr,
             reason: type as SundayExceptionReason,
           };
-        })
-        .filter(Boolean) as { ward_id: string; date: string; reason: SundayExceptionReason }[];
+        });
 
       if (entries.length === 0) return 0;
 
@@ -295,7 +289,8 @@ export function useSetSundayType() {
 }
 
 /**
- * Remove a sunday exception (revert to default "speeches").
+ * Revert a sunday exception to default "speeches" type.
+ * Updates the entry in-place rather than deleting it.
  * Uses optimistic update for instant UI feedback.
  */
 export function useRemoveSundayException() {
@@ -306,7 +301,7 @@ export function useRemoveSundayException() {
     mutationFn: async (date: string): Promise<void> => {
       const { error } = await supabase
         .from('sunday_exceptions')
-        .delete()
+        .update({ reason: 'speeches' as SundayExceptionReason, custom_reason: null })
         .eq('ward_id', wardId)
         .eq('date', date);
       if (error) throw error;
@@ -314,12 +309,17 @@ export function useRemoveSundayException() {
     onMutate: async (date) => {
       await queryClient.cancelQueries({ queryKey: sundayTypeKeys.all });
 
-      // Optimistically remove the exception from cached data
+      // Optimistically update the exception to 'speeches' in cached data
       queryClient.setQueriesData<SundayException[]>(
         { queryKey: sundayTypeKeys.all },
         (old) => {
           if (!old) return old;
-          return old.filter((e) => !(e.date === date && e.ward_id === wardId));
+          return old.map((e) => {
+            if (e.date === date && e.ward_id === wardId) {
+              return { ...e, reason: 'speeches' as SundayExceptionReason, custom_reason: null };
+            }
+            return e;
+          });
         }
       );
     },

@@ -59,8 +59,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check permission: only Bishopric can list users
-    if (userRole !== 'bishopric') {
+    // Check permission: Bishopric and Secretary can list users
+    if (!['bishopric', 'secretary'].includes(userRole)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

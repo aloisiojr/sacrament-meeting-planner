@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SwipeableCard } from '../../../components/SwipeableCard';
@@ -175,6 +176,7 @@ export default function TopicsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
+  const router = useRouter();
   const language = getCurrentLanguage();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -264,26 +266,34 @@ export default function TopicsScreen() {
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => setActiveSwipeId(null)}
         >
-          {/* Header */}
+          {/* Header with back button */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>{t('topics.title')}</Text>
-            {canWrite && (
-              <Pressable
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={handleAdd}
-                accessibilityRole="button"
-                accessibilityLabel={t('topics.addTopic')}
-              >
-                <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
-              </Pressable>
-            )}
+            <Pressable onPress={() => router.back()} accessibilityRole="button">
+              <Text style={[styles.backButton, { color: colors.primary }]}>
+                {t('common.back')}
+              </Text>
+            </Pressable>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('topics.title')}</Text>
+            <View style={styles.headerSpacer} />
           </View>
 
           {/* Ward Topics Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-              {t('topics.wardTopics')}
-            </Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                {t('topics.wardTopics')}
+              </Text>
+              {canWrite && (
+                <Pressable
+                  style={[styles.addButton, { backgroundColor: colors.primary }]}
+                  onPress={handleAdd}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('topics.addTopic')}
+                >
+                  <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
+                </Pressable>
+              )}
+            </View>
 
             {isAdding && (
               <TopicEditor onSave={handleSaveNew} colors={colors} />
@@ -358,9 +368,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
+  backButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerSpacer: {
+    width: 50,
   },
   addButton: {
     width: 36,
@@ -377,12 +394,17 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     letterSpacing: 0.5,
   },
   editor: {

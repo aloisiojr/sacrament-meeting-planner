@@ -51,6 +51,7 @@ const PERMISSIONS_MAP: Record<Role, ReadonlySet<Permission>> = {
     'settings:language',
     'settings:whatsapp',
     'settings:timezone',
+    'settings:users',
     'invite:manage',
     'home:invite_mgmt',
     'agenda:read',

@@ -345,7 +345,7 @@ export function SundayCard({
             onRevertToSpeeches={handleRemoveException}
             disabled={typeDisabled}
           />
-          {isSpeechesType && children}
+          {children}
         </View>
       )}
     </View>

@@ -1,9 +1,10 @@
 /**
- * ActorSelector: Inline search component for selecting a meeting actor.
- * Supports filtering by role capability and adding new actors inline.
+ * ActorSelector: Bottom-sheet (2/3 screen) dialog for selecting, adding,
+ * editing, and deleting meeting actors. Replaces the old full-screen modal.
+ * The word "Actor"/"Ator" never appears in the UI.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,74 +13,74 @@ import {
   FlatList,
   Pressable,
   Modal,
+  Dimensions,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
-import { useActors, useCreateActor, type ActorRoleFilter } from '../hooks/useActors';
+import { useActors, useCreateActor, useUpdateActor, useDeleteActor, type ActorRoleFilter } from '../hooks/useActors';
 import type { MeetingActor, CreateActorInput } from '../types/database';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.67);
 
 // --- Types ---
 
 export interface ActorSelectorProps {
-  /** The currently selected actor name (null if none). */
-  selectedName: string | null;
-  /** The currently selected actor ID (null if none). */
-  selectedActorId: string | null;
-  /** Called when an actor is selected. */
-  onSelect: (actor: MeetingActor | null) => void;
-  /** Filter actors by role capability. */
-  roleFilter?: ActorRoleFilter;
-  /** Placeholder text. */
-  placeholder?: string;
-  /** Whether the selector is disabled. */
-  disabled?: boolean;
-  /** Whether to allow adding new actors inline. */
-  allowAdd?: boolean;
+  visible: boolean;
+  roleFilter: ActorRoleFilter;
+  onSelect: (actor: MeetingActor) => void;
+  onClose: () => void;
 }
 
 export function ActorSelector({
-  selectedName,
-  selectedActorId,
+  visible,
+  roleFilter,
   onSelect,
-  roleFilter = 'all',
-  placeholder,
-  disabled = false,
-  allowAdd = true,
+  onClose,
 }: ActorSelectorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newActorName, setNewActorName] = useState('');
+  const [addingName, setAddingName] = useState('');
+  const [showAddInput, setShowAddInput] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const { data: actors } = useActors(roleFilter);
   const createActor = useCreateActor();
+  const updateActor = useUpdateActor();
+  const deleteActor = useDeleteActor();
 
-  // Client-side filter by search
-  const filteredActors = (actors ?? []).filter((a) => {
-    if (!search.trim()) return true;
-    return a.name.toLowerCase().includes(search.toLowerCase());
-  });
+  const filtered = useMemo(() => {
+    const list = actors ?? [];
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter((a) => a.name.toLowerCase().includes(q));
+  }, [actors, search]);
 
   const handleSelect = useCallback(
     (actor: MeetingActor) => {
       onSelect(actor);
-      setModalVisible(false);
       setSearch('');
+      setShowAddInput(false);
+      setEditingId(null);
     },
     [onSelect]
   );
 
-  const handleClear = useCallback(() => {
-    onSelect(null);
-  }, [onSelect]);
+  const handleClose = useCallback(() => {
+    setSearch('');
+    setShowAddInput(false);
+    setAddingName('');
+    setEditingId(null);
+    onClose();
+  }, [onClose]);
 
-  const handleAddNew = useCallback(() => {
-    const trimmed = newActorName.trim();
+  const handleAdd = useCallback(() => {
+    const trimmed = addingName.trim();
     if (!trimmed) return;
 
-    // Derive role capabilities from the roleFilter
     const input: CreateActorInput = {
       name: trimmed,
       can_preside: roleFilter === 'can_preside' || roleFilter === 'can_conduct',
@@ -91,135 +92,164 @@ export function ActorSelector({
     createActor.mutate(input, {
       onSuccess: (newActor) => {
         onSelect(newActor);
-        setIsAddingNew(false);
-        setNewActorName('');
-        setModalVisible(false);
+        setAddingName('');
+        setShowAddInput(false);
         setSearch('');
       },
     });
-  }, [newActorName, roleFilter, createActor, onSelect]);
+  }, [addingName, roleFilter, createActor, onSelect]);
 
-  return (
-    <>
-      <Pressable
-        style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-        onPress={() => !disabled && setModalVisible(true)}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={placeholder ?? t('settings.actors')}
-      >
-        <Text
-          style={[
-            styles.selectorText,
-            { color: selectedName ? colors.text : colors.placeholder },
-          ]}
-          numberOfLines={1}
-        >
-          {selectedName ?? (placeholder ?? t('common.search'))}
-        </Text>
-        {selectedName && !disabled && (
-          <Pressable onPress={handleClear} hitSlop={8}>
-            <Text style={[styles.clearButton, { color: colors.textSecondary }]}>x</Text>
-          </Pressable>
-        )}
-        <Text style={[styles.arrow, { color: colors.textSecondary }]}>{'\u25BC'}</Text>
-      </Pressable>
+  const handleEditSave = useCallback(
+    (id: string) => {
+      const trimmed = editingName.trim();
+      if (!trimmed) {
+        setEditingId(null);
+        return;
+      }
+      updateActor.mutate({ id, name: trimmed });
+      setEditingId(null);
+      setEditingName('');
+    },
+    [editingName, updateActor]
+  );
 
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setModalVisible(false);
-          setIsAddingNew(false);
-        }}
-      >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
+  const handleDelete = useCallback(
+    (actor: MeetingActor) => {
+      Alert.alert(
+        t('common.delete'),
+        t('members.deleteConfirm'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.delete'),
+            style: 'destructive',
+            onPress: () => deleteActor.mutate({ actorId: actor.id, actorName: actor.name }),
+          },
+        ]
+      );
+    },
+    [t, deleteActor]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: MeetingActor }) => {
+      const isEditing = editingId === item.id;
+
+      return (
+        <View style={[styles.actorRow, { borderBottomColor: colors.divider }]}>
+          {isEditing ? (
             <TextInput
-              style={[styles.searchInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-              value={search}
-              onChangeText={setSearch}
-              placeholder={t('common.search')}
-              placeholderTextColor={colors.placeholder}
+              style={[styles.editInput, { color: colors.text, borderColor: colors.border }]}
+              value={editingName}
+              onChangeText={setEditingName}
               autoFocus
-              autoCapitalize="words"
-              autoCorrect={false}
+              onSubmitEditing={() => handleEditSave(item.id)}
+              onBlur={() => handleEditSave(item.id)}
+              returnKeyType="done"
             />
-            <Pressable
-              style={styles.cancelButton}
-              onPress={() => {
-                setModalVisible(false);
-                setSearch('');
-                setIsAddingNew(false);
-              }}
-            >
-              <Text style={[styles.cancelText, { color: colors.primary }]}>
-                {t('common.close')}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Add new actor inline */}
-          {allowAdd && !isAddingNew && (
-            <Pressable
-              style={[styles.addNewButton, { borderColor: colors.primary }]}
-              onPress={() => setIsAddingNew(true)}
-            >
-              <Text style={[styles.addNewText, { color: colors.primary }]}>
-                + {t('common.add')}
+          ) : (
+            <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+              <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
+                {item.name}
               </Text>
             </Pressable>
           )}
+          {!isEditing && (
+            <View style={styles.actorActions}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  setEditingId(item.id);
+                  setEditingName(item.name);
+                }}
+              >
+                <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>{'\u270E'}</Text>
+              </Pressable>
+              <Pressable hitSlop={8} onPress={() => handleDelete(item)}>
+                <Text style={[styles.actionIcon, { color: colors.error }]}>{'\u2716'}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      );
+    },
+    [colors, editingId, editingName, handleSelect, handleEditSave, handleDelete]
+  );
 
-          {isAddingNew && (
-            <View style={styles.addNewForm}>
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <Pressable style={styles.overlay} onPress={handleClose}>
+        <View
+          style={[styles.sheet, { backgroundColor: colors.card }]}
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Handle bar */}
+          <View style={styles.handleBar}>
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          </View>
+
+          {/* Search */}
+          <View style={styles.searchRow}>
+            <TextInput
+              style={[styles.searchInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t('common.search')}
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+            <Pressable onPress={handleClose} style={styles.closeBtn}>
+              <Text style={[styles.closeText, { color: colors.primary }]}>{t('common.close')}</Text>
+            </Pressable>
+          </View>
+
+          {/* Add button / input */}
+          {!showAddInput ? (
+            <Pressable
+              style={[styles.addButton, { borderColor: colors.primary }]}
+              onPress={() => setShowAddInput(true)}
+            >
+              <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                + {t('common.add')}
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.addRow}>
               <TextInput
-                style={[styles.addNewInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                value={newActorName}
-                onChangeText={setNewActorName}
+                style={[styles.addInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
+                value={addingName}
+                onChangeText={setAddingName}
                 placeholder={t('members.fullName')}
-                placeholderTextColor={colors.placeholder}
+                placeholderTextColor={colors.textTertiary}
                 autoFocus
                 autoCapitalize="words"
-                onSubmitEditing={handleAddNew}
+                onSubmitEditing={handleAdd}
                 returnKeyType="done"
               />
               <Pressable
-                style={[styles.addConfirmButton, { backgroundColor: colors.primary }]}
-                onPress={handleAddNew}
+                style={[styles.addConfirm, { backgroundColor: addingName.trim() ? colors.primary : colors.surfaceVariant }]}
+                onPress={handleAdd}
+                disabled={!addingName.trim()}
               >
-                <Text style={[styles.addConfirmText, { color: colors.onPrimary }]}>
+                <Text style={[styles.addConfirmText, { color: addingName.trim() ? colors.onPrimary : colors.textTertiary }]}>
                   {t('common.add')}
                 </Text>
               </Pressable>
             </View>
           )}
 
+          {/* Actor list */}
           <FlatList
-            data={filteredActors}
+            data={filtered}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[
-                  styles.actorItem,
-                  { borderBottomColor: colors.divider },
-                  item.id === selectedActorId && { backgroundColor: colors.primaryContainer },
-                ]}
-                onPress={() => handleSelect(item)}
-              >
-                <Text
-                  style={[
-                    styles.actorName,
-                    { color: colors.text },
-                    item.id === selectedActorId && { fontWeight: '600' },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-              </Pressable>
-            )}
+            renderItem={renderItem}
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.empty}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -227,44 +257,39 @@ export function ActorSelector({
                 </Text>
               </View>
             }
-            keyboardShouldPersistTaps="handled"
           />
         </View>
-      </Modal>
-    </>
+      </Pressable>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  selector: {
-    flexDirection: 'row',
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    height: SHEET_HEIGHT,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  handleBar: {
     alignItems: 'center',
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  selectorText: {
-    flex: 1,
-    fontSize: 15,
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
-  clearButton: {
-    fontSize: 16,
-    paddingHorizontal: 8,
-  },
-  arrow: {
-    fontSize: 10,
-    marginLeft: 4,
-  },
-  modalContainer: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  modalHeader: {
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
     gap: 12,
   },
   searchInput: {
@@ -275,14 +300,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 15,
   },
-  cancelButton: {
+  closeBtn: {
     paddingVertical: 8,
   },
-  cancelText: {
+  closeText: {
     fontSize: 16,
     fontWeight: '500',
   },
-  addNewButton: {
+  addButton: {
     marginHorizontal: 16,
     marginBottom: 8,
     paddingVertical: 10,
@@ -291,17 +316,17 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
   },
-  addNewText: {
+  addButtonText: {
     fontSize: 15,
     fontWeight: '500',
   },
-  addNewForm: {
+  addRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     marginBottom: 8,
     gap: 8,
   },
-  addNewInput: {
+  addInput: {
     flex: 1,
     height: 40,
     borderWidth: 1,
@@ -309,7 +334,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 15,
   },
-  addConfirmButton: {
+  addConfirm: {
     height: 40,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -320,13 +345,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  actorItem: {
+  actorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  actorNameArea: {
+    flex: 1,
   },
   actorName: {
     fontSize: 16,
+  },
+  actorActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginLeft: 12,
+  },
+  actionIcon: {
+    fontSize: 18,
+  },
+  editInput: {
+    flex: 1,
+    height: 36,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    fontSize: 15,
   },
   empty: {
     padding: 40,

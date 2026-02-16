@@ -102,7 +102,7 @@ export function useCreateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:create', `Membro criado: ${data.full_name}`);
+        logAction(wardId, user.id, user.email ?? '', 'member:create', `${data.full_name} adicionado como membro`);
       }
     },
   });
@@ -131,7 +131,7 @@ export function useUpdateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:update', `Membro atualizado: ${data.full_name}`);
+        logAction(wardId, user.id, user.email ?? '', 'member:update', `${data.full_name} atualizado`);
       }
     },
   });
@@ -172,7 +172,7 @@ export function useDeleteMember() {
     onSuccess: (memberName) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:delete', `Membro excluído: ${memberName}`);
+        logAction(wardId, user.id, user.email ?? '', 'member:delete', `${memberName} removido`);
       }
     },
   });

@@ -5,8 +5,10 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -48,7 +50,9 @@ export default function WhatsAppTemplateScreen() {
   const { colors } = useTheme();
   const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   // Fetch ward to get current template
   const { data: ward } = useQuery({
@@ -111,12 +115,43 @@ export default function WhatsAppTemplateScreen() {
 
   const preview = resolveTemplate(template);
 
+  // Insert placeholder at cursor position (CR-15)
+  const insertPlaceholder = useCallback(
+    (placeholder: string) => {
+      const pos = selection.start;
+      const before = template.substring(0, pos);
+      const after = template.substring(pos);
+      const newTemplate = before + placeholder + after;
+      setTemplate(newTemplate);
+      const newPos = pos + placeholder.length;
+      setSelection({ start: newPos, end: newPos });
+
+      // Trigger auto-save
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = setTimeout(() => {
+        saveMutation.mutate(newTemplate);
+      }, 1000);
+    },
+    [template, selection, saveMutation]
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {t('settings.whatsappTemplate')}
-        </Text>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button">
+            <Text style={[styles.backButton, { color: colors.primary }]}>
+              {t('common.back')}
+            </Text>
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('settings.whatsappTemplate')}
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
         {/* Placeholder list */}
         <View style={styles.placeholderSection}>
@@ -125,12 +160,13 @@ export default function WhatsAppTemplateScreen() {
           </Text>
           <View style={styles.placeholderList}>
             {PLACEHOLDERS.map((p) => (
-              <View
+              <Pressable
                 key={p}
                 style={[styles.placeholderChip, { backgroundColor: colors.surfaceVariant }]}
+                onPress={() => insertPlaceholder(p)}
               >
                 <Text style={[styles.placeholderText, { color: colors.text }]}>{p}</Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         </View>
@@ -150,6 +186,7 @@ export default function WhatsAppTemplateScreen() {
           ]}
           value={template}
           onChangeText={handleChange}
+          onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
           multiline
           numberOfLines={6}
           textAlignVertical="top"
@@ -184,10 +221,22 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  backButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerSpacer: {
+    width: 50,
   },
   sectionLabel: {
     fontSize: 13,
@@ -205,21 +254,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   placeholderChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 12,
   },
   placeholderText: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: 'monospace',
   },
   editor: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
-    fontSize: 15,
-    minHeight: 120,
-    lineHeight: 22,
+    fontSize: 17,
+    minHeight: 160,
+    lineHeight: 24,
   },
   previewCard: {
     borderRadius: 10,
@@ -227,8 +276,8 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   previewText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 24,
   },
   savingText: {
     fontSize: 12,

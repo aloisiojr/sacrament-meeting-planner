@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import { hasPermission as checkPermission } from '../lib/permissions';
+import { changeLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Role, Permission } from '../types/database';
 
@@ -84,6 +85,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscription.unsubscribe();
     };
   }, []);
+
+  // CR-11: Apply ward language after auth loads
+  useEffect(() => {
+    if (!wardId) return;
+    supabase
+      .from('wards')
+      .select('language')
+      .eq('id', wardId)
+      .single()
+      .then(({ data }) => {
+        const lang = data?.language;
+        if (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
+          changeLanguage(lang as SupportedLanguage);
+        } else {
+          changeLanguage('pt-BR');
+        }
+      });
+  }, [wardId]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({

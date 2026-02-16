@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { TextInput, type TextInputProps } from 'react-native';
+import { TextInput, type TextInputProps, type NativeSyntheticEvent, type TextInputFocusEventData } from 'react-native';
 
 export interface DebouncedTextInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   /** The current persisted value. */
@@ -25,6 +25,11 @@ export function DebouncedTextInput({
   const [localValue, setLocalValue] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestValueRef = useRef(localValue);
+  const onSaveRef = useRef(onSave);
+  const savedValueRef = useRef(value);
+
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+  useEffect(() => { savedValueRef.current = value; }, [value]);
 
   // Sync local value when external value changes (e.g., from server)
   useEffect(() => {
@@ -58,18 +63,22 @@ export function DebouncedTextInput({
   );
 
   const handleBlur = useCallback(
-    (e: any) => {
+    (e: NativeSyntheticEvent<TextInputFocusEventData>) => {
       flush();
       rest.onBlur?.(e);
     },
     [flush, rest.onBlur]
   );
 
-  // Cleanup on unmount
+  // Cleanup on unmount - flush pending changes
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (latestValueRef.current !== savedValueRef.current) {
+        onSaveRef.current(latestValueRef.current);
       }
     };
   }, []);

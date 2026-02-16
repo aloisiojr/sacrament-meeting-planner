@@ -30,7 +30,7 @@ export type AgendaUpdateInput = Partial<Omit<SundayAgenda, 'id' | 'ward_id' | 's
 
 /**
  * Exception types that exclude a sunday from the Agenda tab.
- * Gen Conf, Stake Conf, and No Meeting have no sacrament meeting.
+ * Gen Conf and Stake Conf have no sacrament meeting.
  */
 export const EXCLUDED_EXCEPTION_TYPES = new Set([
   'general_conference',

@@ -12,7 +12,7 @@
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-AGD-001 | user navigates to Agenda tab | list rendered | infinite scroll with sundays (12 months past + 12 future); sundays with Gen. Conf./Stake Conf./Other do NOT appear |
+| AC-AGD-001 | user navigates to Agenda tab | list rendered | infinite scroll with sundays (12 months past + 12 future); sundays with Gen. Conf./Stake Conf./Other appear as non-expandable cards with yellow label |
 | AC-AGD-002 | clicks on a sunday in Agenda tab | form opens | agenda created automatically (lazy creation) with all fields empty |
 | AC-AGD-003 | normal meeting agenda form | sections visible | 4 sections: Welcome, Designations/Sacrament, 1st+2nd Speech, Last Speech |
 | AC-AGD-004 | special meeting agenda form | sections visible | 3 sections: Welcome, Designations/Sacrament, Special Meeting; meeting type auto-filled |
@@ -26,7 +26,7 @@
 ## Normal Meeting Form (4 sections)
 
 ### Section: Welcome & Announcements
-- Who presides: actor selector (Preside role, includes Conduct)
+- Who presides: actor selector (Preside role)
 - Who conducts: actor selector (Conduct role)
 - Recognize presence: multi-select actors (Recognize role)
 - Announcements: free text multiline
@@ -74,7 +74,7 @@ Same Welcome and Designations sections + Special Meeting section:
 - EXCEPTION: Both Bishopric AND Secretary can assign speakers in Agenda tab (unlike Speeches tab where only Bishopric can)
 - Topic is NOT visible/editable in Agenda tab
 - No fields are required - all can be empty
-- Auto-save on all field changes
+- Auto-save on all field changes (text inputs use debounce ~500ms before saving)
 - Past agendas are editable (no temporal restriction)
-- Sundays with exceptions that don't have sacrament meeting (Gen. Conf., Stake Conf., Other) do NOT appear in Agenda list
+- Sundays with exceptions that don't have sacrament meeting (Gen. Conf., Stake Conf., Other) appear as non-expandable cards with yellow exception label
 - Sundays with Testimony Meeting, Ward Conference, or Primary Presentation DO appear (special format)

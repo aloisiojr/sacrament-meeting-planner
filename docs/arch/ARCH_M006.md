@@ -54,7 +54,10 @@ principles:
 
 ```typescript
 // hooks/useRealtimeSync.ts
-function useRealtimeSync(): void;
+function useRealtimeSync(options: {
+  isOnline: boolean;
+  setWebSocketConnected: (connected: boolean) => void;
+}): void;
 
 // Internal: subscribes to these tables
 const SYNCED_TABLES = [
@@ -108,4 +111,56 @@ function handleRealtimeEvent(table: string, event: RealtimeEvent): void;
    a. Immediately refetch all active queries
    b. Disable polling intervals
    c. Resume Realtime subscriptions
+```
+
+
+## Integration
+
+### Where modules are connected (added by CR-46)
+
+```
+┌─────────────────────────────────────────────┐
+│  src/app/_layout.tsx                         │
+│                                             │
+│  InnerLayout component:                     │
+│    <AuthProvider>                            │
+│      <SyncProvider>         ← providers/    │
+│        <NavigationGuard>     SyncProvider.tsx│
+│          ...                                │
+│        </NavigationGuard>                   │
+│      </SyncProvider>                        │
+│    </AuthProvider>                           │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  src/providers/SyncProvider.tsx              │
+│                                             │
+│  const { isOnline, showOfflineBanner,       │
+│          setWebSocketConnected }            │
+│        = useConnection();                   │
+│  useRealtimeSync({ isOnline,                │
+│                    setWebSocketConnected }); │
+│  useOfflineQueueProcessor(isOnline);        │
+│  useRegisterPushToken(isOnline);            │
+│  useNotificationHandler();                  │
+│                                             │
+│  return (                                   │
+│    <>                                       │
+│      <OfflineBanner visible={...} />        │
+│      {children}                             │
+│    </>                                      │
+│  );                                         │
+└─────────────────────────────────────────────┘
+```
+
+### Initialization flow
+
+```
+1. App mounts RootLayout → InnerLayout → AuthProvider → SyncProvider → NavigationGuard
+2. SyncProvider calls useConnection() to start NetInfo monitoring
+3. useRealtimeSync() subscribes to Supabase Realtime for ward-scoped tables
+4. On WebSocket SUBSCRIBED → invalidates all queries, stops polling
+5. On WebSocket CLOSED/ERROR → starts polling fallback (2.5s interval)
+6. OfflineBanner renders above children when device goes offline
+7. useOfflineQueueProcessor drains queued mutations on reconnect
 ```

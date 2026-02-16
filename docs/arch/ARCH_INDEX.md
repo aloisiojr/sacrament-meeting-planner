@@ -102,6 +102,11 @@ estimated_iterations: 4
 | CR001 | Batch 1 Bug Fixes | CR-01 to CR-10 | Complete | [ARCH_CR001](ARCH_CR001.md) |
 | CR002 | Batch 2 Bug Fixes & Actors Redesign | CR-11 to CR-30 | Complete | [ARCH_CR002](ARCH_CR002.md) |
 | CR003 | Batch 3 Spec Fixes, CSV, About, Logout | CR-31 to CR-43 | Complete | [ARCH_CR003](ARCH_CR003.md) |
+| CR4_F005 | CSV & Members Screen Fixes | CR-54, CR-55, CR-66 | Complete | [ARCH_CR4_F005](ARCH_CR4_F005.md) |
+| CR4_F007 | Auth Fixes: Users Screen + Forgot Password | CR-64, CR-67 | Complete | [ARCH_CR4_F007](ARCH_CR4_F007.md) |
+| CR4_F008 | Agenda & Actors Enhancements | CR-71, CR-72, CR-73, CR-74, CR-75 | Complete | [ARCH_CR4_F008](ARCH_CR4_F008.md) |
+| CR4_F003 | Infrastructure Integration (Sync, Offline, Notifications) | CR-52, CR-53 | Complete | [ARCH_CR4_F003](ARCH_CR4_F003.md) |
+| CR4_F009 | Import Hymns CLI Script | CR-51 | Complete | [ARCH_CR4_F009](ARCH_CR4_F009.md) |
 
 ## Module Dependencies
 
@@ -135,11 +140,12 @@ M007 (Offline) ──> M006 (Sync)      # reconnect triggers queue processing
 ```
 src/
   app/                          # Expo Router pages
-    _layout.tsx                 # Root layout (providers)
+    _layout.tsx                 # Root layout (providers + SyncProvider)
     (auth)/                     # Auth screens
       login.tsx
       register.tsx
       invite/[token].tsx
+      forgot-password.tsx
     (tabs)/                     # Tab navigator
       _layout.tsx
       index.tsx                 # Home
@@ -150,13 +156,16 @@ src/
         index.tsx
         members.tsx
         topics.tsx
-        actors.tsx
         users.tsx
         history.tsx
         whatsapp.tsx
         theme.tsx
         about.tsx
+        timezone.tsx
     presentation.tsx            # Presentation Mode (modal)
+
+  providers/                    # React Providers
+    SyncProvider.tsx             # Sync, offline, notifications orchestrator
 
   components/                   # Shared UI components
     SundayCard.tsx
@@ -166,11 +175,13 @@ src/
     AccordionCard.tsx
     MemberSelectorModal.tsx
     TopicSelectorModal.tsx
-    ActorSelectorField.tsx
+    ActorSelector.tsx
     HymnSelectorField.tsx
     PrayerSelectorField.tsx
     StatusChangeModal.tsx
     OfflineBanner.tsx
+    QueryErrorView.tsx
+    ErrorBoundary.tsx
 
   contexts/                     # React Contexts
     AuthContext.tsx
@@ -184,9 +195,12 @@ src/
     useActors.ts
     useSundayTypes.ts
     useActivityLog.ts
+    useHymns.ts
+    usePresentationMode.ts
     useRealtimeSync.ts
     useConnection.ts
     useNotifications.ts
+    useOfflineQueueProcessor.ts
     useSundayList.ts
 
   lib/                          # Pure functions and utilities
@@ -195,6 +209,7 @@ src/
     offlineQueue.ts
     offlineGuard.ts
     sync.ts
+    connectionUtils.ts
     supabase.ts
     dateUtils.ts
 
@@ -240,6 +255,9 @@ scripts/                          # Admin CLI scripts (not Edge Functions)
 | ADR-013 | Inline actor management via bottom-sheet dialog | CR002 |
 | ADR-017 | Static imports for Expo SDK modules in CSV handlers | CR003 |
 | ADR-018 | Per-screen back buttons instead of global headerLeft | CR003 |
+| ADR-019 | Use Supabase built-in password reset flow | CR4_F007 |
+| ADR-020 | Independent can_conduct and can_preside actor fields | CR4_F008 |
+| ADR-021 | Auto-create actors for bishopric users in Edge Functions | CR4_F008 |
 
 ## Security Model
 

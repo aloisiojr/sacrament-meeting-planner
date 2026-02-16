@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -23,7 +23,7 @@ interface SettingsItemProps {
   colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
+const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
   return (
     <Pressable
       style={[styles.item, { borderBottomColor: colors.divider }]}
@@ -39,7 +39,7 @@ function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
       </View>
     </Pressable>
   );
-}
+});
 
 export default function SettingsScreen() {
   const { t } = useTranslation();

@@ -199,17 +199,18 @@ Ponte entre ala e colecoes gerais. Campo `active` (boolean) controla ativacao.
 | id | uuid PK | |
 | ward_id | uuid FK→wards | |
 | date | date NOT NULL | Data do domingo |
-| reason | text NOT NULL | Tipo do domingo |
+| reason | text NOT NULL | Tipo do domingo (enum) |
+| custom_reason | text NULL | Motivo customizado (apenas quando reason='other') |
 
 **Unique:** `(ward_id, date)` — **Check:** apenas domingos
-**Valores validos de reason:** `Discursos`, `Reuniao de Testemunho`, `Conferencia Geral`, `Conferencia de Estaca`, `Conferencia de Ala`, `Apresentacao Especial da Primaria`, `Outro`
-**Nota:** "Discursos" indica domingo normal com discursos (sem excecao). Todos os domingos possuem uma entrada nesta tabela apos a auto-atribuicao em lote.
-**Nota:** Para reason = "Outro", o campo `reason` contem o texto customizado digitado pelo usuario (ex: "Feriado local").
+**Valores validos de reason:** `speeches`, `testimony_meeting`, `general_conference`, `stake_conference`, `ward_conference`, `primary_presentation`, `other`
+**Nota:** `speeches` indica domingo normal com discursos (sem excecao). Todos os domingos possuem uma entrada nesta tabela apos a auto-atribuicao em lote.
+**Nota:** Para reason = `other`, o campo `custom_reason` contem o texto customizado digitado pelo usuario (ex: "Feriado local"). O campo `reason` permanece como `other`.
 **Auto-atribuicao em lote:** Ao carregar a lista de domingos (aba Discursos ou Home), para cada domingo sem entrada nesta tabela:
-- Padrao: `Discursos`
-- 1o domingo de Jan, Fev, Mar, Mai, Jun, Jul, Ago, Set, Nov, Dez: `Reuniao de Testemunho`
-- 1o domingo de Abr e Out: `Conferencia Geral`
-- 2o domingo de Abr e Out: `Reuniao de Testemunho`
+- Padrao: `speeches`
+- 1o domingo de Jan, Fev, Mar, Mai, Jun, Jul, Ago, Set, Nov, Dez: `testimony_meeting`
+- 1o domingo de Abr e Out: `general_conference`
+- 2o domingo de Abr e Out: `testimony_meeting`
 - Todos os valores auto-atribuidos sao persistidos imediatamente no banco.
 - Ao carregar +6 meses (scroll infinito), a auto-atribuicao roda para os novos domingos.
 
@@ -1816,7 +1817,7 @@ Os seguintes itens ainda nao foram implementados:
 | Auto-scroll Home | Auto-scroll para card expandido ficar visivel na tela Home | Pendente |
 | Gerenciar usuarios | Resolvido: Secretario agora tem acesso a gerenciamento de usuarios (CR-23). Permissao `settings:users` concedida ao papel Secretario. | Resolvido |
 | Dropdown codigo | Clicar no campo de codigo internacional fecha o card do membro | Pendente |
-| Botao Sair | Botao "Sair" nas Configuracoes nao faz nada | Pendente |
+| Botao Sair | Resolvido: Botao "Sair" implementado com dialogo de confirmacao (CR-43). queryClient.clear() antes de signOut(). | Resolvido |
 
 ---
 

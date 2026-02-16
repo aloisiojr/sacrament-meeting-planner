@@ -83,10 +83,14 @@ function clearQueue(): Promise<void>;
 
 ```typescript
 // hooks/useConnection.ts
-function useConnection(): {
+interface ConnectionState {
   isOnline: boolean;
   showOfflineBanner: boolean;
-};
+  isWebSocketConnected: boolean;
+  setWebSocketConnected: (connected: boolean) => void;
+}
+
+function useConnection(): ConnectionState;
 ```
 
 ### OfflineGuard
@@ -142,4 +146,45 @@ adrs:
     consequences:
       - "Simple implementation, no merge logic"
       - "Acceptable for single-active-user-per-ward model"
+```
+
+
+## Integration
+
+### Where modules are connected (added by CR-46)
+
+```
+src/app/_layout.tsx → InnerLayout → AuthProvider → SyncProvider → NavigationGuard
+
+src/providers/SyncProvider.tsx:
+  useConnection()          → Monitors NetInfo, shows/hides OfflineBanner
+  useRealtimeSync()        → Subscribes to Supabase Realtime (SyncEngine)
+  useOfflineQueueProcessor → Drains mutation queue on reconnect
+  useRegisterPushToken     → Registers push token (NotificationModule)
+  useNotificationHandler   → Handles notification taps
+
+src/components/OfflineBanner.tsx:
+  Rendered by SyncProvider above {children}
+  Shows translated "offline" message with red banner
+
+src/hooks/useOfflineQueueProcessor.ts:
+  Watches isOnline transitions (offline → online)
+  Processes queued mutations FIFO via supabase client
+  Supports INSERT, UPDATE, DELETE operations
+  Invalidates all queries after queue drain
+```
+
+### OfflineBanner rendering
+
+```
+┌──────────────────────────────────┐
+│  OfflineBanner (red, top)        │ ← visible when showOfflineBanner=true
+│  "Sem conexão"                   │
+│  "Alterações serão sincronizadas │
+│   quando a conexão for           │
+│   restaurada."                   │
+├──────────────────────────────────┤
+│  Tab Content (Slot)              │
+│  ...                             │
+└──────────────────────────────────┘
 ```

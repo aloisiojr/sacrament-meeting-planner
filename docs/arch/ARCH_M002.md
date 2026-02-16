@@ -25,7 +25,7 @@ principles:
 ┌──────────────────────────────────────────────────┐
 │                  Settings Tab                     │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐         │
-│  │ Members  │ │  Topics  │ │  Actors  │  ...     │
+│  │ Members  │ │  Topics  │ │  Agenda  │  ...     │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘         │
 └───────┼────────────┼────────────┼────────────────┘
         │            │            │
@@ -51,7 +51,7 @@ principles:
 | 2 | MemberImportExport | CSV import (overwrite) and export for members | TanStack Query, Supabase |
 | 3 | TopicManagementScreen | CRUD ward topics; activate/deactivate general collections | TanStack Query, Supabase |
 | 4 | SundayTypeManager | Auto-assign sunday types; dropdown override in card | TanStack Query, Supabase |
-| 5 | ActorManagementScreen | CRUD meeting actors with role toggles (inline) | TanStack Query, Supabase |
+| 5 | ActorSelectorDialog | Inline actor management via selector in agenda cards (no dedicated screen) | TanStack Query, Supabase |
 | 6 | HymnsCatalog | Read-only hymn lookup; admin script import | Supabase (global table) |
 | 7 | PrayerSelector | Select member or type custom name for prayers | Members query |
 | 8 | ActivityLogScreen | Read-only paginated log with search | TanStack Query, Supabase |
@@ -67,8 +67,8 @@ function useMembers(search?: string): UseQueryResult<Member[]>;
 function useCreateMember(): UseMutationResult<Member, Error, CreateMemberInput>;
 function useUpdateMember(): UseMutationResult<Member, Error, UpdateMemberInput>;
 function useDeleteMember(): UseMutationResult<void, Error, string>;
-function useImportMembers(): UseMutationResult<ImportResult, Error, File>;
-function useExportMembers(): UseMutationResult<Blob, Error, void>;
+function useImportMembers(): UseMutationResult<ImportResult, Error, string>;  // CSV content string (via expo-document-picker + expo-file-system)
+function useExportMembers(): UseMutationResult<void, Error, void>;  // Generates CSV file via expo-file-system + expo-sharing
 ```
 
 ### TopicService
@@ -138,15 +138,18 @@ tables:
     rls: "ward_id = auth.jwt().app_metadata.ward_id"
 
   sunday_exceptions:
-    columns: [id, ward_id, date, reason]
+    columns: [id, ward_id, date, reason, custom_reason]
     unique: [(ward_id, date)]
-    check: "date is a Sunday"
+    check: "date is a Sunday; reason IN ('speeches','testimony_meeting','general_conference','stake_conference','ward_conference','primary_presentation','other')"
     rls: "ward_id = auth.jwt().app_metadata.ward_id"
+    notes:
+      - "'speeches' is the default reason and is persisted for all regular sundays"
+      - "'custom_reason' is nullable, only used when reason='other'"
 
   meeting_actors:
     columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_music, created_at, updated_at]
     rls: "ward_id = auth.jwt().app_metadata.ward_id"
-    rule: "can_conduct=true implies can_preside=true (app-enforced)"
+    notes: "Actor roles are independent; can_conduct does NOT imply can_preside (per CR-71)"
 
   hymns:
     columns: [id, language, number, title, is_sacramental]
@@ -178,9 +181,10 @@ tables:
 1. Load sunday list for date range (tab open or scroll)
 2. For each sunday without entry in sunday_exceptions:
    a. Check month rules (1st Sunday = testimony, April/October = conference, etc.)
-   b. Default: "Discursos"
-3. Batch INSERT all missing entries
-4. Persist immediately (no lazy creation for types)
+   b. Default: "speeches" (Discursos)
+3. Batch INSERT all missing entries (including "speeches" as a regular reason)
+4. All sunday types are persisted in the database, including the default "speeches"
+5. User can override any type via dropdown in the sunday card
 ```
 
 ## ADRs

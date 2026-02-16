@@ -81,37 +81,27 @@ No changes to `resolveTemplate()` function -- it remains generic and works with 
 
 ### Architecture Decision
 
-**Replace title text with formatted date using `Intl.DateTimeFormat`**. No new utility functions or i18n keys needed -- `Intl.DateTimeFormat` handles localization natively using the locale string already available via `i18n.language`.
+**Replace title text with formatted date using `formatFullDate` from `dateUtils.ts`**. This function uses `Intl.DateTimeFormat` internally and handles locale mapping for pt-BR, en, and es.
 
 ### Change Plan
 
 **File: `src/app/presentation.tsx`**
 
-1. Destructure `i18n` from `useTranslation()`:
+1. Import `formatFullDate` from `dateUtils.ts` and `getCurrentLanguage` from i18n:
 
 ```typescript
-// Before:
-const { t } = useTranslation();
-
-// After:
-const { t, i18n } = useTranslation();
+import { formatFullDate } from '../lib/dateUtils';
+import { getCurrentLanguage } from '../i18n';
 ```
 
 2. Add formatted date memo after `sundayDate` declaration:
 
 ```typescript
-const formattedDate = useMemo(() => {
-  const date = new Date(sundayDate + 'T12:00:00');
-  return date.toLocaleDateString(i18n.language, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}, [sundayDate, i18n.language]);
+const formattedDate = useMemo(
+  () => formatFullDate(sundayDate, getCurrentLanguage()),
+  [sundayDate]
+);
 ```
-
-Note: `T12:00:00` is appended to avoid timezone-shift issues when parsing date-only strings. Without it, `new Date('2026-02-15')` is interpreted as midnight UTC, which in negative UTC offsets (e.g., Brazil, UTC-3) would show February 14.
 
 3. Replace header title text:
 

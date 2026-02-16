@@ -1506,7 +1506,7 @@ O app envia push notifications via Expo Push Notifications para manter bispado e
 | ASM-006 | Autenticacao apenas email/senha. Sem OAuth/Google |
 | ASM-007 | Criacao de Alas via self-registration do primeiro usuario. Sem CLI |
 | ASM-008 | Demais usuarios convidados por link (deep link) pelo Bispado ou Secretario |
-| ASM-009 | Secretario NAO designa em nenhuma tela |
+| ASM-009 | Secretario NAO designa pela aba Discursos nem Home, mas PODE designar pela aba Agenda (excecao documentada em ASM-AGD-003) |
 | ASM-010 | Template WhatsApp editavel, com default traduzido por idioma |
 | ASM-011 | Discursos criados via lazy creation |
 | ASM-012 | Formato de arquivo para membros: CSV (nao Excel nativo) |

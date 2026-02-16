@@ -429,14 +429,13 @@ describe('STEP-06-08: WhatsApp Template', () => {
     '{nome}',
     '{data}',
     '{posicao}',
-    '{duracao}',
     '{colecao}',
     '{titulo}',
     '{link}',
   ];
 
-  it('has exactly 7 placeholders', () => {
-    expect(PLACEHOLDERS).toHaveLength(7);
+  it('has exactly 6 placeholders', () => {
+    expect(PLACEHOLDERS).toHaveLength(6);
   });
 
   it('resolveTemplate replaces all placeholders', () => {
@@ -445,7 +444,6 @@ describe('STEP-06-08: WhatsApp Template', () => {
       '{nome}': 'Maria Silva',
       '{data}': '2026-03-01',
       '{posicao}': '1',
-      '{duracao}': '10 min',
       '{colecao}': 'Temas da Ala',
       '{titulo}': 'Fe em Jesus Cristo',
       '{link}': 'https://example.com/topic',
@@ -471,12 +469,11 @@ describe('STEP-06-08: WhatsApp Template', () => {
     expect(resolved).not.toContain('{colecao}');
   });
 
-  it('resolveTemplate handles template with all 7 placeholders', () => {
+  it('resolveTemplate handles template with all 6 placeholders', () => {
     const SAMPLE_DATA: Record<string, string> = {
       '{nome}': 'Maria Silva',
       '{data}': '2026-03-01',
       '{posicao}': '1',
-      '{duracao}': '10 min',
       '{colecao}': 'Temas da Ala',
       '{titulo}': 'Fe em Jesus Cristo',
       '{link}': 'https://example.com/topic',
@@ -490,7 +487,7 @@ describe('STEP-06-08: WhatsApp Template', () => {
       return result;
     }
 
-    const template = '{nome} {data} {posicao} {duracao} {colecao} {titulo} {link}';
+    const template = '{nome} {data} {posicao} {colecao} {titulo} {link}';
     const resolved = resolveTemplate(template);
     for (const placeholder of PLACEHOLDERS) {
       expect(resolved).not.toContain(placeholder);
@@ -503,7 +500,6 @@ describe('STEP-06-08: WhatsApp Template', () => {
         '{nome}': 'Maria Silva',
         '{data}': '2026-03-01',
         '{posicao}': '1',
-        '{duracao}': '10 min',
         '{colecao}': 'Temas da Ala',
         '{titulo}': 'Fe em Jesus Cristo',
         '{link}': 'https://example.com/topic',

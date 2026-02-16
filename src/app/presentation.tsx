@@ -23,6 +23,8 @@ import {
   buildPresentationCards,
 } from '../hooks/usePresentationMode';
 import { AccordionCard } from '../components/AccordionCard';
+import { formatFullDate } from '../lib/dateUtils';
+import { getCurrentLanguage } from '../i18n';
 import type { PresentationField } from '../hooks/usePresentationMode';
 
 export default function PresentationScreen() {
@@ -31,6 +33,10 @@ export default function PresentationScreen() {
   const router = useRouter();
 
   const sundayDate = getTodaySundayDate();
+  const dateLabel = useMemo(
+    () => formatFullDate(sundayDate, getCurrentLanguage()),
+    [sundayDate]
+  );
   const {
     agenda,
     speeches,
@@ -68,9 +74,14 @@ export default function PresentationScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('home.startMeeting')}
-        </Text>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('home.startMeeting')}
+          </Text>
+          <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
+            {dateLabel}
+          </Text>
+        </View>
         <Pressable
           style={[styles.closeButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.back()}
@@ -140,6 +151,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     flex: 1,
+  },
+  headerDate: {
+    fontSize: 14,
+    marginTop: 2,
   },
   closeButton: {
     width: 36,

@@ -1,6 +1,6 @@
 /**
  * WhatsApp URL building utilities (pure functions, no React Native deps).
- * Template placeholders: {nome}, {data}, {posicao}, {duracao}, {colecao}, {titulo}, {link}
+ * Template placeholders: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}
  */
 
 // --- Default Template ---
@@ -17,7 +17,6 @@ export interface WhatsAppVariables {
   position: string;
   collection?: string;
   link?: string;
-  duration?: string;
 }
 
 // --- Functions ---
@@ -30,7 +29,6 @@ export function resolveTemplate(template: string, vars: WhatsAppVariables): stri
   result = result.replace(/\{nome\}/g, vars.speakerName);
   result = result.replace(/\{data\}/g, vars.date);
   result = result.replace(/\{posicao\}/g, vars.position);
-  result = result.replace(/\{duracao\}/g, vars.duration ?? '');
   result = result.replace(/\{colecao\}/g, vars.collection ?? '');
   result = result.replace(/\{titulo\}/g, vars.topic);
   result = result.replace(/\{link\}/g, vars.link ?? '');

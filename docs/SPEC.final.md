@@ -742,7 +742,7 @@ Discursos armazenam `speaker_name`, `speaker_phone`, `topic_title`, `topic_link`
 ### 7.9 Configuracoes > Template WhatsApp
 
 - Editor com preview em tempo real (AC-043)
-- Placeholders: {nome}, {data}, {posicao}, {duracao}, {colecao}, {titulo}, {link}
+- Placeholders: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}
 - Template salvo por ala
 - Acessivel a Bispado e Secretario
 

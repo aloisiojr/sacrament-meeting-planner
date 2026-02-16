@@ -14,7 +14,7 @@
 
 ## Technical Notes
 - Editor with real-time preview
-- Placeholders: {nome}, {data}, {posicao}, {duracao}, {colecao}, {titulo}, {link}
+- Placeholders: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}
 - Template saved per ward (wards.whatsapp_template)
 - Accessible to Bishopric and Secretary
 - Default template provided per language on ward creation

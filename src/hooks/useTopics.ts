@@ -92,7 +92,7 @@ export function useCreateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema criado: ${data.title}`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema "${data.title}" adicionado`);
       }
     },
   });
@@ -122,7 +122,7 @@ export function useUpdateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema atualizado: ${data.title}`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema "${data.title}" atualizado`);
       }
     },
   });
@@ -162,7 +162,7 @@ export function useDeleteWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema excluído: ${topicTitle}`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema "${topicTitle}" removido`);
       }
     },
   });
@@ -272,8 +272,8 @@ export function useToggleCollection() {
       if (user && result.collectionName) {
         const action = result.active ? 'collection:activate' : 'collection:deactivate';
         const desc = result.active
-          ? `Coleção ativada: ${result.collectionName}`
-          : `Coleção desativada: ${result.collectionName}`;
+          ? `Colecao "${result.collectionName}" ativada`
+          : `Colecao "${result.collectionName}" desativada`;
         logAction(wardId, user.id, user.email ?? '', action, desc);
       }
     },

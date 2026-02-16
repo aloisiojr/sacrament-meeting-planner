@@ -119,7 +119,7 @@ export function useCreateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:create', `Ator criado: ${data.name}`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:create', `${data.name} adicionado como ator da reuniao`);
       }
     },
   });
@@ -150,7 +150,7 @@ export function useUpdateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:update', `Ator atualizado: ${data.name}`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:update', `${data.name} atualizado`);
       }
     },
   });
@@ -173,7 +173,7 @@ export function useDeleteActor() {
     onSuccess: (actorName) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `Ator excluído: ${actorName}`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `${actorName} removido`);
       }
     },
   });

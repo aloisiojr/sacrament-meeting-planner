@@ -224,9 +224,14 @@ describe('CR-03: Empty agenda rendering in presentation', () => {
   });
 
   describe('EC: Edge cases', () => {
-    it('null agenda returns empty array', () => {
+    it('null agenda returns 4 cards with empty values (R-2: null handled at UI level)', () => {
       const cards = buildPresentationCards(null, [], null, mockHymnLookup, mockT);
-      expect(cards).toEqual([]);
+      expect(cards).toHaveLength(4);
+      for (const card of cards) {
+        for (const field of card.fields) {
+          expect(field.value).toBe('');
+        }
+      }
     });
 
     it('special meeting with empty agenda returns 3 cards', () => {

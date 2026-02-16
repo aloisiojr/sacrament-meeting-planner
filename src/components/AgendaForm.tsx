@@ -22,11 +22,11 @@ import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
 import { useSpeeches, useAssignSpeaker, useLazyCreateSpeeches } from '../hooks/useSpeeches';
-import { useActors } from '../hooks/useActors';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
 import { useMembers } from '../hooks/useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { MemberSelectorModal } from './MemberSelectorModal';
+import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import type {
   SundayAgenda,
@@ -71,10 +71,6 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
   const assignSpeaker = useAssignSpeaker();
   const lazyCreateSpeeches = useLazyCreateSpeeches();
 
-  const { data: presidingActors } = useActors('can_preside');
-  const { data: conductingActors } = useActors('can_conduct');
-  const { data: recognizeActors } = useActors('can_recognize');
-  const { data: musicActors } = useActors('can_music');
   const { data: members } = useMembers();
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
@@ -424,8 +420,15 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
         </>
       ) : (
         <>
-          {/* Special meeting */}
-          <SectionHeader title={t(`sundayExceptions.${exceptionReason}`, 'Special Meeting')} colors={colors} />
+          {/* Special meeting: use custom_reason as header for "other" type (CR-29) */}
+          <SectionHeader
+            title={
+              exceptionReason === 'other' && customReason
+                ? customReason
+                : t(`sundayExceptions.${exceptionReason}`, 'Special Meeting')
+            }
+            colors={colors}
+          />
           <FieldRow label={t('agenda.meetingType', 'Meeting Type')} colors={colors}>
             <Text style={[styles.fieldValue, { color: colors.textSecondary }]}>
               {exceptionReason ? t(`sundayExceptions.${exceptionReason}`, exceptionReason) : ''}
@@ -463,19 +466,11 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
         />
       </FieldRow>
 
-      {/* Actor selector modal */}
+      {/* Actor selector bottom-sheet */}
       {selectorModal?.type === 'actor' && (
-        <ActorSelectorModal
+        <ActorSelector
           visible
-          actors={
-            selectorModal.roleFilter === 'can_preside'
-              ? presidingActors ?? []
-              : selectorModal.roleFilter === 'can_conduct'
-              ? conductingActors ?? []
-              : selectorModal.roleFilter === 'can_recognize'
-              ? recognizeActors ?? []
-              : musicActors ?? []
-          }
+          roleFilter={(selectorModal.roleFilter ?? 'all') as import('../hooks/useActors').ActorRoleFilter}
           onSelect={(actor) => {
             const nameField = `${selectorModal.field}_name`;
             const idField = `${selectorModal.field}_actor_id`;
@@ -640,52 +635,6 @@ function ToggleField({
 }
 
 // --- Inline Selector Modals ---
-
-function ActorSelectorModal({
-  visible,
-  actors,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  actors: MeetingActor[];
-  onSelect: (actor: MeetingActor) => void;
-  onClose: () => void;
-}) {
-  const { colors } = useTheme();
-  const { t } = useTranslation();
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {t('speeches.selectSpeaker')}
-          </Text>
-          <FlatList
-            data={actors}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.modalItem}
-                onPress={() => onSelect(item)}
-              >
-                <Text style={[styles.modalItemText, { color: colors.text }]}>
-                  {item.name}
-                </Text>
-              </Pressable>
-            )}
-            ListEmptyComponent={
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('common.noResults')}
-              </Text>
-            }
-          />
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}
 
 function HymnSelectorModal({
   visible,

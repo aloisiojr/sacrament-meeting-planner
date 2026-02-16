@@ -147,13 +147,6 @@ export default function SettingsScreen() {
               colors={colors}
             />
           )}
-          {hasPermission('settings:access') && (
-            <SettingsItem
-              label={t('settings.actors')}
-              onPress={() => router.push('/(tabs)/settings/actors')}
-              colors={colors}
-            />
-          )}
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>

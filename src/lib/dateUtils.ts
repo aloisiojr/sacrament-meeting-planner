@@ -11,6 +11,15 @@ const MONTH_ABBR: Record<SupportedLanguage, string[]> = {
 };
 
 /**
+ * Full month names for human-readable date formatting.
+ */
+const MONTH_FULL: Record<SupportedLanguage, string[]> = {
+  'pt-BR': ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  es: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+};
+
+/**
  * Check if a given date is a Sunday.
  * Works with Date objects and ISO date strings (YYYY-MM-DD).
  */
@@ -162,4 +171,26 @@ export function getPreviousSundays(from: Date | string, count: number): Date[] {
   }
 
   return sundays;
+}
+
+/**
+ * Format a date as a human-readable string for activity log descriptions.
+ * - pt-BR: "15 de Fevereiro de 2026"
+ * - en: "February 15, 2026"
+ * - es: "15 de Febrero de 2026"
+ */
+export function formatDateHumanReadable(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
+  const d = parseLocalDate(dateStr);
+  const day = d.getDate();
+  const month = MONTH_FULL[language][d.getMonth()];
+  const year = d.getFullYear();
+
+  switch (language) {
+    case 'en':
+      return `${month} ${day}, ${year}`;
+    case 'pt-BR':
+    case 'es':
+    default:
+      return `${day} de ${month} de ${year}`;
+  }
 }

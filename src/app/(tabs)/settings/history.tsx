@@ -6,8 +6,10 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useActivityLog, useActivityLogSearch } from '../../../hooks/useActivityLog';
@@ -58,6 +60,7 @@ function ActivityLogEntry({
 export default function ActivityLogScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const router = useRouter();
   const { searchText, debouncedSearch, updateSearch } = useActivityLogSearch();
 
   const {
@@ -86,9 +89,18 @@ export default function ActivityLogScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
-        {t('activityLog.title')}
-      </Text>
+      {/* Header with back button */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button">
+          <Text style={[styles.backButton, { color: colors.primary }]}>
+            {t('common.back')}
+          </Text>
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {t('activityLog.title')}
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
       {/* Search field */}
       <View style={styles.searchContainer}>
@@ -159,12 +171,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingVertical: 12,
+  },
+  backButton: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerSpacer: {
+    width: 50,
   },
   searchContainer: {
     paddingHorizontal: 16,

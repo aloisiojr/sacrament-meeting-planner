@@ -1,6 +1,6 @@
 /**
  * Agenda tab: Infinite scroll list of sundays with agenda forms.
- * Excludes sundays with Gen Conf / Stake Conf.
+ * Shows all sundays including Gen Conf / Stake Conf (non-expandable).
  * Includes Testimony Meeting, Ward Conference, Special Program.
  * 12 months past + 12 months future, +6 on scroll.
  */
@@ -18,10 +18,11 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
+import { QueryErrorView } from '../../components/QueryErrorView';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
-import { useLazyCreateAgenda } from '../../hooks/useAgenda';
-import { isExcludedFromAgenda } from '../../hooks/useAgenda';
+import { useLazyCreateAgenda, isExcludedFromAgenda } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
 import { formatDate, toISODateString, zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
@@ -41,7 +42,7 @@ type ListItem =
 
 // --- Component ---
 
-export default function AgendaTab() {
+function AgendaTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const locale = getCurrentLanguage();
@@ -57,7 +58,7 @@ export default function AgendaTab() {
     nextSunday,
   } = useSundayList();
 
-  const { data: exceptions } = useSundayExceptions(startDate, endDate);
+  const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
   const lazyCreate = useLazyCreateAgenda();
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -71,22 +72,16 @@ export default function AgendaTab() {
     return map;
   }, [exceptions]);
 
-  // Filter sundays: exclude Gen Conf / Stake Conf / No Meeting
+  // Build sunday list (all sundays, including Gen Conf / Stake Conf)
   const filteredSundays = useMemo(() => {
-    return sundays
-      .filter((date) => {
-        const ex = exceptionMap.get(date);
-        if (ex && isExcludedFromAgenda(ex.reason)) return false;
-        return true;
-      })
-      .map((date) => {
-        const [yearStr] = date.split('-');
-        return {
-          date,
-          exception: exceptionMap.get(date) ?? null,
-          year: parseInt(yearStr, 10),
-        };
-      });
+    return sundays.map((date) => {
+      const [yearStr] = date.split('-');
+      return {
+        date,
+        exception: exceptionMap.get(date) ?? null,
+        year: parseInt(yearStr, 10),
+      };
+    });
   }, [sundays, exceptionMap]);
 
   // Build list items with year separators
@@ -167,6 +162,7 @@ export default function AgendaTab() {
           isNext={isNext}
           isPast={isPast}
           locale={locale}
+          expandable={!exception || !isExcludedFromAgenda(exception.reason)}
           onToggle={() => handleToggle(date)}
         />
       );
@@ -192,6 +188,17 @@ export default function AgendaTab() {
     },
     []
   );
+
+  if (exceptionsError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <QueryErrorView
+          error={exceptionsErr ?? null}
+          onRetry={refetchExceptions}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -232,6 +239,7 @@ interface AgendaSundayCardProps {
   isNext: boolean;
   isPast: boolean;
   locale: SupportedLanguage;
+  expandable: boolean;
   onToggle: () => void;
 }
 
@@ -242,6 +250,7 @@ function AgendaSundayCard({
   isNext,
   isPast,
   locale,
+  expandable,
   onToggle,
 }: AgendaSundayCardProps) {
   const { colors } = useTheme();
@@ -268,7 +277,7 @@ function AgendaSundayCard({
     >
       <Pressable
         style={styles.cardHeader}
-        onPress={onToggle}
+        onPress={expandable ? onToggle : undefined}
         accessibilityRole="button"
         accessibilityState={{ expanded: isExpanded }}
       >
@@ -290,21 +299,33 @@ function AgendaSundayCard({
           )}
         </View>
 
-        <Text style={[styles.chevron, { color: colors.textSecondary }]}>
-          {isExpanded ? '\u25B2' : '\u25BC'}
-        </Text>
+        {expandable && (
+          <Text style={[styles.chevron, { color: colors.textSecondary }]}>
+            {isExpanded ? '\u25B2' : '\u25BC'}
+          </Text>
+        )}
       </Pressable>
 
-      {isExpanded && (
+      {expandable && isExpanded && (
         <View style={styles.expandedContent}>
-          <AgendaForm
-            sundayDate={date}
-            exceptionReason={exception?.reason ?? null}
-            customReason={exception?.custom_reason ?? null}
-          />
+          <ThemedErrorBoundary>
+            <AgendaForm
+              sundayDate={date}
+              exceptionReason={exception?.reason ?? null}
+              customReason={exception?.custom_reason ?? null}
+            />
+          </ThemedErrorBoundary>
         </View>
       )}
     </View>
+  );
+}
+
+export default function AgendaTab() {
+  return (
+    <ThemedErrorBoundary>
+      <AgendaTabContent />
+    </ThemedErrorBoundary>
   );
 }
 

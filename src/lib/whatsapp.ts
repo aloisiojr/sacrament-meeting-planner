@@ -4,6 +4,7 @@
  */
 
 import { Linking, Alert } from 'react-native';
+import i18n from '../i18n';
 
 // Re-export pure utilities so existing imports continue to work
 export {
@@ -23,9 +24,9 @@ export async function openWhatsApp(url: string): Promise<void> {
     if (canOpen) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('WhatsApp', 'WhatsApp is not installed on this device.');
+      Alert.alert('WhatsApp', i18n.t('errors.whatsappNotInstalled'));
     }
   } catch {
-    Alert.alert('WhatsApp', 'Failed to open WhatsApp.');
+    Alert.alert('WhatsApp', i18n.t('errors.whatsappFailed'));
   }
 }

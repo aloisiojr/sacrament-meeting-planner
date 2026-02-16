@@ -17,6 +17,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
+import { QueryErrorView } from '../../components/QueryErrorView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SundayCard } from '../../components/SundayCard';
 import { SpeechSlot } from '../../components/SpeechSlot';
@@ -72,7 +74,18 @@ function buildListItems(sundayDates: string[]): ListItem[] {
   return items;
 }
 
-export default function SpeechesTab() {
+const YearSeparator = React.memo(function YearSeparator({ year }: { year: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.yearSeparator}>
+      <Text style={[styles.yearText, { color: colors.textSecondary }]}>
+        {year}
+      </Text>
+    </View>
+  );
+});
+
+function SpeechesTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission, role } = useAuth();
@@ -90,14 +103,14 @@ export default function SpeechesTab() {
   const canWriteSundayType = hasPermission('sunday_type:write');
 
   // Fetch speeches and exceptions for the visible range
-  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
-  const { data: exceptions } = useSundayExceptions(startDate, endDate);
+  const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
 
   // Auto-assign sunday types on load
   const autoAssign = useAutoAssignSundayTypes();
   useEffect(() => {
     if (sundays.length > 0) {
-      autoAssign.mutate(sundays);
+      autoAssign.mutate(sundays, { meta: { suppressGlobalError: true } } as any);
     }
   }, [sundays.length]); // Only re-run when sundays count changes
 
@@ -234,13 +247,7 @@ export default function SpeechesTab() {
   const renderItem = useCallback(
     ({ item }: { item: ListItem }) => {
       if (item.type === 'year') {
-        return (
-          <View style={styles.yearSeparator}>
-            <Text style={[styles.yearText, { color: colors.textSecondary }]}>
-              {item.year}
-            </Text>
-          </View>
-        );
+        return <YearSeparator year={item.year} />;
       }
 
       const sundayData = speechMap.get(item.date);
@@ -286,7 +293,6 @@ export default function SpeechesTab() {
       );
     },
     [
-      colors,
       speechMap,
       nextSunday,
       today,
@@ -308,6 +314,17 @@ export default function SpeechesTab() {
     }),
     []
   );
+
+  if (speechesError || exceptionsError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <QueryErrorView
+          error={speechesErr ?? exceptionsErr ?? null}
+          onRetry={() => { refetchSpeeches(); refetchExceptions(); }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -372,6 +389,15 @@ export default function SpeechesTab() {
     </SafeAreaView>
   );
 }
+
+export default function SpeechesTab() {
+  return (
+    <ThemedErrorBoundary>
+      <SpeechesTabContent />
+    </ThemedErrorBoundary>
+  );
+}
+
 
 const styles = StyleSheet.create({
   container: {

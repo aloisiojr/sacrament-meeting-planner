@@ -95,6 +95,13 @@ estimated_iterations: 4
 | M007 | OfflineManager | F022 | Complete | [ARCH_M007](ARCH_M007.md) |
 | M008 | UIShell | F009, F020, F021 | Complete | [ARCH_M008](ARCH_M008.md) |
 
+## Change Request Architectures
+
+| ID | Scope | CRs | Status | Doc |
+|----|-------|-----|--------|-----|
+| CR001 | Batch 1 Bug Fixes | CR-01 to CR-10 | Complete | [ARCH_CR001](ARCH_CR001.md) |
+| CR002 | Batch 2 Bug Fixes & Actors Redesign | CR-11 to CR-30 | Complete | [ARCH_CR002](ARCH_CR002.md) |
+
 ## Module Dependencies
 
 ```
@@ -146,6 +153,8 @@ src/
         users.tsx
         history.tsx
         whatsapp.tsx
+        theme.tsx
+        about.tsx
     presentation.tsx            # Presentation Mode (modal)
 
   components/                   # Shared UI components
@@ -224,6 +233,10 @@ scripts/                          # Admin CLI scripts (not Edge Functions)
 | ADR-007 | Queue-based push notifications | M005 |
 | ADR-008 | Last-write-wins conflict resolution | M007 |
 | ADR-009 | Expo Router file-based routing | M008 |
+| ADR-010 | Replace sunday type enum with corrected list | CR001 |
+| ADR-011 | ScrollView wrapper for Topics screen | CR001 |
+| ADR-012 | Debounced auto-save for AgendaForm text inputs | CR002 |
+| ADR-013 | Inline actor management via bottom-sheet dialog | CR002 |
 
 ## Security Model
 

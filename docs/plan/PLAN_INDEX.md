@@ -37,6 +37,13 @@ main_risks:
 | [PHASE-05](PLAN_PHASE_05.md) | Infrastructure | 8 | PHASE-03 | F011, F017, F022 |
 | [PHASE-06](PLAN_PHASE_06.md) | Admin & Polish | 9 | PHASE-01, PHASE-02 | F004, F018, F019, F024 |
 
+## Change Request Plans
+
+| Plan | Title | Steps | Dependencies | CRs Covered |
+|------|-------|-------|--------------|-------------|
+| [PLAN_CR001](PLAN_CR001.md) | Change Requests Batch 1 | 14 | PHASE-01 through PHASE-06 (existing codebase) | CR-01 to CR-10 |
+| [PLAN_CR002](PLAN_CR002.md) | Change Requests Batch 2 | 18 | PLAN_CR001 (existing codebase) | CR-11 to CR-30 |
+
 ## Module-to-Phase Mapping
 
 | Module | Phase(s) |

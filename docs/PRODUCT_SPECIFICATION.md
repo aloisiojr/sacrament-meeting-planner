@@ -746,11 +746,8 @@ Uma solução digital centralizada permite:
   - Botão "Adicionar novo ator" ao final da lista
   - Ícone de lixeira ao lado de cada ator para deletar
 - **Quando** clica em "Adicionar novo ator"
-- **Então** mini-formulário inline abre: nome + checkboxes de papéis (Presidir, Dirigir, Reconhecer, Música)
-- **E** ao salvar: ator criado, automaticamente selecionado no campo
-- **E** ator com papel "Dirigir" automaticamente qualifica para "Presidir"
+- **Então** campo de nome aparece. Ao salvar, o papel é inferido automaticamente do campo de ator clicado (ex: campo "Pianista" define can_music=true). Ator com papel "Dirigir" automaticamente qualifica para "Presidir".
 - **E** um ator pode ter múltiplos papéis (ex: Presidir + Música)
-- **E** papéis são editáveis após criação
 - **Quando** clica no ícone de lixeira de um ator
 - **Então** diálogo de confirmação aparece
 - **E** ao confirmar: ator removido da lista; nome preservado como snapshot em agendas existentes (FK vira NULL)

@@ -3,7 +3,7 @@
  * general collections toggle, and inline add/edit.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -188,10 +188,12 @@ export default function TopicsScreen() {
   const canToggle = hasPermission('collection:toggle');
 
   const { data: wardTopics } = useWardTopics();
-  const filteredTopics = wardTopics?.filter((topic) => {
-    if (!search.trim()) return true;
-    return topic.title.toLowerCase().includes(search.trim().toLowerCase());
-  });
+  const filteredTopics = useMemo(() => {
+    return wardTopics?.filter((topic) => {
+      if (!search.trim()) return true;
+      return topic.title.toLowerCase().includes(search.trim().toLowerCase());
+    });
+  }, [wardTopics, search]);
   const { data: collections } = useCollections(language);
   const createTopic = useCreateWardTopic();
   const updateTopic = useUpdateWardTopic();

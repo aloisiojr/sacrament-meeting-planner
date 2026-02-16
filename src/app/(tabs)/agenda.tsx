@@ -1,6 +1,6 @@
 /**
  * Agenda tab: Infinite scroll list of sundays with agenda forms.
- * Excludes sundays with Gen Conf / Stake Conf / No Meeting.
+ * Excludes sundays with Gen Conf / Stake Conf.
  * Includes Testimony Meeting, Ward Conference, Special Program.
  * 12 months past + 12 months future, +6 on scroll.
  */

@@ -182,11 +182,16 @@ export default function TopicsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const canWrite = hasPermission('topic:write');
   const canToggle = hasPermission('collection:toggle');
 
   const { data: wardTopics } = useWardTopics();
+  const filteredTopics = wardTopics?.filter((topic) => {
+    if (!search.trim()) return true;
+    return topic.title.toLowerCase().includes(search.trim().toLowerCase());
+  });
   const { data: collections } = useCollections(language);
   const createTopic = useCreateWardTopic();
   const updateTopic = useUpdateWardTopic();
@@ -295,12 +300,25 @@ export default function TopicsScreen() {
               )}
             </View>
 
+            {/* Search field for Ward Topics */}
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={[styles.searchInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                value={search}
+                onChangeText={setSearch}
+                placeholder={t('common.search')}
+                placeholderTextColor={colors.placeholder}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
             {isAdding && (
               <TopicEditor onSave={handleSaveNew} colors={colors} />
             )}
 
-            {wardTopics && wardTopics.length > 0 ? (
-              wardTopics.map((item) => (
+            {filteredTopics && filteredTopics.length > 0 ? (
+              filteredTopics.map((item) => (
                 <TopicRow
                   key={item.id}
                   topic={item}
@@ -406,6 +424,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  searchInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
   },
   editor: {
     paddingHorizontal: 16,

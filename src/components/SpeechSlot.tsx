@@ -55,7 +55,7 @@ function getPositionLabel(position: number, t: (key: string, opts?: Record<strin
 
 // --- Component ---
 
-export function SpeechSlot({
+export const SpeechSlot = React.memo(function SpeechSlot({
   speech,
   position,
   onAssignSpeaker,
@@ -209,7 +209,7 @@ export function SpeechSlot({
       />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

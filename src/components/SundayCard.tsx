@@ -245,7 +245,7 @@ function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disable
 
 // --- SundayCard ---
 
-export function SundayCard({
+export const SundayCard = React.memo(function SundayCard({
   date,
   speeches,
   exception,
@@ -350,7 +350,7 @@ export function SundayCard({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

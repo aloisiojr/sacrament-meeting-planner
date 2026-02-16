@@ -72,6 +72,7 @@ export default function UserManagementScreen() {
     data: users = [],
     isLoading,
     error: usersError,
+    refetch,
   } = useQuery({
     queryKey: userManagementKeys.users,
     queryFn: async (): Promise<WardUser[]> => {
@@ -233,8 +234,16 @@ export default function UserManagementScreen() {
         {usersError && (
           <View style={styles.centered}>
             <Text style={[styles.errorText, { color: colors.error }]}>
-              {t('common.error')}
+              {t('users.loadError')}
             </Text>
+            <Pressable
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => refetch()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+            </Pressable>
           </View>
         )}
 
@@ -523,6 +532,17 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
+    marginBottom: 12,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyText: {
     fontSize: 16,

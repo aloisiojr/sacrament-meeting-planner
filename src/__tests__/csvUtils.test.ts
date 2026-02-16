@@ -15,6 +15,14 @@ describe('parseCsv', () => {
     expect(result.members[1]).toEqual({ full_name: 'Maria Santos', phone: '+5521888888888' });
   });
 
+  it('handles UTF-8 BOM prefix', () => {
+    const csv = '\uFEFFNome,Telefone Completo\nJoao Silva,+5511999999999';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(true);
+    expect(result.members).toHaveLength(1);
+    expect(result.members[0].full_name).toBe('Joao Silva');
+  });
+
   it('handles empty phone numbers', () => {
     const csv = 'Nome,Telefone Completo\nJoao Silva,';
     const result = parseCsv(csv);
@@ -78,14 +86,15 @@ describe('parseCsv', () => {
 });
 
 describe('generateCsv', () => {
-  it('generates CSV with header and data rows', () => {
+  it('generates CSV with BOM, header, and data rows', () => {
     const members = [
       { full_name: 'Joao Silva', country_code: '+55', phone: '11999999999' },
       { full_name: 'Maria Santos', country_code: '+55', phone: '21888888888' },
     ];
     const csv = generateCsv(members);
+    expect(csv.startsWith('\uFEFF')).toBe(true);
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('Nome,Telefone Completo');
+    expect(lines[0]).toBe('\uFEFFNome,Telefone Completo');
     expect(lines[1]).toBe('Joao Silva,+5511999999999');
     expect(lines[2]).toBe('Maria Santos,+5521888888888');
   });

@@ -27,6 +27,9 @@ import { SwipeableCard } from '../../../components/SwipeableCard';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { generateCsv, parseCsv, splitPhoneNumber } from '../../../lib/csvUtils';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   useMembers,
   useCreateMember,
@@ -355,8 +358,6 @@ export default function MembersScreen() {
     } else {
       // Mobile: Write temp file and share via expo-sharing
       try {
-        const FileSystem = await import('expo-file-system');
-        const Sharing = await import('expo-sharing');
         const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
         await FileSystem.writeAsStringAsync(fileUri, csv, {
           encoding: FileSystem.EncodingType.UTF8,
@@ -367,7 +368,7 @@ export default function MembersScreen() {
           UTI: 'public.comma-separated-values-text',
         });
       } catch {
-        // User cancelled or sharing not available
+        Alert.alert(t('common.error'), t('members.exportFailed'));
       }
     }
   }, [members, t]);
@@ -433,13 +434,11 @@ export default function MembersScreen() {
     } else {
       // Mobile: DocumentPicker
       try {
-        const DocumentPicker = await import('expo-document-picker');
         const result = await DocumentPicker.getDocumentAsync({
           type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
           copyToCacheDirectory: true,
         });
         if (result.canceled || !result.assets?.[0]) return;
-        const FileSystem = await import('expo-file-system');
         const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
           encoding: FileSystem.EncodingType.UTF8,
         });

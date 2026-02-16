@@ -224,7 +224,7 @@ export default function SettingsScreen() {
         </View>
 
         <Pressable
-          style={styles.signOutButton}
+          style={[styles.signOutButton, { borderColor: colors.error }]}
           onPress={handleSignOut}
           accessibilityRole="button"
         >
@@ -356,6 +356,8 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     marginHorizontal: 16,
     marginBottom: 32,
+    borderWidth: 1,
+    borderRadius: 12,
   },
   signOutText: {
     fontSize: 16,

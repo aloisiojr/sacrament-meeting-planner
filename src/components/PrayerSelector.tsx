@@ -148,7 +148,7 @@ export function PrayerSelector({
                 {customName.trim()}
               </Text>
               <Text style={[styles.customNameHint, { color: colors.textSecondary }]}>
-                (custom name)
+                {t('agenda.customName')}
               </Text>
             </Pressable>
           )}

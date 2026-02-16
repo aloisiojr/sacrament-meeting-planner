@@ -1,7 +1,7 @@
 // Edge Function: update-user-role
 // Changes a user's role. Cannot change own role.
 // Warns on last Bishopric user in the ward.
-// Requires JWT with Bishopric role (settings:users permission).
+// Requires JWT with Bishopric or Secretary role (settings:users permission).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -60,8 +60,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check permission: only Bishopric can change roles
-    if (callerRole !== 'bishopric') {
+    // Check permission: Bishopric and Secretary can change roles
+    const ALLOWED_ROLES = ['bishopric', 'secretary'];
+    if (!ALLOWED_ROLES.includes(callerRole)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -157,6 +158,47 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Failed to update user role' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Auto-create meeting actor when changing TO bishopric (best-effort)
+    if (input.newRole === 'bishopric') {
+      try {
+        const actorName = (targetUser.email ?? '')
+          .split('@')[0]
+          .replace(/[._]/g, ' ')
+          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+        if (actorName) {
+          const { data: existing } = await supabaseAdmin
+            .from('meeting_actors')
+            .select('id, can_preside, can_conduct')
+            .eq('ward_id', wardId)
+            .ilike('name', actorName)
+            .maybeSingle();
+
+          if (existing) {
+            if (!existing.can_preside || !existing.can_conduct) {
+              await supabaseAdmin
+                .from('meeting_actors')
+                .update({ can_preside: true, can_conduct: true })
+                .eq('id', existing.id);
+            }
+          } else {
+            await supabaseAdmin
+              .from('meeting_actors')
+              .insert({
+                ward_id: wardId,
+                name: actorName,
+                can_preside: true,
+                can_conduct: true,
+                can_recognize: false,
+                can_music: false,
+              });
+          }
+        }
+      } catch (actorErr) {
+        console.error('Auto-actor creation on role change failed:', actorErr);
+      }
     }
 
     return new Response(

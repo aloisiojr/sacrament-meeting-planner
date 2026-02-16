@@ -22,15 +22,15 @@ function makeActor(overrides: Partial<MeetingActor> & { name: string }): Meeting
 }
 
 describe('useActors utilities', () => {
-  describe('enforceActorRules', () => {
-    it('should set can_preside=true when can_conduct=true', () => {
+  describe('enforceActorRules (identity function - CR-71)', () => {
+    it('should return input unchanged (identity) - can_conduct=true does NOT auto-set can_preside', () => {
       const input: CreateActorInput = {
         name: 'Bishop',
         can_conduct: true,
         can_preside: false,
       };
       const result = enforceActorRules(input);
-      expect(result.can_preside).toBe(true);
+      expect(result.can_preside).toBe(false);
       expect(result.can_conduct).toBe(true);
     });
 
@@ -66,23 +66,24 @@ describe('useActors utilities', () => {
       expect(result.can_music).toBe(true);
     });
 
-    it('should work with UpdateActorInput (partial fields)', () => {
+    it('should return input unchanged for UpdateActorInput', () => {
       const input: UpdateActorInput = {
         id: 'actor-1',
         can_conduct: true,
       };
       const result = enforceActorRules(input);
-      expect(result.can_preside).toBe(true);
+      // Identity function: does NOT add can_preside
+      expect(result.can_preside).toBeUndefined();
     });
 
-    it('should not mutate the original input', () => {
+    it('should return the same reference (identity)', () => {
       const input: CreateActorInput = {
         name: 'Test',
         can_conduct: true,
         can_preside: false,
       };
-      enforceActorRules(input);
-      expect(input.can_preside).toBe(false);
+      const result = enforceActorRules(input);
+      expect(result).toBe(input);
     });
   });
 

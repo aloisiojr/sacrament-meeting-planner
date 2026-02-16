@@ -124,6 +124,48 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Auto-create meeting actor for bishopric invitations (best-effort)
+    if (input.role === 'bishopric') {
+      try {
+        const actorName = input.email
+          .split('@')[0]
+          .replace(/[._]/g, ' ')
+          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+        if (actorName) {
+          const { data: existing } = await supabaseAdmin
+            .from('meeting_actors')
+            .select('id, can_preside, can_conduct')
+            .eq('ward_id', wardId)
+            .ilike('name', actorName)
+            .maybeSingle();
+
+          if (existing) {
+            if (!existing.can_preside || !existing.can_conduct) {
+              await supabaseAdmin
+                .from('meeting_actors')
+                .update({ can_preside: true, can_conduct: true })
+                .eq('id', existing.id);
+            }
+          } else {
+            await supabaseAdmin
+              .from('meeting_actors')
+              .insert({
+                ward_id: wardId,
+                name: actorName,
+                can_preside: true,
+                can_conduct: true,
+                can_recognize: false,
+                can_music: false,
+              });
+          }
+        }
+      } catch (actorErr) {
+        // Best-effort: don't block invitation creation
+        console.error('Auto-actor creation failed:', actorErr);
+      }
+    }
+
     // Build deep link
     const deepLink = `wardmanager://invite/${invitationToken}`;
 

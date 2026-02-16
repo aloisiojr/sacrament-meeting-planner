@@ -45,6 +45,7 @@ export type SpeechStatus =
 // --- Sunday Exception Reasons ---
 
 export type SundayExceptionReason =
+  | 'speeches'
   | 'testimony_meeting'
   | 'general_conference'
   | 'stake_conference'

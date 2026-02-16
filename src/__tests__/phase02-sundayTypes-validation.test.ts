@@ -15,6 +15,7 @@ import type { SundayExceptionReason } from '../types/database';
 
 // All valid SundayExceptionReason values from the database schema
 const VALID_DB_REASONS: SundayExceptionReason[] = [
+  'speeches',
   'testimony_meeting',
   'general_conference',
   'stake_conference',
@@ -25,9 +26,9 @@ const VALID_DB_REASONS: SundayExceptionReason[] = [
 
 describe('PHASE-02: Sunday Types extended validation', () => {
   describe('SUNDAY_TYPE_OPTIONS alignment with DB schema', () => {
-    it('should have "speeches" as a virtual type (not stored in DB)', () => {
+    it('should have "speeches" stored in DB (CR-56: no longer virtual)', () => {
       expect(SUNDAY_TYPE_OPTIONS).toContain(SUNDAY_TYPE_SPEECHES);
-      expect(VALID_DB_REASONS).not.toContain(SUNDAY_TYPE_SPEECHES);
+      expect(VALID_DB_REASONS).toContain(SUNDAY_TYPE_SPEECHES);
     });
 
     it('should have "other" which IS now in the DB schema', () => {
@@ -36,13 +37,9 @@ describe('PHASE-02: Sunday Types extended validation', () => {
       expect(VALID_DB_REASONS).toContain('other');
     });
 
-    it('all non-virtual/non-other options should match DB SundayExceptionReason values', () => {
-      const appOnlyTypes = [SUNDAY_TYPE_SPEECHES, 'other'];
-      const dbTypes = SUNDAY_TYPE_OPTIONS.filter(
-        (t) => !appOnlyTypes.includes(t)
-      );
-      // Each remaining type should be a valid DB reason
-      dbTypes.forEach((type) => {
+    it('all options should match DB SundayExceptionReason values', () => {
+      // Since CR-56, all SUNDAY_TYPE_OPTIONS are valid DB reasons
+      SUNDAY_TYPE_OPTIONS.forEach((type) => {
         expect(VALID_DB_REASONS).toContain(type);
       });
     });

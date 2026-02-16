@@ -946,8 +946,8 @@ Ao clicar em um campo de ator:
 - Mostra lista dos atores existentes **filtrados pelo papel** requerido pelo campo
 - Campo de busca/filtro no topo
 - **Botao "Adicionar novo ator"** ao final da lista
-  - Abre mini-formulario inline: nome + checkboxes de papeis (Presidir, Dirigir, Reconhecer, Musica)
-  - Ao salvar: ator criado, automaticamente selecionado no campo
+  - Campo de nome aparece. Papel inferido do campo de ator clicado (ex: "Quem preside" → can_preside=true, "Pianista" → can_music=true). Ao salvar: ator criado com papel inferido, automaticamente selecionado no campo.
+- **Opcao de editar** ator: icone de edicao ao lado de cada ator na lista. Apenas o nome e editavel (papel e gerenciado pelo contexto dos campos onde o ator e usado).
 - **Opcao de deletar** ator: icone de lixeira ao lado de cada ator na lista
   - Se ator ja esta associado a agendas: snapshot preservado (nome fica, referencia vira NULL)
   - Dialogo de confirmacao antes de deletar

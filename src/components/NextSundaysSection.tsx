@@ -17,6 +17,7 @@ import { SundayCard } from './SundayCard';
 import { SpeechSlot } from './SpeechSlot';
 import { MemberSelectorModal } from './MemberSelectorModal';
 import { TopicSelectorModal } from './TopicSelectorModal';
+import { QueryErrorView } from './QueryErrorView';
 import {
   useSpeeches,
   useLazyCreateSpeeches,
@@ -55,8 +56,8 @@ export function NextSundaysSection() {
   const nextSunday = nextSundays[0] ?? null;
 
   // Fetch data
-  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
-  const { data: exceptions } = useSundayExceptions(startDate, endDate);
+  const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
 
   // Mutations
   const lazyCreate = useLazyCreateSpeeches();
@@ -139,6 +140,23 @@ export function NextSundaysSection() {
   );
 
   if (nextSundays.length === 0) return null;
+
+  if (speechesError || exceptionsError) {
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {t('home.nextAssignments')}
+        </Text>
+        <QueryErrorView
+          error={speechesErr ?? exceptionsErr ?? null}
+          onRetry={() => {
+            refetchSpeeches();
+            refetchExceptions();
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.section}>

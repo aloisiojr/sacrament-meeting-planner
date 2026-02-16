@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
+import { QueryErrorView } from './QueryErrorView';
 import { getNextSundays, toISODateString, formatDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import { buildWhatsAppUrl, openWhatsApp } from '../lib/whatsapp';
@@ -45,7 +46,7 @@ export function InviteManagementSection() {
   const startDate = nextSundays[0] ?? '';
   const endDate = nextSundays[nextSundays.length - 1] ?? '';
 
-  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
 
   const inviteItems = useMemo(
     () => getInviteItems(speeches ?? [], locale, formatDate),
@@ -130,6 +131,20 @@ export function InviteManagementSection() {
 
   // Only visible for Secretary
   if (!hasPermission('home:invite_mgmt')) return null;
+
+  if (speechesError) {
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {t('home.inviteManagement')}
+        </Text>
+        <QueryErrorView
+          error={speechesErr ?? null}
+          onRetry={refetchSpeeches}
+        />
+      </View>
+    );
+  }
 
   if (inviteItems.length === 0) return null;
 

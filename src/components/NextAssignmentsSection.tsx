@@ -17,6 +17,7 @@ import { SundayCard } from './SundayCard';
 import { SpeechSlot } from './SpeechSlot';
 import { MemberSelectorModal } from './MemberSelectorModal';
 import { TopicSelectorModal } from './TopicSelectorModal';
+import { QueryErrorView } from './QueryErrorView';
 import {
   useSpeeches,
   useLazyCreateSpeeches,
@@ -61,8 +62,8 @@ export function NextAssignmentsSection() {
   const startDate = nextSundays[0] ?? '';
   const endDate = nextSundays[nextSundays.length - 1] ?? '';
 
-  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
-  const { data: exceptions } = useSundayExceptions(startDate, endDate);
+  const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
 
   const lazyCreate = useLazyCreateSpeeches();
   const assignSpeaker = useAssignSpeaker();
@@ -116,6 +117,23 @@ export function NextAssignmentsSection() {
 
   // Only visible for Bishopric
   if (!hasPermission('home:next_assignments')) return null;
+
+  if (speechesError || exceptionsError) {
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {t('home.nextAssignments')}
+        </Text>
+        <QueryErrorView
+          error={speechesErr ?? exceptionsErr ?? null}
+          onRetry={() => {
+            refetchSpeeches();
+            refetchExceptions();
+          }}
+        />
+      </View>
+    );
+  }
 
   // Only show if all 9 speeches of next 3 sundays are assigned
   if (!allAssigned) return null;

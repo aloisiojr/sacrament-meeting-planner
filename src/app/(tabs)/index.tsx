@@ -10,6 +10,7 @@
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,7 +19,7 @@ import { NextSundaysSection } from '../../components/NextSundaysSection';
 import { NextAssignmentsSection } from '../../components/NextAssignmentsSection';
 import { InviteManagementSection } from '../../components/InviteManagementSection';
 
-export default function HomeTab() {
+function HomeTabContent() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
@@ -49,6 +50,14 @@ export default function HomeTab() {
         <InviteManagementSection />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function HomeTab() {
+  return (
+    <ThemedErrorBoundary>
+      <HomeTabContent />
+    </ThemedErrorBoundary>
   );
 }
 

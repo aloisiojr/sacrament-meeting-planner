@@ -1,10 +1,13 @@
 import React, { Component } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import i18n from '../i18n';
+import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
   fallbackTitle?: string;
   fallbackMessage?: string;
+  colors?: Partial<ThemeColors>;
 }
 
 interface ErrorBoundaryState {
@@ -14,7 +17,7 @@ interface ErrorBoundaryState {
 
 /**
  * Error boundary component that catches rendering errors in its children.
- * Displays a fallback UI instead of crashing the entire app.
+ * Displays a fallback UI with i18n support and optional theme colors.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -36,21 +39,27 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (this.state.hasError) {
+      const c = this.props.colors;
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>
-            {this.props.fallbackTitle ?? 'Something went wrong'}
+        <View style={[styles.container, { backgroundColor: c?.background ?? '#FFFFFF' }]}>
+          <Text style={[styles.title, { color: c?.text ?? '#333' }]}>
+            {this.props.fallbackTitle ?? i18n.t('errors.boundaryTitle')}
           </Text>
-          <Text style={styles.message}>
-            {this.props.fallbackMessage ?? 'An unexpected error occurred. Please try again.'}
+          <Text style={[styles.message, { color: c?.textSecondary ?? '#666' }]}>
+            {this.props.fallbackMessage ?? i18n.t('errors.boundaryMessage')}
           </Text>
           {__DEV__ && this.state.error && (
-            <Text style={styles.errorDetail}>
+            <Text style={[styles.errorDetail, { backgroundColor: c?.surfaceVariant ?? '#f5f5f5' }]}>
               {this.state.error.message}
             </Text>
           )}
-          <Pressable style={styles.button} onPress={this.handleReset}>
-            <Text style={styles.buttonText}>Try Again</Text>
+          <Pressable
+            style={[styles.button, { backgroundColor: c?.primary ?? '#007AFF' }]}
+            onPress={this.handleReset}
+          >
+            <Text style={[styles.buttonText, { color: c?.onPrimary ?? '#FFFFFF' }]}>
+              {i18n.t('common.retry')}
+            </Text>
           </Pressable>
         </View>
       );
@@ -58,6 +67,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return this.props.children;
   }
+}
+
+/**
+ * ThemedErrorBoundary: wraps ErrorBoundary with theme colors from ThemeContext.
+ */
+export function ThemedErrorBoundary(props: Omit<ErrorBoundaryProps, 'colors'>) {
+  const { colors } = useTheme();
+  return <ErrorBoundary {...props} colors={colors}>{props.children}</ErrorBoundary>;
 }
 
 const styles = StyleSheet.create({
@@ -70,13 +87,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#333',
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
     fontSize: 15,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 22,
@@ -88,18 +103,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     padding: 8,
-    backgroundColor: '#f5f5f5',
     borderRadius: 6,
     overflow: 'hidden',
   },
   button: {
-    backgroundColor: '#007AFF',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

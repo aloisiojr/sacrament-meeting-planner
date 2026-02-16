@@ -341,23 +341,28 @@ export default function MembersScreen() {
     [t, deleteMember]
   );
 
+  // Export guard to prevent double-tap
+  const exportingRef = useRef(false);
+
   // CSV Export handler
   const handleExport = useCallback(async () => {
-    if (!members || members.length === 0) return;
-    const csv = generateCsv(members);
+    if (exportingRef.current) return;
+    exportingRef.current = true;
 
-    if (Platform.OS === 'web') {
-      // Web: Blob download
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'membros.csv';
-      link.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // Mobile: Write temp file and share via expo-sharing
-      try {
+    try {
+      const csv = generateCsv(members ?? []);
+
+      if (Platform.OS === 'web') {
+        // Web: Blob download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'membros.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // Mobile: Write temp file and share via expo-sharing
         const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
         await FileSystem.writeAsStringAsync(fileUri, csv, {
           encoding: FileSystem.EncodingType.UTF8,
@@ -367,9 +372,14 @@ export default function MembersScreen() {
           dialogTitle: t('members.exportCsv'),
           UTI: 'public.comma-separated-values-text',
         });
-      } catch {
+      }
+    } catch (err: any) {
+      const msg = (err?.message ?? '').toLowerCase();
+      if (msg !== 'user did not share' && !msg.includes('cancelled')) {
         Alert.alert(t('common.error'), t('members.exportFailed'));
       }
+    } finally {
+      exportingRef.current = false;
     }
   }, [members, t]);
 
@@ -380,9 +390,13 @@ export default function MembersScreen() {
 
       if (!result.success) {
         const errorMessages = result.errors
-          .map((e) => `Line ${e.line}, ${e.field}: ${e.message}`)
+          .map((e) => t('members.importErrorLine', { line: e.line, field: e.field, error: e.message }))
           .join('\n');
         throw new Error(errorMessages);
+      }
+
+      if (result.members.length === 0) {
+        throw new Error(t('members.importEmpty'));
       }
 
       // Build members array for the RPC
@@ -407,7 +421,7 @@ export default function MembersScreen() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
-      Alert.alert(t('common.success'), `${data.imported} members imported`);
+      Alert.alert(t('common.success'), t('members.importSuccess', { count: data.imported }));
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:import', `Members imported via CSV: ${data.imported} members`);
       }
@@ -444,7 +458,7 @@ export default function MembersScreen() {
         });
         importMutation.mutate(content);
       } catch {
-        Alert.alert(t('common.error'), 'Failed to read file');
+        Alert.alert(t('common.error'), t('members.importFailed'));
       }
     }
   }, [importMutation, t]);
@@ -482,7 +496,7 @@ export default function MembersScreen() {
             </Text>
           </Pressable>
           <Text style={[styles.title, { color: colors.text }]}>{t('members.title')}</Text>
-          {canWrite && (
+          {canWrite ? (
             <Pressable
               style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={handleAdd}
@@ -491,6 +505,8 @@ export default function MembersScreen() {
             >
               <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
             </Pressable>
+          ) : (
+            <View style={{ width: 36 }} />
           )}
         </View>
 
@@ -513,7 +529,6 @@ export default function MembersScreen() {
             <Pressable
               style={[styles.csvButton, { borderColor: colors.primary }]}
               onPress={handleExport}
-              disabled={!members || members.length === 0}
               accessibilityRole="button"
               accessibilityLabel={t('members.exportCsv')}
             >

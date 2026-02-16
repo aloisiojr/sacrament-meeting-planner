@@ -7,7 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction } from '../lib/activityLog';
-import { parseLocalDate } from '../lib/dateUtils';
+import { parseLocalDate, formatDateHumanReadable } from '../lib/dateUtils';
+import { getCurrentLanguage } from '../i18n';
 import type { SundayException, SundayExceptionReason } from '../types/database';
 
 // --- Query Keys ---
@@ -42,6 +43,43 @@ export const SUNDAY_TYPE_OPTIONS = [
 ] as const;
 
 export type SundayTypeOption = (typeof SUNDAY_TYPE_OPTIONS)[number];
+
+/**
+ * Human-readable sunday type names for activity log descriptions.
+ */
+const SUNDAY_TYPE_LABELS: Record<string, Record<string, string>> = {
+  'pt-BR': {
+    speeches: 'Domingo com Discursos',
+    testimony_meeting: 'Reuniao de Testemunho',
+    general_conference: 'Conferencia Geral',
+    stake_conference: 'Conferencia de Estaca',
+    ward_conference: 'Conferencia da Ala',
+    primary_presentation: 'Reuniao Especial da Primaria',
+    other: 'Outro',
+  },
+  en: {
+    speeches: 'Sunday with Speeches',
+    testimony_meeting: 'Testimony Meeting',
+    general_conference: 'General Conference',
+    stake_conference: 'Stake Conference',
+    ward_conference: 'Ward Conference',
+    primary_presentation: 'Primary Special Presentation',
+    other: 'Other',
+  },
+  es: {
+    speeches: 'Domingo con Discursos',
+    testimony_meeting: 'Reunion de Testimonios',
+    general_conference: 'Conferencia General',
+    stake_conference: 'Conferencia de Estaca',
+    ward_conference: 'Conferencia de Barrio',
+    primary_presentation: 'Presentacion Especial de la Primaria',
+    other: 'Otro',
+  },
+};
+
+function getSundayTypeLabel(reason: string, language: string): string {
+  return SUNDAY_TYPE_LABELS[language]?.[reason] ?? SUNDAY_TYPE_LABELS['pt-BR'][reason] ?? reason;
+}
 
 // --- Auto-Assignment Logic ---
 
@@ -172,6 +210,7 @@ export function useAutoAssignSundayTypes() {
 /**
  * Set the sunday type for a specific date.
  * Creates or updates the exception entry.
+ * Uses optimistic update for instant UI feedback.
  */
 export function useSetSundayType() {
   const { wardId, user } = useAuth();
@@ -193,7 +232,7 @@ export function useSetSundayType() {
         .select('id')
         .eq('ward_id', wardId)
         .eq('date', date)
-        .single();
+        .maybeSingle();
 
       const payload = {
         reason,
@@ -213,20 +252,54 @@ export function useSetSundayType() {
         if (error) throw error;
       }
     },
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches so they don't overwrite optimistic update
+      await queryClient.cancelQueries({ queryKey: sundayTypeKeys.all });
+
+      // Optimistically update all cached sundayTypes queries
+      queryClient.setQueriesData<SundayException[]>(
+        { queryKey: sundayTypeKeys.all },
+        (old) => {
+          if (!old) return old;
+          const idx = old.findIndex((e) => e.date === variables.date && e.ward_id === wardId);
+          const optimistic: SundayException = {
+            id: idx >= 0 ? old[idx].id : `optimistic-${variables.date}`,
+            ward_id: wardId,
+            date: variables.date,
+            reason: variables.reason,
+            custom_reason: variables.reason === 'other' ? (variables.custom_reason ?? null) : null,
+          };
+          if (idx >= 0) {
+            const updated = [...old];
+            updated[idx] = optimistic;
+            return updated;
+          }
+          return [...old, optimistic];
+        }
+      );
+    },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Tipo de domingo alterado: ${variables.date} -> ${variables.reason}`);
+        const lang = getCurrentLanguage();
+        const dateStr = formatDateHumanReadable(variables.date, lang);
+        const typeLabel = getSundayTypeLabel(variables.reason, lang);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`);
       }
+    },
+    onError: () => {
+      // Revert optimistic update on error by refetching
+      queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
     },
   });
 }
 
 /**
  * Remove a sunday exception (revert to default "speeches").
+ * Uses optimistic update for instant UI feedback.
  */
 export function useRemoveSundayException() {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -238,7 +311,28 @@ export function useRemoveSundayException() {
         .eq('date', date);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async (date) => {
+      await queryClient.cancelQueries({ queryKey: sundayTypeKeys.all });
+
+      // Optimistically remove the exception from cached data
+      queryClient.setQueriesData<SundayException[]>(
+        { queryKey: sundayTypeKeys.all },
+        (old) => {
+          if (!old) return old;
+          return old.filter((e) => !(e.date === date && e.ward_id === wardId));
+        }
+      );
+    },
+    onSuccess: (_data, date) => {
+      queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
+      if (user) {
+        const lang = getCurrentLanguage();
+        const dateStr = formatDateHumanReadable(date, lang);
+        const typeLabel = getSundayTypeLabel('speeches', lang);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`);
+      }
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
     },
   });

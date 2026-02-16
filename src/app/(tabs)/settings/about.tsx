@@ -67,6 +67,12 @@ export default function AboutScreen() {
           </Pressable>
         ) : null}
       </View>
+
+      <View style={styles.disclaimerContainer}>
+        <Text style={[styles.disclaimerText, { color: colors.textSecondary }]}>
+          {t('about.disclaimer')}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -114,5 +120,15 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 16,
+  },
+  disclaimerContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

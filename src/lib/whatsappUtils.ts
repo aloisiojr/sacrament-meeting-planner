@@ -6,7 +6,7 @@
 // --- Default Template ---
 
 export const DEFAULT_TEMPLATE_PT_BR =
-  'Ola, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Voce falara sobre um tema da {colecao} com o titulo {titulo} {link}. Podemos confirmar o seu discurso?';
+  'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título {titulo} {link}. Podemos confirmar o seu discurso?';
 
 // --- Types ---
 

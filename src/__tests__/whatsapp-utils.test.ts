@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { resolveTemplate, buildWhatsAppUrl } from '../lib/whatsappUtils';
+import { resolveTemplate, buildWhatsAppUrl, DEFAULT_TEMPLATE_PT_BR } from '../lib/whatsappUtils';
 
 describe('resolveTemplate', () => {
   it('replaces all placeholders', () => {
@@ -101,5 +101,12 @@ describe('buildWhatsAppUrl', () => {
 
     // Should contain encoded default template content
     expect(url).toContain(encodeURIComponent('Bispado'));
+  });
+
+  it('default template contains proper accents', () => {
+    expect(DEFAULT_TEMPLATE_PT_BR).toContain('Olá');
+    expect(DEFAULT_TEMPLATE_PT_BR).toContain('Você');
+    expect(DEFAULT_TEMPLATE_PT_BR).toContain('falará');
+    expect(DEFAULT_TEMPLATE_PT_BR).toContain('título');
   });
 });

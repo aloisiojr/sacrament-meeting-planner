@@ -100,7 +100,7 @@ Uma solução digital centralizada permite:
 - **Então** navega para tela cheia de gerenciamento de membros
 - **E** vê botão de voltar (à esquerda do campo de search)
 - **E** vê campo de search no topo
-- **E** vê botão "+" (à direita do campo de search)
+- **E** vê botão "+" no header (à direita do título da tela)
 - **E** vê lista de membros (cards recolhidos, ordenados alfabeticamente por nome)
 
 **Prioridade:** Must have

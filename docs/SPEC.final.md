@@ -620,7 +620,7 @@ Discursos armazenam `speaker_name`, `speaker_phone`, `topic_title`, `topic_link`
 - **Swipe para a esquerda** revela 2 botoes: lapis (editar) e lixeira (excluir)
 - Apenas 1 card com botoes revelados por vez
 - Swipe so ativa apos threshold (~20px horizontal com pouco vertical)
-- Botao FAB (+) no canto inferior direito para adicionar
+- Botao "+" no header, a direita do titulo, para adicionar novo membro
 - Campo de busca com filtro em tempo real (debounce ≤300ms, case-insensitive, sem acentos) (AC-002)
 - Observador: swipe desabilitado
 
@@ -1689,6 +1689,17 @@ Campos de texto com auto-save (agenda, membros, temas) devem seguir as regras:
 2. Estado do campo gerenciado localmente com useState (nao depender do valor do servidor durante digitacao)
 3. Cursor e selecao preservados apos auto-save
 4. Se o campo for esvaziado, o valor vazio deve ser salvo corretamente
+
+### 13.7 Navegacao: Botao Voltar em Telas Stack
+
+Toda tela acessada via navegacao Stack (sub-telas de Configuracoes e outras telas empilhadas) DEVE ter um botao de voltar no header, seguindo o padrao:
+
+- Posicao: topo-esquerdo do header
+- Componente: Pressable com texto usando a chave i18n `common.back`
+- Acao: `router.back()` (expo-router)
+- Estilo: fontSize 16, fontWeight '600', cor `colors.primary`
+- Excecao: telas de tab principal (Home, Agenda, Discursos, Configuracoes) NAO tem botao voltar
+- Excecao: Modo Apresentacao usa botao "fechar" proprio (ver secao 7.14.5)
 
 ---
 

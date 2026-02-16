@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -249,6 +250,7 @@ function MemberRow({
 export default function MembersScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const router = useRouter();
   const { hasPermission, wardId, user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -464,6 +466,11 @@ export default function MembersScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button">
+            <Text style={[styles.backButton, { color: colors.primary }]}>
+              {t('common.back')}
+            </Text>
+          </Pressable>
           <Text style={[styles.title, { color: colors.text }]}>{t('members.title')}</Text>
           {canWrite && (
             <Pressable
@@ -570,6 +577,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
+  },
+  backButton: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   addButton: {
     width: 36,

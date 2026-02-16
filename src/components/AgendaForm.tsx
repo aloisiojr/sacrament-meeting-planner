@@ -5,7 +5,7 @@
  * Special: Welcome, Designations/Sacrament, Special Meeting.
  */
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
-  type TextInputProps,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -28,6 +27,7 @@ import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '.
 import { useMembers } from '../hooks/useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { MemberSelectorModal } from './MemberSelectorModal';
+import { DebouncedTextInput } from './DebouncedTextInput';
 import type {
   SundayAgenda,
   MeetingActor,
@@ -42,6 +42,7 @@ import type {
 export interface AgendaFormProps {
   sundayDate: string;
   exceptionReason: SundayExceptionReason | null;
+  customReason?: string | null;
 }
 
 type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer' | 'speaker';
@@ -55,7 +56,7 @@ interface SelectorState {
 
 // --- Component ---
 
-export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
+export function AgendaForm({ sundayDate, exceptionReason, customReason }: AgendaFormProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
@@ -232,9 +233,17 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
       </FieldRow>
 
       <FieldRow label={t('agenda.recognizing')} colors={colors}>
-        <Text style={[styles.fieldValue, { color: colors.text }]}>
-          {agenda.recognized_names?.join(', ') || ''}
-        </Text>
+        <DebouncedTextInput
+          style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+          value={agenda.recognized_names?.join(', ') || ''}
+          onSave={(text) => {
+            const names = text.split(',').map((n: string) => n.trim()).filter(Boolean);
+            updateField('recognized_names', names.length > 0 ? names : null);
+          }}
+          placeholder={t('agenda.recognizing')}
+          placeholderTextColor={colors.textTertiary}
+          editable={!isObserver}
+        />
       </FieldRow>
 
       <FieldRow label={t('agenda.announcements')} colors={colors}>
@@ -520,67 +529,6 @@ export function AgendaForm({ sundayDate, exceptionReason }: AgendaFormProps) {
 }
 
 // --- Sub-components ---
-
-/**
- * DebouncedTextInput: Maintains local state to prevent letter-eating from
- * mutation-triggered re-renders. Debounces save by 800ms; saves immediately on blur.
- */
-function DebouncedTextInput({
-  value,
-  onSave,
-  debounceMs = 800,
-  ...props
-}: Omit<TextInputProps, 'value' | 'onChangeText' | 'onBlur'> & {
-  value: string;
-  onSave: (text: string) => void;
-  debounceMs?: number;
-}) {
-  const [localValue, setLocalValue] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const pendingRef = useRef(false);
-
-  useEffect(() => {
-    if (!pendingRef.current) {
-      setLocalValue(value);
-    }
-  }, [value]);
-
-  const handleChange = useCallback(
-    (text: string) => {
-      setLocalValue(text);
-      pendingRef.current = true;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        pendingRef.current = false;
-        onSave(text);
-      }, debounceMs);
-    },
-    [onSave, debounceMs]
-  );
-
-  const handleBlur = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (pendingRef.current) {
-      pendingRef.current = false;
-      onSave(localValue);
-    }
-  }, [localValue, onSave]);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  return (
-    <TextInput
-      value={localValue}
-      onChangeText={handleChange}
-      onBlur={handleBlur}
-      {...props}
-    />
-  );
-}
 
 function SectionHeader({ title, colors }: { title: string; colors: ThemeColors }) {
   return (

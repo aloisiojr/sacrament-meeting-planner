@@ -199,7 +199,7 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
   return (
     <View style={styles.form}>
       {/* Section 1: Welcome & Announcements */}
-      <SectionHeader title={t('agenda.presiding')} colors={colors} />
+      <SectionHeader title={t('agenda.sectionWelcome')} colors={colors} />
 
       <FieldRow label={t('agenda.presiding')} colors={colors}>
         <SelectorField
@@ -284,7 +284,7 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
       </FieldRow>
 
       {/* Section 2: Designations & Sacrament */}
-      <SectionHeader title={t('agenda.wardBusiness')} colors={colors} />
+      <SectionHeader title={t('agenda.sectionSacrament')} colors={colors} />
 
       <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
         <DebouncedTextInput
@@ -360,7 +360,7 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
       {!isSpecial ? (
         <>
           {/* Normal meeting: speeches 1 + 2 */}
-          <SectionHeader title={t('speeches.title')} colors={colors} />
+          <SectionHeader title={t('agenda.sectionFirstSpeeches')} colors={colors} />
 
           <SpeakerField
             label={`1\u00BA ${t('speeches.speaker')}`}
@@ -411,6 +411,8 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
           )}
 
           {/* Section 4: Last Speech */}
+          <SectionHeader title={t('agenda.sectionLastSpeech')} colors={colors} />
+
           <SpeakerField
             label={`3\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(3)?.speaker_name ?? ''}
@@ -421,12 +423,16 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
         </>
       ) : (
         <>
-          {/* Special meeting: use custom_reason as header for "other" type (CR-29) */}
+          {/* Special meeting: dynamic section header based on type (CR-29) */}
           <SectionHeader
             title={
-              exceptionReason === 'other' && customReason
-                ? customReason
-                : t(`sundayExceptions.${exceptionReason}`, 'Special Meeting')
+              exceptionReason === 'testimony_meeting'
+                ? t('agenda.sectionTestimonies')
+                : exceptionReason === 'primary_presentation'
+                  ? t('agenda.sectionPrimaryPresentation')
+                  : exceptionReason === 'other' && customReason
+                    ? customReason
+                    : t(`sundayExceptions.${exceptionReason}`, 'Special Meeting')
             }
             colors={colors}
           />

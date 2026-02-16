@@ -1681,6 +1681,15 @@ O app envia push notifications via Expo Push Notifications para manter bispado e
 - Metricas: latencia API (p95 < 2s), taxa de erro (< 1%)
 - Nomes, telefones e senhas NUNCA em logs
 
+### 13.6 Auto-Save em Campos de Texto
+
+Campos de texto com auto-save (agenda, membros, temas) devem seguir as regras:
+
+1. Debounce minimo de 500ms antes de disparar a gravacao automatica
+2. Estado do campo gerenciado localmente com useState (nao depender do valor do servidor durante digitacao)
+3. Cursor e selecao preservados apos auto-save
+4. Se o campo for esvaziado, o valor vazio deve ser salvo corretamente
+
 ---
 
 ## 14. Data Contracts

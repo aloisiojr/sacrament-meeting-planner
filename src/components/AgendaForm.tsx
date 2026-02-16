@@ -29,6 +29,7 @@ import { getCurrentLanguage } from '../i18n';
 import { MemberSelectorModal } from './MemberSelectorModal';
 import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
+import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import type {
   SundayAgenda,
   MeetingActor,
@@ -57,7 +58,7 @@ interface SelectorState {
 
 // --- Component ---
 
-export function AgendaForm({ sundayDate, exceptionReason, customReason }: AgendaFormProps) {
+export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exceptionReason, customReason }: AgendaFormProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
@@ -230,16 +231,16 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
       </FieldRow>
 
       <FieldRow label={t('agenda.recognizing')} colors={colors}>
-        <DebouncedTextInput
-          style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+        <SelectorField
           value={agenda.recognized_names?.join(', ') || ''}
-          onSave={(text) => {
-            const names = text.split(',').map((n: string) => n.trim()).filter(Boolean);
-            updateField('recognized_names', names.length > 0 ? names : null);
-          }}
           placeholder={t('agenda.recognizing')}
-          placeholderTextColor={colors.textTertiary}
-          editable={!isObserver}
+          onPress={() => {
+            if (!isObserver) {
+              setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'can_recognize' });
+            }
+          }}
+          disabled={isObserver}
+          colors={colors}
         />
       </FieldRow>
 
@@ -479,6 +480,11 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
           visible
           roleFilter={(selectorModal.roleFilter ?? 'all') as import('../hooks/useActors').ActorRoleFilter}
           onSelect={(actor) => {
+            if (selectorModal.field === 'recognizing') {
+              updateField('recognized_names', [actor.name]);
+              setSelectorModal(null);
+              return;
+            }
             const nameField = `${selectorModal.field}_name`;
             const idField = `${selectorModal.field}_actor_id`;
             handleActorSelect(actor, nameField, idField);
@@ -503,15 +509,29 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
 
       {/* Prayer selector modal */}
       {selectorModal?.type === 'prayer' && (
-        <MemberSelectorModal
-          visible
-          onSelect={(member) => {
+        <PrayerSelector
+          selected={(() => {
+            const nameField = `${selectorModal.field}_name` as keyof typeof agenda;
+            const idField = `${selectorModal.field}_member_id` as keyof typeof agenda;
+            const name = agenda[nameField] as string | null;
+            if (!name) return null;
+            return { memberId: (agenda[idField] as string | null) ?? null, name };
+          })()}
+          onSelect={(selection: PrayerSelection | null) => {
+            if (!agenda || isObserver) return;
             const nameField = `${selectorModal.field}_name`;
             const idField = `${selectorModal.field}_member_id`;
-            handlePrayerSelect(member, nameField, idField);
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: {
+                [nameField]: selection?.name ?? null,
+                [idField]: selection?.memberId ?? null,
+              } as Record<string, unknown>,
+            });
             setSelectorModal(null);
           }}
-          onClose={() => setSelectorModal(null)}
+          placeholder={selectorModal.field === 'opening_prayer' ? t('agenda.openingPrayer') : t('agenda.closingPrayer')}
+          disabled={isObserver}
         />
       )}
 
@@ -528,7 +548,7 @@ export function AgendaForm({ sundayDate, exceptionReason, customReason }: Agenda
       )}
     </View>
   );
-}
+});
 
 // --- Sub-components ---
 

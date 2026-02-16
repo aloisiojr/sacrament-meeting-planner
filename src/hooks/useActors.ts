@@ -1,7 +1,6 @@
 /**
  * TanStack Query hooks for meeting actor CRUD operations.
  * Actors are ward members who can preside, conduct, recognize, or play music.
- * Business rule: can_conduct=true implies can_preside=true (app-enforced).
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,15 +30,11 @@ export type ActorRoleFilter =
 // --- Utilities ---
 
 /**
- * Enforce business rule: can_conduct=true implies can_preside=true.
- * This is app-enforced (not DB-enforced) per ARCH_M002.
+ * Actor rules pass-through (no auto-enforce).
+ * can_preside and can_conduct are independent flags.
  */
 export function enforceActorRules(input: CreateActorInput | UpdateActorInput): typeof input {
-  const result = { ...input };
-  if ('can_conduct' in result && result.can_conduct === true) {
-    result.can_preside = true;
-  }
-  return result;
+  return input;
 }
 
 /**
@@ -89,10 +84,7 @@ export function useActors(roleFilter: ActorRoleFilter = 'all') {
   });
 }
 
-/**
- * Create a new meeting actor.
- * Enforces can_conduct -> can_preside rule.
- */
+/** Create a new meeting actor. */
 export function useCreateActor() {
   const { wardId, user } = useAuth();
   const queryClient = useQueryClient();
@@ -125,10 +117,7 @@ export function useCreateActor() {
   });
 }
 
-/**
- * Update an existing meeting actor.
- * Enforces can_conduct -> can_preside rule.
- */
+/** Update an existing meeting actor. */
 export function useUpdateActor() {
   const { wardId, user } = useAuth();
   const queryClient = useQueryClient();

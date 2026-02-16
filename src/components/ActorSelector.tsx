@@ -83,7 +83,7 @@ export function ActorSelector({
 
     const input: CreateActorInput = {
       name: trimmed,
-      can_preside: roleFilter === 'can_preside' || roleFilter === 'can_conduct',
+      can_preside: roleFilter === 'can_preside',
       can_conduct: roleFilter === 'can_conduct',
       can_recognize: roleFilter === 'can_recognize',
       can_music: roleFilter === 'can_music',
@@ -157,7 +157,7 @@ export function ActorSelector({
           {!isEditing && (
             <View style={styles.actorActions}>
               <Pressable
-                hitSlop={8}
+                hitSlop={12}
                 onPress={() => {
                   setEditingId(item.id);
                   setEditingName(item.name);
@@ -165,7 +165,7 @@ export function ActorSelector({
               >
                 <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>{'\u270E'}</Text>
               </Pressable>
-              <Pressable hitSlop={8} onPress={() => handleDelete(item)}>
+              <Pressable hitSlop={12} onPress={() => handleDelete(item)}>
                 <Text style={[styles.actionIcon, { color: colors.error }]}>{'\u2716'}</Text>
               </Pressable>
             </View>
@@ -360,11 +360,12 @@ const styles = StyleSheet.create({
   },
   actorActions: {
     flexDirection: 'row',
-    gap: 16,
-    marginLeft: 12,
+    gap: 20,
+    marginLeft: 16,
   },
   actionIcon: {
-    fontSize: 18,
+    fontSize: 24,
+    padding: 4,
   },
   editInput: {
     flex: 1,

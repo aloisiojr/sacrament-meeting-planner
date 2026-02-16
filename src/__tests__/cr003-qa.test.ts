@@ -563,10 +563,13 @@ describe('CR-42: CSV export and import', () => {
     expect(content).toContain("ActivityIndicator");
   });
 
-  // AC-42.8: Export disabled when member list is empty
-  it('AC-42.8: members.tsx export button disabled when members is empty', () => {
+  // AC-42.8: Export always allowed (F005 CR-55: empty export produces header-only CSV)
+  it('AC-42.8: members.tsx export button is never disabled (empty export allowed)', () => {
     const content = readSourceFile('app/(tabs)/settings/members.tsx');
-    expect(content).toContain("disabled={!members || members.length === 0}");
+    // Export button should NOT have a disabled guard for empty members
+    expect(content).not.toContain("disabled={!members || members.length === 0}");
+    // Export uses generateCsv(members ?? []) which handles empty arrays
+    expect(content).toContain("generateCsv(members ?? [])");
   });
 
   // CSV edge cases

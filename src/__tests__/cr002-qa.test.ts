@@ -121,7 +121,6 @@ describe('CR-13: WhatsApp template default does not use {tema}', () => {
     expect(edgeFnContent).toContain('{colecao}');
     expect(edgeFnContent).toContain('{titulo}');
     expect(edgeFnContent).toContain('{link}');
-    expect(edgeFnContent).toContain('{nome}');
     expect(edgeFnContent).toContain('{data}');
     expect(edgeFnContent).toContain('{posicao}');
   });
@@ -138,8 +137,8 @@ describe('CR-14: Default WhatsApp template is in Portuguese', () => {
       new URL('../../supabase/functions/register-first-user/index.ts', import.meta.url).pathname,
       'utf-8'
     );
-    // Template should be in Portuguese
-    expect(content).toContain('Ola {nome}');
+    // Template should be in Portuguese (with proper accents)
+    expect(content).toContain('Olá');
     expect(content).toContain('discurso');
   });
 });
@@ -432,13 +431,13 @@ describe('CR-25: Non-excluded exception types show speech slots', () => {
 });
 
 // =============================================================================
-// CR-26: ActorSelector enforces can_preside for conducting role
+// CR-26: ActorSelector / enforceActorRules is identity (CR-71 removed auto-rule)
 // =============================================================================
 
-describe('CR-26: ActorSelector enforces conducting -> preside rule', () => {
-  it('enforceActorRules: can_conduct=true should also set can_preside=true', () => {
+describe('CR-26: enforceActorRules is identity function (CR-71)', () => {
+  it('enforceActorRules: can_conduct=true should NOT auto-set can_preside (CR-71)', () => {
     const result = enforceActorRules({ name: 'Test', can_conduct: true });
-    expect(result.can_preside).toBe(true);
+    expect(result.can_preside).toBeUndefined();
     expect(result.can_conduct).toBe(true);
   });
 
@@ -491,19 +490,17 @@ describe('CR-27: DebouncedTextInput exists and is used', () => {
 // CR-28: Recognized names free-text editable (structural)
 // =============================================================================
 
-describe('CR-28: Recognized names is an editable text field', () => {
-  it('AgendaForm recognized_names should use DebouncedTextInput', async () => {
+describe('CR-28: Recognized names uses ActorSelector (CR-73)', () => {
+  it('AgendaForm recognizing should use SelectorField with ActorSelector (CR-73)', async () => {
     const fs = await import('fs');
     const content = fs.readFileSync(
       new URL('../components/AgendaForm.tsx', import.meta.url).pathname,
       'utf-8'
     );
-    // Should use DebouncedTextInput for recognized_names, not static Text
-    // The recognized_names field should be editable
+    // Should use ActorSelector for recognized_names via SelectorField
     expect(content).toContain("recognized_names");
-    // Should split by comma for storage
-    expect(content).toContain('.split');
-    expect(content).toContain('.trim()');
+    // Recognizing opens ActorSelector with can_recognize roleFilter
+    expect(content).toContain("field: 'recognizing', roleFilter: 'can_recognize'");
   });
 });
 

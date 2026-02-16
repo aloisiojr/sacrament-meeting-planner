@@ -112,15 +112,15 @@ describe('PHASE-02: Cross-cutting validation', () => {
     });
   });
 
-  describe('Actor business rule: can_conduct implies can_preside', () => {
-    it('should enforce the rule when creating with can_conduct=true, can_preside=false', () => {
+  describe('Actor rules: enforceActorRules is identity (CR-71)', () => {
+    it('should NOT auto-enforce can_preside when can_conduct=true (CR-71 removed rule)', () => {
       const input: CreateActorInput = {
         name: 'Test',
         can_conduct: true,
         can_preside: false,
       };
       const enforced = enforceActorRules(input);
-      expect(enforced.can_preside).toBe(true);
+      expect(enforced.can_preside).toBe(false);
       expect(enforced.can_conduct).toBe(true);
     });
 

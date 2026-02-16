@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     // Create the ward
     const defaultWhatsappTemplate =
-      'Ola {nome}, voce foi designado(a) para o {posicao} discurso no dia {data} sobre o tema {colecao} - {titulo} ({link}). Podemos confirmar o seu discurso? Obrigado!';
+      'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título {titulo} {link}. Podemos confirmar o seu discurso?';
 
     const { data: ward, error: wardError } = await supabaseAdmin
       .from('wards')

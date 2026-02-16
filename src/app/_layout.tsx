@@ -1,19 +1,43 @@
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { I18nextProvider } from 'react-i18next';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { SyncProvider } from '../providers/SyncProvider';
 import i18n from '../i18n';
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      console.error('[QueryCache] Error:', error.message);
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if ((mutation as any).meta?.suppressGlobalError) return;
+      if (__DEV__) {
+        console.error('[MutationCache] Error:', error.message);
+      }
+      Alert.alert(
+        i18n.t('common.error'),
+        i18n.t('errors.mutationFailed')
+      );
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 2,
+      retry: (failureCount: number, error: any) => {
+        if (error?.status >= 400 && error?.status < 500) return false;
+        return failureCount < 2;
+      },
+    },
+    mutations: {
+      retry: 0,
     },
   },
 });
@@ -52,7 +76,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return children;
 }
 
 /**
@@ -63,10 +87,12 @@ function InnerLayout() {
 
   return (
     <AuthProvider>
-      <NavigationGuard>
-        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-        <Slot />
-      </NavigationGuard>
+      <SyncProvider>
+        <NavigationGuard>
+          <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+          <Slot />
+        </NavigationGuard>
+      </SyncProvider>
     </AuthProvider>
   );
 }

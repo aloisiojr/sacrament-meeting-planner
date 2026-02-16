@@ -174,6 +174,17 @@ export default function AgendaTab() {
     [expandedDate, nextSunday, locale, handleToggle, colors]
   );
 
+  const ESTIMATED_ITEM_HEIGHT = 64;
+
+  const getItemLayout = useCallback(
+    (_data: unknown, index: number) => ({
+      length: ESTIMATED_ITEM_HEIGHT,
+      offset: ESTIMATED_ITEM_HEIGHT * index,
+      index,
+    }),
+    []
+  );
+
   const onScrollToIndexFailed = useCallback(
     (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
       const offset = info.averageItemLength * info.index;
@@ -189,6 +200,7 @@ export default function AgendaTab() {
         data={listItems}
         keyExtractor={getItemKey}
         renderItem={renderItem}
+        initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
         onEndReached={hasMoreFuture ? loadMoreFuture : undefined}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
@@ -205,7 +217,7 @@ export default function AgendaTab() {
         }
         onScrollToIndexFailed={onScrollToIndexFailed}
         contentContainerStyle={styles.listContent}
-        getItemLayout={undefined}
+        getItemLayout={getItemLayout}
       />
     </SafeAreaView>
   );
@@ -288,6 +300,7 @@ function AgendaSundayCard({
           <AgendaForm
             sundayDate={date}
             exceptionReason={exception?.reason ?? null}
+            customReason={exception?.custom_reason ?? null}
           />
         </View>
       )}

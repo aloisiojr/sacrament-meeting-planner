@@ -107,9 +107,13 @@ describe('CR-76: Fix Users Screen Edge Function Error', () => {
       expect(source).not.toContain('function getAccessToken');
     });
 
-    it('should NOT call supabase.auth.getSession() for token retrieval', () => {
+    it('should NOT call supabase.auth.getSession() for token retrieval (getAccessToken pattern)', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
-      expect(source).not.toContain('supabase.auth.getSession()');
+      // getSession() may exist for session validation guard (ADR-024 / BUG-401),
+      // but must NOT be used to extract access_token for manual Authorization header
+      expect(source).not.toContain('session?.access_token');
+      expect(source).not.toContain('access_token');
+      expect(source).not.toContain('async function getAccessToken');
     });
 
     it('should NOT pass Authorization header to supabase.functions.invoke', () => {

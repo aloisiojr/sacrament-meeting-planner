@@ -485,15 +485,15 @@ describe('CR-004 F007: Auth Fixes', () => {
       expect(source).toContain('export const userManagementKeys');
     });
 
-    it('should have getAccessToken helper using supabase session', () => {
+    it('should NOT have getAccessToken helper (removed in CR-76 v2 -- SDK handles auth automatically)', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
-      expect(source).toContain('async function getAccessToken');
-      expect(source).toContain('supabase.auth.getSession()');
+      expect(source).not.toContain('async function getAccessToken');
+      expect(source).not.toContain('supabase.auth.getSession()');
     });
 
-    it('should pass Authorization header with Bearer token to edge functions', () => {
+    it('should NOT pass manual Authorization header to edge functions (CR-76 v2 -- SDK auto-injects auth)', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
-      expect(source).toContain('Authorization: `Bearer ${token}`');
+      expect(source).not.toContain('Authorization: `Bearer ${token}`');
     });
 
     it('should use callEdgeFunction with supabase.functions.invoke', () => {

@@ -1,9 +1,10 @@
 /**
- * QA Tests for CR-76: Fix Users Screen Edge Function Error (Regression CR-64)
+ * QA Tests for CR-76: Fix Users Screen HTTP 401 (Regression CR-64)
  *
  * Covers:
- * - STEP-01: Verify Edge Function and RPC code correctness
- * - STEP-02: callEdgeFunction error extraction from FunctionsHttpError.context
+ * - Edge Function and RPC code correctness (server-side is correct)
+ * - callEdgeFunction does NOT manually set Authorization header (ADR-023)
+ * - callEdgeFunction error extraction from FunctionsHttpError.context (ADR-022)
  * - Existing UI error handling (retry button, i18n messages)
  * - changeRoleMutation and deleteUserMutation onError guards
  */
@@ -97,9 +98,51 @@ describe('CR-76: Fix Users Screen Edge Function Error', () => {
   });
 
   // ---------------------------------------------------------------
-  // STEP-02: callEdgeFunction error extraction logic
+  // CR-76 v2: callEdgeFunction does NOT manually set auth headers (ADR-023)
   // ---------------------------------------------------------------
-  describe('STEP-02: callEdgeFunction error extraction from FunctionsHttpError.context', () => {
+  describe('CR-76 v2: callEdgeFunction does NOT manually override auth (ADR-023)', () => {
+    it('should NOT contain getAccessToken function', () => {
+      const source = readSourceFile('app/(tabs)/settings/users.tsx');
+      expect(source).not.toContain('async function getAccessToken');
+      expect(source).not.toContain('function getAccessToken');
+    });
+
+    it('should NOT call supabase.auth.getSession() for token retrieval', () => {
+      const source = readSourceFile('app/(tabs)/settings/users.tsx');
+      expect(source).not.toContain('supabase.auth.getSession()');
+    });
+
+    it('should NOT pass Authorization header to supabase.functions.invoke', () => {
+      const source = readSourceFile('app/(tabs)/settings/users.tsx');
+      // Check that callEdgeFunction does not contain Authorization header
+      const callEFStart = source.indexOf('async function callEdgeFunction');
+      const callEFEnd = source.indexOf('\n}', callEFStart) + 2;
+      const callEFBody = source.slice(callEFStart, callEFEnd);
+      expect(callEFBody).not.toContain('Authorization');
+    });
+
+    it('should NOT contain Bearer token construction', () => {
+      const source = readSourceFile('app/(tabs)/settings/users.tsx');
+      expect(source).not.toContain('Bearer ${token}');
+      expect(source).not.toContain('Bearer ${');
+    });
+
+    it('should invoke with only { body } and no headers parameter', () => {
+      const source = readSourceFile('app/(tabs)/settings/users.tsx');
+      // Find the invoke call inside callEdgeFunction
+      const callEFStart = source.indexOf('async function callEdgeFunction');
+      const callEFEnd = source.indexOf('\n}', callEFStart) + 2;
+      const callEFBody = source.slice(callEFStart, callEFEnd);
+      expect(callEFBody).toContain('supabase.functions.invoke(functionName, {');
+      expect(callEFBody).toContain('body,');
+      expect(callEFBody).not.toContain('headers:');
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // STEP-02: callEdgeFunction error extraction logic (ADR-022 -- preserved)
+  // ---------------------------------------------------------------
+  describe('callEdgeFunction error extraction from FunctionsHttpError.context (ADR-022)', () => {
     it('should check for error.context existence', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
       expect(source).toContain('error.context');

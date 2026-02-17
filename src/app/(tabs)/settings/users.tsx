@@ -35,19 +35,12 @@ export const userManagementKeys = {
   users: ['user-management', 'users'] as const,
 };
 
-async function getAccessToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? '';
-}
-
 async function callEdgeFunction(
   functionName: string,
   body: Record<string, unknown>
 ) {
-  const token = await getAccessToken();
   const { data, error } = await supabase.functions.invoke(functionName, {
     body,
-    headers: { Authorization: `Bearer ${token}` },
   });
   if (error) {
     let serverMessage: string | undefined;

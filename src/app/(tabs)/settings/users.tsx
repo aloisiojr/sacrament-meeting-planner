@@ -39,6 +39,12 @@ async function callEdgeFunction(
   functionName: string,
   body: Record<string, unknown>
 ) {
+  // Guard: verify session before calling invoke (ADR-024)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('auth/no-session');
+  }
+
   const { data, error } = await supabase.functions.invoke(functionName, {
     body,
   });

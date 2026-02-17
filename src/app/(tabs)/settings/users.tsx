@@ -49,7 +49,18 @@ async function callEdgeFunction(
     body,
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (error) throw error;
+  if (error) {
+    let serverMessage: string | undefined;
+    try {
+      if (error.context && typeof error.context.json === 'function') {
+        const errorBody = await error.context.json();
+        serverMessage = errorBody?.error;
+      }
+    } catch {
+      // Extraction failed, fall through to generic message
+    }
+    throw new Error(serverMessage || error.message);
+  }
   return data;
 }
 

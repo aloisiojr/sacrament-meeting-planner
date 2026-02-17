@@ -488,7 +488,9 @@ describe('CR-004 F007: Auth Fixes', () => {
     it('should NOT have getAccessToken helper (removed in CR-76 v2 -- SDK handles auth automatically)', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
       expect(source).not.toContain('async function getAccessToken');
-      expect(source).not.toContain('supabase.auth.getSession()');
+      // getSession() may exist for session validation guard (ADR-024 / BUG-401),
+      // but must NOT be used to extract access_token for manual auth header
+      expect(source).not.toContain('session?.access_token');
     });
 
     it('should NOT pass manual Authorization header to edge functions (CR-76 v2 -- SDK auto-injects auth)', () => {

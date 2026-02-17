@@ -66,7 +66,7 @@ async function callEdgeFunction(
 export default function UserManagementScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, session } = useAuth();
   const queryClient = useQueryClient();
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -89,6 +89,7 @@ export default function UserManagementScreen() {
       const result = await callEdgeFunction('list-users', {});
       return result.users ?? [];
     },
+    enabled: !!session,
   });
 
   // Invite user mutation

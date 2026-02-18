@@ -383,19 +383,12 @@ export default function MembersScreen() {
         URL.revokeObjectURL(url);
       } else {
         // Mobile: Write temp file and share via expo-sharing
-        if (!FileSystem.cacheDirectory) {
-          console.warn('[Export] cacheDirectory is null');
-          Alert.alert(t('common.error'), t('members.exportFailed'));
-          return;
-        }
-        const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
-        console.log('[Export] fileUri:', fileUri);
-        await FileSystem.writeAsStringAsync(fileUri, csv, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
+        const file = new File(Paths.cache, 'membros.csv');
+        console.log('[Export] fileUri:', file.uri);
+        file.write(csv);
         console.log('[Export] File written successfully');
         console.log('[Export] Opening share sheet...');
-        await Sharing.shareAsync(fileUri, {
+        await Sharing.shareAsync(file.uri, {
           mimeType: 'text/csv',
           dialogTitle: t('members.exportCsv'),
           UTI: 'public.comma-separated-values-text',

@@ -32,6 +32,8 @@ export interface ActorSelectorProps {
   roleFilter: ActorRoleFilter;
   onSelect: (actor: MeetingActor) => void;
   onClose: () => void;
+  selectedNames?: string[];
+  multiSelect?: boolean;
 }
 
 export function ActorSelector({
@@ -39,6 +41,8 @@ export function ActorSelector({
   roleFilter,
   onSelect,
   onClose,
+  selectedNames,
+  multiSelect,
 }: ActorSelectorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -63,11 +67,13 @@ export function ActorSelector({
   const handleSelect = useCallback(
     (actor: MeetingActor) => {
       onSelect(actor);
-      setSearch('');
-      setShowAddInput(false);
-      setEditingId(null);
+      if (!multiSelect) {
+        setSearch('');
+        setShowAddInput(false);
+        setEditingId(null);
+      }
     },
-    [onSelect]
+    [onSelect, multiSelect]
   );
 
   const handleClose = useCallback(() => {
@@ -94,8 +100,10 @@ export function ActorSelector({
       onSuccess: (newActor) => {
         onSelect(newActor);
         setAddingName('');
-        setShowAddInput(false);
-        setSearch('');
+        if (!multiSelect) {
+          setShowAddInput(false);
+          setSearch('');
+        }
       },
     });
   }, [addingName, roleFilter, createActor, onSelect]);
@@ -135,6 +143,7 @@ export function ActorSelector({
   const renderItem = useCallback(
     ({ item }: { item: MeetingActor }) => {
       const isEditing = editingId === item.id;
+      const isSelected = multiSelect && selectedNames?.includes(item.name);
 
       return (
         <View style={[styles.actorRow, { borderBottomColor: colors.divider }]}>
@@ -151,7 +160,7 @@ export function ActorSelector({
           ) : (
             <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
               <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
-                {item.name}
+                {isSelected ? '\u2713 ' : ''}{item.name}
               </Text>
             </Pressable>
           )}
@@ -174,7 +183,7 @@ export function ActorSelector({
         </View>
       );
     },
-    [colors, editingId, editingName, handleSelect, handleEditSave, handleDelete]
+    [colors, editingId, editingName, handleSelect, handleEditSave, handleDelete, multiSelect, selectedNames]
   );
 
   return (

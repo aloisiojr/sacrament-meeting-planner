@@ -372,7 +372,7 @@ describe('CR-39: Ward Topics search/filter', () => {
     const content = readSourceFile('app/(tabs)/settings/topics.tsx');
     expect(content).toContain('search');
     expect(content).toContain('setSearch');
-    expect(content).toContain('searchInput');
+    expect(content).toContain('SearchInput');
   });
 
   // AC-39.2: Real-time case-insensitive filtering
@@ -395,14 +395,18 @@ describe('CR-39: Ward Topics search/filter', () => {
     expect(content).toContain("common.noResults");
   });
 
-  // AC-39.5: Search input styling matches Members screen
-  it('AC-39.5: topics.tsx search input styling matches Members screen', () => {
+  // AC-39.5: Search input styling matches Members screen (via shared SearchInput component)
+  it('AC-39.5: topics.tsx uses shared SearchInput component (consistent styling)', () => {
     const content = readSourceFile('app/(tabs)/settings/topics.tsx');
-    expect(content).toMatch(/searchInput[\s\S]*?height:\s*40/);
-    expect(content).toMatch(/searchInput[\s\S]*?borderWidth:\s*1/);
-    expect(content).toMatch(/searchInput[\s\S]*?borderRadius:\s*8/);
-    expect(content).toMatch(/searchInput[\s\S]*?paddingHorizontal:\s*12/);
-    expect(content).toMatch(/searchInput[\s\S]*?fontSize:\s*15/);
+    expect(content).toContain("import { SearchInput } from '../../../components/SearchInput'");
+    expect(content).toContain('<SearchInput');
+    // Verify SearchInput component itself has the expected styles
+    const searchInputComponent = readSourceFile('components/SearchInput.tsx');
+    expect(searchInputComponent).toMatch(/height:\s*40/);
+    expect(searchInputComponent).toMatch(/borderWidth:\s*1/);
+    expect(searchInputComponent).toMatch(/borderRadius:\s*8/);
+    expect(searchInputComponent).toMatch(/paddingHorizontal:\s*12/);
+    expect(searchInputComponent).toMatch(/fontSize:\s*15/);
   });
 
   // AC-39.6: Collections section is NOT filtered by search

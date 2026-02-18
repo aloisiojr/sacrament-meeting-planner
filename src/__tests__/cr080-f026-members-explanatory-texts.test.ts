@@ -286,7 +286,7 @@ describe('CR-80 / F026: Members Screen Explanatory Texts', () => {
 
     it('should still have search functionality', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
-      expect(source).toContain('searchInput');
+      expect(source).toContain('SearchInput');
       expect(source).toContain('setSearch');
     });
 

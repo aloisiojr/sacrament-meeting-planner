@@ -14,7 +14,7 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-18"
-  total_features: 30
+  total_features: 33
   total_change_requests: 90
   implemented_crs: 78
   pending_crs: 12
@@ -30,6 +30,7 @@ metadata:
     - docs/CHANGE_REQUESTS.yaml
     - docs/specs/SPEC_F026.yaml
     - docs/specs/SPEC_F027_F031.yaml
+    - docs/specs/SPEC_F032_F034.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -228,7 +229,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 82 CRs, 78 implementados)
+# FEATURES (estado atual apos 90 CRs, 78 implementados)
 # =============================================================================
 
 features:
@@ -575,6 +576,61 @@ features:
       - "CR-90: Bug - botao Delete nao faz nada"
       - "Edit funciona com padrao identico de codigo"
       - "Fix no componente compartilhado SwipeableCard.tsx"
+
+  # ---------------------------------------------------------------------------
+  # Batch 6 Phase 2 (F032-F034)
+  # ---------------------------------------------------------------------------
+
+  - id: F032
+    name: "Swipe Action Icons (pencil/trash) instead of Text"
+    status: pending
+    rfs: []
+    description: >
+      Substituir texto dos botoes de acao do SwipeableCard ("Editar"/"Excluir")
+      por icones Unicode: lapis (pencil) para editar, lixeira (wastebasket)
+      para excluir. Manter accessibilityLabel com texto descritivo. Nao
+      instalar biblioteca de icones.
+    modified_by_crs: [87]
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    notes:
+      - "CR-87: Trocar texto por icones nos botoes de swipe"
+      - "Usar caracteres Unicode (nao icon library)"
+      - "accessibilityLabel mantem texto para screen readers"
+      - "Unico arquivo afetado: SwipeableCard.tsx"
+
+  - id: F033
+    name: "Topics Screen Explanatory Text"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar texto explicativo na tela de Temas, abaixo do header, explicando
+      temas da ala vs colecoes e o mecanismo de ativar/desativar colecoes.
+      Segue padrao visual de CR-80 (F026). Textos i18n em pt-BR, en, es.
+    modified_by_crs: [88]
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    notes:
+      - "CR-88: Texto explicativo na tela de temas"
+      - "Segue padrao visual de F026 (fontSize 13, textSecondary, center)"
+      - "Explica ativar/desativar colecoes"
+      - "Adiciona tambem key topics.noTopics para uso por F034"
+
+  - id: F034
+    name: "Collection Topics View (expand/collapse read-only list)"
+    status: pending
+    rfs: []
+    description: >
+      Ao clicar numa colecao na tela de Temas, expandir inline e mostrar todos
+      os temas daquela colecao em lista simples read-only. Padrao acordeao
+      (uma colecao expandida por vez). Busca lazy de general_topics por
+      collection_id. Loading state, empty state, Switch independente do tap.
+    modified_by_crs: [89]
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    notes:
+      - "CR-89: Mostrar temas de colecao ao clicar"
+      - "Padrao expand/collapse inline (acordeao)"
+      - "Novo hook useCollectionTopics em useTopics.ts"
+      - "Switch toggle independente do tap na colecao"
+      - "Depende de F033 para key topics.noTopics"
 
   # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
@@ -939,6 +995,65 @@ pending_crs:
     files_likely_impacted:
       - src/components/SwipeableCard.tsx
 
+  - id: 87
+    type: ui
+    area: "SwipeableCard (F003, F005)"
+    feature_id: F032
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    related_crs: [90]
+    description: >
+      Nos botoes de Editar e Excluir ao deslizar, trocar texto por icones
+      de lapis (pencil) e lixeira (wastebasket) usando caracteres Unicode.
+    acceptance_criteria:
+      - "Botao Edit mostra icone de lapis ao inves de texto"
+      - "Botao Delete mostra icone de lixeira ao inves de texto"
+      - "accessibilityLabel mantem texto descritivo para screen readers"
+      - "Icones visiveis e com contraste adequado"
+    files_likely_impacted:
+      - src/components/SwipeableCard.tsx
+
+  - id: 88
+    type: ux
+    area: "Topics screen (F005)"
+    feature_id: F033
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    related_crs: [80]
+    description: >
+      Na tela de temas adicionar texto explicando o que a tela faz,
+      especialmente ativar/desativar colecao. Segue padrao de CR-80.
+    acceptance_criteria:
+      - "Texto descritivo visivel abaixo do header da tela de Temas"
+      - "Texto explica temas da ala vs colecoes"
+      - "Texto explica ativar/desativar colecoes"
+      - "Segue padrao visual de CR-80 (fontSize 13, textSecondary, center)"
+      - "Textos traduzidos em pt-BR, en, es"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/topics.tsx
+      - src/i18n/locales/en.json
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/es.json
+
+  - id: 89
+    type: feature
+    area: "Topics screen (F005, F006)"
+    feature_id: F034
+    spec_file: "docs/specs/SPEC_F032_F034.yaml"
+    related_crs: [88]
+    description: >
+      Ao clicar numa colecao, mostrar todos os temas (read-only, lista simples)
+      com padrao expand/collapse inline (acordeao).
+    acceptance_criteria:
+      - "Tap na colecao expande e mostra lista de temas"
+      - "Tap novamente colapsa a lista"
+      - "Temas buscados de general_topics por collection_id"
+      - "Loading state enquanto busca"
+      - "Empty state se nao tem temas"
+      - "Switch toggle funciona independentemente do tap"
+      - "Padrao acordeao (uma colecao expandida por vez)"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/topics.tsx
+      - src/hooks/useTopics.ts
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -1170,6 +1285,36 @@ design_decisions:
       membros, (2) designacoes existentes nao sao afetadas. Confirmar abre
       file picker. Cancelar fecha dialogo.
 
+  - id: DD-25
+    title: "Unicode icons para swipe buttons (sem icon library)"
+    decided_in: CR-87
+    decision: >
+      Botoes de acao do SwipeableCard usam caracteres Unicode ao inves de
+      texto ou biblioteca de icones. Pencil (U+270F) para Edit, Wastebasket
+      (U+1F5D1) para Delete. O app nao tem dependencia de icon library
+      instalada; instalar uma para 2 icones seria desproporcional. Props
+      editLabel/deleteLabel mantidas para accessibilityLabel.
+
+  - id: DD-26
+    title: "Topics screen explanatory text (padrao CR-80)"
+    decided_in: CR-88
+    decision: >
+      Texto descritivo abaixo do header da tela de Temas, seguindo mesmo
+      padrao visual de F026/CR-80 (fontSize 13, textAlign center,
+      paddingHorizontal 16, color textSecondary). Um unico texto no topo
+      da tela cobre ambos os conceitos (temas da ala e colecoes).
+
+  - id: DD-27
+    title: "Collection topics expand/collapse (acordeao)"
+    decided_in: CR-89
+    decision: >
+      Ao clicar na area da colecao (fora do Switch), a lista de temas
+      expande inline abaixo da linha. Padrao acordeao: uma colecao
+      expandida por vez. Switch toggle funciona independentemente.
+      Busca lazy de general_topics por collection_id (sob demanda).
+      Hook useCollectionTopics em useTopics.ts. Chevron indicator
+      (> / v) a esquerda do nome da colecao para indicar tappable.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -1293,6 +1438,11 @@ business_rules:
   - id: BR-27
     rule: "Dialogo de confirmacao ANTES de importar CSV (Alert.alert com aviso de substituicao total)"
     origin: CR-86
+
+  - id: BR-28
+    rule: "Temas de colecao visiveis via expand/collapse inline (acordeao, uma por vez)"
+    origin: CR-89
+    notes: "Tap na colecao expande lista read-only de temas. Switch toggle independente."
 
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
@@ -1536,5 +1686,7 @@ cr_history:
   batch_6:
     range: "CR-83 a CR-90"
     status: "8 pendentes (83, 84, 85, 86, 87, 88, 89, 90)"
-    file: "docs/specs/SPEC_F027_F031.yaml (CR-83, 84, 85, 86, 90 - Fase 1)"
+    files:
+      - "docs/specs/SPEC_F027_F031.yaml (CR-83, 84, 85, 86, 90 - Fase 1)"
+      - "docs/specs/SPEC_F032_F034.yaml (CR-87, 88, 89 - Fase 2)"
     summary: "Save/Cancel explicito, search clear button, country codes completo, import confirmation dialog, swipe icons, topics explanatory text, collection detail view, delete button fix"

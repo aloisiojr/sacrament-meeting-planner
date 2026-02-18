@@ -1,0 +1,546 @@
+# =============================================================================
+# PLAN_P012.yaml
+# Batch 6, Phase 2: Themes & Swipe UX Improvements
+# Features: F032 (Swipe Icons), F033 (Topics Explanatory Text),
+#           F034 (Collection Topics View)
+# CRs: 87, 88, 89
+# SPEC: docs/specs/SPEC_F032_F034.yaml
+# ARCH: docs/arch/ARCH_M012.yaml
+# Generated: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement 3 UX improvements: (1) replace Edit/Delete text labels on swipe
+  action buttons with Unicode icons (pencil U+270F / trash U+1F5D1),
+  (2) add explanatory text on the Topics screen describing ward topics and
+  collection toggle functionality, (3) add expand/collapse inline view to
+  show collection topics in a read-only list when tapping a collection row
+  (accordion pattern, lazy-loaded via new useCollectionTopics hook).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # ===========================================================================
+  # F032 - Swipe Action Icons (CR-87) - 1 file
+  # ===========================================================================
+
+  - id: STEP-01
+    description: >
+      Replace text labels in SwipeableCard Edit and Delete action buttons with
+      Unicode icon characters. In src/components/SwipeableCard.tsx:
+      1. In the Edit button Pressable, change the Text content from
+         {editLabel ?? 'Edit'} to {'\u270F'} (Pencil icon).
+      2. In the Delete button Pressable, change the Text content from
+         {deleteLabel ?? 'Delete'} to {'\uD83D\uDDD1'} (Wastebasket icon,
+         surrogate pair for U+1F5D1).
+      3. Change the style on both icon Text components from styles.actionText
+         to styles.actionIcon (new style).
+      4. Add new actionIcon style: { fontSize: 20, textAlign: 'center' }.
+         The existing actionText style can remain for backward compat but is
+         no longer referenced by these buttons.
+      5. accessibilityLabel on both Pressables remains unchanged
+         (editLabel ?? 'Edit' and deleteLabel ?? 'Delete').
+      6. The props editLabel and deleteLabel remain in SwipeableCardProps
+         interface unchanged (used for accessibilityLabel only now).
+    files:
+      - "src/components/SwipeableCard.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03"]
+    done_when:
+      - "Edit button Text renders '\\u270F' (pencil character), NOT editLabel text"
+      - "Delete button Text renders '\\uD83D\\uDDD1' (wastebasket character), NOT deleteLabel text"
+      - "Both icon Text components use styles.actionIcon with fontSize 20 and textAlign center"
+      - "accessibilityLabel on Edit Pressable still equals editLabel ?? 'Edit'"
+      - "accessibilityLabel on Delete Pressable still equals deleteLabel ?? 'Delete'"
+      - "Props editLabel and deleteLabel remain in SwipeableCardProps (no interface change)"
+      - "Edit button still fires onEdit callback when pressed"
+      - "Delete button still fires onDelete callback when pressed"
+    tests:
+      - type: component
+        description: >
+          T-01: Render SwipeableCard with onEdit and editLabel='Editar'.
+          Verify Edit button Text content contains pencil character (U+270F)
+          and does NOT contain 'Editar'. Verify accessibilityLabel equals 'Editar'.
+          (AC-F032-01, AC-F032-04)
+      - type: component
+        description: >
+          T-02: Render SwipeableCard with onDelete and deleteLabel='Excluir'.
+          Verify Delete button Text content contains wastebasket character
+          and does NOT contain 'Excluir'. Verify accessibilityLabel equals 'Excluir'.
+          (AC-F032-01, AC-F032-04)
+      - type: component
+        description: >
+          T-03: Render SwipeableCard with onEdit mock. Press Edit button.
+          Verify onEdit was called. (AC-F032-02)
+      - type: component
+        description: >
+          T-04: Render SwipeableCard with onDelete mock. Press Delete button.
+          Verify onDelete was called. (AC-F032-03)
+      - type: component
+        description: >
+          T-05: Render SwipeableCard. Verify icon Text has fontSize 20
+          (via actionIcon style). (AC-F032-05)
+    covers:
+      acceptance_criteria: ["AC-F032-01", "AC-F032-02", "AC-F032-03", "AC-F032-04", "AC-F032-05"]
+      edge_cases: []
+    risks:
+      - risk: "Unicode emoji rendering varies across iOS and Android"
+        mitigation: >
+          U+270F and U+1F5D1 are widely supported Unicode characters in all
+          modern emoji sets. User confirmed these specific characters. Visual
+          differences are cosmetic only. fontSize 20 ensures visibility.
+    commit_message: "feat(swipeable): replace Edit/Delete text with Unicode icons pencil/trash (CR-87)"
+
+  # ===========================================================================
+  # F033 - Topics Screen Explanatory Text (CR-88) - 4 files
+  # ===========================================================================
+
+  - id: STEP-02
+    description: >
+      Add i18n keys for topics explanatory text and collection empty state in
+      all 3 locale files. Keys to add inside the "topics" object:
+      1. topics.description: explanatory text about ward topics and collections.
+         en: "Create custom ward topics or activate predefined topic collections.
+         Ward topics can be added, edited, and deleted. Activating a collection
+         makes its topics available when assigning speeches. Deactivating removes
+         them from the selection list."
+         pt-BR: "Crie temas customizados da ala ou ative colecoes de temas
+         pre-definidos. Temas da ala podem ser adicionados, editados e excluidos.
+         Ativar uma colecao torna seus temas disponiveis ao designar discursos.
+         Desativar remove da lista de selecao."
+         es: "Cree temas personalizados del barrio o active colecciones de temas
+         predefinidos. Los temas del barrio se pueden agregar, editar y eliminar.
+         Activar una coleccion hace que sus temas esten disponibles al asignar
+         discursos. Desactivar los elimina de la lista de seleccion."
+      2. topics.noTopics: empty state for expanded collection with no topics.
+         en: "No topics in this collection"
+         pt-BR: "Nenhum tema nesta colecao"
+         es: "No hay temas en esta coleccion"
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "en.json has topics.description with full English text"
+      - "en.json has topics.noTopics = 'No topics in this collection'"
+      - "pt-BR.json has topics.description with full Portuguese text"
+      - "pt-BR.json has topics.noTopics = 'Nenhum tema nesta colecao'"
+      - "es.json has topics.description with full Spanish text"
+      - "es.json has topics.noTopics = 'No hay temas en esta coleccion'"
+      - "All 3 files remain valid JSON (no parse errors)"
+      - "No existing keys were removed or modified"
+    tests:
+      - type: unit
+        description: >
+          T-06: Import all 3 locale files. Verify topics.description key exists
+          and is a non-empty string in each. (AC-F033-03, AC-F033-06)
+      - type: unit
+        description: >
+          T-07: Import all 3 locale files. Verify topics.noTopics key exists
+          and is a non-empty string in each. (AC-F033-03, AC-F033-06)
+    covers:
+      acceptance_criteria: ["AC-F033-03", "AC-F033-06"]
+      edge_cases: []
+    risks:
+      - risk: "JSON syntax error breaking all translations"
+        mitigation: "Test validates JSON parse succeeds for all 3 files"
+    commit_message: "feat(i18n): add topics.description and topics.noTopics keys in 3 locales (CR-88)"
+
+  - id: STEP-03
+    description: >
+      Add explanatory description text to the Topics screen. In
+      src/app/(tabs)/settings/topics.tsx:
+      1. Add a Text element between the header View and the Ward Topics section View.
+         Content: t('topics.description'). Style: [styles.description, { color: colors.textSecondary }].
+      2. Add new description style to StyleSheet: { fontSize: 13, textAlign: 'center',
+         paddingHorizontal: 16, marginBottom: 8 }.
+      This follows the exact same pattern as CR-80 (members.tsx description).
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "Text element with t('topics.description') is rendered between header and Ward Topics section"
+      - "Text uses styles.description with fontSize 13, textAlign center, paddingHorizontal 16, marginBottom 8"
+      - "Text uses color colors.textSecondary"
+      - "Text wraps naturally (no numberOfLines constraint)"
+      - "No existing layout broken"
+    tests:
+      - type: component
+        description: >
+          T-08: Render TopicsScreen. Verify a Text element with
+          t('topics.description') content is present in the rendered tree.
+          (AC-F033-01, AC-F033-02)
+      - type: component
+        description: >
+          T-09: Verify the description text mentions ward topics and collection
+          activation/deactivation (check i18n content). (AC-F033-02)
+      - type: component
+        description: >
+          T-10: Verify the description Text has correct styling: fontSize 13,
+          textAlign center, paddingHorizontal 16, color textSecondary. (AC-F033-04)
+      - type: component
+        description: >
+          T-11: Verify the description Text has no numberOfLines constraint,
+          allowing natural wrapping. (AC-F033-05)
+    covers:
+      acceptance_criteria: ["AC-F033-01", "AC-F033-02", "AC-F033-04", "AC-F033-05"]
+      edge_cases:
+        - "Long text wrapping on small screens"
+    risks:
+      - risk: "Description text may push content down too much on small screens"
+        mitigation: >
+          fontSize 13 and marginBottom 8 are compact. Same approach used for
+          members.tsx description which has been validated.
+    commit_message: "feat(topics): add explanatory description text below header (CR-88)"
+
+  # ===========================================================================
+  # F034 - Collection Topics View (CR-89) - 2 files
+  # ===========================================================================
+
+  - id: STEP-04
+    description: >
+      Add useCollectionTopics hook in src/hooks/useTopics.ts. Changes:
+      1. Add collectionTopics key to topicKeys:
+         collectionTopics: (collectionId: string) =>
+           ['topics', 'collectionTopics', collectionId] as const.
+      2. Add new hook useCollectionTopics(collectionId: string | null):
+         - Uses useQuery with queryKey topicKeys.collectionTopics(collectionId ?? '').
+         - queryFn: SELECT * FROM general_topics WHERE collection_id = collectionId,
+           ORDER BY title ASC.
+         - Returns GeneralTopic[].
+         - enabled: !!collectionId (only runs when collectionId is non-null).
+      3. Export the new hook.
+    files:
+      - "src/hooks/useTopics.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "topicKeys has collectionTopics key function"
+      - "useCollectionTopics hook exists and is exported"
+      - "Hook queries general_topics filtered by collection_id"
+      - "Hook orders results by title ascending"
+      - "Hook is disabled when collectionId is null"
+      - "Hook returns GeneralTopic[]"
+    tests:
+      - type: unit
+        description: >
+          T-12: Mock supabase. Call useCollectionTopics with a collection ID.
+          Verify the query calls general_topics with eq('collection_id', id)
+          and order('title', ascending). (AC-F034-03)
+      - type: unit
+        description: >
+          T-13: Call useCollectionTopics(null). Verify the query does NOT execute
+          (enabled: false). (AC-F034-03 edge case)
+    covers:
+      acceptance_criteria: ["AC-F034-03"]
+      edge_cases:
+        - "Null collectionId does not trigger query"
+    risks:
+      - risk: "Query might return stale data if collection topics change"
+        mitigation: >
+          General topics are static data (managed by import scripts, not users).
+          TanStack Query default staleTime is sufficient. Re-expansion triggers
+          refetch if stale.
+    commit_message: "feat(hooks): add useCollectionTopics hook for lazy-loading collection topics (CR-89)"
+
+  - id: STEP-05
+    description: >
+      Modify CollectionRow in topics.tsx to be tappable with expand/collapse.
+      Changes to CollectionRow component:
+      1. Add isExpanded (boolean) and onPress (() => void) to CollectionRowProps.
+      2. Restructure the row: wrap the name area (chevron + name) in a Pressable
+         with onPress. The Switch remains OUTSIDE the Pressable as a sibling,
+         preventing event conflicts.
+      3. Add chevron indicator: Text with U+25B6 (right-pointing triangle) when
+         collapsed, U+25BC (down-pointing triangle) when expanded. Style: fontSize
+         10, width 16, textAlign center, color textSecondary.
+      4. Add collectionPressable style: { flex: 1, flexDirection: 'row',
+         alignItems: 'center', gap: 8 }.
+      5. Add chevron style: { fontSize: 10, width: 16, textAlign: 'center' }.
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-04"]
+    done_when:
+      - "CollectionRowProps has isExpanded and onPress properties"
+      - "CollectionRow content has Pressable wrapping chevron + name (not Switch)"
+      - "Chevron shows U+25B6 when collapsed and U+25BC when expanded"
+      - "Switch remains outside Pressable and functions independently"
+      - "Pressing the name area triggers onPress (not Switch toggle)"
+      - "Pressing the Switch triggers onToggle (not expand/collapse)"
+    tests:
+      - type: component
+        description: >
+          T-14: Render CollectionRow with isExpanded=false. Verify right-pointing
+          triangle (U+25B6) is shown. (AC-F034-08)
+      - type: component
+        description: >
+          T-15: Render CollectionRow with isExpanded=true. Verify down-pointing
+          triangle (U+25BC) is shown. (AC-F034-08)
+      - type: component
+        description: >
+          T-16: Render CollectionRow. Toggle the Switch. Verify onToggle is called
+          and onPress is NOT called. (AC-F034-06)
+    covers:
+      acceptance_criteria: ["AC-F034-06", "AC-F034-08"]
+      edge_cases: []
+    risks:
+      - risk: "Pressable might intercept Switch tap events on some Android devices"
+        mitigation: >
+          Pressable wraps only chevron + name. Switch is a sibling outside the
+          Pressable. No overlap. This is the standard React Native pattern.
+    commit_message: "feat(topics): make CollectionRow tappable with chevron indicator (CR-89)"
+
+  - id: STEP-06
+    description: >
+      Add expand/collapse accordion state and CollectionTopicsList inline
+      component in topics.tsx. Changes to TopicsScreen:
+      1. Import useState, useCallback (already imported), ActivityIndicator
+         from react-native, and useCollectionTopics from hooks/useTopics.
+      2. Add state: const [expandedCollectionId, setExpandedCollectionId] =
+         useState<string | null>(null).
+      3. Add handler: handleCollectionPress = useCallback((collectionId) =>
+         setExpandedCollectionId((prev) => prev === collectionId ? null : collectionId), []).
+      4. Update CollectionRow rendering in the collections map:
+         - Pass isExpanded={expandedCollectionId === item.id} and
+           onPress={() => handleCollectionPress(item.id)} to each CollectionRow.
+         - Wrap each CollectionRow + optional expansion in React.Fragment.
+         - Below each CollectionRow, conditionally render
+           {expandedCollectionId === item.id && <CollectionTopicsList collectionId={item.id} colors={colors} />}.
+      5. Create CollectionTopicsList inline component:
+         - Props: { collectionId: string; colors: ReturnType<typeof useTheme>['colors'] }.
+         - Uses useCollectionTopics(collectionId) hook.
+         - If isLoading: render ActivityIndicator (size small, color primary)
+           centered in a View with paddingVertical 16.
+         - If topics empty or null: render t('topics.noTopics') in italic Text,
+           paddingLeft 40, paddingVertical 12, fontSize 13, fontStyle italic,
+           color textSecondary.
+         - Otherwise: render topics in a View with paddingLeft 32, paddingRight 16,
+           backgroundColor colors.surface. Each topic is a View with paddingVertical 8,
+           paddingLeft 8. Title: fontSize 14, color textSecondary. Link (if exists):
+           fontSize 12, marginTop 2, color primary, numberOfLines 1. Thin separator
+           (hairlineWidth) between items except last.
+      6. Add new styles: collectionTopicsContainer, collectionTopicItem,
+         collectionTopicTitle, collectionTopicLink, collectionTopicsLoading,
+         collectionTopicsEmpty, collectionTopicsEmptyText (values per ARCH_M012
+         CT-07 styles section).
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+    dependencies: ["STEP-04", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "expandedCollectionId state exists (string | null)"
+      - "handleCollectionPress toggles expandedCollectionId"
+      - "Each CollectionRow receives isExpanded and onPress props"
+      - "CollectionTopicsList renders below expanded CollectionRow"
+      - "Only ONE collection can be expanded at a time (accordion)"
+      - "Expanding collection B auto-collapses collection A"
+      - "Loading state shows ActivityIndicator while fetching"
+      - "Empty state shows t('topics.noTopics') when no topics"
+      - "Topics show title (textSecondary) and optional link (primary)"
+      - "Topics are visually nested (paddingLeft 32)"
+      - "Thin separator between topic items"
+      - "ActivityIndicator imported from react-native"
+      - "useCollectionTopics imported from hooks/useTopics"
+    tests:
+      - type: component
+        description: >
+          T-17: Render TopicsScreen with mocked collections. Tap a collection row.
+          Verify topics for that collection appear below. (AC-F034-01)
+      - type: component
+        description: >
+          T-18: Expand a collection. Tap it again. Verify topics are no longer
+          visible (toggle/collapse). (AC-F034-02)
+      - type: component
+        description: >
+          T-19: Expand collection A. Then expand collection B. Verify collection
+          A's topics are no longer visible (accordion pattern). (AC-F034-07)
+      - type: component
+        description: >
+          T-20: Mock useCollectionTopics to return loading state. Expand a
+          collection. Verify ActivityIndicator is shown. (AC-F034-04)
+      - type: component
+        description: >
+          T-21: Mock useCollectionTopics to return empty array. Expand a
+          collection. Verify t('topics.noTopics') text is displayed. (AC-F034-05)
+      - type: component
+        description: >
+          T-22: Expand a collection with topics that have links. Verify title
+          and link are both rendered. Verify link uses primary color. (AC-F034-03)
+    covers:
+      acceptance_criteria: ["AC-F034-01", "AC-F034-02", "AC-F034-03", "AC-F034-04", "AC-F034-05", "AC-F034-07", "AC-F034-08"]
+      edge_cases:
+        - "Empty collection shows noTopics message"
+        - "Loading state during first fetch"
+        - "Re-expanding same collection is instant (TanStack Query cache)"
+    risks:
+      - risk: "First expand has network latency (loading state)"
+        mitigation: >
+          ActivityIndicator provides visual feedback. TanStack Query caches
+          results, so subsequent expands of the same collection are instant.
+      - risk: "Many topics in a collection could cause scroll issues"
+        mitigation: >
+          Accordion pattern ensures only one collection expanded at a time.
+          Topics are rendered in a simple View (not FlatList) since individual
+          collections typically have a manageable number of topics.
+    commit_message: "feat(topics): add expand/collapse collection topics view with accordion pattern (CR-89)"
+
+  # ===========================================================================
+  # STEP-07: Regression verification
+  # ===========================================================================
+
+  - id: STEP-07
+    description: >
+      Run full test suite to verify no regressions from the 3 features.
+      Verify:
+      1. All existing SwipeableCard tests pass (STEP-01 changes).
+      2. All existing topics screen tests pass (STEP-03, STEP-05, STEP-06 changes).
+      3. All existing useTopics hook tests pass (STEP-04 changes).
+      4. All i18n tests pass (STEP-02 changes).
+      5. No broken imports or type errors across the project.
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "All existing tests in the project pass (vitest)"
+      - "No TypeScript compilation errors"
+      - "No ESLint errors in modified files"
+    tests:
+      - type: regression
+        description: >
+          T-23: Run full test suite (vitest). Verify zero regressions in
+          existing tests. All new tests from STEP-01 through STEP-06 pass.
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Existing tests may fail if they assert exact text content of swipe buttons"
+        mitigation: >
+          Review existing SwipeableCard tests before running. Update assertions
+          if they check for button text content to expect icons instead.
+    commit_message: "test(batch6-phase2): verify no regressions after F032, F033, F034 implementation"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # F032 ACs
+  - ac_id: AC-F032-01
+    how_to_verify: "Render SwipeableCard. Verify Edit button shows pencil icon (U+270F) and Delete button shows wastebasket icon (U+1F5D1). No text rendered."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F032-02
+    how_to_verify: "Render SwipeableCard with onEdit mock. Press Edit button. Verify onEdit was called."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F032-03
+    how_to_verify: "Render SwipeableCard with onDelete mock. Press Delete button. Verify onDelete was called."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F032-04
+    how_to_verify: "Render SwipeableCard with editLabel and deleteLabel. Verify accessibilityLabel on each button matches the label text (not the icon)."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F032-05
+    how_to_verify: "Render SwipeableCard. Verify icon Text components have fontSize 20 (actionIcon style). Verify Edit icon uses colors.onPrimary and Delete icon uses #FFFFFF."
+    covered_by_steps: ["STEP-01"]
+
+  # F033 ACs
+  - ac_id: AC-F033-01
+    how_to_verify: "Render TopicsScreen. Verify Text with t('topics.description') is present between header and Ward Topics section."
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  - ac_id: AC-F033-02
+    how_to_verify: "Check i18n content: topics.description mentions ward topics, collections, activate, deactivate, and speech assignments."
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  - ac_id: AC-F033-03
+    how_to_verify: "Verify topics.description key exists in en.json, pt-BR.json, es.json with non-empty text."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F033-04
+    how_to_verify: "Verify description Text has fontSize 13, textAlign center, paddingHorizontal 16, marginBottom 8, color textSecondary."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F033-05
+    how_to_verify: "Verify description Text has no numberOfLines constraint. paddingHorizontal 16 ensures safe wrapping on small screens."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F033-06
+    how_to_verify: "Compare topics section keys in all 3 locale files. Same structure. No existing key removed."
+    covered_by_steps: ["STEP-02"]
+
+  # F034 ACs
+  - ac_id: AC-F034-01
+    how_to_verify: "Render TopicsScreen with mocked collections. Tap collection row. Verify topics appear below in read-only list."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-F034-02
+    how_to_verify: "Expand collection. Tap again. Verify topics list collapses (toggle)."
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-F034-03
+    how_to_verify: "Verify topics fetched from general_topics filtered by collection_id. Title and optional link rendered."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-F034-04
+    how_to_verify: "Mock slow query. Expand collection. Verify ActivityIndicator shown during loading."
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-F034-05
+    how_to_verify: "Mock empty topics. Expand collection. Verify t('topics.noTopics') message shown."
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-F034-06
+    how_to_verify: "Toggle Switch on collection. Verify onToggle fires. Verify collection did NOT expand."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F034-07
+    how_to_verify: "Expand collection A. Expand collection B. Verify A collapsed, B expanded (accordion)."
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-F034-08
+    how_to_verify: "Verify expanded topics list has paddingLeft 32 for nesting. Titles use textSecondary. Thin separator between items."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+# =============================================================================
+# EDGE CASE COVERAGE
+# =============================================================================
+
+edge_case_coverage:
+  - ec_id: EC-01
+    description: "Unicode emoji rendering varies across platforms"
+    how_covered: "STEP-01 uses widely supported U+270F and U+1F5D1 characters. fontSize 20 ensures visibility."
+    covered_by_steps: ["STEP-01"]
+
+  - ec_id: EC-02
+    description: "Long description text wrapping on small screens"
+    how_covered: "STEP-03 uses paddingHorizontal 16 and no numberOfLines, allowing natural wrapping."
+    covered_by_steps: ["STEP-03"]
+
+  - ec_id: EC-03
+    description: "Collection with zero topics (empty state)"
+    how_covered: "STEP-06 renders t('topics.noTopics') when topics array is empty."
+    covered_by_steps: ["STEP-06"]
+
+  - ec_id: EC-04
+    description: "Network latency on first collection expand"
+    how_covered: "STEP-06 shows ActivityIndicator during loading. TanStack Query caches results."
+    covered_by_steps: ["STEP-06"]
+
+  - ec_id: EC-05
+    description: "Switch tap vs collection row tap event conflict"
+    how_covered: "STEP-05 wraps only chevron+name in Pressable. Switch is a sibling outside Pressable."
+    covered_by_steps: ["STEP-05"]

@@ -1,0 +1,996 @@
+# =============================================================================
+# ARCH_M012 - Batch 6 Phase 2: Themes & Swipe UX Improvements
+# Features: F032 (Swipe Icons), F033 (Topics Explanatory Text),
+#           F034 (Collection Topics View)
+# CRs: 87, 88, 89
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+module: "WardDataModule (M002) + UIShell (M008)"
+features: [F032, F033, F034]
+spec: SPEC_F032_F034
+crs: [87, 88, 89]
+
+# =============================================================================
+# ARCH_SUMMARY
+# =============================================================================
+
+ARCH_SUMMARY:
+  type: arch_summary
+  status: complete
+  components_count: 8
+  main_components:
+    - "SwipeableCard (replace text with Unicode icons for Edit/Delete buttons)"
+    - "topics.tsx (add explanatory text + expand/collapse collection topics)"
+    - "CollectionRow (make tappable with Pressable, add chevron indicator)"
+    - "useCollectionTopics (new hook in useTopics.ts for lazy-loading topics)"
+    - "3 locale files (new i18n keys: topics.description, topics.noTopics)"
+  adrs:
+    - "ADR-033: Unicode icons for swipe action buttons (no icon library)"
+    - "ADR-034: Accordion pattern for collection topics (one expanded at a time)"
+  tech_stack:
+    - "React Native (Pressable, Switch, ActivityIndicator)"
+    - "TanStack Query (useCollectionTopics hook)"
+    - "react-i18next (new keys)"
+    - "Supabase PostgREST (general_topics query)"
+  implementation_order:
+    - "F032 (Swipe Icons) -> F033 (Topics Text) -> F034 (Collection Topics View)"
+  estimated_iterations: 1
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Implement 3 UX improvements: (1) replace text labels on swipe action buttons
+    with Unicode icons (pencil/trash), (2) add explanatory text on the Topics
+    screen describing ward topics and collection toggle functionality, (3) add
+    expand/collapse inline view to show collection topics when tapping a collection
+    row.
+  principles:
+    - "Minimal change surface: F032 touches only SwipeableCard.tsx"
+    - "Follow existing patterns: F033 replicates CR-80 description pattern from members.tsx"
+    - "Lazy loading: F034 fetches collection topics on demand (not preloaded)"
+    - "Accordion pattern: only one collection expanded at a time (consistent with SwipeableCard one-at-a-time)"
+    - "No new dependencies: Unicode icons, no icon library"
+    - "i18n: all user-facing text in 3 locales (en, pt-BR, es)"
+
+# =============================================================================
+# SYSTEM DIAGRAM
+# =============================================================================
+
+diagram: |
+  +----------------------------------------------------------------------+
+  |  Settings Stack                                                       |
+  |                                                                       |
+  |  +----------------------------------+                                 |
+  |  |  topics.tsx                       |                                 |
+  |  |  +----------------------------+  |                                 |
+  |  |  | Text (topics.description)  |  |  F033 - Explanatory Text        |
+  |  |  +----------------------------+  |                                 |
+  |  |  +----------------------------+  |                                 |
+  |  |  | Ward Topics Section        |  |                                 |
+  |  |  |  TopicRow x N              |  |                                 |
+  |  |  +----------------------------+  |                                 |
+  |  |  +----------------------------+  |                                 |
+  |  |  | Collections Section        |  |  F034 - Collection Topics View  |
+  |  |  |  CollectionRow (tappable)  |  |                                 |
+  |  |  |    > chevron + name        |  |                                 |
+  |  |  |    [Switch]                |  |                                 |
+  |  |  |  [expanded topics list]    |  |                                 |
+  |  |  |    - Topic title           |  |                                 |
+  |  |  |    - Topic link            |  |                                 |
+  |  |  +----------------------------+  |                                 |
+  |  +----------------------------------+                                 |
+  |                                                                       |
+  |  +----------------------------------+                                 |
+  |  |  SwipeableCard.tsx (shared)       |  F032 - Swipe Icons             |
+  |  |  [pencil icon] [trash icon]       |                                 |
+  |  |  accessibilityLabel = text        |                                 |
+  |  +----------------------------------+                                 |
+  |                                                                       |
+  |  +----------------------------------+                                 |
+  |  |  useTopics.ts                     |  F034 - New Hook                |
+  |  |  useCollectionTopics(id)          |                                 |
+  |  |    -> general_topics query        |                                 |
+  |  +----------------------------------+                                 |
+  +----------------------------------------------------------------------+
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # F032 - Swipe Action Icons (CR-87)
+  # ---------------------------------------------------------------------------
+
+  - id: C01
+    name: "SwipeableCard - Unicode icons for Edit/Delete"
+    feature: F032
+    file: "src/components/SwipeableCard.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Replace the text content of Edit and Delete action buttons with Unicode
+      icon characters. Edit shows pencil (U+270F), Delete shows wastebasket
+      (U+1F5D1). The editLabel and deleteLabel props are now used ONLY for
+      accessibilityLabel (not for visible text). Font size adjusted to ~20
+      for icon visibility within 70px-wide buttons.
+
+  # ---------------------------------------------------------------------------
+  # F033 - Topics Screen Explanatory Text (CR-88)
+  # ---------------------------------------------------------------------------
+
+  - id: C02
+    name: "topics.tsx - Explanatory Text"
+    feature: F033
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Add a descriptive Text component between the header and the Ward Topics
+      section. Uses t('topics.description') i18n key. Follows the same visual
+      pattern as members.tsx description (fontSize 13, textAlign center,
+      paddingHorizontal 16, marginBottom 8, color textSecondary).
+
+  - id: C03
+    name: "i18n keys for topics description and noTopics"
+    feature: F033
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    change_type: MODIFY
+    responsibility: >
+      Add topics.description (explanatory text) and topics.noTopics (empty state
+      for expanded collection with no topics) keys in all 3 locale files.
+
+  # ---------------------------------------------------------------------------
+  # F034 - Collection Topics View (CR-89)
+  # ---------------------------------------------------------------------------
+
+  - id: C04
+    name: "useCollectionTopics hook"
+    feature: F034
+    file: "src/hooks/useTopics.ts"
+    change_type: MODIFY
+    responsibility: >
+      New TanStack Query hook that fetches general_topics filtered by
+      collection_id, ordered by title ascending. Returns GeneralTopic[].
+      Enabled only when collectionId is non-null (lazy loading on expand).
+      Add new query key to topicKeys.
+
+  - id: C05
+    name: "CollectionRow - make tappable with expand/collapse"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Wrap CollectionRow content in Pressable to make the name/chevron area
+      tappable. Add onPress prop for expand/collapse. Add chevron indicator
+      (> when collapsed, v when expanded) to the left of the collection name.
+      Switch remains independent and does not trigger expand/collapse.
+      The Pressable wraps the name area only (not the Switch) to prevent
+      event conflicts.
+
+  - id: C06
+    name: "TopicsScreen - expandedCollectionId state and topic list rendering"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Add expandedCollectionId state (string | null). When a collection is
+      tapped, set expandedCollectionId to that collection's id (or null if
+      already expanded = toggle). Render the expanded topics list inline below
+      the CollectionRow when expanded. Use useCollectionTopics hook to fetch
+      topics. Show loading state (ActivityIndicator), empty state
+      (t('topics.noTopics')), or topic list with title and optional link.
+
+  - id: C07
+    name: "CollectionTopicsList - inline read-only topic list"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Inline component (or JSX block) that renders the list of topics for an
+      expanded collection. Each topic shows title (textSecondary color) and
+      optional link (primary color, subtle). List is visually nested with
+      extra paddingLeft. No edit/delete actions (read-only). Thin separator
+      between topics.
+
+  - id: C08
+    name: "topics.tsx - expanded topics styling"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Add new styles for expanded topic items: collectionTopicItem (paddingLeft
+      32+ for visual nesting), collectionTopicTitle (fontSize 14,
+      textSecondary), collectionTopicLink (fontSize 12, primary color),
+      chevron indicator style, loading/empty state styles within expansion.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # ---------------------------------------------------------------------------
+  # F032 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-01
+    name: "SwipeableCard Unicode icons"
+    feature: F032
+    file: "src/components/SwipeableCard.tsx"
+    description: >
+      Replace the visible text inside Edit and Delete action buttons with
+      Unicode icon characters. editLabel/deleteLabel props remain in the
+      interface for accessibilityLabel only.
+
+    current_code: |
+      {onEdit && (
+        <Pressable
+          style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary }]}
+          onPress={handleEdit}
+          accessibilityRole="button"
+          accessibilityLabel={editLabel ?? 'Edit'}
+        >
+          <Text style={[styles.actionText, { color: colors.onPrimary }]}>
+            {editLabel ?? 'Edit'}
+          </Text>
+        </Pressable>
+      )}
+      {onDelete && (
+        <Pressable
+          style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error }]}
+          onPress={handleDelete}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel ?? 'Delete'}
+        >
+          <Text style={[styles.actionText, { color: '#FFFFFF' }]}>
+            {deleteLabel ?? 'Delete'}
+          </Text>
+        </Pressable>
+      )}
+
+    new_code: |
+      {onEdit && (
+        <Pressable
+          style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary }]}
+          onPress={handleEdit}
+          accessibilityRole="button"
+          accessibilityLabel={editLabel ?? 'Edit'}
+        >
+          <Text style={[styles.actionIcon, { color: colors.onPrimary }]}>
+            {'\u270F'}
+          </Text>
+        </Pressable>
+      )}
+      {onDelete && (
+        <Pressable
+          style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error }]}
+          onPress={handleDelete}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel ?? 'Delete'}
+        >
+          <Text style={[styles.actionIcon, { color: '#FFFFFF' }]}>
+            {'\uD83D\uDDD1'}
+          </Text>
+        </Pressable>
+      )}
+
+    style_changes: |
+      # Replace actionText with actionIcon (or add actionIcon alongside):
+      actionIcon: {
+        fontSize: 20,
+        textAlign: 'center',
+      },
+
+    notes:
+      - "U+270F (Pencil) renders as pencil emoji on mobile platforms"
+      - "U+1F5D1 (Wastebasket) renders as trash can emoji on mobile platforms"
+      - "In JS string, U+1F5D1 requires surrogate pair: '\\uD83D\\uDDD1' or direct character"
+      - "accessibilityLabel remains as editLabel/deleteLabel (text for screen readers)"
+      - "actionText style (fontSize 13) replaced by actionIcon style (fontSize 20)"
+      - "Props editLabel and deleteLabel stay in SwipeableCardProps interface, no change needed"
+
+  # ---------------------------------------------------------------------------
+  # F033 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-02
+    name: "Topics screen explanatory text"
+    feature: F033
+    file: "src/app/(tabs)/settings/topics.tsx"
+    description: >
+      Add a descriptive Text element between the header and the Ward Topics
+      section, following the same pattern as members.tsx description.
+
+    insertion_point: "Between the header View and the Ward Topics section View"
+
+    new_jsx: |
+      {/* Screen description */}
+      <Text style={[styles.description, { color: colors.textSecondary }]}>
+        {t('topics.description')}
+      </Text>
+
+    new_style: |
+      description: {
+        fontSize: 13,
+        textAlign: 'center',
+        paddingHorizontal: 16,
+        marginBottom: 8,
+      },
+
+    notes:
+      - "Exact same style as members.tsx description (CR-80)"
+      - "Positioned between header and first section"
+      - "Color from colors.textSecondary (same as members.tsx)"
+
+  - id: CT-03
+    name: "i18n keys for topics"
+    feature: F033
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    description: "Add topics.description and topics.noTopics i18n keys."
+
+    keys:
+      - key: "topics.description"
+        en: >
+          Create custom ward topics or activate predefined topic collections.
+          Ward topics can be added, edited, and deleted. Activating a collection
+          makes its topics available when assigning speeches. Deactivating removes
+          them from the selection list.
+        pt_BR: >
+          Crie temas customizados da ala ou ative colecoes de temas pre-definidos.
+          Temas da ala podem ser adicionados, editados e excluidos. Ativar uma colecao
+          torna seus temas disponiveis ao designar discursos. Desativar remove da
+          lista de selecao.
+        es: >
+          Cree temas personalizados del barrio o active colecciones de temas predefinidos.
+          Los temas del barrio se pueden agregar, editar y eliminar. Activar una coleccion
+          hace que sus temas esten disponibles al asignar discursos. Desactivar los
+          elimina de la lista de seleccion.
+
+      - key: "topics.noTopics"
+        en: "No topics in this collection"
+        pt_BR: "Nenhum tema nesta colecao"
+        es: "No hay temas en esta coleccion"
+        note: "Used by F034 as empty state when expanded collection has no topics"
+
+  # ---------------------------------------------------------------------------
+  # F034 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-04
+    name: "useCollectionTopics hook"
+    feature: F034
+    file: "src/hooks/useTopics.ts"
+    description: >
+      New hook for lazy-loading topics of a specific collection.
+
+    query_key_addition: |
+      export const topicKeys = {
+        // ... existing keys ...
+        collectionTopics: (collectionId: string) =>
+          ['topics', 'collectionTopics', collectionId] as const,
+      };
+
+    hook_implementation: |
+      /**
+       * Fetch topics for a specific general collection (lazy, on-demand).
+       * Used by F034 when a collection row is expanded in the Topics screen.
+       */
+      export function useCollectionTopics(collectionId: string | null) {
+        return useQuery({
+          queryKey: topicKeys.collectionTopics(collectionId ?? ''),
+          queryFn: async (): Promise<GeneralTopic[]> => {
+            const { data, error } = await supabase
+              .from('general_topics')
+              .select('*')
+              .eq('collection_id', collectionId!)
+              .order('title', { ascending: true });
+
+            if (error) throw error;
+            return data ?? [];
+          },
+          enabled: !!collectionId,
+        });
+      }
+
+    notes:
+      - "Hook is enabled only when collectionId is non-null"
+      - "Query is cached per collectionId, so re-expanding same collection is instant"
+      - "No wardId needed because general_topics is a global table (SELECT for all authenticated)"
+      - "Returns GeneralTopic[] (id, collection_id, title, link)"
+      - "Ordered by title ascending (consistent with ward topics)"
+
+  - id: CT-05
+    name: "CollectionRow - tappable with chevron"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    description: >
+      Modify CollectionRow to support tap for expand/collapse and display
+      a chevron indicator showing expanded state.
+
+    interface_change: |
+      interface CollectionRowProps {
+        name: string;
+        active: boolean;
+        isExpanded: boolean;         // NEW
+        onToggle: (active: boolean) => void;
+        onPress: () => void;          // NEW
+        disabled: boolean;
+        colors: ReturnType<typeof useTheme>['colors'];
+      }
+
+    new_jsx: |
+      function CollectionRow({ name, active, isExpanded, onToggle, onPress, disabled, colors }: CollectionRowProps) {
+        return (
+          <View style={[styles.collectionRow, { borderBottomColor: colors.divider }]}>
+            <Pressable
+              style={styles.collectionPressable}
+              onPress={onPress}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.chevron, { color: colors.textSecondary }]}>
+                {isExpanded ? '\u25BC' : '\u25B6'}
+              </Text>
+              <Text style={[styles.collectionName, { color: colors.text }]} numberOfLines={1}>
+                {name}
+              </Text>
+            </Pressable>
+            <Switch
+              value={active}
+              onValueChange={onToggle}
+              disabled={disabled}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          </View>
+        );
+      }
+
+    notes:
+      - "Pressable wraps only the chevron + name, NOT the Switch"
+      - "This prevents the Pressable from intercepting Switch tap events"
+      - "Chevron: U+25B6 (right-pointing triangle) collapsed, U+25BC (down-pointing triangle) expanded"
+      - "collectionPressable style: flex:1, flexDirection:row, alignItems:center, gap:8"
+      - "Switch remains at the right end of the row (unchanged)"
+
+  - id: CT-06
+    name: "TopicsScreen - expanded collection state and rendering"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    description: >
+      Add state management for expanded collection and render topics inline.
+
+    state_addition: |
+      const [expandedCollectionId, setExpandedCollectionId] = useState<string | null>(null);
+
+    handler: |
+      const handleCollectionPress = useCallback((collectionId: string) => {
+        setExpandedCollectionId((prev) => (prev === collectionId ? null : collectionId));
+      }, []);
+
+    collection_section_update: |
+      {collections && collections.length > 0 ? (
+        collections.map((item) => (
+          <React.Fragment key={item.id}>
+            <CollectionRow
+              name={item.name}
+              active={item.active}
+              isExpanded={expandedCollectionId === item.id}
+              onToggle={(active) => handleToggleCollection(item.id, active)}
+              onPress={() => handleCollectionPress(item.id)}
+              disabled={!canToggle}
+              colors={colors}
+            />
+            {expandedCollectionId === item.id && (
+              <CollectionTopicsList collectionId={item.id} colors={colors} />
+            )}
+          </React.Fragment>
+        ))
+      ) : (
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t('common.noResults')}
+          </Text>
+        </View>
+      )}
+
+    notes:
+      - "Accordion pattern: setting expandedCollectionId to a new id auto-collapses the previous"
+      - "Toggle: tap same collection again sets to null (collapses)"
+      - "React.Fragment needed because CollectionRow + optional expansion are siblings"
+
+  - id: CT-07
+    name: "CollectionTopicsList - inline component"
+    feature: F034
+    file: "src/app/(tabs)/settings/topics.tsx"
+    description: >
+      Inline component that renders the expanded topic list for a collection.
+
+    implementation: |
+      interface CollectionTopicsListProps {
+        collectionId: string;
+        colors: ReturnType<typeof useTheme>['colors'];
+      }
+
+      function CollectionTopicsList({ collectionId, colors }: CollectionTopicsListProps) {
+        const { t } = useTranslation();
+        const { data: topics, isLoading } = useCollectionTopics(collectionId);
+
+        if (isLoading) {
+          return (
+            <View style={styles.collectionTopicsLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          );
+        }
+
+        if (!topics || topics.length === 0) {
+          return (
+            <View style={styles.collectionTopicsEmpty}>
+              <Text style={[styles.collectionTopicsEmptyText, { color: colors.textSecondary }]}>
+                {t('topics.noTopics')}
+              </Text>
+            </View>
+          );
+        }
+
+        return (
+          <View style={[styles.collectionTopicsContainer, { backgroundColor: colors.surface }]}>
+            {topics.map((topic, index) => (
+              <View
+                key={topic.id}
+                style={[
+                  styles.collectionTopicItem,
+                  index < topics.length - 1 && { borderBottomColor: colors.divider, borderBottomWidth: StyleSheet.hairlineWidth },
+                ]}
+              >
+                <Text style={[styles.collectionTopicTitle, { color: colors.textSecondary }]}>
+                  {topic.title}
+                </Text>
+                {topic.link && (
+                  <Text style={[styles.collectionTopicLink, { color: colors.primary }]} numberOfLines={1}>
+                    {topic.link}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        );
+      }
+
+    styles: |
+      collectionTopicsContainer: {
+        paddingLeft: 32,
+        paddingRight: 16,
+      },
+      collectionTopicItem: {
+        paddingVertical: 8,
+        paddingLeft: 8,
+      },
+      collectionTopicTitle: {
+        fontSize: 14,
+      },
+      collectionTopicLink: {
+        fontSize: 12,
+        marginTop: 2,
+      },
+      collectionTopicsLoading: {
+        paddingVertical: 16,
+        alignItems: 'center',
+      },
+      collectionTopicsEmpty: {
+        paddingVertical: 12,
+        paddingLeft: 40,
+      },
+      collectionTopicsEmptyText: {
+        fontSize: 13,
+        fontStyle: 'italic',
+      },
+      chevron: {
+        fontSize: 10,
+        width: 16,
+        textAlign: 'center',
+      },
+      collectionPressable: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+      },
+
+    notes:
+      - "paddingLeft: 32 on container creates visual nesting effect"
+      - "Thin separator (hairlineWidth) between topic items"
+      - "Last item has no separator (index check)"
+      - "Loading uses ActivityIndicator (consistent with rest of app)"
+      - "Empty state uses t('topics.noTopics') key from F033"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  notes: >
+    No schema changes. F034 reads from existing general_topics table
+    (global, no ward_id). The table already has: id, collection_id, title, link.
+    RLS allows SELECT for all authenticated users.
+
+  queries:
+    - name: "useCollectionTopics"
+      table: "general_topics"
+      operation: "SELECT"
+      filter: "collection_id = :collectionId"
+      order: "title ASC"
+      rls: "Allowed for all authenticated users (global table)"
+
+# =============================================================================
+# FLOWS
+# =============================================================================
+
+flows:
+
+  - id: FL-01
+    name: "Swipe card shows icons instead of text"
+    feature: F032
+    steps:
+      - "User swipes a member or topic card to the left"
+      - "Action buttons are revealed: Edit (pencil icon) and Delete (trash icon)"
+      - "Icons are Unicode characters rendered in Text components"
+      - "Screen readers announce accessibilityLabel text (editLabel/deleteLabel)"
+      - "User taps pencil icon: handleEdit fires normally"
+      - "User taps trash icon: handleDelete fires normally"
+
+  - id: FL-02
+    name: "Topics screen shows explanatory text"
+    feature: F033
+    steps:
+      - "User navigates to Settings > Topics"
+      - "Below the header, a descriptive text explains the screen functionality"
+      - "Text explains: ward topics are custom, collections are predefined sets"
+      - "Text explains: activating a collection makes topics available for speeches"
+      - "Text is displayed in the ward's language (i18n)"
+
+  - id: FL-03
+    name: "Expand collection to view topics"
+    feature: F034
+    steps:
+      - "User navigates to Settings > Topics, scrolls to Collections section"
+      - "Each collection row shows a chevron (>) to indicate tappability"
+      - "User taps on a collection row (on the name/chevron area, not the Switch)"
+      - "Chevron changes to (v), indicating expanded state"
+      - "Loading indicator shows briefly while topics are fetched from general_topics"
+      - "Topics appear below the collection row in a visually nested list"
+      - "Each topic shows title and optional link"
+      - "If no topics exist, message 'No topics in this collection' is shown"
+      - "User taps the same collection again: topics collapse, chevron reverts to (>)"
+      - "User taps a DIFFERENT collection: previous one collapses, new one expands"
+      - "Switch toggle remains independent: tapping Switch does NOT expand/collapse"
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-033
+    title: "Unicode icons for swipe action buttons instead of icon library"
+    context: >
+      The user requested pencil and trash icons for swipe action buttons.
+      The app does NOT use any icon library (@expo/vector-icons, lucide, etc.).
+      Installing one for just 2 icons would be disproportionate.
+    decision: >
+      Use Unicode characters U+270F (Pencil) and U+1F5D1 (Wastebasket) as icon
+      content in Text components. These render natively on all platforms supported
+      by React Native. Props editLabel/deleteLabel are repurposed for
+      accessibilityLabel only (not visible text). fontSize changed from 13 to 20
+      for icon visibility.
+    consequences:
+      - "Zero new dependencies"
+      - "Consistent with app's no-icon-library approach"
+      - "Icons render slightly differently across platforms (emoji rendering varies)"
+      - "accessibilityLabel preserved for screen reader support"
+
+  - id: ADR-034
+    title: "Accordion pattern for collection topics (one expanded at a time)"
+    context: >
+      F034 needs to show collection topics inline when a collection is tapped.
+      Options: (a) allow multiple collections expanded simultaneously, or
+      (b) accordion pattern (one at a time). Collections can have many topics,
+      so expanding multiple could cause excessive scrolling.
+    decision: >
+      Use accordion pattern: expandedCollectionId is a single string | null.
+      Tapping a new collection auto-collapses the previous one. This is consistent
+      with SwipeableCard's one-revealed-at-a-time pattern. Topics are lazy-loaded
+      on first expand and cached by TanStack Query for instant re-expansion.
+    consequences:
+      - "Cleaner UX: one list visible at a time, less scrolling"
+      - "Simpler state: single string vs Set<string>"
+      - "Consistent with SwipeableCard one-at-a-time pattern"
+      - "TanStack Query caching makes re-expansion instant (no refetch)"
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  no_security_impact: true
+  notes:
+    - "F032: UI-only change (icon vs text in buttons). No permission changes."
+    - "F033: UI-only change (static text). No data access changes."
+    - "F034: Reads from general_topics (global table, SELECT for all authenticated). Same access level as existing useActiveTopics hook."
+    - "No new API calls beyond what the app already has permissions for."
+    - "Switch toggle behavior unchanged (same mutation as before)."
+
+# =============================================================================
+# FILE IMPACT SUMMARY
+# =============================================================================
+
+file_impact_summary:
+
+  created: []
+
+  modified:
+    - file: "src/components/SwipeableCard.tsx"
+      feature: F032
+      lines_changed_est: 10
+      description: "Replace text content with Unicode icons, add actionIcon style"
+
+    - file: "src/app/(tabs)/settings/topics.tsx"
+      features: [F033, F034]
+      lines_changed_est: 100
+      description: >
+        Add description text (F033), add expandedCollectionId state,
+        modify CollectionRow for tap + chevron, add CollectionTopicsList
+        inline component, add new styles (F034)
+
+    - file: "src/hooks/useTopics.ts"
+      feature: F034
+      lines_changed_est: 20
+      description: "Add collectionTopics query key and useCollectionTopics hook"
+
+    - file: "src/i18n/locales/en.json"
+      feature: F033
+      lines_changed_est: 3
+      description: "Add topics.description and topics.noTopics keys"
+
+    - file: "src/i18n/locales/pt-BR.json"
+      feature: F033
+      lines_changed_est: 3
+      description: "Add topics.description and topics.noTopics keys"
+
+    - file: "src/i18n/locales/es.json"
+      feature: F033
+      lines_changed_est: 3
+      description: "Add topics.description and topics.noTopics keys"
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+
+implementation_order:
+  - order: 1
+    feature: F032
+    cr: CR-87
+    reason: >
+      Isolated change in SwipeableCard.tsx only. No dependency on F033 or F034.
+      Quick to implement and test independently.
+    files: ["src/components/SwipeableCard.tsx"]
+    dependencies: none
+
+  - order: 2
+    feature: F033
+    cr: CR-88
+    reason: >
+      Adds explanatory text and i18n keys (including topics.noTopics needed by
+      F034). Must be done before F034 so the key is available.
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    dependencies: none
+
+  - order: 3
+    feature: F034
+    cr: CR-89
+    reason: >
+      Most complex change: modifies CollectionRow, adds state, new hook,
+      inline component. Depends on F033 for topics.noTopics i18n key.
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+      - "src/hooks/useTopics.ts"
+    dependencies: [F033]
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+
+risks:
+  - id: R-01
+    severity: LOW
+    feature: F032
+    description: >
+      Unicode emoji rendering varies across platforms (iOS, Android, web).
+      Pencil and wastebasket emojis may look different on different OS versions.
+    mitigation: >
+      U+270F and U+1F5D1 are widely supported Unicode characters present in
+      all modern emoji sets. The user confirmed these specific characters.
+      Visual differences across platforms are cosmetic only. fontSize 20
+      ensures adequate visibility on all platforms.
+
+  - id: R-02
+    severity: LOW
+    feature: F034
+    description: >
+      Pressable wrapping the collection name/chevron might interfere with
+      the Switch event on some Android devices if touch areas overlap.
+    mitigation: >
+      The Pressable wraps only the name/chevron area (flex:1 in a row layout).
+      The Switch is positioned outside the Pressable as a sibling element.
+      They do not overlap. Switch has its own onValueChange which is independent.
+      This is the same pattern used in many React Native apps.
+
+  - id: R-03
+    severity: VERY_LOW
+    feature: F034
+    description: >
+      First expand of a collection triggers a Supabase query which has
+      a small latency. Users may see a brief loading state.
+    mitigation: >
+      ActivityIndicator is shown during loading (standard UX pattern).
+      TanStack Query caches the result, so subsequent expands of the
+      same collection are instant. The query is lightweight (SELECT
+      from a small table filtered by collection_id).
+
+# =============================================================================
+# TESTING STRATEGY
+# =============================================================================
+
+testing_strategy:
+
+  # F032 tests
+  - id: TS-01
+    feature: F032
+    type: component
+    description: "SwipeableCard: Edit button renders pencil icon (U+270F) instead of text"
+    approach: >
+      Render SwipeableCard. Find the Edit button's Text child. Verify
+      it contains the pencil character and does NOT contain editLabel text.
+
+  - id: TS-02
+    feature: F032
+    type: component
+    description: "SwipeableCard: Delete button renders wastebasket icon (U+1F5D1) instead of text"
+    approach: >
+      Render SwipeableCard. Find the Delete button's Text child. Verify
+      it contains the wastebasket character and does NOT contain deleteLabel text.
+
+  - id: TS-03
+    feature: F032
+    type: component
+    description: "SwipeableCard: accessibilityLabel still uses editLabel/deleteLabel text"
+    approach: >
+      Render SwipeableCard with editLabel and deleteLabel props. Verify
+      accessibilityLabel on Edit button equals editLabel. Verify
+      accessibilityLabel on Delete button equals deleteLabel.
+
+  - id: TS-04
+    feature: F032
+    type: regression
+    description: "SwipeableCard: Edit and Delete buttons still trigger callbacks"
+    approach: >
+      Render SwipeableCard with onEdit and onDelete mocks. Press Edit button,
+      verify onEdit called. Press Delete button, verify onDelete called.
+
+  # F033 tests
+  - id: TS-05
+    feature: F033
+    type: component
+    description: "Topics screen: description text is rendered"
+    approach: >
+      Render TopicsScreen. Verify a Text element with t('topics.description')
+      content is present.
+
+  - id: TS-06
+    feature: F033
+    type: i18n
+    description: "i18n: topics.description key exists in all 3 locales"
+    approach: >
+      Load en.json, pt-BR.json, es.json. Verify topics.description key
+      exists and has non-empty string value in each.
+
+  - id: TS-07
+    feature: F033
+    type: i18n
+    description: "i18n: topics.noTopics key exists in all 3 locales"
+    approach: >
+      Load en.json, pt-BR.json, es.json. Verify topics.noTopics key
+      exists and has non-empty string value in each.
+
+  # F034 tests
+  - id: TS-08
+    feature: F034
+    type: unit
+    description: "useCollectionTopics: fetches topics filtered by collection_id"
+    approach: >
+      Mock supabase query. Call useCollectionTopics with a collection ID.
+      Verify the query filters by collection_id and orders by title.
+
+  - id: TS-09
+    feature: F034
+    type: unit
+    description: "useCollectionTopics: disabled when collectionId is null"
+    approach: >
+      Call useCollectionTopics(null). Verify the query does not execute
+      (enabled: false).
+
+  - id: TS-10
+    feature: F034
+    type: component
+    description: "Topics screen: tapping collection row expands topic list"
+    approach: >
+      Render TopicsScreen with mocked collections. Tap on a collection row.
+      Verify that topics for that collection are displayed below.
+
+  - id: TS-11
+    feature: F034
+    type: component
+    description: "Topics screen: tapping expanded collection collapses it"
+    approach: >
+      Expand a collection. Tap it again. Verify topics are no longer visible.
+
+  - id: TS-12
+    feature: F034
+    type: component
+    description: "Topics screen: expanding one collection collapses another (accordion)"
+    approach: >
+      Expand collection A. Then expand collection B. Verify collection A's
+      topics are no longer visible while collection B's topics are shown.
+
+  - id: TS-13
+    feature: F034
+    type: component
+    description: "Topics screen: Switch toggle works independently of expand/collapse"
+    approach: >
+      Render TopicsScreen. Toggle a collection's Switch. Verify the toggle
+      mutation is called. Verify the collection did NOT expand.
+
+  - id: TS-14
+    feature: F034
+    type: component
+    description: "Topics screen: empty state shown when collection has no topics"
+    approach: >
+      Mock useCollectionTopics to return empty array. Expand a collection.
+      Verify t('topics.noTopics') text is displayed.
+
+  - id: TS-15
+    feature: F034
+    type: component
+    description: "Topics screen: chevron indicator changes on expand/collapse"
+    approach: >
+      Render TopicsScreen. Verify chevron shows right-pointing triangle.
+      Tap collection. Verify chevron changes to down-pointing triangle.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true   # Componentes tem responsabilidade unica
+  GATE-03: true   # Contratos definidos para cada integracao
+  GATE-04: true   # ADRs registrados (ADR-033, ADR-034)
+  GATE-05: true   # ARCH_M012.yaml salvo no disco
+  GATE-06: true   # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true   # ARCH_SUMMARY preenchido com status correto
+  GATE-08: true   # Max 10 componentes respeitado (8 componentes)

@@ -1,0 +1,728 @@
+# =============================================================================
+# SPEC_F032_F034.yaml
+# Especificacao de requisitos para Batch 6, Fase 2 (CRs 87, 88, 89)
+# Features F032-F034
+# Gerado: 2026-02-18
+# Status: COMPLETE (user_confirmed)
+# =============================================================================
+
+metadata:
+  batch: 6
+  phase: 2
+  features: [F032, F033, F034]
+  crs: [87, 88, 89]
+  created: "2026-02-18"
+  status: complete
+  source_request: >
+    Pedido do usuario para 3 mudancas: trocar texto Editar/Excluir nos botoes
+    de swipe por icones de lapis e lixeira (CR-87), adicionar texto explicativo
+    na tela de temas sobre ativar/desativar colecoes (CR-88), e ao clicar numa
+    colecao mostrar todos os temas em lista read-only (CR-89).
+
+# =============================================================================
+# F032 - Swipe Action Icons (pencil/trash) instead of Text (CR-87)
+# =============================================================================
+
+features:
+
+  - id: F032
+    name: "Swipe Action Icons (pencil/trash) instead of Text"
+    cr_id: CR-87
+    type: ui
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      Os botoes de acao revelados pelo swipe-to-reveal no SwipeableCard
+      atualmente exibem texto ("Editar"/"Excluir" ou equivalentes i18n).
+      O usuario pediu para substituir o texto por icones: lapis (pencil) para
+      editar e lixeira (trash) para excluir. O app NAO usa biblioteca de icones
+      (@expo/vector-icons nao esta instalado). A solucao mais simples e consistente
+      e usar caracteres Unicode para os icones.
+
+    scope:
+      in:
+        - "Substituir texto do botao Edit no SwipeableCard por icone Unicode de lapis"
+        - "Substituir texto do botao Delete no SwipeableCard por icone Unicode de lixeira"
+        - "Manter accessibilityLabel com texto descritivo para screen readers"
+        - "Ajustar tamanho do icone para ser visivel e bem posicionado no botao"
+        - "Manter props editLabel e deleteLabel para uso em accessibilityLabel"
+      out:
+        - "Instalar biblioteca de icones (@expo/vector-icons, lucide, etc.)"
+        - "Mudancas na logica de swipe ou gesture handling"
+        - "Mudancas no backend/Supabase"
+        - "Mudancas em telas individuais (members.tsx, topics.tsx)"
+
+    personas:
+      - id: P-1
+        description: >
+          Qualquer usuario (Bishopric ou Secretary) que usa swipe-to-reveal
+          para editar ou excluir membros ou temas da ala
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario que desliza um membro ou tema"
+        i_want: "ver icones de lapis e lixeira nos botoes de acao"
+        so_that: "reconheco as acoes instantaneamente sem ler texto"
+
+    acceptance_criteria:
+      - id: AC-F032-01
+        given: "Um card de membro ou tema foi revelado por swipe"
+        when: "O usuario olha para os botoes de acao"
+        then: >
+          O botao de editar mostra o icone de lapis U+270F (Pencil) ao inves de texto.
+          O botao de excluir mostra o icone de lixeira U+1F5D1 (Wastebasket) ao inves de texto.
+          Nenhum texto e renderizado dentro dos botoes.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SwipeableCard. Verificar que os botoes NAO renderizam o texto
+          editLabel/deleteLabel como conteudo visivel, e sim caracteres Unicode de icone.
+
+      - id: AC-F032-02
+        given: "O botao Edit com icone de lapis"
+        when: "O usuario pressiona o botao"
+        then: >
+          O callback onEdit e chamado normalmente. O comportamento e identico
+          ao anterior (fecha card, chama onEdit).
+        priority: must
+        testable: true
+        test_approach: >
+          Render SwipeableCard com onEdit mockado. Pressionar botao Edit.
+          Verificar que onEdit foi chamado.
+
+      - id: AC-F032-03
+        given: "O botao Delete com icone de lixeira"
+        when: "O usuario pressiona o botao"
+        then: >
+          O callback onDelete e chamado normalmente. O comportamento e identico
+          ao anterior (fecha card, chama onDelete).
+        priority: must
+        testable: true
+        test_approach: >
+          Render SwipeableCard com onDelete mockado. Pressionar botao Delete.
+          Verificar que onDelete foi chamado.
+
+      - id: AC-F032-04
+        given: "Os botoes Edit e Delete com icones"
+        when: "Um screen reader le os botoes"
+        then: >
+          O accessibilityLabel de cada botao contem texto descritivo
+          (editLabel ou 'Edit' para Edit, deleteLabel ou 'Delete' para Delete).
+          O screen reader anuncia a acao, nao o caractere Unicode.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SwipeableCard. Verificar que accessibilityLabel dos botoes
+          contem o texto esperado (nao o icone Unicode).
+
+      - id: AC-F032-05
+        given: "Os icones nos botoes de acao"
+        when: "O usuario visualiza"
+        then: >
+          Os icones sao visiveis e contrastam com o fundo do botao.
+          Edit: icone branco (colors.onPrimary) sobre fundo colors.primary.
+          Delete: icone branco (#FFFFFF) sobre fundo colors.error.
+          Tamanho do icone e adequado (18-24px).
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar estilos do Text que renderiza o icone: fontSize, color.
+
+    design_notes: >
+      Caracteres Unicode confirmados pelo usuario:
+      - Lapis (Edit): U+270F (Pencil) - CONFIRMADO
+      - Lixeira (Delete): U+1F5D1 (Wastebasket) - CONFIRMADO
+      Usar caracteres Unicode, NAO biblioteca de icones - CONFIRMADO.
+      fontSize do icone deve ser ~20 para boa visibilidade dentro dos botoes de 70px de largura.
+      O Text com icone deve ter textAlign center para centralizar no botao.
+
+    files_impacted:
+      - path: "src/components/SwipeableCard.tsx"
+        action: MODIFY
+        details: >
+          1. Substituir conteudo dos botoes Edit e Delete de texto para icone Unicode.
+          2. Manter accessibilityLabel com editLabel/deleteLabel.
+          3. Ajustar fontSize do actionText style para o tamanho do icone (~20).
+          4. Props editLabel e deleteLabel continuam existindo (usadas em accessibilityLabel).
+
+    assumptions:
+      - id: A-F032-01
+        assumption: >
+          Usar caracteres Unicode ao inves de biblioteca de icones, consistente com
+          a abordagem do app que NAO usa @expo/vector-icons nem nenhuma outra
+          biblioteca de icones.
+        reason: >
+          O app nao tem nenhuma dependencia de icones instalada. Instalar uma
+          biblioteca apenas para 2 icones seria desproporcional. Caracteres Unicode
+          sao suportados nativamente por React Native em todas as plataformas.
+        impact_if_wrong: >
+          Se os caracteres Unicode nao renderizarem bem em alguma plataforma,
+          sera necessario reconsiderar e possivelmente instalar @expo/vector-icons.
+        needs_confirmation: false
+        confirmed: true
+        confirmed_date: "2026-02-18"
+
+      - id: A-F032-02
+        assumption: >
+          As props editLabel e deleteLabel continuam existindo na interface
+          SwipeableCardProps, mas sao usadas SOMENTE para accessibilityLabel
+          (nao mais para texto visivel).
+        reason: >
+          Manter backward compatibility com telas que passam essas props.
+          As telas members.tsx e topics.tsx passam t('common.edit') e
+          t('common.delete') como editLabel/deleteLabel.
+        impact_if_wrong: >
+          Se as props forem removidas, sera necessario atualizar todas as
+          telas que usam SwipeableCard.
+        needs_confirmation: false
+
+    open_questions:
+      - id: OQ-F032-01
+        status: resolved
+        resolution: "U+270F Pencil - confirmado pelo usuario"
+        resolved_date: "2026-02-18"
+
+      - id: OQ-F032-02
+        status: resolved
+        resolution: "U+1F5D1 Wastebasket - confirmado pelo usuario"
+        resolved_date: "2026-02-18"
+
+    inconsistencies: []
+
+
+# =============================================================================
+# F033 - Topics Screen Explanatory Text (CR-88)
+# =============================================================================
+
+  - id: F033
+    name: "Topics Screen Explanatory Text"
+    cr_id: CR-88
+    type: ux
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      A tela de Temas (topics.tsx) nao tem nenhum texto explicativo sobre o que
+      a tela faz. O usuario pediu para adicionar texto explicando as funcionalidades,
+      especialmente o conceito de ativar/desativar colecoes. Segue o mesmo padrao
+      do CR-80 (F026) que adicionou textos explicativos na tela de Membros.
+
+    scope:
+      in:
+        - "Adicionar texto descritivo abaixo do header da tela de Temas"
+        - "O texto deve explicar: temas da ala sao temas customizados, colecoes sao conjuntos de temas pre-definidos"
+        - "O texto deve explicar: ativar colecao torna seus temas disponiveis para designacao, desativar remove da lista"
+        - "Textos internacionalizados em pt-BR, en, es"
+        - "Seguir padrao visual de CR-80 (fontSize 13, textSecondary, center aligned)"
+      out:
+        - "Mudancas na logica de CRUD de temas"
+        - "Mudancas na logica de toggle de colecoes"
+        - "Mudancas no backend/Supabase"
+        - "Textos explicativos dentro da secao Ward Topics (o texto vai no topo da tela)"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary que acessa a tela de Temas pela
+          primeira vez e precisa entender o que sao temas da ala vs colecoes
+          e como ativar/desativar colecoes
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario novo que acessa a tela de Temas"
+        i_want: "ver uma explicacao do que a tela faz"
+        so_that: "entendo como gerenciar temas e colecoes sem precisar de ajuda"
+
+      - id: US-2
+        as_a: "usuario que ve colecoes com toggle"
+        i_want: "entender o que acontece ao ativar ou desativar uma colecao"
+        so_that: "sei que ativar adiciona esses temas para designacao de discursos"
+
+    acceptance_criteria:
+      - id: AC-F033-01
+        given: "A tela de Temas e aberta"
+        when: "O usuario olha abaixo do header"
+        then: >
+          Um texto descritivo e visivel explicando o que a tela faz.
+          O texto menciona que temas da ala sao temas customizados que podem
+          ser criados, editados e excluidos, e que colecoes sao conjuntos de
+          temas pre-definidos que podem ser ativados ou desativados.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicsScreen. Verificar que t('topics.description') e
+          renderizado como Text visivel.
+
+      - id: AC-F033-02
+        given: "O texto descritivo da tela de Temas"
+        when: "O usuario le"
+        then: >
+          O texto explica especificamente que ativar uma colecao torna seus
+          temas disponiveis para selecao ao designar discursos, e desativar
+          remove os temas da lista de opcoes.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar que o conteudo das i18n keys menciona ativar/desativar
+          e disponibilidade para discursos.
+
+      - id: AC-F033-03
+        given: "A i18n key topics.description"
+        when: "Verificada em cada locale"
+        then: >
+          A key existe em en.json, pt-BR.json e es.json com traducoes
+          corretas e naturais em cada idioma.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar existencia da key em todos os 3 arquivos de locale.
+
+      - id: AC-F033-04
+        given: "A tela de Temas"
+        when: "O texto descritivo e renderizado"
+        then: >
+          O texto segue o padrao visual de CR-80 (members.description):
+          fontSize 13, textAlign center, paddingHorizontal 16,
+          color colors.textSecondary. Posicionado entre o header e
+          a secao Ward Topics.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar estilos do Text: fontSize, textAlign, paddingHorizontal, color.
+
+      - id: AC-F033-05
+        given: "O texto descritivo da tela de Temas"
+        when: "Em telas pequenas"
+        then: >
+          O texto quebra linhas corretamente (sem numberOfLines constraint).
+          Nao causa problemas de layout em telas pequenas.
+        priority: should
+        testable: true
+        test_approach: >
+          Verificar que o Text nao tem numberOfLines e tem paddingHorizontal
+          adequado para wrapping.
+
+      - id: AC-F033-06
+        given: "Os 3 arquivos de locale"
+        when: "Comparados"
+        then: >
+          Todos os 3 arquivos tem a mesma estrutura de keys na secao topics.
+          Nenhuma key existente foi removida ou renomeada.
+        priority: must
+        testable: true
+        test_approach: >
+          Comparar keys da secao topics em en.json, pt-BR.json, es.json.
+
+    i18n_keys:
+      new_keys:
+        - key: "topics.description"
+          en: >
+            Create custom ward topics or activate predefined topic collections.
+            Ward topics can be added, edited, and deleted. Activating a collection
+            makes its topics available when assigning speeches. Deactivating removes
+            them from the selection list.
+          pt_BR: >
+            Crie temas customizados da ala ou ative colecoes de temas pre-definidos.
+            Temas da ala podem ser adicionados, editados e excluidos. Ativar uma colecao
+            torna seus temas disponiveis ao designar discursos. Desativar remove da
+            lista de selecao.
+          es: >
+            Cree temas personalizados del barrio o active colecciones de temas predefinidos.
+            Los temas del barrio se pueden agregar, editar y eliminar. Activar una coleccion
+            hace que sus temas esten disponibles al asignar discursos. Desactivar los
+            elimina de la lista de seleccion.
+
+        - key: "topics.noTopics"
+          en: "No topics in this collection"
+          pt_BR: "Nenhum tema nesta colecao"
+          es: "No hay temas en esta coleccion"
+          note: "Key adicional para CR-89 (empty state de colecao expandida)"
+
+    design_notes: >
+      Posicionar o texto descritivo entre o header e a secao Ward Topics,
+      seguindo o mesmo padrao do members.tsx (CR-80). Usar styles.description
+      com fontSize 13, textAlign 'center', paddingHorizontal 16, marginBottom 8,
+      color colors.textSecondary. O texto deve ser conciso mas informativo,
+      cobrindo tanto temas da ala quanto colecoes gerais.
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        action: MODIFY
+        details: >
+          1. Adicionar Text com t('topics.description') entre o header e a
+          secao Ward Topics.
+          2. Adicionar style description seguindo padrao de members.tsx.
+
+      - path: "src/i18n/locales/en.json"
+        action: MODIFY
+        details: "Adicionar key topics.description e topics.noTopics."
+
+      - path: "src/i18n/locales/pt-BR.json"
+        action: MODIFY
+        details: "Adicionar key topics.description e topics.noTopics."
+
+      - path: "src/i18n/locales/es.json"
+        action: MODIFY
+        details: "Adicionar key topics.description e topics.noTopics."
+
+    assumptions:
+      - id: A-F033-01
+        assumption: >
+          Um unico texto descritivo no topo da tela (entre header e secao
+          Ward Topics) e suficiente. NAO e necessario adicionar texto
+          separado dentro da secao Collections.
+        reason: >
+          O texto no topo pode explicar ambos os conceitos (temas da ala
+          e colecoes) de forma concisa. Adicionar texto dentro de cada secao
+          ocuparia espaco desnecessario.
+        impact_if_wrong: >
+          Se o usuario quiser texto separado por secao, sera necessario
+          adicionar mais uma Text dentro da secao Collections.
+        needs_confirmation: false
+        confirmed: true
+        confirmed_date: "2026-02-18"
+
+      - id: A-F033-02
+        assumption: >
+          A key topics.noTopics e adicionada junto com topics.description para
+          uso pelo CR-89 (empty state quando colecao expandida nao tem temas).
+          Isso evita uma segunda modificacao nos arquivos de locale.
+        reason: >
+          CR-88 e CR-89 modificam o mesmo arquivo (topics.tsx) e os mesmos
+          arquivos de locale. Agrupar as novas keys minimiza conflitos.
+        impact_if_wrong: >
+          Se CR-89 nao for implementado ou tiver escopo diferente, a key
+          topics.noTopics fica sem uso (dead code i18n).
+        needs_confirmation: false
+
+    open_questions: []
+
+    inconsistencies: []
+
+
+# =============================================================================
+# F034 - Collection Topics View (expand/collapse read-only list) (CR-89)
+# =============================================================================
+
+  - id: F034
+    name: "Collection Topics View (expand/collapse read-only list)"
+    cr_id: CR-89
+    type: feature
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      Atualmente, ao clicar numa colecao na tela de Temas, nada acontece - a
+      linha da colecao apenas mostra o nome e um Switch de ativar/desativar.
+      O usuario quer que ao clicar (tap) numa colecao, todos os temas daquela
+      colecao sejam exibidos em uma lista simples e read-only. A implementacao
+      recomendada e um padrao expand/collapse inline (acordeao): ao tocar na
+      linha da colecao, os temas aparecem abaixo dela; ao tocar novamente,
+      os temas sao escondidos.
+
+    scope:
+      in:
+        - "Tornar CollectionRow tappable (Pressable wrapper)"
+        - "Ao tocar na colecao, expandir e mostrar lista de temas abaixo"
+        - "Ao tocar novamente, colapsar a lista de temas"
+        - "Buscar temas da colecao via Supabase (general_topics por collection_id)"
+        - "Exibir temas em lista simples read-only (titulo e link opcional)"
+        - "Mostrar loading state enquanto busca temas"
+        - "Mostrar empty state se colecao nao tem temas"
+        - "Switch de toggle continua funcionando independentemente do tap"
+      out:
+        - "Edicao/exclusao de temas de colecoes (sempre read-only)"
+        - "Navegacao para tela separada de detalhes da colecao"
+        - "Modal com lista de temas"
+        - "Mudancas no backend/Supabase"
+        - "Mudancas na logica de toggle de colecao"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary que quer ver quais temas estao
+          em uma colecao antes de decidir ativa-la ou desativa-la
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario que ve colecoes de temas"
+        i_want: "clicar numa colecao e ver todos os seus temas"
+        so_that: "posso avaliar o conteudo da colecao antes de ativa-la"
+
+      - id: US-2
+        as_a: "usuario que ativou uma colecao"
+        i_want: "ver quais temas ficaram disponiveis"
+        so_that: "sei quais opcoes de tema tenho para designar discursos"
+
+    acceptance_criteria:
+      - id: AC-F034-01
+        given: "A tela de Temas esta aberta na secao Collections"
+        when: "O usuario toca (tap) na area da colecao (fora do Switch)"
+        then: >
+          Os temas daquela colecao sao exibidos abaixo da linha da colecao,
+          em uma lista simples e read-only. Cada tema mostra pelo menos o titulo.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicsScreen com colecoes mockadas. Simular tap na CollectionRow.
+          Verificar que os temas da colecao aparecem abaixo.
+
+      - id: AC-F034-02
+        given: "Uma colecao esta expandida mostrando seus temas"
+        when: "O usuario toca na colecao novamente"
+        then: >
+          A lista de temas colapsa (desaparece). O comportamento e toggle.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicsScreen, expandir colecao, tocar novamente. Verificar
+          que os temas nao estao mais visiveis.
+
+      - id: AC-F034-03
+        given: "Os temas de uma colecao"
+        when: "Exibidos na lista expandida"
+        then: >
+          Os temas sao buscados da tabela general_topics filtrados por
+          collection_id. Cada tema mostra o titulo. Se o tema tem link,
+          o link e exibido abaixo do titulo (estilo sutil, cor primary).
+        priority: must
+        testable: true
+        test_approach: >
+          Mockar Supabase query para general_topics. Verificar que a query
+          filtra por collection_id e que titulo e link sao renderizados.
+
+      - id: AC-F034-04
+        given: "O usuario toca numa colecao para expandir"
+        when: "Os temas estao sendo buscados do servidor"
+        then: >
+          Um indicador de loading e exibido (texto "Loading..." ou ActivityIndicator)
+          enquanto a busca esta em andamento.
+        priority: should
+        testable: true
+        test_approach: >
+          Mockar Supabase query com delay. Verificar que loading state e mostrado.
+
+      - id: AC-F034-05
+        given: "Uma colecao e expandida"
+        when: "A colecao nao tem nenhum tema (0 registros em general_topics)"
+        then: >
+          Uma mensagem "Nenhum tema nesta colecao" (i18n: topics.noTopics)
+          e exibida no espaco expandido.
+        priority: should
+        testable: true
+        test_approach: >
+          Mockar general_topics retornando array vazio. Verificar que
+          mensagem de empty state e renderizada.
+
+      - id: AC-F034-06
+        given: "O Switch de toggle da colecao"
+        when: "O usuario toca no Switch (nao na area geral da linha)"
+        then: >
+          O Switch alterna normalmente (ativa/desativa a colecao) SEM
+          expandir/colapsar a lista de temas. O tap no Switch e o tap
+          na area da colecao sao eventos independentes.
+        priority: must
+        testable: true
+        test_approach: >
+          Render CollectionRow. Verificar que Switch onValueChange funciona
+          independentemente do onPress da area tappable.
+
+      - id: AC-F034-07
+        given: "Multiplas colecoes na lista"
+        when: "O usuario expande uma colecao"
+        then: >
+          Apenas UMA colecao pode estar expandida por vez (padrao acordeao).
+          Ao expandir uma colecao, a colecao anteriormente expandida colapsa.
+        priority: should
+        testable: true
+        test_approach: >
+          Expandir colecao A, depois expandir colecao B. Verificar que
+          colecao A colapsou.
+
+      - id: AC-F034-08
+        given: "A lista de temas expandida"
+        when: "O usuario visualiza"
+        then: >
+          Os temas sao exibidos com estilo visualmente aninhado: paddingLeft
+          maior que a colecao, cor textSecondary para titulos, separador fino
+          entre temas. Lista nao e editavel (sem swipe, sem botoes).
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar estilos dos itens da lista expandida.
+
+    design_notes: >
+      Padrao expand/collapse inline (acordeao) na secao Collections:
+      1. CollectionRow vira Pressable (ou wrapa em Pressable).
+      2. Ao tocar, seta expandedCollectionId no state.
+      3. Se expandedCollectionId === collection.id, renderiza lista de temas abaixo.
+      4. Criar hook useCollectionTopics(collectionId) ou fazer query inline.
+      5. Query: supabase.from('general_topics').select('*').eq('collection_id', id).order('title').
+      6. Temas renderizados em View simples com Text para titulo e link.
+      7. Indicador visual de expand/collapse: chevron (> / v) a esquerda do nome.
+      8. Switch continua a direita, independente do tap na area da colecao.
+      Cuidado: o Pressable nao deve engolir o evento do Switch. Usar hitSlop ou
+      posicionar o Switch fora da area Pressable com zIndex.
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        action: MODIFY
+        details: >
+          1. Adicionar state expandedCollectionId (string | null).
+          2. Modificar CollectionRow para ser tappable (Pressable wrapper).
+          3. Adicionar prop onPress ao CollectionRow.
+          4. Renderizar lista de temas inline quando expandido.
+          5. Adicionar chevron indicator (>) que muda para (v) quando expandido.
+          6. Adicionar estilos para lista de temas expandida.
+
+      - path: "src/hooks/useTopics.ts"
+        action: MODIFY
+        details: >
+          1. Adicionar hook useCollectionTopics(collectionId) que busca
+          general_topics por collection_id.
+          2. Adicionar query key para collection topics.
+          3. Query retorna GeneralTopic[] ordenado por titulo.
+
+      - path: "src/i18n/locales/en.json"
+        action: MODIFY
+        details: "Key topics.noTopics ja adicionada pelo CR-88."
+
+      - path: "src/i18n/locales/pt-BR.json"
+        action: MODIFY
+        details: "Key topics.noTopics ja adicionada pelo CR-88."
+
+      - path: "src/i18n/locales/es.json"
+        action: MODIFY
+        details: "Key topics.noTopics ja adicionada pelo CR-88."
+
+    assumptions:
+      - id: A-F034-01
+        assumption: >
+          Padrao acordeao (uma colecao expandida por vez) ao inves de permitir
+          multiplas colecoes expandidas simultaneamente.
+        reason: >
+          O padrao acordeao e consistente com o SwipeableCard (um revelado
+          por vez) e mantem a tela mais limpa. Colecoes podem ter muitos
+          temas, expandir multiplas ao mesmo tempo pode causar scroll excessivo.
+        impact_if_wrong: >
+          Se o usuario preferir multiplas expandidas, trocar de
+          expandedCollectionId (string) para expandedCollectionIds (Set<string>).
+        needs_confirmation: false
+        confirmed: true
+        confirmed_date: "2026-02-18"
+
+      - id: A-F034-02
+        assumption: >
+          A busca de temas e feita sob demanda (lazy loading) ao expandir a
+          colecao, e nao pre-carregada. Isso evita queries desnecessarias para
+          colecoes que o usuario nao vai inspecionar.
+        reason: >
+          Pode haver muitas colecoes e cada uma pode ter dezenas de temas.
+          Buscar todas antecipadamente seria desperdicio de bandwidth.
+        impact_if_wrong: >
+          Minimal - se pre-carregar, os temas aparecem instantaneamente mas
+          com custo de mais queries na montagem da tela.
+        needs_confirmation: false
+
+      - id: A-F034-03
+        assumption: >
+          O tap na area do nome da colecao expande/colapsa, enquanto o tap
+          no Switch apenas togga ativacao. Os dois eventos sao independentes.
+        reason: >
+          O Switch ja tem sua propria area de toque. O Pressable da colecao
+          deve usar onPress apenas na area do nome/chevron, nao engolir
+          eventos do Switch.
+        impact_if_wrong: >
+          Se o Pressable engolir o evento do Switch, sera necessario ajustar
+          hitSlop ou separar as areas de toque.
+        needs_confirmation: false
+
+      - id: A-F034-04
+        assumption: >
+          Os temas sao exibidos em ordem alfabetica por titulo, assim como
+          o padrao ja existente para ward topics e active topics.
+        reason: >
+          Consistencia com o ordenamento usado em useWardTopics e useActiveTopics.
+        impact_if_wrong: >
+          Minimal - se outra ordenacao for preferida, basta mudar o .order()
+          na query.
+        needs_confirmation: false
+
+    open_questions:
+      - id: OQ-F034-01
+        status: resolved
+        resolution: "Sim, adicionar chevron (> / v) - confirmado pelo usuario"
+        resolved_date: "2026-02-18"
+
+    inconsistencies: []
+
+
+# =============================================================================
+# CROSS-FEATURE CONSIDERATIONS
+# =============================================================================
+
+cross_feature_notes:
+  - note: >
+      F032 (Swipe Icons) modifica SwipeableCard.tsx. F033 e F034 modificam
+      topics.tsx. Nao ha conflito direto entre os arquivos, mas SwipeableCard
+      e usado por topics.tsx para Ward Topics (nao para Collections).
+    features: [F032, F033, F034]
+
+  - note: >
+      F033 (Explanatory Text) e F034 (Collection Topics View) ambos modificam
+      topics.tsx e os 3 arquivos de locale. F033 adiciona texto no topo da tela,
+      F034 adiciona expand/collapse na secao Collections. A ordem recomendada e:
+      F033 primeiro (mudanca simples), F034 depois (mudanca mais complexa).
+    features: [F033, F034]
+
+  - note: >
+      F033 adiciona a key topics.noTopics nos locales que sera usada por F034
+      como empty state. Isso cria uma dependencia: F033 DEVE ser implementada
+      antes de F034 ou ao menos as keys i18n devem ser adicionadas primeiro.
+    features: [F033, F034]
+
+  - note: >
+      F034 cria um novo hook (useCollectionTopics) em useTopics.ts. Isso e
+      independente de F032 e F033 e pode ser desenvolvido em paralelo, mas
+      os testes de integracao em topics.tsx dependem de F033 estar pronto.
+    features: [F034]
+
+# =============================================================================
+# IMPLEMENTATION ORDER RECOMMENDATION
+# =============================================================================
+
+implementation_order:
+  - order: 1
+    feature: F032
+    reason: >
+      Mudanca isolada em SwipeableCard.tsx. Nao tem dependencia com F033 ou
+      F034. Pode ser implementada independentemente.
+
+  - order: 2
+    feature: F033
+    reason: >
+      Adiciona textos explicativos e keys i18n (incluindo topics.noTopics
+      que sera usada por F034). Deve ser feita antes de F034.
+
+  - order: 3
+    feature: F034
+    reason: >
+      Mudanca mais complexa que adiciona expand/collapse na secao Collections
+      com busca de dados e novo hook. Depende de F033 para a key topics.noTopics.
+
+# =============================================================================
+# VALIDATION GATE (SPEC_COMPLETE - user confirmed all decisions)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true   # Identifiquei todas ambiguidades (OQ-F032-01, OQ-F032-02, OQ-F034-01)
+  GATE-03: true   # Listei TODAS open questions com IDs
+  GATE-04: true   # Listei TODAS assumptions com IDs
+  GATE-05: true   # Reportei inconsistencias com SPEC_CONSOLIDATED (nenhuma encontrada)
+  GATE-06: true   # Status mudou de "pending_user_confirmation" para "complete"
+  GATE-07: true   # Todas open questions resolvidas (OQ-F032-01, OQ-F032-02, OQ-F034-01)
+  GATE-08: true   # Todas assumptions confirmadas (A-F032-01, A-F033-01, A-F034-01)
+  GATE-09: true   # Decisoes incorporadas nos ACs e design_notes
+  confirmation_date: "2026-02-18"

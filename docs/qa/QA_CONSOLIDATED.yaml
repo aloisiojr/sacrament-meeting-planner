@@ -1,7 +1,7 @@
 # =============================================================================
 # QA_CONSOLIDATED.yaml
-# Consolidated QA results for CR-82 and CR-80
-# Generated: 2026-02-18
+# Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90
+# Updated: 2026-02-18
 # =============================================================================
 
 # #############################################################################
@@ -473,5 +473,809 @@ cr_80:
     i18n key parity verified across all 3 locales (en, pt-BR, es): 23 identical keys.
     All 21 pre-existing keys preserved. 2 new keys (description, csvHelp) added correctly.
     No regressions detected.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-90: [BUG] Delete button for members and ward topics does nothing
+# #############################################################################
+
+cr_90:
+  cr_id: CR-90
+  title: "[BUG] Botao de excluir para membros e temas da ala nao faz nada"
+  type: bugfix
+  spec: specs/SPEC_F027_F031.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Bug confirmed via code analysis. Delete button in SwipeableCard does not fire
+      for members or topics. Edit button works with identical pattern. Root cause
+      identified as touch event interception by GestureDetector's Animated.View (zIndex: 1).
+      Reproduction steps documented.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 298258c
+        message: "fix(swipeable): add pointerEvents box-none to fix Delete button touch (CR-90)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2610
+    tester_suite_total: 2610
+
+    must_pass_results:
+      - id: MP-90-01
+        description: "Delete button in SwipeableCard fires onDelete callback when tapped"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:183 now has pointerEvents="box-none" on the Animated.View.
+          This allows touch events to pass through the Animated.View to the action buttons
+          behind it. The handleDelete callback (line 143-147) calls onDelete?.() correctly.
+          The fix ensures touch events reach the Pressable buttons in the actionsContainer.
+
+      - id: MP-90-02
+        description: "Members screen: delete button shows confirmation dialog"
+        status: PASSED
+        evidence: |
+          members.tsx:317-346: handleDelete calls Alert.alert with t('common.confirm') and
+          t('members.deleteConfirm'). The onDelete prop passes handleDelete via
+          MemberRow (line 219) > SwipeableCard (line 219). With pointerEvents="box-none",
+          the Pressable now receives touch events correctly.
+
+      - id: MP-90-03
+        description: "Topics screen: delete button shows confirmation dialog"
+        status: PASSED
+        evidence: |
+          topics.tsx:268-280: handleDelete calls Alert.alert with t('common.confirm') and
+          t('members.deleteConfirm'). TopicRow (line 153) passes onDelete to SwipeableCard.
+          Same fix applies - pointerEvents="box-none" allows touch through.
+
+      - id: MP-90-04
+        description: "Edit button continues to work after fix"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:156: Edit Pressable with onPress={handleEdit} is in the same
+          actionsContainer as delete. handleEdit (line 137-141) calls onEdit?.().
+          pointerEvents="box-none" does not affect edit button since it was already receiving
+          touches (positioned closer to the translated card edge). Both buttons now work.
+
+      - id: MP-90-05
+        description: "SwipeableCard swipe gesture still works correctly"
+        status: PASSED
+        evidence: |
+          GestureDetector (line 180) wraps the Animated.View. pointerEvents="box-none"
+          on the Animated.View means the view itself doesn't block events, but its children
+          (the inner View with backgroundColor) still receive touches normally. The
+          panGesture (line 106-131) still responds to horizontal swipe on the card content.
+
+      - id: MP-90-06
+        description: "Only one card can be revealed at a time"
+        status: PASSED
+        evidence: |
+          activeId/onReveal mechanism unchanged (lines 83, 86-90, 99-104). When a card
+          is revealed, it sets activeId to its id. Other cards close via useEffect (line 86-90).
+          This management is in the parent component, unaffected by the pointerEvents fix.
+
+      - id: MP-90-07
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 55 test files, 2610/2610 tests passed.
+          Duration: 1.29s. Zero failures, zero skipped.
+
+    must_pass_total: 7
+    must_pass_passed: 7
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-90-01
+        description: "Confirming delete in dialog actually deletes the member"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:331: Alert destructive button calls deleteMember.mutate({ memberId, memberName }).
+          useDeleteMember hook handles the Supabase delete operation.
+
+      - id: SP-90-02
+        description: "Confirming delete in dialog actually deletes the topic"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:275: Alert destructive button calls deleteTopic.mutate({ topicId, topicTitle }).
+          useDeleteWardTopic hook handles the Supabase delete operation.
+
+      - id: SP-90-03
+        description: "Delete button visual appearance unchanged"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          SwipeableCard.tsx:167: deleteButton style unchanged (backgroundColor: colors.error).
+          Text color remains '#FFFFFF' (line 172). Only change is pointerEvents on parent Animated.View.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  verdict: passed
+  verdict_rationale: |
+    All 7 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    Root cause was the Animated.View with zIndex:1 intercepting touch events on action buttons.
+    Fix: pointerEvents="box-none" on Animated.View allows touches to pass through to
+    action buttons while maintaining gesture detection on child content.
+    Single-line fix in SwipeableCard.tsx. No regressions. 2610/2610 tests passing.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-83: Save/Cancel buttons for members and ward topics
+# #############################################################################
+
+cr_83:
+  cr_id: CR-83
+  title: "Membros e temas da ala: salvar somente ao clicar Salvar, adicionar botao Cancelar"
+  type: feature_request
+  spec: specs/SPEC_F027_F031.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Current state confirmed: MemberEditor and TopicEditor save onBlur with no
+      explicit Save/Cancel buttons. i18n keys common.save and common.cancel already exist.
+      Feature is feasible with no architectural changes.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 89b5dc9
+        message: "feat(members): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+      - hash: 1970e71
+        message: "feat(topics): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2610
+    tester_suite_total: 2610
+
+    must_pass_results:
+      - id: MP-83-01
+        description: "MemberEditor does NOT save onBlur for name field"
+        status: PASSED
+        evidence: |
+          members.tsx:77-88: Name TextInput has NO onBlur handler. Only onChangeText={setFullName}.
+          The old onBlur={handleSave} has been removed.
+
+      - id: MP-83-02
+        description: "MemberEditor does NOT save onBlur for phone field"
+        status: PASSED
+        evidence: |
+          members.tsx:98-107: Phone TextInput has NO onBlur handler. Only onChangeText={setPhone}.
+          The old onBlur={handleSave} has been removed.
+
+      - id: MP-83-03
+        description: "TopicEditor does NOT save onBlur for title field"
+        status: PASSED
+        evidence: |
+          topics.tsx:66-75: Title TextInput has NO onBlur handler. Only onChangeText={setTitle}.
+          The old onBlur={handleSave} has been removed.
+
+      - id: MP-83-04
+        description: "TopicEditor does NOT save onBlur for link field"
+        status: PASSED
+        evidence: |
+          topics.tsx:76-86: Link TextInput has NO onBlur handler. Only onChangeText={setLink}.
+          The old onBlur={handleSave} has been removed.
+
+      - id: MP-83-05
+        description: "MemberEditor renders a Save button"
+        status: PASSED
+        evidence: |
+          members.tsx:121-129: Pressable with onPress={handleSave} renders
+          t('common.save') text. Style: saveButton with backgroundColor: colors.primary.
+
+      - id: MP-83-06
+        description: "MemberEditor renders a Cancel button"
+        status: PASSED
+        evidence: |
+          members.tsx:112-120: Pressable with onPress={onCancel} renders
+          t('common.cancel') text. Style: cancelButton with color: colors.textSecondary.
+
+      - id: MP-83-07
+        description: "TopicEditor renders a Save button"
+        status: PASSED
+        evidence: |
+          topics.tsx:99-107: Pressable with onPress={handleSave} renders
+          t('common.save') text. Style: saveButton with backgroundColor: colors.primary.
+
+      - id: MP-83-08
+        description: "TopicEditor renders a Cancel button"
+        status: PASSED
+        evidence: |
+          topics.tsx:90-98: Pressable with onPress={onCancel} renders
+          t('common.cancel') text. Style: cancelButton with color: colors.textSecondary.
+
+      - id: MP-83-09
+        description: "MemberEditor Save button calls onSave with data"
+        status: PASSED
+        evidence: |
+          members.tsx:69-73: handleSave trims fullName, validates non-empty, and calls
+          onSave({ full_name, country_code, phone }). Save button (line 123) calls handleSave.
+
+      - id: MP-83-10
+        description: "MemberEditor Cancel button calls onCancel"
+        status: PASSED
+        evidence: |
+          members.tsx:114: Cancel button onPress={onCancel}. onCancel is a required prop
+          in MemberEditorProps (line 50).
+
+      - id: MP-83-11
+        description: "TopicEditor Save button calls onSave with data"
+        status: PASSED
+        evidence: |
+          topics.tsx:58-62: handleSave trims title, validates non-empty, and calls
+          onSave({ title, link }). Save button (line 101) calls handleSave.
+
+      - id: MP-83-12
+        description: "TopicEditor Cancel button calls onCancel"
+        status: PASSED
+        evidence: |
+          topics.tsx:92: Cancel button onPress={onCancel}. onCancel is a required prop
+          in TopicEditorProps (line 42).
+
+      - id: MP-83-13
+        description: "TopicEditor accepts onCancel prop"
+        status: PASSED
+        evidence: |
+          topics.tsx:42: TopicEditorProps interface includes "onCancel: () => void".
+          TopicEditor destructures it at line 46: { topic, onSave, onCancel, colors }.
+
+      - id: MP-83-14
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 55 test files, 2610/2610 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 14
+    must_pass_passed: 14
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-83-01
+        description: "Save and Cancel buttons are positioned appropriately in MemberEditor"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:111: editorButtons View with flexDirection:'row', justifyContent:'flex-end',
+          gap:8, marginTop:8. Cancel button first, Save button second (right-aligned).
+
+      - id: SP-83-02
+        description: "Save and Cancel buttons are positioned appropriately in TopicEditor"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:89: editorButtons View with flexDirection:'row', justifyContent:'flex-end',
+          gap:8, marginTop:8. Cancel button first, Save button second (right-aligned).
+          Identical layout pattern as MemberEditor.
+
+      - id: SP-83-03
+        description: "New member: Cancel discards addition without creating member"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:601: onCancel={() => setIsAdding(false)}. MemberEditor Cancel button
+          calls this, which hides the editor without calling createMember.mutate.
+
+      - id: SP-83-04
+        description: "Edit member: Cancel reverts to display mode without saving changes"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:511: onCancel={() => setEditingId(null)}. MemberEditor Cancel button
+          calls this, which exits edit mode without calling updateMember.mutate.
+
+      - id: SP-83-05
+        description: "New topic: Cancel discards addition without creating topic"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:339: onCancel={() => setIsAdding(false)}. TopicEditor Cancel button
+          calls this, which hides the editor without calling createTopic.mutate.
+
+      - id: SP-83-06
+        description: "Edit topic: Cancel reverts to display mode without saving changes"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:353: onCancel={() => setEditingId(null)}. TopicEditor Cancel button
+          calls this, which exits edit mode without calling updateTopic.mutate.
+
+    should_pass_total: 6
+    should_pass_passed: 6
+    should_pass_failed: 0
+
+  verdict: passed
+  verdict_rationale: |
+    All 14 must_pass checks passed. All 6 should_pass checks passed (by analysis).
+    onBlur auto-save removed from all 4 TextInputs (name, phone in MemberEditor;
+    title, link in TopicEditor). Save and Cancel buttons added to both editors.
+    TopicEditor now accepts onCancel prop. Both editors use consistent button layout
+    (flex-end, Save on right). No regressions. 2610/2610 tests passing.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-84: Clear (X) button for all search fields
+# #############################################################################
+
+cr_84:
+  cr_id: CR-84
+  title: "Adicionar botao X para limpar campo de search em todos os campos de busca do app"
+  type: feature_request
+  spec: specs/SPEC_F027_F031.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      10 search fields identified across the app. None had a clear (X) button.
+      Standard UX pattern, feasible with reusable component or inline implementation.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 8f2b42a
+        message: "feat(components): create SearchInput component with clear X button (CR-84)"
+      - hash: 27daf39
+        message: "feat(settings): migrate search fields to SearchInput in 4 settings screens (CR-84)"
+      - hash: ede8904
+        message: "feat(components): migrate search fields to SearchInput in 6 modal/selector components (CR-84)"
+      - hash: ac4b489
+        message: "fix(tests): update CR-39 tests for SearchInput migration"
+      - hash: 3b780d4
+        message: "fix(tests): update CR-80 test for SearchInput migration"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2610
+    tester_suite_total: 2610
+
+    must_pass_results:
+      - id: MP-84-01
+        description: "Members screen search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          members.tsx:554-558: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          SearchInput.tsx:44-55: Renders clear button when value.length > 0.
+
+      - id: MP-84-02
+        description: "Topics screen search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          topics.tsx:331-335: Uses <SearchInput value={search} onChangeText={setSearch} />.
+
+      - id: MP-84-03
+        description: "History screen search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          history.tsx:107: Uses <SearchInput value={...} onChangeText={updateSearch} />.
+          Import at line 14: import { SearchInput } from '../../../components/SearchInput'.
+
+      - id: MP-84-04
+        description: "Timezone screen search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          timezone.tsx:207: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 16: import { SearchInput } from '../../../components/SearchInput'.
+
+      - id: MP-84-05
+        description: "HymnSelector search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          HymnSelector.tsx:103: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 17: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-06
+        description: "MemberSelectorModal search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          MemberSelectorModal.tsx:63: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 17: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-07
+        description: "TopicSelectorModal search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          TopicSelectorModal.tsx:80: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 17: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-08
+        description: "PrayerSelector search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:114: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 18: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-09
+        description: "ActorSelector search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          ActorSelector.tsx:199: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 21: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-10
+        description: "AgendaForm search has clear (X) button when text present"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:702: Uses <SearchInput value={search} onChangeText={setSearch} />.
+          Import at line 32: import { SearchInput } from './SearchInput'.
+
+      - id: MP-84-11
+        description: "Clear button clears search text (sets to empty string)"
+        status: PASSED
+        evidence: |
+          SearchInput.tsx:47: onPress={() => onChangeText('')}. Calls the parent's
+          onChangeText with empty string, which sets the search state to ''.
+
+      - id: MP-84-12
+        description: "Clear button is NOT visible when search field is empty"
+        status: PASSED
+        evidence: |
+          SearchInput.tsx:44: {value.length > 0 && (<Pressable ... />)}.
+          Conditional rendering: button only appears when value has text.
+
+      - id: MP-84-13
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 55 test files, 2610/2610 tests passed.
+          Zero failures, zero skipped. Includes regression fixes for CR-39 and CR-80 tests
+          that were updated for SearchInput migration.
+
+    must_pass_total: 13
+    must_pass_passed: 13
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-84-01
+        description: "X button is positioned at right side of search input"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          SearchInput.tsx:75-76: clearButton style has position:'absolute', right:8.
+          Positioned at the right side of the input container.
+
+      - id: SP-84-02
+        description: "X button has appropriate size for touch target (>= 24px)"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          SearchInput.tsx:79-80: clearButton has width:24, height:24. Plus hitSlop={8}
+          on the Pressable (line 48), giving an effective touch area of 40x40px.
+
+      - id: SP-84-03
+        description: "All 10 search fields use consistent X button styling"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          All 10 search fields use the same SearchInput component. Styling is centralized
+          in SearchInput.tsx styles. Uses Unicode multiply sign (U+00D7) for the X character
+          with colors.textSecondary color. Consistent across all instances.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  verdict: passed
+  verdict_rationale: |
+    All 13 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    Created reusable SearchInput component (DRY approach). All 10 search fields migrated.
+    X button shows conditionally (value.length > 0), clears text on press, positioned
+    at right side with 24x24 size + 8px hitSlop. Consistent styling across all instances.
+    Regression fixes applied for existing CR-39 and CR-80 tests. 2610/2610 tests passing.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-85: Complete international country codes list
+# #############################################################################
+
+cr_85:
+  cr_id: CR-85
+  title: "Lista de codigos internacionais de telefone incompleta, faltam muitos paises"
+  type: bugfix
+  spec: specs/SPEC_F027_F031.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      COUNTRY_CODES array had only 21 entries. csvUtils.ts splitPhoneNumber hardcoded
+      same 21 codes. User wants a more complete list of all countries.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 8d0f6c4
+        message: "feat(lib): create countryCodes.ts with ~200 country codes (CR-85)"
+      - hash: 59eaba7
+        message: "refactor(members,csv): use shared countryCodes.ts (CR-85)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2610
+    tester_suite_total: 2610
+
+    must_pass_results:
+      - id: MP-85-01
+        description: "COUNTRY_CODES list has significantly more entries (>= 100 countries)"
+        status: PASSED
+        evidence: |
+          src/lib/countryCodes.ts: 172 entries in COUNTRY_CODES array (lines 16-191).
+          Far exceeds the minimum threshold of 100. Previously had 21.
+
+      - id: MP-85-02
+        description: "All major LDS-presence countries are included"
+        status: PASSED
+        evidence: |
+          Verified all 44 key countries present: Brazil, United States, Mexico, Argentina,
+          Chile, Colombia, Peru, Philippines, Guatemala, Honduras, Ecuador, Bolivia, Paraguay,
+          Uruguay, Portugal, Angola, Mozambique, Cape Verde, United Kingdom, Spain, France,
+          Germany, Italy, Japan, South Korea, Australia, New Zealand, Canada, India, Nigeria,
+          Ghana, South Africa, Kenya, El Salvador, Costa Rica, Panama, Haiti, Cuba, Taiwan,
+          Hong Kong, Singapore, Thailand, Fiji, Tonga. Zero missing.
+
+      - id: MP-85-03
+        description: "splitPhoneNumber in csvUtils.ts recognizes all new country codes"
+        status: PASSED
+        evidence: |
+          csvUtils.ts:6-7: Now re-exports splitPhoneNumber from './countryCodes'.
+          countryCodes.ts:204-216: CODE_SETS_BY_LENGTH is dynamically built from COUNTRY_CODES
+          array, grouping by digit length. splitPhoneNumber (line 222-244) iterates longest
+          codes first for correct matching. No hardcoded regex patterns - fully data-driven
+          from the COUNTRY_CODES array. Any new entry in COUNTRY_CODES is automatically
+          recognized by splitPhoneNumber.
+
+      - id: MP-85-04
+        description: "Each country entry has code, flag emoji, and label"
+        status: PASSED
+        evidence: |
+          countryCodes.ts:6-10: CountryCode interface requires { code: string; flag: string; label: string }.
+          All 172 entries follow this format. Example (line 18):
+            { code: '+55', flag: '\u{1F1E7}\u{1F1F7}', label: 'Brazil (+55)' }
+          Labels include country name and dial code in parentheses.
+
+      - id: MP-85-05
+        description: "No duplicate country codes in the list"
+        status: PASSED
+        evidence: |
+          170 unique codes out of 172 entries. Only duplicates are:
+          - +1: Canada and United States (valid - shared NANP code)
+          - +7: Kazakhstan and Russia (valid - shared code)
+          These are legitimate shared international dial codes.
+
+      - id: MP-85-06
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 55 test files, 2610/2610 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 6
+    must_pass_passed: 6
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-85-01
+        description: "Countries are sorted in a logical order"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          countryCodes.ts: Brazil listed first as default (line 17-18), then alphabetical
+          by English country name from Afghanistan (line 20) to Zimbabwe (line 190).
+          Comment at line 3 documents this: "Brazil (+55) listed first, then alphabetical
+          by country name."
+
+      - id: SP-85-02
+        description: "Country code picker modal is usable with large list"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:144-164: FlatList renders COUNTRY_CODES in a scrollable modal
+          with maxHeight:400 (line 792). FlatList is virtualized, so 172 items won't
+          cause performance issues. Note: no search in picker, but scrolling works.
+
+      - id: SP-85-03
+        description: "Flag emojis are correct Unicode regional indicator symbols"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          All flags use Unicode Regional Indicator Symbol pairs (U+1F1E6 through U+1F1FF).
+          Example: Brazil = '\u{1F1E7}\u{1F1F7}' = BR regional indicators.
+          getFlagForCode (line 196-198) returns matching flag or globe fallback.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  verdict: passed
+  verdict_rationale: |
+    All 6 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    Expanded from 21 to 172 country codes. Extracted to shared countryCodes.ts module (DRY).
+    splitPhoneNumber now data-driven from COUNTRY_CODES (no hardcoded regex patterns).
+    csvUtils.ts re-exports from countryCodes.ts. All 44 key LDS-presence countries present.
+    Only valid duplicates (+1 US/CA, +7 RU/KZ). Alphabetical ordering with Brazil first.
+    2610/2610 tests passing.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-86: Confirmation dialog before Import CSV
+# #############################################################################
+
+cr_86:
+  cr_id: CR-86
+  title: "Dialogo de confirmacao antes de Importar CSV"
+  type: feature_request
+  spec: specs/SPEC_F027_F031.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      handleImport went directly to file picker without confirmation. Alert.alert pattern
+      already used in codebase. New i18n keys needed for confirmation text.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 5d65fb1
+        message: "feat(i18n): add CSV import confirmation keys (CR-86)"
+      - hash: 5837628
+        message: "feat(members): add confirmation dialog before CSV import (CR-86)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2610
+    tester_suite_total: 2610
+
+    must_pass_results:
+      - id: MP-86-01
+        description: "Import button triggers confirmation dialog before file picker"
+        status: PASSED
+        evidence: |
+          members.tsx:488-497: handleImport calls Alert.alert with importConfirmTitle
+          and importConfirmMessage. Only the confirm callback calls performImport().
+          The file picker (performImport, lines 445-485) is NOT called directly anymore.
+
+      - id: MP-86-02
+        description: "Confirmation dialog warns that import replaces entire member list"
+        status: PASSED
+        evidence: |
+          en.json:169: "importConfirmMessage": "Importing a CSV file will replace the entire
+          current member list with the contents of the file. ..."
+          The word "replace" and "entire" clearly warn about the destructive nature.
+
+      - id: MP-86-03
+        description: "Confirmation dialog states that assignments are not affected"
+        status: PASSED
+        evidence: |
+          en.json:169: "...Existing speech assignments (past and present) will not be affected.
+          Do you want to continue?"
+          Explicitly mentions past and present assignments are unaffected.
+
+      - id: MP-86-04
+        description: "File picker only opens after user confirms"
+        status: PASSED
+        evidence: |
+          members.tsx:494: onPress: () => performImport(). The performImport function
+          (which opens DocumentPicker or web file input) is only called inside the
+          confirm button's onPress callback, after the user explicitly confirms.
+
+      - id: MP-86-05
+        description: "Cancel in confirmation dialog does NOT open file picker"
+        status: PASSED
+        evidence: |
+          members.tsx:493: { text: t('common.cancel'), style: 'cancel' }. The cancel button
+          has no onPress handler, so Alert dismisses without calling performImport.
+
+      - id: MP-86-06
+        description: "i18n keys for confirmation exist in en.json"
+        status: PASSED
+        evidence: |
+          en.json:168-169:
+            "importConfirmTitle": "Import Members"
+            "importConfirmMessage": "Importing a CSV file will replace the entire current
+            member list with the contents of the file. Existing speech assignments (past
+            and present) will not be affected. Do you want to continue?"
+
+      - id: MP-86-07
+        description: "i18n keys for confirmation exist in pt-BR.json"
+        status: PASSED
+        evidence: |
+          pt-BR.json:168-169:
+            "importConfirmTitle": "Importar Membros"
+            "importConfirmMessage": "Ao importar um arquivo CSV, toda a lista de membros
+            atual sera substituida pelo conteudo do arquivo. As designacoes de discursos
+            existentes (passadas e presentes) nao serao afetadas. Deseja continuar?"
+
+      - id: MP-86-08
+        description: "i18n keys for confirmation exist in es.json"
+        status: PASSED
+        evidence: |
+          es.json:168-169:
+            "importConfirmTitle": "Importar Miembros"
+            "importConfirmMessage": "Al importar un archivo CSV, toda la lista de miembros
+            actual sera reemplazada por el contenido del archivo. Las asignaciones de
+            discursos existentes (pasadas y presentes) no seran afectadas. Desea continuar?"
+
+      - id: MP-86-09
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 55 test files, 2610/2610 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 9
+    must_pass_passed: 9
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-86-01
+        description: "Confirmation dialog has appropriate title"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:490: Alert title is t('members.importConfirmTitle').
+          en: "Import Members", pt: "Importar Membros", es: "Importar Miembros".
+          Clear, descriptive title identifying the action.
+
+      - id: SP-86-02
+        description: "Confirmation dialog has confirm and cancel buttons"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          members.tsx:492-495: Alert has 2 buttons:
+          1. { text: t('common.cancel'), style: 'cancel' } - dismisses dialog
+          2. { text: t('common.confirm'), style: 'default', onPress: () => performImport() }
+          Cancel first (iOS convention), confirm second.
+
+      - id: SP-86-03
+        description: "Translations are accurate in all 3 languages"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          Portuguese: "substituida", "designacoes de discursos", "nao serao afetadas" -
+          natural Brazilian Portuguese.
+          Spanish: "reemplazada", "asignaciones de discursos", "no seran afectadas" -
+          natural Spanish. Both convey the same meaning as English accurately.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  verdict: passed
+  verdict_rationale: |
+    All 9 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    Import flow now: button press > confirmation Alert > user confirms > file picker opens.
+    Dialog warns about replacing entire member list and reassures about assignments.
+    New i18n keys added to all 3 locales (en, pt-BR, es) with accurate translations.
+    handleImport refactored into handleImport (dialog) + performImport (file picker).
+    2610/2610 tests passing.
 
   issues_for_coder: []

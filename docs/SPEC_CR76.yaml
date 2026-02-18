@@ -1,0 +1,376 @@
+type: spec
+version: 2
+cr_id: CR-76
+regression_of: CR-64
+category: BUG
+priority: CRITICAL
+
+title: >
+  [BUG] (Regression of CR-64) Users screen returns HTTP 401 Unauthorized --
+  callEdgeFunction sends stale/expired JWT via manual header override
+
+description: >
+  When clicking "Users" in the Settings tab, the app displays a runtime error:
+  "Edge Function returned a non-2xx status code" (captured by QueryCache onError
+  in src/app/_layout.tsx:16). The Users screen does not load -- a red error message
+  appears. The ward has only the secretary as a user and they do not appear in the list.
+  Supabase logs confirm the Edge Function returns HTTP 401 (Unauthorized), NOT 403.
+  The authentication fails BEFORE reaching the permission check in the Edge Function.
+
+regression_analysis:
+  cr64_what_was_done:
+    commit: "d7daf13 - feat(auth): allow secretary role management and add forgot password flow (CR-64, CR-67)"
+    code_change: >
+      Changed permission check in supabase/functions/list-users/index.ts from
+      `userRole !== 'bishopric'` to `!['bishopric', 'secretary'].includes(userRole)`.
+      Also updated users.tsx error handling with i18n messages and retry button.
+      Added callEdgeFunction wrapper with manual Authorization header injection.
+    review_status: "APPROVED in docs/REVIEW_CR4_F007.md"
+    tests_status: "All tests in src/__tests__/cr004-f007-auth-fixes.test.ts pass (source-level checks)"
+
+  why_cr64_did_not_fix_the_bug:
+    previous_analysis_was_wrong: >
+      The previous SPEC (v1) assumed the error was HTTP 403 (permission denied) and
+      concluded the Edge Function was not redeployed. The user verified in Supabase logs
+      that the actual error is HTTP 401 (Unauthorized). This means authentication fails
+      BEFORE the permission check is even reached. The root cause is in the client-side
+      code, not the server-side permission logic or deployment status.
+
+    root_cause:
+      id: RCA-AUTH-1
+      title: "callEdgeFunction sends stale JWT by manually overriding Authorization header"
+      description: >
+        The callEdgeFunction wrapper in users.tsx (lines 38-65) manually fetches the
+        access token via getAccessToken() -> supabase.auth.getSession() and passes it
+        as a custom Authorization header to supabase.functions.invoke(). This is both
+        REDUNDANT and HARMFUL:
+
+        1. REDUNDANT: supabase.functions.invoke() from @supabase/supabase-js v2
+           AUTOMATICALLY includes the current session's JWT in the Authorization header.
+           There is no need to manually pass it.
+
+        2. HARMFUL: supabase.auth.getSession() returns the LOCALLY CACHED session from
+           storage (AsyncStorage). It does NOT validate or refresh the token. If the
+           access_token has expired (default JWT lifetime is 3600s = 1 hour), getSession()
+           returns the EXPIRED token. The manual header OVERRIDES the automatic header
+           that supabase.functions.invoke() would have set (which uses the properly
+           refreshed token from the internal auth state).
+
+        3. The Supabase JS v2 documentation explicitly warns: "getSession() reads from
+           local storage and may return an expired session. Use getUser() to validate
+           the session server-side." The autoRefreshToken option (set to true in
+           src/lib/supabase.ts:51) handles automatic refresh via the internal auth
+           state management, but getSession() bypasses this.
+
+      evidence:
+        - >
+          users.tsx:38-41: getAccessToken() calls supabase.auth.getSession() which
+          returns cached session data. If the JWT expired, it returns the expired token.
+        - >
+          users.tsx:48-51: supabase.functions.invoke(functionName, { body, headers:
+          { Authorization: `Bearer ${token}` } }) -- the manual Authorization header
+          overrides the automatic one that invoke() would set.
+        - >
+          list-users/index.ts:42-43: The Edge Function calls
+          supabaseAdmin.auth.getUser(token) which validates the JWT. An expired JWT
+          causes getUser() to return an error, and line 45-49 returns HTTP 401.
+        - >
+          Supabase logs confirm HTTP 401 response, meaning the JWT validation failed.
+        - >
+          The resilientStorage wrapper in supabase.ts catches AsyncStorage errors and
+          returns null. If storage read fails silently, getSession() returns null session,
+          and getAccessToken() returns empty string ''. An empty Bearer token also causes
+          401.
+        - >
+          Other Edge Function calls (register-first-user, register-invited-user) do NOT
+          manually pass Authorization headers -- they rely on invoke()'s automatic
+          behavior. These functions don't require JWT auth, so the issue doesn't manifest
+          there. However, any future authenticated Edge Function call using callEdgeFunction
+          would have the same 401 problem.
+
+      auth_chain_analysis:
+        step_1_client_getSession:
+          code_location: "src/app/(tabs)/settings/users.tsx:38-41"
+          what_happens: >
+            getAccessToken() calls supabase.auth.getSession(). This reads from
+            AsyncStorage via resilientStorage. Returns cached { session } object.
+            Does NOT trigger token refresh. Does NOT validate expiry.
+          problem: >
+            If the JWT has expired (>1 hour old by default), the expired token is returned.
+            If AsyncStorage read fails (resilientStorage catches the error), null session
+            is returned and getAccessToken() returns empty string ''.
+
+        step_2_client_invoke:
+          code_location: "src/app/(tabs)/settings/users.tsx:48-51"
+          what_happens: >
+            supabase.functions.invoke('list-users', { body, headers: { Authorization:
+            `Bearer ${expired_or_empty_token}` } }). The manual headers object OVERRIDES
+            the default Authorization header that invoke() would set from the current
+            (possibly refreshed) session.
+          problem: >
+            The manual header contains the stale/expired/empty token. The automatic header
+            injection (which would use the refreshed token) is overridden.
+
+        step_3_edge_function_receives:
+          code_location: "supabase/functions/list-users/index.ts:27-33"
+          what_happens: >
+            The Edge Function reads req.headers.get('Authorization'). Gets the expired
+            or empty token.
+
+        step_4_edge_function_validates:
+          code_location: "supabase/functions/list-users/index.ts:42-49"
+          what_happens: >
+            supabaseAdmin.auth.getUser(token) validates the JWT against Supabase Auth.
+            Expired token -> userError is set. Empty token -> userError is set.
+            Returns HTTP 401 with { error: 'Invalid or expired token' }.
+
+        step_5_client_receives_error:
+          code_location: "src/app/(tabs)/settings/users.tsx:52-63"
+          what_happens: >
+            supabase.functions.invoke returns { data: null, error: FunctionsHttpError }.
+            The error.message is "Edge Function returned a non-2xx status code".
+            callEdgeFunction attempts to extract server message from error.context.json()
+            (added in previous CR-76 fix attempt) -- this may or may not work depending
+            on the Supabase JS version and how the error context is structured.
+
+      likelihood: "CONFIRMED (matches HTTP 401 from Supabase logs)"
+
+    contributing_factors:
+      - id: CF-1
+        description: >
+          The resilientStorage adapter in src/lib/supabase.ts:23-46 catches errors in
+          getItem/setItem/removeItem and returns fallback values (null for getItem).
+          If AsyncStorage fails (e.g., on Android during cold start), getSession() returns
+          null, and getAccessToken() returns ''. This amplifies the 401 problem in scenarios
+          where storage is temporarily unavailable.
+        impact: "Makes 401 more likely on Android cold start"
+
+      - id: CF-2
+        description: >
+          The callEdgeFunction error extraction (lines 53-63) attempts to read
+          error.context.json() to get the server-side error message. This was added as
+          a fix attempt for the previous CR-76 analysis. While it may work for extracting
+          "Invalid or expired token" from the 401 response, it doesn't solve the
+          underlying authentication problem.
+        impact: "Improved error visibility but does not fix root cause"
+
+scope:
+  in:
+    - "Fix callEdgeFunction to NOT manually override the Authorization header"
+    - "Remove the redundant getAccessToken() function"
+    - "Let supabase.functions.invoke handle auth automatically"
+    - "Ensure all Edge Function calls from users.tsx use proper automatic auth"
+    - "Verify the fix resolves the HTTP 401 error"
+    - "Keep the error extraction logic (CF-2) since it is a valid improvement"
+  out:
+    - "Changes to the Edge Function server-side code (it is correct)"
+    - "Changes to the forgot password flow (CR-67)"
+    - "Changes to the supabase client configuration (autoRefreshToken is already true)"
+    - "Changes to RLS policies"
+    - "Edge Function redeployment (not the root cause)"
+    - "New features unrelated to user listing"
+
+personas:
+  - id: P-1
+    description: "Secretary -- ward user with secretary role who manages the ward"
+  - id: P-2
+    description: "Bishopric member -- should also be able to access Users screen"
+
+user_stories:
+  - id: US-1
+    as_a: "Secretary"
+    i_want: "to access the Users screen and see all ward users including myself"
+    so_that: "I can manage user roles and invitations"
+
+acceptance_criteria:
+  # Primary fix: Remove manual Authorization header override
+  - id: AC-1
+    given: "The callEdgeFunction wrapper in users.tsx"
+    when: "Calling any Edge Function (list-users, create-invitation, update-user-role, delete-user)"
+    then: >
+      It does NOT manually set the Authorization header. It relies on
+      supabase.functions.invoke()'s automatic auth header injection which uses
+      the current (auto-refreshed) session token.
+    priority: must
+
+  - id: AC-2
+    given: "The getAccessToken() function in users.tsx"
+    when: "The fix is applied"
+    then: >
+      The function is REMOVED since it is no longer needed. supabase.functions.invoke()
+      handles auth automatically.
+    priority: must
+
+  # Verify end-to-end auth works
+  - id: AC-3
+    given: "A secretary user with a valid session on the app"
+    when: "They navigate to Settings > Users"
+    then: >
+      The list-users Edge Function receives a valid, non-expired JWT via the
+      automatic Authorization header from supabase.functions.invoke().
+      The function returns HTTP 200 with { users: [...] }.
+    priority: must
+    regression_from: "CR-64 AC-1"
+
+  - id: AC-4
+    given: "A ward with only one user (the secretary)"
+    when: "The secretary opens the Users screen"
+    then: "The secretary's email, role, and id appear in the users list"
+    priority: must
+    regression_from: "CR-64 AC-2"
+
+  # Keep existing error extraction
+  - id: AC-5
+    given: "The callEdgeFunction wrapper after the fix"
+    when: "The Edge Function returns a non-2xx status with an error JSON body"
+    then: >
+      The error thrown includes the server-side error message extracted from
+      error.context.json() (e.g., "Insufficient permissions", "Invalid or expired token")
+      instead of the generic "Edge Function returned a non-2xx status code"
+    priority: must
+    note: "This logic already exists (lines 53-63). Keep it after removing the manual header."
+
+  - id: AC-6
+    given: "The Users screen"
+    when: "The query fails for any reason"
+    then: >
+      The error message displayed is user-friendly and translated via i18n
+      (t('users.loadError')), with a "Retry" button that calls refetch()
+    priority: must
+    note: "Already implemented by CR-64, verify it still works after fix"
+
+  # No regressions in other Edge Function calls
+  - id: AC-7
+    given: "The create-invitation, update-user-role, and delete-user Edge Function calls"
+    when: "Invoked from users.tsx via callEdgeFunction after the fix"
+    then: >
+      They continue to work correctly with automatic auth headers.
+      No regressions in invitation creation, role changes, or user deletion.
+    priority: must
+
+edge_cases:
+  - id: EC-1
+    case: "User session has expired and autoRefreshToken has not yet refreshed it"
+    expected: >
+      supabase.functions.invoke() triggers a token refresh before sending the request
+      (this is the default behavior of the Supabase JS client when autoRefreshToken
+      is true). The Edge Function receives a fresh token and returns 200.
+
+  - id: EC-2
+    case: "AsyncStorage fails on Android cold start (resilientStorage returns null)"
+    expected: >
+      The Supabase auth client handles the null storage gracefully. The session may
+      need to be re-established. The user sees a loading state and then either the
+      user list or a login redirect. Without the manual header override, the automatic
+      auth handling is more resilient since it uses the in-memory session state, not
+      just the storage-cached version.
+
+  - id: EC-3
+    case: "The secretary user has no ward_id in app_metadata"
+    expected: >
+      The Edge Function receives a valid JWT (auth passes), but returns 403 with
+      { error: 'User missing ward or role metadata' }. The client shows
+      t('users.loadError') with a retry button.
+
+  - id: EC-4
+    case: "Network timeout during Edge Function call"
+    expected: "The client shows the error with a retry button."
+
+  - id: EC-5
+    case: "The Edge Function is not deployed at all (404)"
+    expected: >
+      supabase.functions.invoke returns an error. The client shows t('users.loadError')
+      with a retry button.
+
+  - id: EC-6
+    case: "The list-users Edge Function permission check rejects an observer user"
+    expected: >
+      The Edge Function returns HTTP 403 with { error: 'Insufficient permissions' }.
+      The client extracts this message via error.context.json() and throws it.
+      The UI shows t('users.loadError') with a retry button.
+
+files_likely_impacted:
+  client_side:
+    - path: "src/app/(tabs)/settings/users.tsx"
+      action: "MODIFY"
+      details: >
+        1. REMOVE the getAccessToken() function (lines 38-41) -- it is the root cause.
+        2. MODIFY callEdgeFunction (lines 43-65) to NOT pass custom Authorization header.
+           Remove `headers: { Authorization: \`Bearer ${token}\` }` from the invoke() call.
+           The final invoke call should be:
+           `const { data, error } = await supabase.functions.invoke(functionName, { body });`
+        3. KEEP the error extraction logic (lines 53-63) that reads error.context.json().
+        4. Remove the `const token = await getAccessToken();` line (line 47).
+
+  server_side: []
+  # No server-side changes needed. The Edge Function code is correct.
+  # The list-users permission check already includes secretary.
+  # supabaseAdmin.auth.getUser(token) correctly validates the JWT.
+  # The 401 is caused by receiving an expired/empty token from the client.
+
+  documentation: []
+  # No documentation changes needed for this fix.
+
+assumptions:
+  - id: A-1
+    description: >
+      The supabase.functions.invoke() method in @supabase/supabase-js v2
+      automatically includes the current session's JWT in the Authorization header
+      when no custom Authorization header is provided in the options.headers.
+    confirmed: true
+    evidence: >
+      This is documented Supabase JS v2 behavior. The client maintains the session
+      internally and automatically attaches the Authorization header to all requests
+      including functions.invoke(). The autoRefreshToken option (true in supabase.ts)
+      ensures the token is refreshed before it expires.
+
+  - id: A-2
+    description: >
+      When a custom Authorization header is passed in supabase.functions.invoke()'s
+      options.headers, it OVERRIDES the automatic Authorization header, even if the
+      custom token is expired or empty.
+    confirmed: true
+    evidence: >
+      Standard HTTP header behavior -- later headers override earlier ones. The Supabase
+      client sets defaults first, then merges user-provided headers which take precedence.
+
+  - id: A-3
+    description: >
+      supabase.auth.getSession() returns the locally cached session from storage
+      WITHOUT validating or refreshing the token. It may return an expired JWT.
+    confirmed: true
+    evidence: >
+      Supabase JS v2 documentation states: "This method reads the session from local
+      storage. It does not send a request to the Supabase Auth server. Note that
+      getSession() may return an expired session as it reads from local storage."
+
+  - id: A-4
+    description: >
+      The Edge Function list-users is correctly deployed and its code matches the
+      repository version (includes secretary in the permission check).
+    confirmed: false
+    default_if_not_confirmed: >
+      Even if the deployment is stale, the 401 error occurs BEFORE the permission
+      check is reached. Fixing the client-side auth header issue will resolve the 401.
+      If a 403 appears after the 401 is fixed, then redeployment would be needed
+      (but the current code already includes secretary).
+
+open_questions:
+  - id: Q-1
+    question: >
+      Which version of @supabase/supabase-js is installed in the project?
+    proposed_default: >
+      Assume v2.x (the import pattern `import { createClient } from '@supabase/supabase-js'`
+      and the usage of `supabase.functions.invoke` confirm this). The automatic auth
+      header behavior is consistent across v2.x versions.
+
+definition_of_done:
+  - "getAccessToken() function is removed from users.tsx"
+  - "callEdgeFunction does NOT manually set Authorization header"
+  - "callEdgeFunction relies on supabase.functions.invoke()'s automatic auth"
+  - "Secretary can access Settings > Users without HTTP 401 error"
+  - "Secretary appears in the user list"
+  - "All ward users appear in the list"
+  - "Error extraction via error.context.json() is preserved"
+  - "No regressions in invitation, role change, or user deletion"
+  - "Retry button on error state works correctly"

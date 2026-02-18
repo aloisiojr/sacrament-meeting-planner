@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SyncProvider } from '../providers/SyncProvider';
 import i18n from '../i18n';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -104,13 +105,15 @@ function InnerLayout() {
 export default function RootLayout() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <I18nextProvider i18n={i18n}>
-          <ThemeProvider>
-            <InnerLayout />
-          </ThemeProvider>
-        </I18nextProvider>
-      </QueryClientProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <I18nextProvider i18n={i18n}>
+            <ThemeProvider>
+              <InnerLayout />
+            </ThemeProvider>
+          </I18nextProvider>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

@@ -1,0 +1,300 @@
+# =============================================================================
+# PLAN.yaml
+# Execution plan for CR-77 and CR-78 bugfixes - expo-file-system v19 migration
+# Generated: 2026-02-18
+# Replaces: Phase 2 PLAN.yaml (completed)
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  change_requests: [CR-77, CR-78]
+  type: bugfix
+  phase: "1 of 1"
+  total_steps: 3
+  estimated_complexity: low
+  spec: specs/SPEC_CONSOLIDATED.yaml
+  description: >
+    Migrate expo-file-system usage from deprecated legacy API (cacheDirectory,
+    writeAsStringAsync, readAsStringAsync, EncodingType) to new v19 class-based
+    API (File, Paths). Single file change: src/app/(tabs)/settings/members.tsx.
+    Three atomic steps: (1) update import, (2) fix export, (3) fix import.
+
+# =============================================================================
+# PRE-CONDITIONS
+# =============================================================================
+
+pre_conditions:
+  - "All 124 tests in cr004-f005-csv-members-fixes.test.ts pass"
+  - "expo-file-system ~19.0.21 is installed"
+  - "File, Paths, Directory classes available from 'expo-file-system'"
+  - "File.write(content) is synchronous (void return)"
+  - "File.text() is async (returns Promise<string>)"
+  - "Paths.cache returns Directory object (never null)"
+
+# =============================================================================
+# SINGLE FILE TO MODIFY
+# =============================================================================
+
+target_file: src/app/(tabs)/settings/members.tsx
+
+# =============================================================================
+# STEP 1: Update import statement
+# =============================================================================
+
+steps:
+  - number: 1
+    title: "Update expo-file-system import from wildcard to named imports"
+    cr: "CR-77, CR-78"
+    description: >
+      Replace the wildcard import that brings in the new API namespace (which
+      lacks cacheDirectory, EncodingType, etc.) with named imports of File and
+      Paths classes from the new API. This is the prerequisite for Steps 2 and 3.
+    file: src/app/(tabs)/settings/members.tsx
+    line: 30
+    old: |
+      import * as FileSystem from 'expo-file-system';
+    new: |
+      import { File, Paths } from 'expo-file-system';
+    verification:
+      - "npx tsc --noEmit will show errors for FileSystem.* references (expected)"
+      - "Tests that check for '!FileSystem.cacheDirectory' will still pass (source code check)"
+    notes:
+      - "After this step, lines 386, 391, 393-395, 490-492 will have TypeScript errors"
+      - "This is expected; Steps 2 and 3 will resolve all remaining references"
+    commit:
+      message: "fix(members): update expo-file-system import to new v19 API (CR-77, CR-78)"
+
+  # ===========================================================================
+  # STEP 2: Fix handleExport mobile branch (CR-77)
+  # ===========================================================================
+
+  - number: 2
+    title: "Fix handleExport: replace cacheDirectory + writeAsStringAsync with File/Paths API"
+    cr: CR-77
+    description: >
+      Remove the cacheDirectory null guard (lines 386-390) that was causing the
+      error dialog. Remove writeAsStringAsync with EncodingType (lines 391-395).
+      Replace with new File(Paths.cache, 'membros.csv') and file.write(csv).
+      Update fileUri references to use file.uri. Keep all debug logs and
+      console.error. Do NOT touch the web branch (Platform.OS === 'web').
+    file: src/app/(tabs)/settings/members.tsx
+    lines: "384-402"
+    old: |
+          } else {
+            // Mobile: Write temp file and share via expo-sharing
+            if (!FileSystem.cacheDirectory) {
+              console.warn('[Export] cacheDirectory is null');
+              Alert.alert(t('common.error'), t('members.exportFailed'));
+              return;
+            }
+            const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
+            console.log('[Export] fileUri:', fileUri);
+            await FileSystem.writeAsStringAsync(fileUri, csv, {
+              encoding: FileSystem.EncodingType.UTF8,
+            });
+            console.log('[Export] File written successfully');
+            console.log('[Export] Opening share sheet...');
+            await Sharing.shareAsync(fileUri, {
+              mimeType: 'text/csv',
+              dialogTitle: t('members.exportCsv'),
+              UTI: 'public.comma-separated-values-text',
+            });
+          }
+    new: |
+          } else {
+            // Mobile: Write temp file and share via expo-sharing
+            const file = new File(Paths.cache, 'membros.csv');
+            console.log('[Export] fileUri:', file.uri);
+            file.write(csv);
+            console.log('[Export] File written successfully');
+            console.log('[Export] Opening share sheet...');
+            await Sharing.shareAsync(file.uri, {
+              mimeType: 'text/csv',
+              dialogTitle: t('members.exportCsv'),
+              UTI: 'public.comma-separated-values-text',
+            });
+          }
+    changes_detail:
+      - what: "Remove cacheDirectory null guard (lines 386-390)"
+        why: "Paths.cache always returns a valid Directory object; guard is unnecessary"
+      - what: "Remove FileSystem.writeAsStringAsync with EncodingType (lines 391-395)"
+        why: "writeAsStringAsync is a deprecated stub in v19 that throws"
+      - what: "Add: const file = new File(Paths.cache, 'membros.csv')"
+        why: "Creates file reference in cache directory using new API"
+      - what: "Add: file.write(csv) -- NO await"
+        why: "File.write() is synchronous (void return type per ExpoFileSystem.types.ts)"
+      - what: "Change fileUri to file.uri in console.log and Sharing.shareAsync"
+        why: "file.uri provides the same file:// URI that Sharing.shareAsync expects"
+      - what: "Remove console.warn('[Export] cacheDirectory is null')"
+        why: "Guard was removed; this warning is no longer reachable"
+    preserved_debug_logs:
+      - "console.log('[Export] CSV length:', csv.length)"
+      - "console.log('[Export] fileUri:', file.uri)"
+      - "console.log('[Export] File written successfully')"
+      - "console.log('[Export] Opening share sheet...')"
+      - "console.error('Export CSV failed:', err)"
+    verification:
+      - "No more FileSystem.cacheDirectory references in handleExport"
+      - "No more FileSystem.writeAsStringAsync references"
+      - "No more FileSystem.EncodingType references in handleExport"
+      - "file.write(csv) has NO await keyword"
+    commit:
+      message: "fix(members): use File/Paths API for CSV export - fixes cacheDirectory null (CR-77)"
+
+  # ===========================================================================
+  # STEP 3: Fix handleImport file reading (CR-78) + update tests
+  # ===========================================================================
+
+  - number: 3
+    title: "Fix handleImport: replace readAsStringAsync + EncodingType with File.text() + update tests"
+    cr: CR-78
+    description: >
+      Remove readAsStringAsync with EncodingType.UTF8 (lines 490-492) that was
+      crashing with "Cannot read property 'UTF8' of undefined". Replace with
+      new File(uri) and await file.text(). Keep all debug logs. Then update
+      the test file to reflect the source code changes (remove checks for
+      removed code patterns, add checks for new API usage).
+    file: src/app/(tabs)/settings/members.tsx
+    lines: "490-492"
+    old: |
+            const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+              encoding: FileSystem.EncodingType.UTF8,
+            });
+    new: |
+            const pickedFile = new File(result.assets[0].uri);
+            const content = await pickedFile.text();
+    changes_detail:
+      - what: "Remove FileSystem.readAsStringAsync with EncodingType (lines 490-492)"
+        why: "readAsStringAsync is a deprecated stub; EncodingType is undefined in v19"
+      - what: "Add: const pickedFile = new File(result.assets[0].uri)"
+        why: "Creates File from DocumentPicker URI (file:// URI from copyToCacheDirectory)"
+      - what: "Add: const content = await pickedFile.text()"
+        why: "File.text() is async (Promise<string>), reads UTF-8 by default"
+    preserved_debug_logs:
+      - "console.log('[Import] DocumentPicker result:', { uri, name, mimeType })"
+      - "console.log('[Import] File content length:', content.length)"
+      - "console.error('Import CSV failed:', err)"
+    test_updates:
+      file: src/__tests__/cr004-f005-csv-members-fixes.test.ts
+      changes:
+        - description: "Update 'should contain cacheDirectory null guard' test"
+          reason: "Guard was removed in Step 2; test must check for NEW API pattern"
+          old_test: |
+            it('should contain cacheDirectory null guard', () => {
+              const source = readSourceFile('app/(tabs)/settings/members.tsx');
+              expect(source).toContain('!FileSystem.cacheDirectory');
+            });
+          new_test: |
+            it('should use new File/Paths API for export (no cacheDirectory guard)', () => {
+              const source = readSourceFile('app/(tabs)/settings/members.tsx');
+              expect(source).not.toContain('!FileSystem.cacheDirectory');
+              expect(source).toContain('new File(Paths.cache');
+              expect(source).toContain("file.write(csv)");
+            });
+        - description: "Update debug log test: remove cacheDirectory null warning check"
+          reason: "console.warn for cacheDirectory was removed with the guard"
+          old_assertion: |
+            expect(source).toContain("console.warn('[Export] cacheDirectory is null')");
+          new_assertion: |
+            expect(source).not.toContain("console.warn('[Export] cacheDirectory is null')");
+        - description: "Add test for new import File API usage"
+          reason: "Verify the new File.text() pattern is used for reading"
+          new_test: |
+            it('should use new File API for import (no readAsStringAsync)', () => {
+              const source = readSourceFile('app/(tabs)/settings/members.tsx');
+              expect(source).not.toContain('readAsStringAsync');
+              expect(source).not.toContain('EncodingType');
+              expect(source).toContain('new File(result.assets[0].uri)');
+              expect(source).toContain('.text()');
+            });
+        - description: "Add test for File/Paths import statement"
+          reason: "Verify the import was updated from wildcard to named imports"
+          new_test: |
+            it('should import File and Paths from expo-file-system (not wildcard)', () => {
+              const source = readSourceFile('app/(tabs)/settings/members.tsx');
+              expect(source).toContain("import { File, Paths } from 'expo-file-system'");
+              expect(source).not.toContain("import * as FileSystem from 'expo-file-system'");
+            });
+    verification:
+      - "npx tsc --noEmit (no TypeScript errors)"
+      - "npx vitest run src/__tests__/cr004-f005-csv-members-fixes.test.ts (all tests pass)"
+      - "npx vitest run (full test suite passes)"
+      - "No FileSystem.* references remain in members.tsx"
+      - "File.text() has await keyword"
+      - "file.write(csv) does NOT have await keyword"
+    commit:
+      message: "fix(members): use File API for CSV import - fixes EncodingType undefined (CR-78)"
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependencies:
+  step_1: []                  # No dependencies - changes only the import line
+  step_2: [step_1]            # Needs File and Paths to be imported
+  step_3: [step_1, step_2]    # Needs File imported; tests verify both export and import changes
+
+# Note: Steps cannot run in parallel because they all modify the same file
+# and Step 3's tests verify changes from Steps 1 and 2.
+
+# =============================================================================
+# POST-CONDITIONS (after all steps complete)
+# =============================================================================
+
+post_conditions:
+  source_code:
+    - "import { File, Paths } from 'expo-file-system' on line 30"
+    - "No FileSystem.* references anywhere in members.tsx"
+    - "No cacheDirectory null guard in handleExport"
+    - "No writeAsStringAsync in handleExport"
+    - "No readAsStringAsync in handleImport"
+    - "No EncodingType references anywhere in members.tsx"
+    - "new File(Paths.cache, 'membros.csv') in handleExport"
+    - "file.write(csv) (synchronous, no await) in handleExport"
+    - "new File(result.assets[0].uri) in handleImport"
+    - "await pickedFile.text() (async, with await) in handleImport"
+    - "All console.log debug messages preserved (except cacheDirectory null warning)"
+    - "All console.error messages preserved"
+    - "Web code paths (Platform.OS === 'web') completely untouched"
+    - "No changes to parseCsv, csvUtils.ts, i18n files"
+
+  tests:
+    - "All tests in cr004-f005-csv-members-fixes.test.ts pass"
+    - "Full test suite (npx vitest run) passes"
+    - "Test for cacheDirectory guard updated to check for new API"
+    - "Test for debug logs updated (no cacheDirectory null warning)"
+    - "New tests added for File/Paths API usage verification"
+
+  runtime_behavior:
+    - "CR-77 FIXED: Export CSV creates file via File.write() and opens share sheet"
+    - "CR-78 FIXED: Import CSV reads file via File.text() without EncodingType error"
+    - "Web export/import continues working unchanged"
+    - "Error handling preserved: catch blocks, Alert dialogs, error classification"
+    - "Debug logging preserved for device diagnostics"
+
+# =============================================================================
+# EXECUTION NOTES
+# =============================================================================
+
+execution_notes:
+  - >
+    Step 1 alone will cause TypeScript errors because FileSystem.* references
+    still exist in the code. This is expected. Steps 2 and 3 resolve them.
+  - >
+    Step 2 removes the cacheDirectory null guard and its console.warn.
+    This causes the test 'should contain cacheDirectory null guard' to fail.
+    Step 3 updates this test.
+  - >
+    Step 3 should be the final step that makes everything green:
+    TypeScript compiles, all tests pass.
+  - >
+    CRITICAL: file.write(csv) must NOT have await (synchronous method).
+    CRITICAL: await pickedFile.text() MUST have await (async method).
+  - >
+    The web code paths are NOT touched. They use browser APIs (Blob,
+    document.createElement) that work correctly and do not use expo-file-system.
+  - >
+    After completing all steps, verify with:
+      npx tsc --noEmit
+      npx vitest run src/__tests__/cr004-f005-csv-members-fixes.test.ts
+      npx vitest run

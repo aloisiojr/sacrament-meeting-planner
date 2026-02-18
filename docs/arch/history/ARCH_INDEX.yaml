@@ -1,0 +1,637 @@
+# =============================================================================
+# ARCH_INDEX.yaml
+# Architecture definition for CR-77 and CR-78 bugfixes
+# Generated: 2026-02-18
+# Phase: 2 of 2 - Corrections after manual testing feedback
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  change_requests: [CR-77, CR-78]
+  type: bugfix
+  phase: "2 of 2"
+  description: >
+    Post-manual-test corrections. Phase 1 fixes did not resolve the bugs:
+    export still fails silently, import still shows read error, parseCsv
+    is too restrictive for real data. This phase adds console.error logging,
+    removes overly strict validations, and simplifies parseCsv.
+  previous_phase: "1 of 1 (completed but bugs persist)"
+
+# =============================================================================
+# DESIGN DECISIONS (UPDATED FOR PHASE 2)
+# =============================================================================
+
+design_decisions:
+  - id: DD-01
+    title: Error codes in parseCsv (Option A - maintained from Phase 1)
+    decision: >
+      parseCsv returns structured error codes (CsvErrorCode values) in a 'code'
+      field on CsvValidationError. The presentation layer (members.tsx)
+      translates codes to user-facing messages via i18n t() function.
+    rationale:
+      - parseCsv stays a pure function with no i18n dependency
+      - Tests assert on stable error codes, not translatable strings
+      - Clean separation of concerns (validation logic vs presentation)
+    status: maintained
+
+  - id: DD-02
+    title: Do NOT validate CSV header column names (CHANGED from Phase 1)
+    decision: >
+      parseCsv does NOT validate header column names. It assumes positional
+      mapping: column 1 = name, column 2 = phone. The only header validation
+      kept is checking that the header has at least 2 columns.
+      SUPPORTED_CSV_HEADERS constant is REMOVED entirely.
+    rationale:
+      - The real user CSV has header "Nome,Telefone" which did not match
+        any of the SUPPORTED_CSV_HEADERS entries
+      - Validating column names is fragile and causes unnecessary failures
+      - Positional mapping is simple and works for all languages/formats
+    status: confirmed_by_user
+    phase_1_change: >
+      Phase 1 validated column names against SUPPORTED_CSV_HEADERS (3 languages).
+      Phase 2 removes this entirely per user decision.
+
+  - id: DD-03
+    title: Relaxed phone validation (CHANGED from Phase 1)
+    decision: >
+      Phone validation uses /^[+\d]*$/ (only '+' and digits allowed).
+      If the phone value does NOT match this regex, it is treated as empty
+      (phone = ""). Lines are NEVER rejected because of phone values.
+      INVALID_PHONE error code is REMOVED.
+    rationale:
+      - Real user data contains values like "VERIFICAR" in phone field
+      - Rejecting such lines prevents importing valid members
+      - The old regex /^\+\d{8,15}$/ was too strict (rejected valid phones
+        with >15 digits, or any non-standard format)
+    status: confirmed_by_user
+    phase_1_change: >
+      Phase 1 used /^\+\d{8,15}$/ and returned INVALID_PHONE on mismatch.
+      Phase 2 relaxes to /^[+\d]*$/ and treats non-matching as empty.
+
+  - id: DD-04
+    title: Allow duplicate phone numbers (NEW in Phase 2)
+    decision: >
+      Duplicate phone numbers are allowed. The seenPhones Set and
+      DUPLICATE_PHONE error code are REMOVED from parseCsv entirely.
+    rationale:
+      - Real user data has family members sharing the same phone
+      - Example: +5511959409095 appears on 4 different members
+      - Rejecting duplicates prevents importing valid members
+    status: confirmed_by_user
+
+  - id: DD-05
+    title: Mandatory console.error in all catch blocks (NEW in Phase 2)
+    decision: >
+      Every catch block in handleExport and handleImport MUST include
+      console.error with the full error object BEFORE any Alert.
+      Debug logs at key steps (before/after writeAsStringAsync,
+      before shareAsync, after DocumentPicker) are also required.
+    rationale:
+      - Phase 1 bugs persisted but NOTHING appeared in console
+      - The catches swallowed errors silently, making diagnosis impossible
+      - Adding console.error is the minimum needed to identify root causes
+    status: confirmed_by_user
+
+  - id: DD-06
+    title: Defensive cacheDirectory guard (maintained from Phase 1)
+    decision: >
+      Keep the guard for FileSystem.cacheDirectory !== null in handleExport.
+      Not the root cause but a safe defensive check.
+    rationale: Cheap, safe, and covers an edge case on some devices.
+    status: maintained
+
+# =============================================================================
+# TYPES AND CONTRACTS
+# =============================================================================
+
+types:
+  CsvErrorCode:
+    kind: enum (string union type)
+    location: src/lib/csvUtils.ts
+    values:
+      - EMPTY_FILE            # CSV content is empty after trimming
+      - INVALID_HEADER        # Header row has fewer than 2 columns
+      - INSUFFICIENT_COLUMNS  # Data row has fewer than 2 columns
+      - NAME_REQUIRED         # Name field is empty on a data row
+      - NO_DATA               # No valid data rows found after header
+    removed_values:
+      - UNRECOGNIZED_HEADER   # REMOVED - no longer validating column names
+      - INVALID_PHONE         # REMOVED - non-matching phones treated as empty
+      - DUPLICATE_PHONE       # REMOVED - duplicates now allowed
+
+  CsvValidationError:
+    kind: interface
+    location: src/lib/csvUtils.ts
+    fields:
+      line: number          # 0 = file-level, 1+ = row number
+      field: string         # 'file', 'header', 'format', 'Nome'
+      message: string       # English fallback message (kept for backward compat)
+      code: CsvErrorCode    # Stable error code for i18n translation (was optional, now always present)
+    removed_fields:
+      params: >
+        No longer needed. INVALID_PHONE and DUPLICATE_PHONE were the only
+        codes that used params, and both are removed. The remaining 5 codes
+        do not require interpolation parameters.
+
+  CsvHeaders:
+    kind: interface (MAINTAINED)
+    location: src/lib/csvUtils.ts
+    fields:
+      name: string          # Translated column header for name (e.g., "Nome")
+      phone: string         # Translated column header for phone (e.g., "Telefone Completo")
+    notes: Used by generateCsv for export. NOT used by parseCsv.
+
+# =============================================================================
+# FUNCTION CONTRACTS (UPDATED)
+# =============================================================================
+
+contracts:
+  # --- csvUtils.ts ---
+
+  parseCsv:
+    file: src/lib/csvUtils.ts
+    signature: "parseCsv(csvContent: string): CsvParseResult"
+    behavior:
+      - Strip UTF-8 BOM and trim content
+      - If empty -> error EMPTY_FILE, return
+      - Split into lines, parse header
+      - If header has < 2 columns -> error INVALID_HEADER, return
+      - SKIP header row (do NOT validate column names)
+      - For each data row:
+        - Skip empty lines
+        - If < 2 columns -> error INSUFFICIENT_COLUMNS, continue
+        - If name is empty -> error NAME_REQUIRED, continue
+        - Phone sanitization: if phone does NOT match /^[+\d]*$/, set phone = ""
+        - Push { full_name, phone } to members
+      - If errors exist -> return success=false with errors
+      - If no members -> error NO_DATA, return
+      - Return success=true with members
+    changes_from_phase_1:
+      removed:
+        - Header column name validation (lines 79-88 in current code)
+        - SUPPORTED_CSV_HEADERS usage
+        - Phone format regex /^\+\d{8,15}$/ with INVALID_PHONE error
+        - seenPhones Set and DUPLICATE_PHONE check
+        - params field from error objects
+      added:
+        - Phone sanitization: non-matching /^[+\d]*$/ -> treat as empty
+      kept:
+        - EMPTY_FILE check
+        - INVALID_HEADER check (column count < 2)
+        - INSUFFICIENT_COLUMNS check
+        - NAME_REQUIRED check
+        - NO_DATA check
+        - parseCsvLine helper (quoted field parsing)
+    notes:
+      - No signature change (backward compatible)
+      - parseCsv is now MORE permissive (accepts more CSVs than before)
+      - No CSV that was valid before becomes invalid
+
+  generateCsv:
+    file: src/lib/csvUtils.ts
+    signature: >
+      generateCsv(
+        members: Array<{ full_name: string; country_code: string; phone: string | null }>,
+        headers?: CsvHeaders
+      ): string
+    behavior: >
+      Generate CSV string with BOM, translated headers, and member data.
+      Uses CSV_DEFAULT_HEADERS when headers param is omitted.
+    changes_from_phase_1: none
+    notes:
+      - No changes in Phase 2. Already correct from Phase 1.
+      - Default headers = { name: 'Nome', phone: 'Telefone Completo' }
+
+  # --- members.tsx ---
+
+  handleExport:
+    file: src/app/(tabs)/settings/members.tsx
+    changes_from_phase_1:
+      added:
+        - "console.error('Export CSV failed:', err) in catch block BEFORE Alert"
+        - "console.log('[Export] fileUri:', fileUri) before writeAsStringAsync"
+        - "console.log('[Export] CSV length:', csv.length) after generateCsv"
+        - "console.log('[Export] File written successfully') after writeAsStringAsync"
+        - "console.log('[Export] Opening share sheet...') before shareAsync"
+        - "console.warn('[Export] cacheDirectory is null') in cacheDir guard"
+      kept:
+        - cacheDirectory guard
+        - Translated headers via t()
+        - Cancel detection (toLowerCase check)
+        - Alert for exportFailed
+
+  handleImport:
+    file: src/app/(tabs)/settings/members.tsx
+    changes_from_phase_1:
+      added:
+        - "console.error('Import CSV failed:', err) in catch block BEFORE Alert"
+        - "console.log('[Import] DocumentPicker result:', { uri, name, mimeType }) after getDocumentAsync"
+        - "console.log('[Import] File content length:', content.length) after readAsStringAsync"
+      kept:
+        - DocumentPicker cancel detection (result.canceled)
+        - Error differentiation (importReadError vs importFailed)
+        - Alert messages unchanged
+
+  translateCsvError:
+    file: src/app/(tabs)/settings/members.tsx
+    description: >
+      Local helper function that maps CsvErrorCode to a translated string
+      using the t() function. Updated to remove obsolete cases.
+    signature: >
+      function translateCsvError(
+        code: CsvErrorCode | undefined,
+        params: Record<string, string> | undefined,
+        t: TFunction
+      ): string
+    implementation:
+      EMPTY_FILE:           "t('members.csvErrorEmptyFile')"
+      INVALID_HEADER:       "t('members.csvErrorInvalidHeader')"
+      INSUFFICIENT_COLUMNS: "t('members.csvErrorInsufficientColumns')"
+      NAME_REQUIRED:        "t('members.csvErrorNameRequired')"
+      NO_DATA:              "t('members.csvErrorNoData')"
+      default:              "code ?? 'Unknown error'"
+    removed_cases:
+      - "UNRECOGNIZED_HEADER -> t('members.csvErrorUnrecognizedHeader')"
+      - "INVALID_PHONE -> t('members.csvErrorInvalidPhone', params)"
+      - "DUPLICATE_PHONE -> t('members.csvErrorDuplicatePhone', params)"
+    notes: >
+      The params parameter can be removed from the signature since no remaining
+      error code uses interpolation. However, keeping it is harmless and avoids
+      changing the call site in importMutation. Either approach is acceptable.
+
+# =============================================================================
+# CONSTANTS (UPDATED)
+# =============================================================================
+
+constants:
+  SUPPORTED_CSV_HEADERS:
+    file: src/lib/csvUtils.ts
+    status: REMOVED
+    reason: >
+      No longer needed. parseCsv does not validate column names.
+      The entire constant (NAME_COLUMNS and PHONE_COLUMNS arrays)
+      must be deleted from the file and its export removed.
+
+  CSV_DEFAULT_HEADERS:
+    file: src/lib/csvUtils.ts
+    status: MAINTAINED
+    value:
+      name: "Nome"
+      phone: "Telefone Completo"
+    notes: Used by generateCsv as fallback when no headers param is provided.
+
+# =============================================================================
+# I18N KEYS (UPDATED)
+# =============================================================================
+
+i18n_keys:
+  maintained:
+    members.csvHeaderName:
+      pt-BR: "Nome"
+      en: "Name"
+      es: "Nombre"
+
+    members.csvHeaderPhone:
+      pt-BR: "Telefone Completo"
+      en: "Full Phone"
+      es: "Telefono Completo"
+
+    members.csvErrorEmptyFile:
+      pt-BR: "O arquivo CSV esta vazio."
+      en: "The CSV file is empty."
+      es: "El archivo CSV esta vacio."
+
+    members.csvErrorInvalidHeader:
+      pt-BR: "Cabecalho do CSV invalido. Sao necessarias pelo menos 2 colunas."
+      en: "Invalid CSV header. At least 2 columns are required."
+      es: "Encabezado del CSV invalido. Se necesitan al menos 2 columnas."
+
+    members.csvErrorInsufficientColumns:
+      pt-BR: "A linha deve ter pelo menos 2 colunas."
+      en: "Row must have at least 2 columns."
+      es: "La fila debe tener al menos 2 columnas."
+
+    members.csvErrorNameRequired:
+      pt-BR: "O nome e obrigatorio."
+      en: "Name is required."
+      es: "El nombre es obligatorio."
+
+    members.csvErrorNoData:
+      pt-BR: "O arquivo CSV nao contem linhas de dados validas."
+      en: "The CSV file contains no valid data rows."
+      es: "El archivo CSV no contiene filas de datos validas."
+
+    members.importReadError:
+      pt-BR: "Falha ao ler o arquivo. Verifique se o arquivo nao esta corrompido e tente novamente."
+      en: "Failed to read the file. Check that the file is not corrupted and try again."
+      es: "Error al leer el archivo. Verifique que el archivo no este danado e intentelo de nuevo."
+
+  removed:
+    members.csvErrorUnrecognizedHeader:
+      reason: "UNRECOGNIZED_HEADER error code removed; column names no longer validated"
+
+    members.csvErrorInvalidPhone:
+      reason: "INVALID_PHONE error code removed; non-matching phones treated as empty"
+
+    members.csvErrorDuplicatePhone:
+      reason: "DUPLICATE_PHONE error code removed; duplicates now allowed"
+
+# =============================================================================
+# FILES TO MODIFY (SPECIFIC CHANGES)
+# =============================================================================
+
+files_to_modify:
+  - path: src/lib/csvUtils.ts
+    changes:
+      - section: "CsvErrorCode type (lines 11-19)"
+        action: MODIFY
+        detail: >
+          Remove 'UNRECOGNIZED_HEADER', 'INVALID_PHONE', 'DUPLICATE_PHONE'.
+          Final type: 'EMPTY_FILE' | 'INVALID_HEADER' | 'INSUFFICIENT_COLUMNS'
+          | 'NAME_REQUIRED' | 'NO_DATA'.
+
+      - section: "CsvValidationError interface (lines 36-42)"
+        action: MODIFY
+        detail: >
+          Remove 'params?' field. The 'code' field can remain optional
+          (code?: CsvErrorCode) for backward compatibility, but in practice
+          all error objects will always have a code value.
+
+      - section: "SUPPORTED_CSV_HEADERS constant (lines 26-29)"
+        action: DELETE
+        detail: >
+          Remove the entire SUPPORTED_CSV_HEADERS constant and its export.
+
+      - section: "parseCsv - header name validation (lines 79-88)"
+        action: DELETE
+        detail: >
+          Remove the block that validates column names against
+          SUPPORTED_CSV_HEADERS. Keep only the headerParts.length < 2 check.
+          After removing, the flow goes directly from header column count
+          check to data row parsing.
+
+      - section: "parseCsv - phone validation (lines 111-121)"
+        action: REPLACE
+        detail: >
+          Remove regex /^\+\d{8,15}$/ and INVALID_PHONE error.
+          Replace with phone sanitization:
+            if (fullPhone && !/^[+\d]*$/.test(fullPhone)) {
+              fullPhone = '';  // treat non-numeric/plus as empty
+            }
+          Note: need to change 'const fullPhone' to 'let fullPhone' on line 103.
+
+      - section: "parseCsv - duplicate phone check (lines 58, 123-137)"
+        action: DELETE
+        detail: >
+          Remove 'const seenPhones = new Set<string>()' (line 58).
+          Remove the duplicate phone check block (lines 123-133).
+          Remove seenPhones.add(fullPhone) (lines 135-137).
+
+  - path: src/app/(tabs)/settings/members.tsx
+    changes:
+      - section: "handleExport catch block (lines 403-407)"
+        action: MODIFY
+        detail: >
+          Add console.error BEFORE the message check:
+            catch (err: any) {
+              console.error('Export CSV failed:', err);
+              const msg = ...
+          Add debug logs throughout handleExport:
+            console.log('[Export] CSV length:', csv.length);
+            console.log('[Export] fileUri:', fileUri);
+            console.log('[Export] File written successfully');
+            console.log('[Export] Opening share sheet...');
+          Add console.warn in cacheDirectory guard:
+            console.warn('[Export] cacheDirectory is null');
+
+      - section: "handleImport catch block (lines 487-494)"
+        action: MODIFY
+        detail: >
+          Add console.error BEFORE the message check:
+            catch (err: any) {
+              console.error('Import CSV failed:', err);
+              const msg = ...
+          Add debug log after DocumentPicker result:
+            console.log('[Import] DocumentPicker result:', {
+              uri: result.assets[0].uri,
+              name: result.assets[0].name,
+              mimeType: result.assets[0].mimeType,
+            });
+          Add debug log after readAsStringAsync:
+            console.log('[Import] File content length:', content.length);
+
+      - section: "translateCsvError (lines 253-269)"
+        action: MODIFY
+        detail: >
+          Remove cases for 'UNRECOGNIZED_HEADER', 'INVALID_PHONE',
+          'DUPLICATE_PHONE'. Keep only: EMPTY_FILE, INVALID_HEADER,
+          INSUFFICIENT_COLUMNS, NAME_REQUIRED, NO_DATA.
+
+  - path: src/i18n/locales/pt-BR.json
+    changes:
+      - section: "members object"
+        action: DELETE keys
+        detail: >
+          Remove: csvErrorUnrecognizedHeader, csvErrorInvalidPhone,
+          csvErrorDuplicatePhone. Keep all other CSV/import/export keys.
+
+  - path: src/i18n/locales/en.json
+    changes:
+      - section: "members object"
+        action: DELETE keys
+        detail: >
+          Remove: csvErrorUnrecognizedHeader, csvErrorInvalidPhone,
+          csvErrorDuplicatePhone. Keep all other CSV/import/export keys.
+
+  - path: src/i18n/locales/es.json
+    changes:
+      - section: "members object"
+        action: DELETE keys
+        detail: >
+          Remove: csvErrorUnrecognizedHeader, csvErrorInvalidPhone,
+          csvErrorDuplicatePhone. Keep all other CSV/import/export keys.
+
+  - path: src/__tests__/cr004-f005-csv-members-fixes.test.ts
+    changes:
+      - section: "Tests referencing removed error codes"
+        action: MODIFY
+        detail: >
+          Remove or convert tests that assert UNRECOGNIZED_HEADER,
+          INVALID_PHONE, DUPLICATE_PHONE errors. Convert them to
+          acceptance tests that verify these scenarios now SUCCEED:
+          - Header "Nome,Telefone" -> parseCsv returns success=true
+          - Header "Foo,Bar" -> parseCsv returns success=true
+          - Phone "VERIFICAR" -> member imported with phone=""
+          - Phone "(11) 9999-9999" -> member imported with phone=""
+          - Duplicate phones -> all members imported
+          - Phone with >15 digits -> accepted
+
+      - section: "New test cases"
+        action: ADD
+        detail: >
+          Add tests for Phase 2 scenarios:
+          - parseCsv with real user CSV format (header "Nome,Telefone")
+          - parseCsv with arbitrary header text ("Foo,Bar")
+          - Phone sanitization (/^[+\d]*$/ rule)
+          - Duplicate phones accepted
+          - Variable-length phones accepted
+          - All 5 remaining error codes still work correctly
+
+# =============================================================================
+# COMPONENT DIAGRAM (UPDATED)
+# =============================================================================
+#
+# +--------------------------+     +-----------------------+
+# |   members.tsx            |     |   csvUtils.ts         |
+# |                          |     |   (pure functions)    |
+# |  handleExport()          |---->|   generateCsv()       |
+# |    - guard cacheDir      |     |     + headers param   |
+# |    - pass translated     |     |                       |
+# |      headers via t()     |     |   parseCsv()          |
+# |    - console.error [NEW] |<----|     + 5 error codes   |
+# |    - debug logs    [NEW] |     |     + positional cols  |
+# |                          |     |     + relaxed phone   |
+# |  importMutation()        |     |                       |
+# |    - translateCsvError() |     |   CSV_DEFAULT_HEADERS  |
+# |    - map code -> t()     |     |     (const, maintained)|
+# |    - 5 cases only  [CHG] |     |                       |
+# |                          |     |   [REMOVED]:          |
+# |  handleImport()          |     |   SUPPORTED_CSV_       |
+# |    - console.error [NEW] |     |   HEADERS              |
+# |    - debug logs    [NEW] |     +-----------------------+
+# |    - differentiate       |
+# |      error types         |
+# +--------------------------+
+#          |
+#          | uses t()
+#          v
+# +--------------------------+
+# |   i18n locales           |
+# |   pt-BR.json             |
+# |   en.json                |
+# |   es.json                |
+# |   - 3 keys REMOVED       |
+# |   - 8 keys maintained    |
+# +--------------------------+
+#
+# =============================================================================
+# DATA FLOW (UPDATED)
+# =============================================================================
+#
+# EXPORT FLOW (CR-77 fix):
+#   1. handleExport() called
+#   2. generateCsv(members, { name: t(...), phone: t(...) })
+#   3. console.log('[Export] CSV length:', csv.length)          [NEW]
+#   4. Guard: check cacheDirectory != null
+#      - If null: console.warn + Alert + return                [NEW]
+#   5. console.log('[Export] fileUri:', fileUri)                [NEW]
+#   6. FileSystem.writeAsStringAsync(fileUri, csv)
+#   7. console.log('[Export] File written successfully')        [NEW]
+#   8. console.log('[Export] Opening share sheet...')           [NEW]
+#   9. Sharing.shareAsync(fileUri)
+#  10. Cancel detection (existing, unchanged)
+#  11. catch: console.error('Export CSV failed:', err)          [NEW]
+#      then Alert if not cancelled
+#
+# IMPORT FLOW (CR-78 fix):
+#   1. handleImport() called
+#   2. DocumentPicker.getDocumentAsync(...)
+#   3. console.log('[Import] DocumentPicker result:', ...)      [NEW]
+#   4. FileSystem.readAsStringAsync(uri)
+#   5. console.log('[Import] File content length:', ...)        [NEW]
+#   6. parseCsv(content):
+#      a. Strip BOM, trim
+#      b. Check empty -> EMPTY_FILE
+#      c. Check header columns >= 2 -> INVALID_HEADER
+#      d. (NO column name validation)                          [REMOVED]
+#      e. For each data row:
+#         - Check columns >= 2 -> INSUFFICIENT_COLUMNS
+#         - Check name not empty -> NAME_REQUIRED
+#         - Sanitize phone: if !/^[+\d]*$/ -> phone=""        [NEW]
+#         - (NO duplicate check)                               [REMOVED]
+#         - Push member
+#      f. Check members > 0 -> NO_DATA
+#   7. translateCsvError maps 5 codes to i18n keys             [SIMPLIFIED]
+#   8. Display translated error messages to user
+#   9. On success: call RPC import_members (unchanged)
+#  10. catch: console.error('Import CSV failed:', err)         [NEW]
+#      then Alert with appropriate error key
+#
+# =============================================================================
+# RISK ASSESSMENT (UPDATED)
+# =============================================================================
+
+risks:
+  - id: RISK-01
+    description: >
+      Tests that assert on UNRECOGNIZED_HEADER, INVALID_PHONE, and
+      DUPLICATE_PHONE error codes will fail.
+    mitigation: >
+      Update tests in the same PR: remove/convert those test cases to
+      acceptance tests that verify the scenarios now succeed.
+
+  - id: RISK-02
+    description: >
+      Adding console.error could expose sensitive data in production logs
+      (member names, phone numbers in error messages).
+    mitigation: >
+      The console.error only logs the error object itself, not the CSV
+      content. Debug logs show URI paths and content length, not content.
+      This is acceptable for a ward-internal app with no public exposure.
+
+  - id: RISK-03
+    description: >
+      Removing phone validation means invalid phone formats are stored
+      in the database (e.g., phones with only digits, no '+' prefix).
+    mitigation: >
+      The phone field is sanitized to empty if it doesn't match /^[+\d]*$/.
+      Phones that DO match (like "+5511999999999") are stored as-is.
+      The splitPhoneNumber function already handles edge cases.
+      WhatsApp behavior without phone is out of scope (future CR).
+
+  - id: RISK-04
+    description: >
+      Removing the params field from CsvValidationError could break
+      any code that reads e.params.
+    mitigation: >
+      The only consumer of params was translateCsvError in members.tsx,
+      which is also being updated. The params field was optional (?),
+      so removing it is safe. The call site can keep passing e.params
+      (which will be undefined) harmlessly.
+
+# =============================================================================
+# SUMMARY OF CHANGES
+# =============================================================================
+#
+# REMOVALS (simplifications):
+#   - SUPPORTED_CSV_HEADERS constant from csvUtils.ts
+#   - CsvErrorCode values: UNRECOGNIZED_HEADER, INVALID_PHONE, DUPLICATE_PHONE
+#   - Header column name validation in parseCsv
+#   - Phone format regex /^\+\d{8,15}$/ in parseCsv
+#   - seenPhones Set and duplicate phone check in parseCsv
+#   - 3 i18n keys from all 3 locales (csvErrorUnrecognizedHeader,
+#     csvErrorInvalidPhone, csvErrorDuplicatePhone)
+#   - 3 cases from translateCsvError switch statement
+#   - params field from CsvValidationError (optional, can keep if easier)
+#
+# ADDITIONS (logging):
+#   - console.error('Export CSV failed:', err) in handleExport catch
+#   - console.error('Import CSV failed:', err) in handleImport catch
+#   - Debug console.log at key steps in handleExport
+#   - Debug console.log at key steps in handleImport
+#
+# MODIFICATIONS:
+#   - Phone validation: /^\+\d{8,15}$/ -> sanitize with /^[+\d]*$/
+#   - CsvErrorCode: 8 values -> 5 values
+#   - translateCsvError: 8 cases -> 5 cases
+#   - parseCsv: more permissive (accepts more CSVs, rejects fewer)
+#
+# NO CHANGES:
+#   - generateCsv (already correct)
+#   - CsvHeaders interface (maintained for export)
+#   - CSV_DEFAULT_HEADERS (maintained for export)
+#   - splitPhoneNumber (unchanged)
+#   - parseCsvLine (unchanged)
+#   - escapeCsvField (unchanged)
+#   - importMutation.mutationFn logic (unchanged, just fewer error codes)
+#   - RPC import_members call (unchanged)

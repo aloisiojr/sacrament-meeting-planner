@@ -1,0 +1,348 @@
+# =============================================================================
+# PLAN_CONSOLIDATED.yaml
+# Fonte unica de verdade dos planos de implementacao
+# Gerado: 2026-02-18
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  last_updated: "2026-02-18"
+  total_phases: 6
+  total_cr_plans: 16
+  phases_completed: true
+  cr_plans_completed: true
+  pending_crs_without_plan: [80]
+
+# =============================================================================
+# Fases do projeto original
+# =============================================================================
+
+project_phases:
+  - id: PHASE-01
+    title: "Foundation (DB + Auth + Permissions + i18n + Theme)"
+    status: completed
+    features_covered: [F001, F002, F020, F021, F023]
+    total_steps: 12
+    summary: >
+      Configuracao inicial do projeto: Expo SDK 54, Supabase com schema completo
+      (15 tabelas), RLS ward-scoped, AuthContext com sessao e permissoes,
+      auto-registro e convite via deep link, react-i18next com 3 idiomas
+      (pt-BR, en, es), tema escuro/claro com persistencia, app shell com
+      4 tabs (Home, Agenda, Speeches, Settings), date utils e tipos TypeScript.
+
+  - id: PHASE-02
+    title: "Core Data (Ward, Members, Topics, Sunday Types, Actors, Hymns)"
+    status: completed
+    features_covered: [F003, F005, F006, F007, F013, F014, F015]
+    total_steps: 12
+    summary: >
+      CRUD de membros com busca accent-insensitive e auto-save, gestao de
+      temas (ward topics + colecoes gerais com toggle), auto-atribuicao de
+      tipos de domingo com regras de testemunho e conferencia geral, atores
+      com papeis (presidir, dirigir, reconhecer, musica), seletores de hinos
+      com filtro sacramental, seletores de oracoes com nome customizado,
+      e scripts CLI de importacao de hinos e colecoes gerais.
+
+  - id: PHASE-03
+    title: "Speech Lifecycle (Speech CRUD, Home tab, WhatsApp)"
+    status: completed
+    features_covered: [F008, F009, F010]
+    total_steps: 11
+    summary: >
+      Gestao completa de discursos: scroll infinito de domingos (12 meses
+      passado + 12 futuro), SundayCards expansiveis com LEDs 3D animados
+      por status, atribuicao de oradores e temas com snapshots, ciclo de
+      vida de status (nao-designado -> designado -> convidado -> confirmado
+      / desistiu), aba Home com 3 proximos domingos, secao de proximas
+      designacoes (Bispado), gestao de convites (Secretario), e integracao
+      WhatsApp com template e URL wa.me.
+
+  - id: PHASE-04
+    title: "Agenda & Presentation Mode"
+    status: completed
+    features_covered: [F012, F016]
+    total_steps: 10
+    summary: >
+      Formulario de agenda da reuniao com 4 secoes (boas-vindas, designacoes,
+      discursos, ultimo discurso), formulario especial para reunioes nao-discursos
+      (testemunho, conferencia de ala, primaria), designacao de oradores via
+      agenda (com status auto-confirmado), modo apresentacao full-screen com
+      accordion cards (1 expandido por vez), botao "Iniciar Reuniao" visivel
+      apenas aos domingos, e troca de idioma com gestao de colecoes.
+
+  - id: PHASE-05
+    title: "Infrastructure (Sync, Offline, Notifications)"
+    status: completed
+    features_covered: [F011, F017, F022]
+    total_steps: 8
+    summary: >
+      Sincronizacao realtime via Supabase Realtime com polling fallback
+      (2.5s quando WebSocket desconecta), push notifications com fila no DB
+      (triggers por evento de discurso), lembretes semanais aos domingos 18h,
+      processador de notificacoes via Edge Function cron, registro de tokens
+      Expo Push, suporte offline com fila de mutacoes (AsyncStorage, max 100),
+      UI otimista, e guard para operacoes que requerem conexao.
+
+  - id: PHASE-06
+    title: "Admin & Polish (Users, Activity Log, CSV, Template, Hardening)"
+    status: completed
+    features_covered: [F004, F018, F019, F024]
+    total_steps: 9
+    summary: >
+      Gestao de usuarios via Edge Functions (convite, listagem, troca de
+      papel, exclusao), tela de usuarios com card expansivel, log de
+      atividades com busca e paginacao infinita, retencao de 2 anos,
+      import/export CSV de membros (overwrite total com validacao),
+      editor de template WhatsApp com preview em tempo real, tela de
+      settings completa com todas as opcoes por papel, error boundaries
+      por modulo, e confirmacao de saida.
+
+# =============================================================================
+# Planos de Change Requests
+# =============================================================================
+
+cr_plans:
+  - id: PLAN_CR001
+    title: "Change Requests Batch 1"
+    status: completed
+    crs_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    total_steps: 14
+    summary: >
+      Correcoes criticas de UI e bugs: fix do enum de sunday types (remocao
+      de fast_sunday/special_program/no_meeting, adicao de primary_presentation
+      e other com razao customizada), migracao de DB, atualizacao de tipos e
+      i18n, titulo na Home, texto traduzido de excecoes, labels de discursos,
+      fix de idioma na criacao de ala, ocultar discursos para domingos
+      nao-discursos, scroll de temas, fix de flash na navegacao settings,
+      telas de tema e sobre, fix de agenda vazia no modo apresentacao.
+
+  - id: PLAN_CR002
+    title: "Change Requests Batch 2"
+    status: completed
+    crs_covered: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    total_steps: 18
+    summary: >
+      Fix do idioma padrao ao iniciar app, rename do template WhatsApp,
+      fix do template default, placeholders clicaveis, layout do template,
+      botoes de voltar em 3 telas, log legivel com datas por extenso,
+      fix do dropdown de sunday type (bug critico de revert), scroll
+      inicial da aba Agenda, redesign completo de atores (remocao da
+      tela Settings, bottom-sheet 2/3, CRUD inline, remocao de "Ator"
+      da UI), fix de input com letras perdidas (DebouncedTextInput),
+      dialogo de hinos em 2/3, renomeacao de secoes da agenda com
+      secoes dinamicas por tipo de reuniao, permissao de Secretario
+      para ver Usuarios, label de apresentacao especial.
+
+  - id: PLAN_CR003
+    title: "Spec Corrections Batch 3"
+    status: completed
+    crs_covered: [31, 34, 36, 37]
+    total_steps: 5
+    type: documentation-only
+    summary: >
+      Correcoes de inconsistencias na documentacao: fix de ASM-009
+      (Secretario pode designar via Agenda), atualizacao de RF-22 e
+      secao 7.13.4 para refletir redesign de atores (papel inferido
+      do campo, sem checkboxes), adicao de regra de debounce 500ms
+      para auto-save em campos de texto, atualizacao de permissoes
+      do Secretario para gestao de usuarios em secoes 4.2 e 7.8.
+
+  - id: PLAN_CR4_F001
+    title: "Documentation Updates"
+    status: completed
+    crs_covered: [44, 45, 46, 47, 48, 49, 50]
+    total_steps: 7
+    type: documentation-only
+    summary: >
+      Atualizacao de documentos ARCH e SPEC desatualizados: ARCH_M002
+      (custom_reason, enum speeches, contracts mobile), ARCH_M006/M007
+      (integracao sync/offline), ARCH_M008 (sub-telas settings),
+      ARCH_M004 (formatFullDate no PresentationMode), fix de
+      inconsistencias em ARCH_CR3_F029 e F027, atualizacao de
+      PRODUCT_SPECIFICATION e SPEC.final.md com labels, enum, e
+      permissoes corrigidos.
+
+  - id: PLAN_CR4_F002
+    title: "Speeches Persistence & Sunday Type Revert Fix"
+    status: completed
+    crs_covered: [56, 68]
+    total_steps: 3
+    summary: >
+      Fix critico de persistencia de discursos: migracao DB para
+      adicionar 'speeches' ao CHECK constraint, remocao do filtro
+      que bloqueava insercao de 'speeches' no DB, mudanca de
+      useRemoveSundayException para UPSERT ao inves de DELETE,
+      fix do bug de revert do tipo de domingo (race condition
+      entre optimistic update e refetch).
+
+  - id: PLAN_CR4_F003
+    title: "Infrastructure Integration (Sync, Offline, Notifications)"
+    status: completed
+    crs_covered: [52, 53]
+    total_steps: 2
+    summary: >
+      Conexao de codigo morto de infraestrutura ao app: ativacao
+      de useConnection, useRealtimeSync e OfflineBanner no layout
+      de tabs, registro de push tokens e handler de notificacoes.
+
+  - id: PLAN_CR4_F004
+    title: "Error Handling Overhaul"
+    status: completed
+    crs_covered: [57, 58, 59, 60, 61]
+    total_steps: 7
+    summary: >
+      Overhaul completo de tratamento de erros: configuracao do
+      QueryClient com retry policies (queries 2x, mutations 0x,
+      401/403 sem retry), onError com Alert.alert i18n em todas
+      as 17+ mutations, internacionalizacao do ErrorBoundary com
+      suporte a tema, QueryErrorView reutilizavel com botao retry
+      nas 3 tabs principais, error boundaries granulares por tab
+      e componentes criticos.
+
+  - id: PLAN_CR4_F005
+    title: "CSV & Members Screen Fixes"
+    status: completed
+    crs_covered: [54, 55, 66]
+    total_steps: 5
+    summary: >
+      Fix de export CSV (cancel do share sheet nao mostra erro),
+      import com string i18n ao inves de hardcoded, spacer no
+      header quando add button oculto, export habilitado com lista
+      vazia (gera CSV apenas com headers), validacao de import
+      com numeros de linha e campos especificos.
+
+  - id: PLAN_CR4_F006
+    title: "UI/UX Small Fixes"
+    status: completed
+    crs_covered: [62, 63, 65, 69, 70]
+    total_steps: 6
+    summary: >
+      Tela Sobre com disclaimer e nome do autor corrigido, fix
+      do template WhatsApp default, toggle de tema com feedback
+      instantaneo (AsyncStorage async), atualizacao de labels
+      da agenda (Dirigindo, Apoios e Agradecimentos, etc.),
+      aumento de icones de editar/deletar atores.
+
+  - id: PLAN_CR4_F007
+    title: "Auth Fixes: Users + Forgot Password"
+    status: completed
+    crs_covered: [64, 67]
+    total_steps: 7
+    summary: >
+      Fix da tela de usuarios para Secretario (debug de Edge Function
+      e erro i18n), implementacao do fluxo "Esqueci minha senha" com
+      tela dedicada (email input, supabase.auth.resetPasswordForEmail,
+      loading state, validacao, feedback de sucesso/erro, i18n 3 idiomas,
+      suporte a dark/light theme).
+
+  - id: PLAN_CR4_F008
+    title: "Agenda & Actors Enhancements"
+    status: completed
+    crs_covered: [71, 72, 73, 74, 75]
+    total_steps: 10
+    summary: >
+      Remocao da regra auto-presidir (can_conduct nao implica mais
+      can_preside), auto-criacao de ator para membros do bispado
+      convidados, campo Reconhecendo usando ActorSelector ao inves
+      de texto, nomes customizados para oracoes via MemberSelectorModal,
+      domingos com conferencia geral/estaca aparecem como cards
+      nao-expansiveis na aba Agenda.
+
+  - id: PLAN_CR4_F009
+    title: "Import Hymns CLI Script"
+    status: completed
+    crs_covered: [51]
+    total_steps: 1
+    summary: >
+      Script CLI executavel via 'pnpm import-hymns <file.csv>' para
+      importar hinario: leitura de CSV (Lingua, Numero, Titulo,
+      Sacramental S/N), validacao com erros por linha, upsert por
+      (language, number), sumario de importacao.
+
+  - id: project_CR77_CR78_CR82
+    title: "Regressions Fix (expo-file-system v19 + GestureHandler)"
+    status: completed
+    crs_covered: [77, 78, 82]
+    total_steps: 3
+    summary: >
+      Migracao para nova API do expo-file-system v19 (File/Paths API
+      ao inves de cacheDirectory/EncodingType), fix de export CSV
+      com lista vazia (cacheDirectory null), fix de import CSV
+      (EncodingType undefined), remocao de constraint unique no
+      phone de membros, adicao de GestureHandlerRootView como wrapper
+      no root layout.
+
+  - id: PLAN_CR76
+    title: "Fix Users Screen HTTP 401 (Regression CR-64)"
+    status: pending
+    crs_covered: [76]
+    total_steps: 2
+    summary: >
+      Remocao do header Authorization manual em callEdgeFunction
+      (getAccessToken com JWT stale/expirado), delegando auth ao
+      SDK do Supabase que gerencia tokens automaticamente via
+      autoRefreshToken. Preservacao da logica de extracao de erro
+      via error.context.json().
+
+  - id: PLAN_CR79
+    title: "Back Button on Users Screen"
+    status: pending
+    crs_covered: [79]
+    total_steps: 3
+    summary: >
+      Adicao de botao de voltar na tela de Usuarios seguindo o
+      padrao das demais sub-telas de Settings (Pressable com
+      router.back(), layout 3 elementos: voltar | titulo | invite),
+      ajuste de fontSize do titulo para consistencia.
+
+  - id: PLAN_CR81
+    title: "User Name Field"
+    status: pending
+    crs_covered: [81]
+    total_steps: 13
+    summary: >
+      Campo Nome obrigatorio para usuarios: migracao DB (user_name
+      em activity_log, RPC list_ward_users com full_name), atualizacao
+      das Edge Functions (register-first-user com auto-ator para
+      bispado, register-invited-user, novo update-user-name),
+      AuthContext expondo userName, inputs de nome nas telas de
+      registro, exibicao e edicao na tela de usuarios, pipeline
+      de activity log com user_name em 6 hooks.
+
+# =============================================================================
+# CRs pendentes sem plano
+# =============================================================================
+
+pending_without_plan:
+  - cr_id: 80
+    description: "Textos explicativos na tela de Membros (i18n pt/en/es)"
+
+# =============================================================================
+# CRs pendentes com plano (nao implementados ainda)
+# =============================================================================
+
+pending_with_plan:
+  - cr_id: 76
+    plan_id: PLAN_CR76
+    description: "Edge Function erro na tela de Usuarios (regressao CR-64) - HTTP 401"
+  - cr_id: 79
+    plan_id: PLAN_CR79
+    description: "Tela de Usuarios sem botao de voltar"
+  - cr_id: 81
+    plan_id: PLAN_CR81
+    description: "Campo Nome para usuario (auto-ator, logs, tela usuarios)"
+
+# =============================================================================
+# Convencoes de implementacao
+# =============================================================================
+
+conventions:
+  commits: "Conventional Commits (feat:, fix:, chore:, test:, docs:)"
+  testing: "Vitest + React Testing Library, testes junto com codigo"
+  branching: "master para desenvolvimento, main para releases"
+  code_style: "TypeScript strict, ESLint, Prettier"
+  plan_structure: "1 commit por step, steps com done_when, covers, risks"
+  snapshot_pattern: "ADR-003: dados de oradores e temas copiados como snapshot"
+  offline_strategy: "ADR-008: last-write-wins com fila de mutacoes"
+  error_handling: "ADR-022: extracao de erro via error.context.json()"
+  auth_pattern: "ADR-023: SDK gerencia auth automaticamente, sem header manual"

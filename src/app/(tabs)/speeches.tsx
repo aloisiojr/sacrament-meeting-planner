@@ -35,7 +35,6 @@ import {
   groupSpeechesBySunday,
 } from '../../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
-import { isExcludedFromAgenda } from '../../hooks/useAgenda';
 import { toISODateString } from '../../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../../types/database';
 
@@ -274,7 +273,7 @@ function SpeechesTabContent() {
           typeDisabled={!canWriteSundayType}
         >
           {isExpanded &&
-            !(exception && isExcludedFromAgenda(exception.reason)) &&
+            (!exception || exception.reason === 'speeches') &&
             [1, 2, 3].map((pos) => {
               const speech = speechesForDay.find((s) => s.position === pos) ?? null;
               return (

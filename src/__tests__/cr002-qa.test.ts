@@ -418,15 +418,14 @@ describe('CR-25: Non-excluded exception types show speech slots', () => {
     expect(isExcludedFromAgenda('stake_conference')).toBe(true);
   });
 
-  it('speeches.tsx should use isExcludedFromAgenda, not check for !exception', async () => {
+  it('speeches.tsx should use direct type check, not isExcludedFromAgenda', async () => {
     const fs = await import('fs');
     const content = fs.readFileSync(
       new URL('../app/(tabs)/speeches.tsx', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('isExcludedFromAgenda');
-    // Should NOT have the old `!exception` check for showing children
-    expect(content).not.toContain('!exception &&');
+    expect(content).not.toContain('isExcludedFromAgenda');
+    expect(content).toContain("exception.reason === 'speeches'");
   });
 });
 

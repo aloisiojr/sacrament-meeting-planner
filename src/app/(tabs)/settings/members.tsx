@@ -440,8 +440,8 @@ export default function MembersScreen() {
     },
   });
 
-  // CSV Import handler
-  const handleImport = useCallback(async () => {
+  // CSV Import - actual file picker logic
+  const performImport = useCallback(async () => {
     if (Platform.OS === 'web') {
       // Web: file input
       const input = document.createElement('input');
@@ -482,6 +482,18 @@ export default function MembersScreen() {
       }
     }
   }, [importMutation, t]);
+
+  // CSV Import handler with confirmation dialog
+  const handleImport = useCallback(() => {
+    Alert.alert(
+      t('members.importConfirmTitle'),
+      t('members.importConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.confirm'), style: 'default', onPress: () => performImport() },
+      ]
+    );
+  }, [t, performImport]);
 
   const canImport = hasPermission('member:import');
 

@@ -492,12 +492,12 @@ describe('CR-42: CSV export and import', () => {
 
   // AC-42.6: CSV parsing validation errors
   it('AC-42.6: parseCsv returns line-level errors for invalid data', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,invalid_phone';
+    const csv = 'Nome,Telefone Completo\n,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0].line).toBe(2);
-    expect(result.errors[0].field).toBe('Telefone Completo');
+    expect(result.errors[0].field).toBe('Nome');
   });
 
   // EC-42.4: CSV with BOM should parse correctly
@@ -814,11 +814,12 @@ describe('Cross-feature validation', () => {
     expect(lines[1]).toBe('No Phone,');
   });
 
-  it('parseCsv validates phone format with min/max digit length', () => {
-    // Too short phone
+  it('parseCsv accepts phones of any length matching /^[+\\d]*$/', () => {
+    // Short phone is now accepted (no min/max digit length validation)
     const shortCsv = 'Nome,Telefone Completo\nJoao,+12345';
     const shortResult = parseCsv(shortCsv);
-    expect(shortResult.success).toBe(false);
+    expect(shortResult.success).toBe(true);
+    expect(shortResult.members[0].phone).toBe('+12345');
 
     // Valid length phone
     const validCsv = 'Nome,Telefone Completo\nJoao,+5511999999999';

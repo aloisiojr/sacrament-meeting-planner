@@ -1,0 +1,501 @@
+type: spec
+version: 1
+bug_id: BUG-401
+related_cr: CR-76
+category: BUG
+priority: CRITICAL
+
+title: >
+  [BUG] Systemic HTTP 401 (Unauthorized) on ALL authenticated Supabase Edge
+  Functions -- JWT not sent or session not available when functions.invoke() runs
+
+description: >
+  After the CR-76 fix (commit 9a3f81a) correctly removed the manual Authorization
+  header override from callEdgeFunction in users.tsx, ALL Edge Functions that require
+  JWT authentication continue returning HTTP 401 (Unauthorized). The ONLY Edge
+  Function that works is process-notifications, which does NOT require JWT auth
+  (it uses the service_role_key as a cron job). The two registration functions
+  (register-first-user, register-invited-user) also do NOT require JWT auth and
+  are not affected. This is a systemic authentication failure affecting all 4
+  authenticated Edge Functions: list-users, create-invitation, update-user-role,
+  and delete-user.
+
+symptom:
+  what_user_sees: >
+    Every Edge Function call that requires JWT auth returns HTTP 401 (Unauthorized).
+    The Users screen shows an error message. Invitation creation, role changes, and
+    user deletion all fail with the same 401 error.
+  pattern: |
+    - list-users: 401 (requires JWT) -- FAILS
+    - create-invitation: 401 (requires JWT) -- FAILS
+    - update-user-role: 401 (requires JWT) -- FAILS
+    - delete-user: 401 (requires JWT) -- FAILS
+    - register-first-user: NO JWT required -- WORKS
+    - register-invited-user: NO JWT required -- WORKS
+    - process-notifications: NO JWT required (cron/service_role) -- WORKS (1 call in 24h, 200 OK)
+  error_code: "HTTP 401 Unauthorized"
+  error_source: "Edge Function server-side: supabaseAdmin.auth.getUser(token) fails"
+
+cr76_status:
+  fix_applied: true
+  commit: "9a3f81a"
+  what_was_done: >
+    Removed getAccessToken() function and manual Authorization header override
+    from callEdgeFunction in users.tsx. Now uses supabase.functions.invoke(name,
+    { body }) without custom headers, relying on the SDK's automatic auth.
+  why_bug_persists: >
+    The CR-76 fix was CORRECT -- removing the manual header override was necessary.
+    But the bug persists because the underlying problem is that the SDK's automatic
+    auth mechanism is NOT successfully attaching a valid JWT. The root cause is
+    deeper than the manual header override.
+
+root_cause_analysis:
+  sdk_auth_chain:
+    step_1_invoke_call:
+      code: "supabase.functions.invoke('list-users', { body })"
+      what_happens: >
+        Accessing supabase.functions triggers the getter in SupabaseClient.ts:197
+        which creates a NEW FunctionsClient with customFetch = this.fetch (which
+        is fetchWithAuth). The invoke() call builds headers and calls this.fetch().
+
+    step_2_fetchWithAuth:
+      code: "fetchWithAuth(supabaseKey, _getAccessToken, fetch)"
+      file: "node_modules/@supabase/supabase-js/src/lib/fetch.ts:14-36"
+      what_happens: >
+        fetchWithAuth calls getAccessToken() to get the JWT. If the result is null,
+        it falls back to supabaseKey (the ANON key). It then sets the Authorization
+        header ONLY if not already present in the request headers.
+
+    step_3_getAccessToken:
+      code: "_getAccessToken() -> this.auth.getSession() -> session?.access_token ?? this.supabaseKey"
+      file: "node_modules/@supabase/supabase-js/src/SupabaseClient.ts:339-347"
+      what_happens: >
+        Calls this.auth.getSession() which reads from storage (resilientStorage /
+        AsyncStorage). If session exists and is not expired, returns it. If expired,
+        attempts token refresh using refresh_token. If NO session in storage, returns
+        { session: null }. When session is null, _getAccessToken falls back to
+        this.supabaseKey (ANON key).
+
+    step_4_fallback_to_anon_key:
+      what_happens: >
+        When getSession() returns null (no session in storage), the SDK sends
+        Authorization: Bearer <ANON_KEY>. The ANON key is NOT a valid user JWT.
+        The Edge Function calls supabaseAdmin.auth.getUser(<ANON_KEY>) which
+        fails because the ANON key is not a user token. Result: HTTP 401.
+
+  primary_hypotheses:
+    - id: H-1
+      title: "Session not available in storage when functions.invoke() runs"
+      description: >
+        The Supabase auth session is not found in AsyncStorage when
+        _getAccessToken() -> getSession() runs. This causes the SDK to fall
+        back to the ANON key as the Authorization bearer token. The edge
+        function receives the ANON key, tries to validate it as a JWT via
+        auth.getUser(), and gets 401 because the ANON key is not a user JWT.
+      possible_sub_causes:
+        - id: H-1a
+          title: "resilientStorage silently failing"
+          description: >
+            The resilientStorage wrapper in supabase.ts catches AsyncStorage
+            errors and returns null. If AsyncStorage is unavailable or fails
+            (e.g., on web, on Android cold start, or due to a native module
+            issue), getItem() returns null, the auth module sees no session,
+            and the SDK falls back to the ANON key.
+          evidence: "resilientStorage.getItem() catches ALL errors and returns null"
+          likelihood: MEDIUM
+
+        - id: H-1b
+          title: "Session loading race condition"
+          description: >
+            The AuthContext calls supabase.auth.getSession() during mount (line 71-74)
+            but the Users screen may call functions.invoke() before the session is
+            fully loaded from AsyncStorage. The auth module's initializePromise
+            should prevent this, but if the session hydration is slow or the
+            component mounts before auth is ready, functions.invoke() could run
+            with no session.
+          evidence: >
+            AuthContext sets loading=true initially and only sets loading=false after
+            getSession() resolves. But callEdgeFunction is triggered by useQuery
+            which runs immediately on mount, independent of the loading state.
+          likelihood: MEDIUM-HIGH
+
+        - id: H-1c
+          title: "Session never persisted after login"
+          description: >
+            If the user logged in via register-first-user or register-invited-user,
+            those edge functions return a session object which the client must
+            explicitly set. If the session was not properly persisted to
+            AsyncStorage after initial login, subsequent getSession() calls
+            return null.
+          evidence: "Needs investigation of how session is set after registration"
+          likelihood: MEDIUM
+
+    - id: H-2
+      title: "Refresh token expired or invalidated"
+      description: >
+        The user's refresh token has expired (default 7 days of inactivity in
+        Supabase) or was invalidated server-side. getSession() detects the
+        expired access token, attempts _callRefreshToken(), which fails. The
+        session is removed from storage, and subsequent calls fall back to
+        the ANON key.
+      evidence: "Would explain persistent 401s across ALL authenticated calls"
+      likelihood: MEDIUM
+
+    - id: H-3
+      title: "Environment variables not configured (placeholder values)"
+      description: >
+        EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY are not
+        set in the runtime environment, causing the client to use placeholder
+        values ('https://placeholder.supabase.co' and 'placeholder-key').
+        All API calls would fail.
+      evidence: >
+        supabase.ts:5-6 has fallback to placeholder values. A console.warn
+        is emitted if the URL is placeholder, but the app continues running.
+        However, process-notifications works (it runs server-side with env vars),
+        so this only affects the CLIENT-SIDE calls.
+      likelihood: LOW (app likely configured since user can log in)
+
+    - id: H-4
+      title: "Platform-specific storage issue (web vs native)"
+      description: >
+        AsyncStorage behavior differs between React Native (native) and web.
+        On web, AsyncStorage may use localStorage. If the platform detection
+        or storage implementation has issues, sessions may not persist.
+      evidence: "Platform import exists in supabase.ts but is unused in current code"
+      likelihood: LOW
+
+  confirmed_server_side_code_correct:
+    description: >
+      All Edge Function code is correct. The auth validation pattern
+      (extract Authorization header -> getUser(token) -> check role/ward_id)
+      is implemented correctly. The 401 occurs because the TOKEN received
+      is invalid (ANON key instead of user JWT), not because of a server-side
+      logic error.
+    functions_verified:
+      - list-users/index.ts
+      - create-invitation/index.ts
+      - update-user-role/index.ts
+      - delete-user/index.ts
+
+investigation_steps:
+  - id: INV-1
+    title: "Add diagnostic logging to verify what token is being sent"
+    description: >
+      Add temporary console.log in callEdgeFunction (users.tsx) to log:
+      1. The current session state: await supabase.auth.getSession()
+      2. Whether session is null, has an access_token, and the token expiry
+      This will confirm whether the SDK has a valid session when invoke() runs.
+    priority: FIRST
+
+  - id: INV-2
+    title: "Add diagnostic logging to verify resilientStorage health"
+    description: >
+      Add temporary console.log in resilientStorage.getItem to log what
+      keys are being read and whether values are returned or null. This will
+      confirm whether AsyncStorage is working and the session data is present.
+    priority: SECOND
+
+  - id: INV-3
+    title: "Check if callEdgeFunction runs before session is loaded"
+    description: >
+      Verify that the Users screen waits for AuthContext.loading to be false
+      before rendering and triggering useQuery. If the query runs before the
+      session is loaded, invoke() will have no session and send the ANON key.
+    priority: THIRD
+
+  - id: INV-4
+    title: "Check the session flow after registration/login"
+    description: >
+      Trace what happens after the user registers or logs in. Verify that the
+      session returned by the edge function or signInWithPassword is properly
+      stored in AsyncStorage via the auth module.
+    priority: FOURTH
+
+  - id: INV-5
+    title: "Test with explicit getSession() check before invoke()"
+    description: >
+      Add a getSession() call before invoke() in callEdgeFunction to verify
+      the session state. If session is null, attempt to re-authenticate or
+      show an appropriate error.
+    priority: FIFTH
+
+scope:
+  in:
+    - "Diagnose why the SDK's automatic auth sends invalid tokens (ANON key) to Edge Functions"
+    - "Fix the root cause so that supabase.functions.invoke() sends valid user JWTs"
+    - "Verify all 4 authenticated Edge Functions work after the fix"
+    - "Ensure session persistence and recovery work correctly with resilientStorage"
+    - "Handle the edge case where session is not available (redirect to login, show error)"
+  out:
+    - "Changes to Edge Function server-side code (already verified correct)"
+    - "Reverting the CR-76 fix (it was correct)"
+    - "Changes to the Supabase SDK itself"
+    - "New features unrelated to authentication"
+    - "Changes to process-notifications, register-first-user, register-invited-user"
+
+personas:
+  - id: P-1
+    description: "Secretary -- ward user with secretary role who manages the ward"
+  - id: P-2
+    description: "Bishopric member -- should also be able to access Users screen and manage ward"
+
+user_stories:
+  - id: US-1
+    as_a: "Secretary or Bishopric member"
+    i_want: "Edge Functions that require authentication to receive a valid JWT automatically"
+    so_that: "I can manage users, send invitations, change roles, and delete users without 401 errors"
+
+acceptance_criteria:
+  # Diagnostic: Understand what is happening
+  - id: AC-1
+    given: "The callEdgeFunction wrapper in users.tsx"
+    when: "Calling any authenticated Edge Function"
+    then: >
+      The supabase SDK sends a valid user JWT (not the ANON key) as the
+      Authorization bearer token. The Edge Function receives and validates
+      the JWT successfully.
+    priority: must
+
+  # Session availability
+  - id: AC-2
+    given: "A user who has logged in or registered"
+    when: "The app loads and the user navigates to the Users screen"
+    then: >
+      The Supabase auth session is available via getSession() and contains
+      a valid (or refreshable) access_token. The session persists across
+      app restarts.
+    priority: must
+
+  # No fallback to ANON key for authenticated calls
+  - id: AC-3
+    given: "supabase.functions.invoke() is called for an authenticated Edge Function"
+    when: "The SDK's fetchWithAuth runs _getAccessToken()"
+    then: >
+      If no valid session is available, the call should NOT silently fall
+      back to the ANON key. Instead, it should either:
+      (a) refresh the token successfully and send the fresh JWT, or
+      (b) throw/return an error indicating the user needs to re-authenticate.
+    priority: must
+
+  # All authenticated EFs work
+  - id: AC-4
+    given: "A logged-in secretary or bishopric user"
+    when: "Calling list-users, create-invitation, update-user-role, or delete-user"
+    then: "All Edge Functions return successful responses (200/201), not 401"
+    priority: must
+
+  # Session recovery after app restart
+  - id: AC-5
+    given: "A user who logged in, then closed and reopened the app"
+    when: "The app loads"
+    then: >
+      The session is recovered from AsyncStorage (via resilientStorage),
+      and authenticated Edge Function calls work without re-authentication.
+    priority: must
+
+  # Error handling for expired/invalid sessions
+  - id: AC-6
+    given: "A user whose session cannot be recovered or refreshed"
+    when: "They navigate to the Users screen"
+    then: >
+      The user sees a meaningful error message and is redirected to the
+      login screen, rather than seeing a generic 401 error.
+    priority: should
+
+  # No race condition
+  - id: AC-7
+    given: "The app is freshly loaded and the auth session is being hydrated from storage"
+    when: "A component tries to call an authenticated Edge Function"
+    then: >
+      The call waits for the session to be fully loaded before executing,
+      or the component does not render until auth loading is complete.
+    priority: must
+
+edge_cases:
+  - id: EC-1
+    case: "AsyncStorage is temporarily unavailable (Android cold start)"
+    expected: >
+      The app should handle the null session gracefully. If the session
+      cannot be loaded from storage, the app should show a loading state
+      and retry, or redirect to login if the session is definitively lost.
+
+  - id: EC-2
+    case: "Refresh token has expired (user inactive for >7 days)"
+    expected: >
+      The SDK's _callRefreshToken fails. The session is cleared. The user
+      is redirected to the login screen. Authenticated Edge Function calls
+      should not be attempted.
+
+  - id: EC-3
+    case: "User just registered via register-first-user"
+    expected: >
+      The session returned by the Edge Function is properly stored and
+      available for subsequent authenticated calls. The user can immediately
+      navigate to Users screen and see themselves.
+
+  - id: EC-4
+    case: "App is offline or has intermittent connectivity"
+    expected: >
+      Edge Function calls fail with a network error (not 401). The user
+      sees a retry button. When connectivity is restored, calls succeed
+      with the valid session token.
+
+  - id: EC-5
+    case: "Multiple Edge Function calls in rapid succession"
+    expected: >
+      The SDK handles concurrent getSession() / token refresh calls
+      correctly without race conditions. The lock mechanism in the auth
+      module prevents concurrent refresh attempts.
+
+files_likely_impacted:
+  investigation:
+    - path: "src/app/(tabs)/settings/users.tsx"
+      action: "ADD_DIAGNOSTICS_THEN_FIX"
+      details: >
+        Add temporary logging to callEdgeFunction to capture session state
+        before invoke(). After root cause is confirmed, apply the fix.
+
+    - path: "src/lib/supabase.ts"
+      action: "INVESTIGATE_THEN_POSSIBLY_MODIFY"
+      details: >
+        Investigate resilientStorage behavior. Add logging to getItem to
+        verify session data is present. May need to add retry logic or
+        better error handling.
+
+    - path: "src/contexts/AuthContext.tsx"
+      action: "INVESTIGATE_THEN_POSSIBLY_MODIFY"
+      details: >
+        Verify that components wait for loading=false before making
+        authenticated Edge Function calls. May need to expose session
+        state or add guards.
+
+  potential_fix_files:
+    - path: "src/app/(tabs)/settings/users.tsx"
+      action: "MODIFY"
+      details: >
+        May need to add session validation before Edge Function calls.
+        Could add a pre-check: get session, verify it has an access_token,
+        and only then call invoke(). If no session, show re-auth prompt.
+
+    - path: "src/lib/supabase.ts"
+      action: "POSSIBLY_MODIFY"
+      details: >
+        May need to improve resilientStorage to not silently swallow errors,
+        or add session health monitoring.
+
+    - path: "src/contexts/AuthContext.tsx"
+      action: "POSSIBLY_MODIFY"
+      details: >
+        May need to add session health monitoring that detects when the
+        session becomes invalid and triggers re-authentication.
+
+  server_side: []
+  # No server-side changes needed. Edge Function code is verified correct.
+
+assumptions:
+  - id: A-1
+    description: >
+      The supabase.functions.invoke() method uses fetchWithAuth internally,
+      which calls _getAccessToken() -> getSession() to obtain the JWT. If
+      getSession() returns null, the SDK falls back to the ANON key.
+    confirmed: true
+    evidence: >
+      Verified by reading the SDK source code:
+      - SupabaseClient.ts:197-201 (functions getter)
+      - SupabaseClient.ts:160 (this.fetch = fetchWithAuth)
+      - fetch.ts:14-36 (fetchWithAuth implementation)
+      - SupabaseClient.ts:339-347 (_getAccessToken fallback to supabaseKey)
+
+  - id: A-2
+    description: >
+      The ANON key is NOT a valid user JWT. When sent as a Bearer token
+      to an Edge Function that calls supabaseAdmin.auth.getUser(token),
+      it causes a 401 error because getUser() expects a user JWT, not
+      an API key.
+    confirmed: true
+    evidence: >
+      The ANON key is a project-level API key used for row-level security
+      and authorization at the Supabase proxy level. It is not a user-specific
+      JWT that can be validated by auth.getUser().
+
+  - id: A-3
+    description: >
+      getSession() in @supabase/auth-js does attempt to refresh expired
+      tokens via _callRefreshToken() when autoRefreshToken is true.
+    confirmed: true
+    evidence: >
+      Verified in GoTrueClient.ts:1658-1702. __loadSession() checks expiry
+      with EXPIRY_MARGIN_MS (90 seconds) and calls _callRefreshToken() if
+      the session has expired.
+
+  - id: A-4
+    description: >
+      process-notifications works because it uses service_role_key directly
+      (server-side) and does NOT require client-side JWT auth.
+    confirmed: true
+    evidence: "process-notifications/index.ts:151-152 uses SUPABASE_SERVICE_ROLE_KEY"
+
+  - id: A-5
+    description: >
+      register-first-user and register-invited-user work because they do
+      NOT read the Authorization header for authentication. They accept
+      unauthenticated requests.
+    confirmed: true
+    evidence: >
+      register-first-user/index.ts has no authHeader check.
+      register-invited-user/index.ts has no authHeader check.
+
+open_questions:
+  - id: Q-1
+    question: >
+      Is the user testing on a device (native) or on web? AsyncStorage
+      behavior differs significantly between platforms.
+    importance: HIGH
+    proposed_action: "Ask the user for platform details"
+
+  - id: Q-2
+    question: >
+      Does the user's Supabase project have a custom JWT expiry time
+      configured? (Default is 3600 seconds = 1 hour)
+    importance: MEDIUM
+    proposed_action: "Check Supabase project settings"
+
+  - id: Q-3
+    question: >
+      How long has it been since the user last successfully logged in?
+      If the refresh token has expired (default 7 days of inactivity),
+      no token refresh is possible.
+    importance: HIGH
+    proposed_action: "Ask the user or check Supabase auth logs"
+
+  - id: Q-4
+    question: >
+      After registering or logging in, does the app properly set the
+      session in the Supabase auth module? The register-first-user EF
+      returns a session, but does the client persist it?
+    importance: HIGH
+    proposed_action: "Trace the registration flow to verify session handling"
+
+  - id: Q-5
+    question: >
+      Can we see the actual Authorization header received by the Edge
+      Function? If it is the ANON key, this confirms H-1 (no session
+      in storage). If it is an expired JWT, this confirms H-2 (refresh
+      failed).
+    importance: CRITICAL
+    proposed_action: >
+      Add console.log in an Edge Function to log the first few chars of
+      the received token, or check Supabase Edge Function logs.
+
+definition_of_done:
+  - "Root cause of systemic 401 is identified and confirmed"
+  - "Fix is applied that ensures valid user JWTs are sent for all authenticated EF calls"
+  - "list-users Edge Function returns 200 with users list for secretary/bishopric"
+  - "create-invitation Edge Function returns 201 for secretary/bishopric"
+  - "update-user-role Edge Function returns 200 for valid role change requests"
+  - "delete-user Edge Function returns 200 for valid delete requests"
+  - "Session persists across app restarts (AsyncStorage)"
+  - "No silent fallback to ANON key for authenticated calls"
+  - "User is redirected to login if session is definitively lost"
+  - "No regressions in register-first-user, register-invited-user, process-notifications"
+  - "Diagnostic logging is removed after fix is confirmed"

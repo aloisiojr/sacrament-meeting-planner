@@ -217,9 +217,11 @@ export function splitPhoneNumber(fullPhone: string): { countryCode: string; phon
  * Format: "Nome,Telefone Completo"
  */
 export function generateCsv(
-  members: Array<{ full_name: string; country_code: string; phone: string | null }>
+  members: Array<{ full_name: string; country_code: string; phone: string | null }>,
+  headers?: CsvHeaders
 ): string {
-  const header = 'Nome,Telefone Completo';
+  const h = headers ?? CSV_DEFAULT_HEADERS;
+  const header = `${h.name},${h.phone}`;
   const rows = members.map((m) => {
     const name = escapeCsvField(m.full_name);
     const fullPhone = m.phone ? `${m.country_code}${m.phone}` : '';

@@ -26,6 +26,8 @@ export const topicKeys = {
     ['topics', 'collections', wardId, language] as const,
   collectionConfig: (wardId: string) =>
     ['topics', 'collectionConfig', wardId] as const,
+  collectionTopics: (collectionId: string) =>
+    ['topics', 'collectionTopics', collectionId] as const,
 };
 
 // --- Utilities ---
@@ -220,6 +222,27 @@ export function useCollections(language: string) {
       const inactive = data.filter((c) => !c.active);
       return [...active, ...inactive];
     },
+  });
+}
+
+/**
+ * Fetch topics for a specific general collection (lazy, on-demand).
+ * Used by F034 when a collection row is expanded in the Topics screen.
+ */
+export function useCollectionTopics(collectionId: string | null) {
+  return useQuery({
+    queryKey: topicKeys.collectionTopics(collectionId ?? ''),
+    queryFn: async (): Promise<GeneralTopic[]> => {
+      const { data, error } = await supabase
+        .from('general_topics')
+        .select('*')
+        .eq('collection_id', collectionId!)
+        .order('title', { ascending: true });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!collectionId,
   });
 }
 

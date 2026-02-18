@@ -363,54 +363,55 @@ export default function TopicsScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Header with back button (fixed) */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button">
+            <Text style={[styles.backButton, { color: colors.primary }]}>
+              {t('common.back')}
+            </Text>
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('topics.title')}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        {/* Screen description (fixed) */}
+        <Text style={[styles.description, { color: colors.textSecondary }]}>
+          {t('topics.description')}
+        </Text>
+
+        {/* Search field for Ward Topics (fixed) */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            {t('topics.wardTopics')}
+          </Text>
+          {canWrite && (
+            <Pressable
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={handleAdd}
+              accessibilityRole="button"
+              accessibilityLabel={t('topics.addTopic')}
+            >
+              <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
+            </Pressable>
+          )}
+        </View>
+
+        <View style={styles.searchContainer}>
+          <SearchInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('common.search')}
+          />
+        </View>
+
+        {/* Scrollable content */}
         <ScrollView
           style={styles.flex}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => setActiveSwipeId(null)}
         >
-          {/* Header with back button */}
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()} accessibilityRole="button">
-              <Text style={[styles.backButton, { color: colors.primary }]}>
-                {t('common.back')}
-              </Text>
-            </Pressable>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('topics.title')}</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          {/* Screen description */}
-          <Text style={[styles.description, { color: colors.textSecondary }]}>
-            {t('topics.description')}
-          </Text>
-
           {/* Ward Topics Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                {t('topics.wardTopics')}
-              </Text>
-              {canWrite && (
-                <Pressable
-                  style={[styles.addButton, { backgroundColor: colors.primary }]}
-                  onPress={handleAdd}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('topics.addTopic')}
-                >
-                  <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* Search field for Ward Topics */}
-            <View style={styles.searchContainer}>
-              <SearchInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder={t('common.search')}
-              />
-            </View>
-
             {isAdding && (
               <TopicEditor onSave={handleSaveNew} onCancel={() => setIsAdding(false)} colors={colors} />
             )}

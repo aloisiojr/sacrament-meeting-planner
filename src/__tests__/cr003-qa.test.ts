@@ -568,8 +568,9 @@ describe('CR-42: CSV export and import', () => {
     const content = readSourceFile('app/(tabs)/settings/members.tsx');
     // Export button should NOT have a disabled guard for empty members
     expect(content).not.toContain("disabled={!members || members.length === 0}");
-    // Export uses generateCsv(members ?? []) which handles empty arrays
-    expect(content).toContain("generateCsv(members ?? [])");
+    // Export uses generateCsv(members ?? [], { ... }) which handles empty arrays
+    // CR-77/CR-78: now passes translated headers as second arg
+    expect(content).toContain("generateCsv(members ?? []");
   });
 
   // CSV edge cases

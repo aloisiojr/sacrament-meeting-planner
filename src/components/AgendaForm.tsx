@@ -9,6 +9,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   Switch,
   Pressable,
@@ -21,11 +22,9 @@ import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
-import { useSpeeches, useAssignSpeaker, useLazyCreateSpeeches } from '../hooks/useSpeeches';
+import { useSpeeches } from '../hooks/useSpeeches';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
-import { useMembers } from '../hooks/useMembers';
 import { getCurrentLanguage } from '../i18n';
-import { MemberSelectorModal } from './MemberSelectorModal';
 import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
@@ -34,7 +33,6 @@ import type {
   SundayAgenda,
   MeetingActor,
   Hymn,
-  Member,
   SundayExceptionReason,
   Speech,
 } from '../types/database';
@@ -65,20 +63,15 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   const locale = getCurrentLanguage();
 
   const isObserver = !hasPermission('agenda:write');
-  const canAssignSpeaker = hasPermission('agenda:assign_speaker');
 
   const { data: agenda } = useAgenda(sundayDate);
   const updateAgenda = useUpdateAgenda();
   const { data: speeches } = useSpeeches({ start: sundayDate, end: sundayDate });
-  const assignSpeaker = useAssignSpeaker();
-  const lazyCreateSpeeches = useLazyCreateSpeeches();
 
-  const { data: members } = useMembers();
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
 
   const [selectorModal, setSelectorModal] = useState<SelectorState | null>(null);
-  const [speakerModalPosition, setSpeakerModalPosition] = useState<number | null>(null);
 
   const isSpecial = isSpecialMeeting(exceptionReason);
 
@@ -127,41 +120,6 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       });
     },
     [agenda, isObserver, updateAgenda]
-  );
-
-  // Handle speaker assignment from agenda (status = assigned_confirmed)
-  const handleSpeakerAssign = useCallback(
-    (position: number, member: Member) => {
-      if (!canAssignSpeaker) return;
-      const speech = getSpeech(position);
-      if (!speech) {
-        // Need to lazy-create speeches first
-        lazyCreateSpeeches.mutate(sundayDate, {
-          onSuccess: (created) => {
-            const newSpeech = created.find((s) => s.position === position);
-            if (newSpeech) {
-              assignSpeaker.mutate({
-                speechId: newSpeech.id,
-                memberId: member.id,
-                speakerName: member.full_name,
-                speakerPhone: member.phone ?? null,
-                status: 'assigned_confirmed',
-              });
-            }
-          },
-        });
-        return;
-      }
-      assignSpeaker.mutate({
-        speechId: speech.id,
-        memberId: member.id,
-        speakerName: member.full_name,
-        speakerPhone: member.phone ?? null,
-        status: 'assigned_confirmed',
-      });
-      setSpeakerModalPosition(null);
-    },
-    [canAssignSpeaker, getSpeech, assignSpeaker, lazyCreateSpeeches, sundayDate]
   );
 
   // Handle prayer selection (member or custom name)
@@ -366,16 +324,18 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <SpeakerField
             label={`1\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(1)?.speaker_name ?? ''}
-            onPress={() => canAssignSpeaker && !isObserver && setSpeakerModalPosition(1)}
-            disabled={isObserver || !canAssignSpeaker}
+            overrideName={agenda.speaker_1_override ?? null}
+            onEditOverride={(name) => updateField('speaker_1_override', name)}
+            disabled={isObserver}
             colors={colors}
           />
 
           <SpeakerField
             label={`2\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(2)?.speaker_name ?? ''}
-            onPress={() => canAssignSpeaker && !isObserver && setSpeakerModalPosition(2)}
-            disabled={isObserver || !canAssignSpeaker}
+            overrideName={agenda.speaker_2_override ?? null}
+            onEditOverride={(name) => updateField('speaker_2_override', name)}
+            disabled={isObserver}
             colors={colors}
           />
 
@@ -417,8 +377,9 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <SpeakerField
             label={`3\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(3)?.speaker_name ?? ''}
-            onPress={() => canAssignSpeaker && !isObserver && setSpeakerModalPosition(3)}
-            disabled={isObserver || !canAssignSpeaker}
+            overrideName={agenda.speaker_3_override ?? null}
+            onEditOverride={(name) => updateField('speaker_3_override', name)}
+            disabled={isObserver}
             colors={colors}
           />
         </>
@@ -544,18 +505,6 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           disabled={isObserver}
         />
       )}
-
-      {/* Speaker selector modal */}
-      {speakerModalPosition !== null && (
-        <MemberSelectorModal
-          visible
-          onSelect={(member) => {
-            handleSpeakerAssign(speakerModalPosition, member);
-            setSpeakerModalPosition(null);
-          }}
-          onClose={() => setSpeakerModalPosition(null)}
-        />
-      )}
     </View>
   );
 });
@@ -622,25 +571,86 @@ function SelectorField({
 function SpeakerField({
   label,
   speakerName,
-  onPress,
+  overrideName,
+  onEditOverride,
   disabled,
   colors,
 }: {
   label: string;
   speakerName: string;
-  onPress: () => void;
+  overrideName: string | null;
+  onEditOverride: (name: string | null) => void;
   disabled: boolean;
   colors: ThemeColors;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const displayName = overrideName ?? speakerName;
+  const hasOverride = overrideName !== null && overrideName !== speakerName;
+  const hasSpeaker = !!speakerName;
+
+  const handleStartEdit = useCallback(() => {
+    setEditValue(displayName);
+    setIsEditing(true);
+  }, [displayName]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = editValue.trim();
+    if (!trimmed || trimmed === speakerName) {
+      // Empty or same as original -> clear override
+      onEditOverride(null);
+    } else {
+      onEditOverride(trimmed);
+    }
+    setIsEditing(false);
+  }, [editValue, speakerName, onEditOverride]);
+
+  const handleRevert = useCallback(() => {
+    onEditOverride(null);
+    setIsEditing(false);
+  }, [onEditOverride]);
+
   return (
     <FieldRow label={label} colors={colors}>
-      <SelectorField
-        value={speakerName}
-        placeholder={label}
-        onPress={onPress}
-        disabled={disabled}
-        colors={colors}
-      />
+      {isEditing ? (
+        <View style={styles.speakerEditRow}>
+          <TextInput
+            style={[styles.speakerEditInput, { color: colors.text, borderColor: colors.border }]}
+            value={editValue}
+            onChangeText={setEditValue}
+            autoFocus
+            onSubmitEditing={handleSave}
+            onBlur={handleSave}
+            returnKeyType="done"
+          />
+          <Pressable hitSlop={12} onPress={handleRevert} style={styles.speakerIconBtn}>
+            <Text style={[styles.speakerIcon, { color: colors.error }]}>{'\u2716'}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={[styles.speakerReadRow, { borderColor: colors.border }]}>
+          <Text
+            style={[
+              styles.speakerReadText,
+              { color: displayName ? colors.text : colors.textTertiary },
+            ]}
+            numberOfLines={1}
+          >
+            {displayName || label}
+          </Text>
+          {hasSpeaker && !disabled && (
+            <Pressable hitSlop={12} onPress={handleStartEdit} style={styles.speakerIconBtn}>
+              <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
+            </Pressable>
+          )}
+          {hasOverride && !disabled && (
+            <Pressable hitSlop={12} onPress={handleRevert} style={styles.speakerIconBtn}>
+              <Text style={[styles.speakerIcon, { color: colors.error }]}>{'\u2716'}</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </FieldRow>
   );
 }
@@ -863,5 +873,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 15,
     marginBottom: 8,
+  },
+  speakerEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  speakerEditInput: {
+    flex: 1,
+    height: 36,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    fontSize: 15,
+  },
+  speakerReadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  speakerReadText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  speakerIconBtn: {
+    paddingHorizontal: 4,
+  },
+  speakerIcon: {
+    fontSize: 18,
   },
 });

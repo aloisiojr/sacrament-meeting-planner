@@ -294,6 +294,7 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       const phoneError = result.errors.find((e) => e.field === 'Telefone Completo');
       expect(phoneError).toBeDefined();
       expect(phoneError!.message).toContain('Invalid phone format');
+      expect(phoneError!.code).toBe('INVALID_PHONE');
     });
 
     it('should detect missing name', () => {
@@ -310,18 +311,21 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       expect(result.success).toBe(false);
       const dupError = result.errors.find((e) => e.message.includes('Duplicate'));
       expect(dupError).toBeDefined();
+      expect(dupError!.code).toBe('DUPLICATE_PHONE');
     });
 
     it('should reject file with no data rows', () => {
       const csv = 'Nome,Telefone Completo\n';
       const result = parseCsv(csv);
       expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('NO_DATA');
     });
 
     it('should reject empty file', () => {
       const csv = '';
       const result = parseCsv(csv);
       expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('EMPTY_FILE');
     });
 
     it('should reject CSV with fewer than 2 columns in header', () => {
@@ -329,6 +333,7 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       const result = parseCsv(csv);
       expect(result.success).toBe(false);
       expect(result.errors[0].field).toBe('header');
+      expect(result.errors[0].code).toBe('INVALID_HEADER');
     });
 
     it('should accept valid CSV successfully', () => {
@@ -459,5 +464,172 @@ describe('CSV round-trip: export then import', () => {
 
     expect(parsed.success).toBe(true);
     expect(parsed.members[0].full_name).toBe('Jose, Maria e Filhos');
+  });
+});
+
+// =====================================================================
+// CR-77/CR-78: Error codes, multi-language headers, and i18n
+// =====================================================================
+describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
+  describe('parseCsv multi-language header support', () => {
+    it('should accept pt-BR headers', () => {
+      const result = parseCsv('Nome,Telefone Completo\nMaria,+5511999999999');
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept English headers', () => {
+      const result = parseCsv('Name,Full Phone\nMaria,+5511999999999');
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept Spanish headers', () => {
+      const result = parseCsv('Nombre,Telefono Completo\nMaria,+5511999999999');
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject unrecognized headers', () => {
+      const result = parseCsv('Foo,Bar\nMaria,+5511999999999');
+      expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('UNRECOGNIZED_HEADER');
+    });
+
+    it('should validate headers case-insensitively', () => {
+      const result = parseCsv('nome,telefone completo\nMaria,+5511999999999');
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('generateCsv with custom headers', () => {
+    it('should use custom English headers', () => {
+      const result = generateCsv([], { name: 'Name', phone: 'Full Phone' });
+      const content = result.replace(/^\uFEFF/, '').trim();
+      expect(content).toBe('Name,Full Phone');
+    });
+
+    it('should use custom Spanish headers with data', () => {
+      const members = [
+        { full_name: 'Maria', country_code: '+55', phone: '11999999999' },
+      ];
+      const result = generateCsv(members, { name: 'Nombre', phone: 'Telefono Completo' });
+      const lines = result.replace(/^\uFEFF/, '').trim().split('\n');
+      expect(lines[0]).toBe('Nombre,Telefono Completo');
+    });
+
+    it('should default to pt-BR headers when none provided', () => {
+      const result = generateCsv([]);
+      expect(result).toContain('Nome,Telefone Completo');
+    });
+  });
+
+  describe('parseCsv error params', () => {
+    it('INVALID_PHONE error should include params.phone', () => {
+      const result = parseCsv('Nome,Telefone Completo\nJohn,12345');
+      expect(result.success).toBe(false);
+      const err = result.errors.find((e) => e.code === 'INVALID_PHONE');
+      expect(err).toBeDefined();
+      expect(err!.params).toBeDefined();
+      expect(err!.params!.phone).toBe('12345');
+    });
+
+    it('DUPLICATE_PHONE error should include params.phone', () => {
+      const result = parseCsv('Nome,Telefone Completo\nJohn,+5511999999999\nJane,+5511999999999');
+      expect(result.success).toBe(false);
+      const err = result.errors.find((e) => e.code === 'DUPLICATE_PHONE');
+      expect(err).toBeDefined();
+      expect(err!.params).toBeDefined();
+      expect(err!.params!.phone).toBe('+5511999999999');
+    });
+  });
+
+  describe('i18n keys for CSV errors and headers exist in all locales', () => {
+    const newKeys = [
+      'csvHeaderName',
+      'csvHeaderPhone',
+      'csvErrorEmptyFile',
+      'csvErrorInvalidHeader',
+      'csvErrorUnrecognizedHeader',
+      'csvErrorInsufficientColumns',
+      'csvErrorNameRequired',
+      'csvErrorInvalidPhone',
+      'csvErrorDuplicatePhone',
+      'csvErrorNoData',
+      'importReadError',
+    ];
+
+    for (const key of newKeys) {
+      it(`pt-BR should have members.${key}`, () => {
+        expect(typeof ptBR.members[key]).toBe('string');
+        expect(ptBR.members[key].length).toBeGreaterThan(0);
+      });
+
+      it(`en should have members.${key}`, () => {
+        expect(typeof en.members[key]).toBe('string');
+        expect(en.members[key].length).toBeGreaterThan(0);
+      });
+
+      it(`es should have members.${key}`, () => {
+        expect(typeof es.members[key]).toBe('string');
+        expect(es.members[key].length).toBeGreaterThan(0);
+      });
+    }
+
+    it('csvErrorInvalidPhone keys should have {{phone}} placeholder in all locales', () => {
+      expect(ptBR.members.csvErrorInvalidPhone).toContain('{{phone}}');
+      expect(en.members.csvErrorInvalidPhone).toContain('{{phone}}');
+      expect(es.members.csvErrorInvalidPhone).toContain('{{phone}}');
+    });
+
+    it('csvErrorDuplicatePhone keys should have {{phone}} placeholder in all locales', () => {
+      expect(ptBR.members.csvErrorDuplicatePhone).toContain('{{phone}}');
+      expect(en.members.csvErrorDuplicatePhone).toContain('{{phone}}');
+      expect(es.members.csvErrorDuplicatePhone).toContain('{{phone}}');
+    });
+  });
+
+  describe('Round-trip with multi-language headers', () => {
+    const members = [
+      { full_name: 'Maria Silva', country_code: '+55', phone: '11999999999' },
+      { full_name: 'John Doe', country_code: '+1', phone: '2125551234' },
+    ];
+
+    it('should round-trip with English headers', () => {
+      const csv = generateCsv(members, { name: 'Name', phone: 'Full Phone' });
+      const parsed = parseCsv(csv);
+      expect(parsed.success).toBe(true);
+      expect(parsed.members).toHaveLength(2);
+      expect(parsed.members[0].full_name).toBe('Maria Silva');
+      expect(parsed.members[0].phone).toBe('+5511999999999');
+    });
+
+    it('should round-trip with Spanish headers', () => {
+      const csv = generateCsv(members, { name: 'Nombre', phone: 'Telefono Completo' });
+      const parsed = parseCsv(csv);
+      expect(parsed.success).toBe(true);
+      expect(parsed.members).toHaveLength(2);
+      expect(parsed.members[1].full_name).toBe('John Doe');
+      expect(parsed.members[1].phone).toBe('+12125551234');
+    });
+  });
+
+  describe('members.tsx source code checks', () => {
+    it('should contain translateCsvError function', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain('function translateCsvError');
+    });
+
+    it('should contain cacheDirectory null guard', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain('!FileSystem.cacheDirectory');
+    });
+
+    it('should use translateCsvError in import error mapping', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain('translateCsvError(e.code');
+    });
+
+    it('should differentiate error types in handleImport catch', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain('importReadError');
+    });
   });
 });

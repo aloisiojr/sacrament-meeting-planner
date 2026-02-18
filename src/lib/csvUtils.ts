@@ -58,14 +58,14 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const seenPhones = new Set<string>();
 
   // Strip UTF-8 BOM if present (common in Excel-exported CSVs)
-  const cleanContent = csvContent.replace(/^\uFEFF/, '');
+  const cleanContent = csvContent.replace(/^\uFEFF/, '').trim();
 
-  const lines = cleanContent.trim().split(/\r?\n/);
-
-  if (lines.length === 0) {
+  if (!cleanContent) {
     errors.push({ line: 0, field: 'file', message: 'Empty CSV file', code: 'EMPTY_FILE' });
     return { success: false, members: [], errors };
   }
+
+  const lines = cleanContent.split(/\r?\n/);
 
   // Validate header
   const header = lines[0].trim();

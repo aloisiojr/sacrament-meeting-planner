@@ -4,7 +4,7 @@
  * entering non-member names (e.g., visitors).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,10 @@ export interface PrayerSelectorProps {
   placeholder?: string;
   /** Whether the selector is disabled. */
   disabled?: boolean;
+  /** When true, auto-opens the modal. */
+  visible?: boolean;
+  /** Called when the modal closes. */
+  onClose?: () => void;
 }
 
 export function PrayerSelector({
@@ -44,6 +48,8 @@ export function PrayerSelector({
   onSelect,
   placeholder,
   disabled = false,
+  visible,
+  onClose,
 }: PrayerSelectorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -51,16 +57,21 @@ export function PrayerSelector({
   const [search, setSearch] = useState('');
   const [customName, setCustomName] = useState('');
 
+  useEffect(() => {
+    if (visible) setModalVisible(true);
+  }, [visible]);
+
   const { data: members } = useMembers(search);
 
   const handleSelectMember = useCallback(
     (member: Member) => {
       onSelect({ memberId: member.id, name: member.full_name });
       setModalVisible(false);
+      onClose?.();
       setSearch('');
       setCustomName('');
     },
-    [onSelect]
+    [onSelect, onClose]
   );
 
   const handleCustomName = useCallback(() => {
@@ -68,9 +79,10 @@ export function PrayerSelector({
     if (!trimmed) return;
     onSelect({ memberId: null, name: trimmed });
     setModalVisible(false);
+    onClose?.();
     setSearch('');
     setCustomName('');
-  }, [customName, onSelect]);
+  }, [customName, onSelect, onClose]);
 
   const handleClear = useCallback(() => {
     onSelect(null);
@@ -106,7 +118,7 @@ export function PrayerSelector({
         visible={modalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => { setModalVisible(false); onClose?.(); }}
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           {/* Header */}
@@ -126,6 +138,7 @@ export function PrayerSelector({
               style={styles.cancelButton}
               onPress={() => {
                 setModalVisible(false);
+                onClose?.();
                 setSearch('');
                 setCustomName('');
               }}

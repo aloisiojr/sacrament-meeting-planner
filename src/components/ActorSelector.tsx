@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { SearchInput } from './SearchInput';
 import { useActors, useCreateActor, useUpdateActor, useDeleteActor, type ActorRoleFilter } from '../hooks/useActors';
 import type { MeetingActor, CreateActorInput } from '../types/database';
 
@@ -195,14 +196,12 @@ export function ActorSelector({
 
           {/* Search */}
           <View style={styles.searchRow}>
-            <TextInput
-              style={[styles.searchInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
+            <SearchInput
+              style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
               placeholder={t('common.search')}
-              placeholderTextColor={colors.textTertiary}
               autoCapitalize="words"
-              autoCorrect={false}
             />
             <Pressable onPress={handleClose} style={styles.closeBtn}>
               <Text style={[styles.closeText, { color: colors.primary }]}>{t('common.close')}</Text>

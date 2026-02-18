@@ -8,7 +8,6 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   FlatList,
   Pressable,
@@ -16,6 +15,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { SearchInput } from './SearchInput';
 import { useMembers } from '../hooks/useMembers';
 import type { Member } from '../types/database';
 
@@ -111,18 +111,16 @@ export function PrayerSelector({
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <TextInput
-              style={[styles.searchInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+            <SearchInput
+              style={styles.searchInput}
               value={search}
               onChangeText={(text) => {
                 setSearch(text);
                 setCustomName(text);
               }}
               placeholder={t('common.search')}
-              placeholderTextColor={colors.placeholder}
               autoFocus
               autoCapitalize="words"
-              autoCorrect={false}
             />
             <Pressable
               style={styles.cancelButton}

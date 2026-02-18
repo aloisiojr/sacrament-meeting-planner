@@ -1,0 +1,216 @@
+# =============================================================================
+# QA_CONSOLIDATED.yaml
+# Consolidated QA results for CR-82
+# Generated: 2026-02-18
+# =============================================================================
+
+cr_id: CR-82
+title: "GestureDetector must be used as a descendant of GestureHandlerRootView"
+type: bugfix
+spec: specs/SPEC_F001.yaml
+qa_plan: qa/QA_PLAN_001.yaml
+
+# =============================================================================
+# PRE VALIDATION (before coding)
+# =============================================================================
+
+pre_validation:
+  timestamp: "2026-02-18"
+  status: passed
+  summary: |
+    QA Plan validated against SPEC. All validation_checks are testable,
+    root cause analysis is confirmed, affected files identified. Plan covers
+    must_pass (static + runtime) and should_pass (manual) checks.
+
+# =============================================================================
+# POST VALIDATION (after coding + review)
+# =============================================================================
+
+post_validation:
+  timestamp: "2026-02-18"
+  status: passed
+  phase: "1 of 1"
+  commits:
+    - hash: ee9d84d
+      message: "fix(layout): add GestureHandlerRootView wrapper to root layout (CR-82)"
+    - hash: 37e880b
+      message: "test(layout): add tests for GestureHandlerRootView wrapper (CR-82)"
+    - hash: fd4dc8f
+      message: "docs: commit SPEC, ARCH, PLAN, CODE_LEDGER, REVIEW for CR-82"
+
+  reviewer_verdict: approved
+  reviewer_issues: 0
+
+  tester_verdict: approved
+  tester_tests_passed: 9
+  tester_tests_total: 9
+  tester_suite_passed: 2456
+  tester_suite_total: 2456
+
+  # ---------------------------------------------------------------------------
+  # MUST_PASS checks
+  # ---------------------------------------------------------------------------
+
+  must_pass_results:
+
+    - id: MP-01
+      description: "GestureHandlerRootView is imported from react-native-gesture-handler in root layout"
+      status: PASSED
+      evidence: |
+        src/app/_layout.tsx:12 contains:
+          import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+    - id: MP-02
+      description: "GestureHandlerRootView wraps the app tree (Slot or equivalent) in root layout"
+      status: PASSED
+      evidence: |
+        src/app/_layout.tsx:108-116: GestureHandlerRootView wraps QueryClientProvider >
+        I18nextProvider > ThemeProvider > InnerLayout (which contains AuthProvider >
+        SyncProvider > NavigationGuard > Slot). Full app tree is a descendant.
+
+    - id: MP-03
+      description: "GestureHandlerRootView has style={{ flex: 1 }} to fill screen"
+      status: PASSED
+      evidence: |
+        src/app/_layout.tsx:108:
+          <GestureHandlerRootView style={{ flex: 1 }}>
+
+    - id: MP-04
+      description: "SwipeableCard component unchanged - no workaround in child component"
+      status: PASSED
+      evidence: |
+        src/components/SwipeableCard.tsx is unmodified. GestureDetector is used at line 180.
+        No local GestureHandlerRootView wrapper was added inside the component.
+        The component imports only { Gesture, GestureDetector } from react-native-gesture-handler (line 20-22).
+
+    - id: MP-05
+      description: "No duplicate GestureHandlerRootView in nested layouts"
+      status: PASSED
+      evidence: |
+        Grep for GestureHandlerRootView in src/ returns only 3 hits, all in src/app/_layout.tsx
+        (import at line 12, opening tag at line 108, closing tag at line 116).
+        Verified nested layouts:
+        - src/app/(tabs)/_layout.tsx: No GestureHandlerRootView (uses Tabs from expo-router)
+        - src/app/(tabs)/settings/_layout.tsx: No GestureHandlerRootView (uses Stack from expo-router)
+        - src/app/(auth)/_layout.tsx: No GestureHandlerRootView (uses Stack from expo-router)
+
+    - id: MP-06
+      description: "Existing tests still pass after fix"
+      status: PASSED
+      evidence: |
+        npx vitest run: 53 test files, 2456/2456 tests passed.
+        Duration: 1.22s. Zero failures, zero skipped.
+        Includes 9 new CR-82 specific tests (cr082-gesture-handler-root.test.ts) all passing.
+
+  must_pass_total: 6
+  must_pass_passed: 6
+  must_pass_failed: 0
+
+  # ---------------------------------------------------------------------------
+  # SHOULD_PASS checks (manual - validated via code analysis)
+  # ---------------------------------------------------------------------------
+
+  should_pass_results:
+
+    - id: SP-01
+      description: "Members screen renders without gesture handler error"
+      status: PASSED_BY_ANALYSIS
+      evidence: |
+        With GestureHandlerRootView at root layout (line 108), all screens rendered via Slot
+        are descendants. Members screen (members.tsx:225) uses SwipeableCard > GestureDetector.
+        The ancestor requirement is now satisfied. The error "GestureDetector must be used as
+        a descendant of GestureHandlerRootView" will no longer be thrown.
+
+    - id: SP-02
+      description: "Topics screen renders without gesture handler error"
+      status: PASSED_BY_ANALYSIS
+      evidence: |
+        Same reasoning as SP-01. Topics screen (topics.tsx:123) uses SwipeableCard > GestureDetector.
+        GestureHandlerRootView is an ancestor via the root layout wrapper.
+
+    - id: SP-03
+      description: "Swipe gesture works on MemberRow"
+      status: PASSED_BY_ANALYSIS
+      evidence: |
+        SwipeableCard.tsx:106-131 defines Gesture.Pan() with activeOffsetX threshold,
+        onUpdate handler for translateX, and onEnd handler for snap open/close behavior.
+        With gesture handler root view in place, these gestures will be recognized.
+
+    - id: SP-04
+      description: "Swipe gesture works on TopicRow"
+      status: PASSED_BY_ANALYSIS
+      evidence: |
+        Same SwipeableCard component used by TopicRow (topics.tsx:123).
+        Pan gesture behavior is identical to MemberRow.
+
+  should_pass_total: 4
+  should_pass_passed: 4
+  should_pass_failed: 0
+
+# =============================================================================
+# SPEC COMPLIANCE
+# =============================================================================
+
+spec_compliance:
+
+  functional_requirements:
+    - id: FR-82-01
+      title: "Wrap app tree with GestureHandlerRootView"
+      status: SATISFIED
+      evidence: |
+        AC-82-01-01: GestureHandlerRootView wraps entire provider tree at _layout.tsx:108-116.
+        AC-82-01-02: Members screen SwipeableCard is descendant - no error thrown.
+        AC-82-01-03: Topics screen SwipeableCard is descendant - no error thrown.
+        AC-82-01-04: GestureHandlerRootView with flex:1 is transparent layout wrapper.
+
+    - id: FR-82-02
+      title: "SwipeableCard pan gesture functions correctly"
+      status: SATISFIED
+      evidence: |
+        AC-82-02-01: SwipeableCard pan gesture uses Gesture.Pan() at line 106 with
+        activeOffsetX threshold at line 108. GestureDetector wraps card at line 180.
+        AC-82-02-02: Same component used by Topics screen at topics.tsx:123.
+        AC-82-02-03: Single-reveal managed via activeId prop (lines 83, 86-90, 99-104).
+
+  non_functional_requirements:
+    - id: NFR-82-01
+      title: "Single file change only"
+      status: SATISFIED
+      evidence: "Only src/app/_layout.tsx was modified for the fix. Test file added separately."
+
+    - id: NFR-82-02
+      title: "No changes to existing provider order"
+      status: SATISFIED
+      evidence: |
+        Provider chain: ErrorBoundary > GestureHandlerRootView > QueryClientProvider >
+        I18nextProvider > ThemeProvider > InnerLayout (AuthProvider > SyncProvider >
+        NavigationGuard > Slot). Original order preserved, GestureHandlerRootView inserted.
+
+    - id: NFR-82-03
+      title: "No visual layout changes"
+      status: SATISFIED
+      evidence: "GestureHandlerRootView with style={{ flex: 1 }} fills parent. Transparent wrapper."
+
+    - id: NFR-82-04
+      title: "Web platform compatibility"
+      status: SATISFIED
+      evidence: "GestureHandlerRootView renders as regular View on web. No platform conditionals."
+
+    - id: NFR-82-05
+      title: "No changes to SwipeableCard component"
+      status: SATISFIED
+      evidence: "SwipeableCard.tsx unmodified. Fix is root-level only."
+
+# =============================================================================
+# OVERALL VERDICT
+# =============================================================================
+
+verdict: passed
+verdict_rationale: |
+  All 6 must_pass checks passed. All 4 should_pass checks passed (by code analysis).
+  All functional requirements (FR-82-01, FR-82-02) satisfied.
+  All non-functional requirements (NFR-82-01 through NFR-82-05) satisfied.
+  Reviewer approved with 0 issues. Tester approved with 9/9 tests, 2456/2456 suite.
+  Full test suite passes with zero regressions.
+
+issues_for_coder: []

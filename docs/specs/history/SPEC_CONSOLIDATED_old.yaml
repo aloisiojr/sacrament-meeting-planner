@@ -1,0 +1,951 @@
+# =============================================================================
+# SPEC_CONSOLIDATED.yaml
+# Consolidated requirements specification for CR-77, CR-78, and CR-82
+# Generated: 2026-02-18
+# Updated: 2026-02-18 (added CR-82)
+# Phase: 1 of 1
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  type: bugfix (regressions from CR-66, gesture handler setup)
+  change_requests: [CR-77, CR-78, CR-82]
+  parent_cr: CR-66
+  phase: "1 of 1"
+  phase_description: "Corrigir cacheDirectory null (CR-77), EncodingType undefined (CR-78), GestureHandlerRootView missing (CR-82)"
+  previous_project_status: "CR-77 and CR-78 implemented, CR-82 new bug"
+  expo_sdk: "54 (expo ~54.0.33)"
+  expo_file_system: "~19.0.21"
+  expo_sharing: "~14.0.8"
+  expo_document_picker: "~14.0.8"
+  react_native_gesture_handler: "~2.28.0"
+
+# =============================================================================
+# ROOT CAUSE ANALYSIS (BASED ON REAL CONSOLE LOGS)
+# =============================================================================
+
+root_cause_analysis:
+
+  shared_underlying_cause:
+    summary: >
+      expo-file-system v19.x (Expo SDK 54) completely rewrote its API.
+      The module now exports a NEW class-based API (File, Directory, Paths)
+      and the OLD string-based API (readAsStringAsync, writeAsStringAsync,
+      cacheDirectory, documentDirectory, EncodingType) is DEPRECATED.
+      The legacy methods imported from 'expo-file-system' are now stubs
+      that throw errors (see legacyWarnings.ts). The old constants like
+      cacheDirectory and EncodingType are NOT exported from the new API.
+    evidence:
+      - >
+        node_modules/expo-file-system/src/index.ts exports from
+        './FileSystem' (new API) and './legacyWarnings' (deprecated stubs).
+        It does NOT re-export cacheDirectory, documentDirectory, or
+        EncodingType from the legacy module.
+      - >
+        node_modules/expo-file-system/src/legacyWarnings.ts:
+        writeAsStringAsync and readAsStringAsync are stub functions that
+        throw "Method X is deprecated. You can migrate to the new
+        filesystem API using File and Directory classes or import the
+        legacy API from expo-file-system/legacy."
+      - >
+        The new API (FileSystem.ts) has: Paths.cache (Directory object),
+        Paths.document (Directory object), File class with .write() and
+        .text() methods. There is NO cacheDirectory string constant and
+        NO EncodingType enum in the new API exports.
+      - >
+        The legacy API is still fully available at 'expo-file-system/legacy'
+        with cacheDirectory, documentDirectory, EncodingType, readAsStringAsync,
+        writeAsStringAsync, etc.
+
+  cr_77_export_csv_fails:
+    bug_report: >
+      Ao clicar em "Exportar CSV" na tela de Membros quando nao ha membros
+      cadastrados, o app exibe um dialogo de erro ao inves de exportar um
+      arquivo CSV contendo apenas os cabecalhos.
+    console_logs: |
+      LOG  [Export] CSV length: 23
+      WARN  [Export] cacheDirectory is null
+    analysis:
+      - >
+        The CSV is being generated correctly (23 chars = BOM + header line).
+        The generation step works fine.
+      - >
+        FileSystem.cacheDirectory is null because the new expo-file-system v19
+        API does NOT export a cacheDirectory constant. When imported via
+        `import * as FileSystem from 'expo-file-system'`, the namespace has
+        no such property, so it evaluates to undefined/null.
+      - >
+        The existing guard at members.tsx:386-390 catches this and shows the
+        error Alert, which is exactly the behavior the user sees.
+      - >
+        The writeAsStringAsync call (line 393) would also fail if it reached
+        it, because the new API's version is a deprecated stub that throws.
+    code_location:
+      file: src/app/(tabs)/settings/members.tsx
+      function: handleExport
+      lines: "364-413"
+      relevant_code: |
+        if (!FileSystem.cacheDirectory) {          // line 386 - TRUE because cacheDirectory is not exported
+          console.warn('[Export] cacheDirectory is null');
+          Alert.alert(t('common.error'), t('members.exportFailed'));
+          return;                                   // execution stops here
+        }
+        const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, csv, {
+          encoding: FileSystem.EncodingType.UTF8,   // would also fail: EncodingType is undefined
+        });
+    root_cause: >
+      FileSystem.cacheDirectory does not exist in expo-file-system v19's new
+      API. The import `* as FileSystem from 'expo-file-system'` provides the
+      new class-based API which has Paths.cache (a Directory object) instead
+      of a cacheDirectory string. The existing guard correctly detects this
+      as null and aborts with an error dialog.
+
+  cr_78_import_csv_fails:
+    bug_report: >
+      Ao tentar importar um arquivo CSV de membros, recebe erro de arquivo
+      corrompido.
+    console_logs: |
+      LOG  [Import] DocumentPicker result: {"mimeType": "text/csv", "name": "lista_membros_ala.csv", "uri": "file:///var/mobile/Containers/Data/Application/.../DocumentPicker/802A9CD2-3C93-46F2-B675-CD62CDECA450.csv"}
+      ERROR  Import CSV failed: [TypeError: Cannot read property 'UTF8' of undefined] handleImport (src/app/(tabs)/settings/members.tsx:491:44)
+    analysis:
+      - >
+        The DocumentPicker works perfectly - it returns a valid file URI,
+        correct MIME type, and correct file name.
+      - >
+        The error is "TypeError: Cannot read property 'UTF8' of undefined"
+        at line 491 in handleImport. This means FileSystem.EncodingType is
+        undefined, so accessing .UTF8 on it throws.
+      - >
+        This confirms that the new expo-file-system v19 API does NOT export
+        EncodingType. The enum exists only in the legacy API at
+        'expo-file-system/legacy'.
+      - >
+        Even if EncodingType were available, readAsStringAsync would also
+        fail because it is a deprecated stub that throws in v19.
+    code_location:
+      file: src/app/(tabs)/settings/members.tsx
+      function: handleImport
+      lines: "464-505"
+      relevant_code: |
+        const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+          encoding: FileSystem.EncodingType.UTF8,   // line 491 - CRASHES: EncodingType is undefined
+        });
+    root_cause: >
+      FileSystem.EncodingType is undefined because expo-file-system v19's
+      new API does not export an EncodingType enum. The error occurs at
+      line 491 when trying to access .UTF8 on undefined. Additionally,
+      readAsStringAsync itself is a deprecated stub that would throw even
+      if the encoding parameter were fixed.
+
+# =============================================================================
+# FIX STRATEGY
+# =============================================================================
+
+fix_strategy:
+  approach: "Use the new expo-file-system v19 class-based API (File, Directory, Paths)"
+  rationale: >
+    The project uses expo-file-system ~19.0.21 which has a completely new API.
+    There are two options: (A) switch import to 'expo-file-system/legacy' to
+    keep using the old API, or (B) migrate to the new File/Directory/Paths API.
+    Option B is preferred because the legacy API is deprecated and will
+    eventually be removed. The new API is simpler and does not require
+    EncodingType or string-based directory paths.
+  alternative_approach: >
+    Import from 'expo-file-system/legacy' instead. This would require minimal
+    code changes (just changing the import path) but would use deprecated API
+    that may be removed in future Expo SDK versions.
+  decision: >
+    Use the NEW API (Option B). The new API is cleaner and future-proof.
+    The changes are surgical: replace writeAsStringAsync with File.write(),
+    replace readAsStringAsync with File.text(), replace cacheDirectory
+    string with Paths.cache Directory object.
+
+  export_fix:
+    description: >
+      Replace the cacheDirectory string + writeAsStringAsync pattern with
+      the new File class API. Use Paths.cache to get the cache directory
+      as a Directory object, then create a File and write to it.
+    new_code_pattern: |
+      // Import the new API classes
+      import { File, Paths } from 'expo-file-system';
+      // ...
+      // In handleExport (mobile branch):
+      const file = new File(Paths.cache, 'membros.csv');
+      file.write(csv);
+      console.log('[Export] File written to:', file.uri);
+      await Sharing.shareAsync(file.uri, { ... });
+    changes:
+      - "Remove the cacheDirectory null guard (no longer needed)"
+      - "Remove FileSystem.writeAsStringAsync call"
+      - "Remove FileSystem.EncodingType.UTF8 usage from export"
+      - "Use new File(Paths.cache, 'membros.csv') to create file reference"
+      - "Use file.write(csv) to write content (UTF-8 is default)"
+      - "Use file.uri for Sharing.shareAsync"
+      - "Keep all existing console.log/console.warn/console.error debug logs"
+
+  import_fix:
+    description: >
+      Replace readAsStringAsync + EncodingType.UTF8 with the new File
+      class API. Create a File from the DocumentPicker URI and use .text()
+      to read its content.
+    new_code_pattern: |
+      // Import the new API classes
+      import { File } from 'expo-file-system';
+      // ...
+      // In handleImport (mobile branch):
+      const pickedFile = new File(result.assets[0].uri);
+      const content = await pickedFile.text();
+      console.log('[Import] File content length:', content.length);
+      importMutation.mutate(content);
+    changes:
+      - "Remove FileSystem.readAsStringAsync call"
+      - "Remove FileSystem.EncodingType.UTF8 usage from import"
+      - "Use new File(uri) to create file reference from DocumentPicker URI"
+      - "Use file.text() to read content as string (returns UTF-8 by default)"
+      - "Keep all existing console.log/console.error debug logs"
+
+  import_cleanup:
+    description: >
+      Update the import statement at the top of members.tsx. The wildcard
+      import `import * as FileSystem from 'expo-file-system'` should be
+      replaced with named imports of only the classes used.
+    old_import: "import * as FileSystem from 'expo-file-system';"
+    new_import: "import { File, Paths } from 'expo-file-system';"
+    notes:
+      - "File class is needed for both export (write) and import (read)"
+      - "Paths class is needed for Paths.cache in export"
+      - "No other expo-file-system exports are used"
+
+# =============================================================================
+# FUNCTIONAL REQUIREMENTS
+# =============================================================================
+
+functional_requirements:
+
+  # ---------------------------------------------------------------------------
+  # CR-77: Export CSV - fix cacheDirectory null
+  # ---------------------------------------------------------------------------
+  - id: FR-77-01
+    cr: CR-77
+    title: Fix export CSV by using new expo-file-system v19 File/Paths API
+    description: >
+      Replace the broken cacheDirectory + writeAsStringAsync pattern with
+      the new class-based API. Use Paths.cache to get the cache directory
+      and File to write the CSV content. Remove the cacheDirectory null
+      guard that was causing the error dialog.
+    acceptance_criteria:
+      - Export CSV works on iOS device (no error dialog)
+      - CSV file is written to cache directory successfully
+      - Share sheet opens with the CSV file
+      - Works with empty member list (header-only CSV)
+      - Works with members (header + data rows CSV)
+      - Cancelling share sheet does NOT show error dialog
+      - All existing debug console.log/console.warn messages are preserved
+      - console.error in catch block is preserved
+    current_behavior: >
+      cacheDirectory is null, guard triggers, error dialog shown
+    expected_behavior: >
+      File written via new API, share sheet opens successfully
+
+  - id: FR-77-02
+    cr: CR-77
+    title: Preserve debug logging in handleExport
+    description: >
+      All existing debug logging must be preserved. The console.log for
+      CSV length, the console.warn for cacheDirectory null (can be
+      removed since the guard is removed), the console.log for fileUri
+      and successful write, and the console.error in catch.
+    acceptance_criteria:
+      - console.log('[Export] CSV length:', csv.length) preserved
+      - console.log for file URI preserved (updated to use file.uri)
+      - console.log('[Export] File written successfully') preserved
+      - console.log('[Export] Opening share sheet...') preserved
+      - console.error('Export CSV failed:', err) in catch preserved
+      - The cacheDirectory null warning can be removed (guard no longer needed)
+
+  # ---------------------------------------------------------------------------
+  # CR-78: Import CSV - fix EncodingType undefined
+  # ---------------------------------------------------------------------------
+  - id: FR-78-01
+    cr: CR-78
+    title: Fix import CSV by using new expo-file-system v19 File API
+    description: >
+      Replace the broken readAsStringAsync + EncodingType.UTF8 pattern
+      with the new File class API. Create a File from the DocumentPicker
+      URI and use .text() to read the content as a string.
+    acceptance_criteria:
+      - Import CSV works on iOS device (no TypeError)
+      - File content is read correctly from DocumentPicker URI
+      - parseCsv receives the correct CSV string content
+      - Import completes successfully with valid CSV files
+      - All existing debug console.log messages are preserved
+      - console.error in catch block is preserved
+      - Error handling for corrupt/unreadable files still works
+    current_behavior: >
+      EncodingType is undefined, TypeError thrown at line 491
+    expected_behavior: >
+      File content read via new API, passed to parseCsv for processing
+
+  - id: FR-78-02
+    cr: CR-78
+    title: Preserve debug logging in handleImport
+    description: >
+      All existing debug logging must be preserved. The DocumentPicker
+      result logging and the file content length logging must remain.
+    acceptance_criteria:
+      - console.log('[Import] DocumentPicker result:', ...) preserved
+      - console.log('[Import] File content length:', content.length) preserved
+      - console.error('Import CSV failed:', err) in catch preserved
+      - Error classification logic (read/encoding vs generic) preserved
+
+  # ---------------------------------------------------------------------------
+  # Shared: Update import statement
+  # ---------------------------------------------------------------------------
+  - id: FR-SHARED-01
+    cr: "CR-77, CR-78"
+    title: Update expo-file-system import statement
+    description: >
+      Replace the wildcard import `import * as FileSystem from 'expo-file-system'`
+      with named imports `import { File, Paths } from 'expo-file-system'`.
+      This is required because the wildcard import brings in the new API
+      namespace which does not have cacheDirectory, EncodingType, etc.
+    acceptance_criteria:
+      - Import changed from `import * as FileSystem from 'expo-file-system'` to `import { File, Paths } from 'expo-file-system'`
+      - All references to FileSystem.cacheDirectory replaced
+      - All references to FileSystem.EncodingType removed
+      - All references to FileSystem.writeAsStringAsync replaced
+      - All references to FileSystem.readAsStringAsync replaced
+      - No other FileSystem.* references remain in the file
+      - Imports for expo-sharing and expo-document-picker unchanged
+
+# =============================================================================
+# NON-FUNCTIONAL REQUIREMENTS
+# =============================================================================
+
+non_functional_requirements:
+  - id: NFR-01
+    title: No changes to web code paths
+    description: >
+      The Platform.OS === 'web' branches in both handleExport and
+      handleImport must NOT be modified. They use Blob/URL and
+      document.createElement which work correctly on web.
+
+  - id: NFR-02
+    title: No changes to parseCsv or csvUtils.ts
+    description: >
+      The parseCsv function was already simplified in the previous project
+      and works correctly. No changes needed to csvUtils.ts.
+
+  - id: NFR-03
+    title: No changes to i18n/locale files
+    description: >
+      No new translation keys are needed and no existing keys need to be
+      modified or removed for this fix.
+
+  - id: NFR-04
+    title: Minimal and surgical changes
+    description: >
+      Changes are limited to src/app/(tabs)/settings/members.tsx only.
+      The fix involves: (1) changing the import statement, (2) updating
+      the export mobile branch (remove guard, use File/Paths), (3) updating
+      the import mobile branch (use File.text()). No other files change.
+
+  - id: NFR-05
+    title: Preserve existing error handling behavior
+    description: >
+      The user-facing error handling (Alert dialogs, error messages) must
+      remain unchanged. Only the underlying file system API calls change.
+      The catch blocks, error classification, and Alert.alert calls stay
+      the same.
+
+  - id: NFR-06
+    title: Forward-compatible with Expo SDK updates
+    description: >
+      Using the new File/Paths API ensures forward compatibility. The legacy
+      API (expo-file-system/legacy) is deprecated and may be removed in
+      future SDK versions.
+
+# =============================================================================
+# FILES TO MODIFY
+# =============================================================================
+
+files_to_modify:
+  - path: src/app/(tabs)/settings/members.tsx
+    changes:
+      - description: >
+          CHANGE import statement: Replace
+          `import * as FileSystem from 'expo-file-system';`
+          with
+          `import { File, Paths } from 'expo-file-system';`
+        lines_affected: "30"
+
+      - description: >
+          REWRITE handleExport mobile branch (lines 385-402):
+          Remove the cacheDirectory null guard (lines 386-390).
+          Remove FileSystem.writeAsStringAsync with EncodingType (lines 391-395).
+          Replace with: create File via `new File(Paths.cache, 'membros.csv')`,
+          write via `file.write(csv)`, share via `Sharing.shareAsync(file.uri, ...)`.
+          Keep all console.log debug messages, updating fileUri references
+          to use file.uri. Remove the cacheDirectory null console.warn.
+        lines_affected: "385-402"
+
+      - description: >
+          REWRITE handleImport mobile file reading (lines 490-492):
+          Remove `FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.UTF8 })`.
+          Replace with: create File via `new File(result.assets[0].uri)`,
+          read via `await pickedFile.text()`.
+          Keep the console.log for content length on the next line.
+        lines_affected: "490-492"
+
+# =============================================================================
+# DETAILED CODE CHANGES
+# =============================================================================
+
+code_changes:
+
+  change_1_import:
+    file: src/app/(tabs)/settings/members.tsx
+    line: 30
+    old: "import * as FileSystem from 'expo-file-system';"
+    new: "import { File, Paths } from 'expo-file-system';"
+
+  change_2_export_mobile_branch:
+    file: src/app/(tabs)/settings/members.tsx
+    lines: "385-402"
+    description: "Replace entire mobile export branch"
+    old: |
+      // Mobile: Write temp file and share via expo-sharing
+      if (!FileSystem.cacheDirectory) {
+        console.warn('[Export] cacheDirectory is null');
+        Alert.alert(t('common.error'), t('members.exportFailed'));
+        return;
+      }
+      const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
+      console.log('[Export] fileUri:', fileUri);
+      await FileSystem.writeAsStringAsync(fileUri, csv, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      console.log('[Export] File written successfully');
+      console.log('[Export] Opening share sheet...');
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/csv',
+        dialogTitle: t('members.exportCsv'),
+        UTI: 'public.comma-separated-values-text',
+      });
+    new: |
+      // Mobile: Write temp file and share via expo-sharing
+      const file = new File(Paths.cache, 'membros.csv');
+      console.log('[Export] fileUri:', file.uri);
+      file.write(csv);
+      console.log('[Export] File written successfully');
+      console.log('[Export] Opening share sheet...');
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'text/csv',
+        dialogTitle: t('members.exportCsv'),
+        UTI: 'public.comma-separated-values-text',
+      });
+
+  change_3_import_file_reading:
+    file: src/app/(tabs)/settings/members.tsx
+    lines: "490-492"
+    description: "Replace file reading call"
+    old: |
+      const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    new: |
+      const pickedFile = new File(result.assets[0].uri);
+      const content = await pickedFile.text();
+
+# =============================================================================
+# TEST SCENARIOS
+# =============================================================================
+
+test_scenarios:
+  cr_77_export:
+    - id: TS-77-01
+      scenario: Exportar CSV com lista de membros vazia
+      given: Nao ha membros cadastrados na ala
+      when: Usuario clica em "Exportar CSV"
+      then: >
+        Sistema gera arquivo CSV contendo BOM + header traduzido, escreve
+        no cache directory via File API, e abre share sheet sem erro
+
+    - id: TS-77-02
+      scenario: Exportar CSV com membros cadastrados
+      given: Ha membros cadastrados na ala
+      when: Usuario clica em "Exportar CSV"
+      then: >
+        Sistema gera CSV com cabecalhos traduzidos e linhas de dados,
+        escreve via File API, e abre share sheet normalmente
+
+    - id: TS-77-03
+      scenario: Cancelar share sheet nao mostra erro
+      given: CSV foi gerado e share sheet esta aberta
+      when: Usuario cancela o share sheet
+      then: Nenhum dialogo de erro e exibido
+
+    - id: TS-77-04
+      scenario: Debug logs aparecem no console durante export
+      given: Export e executado no dispositivo
+      when: Cada etapa do fluxo executa
+      then: >
+        Console mostra: CSV length, fileUri (file.uri), "File written
+        successfully", "Opening share sheet..."
+
+  cr_78_import:
+    - id: TS-78-01
+      scenario: Importar CSV valido no dispositivo
+      given: Arquivo CSV valido com header e dados
+      when: Usuario seleciona arquivo via DocumentPicker e confirma
+      then: >
+        File API le o conteudo via .text(), parseCsv processa com sucesso,
+        membros sao importados, mensagem de sucesso exibida
+
+    - id: TS-78-02
+      scenario: DocumentPicker result e logado corretamente
+      given: Usuario seleciona arquivo via DocumentPicker
+      when: DocumentPicker retorna resultado
+      then: >
+        Console mostra URI, nome e mimeType do arquivo selecionado
+
+    - id: TS-78-03
+      scenario: Erro de leitura mostra mensagem adequada
+      given: Arquivo selecionado nao pode ser lido (permissao, corrompido)
+      when: File.text() lanca excecao
+      then: >
+        console.error loga o erro completo, Alert mostra mensagem de erro
+        adequada (importReadError ou importFailed)
+
+    - id: TS-78-04
+      scenario: Cancelar DocumentPicker nao mostra erro
+      given: DocumentPicker esta aberto
+      when: Usuario cancela a selecao
+      then: Nenhum dialogo de erro e exibido
+
+    - id: TS-78-05
+      scenario: Importar CSV com header "Nome,Telefone" (CSV real do usuario)
+      given: >
+        Arquivo CSV com header "Nome,Telefone" e dados reais incluindo
+        telefones vazios, duplicados, e valores como "VERIFICAR"
+      when: Usuario importa o arquivo
+      then: >
+        Arquivo e lido com sucesso pelo File API, parseCsv processa
+        corretamente (ja simplificado no projeto anterior), membros
+        importados com sucesso
+
+  web_no_regression:
+    - id: TS-WEB-01
+      scenario: Export CSV na web continua funcionando
+      given: App rodando na web
+      when: Usuario clica em "Exportar CSV"
+      then: >
+        Web branch usa Blob/URL (nao File API), download funciona normalmente
+
+    - id: TS-WEB-02
+      scenario: Import CSV na web continua funcionando
+      given: App rodando na web
+      when: Usuario seleciona arquivo para importar
+      then: >
+        Web branch usa file input + file.text() (nao File API), import
+        funciona normalmente
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+  - id: DD-01
+    title: Use new File/Paths API instead of legacy import
+    description: >
+      DECISION: Use `import { File, Paths } from 'expo-file-system'` with
+      the new class-based API (File.write(), File.text(), Paths.cache)
+      instead of `import * as FileSystem from 'expo-file-system/legacy'`
+      which would provide the old API (writeAsStringAsync, readAsStringAsync,
+      cacheDirectory, EncodingType).
+    status: decided
+    rationale: >
+      The legacy API is deprecated and shows deprecation warnings in the
+      console. Future Expo SDK versions may remove it entirely. The new
+      API is cleaner, simpler, and does not require specifying encoding
+      (UTF-8 is the default for .write() and .text()). The migration is
+      straightforward with minimal code changes.
+
+  - id: DD-02
+    title: Keep import * as FileSystem REMOVED (not just changed path)
+    description: >
+      Instead of changing `import * as FileSystem from 'expo-file-system'`
+      to `import * as FileSystem from 'expo-file-system/legacy'`, we use
+      named imports `import { File, Paths } from 'expo-file-system'`.
+      This avoids the FileSystem.* namespace pattern entirely.
+    status: decided
+    rationale: >
+      Named imports make it clear exactly which API surface is used.
+      The FileSystem.* namespace pattern is misleading because the new
+      module has a completely different structure.
+
+  - id: DD-03
+    title: File.write() is synchronous - no await needed
+    description: >
+      In the new expo-file-system v19 API, File.write() is a synchronous
+      method (not async). The code should NOT use `await file.write(csv)`.
+      However, File.text() IS async and returns a Promise<string>.
+    status: decided
+    rationale: >
+      Based on the ExpoFileSystem.types.ts source: `write(content: string | Uint8Array, options?: FileWriteOptions): void` (synchronous).
+      `text(): Promise<string>` (async). This difference must be respected.
+
+  - id: DD-04
+    title: File constructor auto-creates parent directories
+    description: >
+      The File constructor `new File(Paths.cache, 'membros.csv')` handles
+      path construction automatically. Paths.cache returns a Directory
+      object for the cache directory. No need to manually concatenate
+      strings or check if the directory exists.
+    status: decided
+    rationale: >
+      The Paths.cache getter internally calls `new Directory(ExpoFileSystem.cacheDirectory)`.
+      The File constructor accepts Directory instances as path components
+      and joins them correctly via PathUtilities.
+
+  - id: DD-05
+    title: No changes to parseCsv or csvUtils
+    description: >
+      The parseCsv function was already correctly simplified in the
+      previous project. The bugs CR-77 and CR-78 are exclusively in the
+      file system API usage, not in CSV parsing logic.
+    status: decided
+    rationale: >
+      Console logs prove that CR-77 fails at cacheDirectory check (before
+      any file write) and CR-78 fails at EncodingType access (before any
+      file read). parseCsv is never reached in either bug.
+
+  - id: DD-06
+    title: Web code paths remain unchanged
+    description: >
+      The Platform.OS === 'web' branches do not use expo-file-system at
+      all. They use browser APIs (Blob, URL, document.createElement for
+      export; input[type=file] + file.text() for import). These must
+      not be modified.
+    status: decided
+    rationale: >
+      Web paths work correctly. The bugs only affect mobile (iOS device).
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+  # No open questions. The console logs clearly reveal both root causes:
+  # - CR-77: FileSystem.cacheDirectory is null (not exported in new API)
+  # - CR-78: FileSystem.EncodingType is undefined (not exported in new API)
+  # The fix is straightforward: migrate to the new File/Paths API.
+
+# =============================================================================
+# ASSUMPTIONS (ALL CONFIRMED)
+# =============================================================================
+
+assumptions:
+  - id: A-01
+    assumption: >
+      The new File/Paths API from expo-file-system v19.x works correctly
+      on iOS devices. File.write() successfully writes to Paths.cache
+      and File.text() successfully reads files from DocumentPicker URIs.
+    status: confirmed
+    confirmation: >
+      The new API is the official API for expo-file-system v19.x as shown
+      in the module's source code. The legacy API explicitly directs users
+      to migrate to File/Directory classes. The File constructor accepts
+      file:// URIs which is what DocumentPicker returns.
+
+  - id: A-02
+    assumption: >
+      Paths.cache is always available on iOS (never null/undefined).
+      Unlike the old cacheDirectory string which could be null, the new
+      Paths.cache getter creates a Directory object from the native
+      module's cacheDirectory property.
+    status: confirmed
+    confirmation: >
+      Paths.cache internally calls `new Directory(ExpoFileSystem.cacheDirectory)`.
+      The native ExpoFileSystem module always provides cacheDirectory on iOS.
+      The old null issue was because the string constant was not re-exported
+      from the new API's index.ts, not because the underlying path was unavailable.
+
+  - id: A-03
+    assumption: >
+      File.write(csv) writes UTF-8 by default without needing to specify
+      encoding. File.text() reads UTF-8 by default.
+    status: confirmed
+    confirmation: >
+      ExpoFileSystem.types.ts shows FileWriteOptions has encoding with
+      default UTF8. The write() method signature accepts string content
+      directly. The text() method returns Promise<string> which is
+      always UTF-8 decoded text.
+
+  - id: A-04
+    assumption: >
+      expo-sharing's shareAsync accepts file.uri from the new File class.
+      The URI format is the same file:// URI that shareAsync expects.
+    status: confirmed
+    confirmation: >
+      The File class stores URIs as `file:///...` strings in the .uri
+      property. Sharing.shareAsync expects a file:// URI string.
+      They are compatible.
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+
+risk_assessment:
+  - risk: "File.write() may need the file to be created first"
+    mitigation: >
+      Check if File has a .create() method that needs to be called before
+      .write(). Based on ExpoFileSystem.types.ts, File has create(options?)
+      method. However, write() may handle creation implicitly. If write()
+      fails, add file.create({ overwrite: true }) before write().
+    likelihood: low
+    impact: low
+
+  - risk: "File constructor may not accept DocumentPicker content:// URIs on Android"
+    mitigation: >
+      This fix targets iOS (where the bugs were reported). DocumentPicker
+      on iOS returns file:// URIs (confirmed by console log). On Android,
+      if DocumentPicker returns content:// URIs, the File constructor may
+      need adjustment. However, copyToCacheDirectory: true is set which
+      copies to a file:// location.
+    likelihood: low
+    impact: medium
+
+  - risk: "Paths.cache directory may not exist on first app launch"
+    mitigation: >
+      The cache directory is always created by the OS/Expo runtime.
+      Paths.cache just returns a reference to it. If somehow the directory
+      does not exist, File.write() would fail and be caught by the existing
+      catch block with console.error for debugging.
+    likelihood: very_low
+    impact: low
+
+# =============================================================================
+# SCOPE BOUNDARIES
+# =============================================================================
+
+scope:
+  in_scope:
+    - "Fix CR-77: Export CSV cacheDirectory null error"
+    - "Fix CR-78: Import CSV EncodingType undefined error"
+    - "Update expo-file-system import statement"
+    - "Migrate file operations to new File/Paths API"
+    - "Preserve all existing debug logging"
+    - "Preserve all existing error handling"
+    - "Fix CR-82: Add GestureHandlerRootView wrapper to root layout"
+
+  out_of_scope:
+    - "CR-76: Edge Function / Users screen error"
+    - "CR-79: Missing back button on Users screen"
+    - "CR-80: Informational text on Members screen"
+    - "CR-81: User name field feature"
+    - "Changes to parseCsv or csvUtils.ts"
+    - "Changes to i18n locale files"
+    - "Changes to web code paths"
+    - "Changes to test files (no test changes needed for API migration)"
+    - "Any other screens or features"
+
+# =============================================================================
+# CR-82: GestureDetector must be descendant of GestureHandlerRootView
+# =============================================================================
+
+cr_82_root_cause_analysis:
+
+  bug_report: >
+    ERROR [Error: GestureDetector must be used as a descendant of
+    GestureHandlerRootView. Otherwise the gestures will not be recognized.]
+    SwipeableCard (src/components/SwipeableCard.tsx:180:7)
+    MemberRow (src/app/(tabs)/settings/members.tsx:225:5)
+    renderItem (src/app/(tabs)/settings/members.tsx:503:7)
+    MembersScreen (src/app/(tabs)/settings/members.tsx:600:9)
+
+  root_cause: >
+    The app tree in src/app/_layout.tsx is NOT wrapped in GestureHandlerRootView.
+    react-native-gesture-handler v2.x requires GestureHandlerRootView as an
+    ancestor of any GestureDetector. SwipeableCard uses GestureDetector at line 180
+    for pan gesture. Both Members (line 225) and Topics (line 123) screens use
+    SwipeableCard and are affected.
+
+  affected_components:
+    - src/components/SwipeableCard.tsx (line 180 - GestureDetector)
+    - src/app/(tabs)/settings/members.tsx (line 225 - SwipeableCard in MemberRow)
+    - src/app/(tabs)/settings/topics.tsx (line 123 - SwipeableCard in TopicRow)
+
+cr_82_fix_strategy:
+  approach: >
+    Import GestureHandlerRootView from react-native-gesture-handler and wrap
+    the app tree in src/app/_layout.tsx RootLayout with it. Single file change.
+  file_to_modify: src/app/_layout.tsx
+  changes:
+    - "Add import: import { GestureHandlerRootView } from 'react-native-gesture-handler'"
+    - "Wrap tree with GestureHandlerRootView style={{ flex: 1 }} inside ErrorBoundary"
+
+cr_82_functional_requirements:
+
+  - id: FR-82-01
+    cr: CR-82
+    title: Wrap app tree with GestureHandlerRootView
+    description: >
+      Import GestureHandlerRootView from react-native-gesture-handler and
+      wrap the app component tree in src/app/_layout.tsx RootLayout function
+      with it. The wrapper must use style={{ flex: 1 }} to fill the screen.
+    acceptance_criteria:
+      - ac_id: AC-82-01-01
+        given: The app is launched on iOS or Android
+        when: The root layout renders
+        then: >
+          GestureHandlerRootView wraps the app tree inside ErrorBoundary
+      - ac_id: AC-82-01-02
+        given: The user navigates to the Members screen
+        when: SwipeableCard components render
+        then: >
+          No error about GestureDetector. Swipe gestures work correctly.
+      - ac_id: AC-82-01-03
+        given: The user navigates to the Topics screen
+        when: SwipeableCard components render
+        then: >
+          No error about GestureDetector. Swipe gestures work correctly.
+      - ac_id: AC-82-01-04
+        given: GestureHandlerRootView wraps the app tree
+        when: The app renders on any screen
+        then: >
+          Layout, navigation, and all existing functionality remain unchanged.
+
+  - id: FR-82-02
+    cr: CR-82
+    title: SwipeableCard pan gesture functions correctly
+    description: >
+      With GestureHandlerRootView in place, SwipeableCard pan gesture is
+      fully functional on Members and Topics screens.
+    acceptance_criteria:
+      - ac_id: AC-82-02-01
+        given: A member/topic row is displayed
+        when: The user swipes left
+        then: The card reveals edit and delete action buttons
+      - ac_id: AC-82-02-02
+        given: A SwipeableCard is revealed
+        when: Another card is swiped
+        then: The first card closes, only one card revealed at a time
+
+cr_82_non_functional_requirements:
+  - id: NFR-82-01
+    title: Single file change (src/app/_layout.tsx only)
+  - id: NFR-82-02
+    title: No changes to existing provider order
+  - id: NFR-82-03
+    title: No visual layout changes (GestureHandlerRootView with flex:1)
+  - id: NFR-82-04
+    title: No changes to SwipeableCard, members.tsx, or topics.tsx
+
+cr_82_code_changes:
+
+  change_1_import:
+    file: src/app/_layout.tsx
+    type: add_import
+    new_line: "import { GestureHandlerRootView } from 'react-native-gesture-handler';"
+
+  change_2_wrap_tree:
+    file: src/app/_layout.tsx
+    location: "RootLayout function"
+    old: |
+      export default function RootLayout() {
+        return (
+          <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <I18nextProvider i18n={i18n}>
+                <ThemeProvider>
+                  <InnerLayout />
+                </ThemeProvider>
+              </I18nextProvider>
+            </QueryClientProvider>
+          </ErrorBoundary>
+        );
+      }
+    new: |
+      export default function RootLayout() {
+        return (
+          <ErrorBoundary>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <QueryClientProvider client={queryClient}>
+                <I18nextProvider i18n={i18n}>
+                  <ThemeProvider>
+                    <InnerLayout />
+                  </ThemeProvider>
+                </I18nextProvider>
+              </QueryClientProvider>
+            </GestureHandlerRootView>
+          </ErrorBoundary>
+        );
+      }
+
+cr_82_test_scenarios:
+  - id: TS-82-01
+    scenario: No GestureDetector error on Members screen
+    given: The app is running on iOS
+    when: User navigates to Settings > Members
+    then: Screen loads without GestureDetector error
+
+  - id: TS-82-02
+    scenario: No GestureDetector error on Topics screen
+    given: The app is running on iOS
+    when: User navigates to Settings > Topics
+    then: Screen loads without GestureDetector error
+
+  - id: TS-82-03
+    scenario: Swipe left on member row reveals actions
+    given: Members screen with members in list
+    when: User swipes left on a member row
+    then: Edit and Delete buttons are revealed
+
+  - id: TS-82-04
+    scenario: Swipe left on topic row reveals actions
+    given: Topics screen with topics in list
+    when: User swipes left on a topic row
+    then: Edit and Delete buttons are revealed
+
+  - id: TS-82-05
+    scenario: App layout unchanged on all screens
+    given: GestureHandlerRootView wraps the app tree
+    when: User navigates through all screens
+    then: All screens render identically to before the fix
+
+cr_82_design_decisions:
+  - id: DD-82-01
+    title: Place GestureHandlerRootView at root layout level
+    status: decided
+    rationale: >
+      Standard pattern per react-native-gesture-handler docs. Covers all
+      current and future GestureDetector usages app-wide.
+
+  - id: DD-82-02
+    title: Place inside ErrorBoundary but outside all other providers
+    status: decided
+    rationale: >
+      ErrorBoundary remains outermost to catch init errors.
+      GestureHandlerRootView does not depend on any React context.
+
+  - id: DD-82-03
+    title: Use style={{ flex: 1 }}
+    status: decided
+    rationale: >
+      Required per docs to fill screen space. Without it the view collapses.
+
+cr_82_open_questions: []
+  # No open questions. Error message is explicit about cause and fix.
+
+cr_82_assumptions:
+  - id: A-82-01
+    assumption: GestureHandlerRootView is exported from react-native-gesture-handler ~2.28.0
+    status: confirmed
+  - id: A-82-02
+    assumption: GestureHandlerRootView with flex:1 does not alter visual layout
+    status: confirmed
+  - id: A-82-03
+    assumption: Compatible with expo-router Slot and existing provider hierarchy
+    status: confirmed

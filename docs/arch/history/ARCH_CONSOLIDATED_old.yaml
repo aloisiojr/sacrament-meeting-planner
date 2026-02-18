@@ -1,0 +1,169 @@
+# =============================================================================
+# ARCH_CONSOLIDATED.yaml
+# Consolidated architecture for all change requests
+# Generated: 2026-02-18
+# Includes: CR-77, CR-78 (from ARCH_INDEX.yaml), CR-82 (from ARCH_M001.yaml)
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  change_requests: [CR-77, CR-78, CR-82]
+  arch_modules:
+    - id: ARCH_INDEX
+      file: arch/ARCH_INDEX.yaml
+      crs: [CR-77, CR-78]
+      description: "Fix expo-file-system v19 API migration for CSV export/import"
+      status: implemented
+    - id: ARCH_M001
+      file: arch/ARCH_M001.yaml
+      crs: [CR-82]
+      description: "Add GestureHandlerRootView wrapper to root layout"
+      status: pending
+
+# =============================================================================
+# ALL COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- From ARCH_INDEX (CR-77, CR-78) ---
+  - id: COMP-INDEX-01
+    source: ARCH_INDEX
+    name: members.tsx (handleExport / handleImport)
+    file: src/app/(tabs)/settings/members.tsx
+    responsibility: >
+      Export and import CSV files for member data. Uses expo-file-system
+      File/Paths API (v19) for mobile file operations.
+    status: implemented
+
+  # --- From ARCH_M001 (CR-82) ---
+  - id: COMP-M001-01
+    source: ARCH_M001
+    name: RootLayout
+    file: src/app/_layout.tsx
+    responsibility: >
+      Root layout component wrapping the entire app tree with providers
+      and GestureHandlerRootView for gesture recognition.
+    status: pending
+
+# =============================================================================
+# ALL CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # --- From ARCH_M001 (CR-82) ---
+  - id: CONTRACT-M001-01
+    source: ARCH_M001
+    name: GestureHandlerRootView wrapper
+    component: COMP-M001-01
+    type: component_integration
+    input:
+      import: "import { GestureHandlerRootView } from 'react-native-gesture-handler'"
+      package: "react-native-gesture-handler ~2.28.0"
+    output:
+      description: "All GestureDetector descendants can register gestures"
+    placement: "Inside ErrorBoundary, outside QueryClientProvider"
+
+  - id: CONTRACT-M001-02
+    source: ARCH_M001
+    name: SwipeableCard gesture recognition
+    depends_on: CONTRACT-M001-01
+    description: >
+      SwipeableCard (line 180) uses GestureDetector. Requires ancestor
+      GestureHandlerRootView. No modification to SwipeableCard needed.
+    screens:
+      - src/app/(tabs)/settings/members.tsx (line 225)
+      - src/app/(tabs)/settings/topics.tsx (line 123)
+
+# =============================================================================
+# ALL ADRs
+# =============================================================================
+
+adrs:
+
+  # --- From ARCH_INDEX (CR-77, CR-78) ---
+  - id: ADR-INDEX-01
+    source: ARCH_INDEX
+    title: Use new File/Paths API instead of legacy import
+    status: accepted
+    decision: >
+      Use import { File, Paths } from 'expo-file-system' with new class-based
+      API instead of deprecated legacy API.
+
+  - id: ADR-INDEX-02
+    source: ARCH_INDEX
+    title: Do NOT validate CSV header column names
+    status: accepted
+    decision: >
+      parseCsv uses positional mapping (column 1 = name, column 2 = phone).
+      No header name validation.
+
+  # --- From ARCH_M001 (CR-82) ---
+  - id: ADR-M001-01
+    source: ARCH_M001
+    title: Place GestureHandlerRootView at root layout level
+    status: accepted
+    decision: >
+      Wrap at root layout level in src/app/_layout.tsx. Standard pattern
+      per react-native-gesture-handler documentation.
+
+  - id: ADR-M001-02
+    source: ARCH_M001
+    title: Place inside ErrorBoundary but outside all other providers
+    status: accepted
+    decision: >
+      Insert GestureHandlerRootView as child of ErrorBoundary and parent
+      of QueryClientProvider.
+
+  - id: ADR-M001-03
+    source: ARCH_M001
+    title: Use style={{ flex: 1 }} on GestureHandlerRootView
+    status: accepted
+    decision: >
+      Apply style={{ flex: 1 }} as documented in react-native-gesture-handler
+      installation guide.
+
+# =============================================================================
+# ALL FILE CHANGES (PENDING)
+# =============================================================================
+
+pending_file_changes:
+
+  - source: ARCH_M001
+    cr: CR-82
+    file: src/app/_layout.tsx
+    changes:
+      - type: add_import
+        code: "import { GestureHandlerRootView } from 'react-native-gesture-handler';"
+      - type: wrap_jsx
+        description: "Wrap provider tree with GestureHandlerRootView style={{ flex: 1 }} inside ErrorBoundary"
+
+# =============================================================================
+# PROVIDER HIERARCHY (CURRENT STATE)
+# =============================================================================
+
+provider_hierarchy:
+  description: "Provider/wrapper nesting order after all CRs applied"
+  order:
+    - ErrorBoundary
+    - "GestureHandlerRootView (CR-82 - pending)"
+    - QueryClientProvider
+    - I18nextProvider
+    - ThemeProvider
+    - "AuthProvider (inside InnerLayout)"
+    - "SyncProvider (inside InnerLayout)"
+    - "NavigationGuard (inside InnerLayout)"
+    - "Slot (inside InnerLayout)"
+
+# =============================================================================
+# CROSS-MODULE DEPENDENCIES
+# =============================================================================
+
+cross_module_dependencies:
+  description: >
+    ARCH_M001 (CR-82) modifies src/app/_layout.tsx which is the root layout.
+    ARCH_INDEX (CR-77, CR-78) modifies src/app/(tabs)/settings/members.tsx.
+    These are independent files with no code overlap. The changes can be
+    applied in any order without conflict.
+  conflicts: none

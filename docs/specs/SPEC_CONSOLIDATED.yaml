@@ -1,0 +1,1265 @@
+# =============================================================================
+# SPEC_CONSOLIDATED.yaml
+# Fonte unica de verdade para requisitos do projeto Sacrament Meeting Planner
+# Gerado: 2026-02-18
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  description: >
+    App mobile (React Native/Expo) para planejamento de reunioes sacramentais
+    da Igreja de Jesus Cristo dos Santos dos Ultimos Dias. Permite ao bispado
+    designar discursantes e temas, ao secretario gerenciar convites e montar a
+    agenda completa da reuniao, com isolamento de dados entre alas, i18n
+    (pt-BR, en, es), modo apresentacao, push notifications e audit log.
+  created: "2026-02-18"
+  last_updated: "2026-02-18"
+  total_features: 24
+  total_change_requests: 82
+  implemented_crs: 78
+  pending_crs: 4
+  source_documents:
+    - docs/PRODUCT_SPECIFICATION.md
+    - docs/SPEC.final.md
+    - docs/specs/history/SPEC_INDEX.md
+    - docs/specs/history/SPEC_CR_batch1.md
+    - docs/specs/history/SPEC_CR_batch2.md
+    - docs/specs/history/SPEC_CR_batch3.md
+    - docs/specs/history/SPEC_CR_batch4.md
+    - docs/specs/history/SPEC_CONSOLIDATED_old.yaml
+    - docs/CHANGE_REQUESTS.yaml
+  detail_references: >
+    Acceptance criteria individuais de cada feature estao nos arquivos
+    docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
+    individuais; apenas referencia que existem.
+
+# =============================================================================
+# TECH STACK
+# =============================================================================
+
+tech_stack:
+  framework: "React Native + Expo SDK 54 (TypeScript)"
+  routing: "Expo Router (file-based)"
+  state_management: "TanStack Query (server state) + React Context (local: theme, auth)"
+  backend: "Supabase (Auth, PostgREST, Realtime, Edge Functions)"
+  database: "PostgreSQL with RLS (Row-Level Security)"
+  i18n: "react-i18next (pt-BR, en, es)"
+  testing: "Vitest"
+  gestures: "react-native-gesture-handler ~2.28.0 + react-native-reanimated"
+  offline: "Fila de mutacoes em AsyncStorage + last-write-wins"
+  push_notifications: "Expo Push Notifications (expo-notifications) + Supabase Edge Function"
+  deep_links: "expo-linking (convites por link)"
+  file_system: "expo-file-system ~19.0.21 (new File/Paths API, NOT legacy)"
+  sharing: "expo-sharing ~14.0.8"
+  document_picker: "expo-document-picker ~14.0.8"
+
+# =============================================================================
+# PERSONAS E PERMISSOES (estado atual apos todos os CRs implementados)
+# =============================================================================
+
+personas:
+  - role: bispado
+    description: >
+      Bispo + 2 Conselheiros (3 pessoas por ala). Responsaveis por decisoes
+      estrategicas: designam discursantes e temas, alteram status, gerenciam
+      usuarios, convidam novos usuarios por link.
+    typescript_type: "bishopric"
+
+  - role: secretario
+    description: >
+      1 pessoa por ala. Executa decisoes do bispado: gerencia membros, temas,
+      excecoes, altera status, envia convites via WhatsApp, gerencia usuarios
+      (CR-23), convida novos usuarios por link. NAO designa discursantes pela
+      aba Discursos nem Home, mas PODE designar pela aba Agenda (CR-31).
+    typescript_type: "secretary"
+
+  - role: observador
+    description: >
+      Membros com acesso somente-leitura. Visualizam discursos, designacoes
+      e agenda sem poder editar. Sem acesso a aba Configuracoes.
+    typescript_type: "observer"
+
+  - role: admin_sistema
+    description: >
+      Papel tecnico (nao usa o app). Importa Colecoes Gerais e hinos via
+      scripts CLI (pnpm import-themes, pnpm import-hymns).
+    typescript_type: null
+
+permissions:
+  # Tabela de permissoes atualizada (reflete CR-23, CR-26, CR-31, CR-37, CR-71)
+  speech_assign:
+    description: "Designar discursantes/temas (aba Discursos e Home)"
+    bispado: true
+    secretario: false
+    observador: false
+
+  speech_unassign:
+    description: "Remover designacao de discursante"
+    bispado: true
+    secretario: false
+    observador: false
+
+  speech_change_status:
+    description: "Alterar status de discursos"
+    bispado: true
+    secretario: true
+    observador: false
+
+  member_read:
+    description: "Visualizar lista de membros"
+    bispado: true
+    secretario: true
+    observador: false
+
+  member_write:
+    description: "Criar, editar, excluir membros"
+    bispado: true
+    secretario: true
+    observador: false
+
+  member_import:
+    description: "Importar/exportar membros via CSV"
+    bispado: true
+    secretario: true
+    observador: false
+
+  topic_write:
+    description: "Gerenciar temas da Ala"
+    bispado: true
+    secretario: true
+    observador: false
+
+  collection_toggle:
+    description: "Ativar/desativar Colecoes Gerais"
+    bispado: true
+    secretario: true
+    observador: false
+
+  sunday_type_write:
+    description: "Marcar tipo de domingo (dropdown)"
+    bispado: true
+    secretario: true
+    observador: false  # dropdown visivel mas desabilitado
+
+  settings_access:
+    description: "Acessar aba Configuracoes"
+    bispado: true
+    secretario: true
+    observador: false
+
+  settings_language:
+    description: "Configurar idioma da Ala"
+    bispado: true
+    secretario: true
+    observador: false
+
+  settings_whatsapp:
+    description: "Gerenciar convites WhatsApp"
+    bispado: false
+    secretario: true
+    observador: false
+
+  settings_users:
+    description: "Gerenciar usuarios (CRUD) - atualizado pelo CR-23"
+    bispado: true
+    secretario: true  # adicionado CR-23
+    observador: false
+
+  invitation_create:
+    description: "Convidar usuarios por link"
+    bispado: true
+    secretario: true
+    observador: false
+
+  home_next_assignments:
+    description: "Ver secao 'Proximas designacoes' na Home"
+    bispado: true
+    secretario: false
+    observador: false
+
+  home_invite_mgmt:
+    description: "Ver secao 'Gerenciamento de convites' na Home"
+    bispado: false
+    secretario: true
+    observador: false
+
+  agenda_read:
+    description: "Visualizar aba Agenda"
+    bispado: true
+    secretario: true
+    observador: true  # read-only
+
+  agenda_write:
+    description: "Editar agenda da reuniao"
+    bispado: true
+    secretario: true
+    observador: false
+
+  agenda_assign_speaker:
+    description: "Designar discursante via Agenda (excecao para Secretario - CR-31)"
+    bispado: true
+    secretario: true  # excecao documentada em CR-31/ASM-AGD-003
+    observador: false
+
+  presentation_start:
+    description: "Iniciar Modo Apresentacao"
+    bispado: true
+    secretario: true
+    observador: true  # read-only
+
+  push_receive:
+    description: "Receber push notifications"
+    bispado: true
+    secretario: true
+    observador: false
+
+  history_read:
+    description: "Visualizar Historico de acoes"
+    bispado: true
+    secretario: true
+    observador: false
+
+  theme_toggle:
+    description: "Alterar tema visual (dark/light)"
+    bispado: true
+    secretario: true
+    observador: false  # usa apenas tema do sistema
+
+# =============================================================================
+# FEATURES (estado atual apos 82 CRs, 78 implementados)
+# =============================================================================
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # Core Data (F001-F006)
+  # ---------------------------------------------------------------------------
+
+  - id: F001
+    name: "Authentication & Session Management"
+    status: implemented
+    rfs: [RF-33, RF-34, RF-35, RF-36]
+    description: >
+      Login com email/senha via Supabase Auth. Signup via self-registration
+      (primeiro usuario cria ala + usuario) ou convite por link (deep link
+      wardmanager://invite/{token}). Sessao persistente, password reset
+      via email (CR-67). Suporte a gerenciadores de senha.
+    modified_by_crs: [67]
+    notes:
+      - "CR-67: Adicionou 'Esqueci a senha' na tela de login"
+      - "Self-registration do primeiro usuario cria ala + usuario"
+      - "Convite por link expira em 30 dias"
+
+  - id: F002
+    name: "Multi-tenancy & Ward Management"
+    status: implemented
+    rfs: [RN-11, RN-13]
+    description: >
+      Criacao e configuracao de ala (nome, estaca, idioma, fuso horario,
+      template WhatsApp). Isolamento completo de dados entre alas via RLS.
+      Configuracao de idioma (pt-BR, en, es) e fuso horario (IANA timezone
+      com seletor de busca - CR-41).
+    modified_by_crs: [41]
+    notes:
+      - "CR-41: Formalizou spec do seletor de fuso horario"
+      - "Timezone default: pt-BR -> America/Sao_Paulo, en -> America/New_York, es -> America/Mexico_City"
+
+  - id: F003
+    name: "Member Management (CRUD)"
+    status: implemented
+    rfs: [RF-01, RF-01.1, RF-01.2, RF-02, RF-03]
+    description: >
+      Tela de gerenciamento de membros com busca em tempo real (case-insensitive,
+      ignora acentos). Adicionar membro via botao "+" no header. Editar/excluir
+      via swipe-to-reveal. Campos: nome completo, codigo do pais (dropdown com
+      bandeira emoji), telefone. Salvamento automatico ao clicar fora.
+      Snapshot pattern: edicao de membro NAO propaga para discursos existentes.
+    modified_by_crs: [40, 55, 78, 82]
+    notes:
+      - "CR-40: Resolveu inconsistencia de posicao do botao '+' (no header, nao FAB)"
+      - "CR-55: Corrigiu desalinhamento do header quando canWrite=false"
+      - "CR-78: Corrigiu unique constraint removendo phone da constraint (ward_id, full_name)"
+      - "CR-82: GestureHandlerRootView para swipe funcionar"
+      - "Observador: swipe desabilitado"
+
+  - id: F004
+    name: "Member Import/Export (CSV)"
+    status: implemented
+    rfs: [RF-04, RF-05]
+    description: >
+      Export CSV via share sheet (mobile) ou download (web). Import CSV via
+      document picker (mobile) ou file input (web). Formato: Nome Completo,
+      Codigo Pais, Telefone. Import sobrescreve toda a lista via Supabase RPC
+      import_members. Usa expo-file-system v19 new File/Paths API (CR-77/78).
+    modified_by_crs: [42, 54, 66, 77, 78]
+    notes:
+      - "CR-42: Corrigiu botoes que nao funcionavam"
+      - "CR-54: Corrigiu erro ao cancelar share sheet e msg hardcoded em ingles"
+      - "CR-66: Corrigiu export vazio e import com erro generico"
+      - "CR-77: Migrou para File/Paths API (cacheDirectory null fix)"
+      - "CR-78: Migrou para File.text() (EncodingType undefined fix)"
+
+  - id: F005
+    name: "Ward Topics Management"
+    status: implemented
+    rfs: [RF-06, RF-06.1, RF-06.2, RF-07, RF-08, RF-08.1]
+    description: >
+      Gerenciamento de temas da ala (CRUD) e colecoes gerais (toggle
+      ativar/desativar). Temas com titulo obrigatorio e link opcional.
+      Swipe-to-reveal para editar/excluir. Botao "+" dentro da secao
+      Temas da Ala (CR-21). Campo de busca/filtro (CR-39). Salvamento
+      automatico. Snapshot pattern para temas em discursos existentes.
+    modified_by_crs: [8, 21, 39, 82]
+    notes:
+      - "CR-8: Corrigiu lista de colecoes nao scrollavel"
+      - "CR-21: Moveu botao '+' para dentro da secao Ward Topics"
+      - "CR-39: Adicionou campo de busca para filtrar temas"
+      - "CR-82: GestureHandlerRootView para swipe funcionar"
+
+  - id: F006
+    name: "General Collections & Import"
+    status: implemented
+    rfs: [RF-08.2, RF-08.3]
+    description: >
+      Colecoes gerais de temas por idioma, importadas via script admin
+      (pnpm import-themes). Ativar/desativar colecoes por ala. Ao mudar
+      idioma da ala, colecoes do idioma anterior sao desativadas.
+    modified_by_crs: []
+
+  # ---------------------------------------------------------------------------
+  # Sunday & Speech (F007-F008)
+  # ---------------------------------------------------------------------------
+
+  - id: F007
+    name: "Sunday Type Management (Exceptions)"
+    status: implemented
+    rfs: [RF-09, RF-10, RF-11]
+    description: >
+      Dropdown no card expandido para tipo de domingo. Opcoes: Domingo com
+      Discursos, Reuniao de Testemunho, Conferencia Geral, Conferencia de
+      Estaca, Conferencia de Ala, Reuniao Especial da Primaria, Outro (com
+      texto livre). Auto-atribuicao em lote ao carregar lista. Todos os
+      valores (incluindo 'speeches') sao persistidos no banco.
+    modified_by_crs: [4, 6, 7, 24, 56, 68]
+    notes:
+      - "CR-6: Corrigiu lista de opcoes do dropdown"
+      - "CR-7: Escondeu secao de discursos quando nao e domingo com discursos"
+      - "CR-24: Corrigiu dropdown ignorando selecao"
+      - "CR-56: Corrigiu 'speeches' nao persistido no DB (CHECK constraint + filtro)"
+      - "CR-68: Corrigiu revert de selecao de tipo (race condition optimistic update)"
+
+  - id: F008
+    name: "Speech Management & Assignment"
+    status: implemented
+    rfs: [RF-12, RF-13, RF-14, RF-15, RF-16]
+    description: >
+      3 slots de discurso por domingo (1o, 2o, 3o Discurso). Ciclo de status:
+      Nao-designado -> Designado/Nao-Convidado -> Convidado -> Confirmado | Desistiu.
+      LEDs 3D com animacao indicam status. Bispado designa pela aba Discursos/Home.
+      Secretario altera status. Scroll infinito (12 meses passado/futuro, +6 ao scroll).
+      Snapshot pattern para nome/telefone/tema.
+    modified_by_crs: [5]
+    notes:
+      - "CR-5: Corrigiu labels de 'VAGA 1o' para '1o Discurso'"
+
+  # ---------------------------------------------------------------------------
+  # Tabs & Views (F009, F012, F016)
+  # ---------------------------------------------------------------------------
+
+  - id: F009
+    name: "Home Tab"
+    status: implemented
+    rfs: [RF-18, RF-19, RF-20]
+    description: >
+      Aba Home com 3 proximos domingos. Bispado ve "Proximas designacoes"
+      (4o+ domingo pendente). Secretario ve "Gerenciamento de convites".
+      Observador ve somente leitura. Titulo "Agenda da Reuniao Sacramental"
+      acima do botao Iniciar (visivel apenas domingos). Botao "Iniciar
+      Reuniao Sacramental" abre Modo Apresentacao.
+    modified_by_crs: [1, 3]
+    notes:
+      - "CR-1: Adicionou titulo para botao 'Iniciar Reuniao Sacramental'"
+      - "CR-3: Corrigiu 'Nenhum resultado encontrado' ao iniciar reuniao"
+
+  - id: F012
+    name: "Meeting Agenda Management"
+    status: implemented
+    rfs: [RF-21, RF-21.1, RF-21.2, RF-21.3, RF-21.4]
+    description: >
+      Aba Agenda para configurar a agenda completa da reuniao sacramental.
+      Secoes: Boas-vindas/Anuncios/Reconhecimentos, Designacoes/Sacramento,
+      Primeiros Discursos, Ultimo Discurso. Secoes dinamicas para reunioes
+      especiais (Testemunhos, Apresentacao da Primaria). Campos: presidir,
+      dirigir, reconhecer, pianista, regente, hinos, oracoes, apoios,
+      anuncios, apresentacao especial. Auto-save com debounce >= 500ms.
+      Designacao de discursantes via Agenda (Bispado + Secretario).
+    modified_by_crs: [25, 27, 28, 29, 30, 36, 69, 75]
+    notes:
+      - "CR-25: Corrigiu scroll inicial mostrando data passada"
+      - "CR-27: Corrigiu letter-eating e resized campo de anuncios (3 linhas)"
+      - "CR-28: Dialogo de hinos usa 2/3 da tela"
+      - "CR-29: Renomeou labels das secoes"
+      - "CR-30: Renomeou 'Numero musical' para 'Apresentacao especial'"
+      - "CR-36: Definiu debounce 500ms para auto-save"
+      - "CR-69: Renomeou labels adicionais (Dirigindo, Apoios, Reconhecendo a Presenca)"
+      - "CR-75: Domingos sem agenda aparecem como cards nao-expansiveis"
+
+  - id: F016
+    name: "Presentation Mode"
+    status: implemented
+    rfs: [RF-25]
+    description: >
+      Tela full-screen read-only com cards acordeao mostrando a agenda
+      completa da reuniao. Header com data completa no idioma da ala
+      (ex: "Domingo, 16 de Fevereiro de 2026"). Botao de fechar (nao
+      botao de voltar - excecao da convencao CR-33).
+    modified_by_crs: [38]
+    notes:
+      - "CR-38: Definiu formato de data no header do Modo Apresentacao"
+
+  # ---------------------------------------------------------------------------
+  # Communication (F010, F017, F024)
+  # ---------------------------------------------------------------------------
+
+  - id: F010
+    name: "WhatsApp Integration"
+    status: implemented
+    rfs: [RF-20]
+    description: >
+      Abertura de links wa.me com mensagem pre-preenchida a partir do template
+      configuravel da ala. Placeholders validos: {nome}, {data}, {posicao},
+      {colecao}, {titulo}, {link}. Template editavel com preview. Placeholders
+      clicaveis para inserir no texto (CR-15).
+    modified_by_crs: [12, 13, 14, 15, 16, 17, 35, 63]
+    notes:
+      - "CR-12: Renomeou titulo da tela"
+      - "CR-13: Removeu placeholder invalido {tema}"
+      - "CR-14: Definiu template padrao correto"
+      - "CR-15: Placeholders clicaveis"
+      - "CR-16: Melhorou uso de espaco na tela"
+      - "CR-17: Adicionou botao de voltar"
+      - "CR-35: Removeu placeholder invalido {duracao}"
+      - "CR-63: Corrigiu template padrao nao respeitado (null vs vazio)"
+
+  - id: F017
+    name: "Push Notifications"
+    status: implemented
+    rfs: [RF-26, RF-27, RF-28, RF-29, RF-30, RF-31, RF-32]
+    description: >
+      Push notifications via Expo Push Notifications. Tipos: notificacao ao
+      secretario apos designacao (5 min, agrupada por domingo), lembrete
+      semanal para bispado/secretario, notificacao imediata ao confirmar ou
+      desistir. Fuso horario configuravel por ala. Edge Function agendada
+      (cron) processa fila. Observadores nao recebem push.
+    modified_by_crs: [52, 53]
+    notes:
+      - "CR-52/53: Conectou codigo morto (useRealtimeSync, useConnection, useNotifications)"
+
+  - id: F024
+    name: "WhatsApp Template"
+    status: implemented
+    rfs: [RF-20]
+    description: >
+      Tela de configuracao do template WhatsApp com editor, preview e chips
+      de placeholders. 6 placeholders validos: {nome}, {data}, {posicao},
+      {colecao}, {titulo}, {link}. Template padrao configurado na criacao
+      da ala. Botao de voltar no header.
+    modified_by_crs: [12, 13, 14, 15, 16, 17, 35, 63]
+    notes:
+      - "Mesmas CRs que F010 (compartilham tela de template)"
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure (F011, F020-F023)
+  # ---------------------------------------------------------------------------
+
+  - id: F011
+    name: "Real-time Sync"
+    status: implemented
+    rfs: [RF-17, RN-08]
+    description: >
+      Sincronizacao entre abas em ate 5 segundos via Supabase Realtime
+      (WebSocket). Polling fallback a cada 2.5s quando WebSocket desconecta.
+      Tabelas sincronizadas: members, speeches, sunday_exceptions,
+      meeting_actors, sunday_agendas, ward_topics.
+    modified_by_crs: [52]
+    notes:
+      - "CR-52: Conectou useRealtimeSync que era codigo morto"
+
+  - id: F020
+    name: "Internationalization (i18n)"
+    status: implemented
+    rfs: [RNF-08, RF-08.3]
+    description: >
+      Suporte a 3 idiomas: pt-BR, en, es via react-i18next. Idioma da ala
+      configuravel. Ao iniciar o app, usa idioma da ala (se autenticado) ou
+      idioma do dispositivo (fallback). Colecoes gerais filtradas por idioma.
+      Todos os textos, labels, erros e mensagens traduzidos.
+    modified_by_crs: [2, 11, 59]
+    notes:
+      - "CR-2: Corrigiu idioma nao aplicado apos criar ala"
+      - "CR-11: Corrigiu idioma sempre em ingles ao iniciar Expo Go"
+      - "CR-59: Internacionalizou ErrorBoundary e strings hardcoded"
+
+  - id: F021
+    name: "Dark/Light Mode"
+    status: implemented
+    rfs: [RNF-02]
+    description: >
+      Suporte a Automatico (deteccao do sistema), Light e Dark mode.
+      Tela de selecao em Configuracoes. Toggle instantaneo (CR-65):
+      estado atualizado imediatamente, persistencia assincrona via
+      AsyncStorage. Todos os componentes usam cores do tema.
+    modified_by_crs: [10, 65]
+    notes:
+      - "CR-10: Implementou tela de selecao de tema (antes onPress vazio)"
+      - "CR-65: Corrigiu delay no toggle de tema (assincrono)"
+
+  - id: F022
+    name: "Offline Support"
+    status: implemented
+    rfs: [RNF-05]
+    description: >
+      Deteccao de conexao via useConnection. OfflineBanner exibido quando
+      offline. Fila de mutacoes em AsyncStorage com last-write-wins.
+      Sincronizacao ao reconectar.
+    modified_by_crs: [52]
+    notes:
+      - "CR-52: Conectou useConnection e OfflineBanner que eram codigo morto"
+
+  - id: F023
+    name: "Permissions & Role-based Access"
+    status: implemented
+    rfs: [RN-11]
+    description: >
+      3 roles: bishopric, secretary, observer. Permissoes gerenciadas via
+      lib/permissions.ts. Secretary pode designar via Agenda (excecao CR-31)
+      mas nao via Discursos/Home. Secretary tem acesso a gerenciamento de
+      usuarios (CR-23). Regra de auto-preside removida (CR-71).
+    modified_by_crs: [23, 31, 37, 71]
+    notes:
+      - "CR-23: Secretary ganhou permissao settings:users"
+      - "CR-31: Corrigiu contradicao ASM-009 (Secretary pode designar via Agenda)"
+      - "CR-37: Atualizou docs para refletir CR-23"
+      - "CR-71: Removeu regra de que ator que dirige tambem pode presidir"
+
+  # ---------------------------------------------------------------------------
+  # Admin & Audit (F013-F015, F018-F019)
+  # ---------------------------------------------------------------------------
+
+  - id: F013
+    name: "Meeting Actors Management"
+    status: implemented
+    rfs: [RF-22]
+    description: >
+      Gestao inline de atores dentro dos cards da agenda (CR-26). Ao clicar
+      em campo de ator (presidir, dirigir, pianista, regente), abre dialogo
+      bottom-sheet 2/3 da tela com busca, lista filtrada por role, e opcoes
+      de adicionar (so nome, role inferido do campo), editar nome e excluir.
+      A palavra "ator/atores" NAO aparece na UI. Tela separada de atores
+      em Configuracoes foi removida. Icones de edicao/exclusao com tamanho
+      adequado (CR-70). Reconhecendo a Presenca usa ActorSelector (CR-73).
+    modified_by_crs: [26, 34, 70, 71, 72, 73]
+    notes:
+      - "CR-26: Redesign completo - gestao inline na agenda"
+      - "CR-34: Atualizou docs removendo checkboxes"
+      - "CR-70: Aumentou icones de edicao/exclusao"
+      - "CR-71: Removeu regra auto-preside (can_conduct nao implica can_preside)"
+      - "CR-72: Bispado registrado auto-adicionado como ator (can_preside+can_conduct)"
+      - "CR-73: Campo Reconhecendo usa ActorSelector com filtro can_recognize"
+
+  - id: F014
+    name: "Hymns Catalog & Import"
+    status: implemented
+    rfs: [RF-23, RF-23.1]
+    description: >
+      Tabela global de hinos da Igreja com suporte a i18n. Importacao via
+      script CLI (pnpm import-hymns). Seletor de hinos em dialogo 2/3 da
+      tela com busca por numero ou titulo. Subset de hinos sacramentais
+      (is_sacramental=true). ~300 hinos por idioma.
+    modified_by_crs: [28, 51]
+    notes:
+      - "CR-28: Dialogo de hinos usa 2/3 da tela"
+      - "CR-51: Criou script CLI pnpm import-hymns"
+
+  - id: F015
+    name: "Prayer Selection"
+    status: implemented
+    rfs: [RF-24]
+    description: >
+      Campos de oracao de abertura e fechamento na agenda. Permite selecionar
+      membro da ala (MemberSelectorModal) OU digitar nome customizado (CR-74).
+      Nome customizado persistido apenas em *_name sem criar membro.
+      *_member_id = null quando nome customizado.
+    modified_by_crs: [74]
+    notes:
+      - "CR-74: Adicionou suporte a nomes customizados para oracoes"
+
+  - id: F018
+    name: "User Management (CRUD)"
+    status: implemented
+    rfs: [RF-33, RF-34, RF-35, RF-36]
+    description: >
+      Tela de gerenciamento de usuarios em Configuracoes. Listar, editar role,
+      excluir usuarios. Convidar novos usuarios por link. Visivel para
+      Bispado e Secretario (CR-23). Gerenciado via 6 Edge Functions:
+      register-first-user, create-invitation, register-invited-user,
+      list-users, update-user-role, delete-user.
+    modified_by_crs: [23, 37, 64]
+    notes:
+      - "CR-23: Secretario ganhou acesso a tela de usuarios"
+      - "CR-37: Docs atualizados para refletir CR-23"
+      - "CR-64: Corrigiu erro vermelho na tela de usuarios para Secretario"
+
+  - id: F019
+    name: "Activity Log (History)"
+    status: implemented
+    rfs: [RF-37]
+    description: >
+      Historico de acoes read-only com busca. Retencao de 2 anos.
+      Descricoes human-readable no idioma da ala (CR-22). Action types:
+      member:create/update/delete/import, topic:create/update/delete,
+      collection:activate/deactivate, sunday_type:change,
+      speech:assign/unassign/status_change, user:*, settings:*.
+    modified_by_crs: [18, 19, 22]
+    notes:
+      - "CR-18: Corrigiu mudanca de tipo de domingo nao logada"
+      - "CR-19: Adicionou botao de voltar na tela"
+      - "CR-22: Tornou descricoes human-readable"
+
+# =============================================================================
+# PENDING CHANGE REQUESTS (4 CRs pendentes de implementacao)
+# =============================================================================
+
+pending_crs:
+
+  - id: 76
+    type: bug_regression
+    regression_of: 64
+    area: "Users screen (F018)"
+    related_crs: [64, 23]
+    description: >
+      Regressao do CR-64. Ao clicar em "Usuarios" na aba Configuracoes,
+      aparece erro "Edge Function returned non-2xx status code". A Edge
+      Function list-users pode estar retornando erro para o papel do usuario
+      logado, ou a resposta pode ter mudado de formato apos o fix do CR-64.
+    likely_root_cause: >
+      A Edge Function list-users pode ter um bug na autorizacao ou no
+      processamento da resposta. Verificar se a funcao aceita corretamente
+      o role do usuario logado (bishopric ou secretary) e se o formato de
+      resposta esta correto.
+    files_likely_impacted:
+      - supabase/functions/list-users/index.ts
+      - src/app/(tabs)/settings/users.tsx
+
+  - id: 79
+    type: ui_bug
+    area: "Users screen (F018)"
+    related_crs: [33, 64]
+    description: >
+      Tela de Usuarios sem botao de voltar no header. Viola a convencao
+      global estabelecida pelo CR-33: toda tela acessada via Stack DEVE
+      ter botao de voltar no header.
+    acceptance_criteria:
+      - "Botao de voltar visivel no header da tela de Usuarios"
+      - "Botao usa common.back i18n key e estilo consistente (fontSize 16, fontWeight 600)"
+      - "Tapping navega de volta para Settings index"
+    notes: >
+      Se a convencao global (CR-33) foi implementada via settings/_layout.tsx
+      Stack screenOptions headerLeft, pode ser que a tela de usuarios nao
+      esteja usando a Stack corretamente. Verificar se users.tsx esta
+      registrado como screen no Stack navigator.
+    files_likely_impacted:
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(tabs)/settings/_layout.tsx
+
+  - id: 80
+    type: ux
+    area: "Members screen (F003/F004)"
+    related_crs: []
+    description: >
+      Tela de Membros precisa de textos explicativos sobre funcionalidades.
+      Adicionar textos informativos sobre: como exportar membros, como
+      importar membros, formato esperado do CSV. Textos devem ser
+      internacionalizados em pt-BR, en e es.
+    acceptance_criteria:
+      - "Textos explicativos visiveis na tela de Membros"
+      - "Explicacao sobre exportar CSV (o que faz, formato)"
+      - "Explicacao sobre importar CSV (o que faz, formato esperado, que sobrescreve)"
+      - "Todos os textos traduzidos em pt-BR, en, es"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/members.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 81
+    type: feature
+    area: "User management (F018)"
+    related_crs: [72]
+    description: >
+      Adicionar campo Nome para usuario. Quando usuario com role "bishopric"
+      se registra, o nome deve ser automaticamente adicionado como ator para
+      dirigir/presidir. Activity logs devem mostrar nome do usuario (amigavel)
+      ao inves de apenas email. Tela de usuarios deve exibir o nome.
+    acceptance_criteria:
+      - "Campo Nome no registro e edicao de usuario"
+      - "Auto-criacao de ator com can_preside+can_conduct ao registrar bishopric"
+      - "Activity logs exibem nome do usuario ao inves de email"
+      - "Tela de usuarios mostra nome ao lado do email/role"
+      - "Textos traduzidos em pt-BR, en, es"
+    notes: >
+      Relacionado ao CR-72 que ja implementou auto-adicao de bispado como
+      ator na aceitacao de convite. Este CR expande para incluir o nome
+      como campo obrigatorio e melhorar a experiencia de logs e listagem.
+    files_likely_impacted:
+      - supabase/functions/register-first-user/index.ts
+      - supabase/functions/register-invited-user/index.ts
+      - supabase/functions/list-users/index.ts
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(auth)/login.tsx
+      - src/lib/activityLog.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+# =============================================================================
+# DESIGN DECISIONS (consolidadas de todos os batches)
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-01
+    title: "Sunday types: lista correta"
+    decided_in: CR-6
+    decision: >
+      Opcoes de tipo de domingo sao exatamente: Domingo com Discursos,
+      Reuniao de Testemunho, Conferencia Geral, Conferencia de Estaca,
+      Conferencia de Ala, Reuniao Especial da Primaria, Outro (com texto livre).
+      Valores no DB: speeches, testimony_meeting, general_conference,
+      stake_conference, ward_conference, primary_presentation, other.
+
+  - id: DD-02
+    title: "Speeches type persists in DB"
+    decided_in: CR-56
+    decision: >
+      O valor 'speeches' e persistido na tabela sunday_exceptions (nao e
+      tratado como ausencia de registro). CHECK constraint inclui 'speeches'.
+      Auto-atribuicao em lote persiste 'speeches' para domingos normais.
+
+  - id: DD-03
+    title: "Actor management: inline na agenda, sem tela separada"
+    decided_in: CR-26
+    decision: >
+      Gestao de atores e feita inline nos campos da agenda, via dialogo
+      bottom-sheet 2/3 da tela. Tela separada em Configuracoes foi removida.
+      Ao adicionar ator, apenas nome e pedido; role inferido do campo que
+      abriu o dialogo. A palavra "ator/atores" NAO aparece na UI.
+    superseded:
+      - "RF-22 original com checkboxes de role"
+      - "Tela separada Settings > Actors"
+
+  - id: DD-04
+    title: "Auto-preside rule removida"
+    decided_in: CR-71
+    decision: >
+      A regra de que can_conduct=true implica can_preside=true foi removida.
+      enforceActorRules tornou-se no-op. Ao criar ator pelo campo "Dirigindo",
+      apenas can_conduct=true e setado.
+    superseded:
+      - "Regra original: can_conduct implica can_preside (SPEC.final.md 6.3)"
+
+  - id: DD-05
+    title: "Snapshot pattern para dados desnormalizados"
+    decided_in: "SPEC original (ADR-005)"
+    decision: >
+      Discursos armazenam speaker_name, speaker_phone, topic_title, topic_link,
+      topic_collection como texto desnormalizado. Agenda armazena nomes de atores,
+      oracoes, e reconhecidos como snapshots. Exclusao de membro/tema/ator
+      preserva dados historicos. Edicao NAO propaga para registros existentes.
+
+  - id: DD-06
+    title: "Debounce 500ms para auto-save em campos de texto"
+    decided_in: CR-36
+    decision: >
+      Campos de texto com auto-save DEVEM usar debounce >= 500ms. Estado
+      do input gerenciado localmente (useState), sincronizado com servidor
+      apos debounce expirar. Flush on unmount para salvar valores pendentes.
+      Implementado via DebouncedTextInput component.
+
+  - id: DD-07
+    title: "Global back button convention"
+    decided_in: CR-33
+    decision: >
+      Toda tela acessada via Stack navigation DEVE ter botao de voltar no
+      header (top-left). Usa common.back i18n key. Estilo: fontSize 16,
+      fontWeight 600, color colors.primary. Excecao: Presentation Mode usa
+      botao "fechar". Modais nao precisam de back button.
+    implementation: >
+      Configurado globalmente via settings/_layout.tsx Stack screenOptions
+      headerLeft para evitar repeticao.
+
+  - id: DD-08
+    title: "WhatsApp placeholders: 6 validos"
+    decided_in: "CR-13, CR-35"
+    decision: >
+      Placeholders validos no template WhatsApp: {nome}, {data}, {posicao},
+      {colecao}, {titulo}, {link}. Removidos: {tema} (CR-13), {duracao} (CR-35).
+    superseded:
+      - "{tema} placeholder (nunca foi valido)"
+      - "{duracao} placeholder (coluna duration nao existe no DB)"
+
+  - id: DD-09
+    title: "Secretario pode designar via Agenda (excecao ASM-009)"
+    decided_in: CR-31
+    decision: >
+      Secretario NAO designa pela aba Discursos nem Home (speech:assign=false),
+      MAS PODE designar pela aba Agenda (agenda:assign_speaker=true). Correcao
+      de contradicao no ASM-009 do SPEC.final.md.
+
+  - id: DD-10
+    title: "expo-file-system v19: usar new File/Paths API"
+    decided_in: "CR-77, CR-78"
+    decision: >
+      Usar import { File, Paths } from 'expo-file-system' (new class-based API)
+      ao inves de legacy API. File.write() para escrita (sincrono), File.text()
+      para leitura (async). Paths.cache para diretorio de cache. Legacy API
+      (cacheDirectory, EncodingType, readAsStringAsync, writeAsStringAsync)
+      esta deprecated e nao e exportada pelo modulo principal.
+
+  - id: DD-11
+    title: "GestureHandlerRootView no root layout"
+    decided_in: CR-82
+    decision: >
+      GestureHandlerRootView wrapa toda a app tree em _layout.tsx, dentro do
+      ErrorBoundary mas fora de todos os outros providers. style={{ flex: 1 }}.
+      Necessario para SwipeableCard funcionar em Members e Topics.
+
+  - id: DD-12
+    title: "About screen: disclaimer e autor"
+    decided_in: "CR-32, CR-62"
+    decision: >
+      Tela Sobre exibe: nome do app, versao, autor "Aloisio Almeida Jr",
+      disclaimer "Esse nao e um app oficial da Igreja de Jesus Cristo Dos
+      Santos Dos Ultimos Dias" (traduzido em 3 idiomas). Link de suporte
+      opcional (oculto se nao configurado).
+
+  - id: DD-13
+    title: "Agenda section labels (estado final)"
+    decided_in: "CR-29, CR-69"
+    decision: >
+      Secoes da agenda (pt-BR): "Boas-vindas, Anuncios e Reconhecimentos",
+      "Designacoes e Sacramento", "Primeiros Discursos", "Ultimo Discurso".
+      Reuniao de testemunho: "Testemunhos". Apresentacao da primaria:
+      "Apresentacao Especial da Primaria". Labels de campos: "Dirigindo"
+      (nao "Conduzindo"), "Apoios e Agradecimentos" (nao "Assuntos da Ala"),
+      "Apoios e Agradecimentos da Estaca" (nao "Anuncios de Estaca"),
+      "Reconhecendo a Presenca" (nao "Reconhecendo").
+
+  - id: DD-14
+    title: "Apresentacao Especial (nao Numero Musical)"
+    decided_in: CR-30
+    decision: >
+      Toggle e campo entre discursos 2 e 3 chama-se "Apresentacao Especial"
+      (nao "Numero Musical"). Traduzido em 3 idiomas.
+
+  - id: DD-15
+    title: "Prayer fields com nomes customizados"
+    decided_in: CR-74
+    decision: >
+      Campos de oracao permitem selecionar membro da ala OU digitar nome
+      customizado. Nome customizado: *_name preenchido, *_member_id = null.
+      Membro selecionado: ambos preenchidos. Nome customizado nao cria
+      registro na tabela members.
+
+  - id: DD-16
+    title: "Sundays sem agenda aparecem como cards nao-expansiveis"
+    decided_in: CR-75
+    decision: >
+      Na aba Agenda, domingos sem registro de agenda aparecem como cards
+      nao-expansiveis (sem acordeao). Mostram date block e badge amarelo
+      com o tipo de excecao. Inclui general_conference e stake_conference
+      (antes excluidos por EXCLUDED_EXCEPTION_TYPES).
+
+  - id: DD-17
+    title: "Bishopric auto-added as actors"
+    decided_in: CR-72
+    decision: >
+      Quando usuario com role "bishopric" aceita convite, e automaticamente
+      adicionado a meeting_actors com can_preside=true, can_conduct=true,
+      can_recognize=false, can_music=false. Se nome ja existe, nao duplica.
+      Mudanca de role de bishopric para outro NAO remove o ator.
+
+  - id: DD-18
+    title: "Logout via Settings"
+    decided_in: CR-43
+    decision: >
+      Botao "Sair" no final da aba Configuracoes. Estilo destrutivo (vermelho).
+      Dialogo de confirmacao antes de executar. Chama supabase.auth.signOut().
+      Visivel para todos os roles. Limpa React Query cache.
+
+  - id: DD-19
+    title: "Error handling: onError em todas as mutations"
+    decided_in: "CR-57, CR-58, CR-59, CR-60, CR-61"
+    decision: >
+      Todas as mutations tem onError com Alert.alert traduzido. Tabs tem
+      QueryErrorView quando query falha. ErrorBoundary internacionalizado
+      e com cores do tema. ErrorBoundaries granulares por tab. QueryClient
+      com global error handlers, retry:2 para queries (exponential backoff),
+      retry:0 para mutations, timeout 30s.
+
+  - id: DD-20
+    title: "Presentation mode date format"
+    decided_in: CR-38
+    decision: >
+      Header do Modo Apresentacao exibe data completa no idioma da ala.
+      pt-BR: "Domingo, DD de [Mes] de YYYY". en: "Sunday, [Month] DD, YYYY".
+      es: "Domingo, DD de [Mes] de YYYY". Usa idioma da ala, nao device locale.
+
+# =============================================================================
+# BUSINESS RULES (globais, consolidadas)
+# =============================================================================
+
+business_rules:
+
+  - id: BR-01
+    rule: "Toda tela acessada via Stack DEVE ter botao de voltar no header"
+    origin: CR-33
+    exceptions: "Presentation Mode (usa botao 'fechar'), modais (dismiss overlay)"
+
+  - id: BR-02
+    rule: "Campos de texto com auto-save devem usar debounce >= 500ms com estado local (useState)"
+    origin: CR-36
+    implementation: "DebouncedTextInput component, flush on unmount"
+
+  - id: BR-03
+    rule: "A palavra 'ator/atores/actor/actors' NAO aparece em nenhum label ou texto na UI"
+    origin: CR-26
+    exception: "Tabela do DB pode se chamar 'meeting_actors'"
+
+  - id: BR-04
+    rule: "Secretario NAO designa pela aba Discursos nem Home, mas PODE designar pela aba Agenda"
+    origin: "CR-31 (correcao de ASM-009)"
+
+  - id: BR-05
+    rule: "Snapshot pattern: edicao/exclusao de membro, tema ou ator NAO altera discursos/agendas existentes"
+    origin: "SPEC original (ADR-005)"
+
+  - id: BR-06
+    rule: "Auto-atribuicao de tipo de domingo ao carregar lista, com persistencia imediata (incluindo 'speeches')"
+    origin: "RF-10, CR-56"
+    auto_assign_rules:
+      - "Padrao: speeches"
+      - "1o domingo de Jan, Fev, Mar, Mai, Jun, Jul, Ago, Set, Nov, Dez: testimony_meeting"
+      - "1o domingo de Abr e Out: general_conference"
+      - "2o domingo de Abr e Out: testimony_meeting"
+
+  - id: BR-07
+    rule: "Observador tem dropdown de tipo de domingo visivel mas desabilitado (read-only)"
+    origin: RF-09
+
+  - id: BR-08
+    rule: "Ao mudar de tipo de domingo para excecao, discursos existentes sao apagados (com confirmacao)"
+    origin: RF-09
+
+  - id: BR-09
+    rule: "Ao mudar de excecao para 'Discursos', 3 speeches vazios sao criados imediatamente"
+    origin: RF-11
+
+  - id: BR-10
+    rule: "CSV import sobrescreve TODA a lista de membros (delete all + insert all, via RPC import_members)"
+    origin: RF-05
+
+  - id: BR-11
+    rule: "Colecoes gerais filtradas por idioma da ala. Ao mudar idioma, colecoes do idioma anterior sao desativadas"
+    origin: RF-08.3
+
+  - id: BR-12
+    rule: "Activity log: retencao de 2 anos, read-only, descricoes human-readable no idioma da ala"
+    origin: "RF-37, CR-22"
+
+  - id: BR-13
+    rule: "Push notifications: Observadores NAO recebem push. Token registrado apenas para bishopric e secretary"
+    origin: "RF-26, CR-53"
+
+  - id: BR-14
+    rule: "Convites por link expiram em 30 dias"
+    origin: "SPEC original"
+
+  - id: BR-15
+    rule: "Mutations NAO fazem retry (retry:0). Queries fazem retry:2 com exponential backoff (1s, 2s)"
+    origin: CR-61
+
+  - id: BR-16
+    rule: "Errors nunca mostram stack traces, codigos Supabase ou mensagens tecnicas ao usuario"
+    origin: CR-57
+
+  - id: BR-17
+    rule: "Bishopric registrado e automaticamente adicionado como ator (can_preside + can_conduct)"
+    origin: CR-72
+
+  - id: BR-18
+    rule: "can_conduct NAO implica can_preside (regra auto-preside removida)"
+    origin: CR-71
+
+  - id: BR-19
+    rule: "Oracoes permitem nomes customizados (nao-membros). *_member_id = null para customizados"
+    origin: CR-74
+
+  - id: BR-20
+    rule: "Domingos sem agenda aparecem na aba Agenda como cards nao-expansiveis com badge de tipo"
+    origin: CR-75
+
+  - id: BR-21
+    rule: "Apenas 1 swipe card revelado por vez (Members e Topics)"
+    origin: "RF-02, RF-08"
+
+  - id: BR-22
+    rule: "Tap no card de membro/tema NAO abre edicao (apenas swipe)"
+    origin: "RF-02, RF-08"
+
+  - id: BR-23
+    rule: "Dialogo de confirmacao ao excluir membro com discursos futuros designados"
+    origin: RF-03
+
+  - id: BR-24
+    rule: "Template WhatsApp null no DB: mostrar template padrao. String vazia: respeitar (usuario limpou intencionalmente)"
+    origin: CR-63
+
+# =============================================================================
+# DATA MODEL (schema principal, estado atual)
+# =============================================================================
+
+data_model:
+  tables:
+    - name: wards
+      description: "Alas da igreja"
+      key_columns: [id, name, stake_name, language, timezone, whatsapp_template]
+      unique_constraints: ["(stake_name, name)"]
+
+    - name: users
+      description: "Usuarios via auth.users do Supabase com app_metadata (ward_id, role)"
+      managed_by: "6 Edge Functions"
+      edge_functions:
+        - register-first-user
+        - create-invitation
+        - register-invited-user
+        - list-users
+        - update-user-role
+        - delete-user
+
+    - name: members
+      description: "Membros da ala"
+      key_columns: [id, ward_id, full_name, country_code, phone]
+      unique_constraints: ["(ward_id, full_name)"]
+      notes: "CR-78 removeu phone da unique constraint"
+
+    - name: ward_topics
+      description: "Temas da ala (CRUD manual)"
+      key_columns: [id, ward_id, title, link]
+
+    - name: general_collections
+      description: "Colecoes globais por idioma (importadas via script admin)"
+
+    - name: general_topics
+      description: "Temas de colecoes globais"
+
+    - name: ward_collection_config
+      description: "Ponte ala-colecao com campo active (boolean)"
+
+    - name: sunday_exceptions
+      description: "Tipo de cada domingo"
+      key_columns: [id, ward_id, date, reason, custom_reason]
+      unique_constraints: ["(ward_id, date)"]
+      check_constraint: "reason IN ('speeches', 'testimony_meeting', 'general_conference', 'stake_conference', 'ward_conference', 'primary_presentation', 'other')"
+      notes: "'speeches' e persistido (CR-56). custom_reason usado apenas quando reason='other'"
+
+    - name: speeches
+      description: "Discursos (3 por domingo)"
+      key_columns: [id, ward_id, sunday_date, position, member_id, speaker_name, speaker_phone, topic_title, topic_link, topic_collection, status]
+      unique_constraints: ["(ward_id, sunday_date, position)"]
+      valid_statuses: [not_assigned, assigned_not_invited, assigned_invited, assigned_confirmed, gave_up]
+      snapshot_fields: [speaker_name, speaker_phone, topic_title, topic_link, topic_collection]
+
+    - name: meeting_actors
+      description: "Atores da reuniao (gerenciados inline na agenda)"
+      key_columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_music]
+      notes: "can_conduct NAO implica can_preside (CR-71)"
+
+    - name: hymns
+      description: "Catalogo global de hinos por idioma (~300 por idioma)"
+      key_columns: [id, language, number, title, is_sacramental]
+      unique_constraints: ["(language, number)"]
+      notes: "Importada via script pnpm import-hymns. Sem ward_id."
+
+    - name: sunday_agendas
+      description: "Agenda completa da reuniao sacramental por domingo"
+      key_columns: >
+        id, ward_id, sunday_date, presiding_name, presiding_actor_id,
+        conducting_name, conducting_actor_id, recognized_names, announcements,
+        pianist_name, pianist_actor_id, conductor_name, conductor_actor_id,
+        opening_hymn_id, opening_prayer_member_id, opening_prayer_name,
+        sustaining_releasing, has_baby_blessing, baby_blessing_names,
+        has_baptism_confirmation, baptism_confirmation_names,
+        has_stake_announcements, sacrament_hymn_id,
+        has_special_presentation, special_presentation_description,
+        intermediate_hymn_id, closing_hymn_id,
+        closing_prayer_member_id, closing_prayer_name
+      unique_constraints: ["(ward_id, sunday_date)"]
+      notes: >
+        Atores armazenados como snapshot (nome) + FK opcional. Oracoes: member_id
+        para membros, null + name para nomes customizados (CR-74).
+
+    - name: device_push_tokens
+      description: "Tokens de push notification por dispositivo"
+      key_columns: [id, user_id, ward_id, expo_push_token]
+      unique_constraints: ["(user_id, expo_push_token)"]
+
+    - name: notification_queue
+      description: "Fila de notificacoes pendentes"
+      key_columns: [id, ward_id, type, sunday_date, speech_position, speaker_name, target_role, status, send_after]
+      notification_types: [designation, weekly_assignment, weekly_confirmation, speaker_confirmed, speaker_withdrew]
+
+    - name: invitations
+      description: "Convites por link para novos usuarios"
+      key_columns: [id, ward_id, email, role, token, expires_at, used_at, created_by]
+      notes: "Token unico. Deep link: wardmanager://invite/{token}. Expira em 30 dias."
+
+    - name: activity_log
+      description: "Historico de acoes (audit log)"
+      key_columns: [id, ward_id, user_id, user_email, action_type, description, created_at]
+      retention: "2 anos"
+      valid_action_types:
+        - "member:create, member:update, member:delete, member:import"
+        - "topic:create, topic:update, topic:delete"
+        - "collection:activate, collection:deactivate"
+        - "sunday_type:change"
+        - "speech:assign, speech:unassign, speech:status_change"
+        - "user:self_register, user:invite, user:register_via_invite, user:role_change, user:delete"
+        - "settings:language, settings:timezone"
+
+# =============================================================================
+# NAVIGATION STRUCTURE
+# =============================================================================
+
+navigation:
+  tabs:
+    - name: Home
+      route: "/(tabs)/index"
+      access: "todos os roles (observador read-only)"
+    - name: Discursos
+      route: "/(tabs)/speeches"
+      access: "todos os roles (observador read-only)"
+    - name: Agenda
+      route: "/(tabs)/agenda"
+      access: "todos os roles (observador read-only)"
+    - name: Configuracoes
+      route: "/(tabs)/settings"
+      access: "bispado e secretario (observador nao ve)"
+
+  settings_sub_screens:
+    - name: Members
+      route: "/(tabs)/settings/members"
+    - name: Topics
+      route: "/(tabs)/settings/topics"
+    - name: Users
+      route: "/(tabs)/settings/users"
+    - name: WhatsApp Template
+      route: "/(tabs)/settings/whatsapp"
+    - name: History
+      route: "/(tabs)/settings/history"
+    - name: Timezone
+      route: "/(tabs)/settings/timezone"
+    - name: Theme
+      route: "/(tabs)/settings/theme"
+    - name: About
+      route: "/(tabs)/settings/about"
+
+  auth_screens:
+    - name: Login
+      route: "/(auth)/login"
+    - name: Register (self)
+      route: "/(auth)/register"
+    - name: Register (invited)
+      route: "/(auth)/register-invited"
+
+  modal_screens:
+    - name: Presentation Mode
+      route: "/presentation"
+      notes: "Usa botao 'fechar' (excecao da convencao de back button)"
+
+# =============================================================================
+# SCOPE BOUNDARIES
+# =============================================================================
+
+in_scope:
+  - "CRUD de membros (manual + CSV import/export)"
+  - "CRUD de temas (ala + colecoes gerais via script admin)"
+  - "Tipo de domingo via dropdown (7 opcoes + texto livre para 'Outro')"
+  - "Auto-atribuicao em lote de tipo de domingo"
+  - "Designacao de discursantes e temas (3 discursos por domingo)"
+  - "Ciclo de status com LEDs 3D animados"
+  - "Aba Home personalizada por role"
+  - "WhatsApp integration (links wa.me com template)"
+  - "Real-time sync (Supabase Realtime + polling fallback)"
+  - "Scroll infinito (12 meses passado/futuro, +6 ao scroll)"
+  - "i18n: pt-BR, en, es"
+  - "Multi-tenancy com RLS"
+  - "3 roles: bishopric, secretary, observer"
+  - "CRUD de usuarios (Edge Functions)"
+  - "Offline support (fila de mutacoes, OfflineBanner)"
+  - "Dark/light mode"
+  - "Agenda completa da reuniao sacramental"
+  - "Gestao inline de atores da reuniao"
+  - "Catalogo de hinos com i18n"
+  - "Modo Apresentacao (full-screen read-only)"
+  - "Push notifications (Expo + Edge Function)"
+  - "Self-registration e convite por link"
+  - "Historico de acoes (audit log, 2 anos)"
+  - "Esqueci a senha"
+  - "Logout"
+
+out_of_scope:
+  - "Envio direto de SMS/email (apenas push notifications e links wa.me)"
+  - "Gestao de outros aspectos da ala (frequencia, chamados, financas)"
+  - "Colaboracao multi-usuario simultanea"
+  - "Integracao com sistemas oficiais da Igreja SUD"
+  - "Gestao de Estacas"
+  - "Fotos de membros"
+  - "Autenticacao federada / SSO"
+  - "Relatorios e analytics"
+  - "Lista de convites pendentes na UI (apenas botao convidar)"
+
+# =============================================================================
+# CR HISTORY REFERENCE (para lookup rapido de todas as 82 CRs)
+# =============================================================================
+
+cr_history:
+  batch_1:
+    range: "CR-01 a CR-10"
+    status: "todas implementadas"
+    file: "docs/specs/history/SPEC_CR_batch1.md"
+    summary: "UI fixes, bugs criticos (sunday types, topics scroll), theme/about buttons"
+
+  batch_2:
+    range: "CR-11 a CR-30"
+    status: "todas implementadas"
+    file: "docs/specs/history/SPEC_CR_batch2.md"
+    summary: "i18n fix, WhatsApp template improvements, activity log, secretary permissions, sunday type dropdown fix, actors redesign, agenda enhancements"
+
+  batch_3:
+    range: "CR-31 a CR-43"
+    status: "todas implementadas"
+    file: "docs/specs/history/SPEC_CR_batch3.md"
+    summary: "Spec corrections, back button convention, debounce rules, CSV fixes, logout, timezone spec, topics search"
+
+  batch_4:
+    range: "CR-44 a CR-75"
+    status: "todas implementadas"
+    file: "docs/specs/history/SPEC_CR_batch4.md"
+    summary: "Docs update, speeches persistence, dead code wiring, error handling overhaul, CSV/members fixes, UI/UX improvements, auth fixes, agenda/actors enhancements, import-hymns CLI"
+
+  batch_5:
+    range: "CR-76 a CR-82"
+    status: "4 pendentes (76, 79, 80, 81), 3 implementadas (77, 78, 82)"
+    file: "docs/specs/history/SPEC_CONSOLIDATED_old.yaml (CR-77, 78, 82)"
+    summary: "Users screen regression, back button, members explanatory text, user name field, expo-file-system v19 migration, GestureHandlerRootView"

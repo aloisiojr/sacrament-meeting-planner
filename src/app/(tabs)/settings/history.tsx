@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TextInput,
   ActivityIndicator,
   Pressable,
 } from 'react-native';
@@ -12,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SearchInput } from '../../../components/SearchInput';
 import { useActivityLog, useActivityLogSearch } from '../../../hooks/useActivityLog';
 import type { ActivityLog } from '../../../types/database';
 
@@ -104,20 +104,10 @@ export default function ActivityLogScreen() {
 
       {/* Search field */}
       <View style={styles.searchContainer}>
-        <TextInput
-          style={[
-            styles.searchInput,
-            {
-              color: colors.text,
-              borderColor: colors.divider,
-              backgroundColor: colors.surfaceVariant,
-            },
-          ]}
-          placeholder={t('common.search')}
-          placeholderTextColor={colors.textSecondary}
+        <SearchInput
           value={searchText}
           onChangeText={updateSearch}
-          autoCorrect={false}
+          placeholder={t('common.search')}
         />
       </View>
 
@@ -192,12 +182,6 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 16,
     paddingBottom: 12,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
   },
   centered: {
     padding: 40,

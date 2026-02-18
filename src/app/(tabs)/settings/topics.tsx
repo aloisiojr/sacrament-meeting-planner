@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SwipeableCard } from '../../../components/SwipeableCard';
+import { SearchInput } from '../../../components/SearchInput';
 import {
   useWardTopics,
   useCreateWardTopic,
@@ -327,14 +328,10 @@ export default function TopicsScreen() {
 
             {/* Search field for Ward Topics */}
             <View style={styles.searchContainer}>
-              <TextInput
-                style={[styles.searchInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              <SearchInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder={t('common.search')}
-                placeholderTextColor={colors.placeholder}
-                autoCapitalize="none"
-                autoCorrect={false}
               />
             </View>
 
@@ -454,13 +451,6 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-  },
-  searchInput: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 15,
   },
   editor: {
     paddingHorizontal: 16,

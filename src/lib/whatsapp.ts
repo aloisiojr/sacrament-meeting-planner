@@ -11,6 +11,9 @@ export {
   resolveTemplate,
   buildWhatsAppUrl,
   DEFAULT_TEMPLATE_PT_BR,
+  DEFAULT_TEMPLATE_EN,
+  DEFAULT_TEMPLATE_ES,
+  getDefaultTemplate,
 } from './whatsappUtils';
 export type { WhatsAppVariables } from './whatsappUtils';
 

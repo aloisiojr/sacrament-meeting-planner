@@ -27,7 +27,7 @@ import { SwipeableCard } from '../../../components/SwipeableCard';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { generateCsv, parseCsv, splitPhoneNumber, type CsvErrorCode } from '../../../lib/csvUtils';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import {

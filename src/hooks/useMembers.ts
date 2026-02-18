@@ -80,7 +80,7 @@ export function useMembers(search?: string) {
  * Create a new member in the current ward.
  */
 export function useCreateMember() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -102,7 +102,7 @@ export function useCreateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:create', `${data.full_name} adicionado como membro`);
+        logAction(wardId, user.id, user.email ?? '', 'member:create', `${data.full_name} adicionado como membro`, userName);
       }
     },
   });
@@ -112,7 +112,7 @@ export function useCreateMember() {
  * Update an existing member.
  */
 export function useUpdateMember() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -131,7 +131,7 @@ export function useUpdateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:update', `${data.full_name} atualizado`);
+        logAction(wardId, user.id, user.email ?? '', 'member:update', `${data.full_name} atualizado`, userName);
       }
     },
   });
@@ -160,7 +160,7 @@ export async function checkFutureSpeeches(memberId: string): Promise<number> {
  * but snapshot fields (speaker_name, speaker_phone) are preserved.
  */
 export function useDeleteMember() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -172,7 +172,7 @@ export function useDeleteMember() {
     onSuccess: (memberName) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:delete', `${memberName} removido`);
+        logAction(wardId, user.id, user.email ?? '', 'member:delete', `${memberName} removido`, userName);
       }
     },
   });

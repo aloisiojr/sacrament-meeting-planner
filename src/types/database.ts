@@ -208,6 +208,7 @@ export interface ActivityLog {
   ward_id: string;
   user_id: string;
   user_email: string;
+  user_name: string | null;
   action_type: string;
   description: string;
   created_at: string;

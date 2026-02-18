@@ -48,6 +48,7 @@ describe('STEP-06-01: Edge Functions offline guard', () => {
     'register-invited-user',
     'create-invitation',
     'update-user-role',
+    'update-user-name',
     'delete-user',
   ];
 
@@ -63,8 +64,8 @@ describe('STEP-06-01: Edge Functions offline guard', () => {
     }
   });
 
-  it('ONLINE_ONLY_OPERATIONS contains all 5 blocked functions', () => {
-    expect(ONLINE_ONLY_OPERATIONS).toHaveLength(5);
+  it('ONLINE_ONLY_OPERATIONS contains all 6 blocked functions', () => {
+    expect(ONLINE_ONLY_OPERATIONS).toHaveLength(6);
     for (const fn of allBlockedFunctions) {
       expect(ONLINE_ONLY_OPERATIONS).toContain(fn);
     }

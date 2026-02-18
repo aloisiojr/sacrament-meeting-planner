@@ -129,7 +129,7 @@ export function useLazyCreateAgenda() {
  * Accepts partial updates - only sends changed fields.
  */
 export function useUpdateAgenda() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -156,7 +156,7 @@ export function useUpdateAgenda() {
       });
       queryClient.invalidateQueries({ queryKey: agendaKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'agenda:edit', `Agenda do dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())} editada`);
+        logAction(wardId, user.id, user.email ?? '', 'agenda:edit', `Agenda do dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())} editada`, userName);
       }
     },
   });

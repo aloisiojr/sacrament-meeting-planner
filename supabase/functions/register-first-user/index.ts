@@ -18,6 +18,7 @@ interface RegisterInput {
   role: 'bishopric' | 'secretary';
   language: string;
   timezone: string;
+  fullName: string;
 }
 
 Deno.serve(async (req) => {
@@ -33,6 +34,14 @@ Deno.serve(async (req) => {
     if (!input.email || !input.password || !input.stakeName || !input.wardName || !input.role) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate fullName
+    if (!input.fullName?.trim()) {
+      return new Response(
+        JSON.stringify({ error: 'Name is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -107,6 +116,7 @@ Deno.serve(async (req) => {
       app_metadata: {
         ward_id: ward.id,
         role: input.role,
+        full_name: input.fullName.trim(),
       },
     });
 
@@ -151,6 +161,45 @@ Deno.serve(async (req) => {
       if (configError) {
         console.error('ward_collection_config creation error:', configError);
         // Non-fatal: ward and user are created, collections can be configured later
+      }
+    }
+
+    // Auto-create meeting actor for bishopric role (best-effort)
+    if (input.role === 'bishopric') {
+      try {
+        const actorName = input.fullName.trim();
+
+        // Check if actor with same name already exists
+        const { data: existing } = await supabaseAdmin
+          .from('meeting_actors')
+          .select('id, can_preside, can_conduct')
+          .eq('ward_id', ward.id)
+          .ilike('name', actorName)
+          .maybeSingle();
+
+        if (existing) {
+          // Update flags if needed
+          if (!existing.can_preside || !existing.can_conduct) {
+            await supabaseAdmin
+              .from('meeting_actors')
+              .update({ can_preside: true, can_conduct: true })
+              .eq('id', existing.id);
+          }
+        } else {
+          await supabaseAdmin
+            .from('meeting_actors')
+            .insert({
+              ward_id: ward.id,
+              name: actorName,
+              can_preside: true,
+              can_conduct: true,
+              can_recognize: false,
+              can_music: false,
+            });
+        }
+      } catch (actorErr) {
+        console.error('Auto-actor creation failed:', actorErr);
+        // Best-effort: do not fail registration
       }
     }
 

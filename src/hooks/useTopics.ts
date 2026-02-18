@@ -70,7 +70,7 @@ export function useWardTopics(search?: string) {
  * Create a new ward topic.
  */
 export function useCreateWardTopic() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -92,7 +92,7 @@ export function useCreateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema "${data.title}" adicionado`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema "${data.title}" adicionado`, userName);
       }
     },
   });
@@ -102,7 +102,7 @@ export function useCreateWardTopic() {
  * Update an existing ward topic.
  */
 export function useUpdateWardTopic() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -122,7 +122,7 @@ export function useUpdateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema "${data.title}" atualizado`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema "${data.title}" atualizado`, userName);
       }
     },
   });
@@ -149,7 +149,7 @@ export async function checkTopicFutureSpeeches(topicTitle: string, wardId: strin
  * Speeches with this topic will preserve snapshot fields (topic_title, topic_link, topic_collection).
  */
 export function useDeleteWardTopic() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -162,7 +162,7 @@ export function useDeleteWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema "${topicTitle}" removido`);
+        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema "${topicTitle}" removido`, userName);
       }
     },
   });
@@ -227,7 +227,7 @@ export function useCollections(language: string) {
  * Toggle a general collection's activation for the current ward.
  */
 export function useToggleCollection() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -274,7 +274,7 @@ export function useToggleCollection() {
         const desc = result.active
           ? `Colecao "${result.collectionName}" ativada`
           : `Colecao "${result.collectionName}" desativada`;
-        logAction(wardId, user.id, user.email ?? '', action, desc);
+        logAction(wardId, user.id, user.email ?? '', action, desc, userName);
       }
     },
   });

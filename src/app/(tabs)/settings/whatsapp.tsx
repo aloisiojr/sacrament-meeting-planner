@@ -46,7 +46,7 @@ function resolveTemplate(template: string): string {
 export default function WhatsAppTemplateScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +90,7 @@ export default function WhatsAppTemplateScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp atualizado');
+        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp atualizado', userName);
       }
     },
   });

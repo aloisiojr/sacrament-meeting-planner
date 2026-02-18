@@ -110,6 +110,7 @@ estimated_iterations: 4
 | CR76 | Fix Users Screen Edge Function Error (Regression CR-64) | CR-76 | Complete | [ARCH_CR76](ARCH_CR76.md) |
 | BUG401 | Fix Systemic HTTP 401 on All Authenticated Edge Functions | BUG-401 | Complete | [ARCH_BUG401](ARCH_BUG401.md) |
 | CR5 | Batch 5: Actor Icons, CSV Fixes, Members UX, Users Name | CR-70, CR-77, CR-78, CR-79, CR-80 | Complete | [ARCH_CR5](ARCH_CR5.md) |
+| CR81 | User Name Field: Registration, Display, Edit, Activity Log | CR-81 | Complete | [ARCH_CR81](ARCH_CR81.md) |
 
 ## Module Dependencies
 
@@ -267,6 +268,8 @@ scripts/                          # Admin CLI scripts (not Edge Functions)
 | ADR-025 | Guard useQuery with enabled: !!session for authenticated queries | BUG401 |
 | ADR-026 | Use error codes in csvUtils.ts instead of English strings | CR5 |
 | ADR-027 | Rename update-user-role Edge Function to update-user | CR5 |
+| ADR-028 | Use full_name in app_metadata and a separate update-user-name EF | CR81 |
+| ADR-029 | Auto-create actor in register-first-user for bishopric role | CR81 |
 
 ## Security Model
 

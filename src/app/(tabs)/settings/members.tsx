@@ -254,7 +254,7 @@ export default function MembersScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
-  const { hasPermission, wardId, user } = useAuth();
+  const { hasPermission, wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -423,7 +423,7 @@ export default function MembersScreen() {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       Alert.alert(t('common.success'), t('members.importSuccess', { count: data.imported }));
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:import', `Members imported via CSV: ${data.imported} members`);
+        logAction(wardId, user.id, user.email ?? '', 'member:import', `Members imported via CSV: ${data.imported} members`, userName);
       }
     },
     onError: (err: Error) => {

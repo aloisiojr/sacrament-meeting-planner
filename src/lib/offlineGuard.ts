@@ -16,6 +16,7 @@ export const ONLINE_ONLY_OPERATIONS = [
   'register-invited-user',
   'create-invitation',
   'update-user-role',
+  'update-user-name',
   'delete-user',
 ] as const;
 

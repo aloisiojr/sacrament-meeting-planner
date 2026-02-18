@@ -207,7 +207,7 @@ export function useAutoAssignSundayTypes() {
  * Uses optimistic update for instant UI feedback.
  */
 export function useSetSundayType() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -278,7 +278,7 @@ export function useSetSundayType() {
         const lang = getCurrentLanguage();
         const dateStr = formatDateHumanReadable(variables.date, lang);
         const typeLabel = getSundayTypeLabel(variables.reason, lang);
-        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`, userName);
       }
     },
     onError: () => {
@@ -294,7 +294,7 @@ export function useSetSundayType() {
  * Uses optimistic update for instant UI feedback.
  */
 export function useRemoveSundayException() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -329,7 +329,7 @@ export function useRemoveSundayException() {
         const lang = getCurrentLanguage();
         const dateStr = formatDateHumanReadable(date, lang);
         const typeLabel = getSundayTypeLabel('speeches', lang);
-        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`, userName);
       }
     },
     onError: () => {

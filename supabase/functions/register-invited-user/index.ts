@@ -12,6 +12,7 @@ const corsHeaders = {
 interface RegisterInvitedInput {
   token: string;
   password: string;
+  fullName: string;
 }
 
 interface ValidateTokenInput {
@@ -112,6 +113,14 @@ async function handleRegister(supabaseAdmin: any, input: RegisterInvitedInput) {
     );
   }
 
+  // Validate fullName
+  if (!input.fullName?.trim()) {
+    return new Response(
+      JSON.stringify({ error: 'Name is required' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   if (password.length < 6) {
     return new Response(
       JSON.stringify({ error: 'Password must be at least 6 characters' }),
@@ -157,6 +166,7 @@ async function handleRegister(supabaseAdmin: any, input: RegisterInvitedInput) {
     app_metadata: {
       ward_id: invitation.ward_id,
       role: invitation.role,
+      full_name: input.fullName.trim(),
     },
   });
 

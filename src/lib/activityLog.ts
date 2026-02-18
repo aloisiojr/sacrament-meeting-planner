@@ -18,19 +18,22 @@ import { supabase } from './supabase';
  * @param userEmail - The user's email
  * @param actionType - Machine-readable action type (e.g., 'member:create')
  * @param description - Human-readable description in ward language
+ * @param userName - Optional user display name
  */
 export async function logAction(
   wardId: string,
   userId: string,
   userEmail: string,
   actionType: string,
-  description: string
+  description: string,
+  userName?: string
 ): Promise<void> {
   try {
     await supabase.from('activity_log').insert({
       ward_id: wardId,
       user_id: userId,
       user_email: userEmail,
+      user_name: userName || null,
       action_type: actionType,
       description,
     });
@@ -44,7 +47,7 @@ export async function logAction(
  * Convenience wrapper that extracts user info from Supabase auth.
  * Returns a function that can be called with actionType and description.
  */
-export function createLogger(wardId: string, userId: string, userEmail: string) {
+export function createLogger(wardId: string, userId: string, userEmail: string, userName?: string) {
   return (actionType: string, description: string) =>
-    logAction(wardId, userId, userEmail, actionType, description);
+    logAction(wardId, userId, userEmail, actionType, description, userName);
 }

@@ -88,7 +88,7 @@ const TIMEZONES: string[] = [
 export default function TimezoneScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -123,7 +123,8 @@ export default function TimezoneScreen() {
           user.id,
           user.email ?? '',
           'settings:timezone',
-          `Timezone changed to ${timezone}`
+          `Timezone changed to ${timezone}`,
+          userName
         );
       }
       Alert.alert(t('common.success'), t('timezoneSelector.saved'));

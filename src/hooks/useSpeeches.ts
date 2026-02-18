@@ -180,7 +180,7 @@ export function useLazyCreateSpeeches() {
  * Bishopric-only operation.
  */
 export function useAssignSpeaker() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -203,7 +203,7 @@ export function useAssignSpeaker() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:assign', `${data.speaker_name} designado para ${data.position}o discurso dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}`);
+        logAction(wardId, user.id, user.email ?? '', 'speech:assign', `${data.speaker_name} designado para ${data.position}o discurso dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}`, userName);
       }
     },
   });
@@ -244,7 +244,7 @@ export function useAssignTopic() {
  * Bishopric + Secretary can change status.
  */
 export function useChangeStatus() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -274,7 +274,7 @@ export function useChangeStatus() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:status_change', `Status de ${data.speaker_name ?? 'N/A'} alterado para ${data.status} (${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}, ${data.position}o discurso)`);
+        logAction(wardId, user.id, user.email ?? '', 'speech:status_change', `Status de ${data.speaker_name ?? 'N/A'} alterado para ${data.status} (${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}, ${data.position}o discurso)`, userName);
       }
     },
   });
@@ -287,7 +287,7 @@ export function useChangeStatus() {
  * Bishopric-only operation.
  */
 export function useRemoveAssignment() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -310,7 +310,7 @@ export function useRemoveAssignment() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:unassign', `Designacao de ${result.previousSpeaker} removida (${formatDateHumanReadable(result.speech.sunday_date, getCurrentLanguage())}, ${result.speech.position}o discurso)`);
+        logAction(wardId, user.id, user.email ?? '', 'speech:unassign', `Designacao de ${result.previousSpeaker} removida (${formatDateHumanReadable(result.speech.sunday_date, getCurrentLanguage())}, ${result.speech.position}o discurso)`, userName);
       }
     },
   });

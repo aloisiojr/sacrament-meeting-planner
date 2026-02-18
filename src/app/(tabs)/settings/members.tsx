@@ -143,7 +143,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <FlatList
               data={COUNTRY_CODES}
-              keyExtractor={(item) => item.code}
+              keyExtractor={(item) => item.label}
               renderItem={({ item }) => (
                 <Pressable
                   style={[

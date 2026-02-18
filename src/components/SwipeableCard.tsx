@@ -157,8 +157,8 @@ export function SwipeableCard({
             accessibilityRole="button"
             accessibilityLabel={editLabel ?? 'Edit'}
           >
-            <Text style={[styles.actionText, { color: colors.onPrimary }]}>
-              {editLabel ?? 'Edit'}
+            <Text style={[styles.actionIcon, { color: colors.onPrimary }]}>
+              {'\u270F'}
             </Text>
           </Pressable>
         )}
@@ -169,8 +169,8 @@ export function SwipeableCard({
             accessibilityRole="button"
             accessibilityLabel={deleteLabel ?? 'Delete'}
           >
-            <Text style={[styles.actionText, { color: '#FFFFFF' }]}>
-              {deleteLabel ?? 'Delete'}
+            <Text style={[styles.actionIcon, { color: '#FFFFFF' }]}>
+              {'\uD83D\uDDD1'}
             </Text>
           </Pressable>
         )}
@@ -215,6 +215,10 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  actionIcon: {
+    fontSize: 20,
+    textAlign: 'center',
   },
   cardContent: {
     zIndex: 1,

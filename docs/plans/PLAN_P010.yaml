@@ -1,0 +1,160 @@
+# =============================================================================
+# PLAN_P010.yaml
+# Feature: F026 - Members Screen Explanatory Texts (i18n)
+# CR: CR-80
+# SPEC: docs/specs/SPEC_F026.yaml
+# ARCH: docs/arch/ARCH_M010.yaml
+# Generated: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Add two explanatory texts to the Members screen (description below title,
+  CSV help below CSV buttons) with i18n support (pt-BR, en, es), following
+  existing subtitle/description patterns from auth screens.
+
+strategy:
+  order: "Happy path -> Edge cases -> Regression"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto com o codigo"
+
+steps:
+  - id: STEP-01
+    description: >
+      Add i18n keys (members.description, members.csvHelp) to all 3 locale
+      files (en.json, pt-BR.json, es.json) inside the existing "members" object.
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "en.json has members.description and members.csvHelp keys with English text"
+      - "pt-BR.json has members.description and members.csvHelp keys with Portuguese text"
+      - "es.json has members.description and members.csvHelp keys with Spanish text"
+      - "All 3 files are valid JSON (no parse errors)"
+    tests:
+      - type: unit
+        description: >
+          Verify i18n keys exist: import each locale JSON and assert
+          members.description and members.csvHelp are non-empty strings
+          matching the values from SPEC_F026 i18n_keys section.
+    covers:
+      acceptance_criteria: ["AC-4", "AC-5", "AC-6"]
+      edge_cases: []
+    risks:
+      - risk: "JSON syntax error breaking all translations"
+        mitigation: "Test validates JSON parse succeeds for all 3 files"
+    commit_message: "feat(i18n): add members.description and members.csvHelp keys in pt-BR/en/es (CR-80)"
+
+  - id: STEP-02
+    description: >
+      Add description Text element below the header and CSV help Text element
+      inside the canImport block in members.tsx. Add corresponding styles
+      (description: fontSize 13, textAlign center, paddingHorizontal 16,
+      marginBottom 8; csvHelp: fontSize 12, paddingHorizontal 16,
+      marginBottom 8). Description text always visible. CSV help text only
+      visible when canImport is true.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "A <Text> with t('members.description') exists between header and searchContainer"
+      - "A <Text> with t('members.csvHelp') exists inside the canImport block, after csvActions"
+      - "description style has fontSize 13, textAlign center, paddingHorizontal 16, marginBottom 8"
+      - "csvHelp style has fontSize 12, paddingHorizontal 16, marginBottom 8"
+      - "Both texts use colors.textSecondary for color"
+    tests:
+      - type: unit
+        description: >
+          T-1: Render MembersScreen, assert getByText(t('members.description'))
+          is present in the tree (AC-1).
+      - type: unit
+        description: >
+          T-2: Render MembersScreen with canImport=true, assert
+          getByText(t('members.csvHelp')) is present (AC-2).
+      - type: unit
+        description: >
+          T-3: Render MembersScreen with canImport=false, assert
+          queryByText(t('members.csvHelp')) returns null (AC-3).
+    covers:
+      acceptance_criteria: ["AC-1", "AC-2", "AC-3"]
+      edge_cases: ["EC-1", "EC-3"]
+    risks:
+      - risk: "Text wrapping issues on small screens (EC-1)"
+        mitigation: "Using paddingHorizontal 16 and no fixed width ensures natural text wrapping"
+    commit_message: "feat(members): add description and csvHelp explanatory texts (CR-80)"
+
+  - id: STEP-03
+    description: >
+      Run existing member management tests to verify no regressions.
+      Ensure all pre-existing tests (CSV import/export, member CRUD)
+      still pass without modification.
+    files: []
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "All existing tests in src/__tests__/cr004-f005-csv-members.test.ts pass"
+      - "All existing tests in src/__tests__/cr004-f005-csv-members-fixes.test.ts pass"
+      - "No test failures related to member screen changes"
+    tests:
+      - type: regression
+        description: >
+          Run full test suite (vitest) and verify no regressions in
+          member-related tests. Existing tests should pass unchanged.
+    covers:
+      acceptance_criteria: ["AC-7"]
+      edge_cases: ["EC-2"]
+    risks:
+      - risk: "Existing tests may break if they assert exact element count or tree structure"
+        mitigation: "Review existing tests before STEP-02 to ensure new elements dont conflict"
+    commit_message: "test(members): verify no regressions after explanatory texts (CR-80)"
+
+validation:
+  - ac_id: AC-1
+    how_to_verify: "getByText(t('members.description')) returns a valid element in rendered MembersScreen"
+    covered_by_steps: ["STEP-01", "STEP-02"]
+
+  - ac_id: AC-2
+    how_to_verify: "getByText(t('members.csvHelp')) returns a valid element when canImport=true"
+    covered_by_steps: ["STEP-01", "STEP-02"]
+
+  - ac_id: AC-3
+    how_to_verify: "queryByText(t('members.csvHelp')) returns null when canImport=false"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-4
+    how_to_verify: "pt-BR.json contains members.description and members.csvHelp with correct Portuguese text"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-5
+    how_to_verify: "en.json contains members.description and members.csvHelp with correct English text"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-6
+    how_to_verify: "es.json contains members.description and members.csvHelp with correct Spanish text"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-7
+    how_to_verify: "All existing member management tests pass without modification"
+    covered_by_steps: ["STEP-03"]
+
+edge_case_coverage:
+  - ec_id: EC-1
+    description: "Long text wrapping on small screens"
+    how_covered: "STEP-02 uses paddingHorizontal 16 and no fixed width/numberOfLines, allowing natural wrap"
+    covered_by_steps: ["STEP-02"]
+
+  - ec_id: EC-2
+    description: "Locale change updates texts dynamically"
+    how_covered: "Uses t() from react-i18next which re-renders on locale change; regression test verifies no breakage"
+    covered_by_steps: ["STEP-01", "STEP-03"]
+
+  - ec_id: EC-3
+    description: "CSV help conditional on canImport"
+    how_covered: "STEP-02 places csvHelp inside existing canImport block; test T-3 verifies absence when canImport=false"
+    covered_by_steps: ["STEP-02"]

@@ -1,0 +1,252 @@
+# ARCH_M010 - Members Screen Explanatory Texts (i18n)
+
+```yaml
+type: arch
+version: 1
+status: complete
+module: WardDataModule_Patch (M002)
+features: [F026]
+spec: SPEC_F026
+cr: CR-80
+```
+
+## ARCH_SUMMARY
+
+```yaml
+type: arch_summary
+status: complete
+components_count: 4
+main_components:
+  - "MembersScreen description text (below title)"
+  - "MembersScreen CSV help text (below CSV buttons)"
+  - "i18n keys: members.description, members.csvHelp"
+tech_stack:
+  - "React Native (TypeScript)"
+  - "react-i18next"
+estimated_iterations: 1
+```
+
+## Overview
+
+```yaml
+goal: >
+  Add two static explanatory texts to the Members screen:
+  (1) a description below the title explaining screen functionality,
+  (2) a CSV help text near the import/export buttons explaining CSV behavior
+  and expected format. Both texts translated in pt-BR, en, es.
+principles:
+  - "Follow existing subtitle/description pattern from auth screens (forgot-password.tsx)"
+  - "Use colors.textSecondary with smaller font sizes for secondary text"
+  - "CSV help text only visible when canImport is true (same conditional as CSV buttons)"
+  - "No logic changes, only UI text additions"
+  - "All new strings must be in all 3 locale files"
+```
+
+## Diagram
+
+```
+  BEFORE (current members.tsx layout):
+  ┌──────────────────────────────────────────────────────┐
+  │  [Back]         [Title "Members"]           [+ Add]  │
+  │                                                      │
+  │  [Search bar                                      ]  │
+  │                                                      │
+  │  [Export CSV]   [Import CSV]                          │  <- only when canImport
+  │                                                      │
+  │  [Member list...]                                    │
+  └──────────────────────────────────────────────────────┘
+
+  AFTER (with explanatory texts):
+  ┌──────────────────────────────────────────────────────┐
+  │  [Back]         [Title "Members"]           [+ Add]  │
+  │                                                      │
+  │  "Add, edit and remove ward members.                 │  <- NEW: members.description
+  │   Swipe a member to edit or delete."                 │     (always visible)
+  │                                                      │
+  │  [Search bar                                      ]  │
+  │                                                      │
+  │  [Export CSV]   [Import CSV]                          │  <- only when canImport
+  │                                                      │
+  │  "Export saves all members as CSV. Import loads       │  <- NEW: members.csvHelp
+  │   a CSV and replaces entire list. Format: ..."       │     (only when canImport)
+  │                                                      │
+  │  [Member list...]                                    │
+  └──────────────────────────────────────────────────────┘
+```
+
+## Components
+
+| # | Component | Responsibility | Change Type |
+|---|-----------|----------------|-------------|
+| 1 | members.tsx (description text) | Display screen description below header title | MODIFY |
+| 2 | members.tsx (CSV help text) | Display CSV usage help below CSV buttons | MODIFY |
+| 3 | en.json, pt-BR.json, es.json | Add 2 new i18n keys to members section | MODIFY |
+| 4 | members.tsx (styles) | Add styles for description and CSV help texts | MODIFY |
+
+## Contracts
+
+### C1: Description Text Below Title
+
+```yaml
+file: src/app/(tabs)/settings/members.tsx
+location: "After the header View (containing Back, Title, Add button), before searchContainer"
+
+jsx_to_add: |
+  {/* Screen description */}
+  <Text style={[styles.description, { color: colors.textSecondary }]}>
+    {t('members.description')}
+  </Text>
+
+style_to_add:
+  description:
+    fontSize: 13
+    textAlign: "center"
+    paddingHorizontal: 16
+    marginTop: 0
+    marginBottom: 8
+
+visibility: "Always visible (no conditional)"
+pattern_reference: "forgot-password.tsx:66 description style (fontSize 15, textSecondary)"
+notes:
+  - "Uses fontSize 13 (slightly smaller than auth screens' 15) because this is a settings sub-screen, not a full-page auth screen"
+  - "Placed between header and search container"
+```
+
+### C2: CSV Help Text Below CSV Buttons
+
+```yaml
+file: src/app/(tabs)/settings/members.tsx
+location: "Inside the canImport conditional block, after the csvActions View (containing Export/Import buttons)"
+
+jsx_to_add: |
+  {/* CSV help text - inside canImport block, after csvActions */}
+  <Text style={[styles.csvHelp, { color: colors.textSecondary }]}>
+    {t('members.csvHelp')}
+  </Text>
+
+style_to_add:
+  csvHelp:
+    fontSize: 12
+    paddingHorizontal: 16
+    marginBottom: 8
+
+visibility: "Only when canImport is true (same guard as CSV buttons)"
+notes:
+  - "Shares the same canImport conditional block as the CSV buttons"
+  - "Placed after the CSV action buttons row"
+  - "Uses fontSize 12 (smaller than description) to visually differentiate help text from primary description"
+```
+
+### C3: i18n Keys
+
+```yaml
+new_keys:
+  - key: "members.description"
+    en: "Add, edit and remove ward members. Swipe a member to edit or delete."
+    pt_BR: "Adicione, edite e remova membros da ala. Deslize um membro para editar ou excluir."
+    es: "Agregue, edite y elimine miembros del barrio. Deslice un miembro para editar o eliminar."
+
+  - key: "members.csvHelp"
+    en: "Export saves all members as a CSV file. Import loads a CSV file and replaces the entire member list. Expected format: Name, Full Phone (with country code, e.g. +5511999999999)."
+    pt_BR: "Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com codigo do pais, ex: +5511999999999)."
+    es: "Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Telefono Completo (con codigo de pais, ej: +5211234567890)."
+
+files_to_modify:
+  - src/i18n/locales/en.json
+  - src/i18n/locales/pt-BR.json
+  - src/i18n/locales/es.json
+
+location_in_json: "Inside the 'members' object, after existing keys"
+```
+
+## Flows
+
+### F1: User Views Members Screen with Explanatory Texts
+
+```
+1. User navigates to Settings > Members
+2. MembersScreen renders with header (Back, Title, Add button)
+3. Description text renders below header: t('members.description')
+   - Always visible regardless of permissions
+   - Uses textSecondary color, fontSize 13, centered
+4. Search bar renders below description
+5. IF canImport is true:
+   a. CSV buttons row renders (Export, Import)
+   b. CSV help text renders below buttons: t('members.csvHelp')
+      - Uses textSecondary color, fontSize 12
+6. Member list renders below
+```
+
+### F2: User Without Import Permission
+
+```
+1. User navigates to Settings > Members
+2. Description text visible below header (always shown)
+3. Search bar visible
+4. CSV buttons and CSV help text are NOT rendered (canImport=false)
+5. Member list renders directly after search bar
+```
+
+## ADRs
+
+```yaml
+no_new_adrs: true
+rationale: >
+  This change follows established patterns (subtitle/description from auth screens,
+  conditional rendering from existing canImport guard). No architectural decisions
+  needed. Text placement and styling follow existing conventions.
+```
+
+## Security
+
+```yaml
+no_security_impact: true
+notes:
+  - "UI-only change: adds static Text elements with i18n translations"
+  - "No new data access, no backend changes, no new permissions"
+  - "CSV help text reuses the same canImport permission check already in place"
+```
+
+## File Impact Summary
+
+| File | Change Type | Lines Changed (est.) | Description |
+|------|-------------|---------------------|-------------|
+| `src/app/(tabs)/settings/members.tsx` | MODIFY | ~15 | Add description Text after header, add csvHelp Text inside canImport block, add 2 new styles |
+| `src/i18n/locales/en.json` | MODIFY | ~2 | Add members.description and members.csvHelp keys |
+| `src/i18n/locales/pt-BR.json` | MODIFY | ~2 | Add members.description and members.csvHelp keys |
+| `src/i18n/locales/es.json` | MODIFY | ~2 | Add members.description and members.csvHelp keys |
+
+## Risk Assessment
+
+```yaml
+risks:
+  - id: R-1
+    severity: VERY_LOW
+    description: "Static text additions only. No logic changes."
+    mitigation: "Uses existing patterns (textSecondary color, conditional rendering). No possible regressions to member CRUD or CSV operations."
+```
+
+## Testing Strategy
+
+```yaml
+tests:
+  - id: T-1
+    type: component
+    description: "Render MembersScreen and verify members.description text is present"
+    approach: "getByText(t('members.description')) should exist"
+
+  - id: T-2
+    type: component
+    description: "Render MembersScreen with canImport=true, verify members.csvHelp text is present"
+    approach: "getByText(t('members.csvHelp')) should exist"
+
+  - id: T-3
+    type: component
+    description: "Render MembersScreen with canImport=false, verify members.csvHelp text is NOT present"
+    approach: "queryByText(t('members.csvHelp')) should be null"
+
+  - id: T-4
+    type: regression
+    description: "Run existing member management tests to verify no regressions"
+    approach: "Existing test suite should pass unchanged"
+```

@@ -1,0 +1,277 @@
+type: spec
+version: 1
+cr_id: CR-80
+feature_id: F026
+category: UX
+priority: LOW
+
+title: >
+  Add explanatory/descriptive texts to the Members screen with i18n support
+  (pt-BR, en, es)
+
+description: >
+  The Members screen (src/app/(tabs)/settings/members.tsx) currently shows only
+  functional elements: title, search bar, CSV import/export buttons, add button,
+  and the members list. There are no explanatory or descriptive texts to help the
+  user understand how the screen's features work. Other screens in the app use
+  subtitle/description patterns (e.g., forgot-password uses
+  auth.forgotPasswordDescription, register uses auth.registerSubtitle, invite
+  uses auth.inviteSubtitle) to provide contextual guidance. This CR adds similar
+  descriptive text to the Members screen, specifically explaining the CSV
+  import/export functionality and the expected file format, since these are the
+  least self-evident features on the screen.
+
+scope:
+  in:
+    - "Add a subtitle/description text below the Members screen title"
+    - "Add a help text near the CSV import/export buttons explaining what they do"
+    - "Explain that CSV import overwrites the entire member list"
+    - "Explain the expected CSV format (Name, Full Phone)"
+    - "Add all new i18n keys in pt-BR, en, and es locale files"
+  out:
+    - "Changes to CSV import/export logic or behavior"
+    - "Changes to member CRUD functionality"
+    - "Changes to navigation or routing"
+    - "Changes to backend/Supabase"
+    - "Changes to other screens"
+    - "Adding tooltips, modals, or interactive help"
+
+personas:
+  - id: P-1
+    description: >
+      Bishopric member or Secretary with 'member:write' and 'member:import'
+      permissions who manages the ward's member list
+
+  - id: P-2
+    description: >
+      Bishopric member or Secretary who is new to the app and needs guidance
+      on how the CSV import/export features work
+
+user_stories:
+  - id: US-1
+    as_a: "Bishopric member or Secretary managing members"
+    i_want: "to see a brief explanation of the Members screen purpose"
+    so_that: "I understand what this screen is for at a glance"
+
+  - id: US-2
+    as_a: "user who wants to import members via CSV"
+    i_want: "to see explanatory text about the CSV format and import behavior"
+    so_that: "I know the expected file format and that import will overwrite all existing members"
+
+  - id: US-3
+    as_a: "user who wants to export members"
+    i_want: "to see explanatory text about what the export does"
+    so_that: "I understand the exported file format and purpose"
+
+acceptance_criteria:
+  - id: AC-1
+    given: "The Members screen is displayed"
+    when: "The user looks at the area below the title"
+    then: >
+      A subtitle/description text is visible below the title, explaining that this
+      screen is used to manage ward members (add, edit, remove). The text uses
+      colors.textSecondary color and a smaller font size than the title, following
+      the same visual pattern as auth screens (e.g., forgot-password description).
+    priority: must
+    testable: true
+    test_approach: >
+      Render MembersScreen and verify that a Text element with the content from
+      t('members.description') is present below the title.
+
+  - id: AC-2
+    given: "The Members screen is displayed and the user has import/export permissions"
+    when: "The user looks at the area near the CSV import/export buttons"
+    then: >
+      A help text is visible near the CSV buttons explaining: (1) Export downloads
+      a CSV file with all members, (2) Import loads members from a CSV file and
+      replaces the entire list, (3) the expected CSV format has two columns: Name
+      and Full Phone (with country code). The text uses colors.textSecondary and
+      fontSize 12-13.
+    priority: must
+    testable: true
+    test_approach: >
+      Render MembersScreen with canImport=true and verify that a Text element
+      with the content from t('members.csvHelp') is present near the CSV buttons.
+
+  - id: AC-3
+    given: "The Members screen is displayed"
+    when: "The user does NOT have import/export permissions"
+    then: >
+      The CSV help text is NOT visible (since the CSV buttons themselves are
+      hidden when canImport is false).
+    priority: must
+    testable: true
+    test_approach: >
+      Render MembersScreen with canImport=false and verify that the CSV help text
+      is not rendered.
+
+  - id: AC-4
+    given: "The app language is set to pt-BR"
+    when: "The Members screen is displayed"
+    then: >
+      All explanatory texts are displayed in Portuguese (pt-BR), using the
+      translated values from the members section of pt-BR.json.
+    priority: must
+    testable: true
+    test_approach: >
+      Set i18n language to pt-BR, render the screen, and verify texts match
+      the pt-BR translations.
+
+  - id: AC-5
+    given: "The app language is set to en"
+    when: "The Members screen is displayed"
+    then: >
+      All explanatory texts are displayed in English, using the translated
+      values from the members section of en.json.
+    priority: must
+    testable: true
+    test_approach: >
+      Set i18n language to en, render the screen, and verify texts match
+      the English translations.
+
+  - id: AC-6
+    given: "The app language is set to es"
+    when: "The Members screen is displayed"
+    then: >
+      All explanatory texts are displayed in Spanish, using the translated
+      values from the members section of es.json.
+    priority: must
+    testable: true
+    test_approach: >
+      Set i18n language to es, render the screen, and verify texts match
+      the Spanish translations.
+
+  - id: AC-7
+    given: "The Members screen is displayed with the description and CSV help texts"
+    when: "The user scrolls or interacts with the screen"
+    then: >
+      The explanatory texts do not interfere with existing functionality.
+      Search, add member, CSV import/export, swipe-to-reveal, and member
+      editing all continue to work as before.
+    priority: must
+    testable: true
+    test_approach: >
+      Run existing member management tests and verify no regressions.
+
+i18n_keys:
+  new_keys:
+    - key: "members.description"
+      en: "Add, edit and remove ward members. Swipe a member to edit or delete."
+      pt_BR: "Adicione, edite e remova membros da ala. Deslize um membro para editar ou excluir."
+      es: "Agregue, edite y elimine miembros del barrio. Deslice un miembro para editar o eliminar."
+
+    - key: "members.csvHelp"
+      en: "Export saves all members as a CSV file. Import loads a CSV file and replaces the entire member list. Expected format: Name, Full Phone (with country code, e.g. +5511999999999)."
+      pt_BR: "Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com codigo do pais, ex: +5511999999999)."
+      es: "Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Telefono Completo (con codigo de pais, ej: +5211234567890)."
+
+edge_cases:
+  - id: EC-1
+    case: "Screen is viewed by a user without import/export permissions"
+    expected: >
+      Only the screen description (members.description) is shown. The CSV help
+      text (members.csvHelp) is NOT shown because the CSV buttons are hidden.
+
+  - id: EC-2
+    case: "Descriptive texts on very small screens"
+    expected: >
+      The texts wrap naturally across multiple lines. They use a smaller font
+      size (13-14px for description, 12-13px for CSV help) so they occupy
+      reasonable space even on small screens.
+
+  - id: EC-3
+    case: "Screen has zero members and descriptive texts"
+    expected: >
+      The description and CSV help texts are always visible regardless of
+      whether the member list is empty or populated. When the list is empty,
+      the existing "No results found" message still appears below the texts.
+
+files_likely_impacted:
+  - path: "src/app/(tabs)/settings/members.tsx"
+    action: MODIFY
+    details: |
+      1. ADD a <Text> element below the title in the header section displaying
+         t('members.description') with style: colors.textSecondary, fontSize 13-14,
+         marginTop 4, textAlign 'center'
+      2. ADD a <Text> element below the CSV import/export buttons (inside the
+         canImport conditional block) displaying t('members.csvHelp') with style:
+         colors.textSecondary, fontSize 12-13, paddingHorizontal 16, marginBottom 8
+      3. ADD corresponding style entries in the StyleSheet
+
+  - path: "src/i18n/locales/en.json"
+    action: MODIFY
+    details: |
+      ADD to the "members" section:
+        "description": "Add, edit and remove ward members. Swipe a member to edit or delete.",
+        "csvHelp": "Export saves all members as a CSV file. Import loads a CSV file and replaces the entire member list. Expected format: Name, Full Phone (with country code, e.g. +5511999999999)."
+
+  - path: "src/i18n/locales/pt-BR.json"
+    action: MODIFY
+    details: |
+      ADD to the "members" section:
+        "description": "Adicione, edite e remova membros da ala. Deslize um membro para editar ou excluir.",
+        "csvHelp": "Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com codigo do pais, ex: +5511999999999)."
+
+  - path: "src/i18n/locales/es.json"
+    action: MODIFY
+    details: |
+      ADD to the "members" section:
+        "description": "Agregue, edite y elimine miembros del barrio. Deslice un miembro para editar o eliminar.",
+        "csvHelp": "Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Telefono Completo (con codigo de pais, ej: +5211234567890)."
+
+assumptions:
+  - id: A-1
+    description: >
+      The explanatory texts should follow the existing visual pattern used in
+      auth screens (subtitle/description with textSecondary color and smaller
+      font size).
+    confirmed: true
+    evidence: >
+      forgot-password.tsx:66 uses description style (fontSize 15, textSecondary)
+      below the title. register.tsx:141 and login.tsx:69 use subtitle style
+      (fontSize 15, textSecondary). This is the established pattern.
+
+  - id: A-2
+    description: >
+      The CSV help text should be near the CSV buttons, not in a separate
+      modal or tooltip, to keep the information discoverable and inline.
+    confirmed: true
+    evidence: >
+      The user request says "textos explicativos" (explanatory texts), which
+      implies static inline text on the screen, not interactive elements.
+
+  - id: A-3
+    description: >
+      The description text mentions "swipe to edit or delete" to explain the
+      non-obvious swipe-to-reveal interaction, since there are no visible
+      edit/delete buttons (they are hidden behind the swipe gesture).
+    confirmed: true
+    evidence: >
+      The members screen uses SwipeableCard with swipe-to-reveal for edit/delete
+      actions. BR-22 states "Tap on member/topic card does NOT open editing
+      (only swipe)". This is a non-obvious interaction that benefits from
+      explanation.
+
+  - id: A-4
+    description: >
+      The CSV help text explicitly warns that import replaces the entire
+      member list, as this is a destructive operation (BR-10) that new users
+      may not expect.
+    confirmed: true
+    evidence: >
+      BR-10 states "CSV import overwrites ALL the member list (delete all +
+      insert all, via RPC import_members)". This is critical information for
+      the user.
+
+open_questions: []
+
+inconsistencies: []
+
+definition_of_done:
+  - "Screen subtitle (members.description) visible below the title"
+  - "CSV help text (members.csvHelp) visible below the CSV buttons when canImport is true"
+  - "CSV help text hidden when canImport is false"
+  - "All texts translated in pt-BR, en, and es"
+  - "Texts use textSecondary color and smaller font size"
+  - "No regressions in existing member management functionality"
+  - "Visual consistency with descriptive text patterns used in other screens"

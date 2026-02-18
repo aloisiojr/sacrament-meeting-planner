@@ -8,6 +8,8 @@ ALTER TABLE activity_log
 ADD COLUMN user_name TEXT;
 
 -- 2. Update list_ward_users RPC to return full_name from raw_app_meta_data
+--    DROP first because return type changed (added full_name column)
+DROP FUNCTION IF EXISTS list_ward_users(uuid);
 CREATE OR REPLACE FUNCTION list_ward_users(target_ward_id uuid)
 RETURNS TABLE (
   id uuid,

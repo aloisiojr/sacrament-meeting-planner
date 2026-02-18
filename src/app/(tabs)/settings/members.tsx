@@ -82,7 +82,7 @@ function getFlagForCode(code: string): string {
 interface MemberEditorProps {
   member?: Member;
   onSave: (data: { full_name: string; country_code: string; phone: string }) => void;
-  onCancel?: () => void;
+  onCancel: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
 }
 
@@ -116,7 +116,6 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
         onChangeText={setFullName}
         placeholder={t('members.fullName')}
         placeholderTextColor={colors.placeholder}
-        onBlur={handleSave}
         returnKeyType="next"
         autoCapitalize="words"
         textContentType="name"
@@ -137,11 +136,32 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           onChangeText={setPhone}
           placeholder={t('members.phone')}
           placeholderTextColor={colors.placeholder}
-          onBlur={handleSave}
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           autoComplete="tel"
         />
+      </View>
+
+      {/* Save/Cancel buttons */}
+      <View style={styles.editorButtons}>
+        <Pressable
+          style={styles.cancelButton}
+          onPress={onCancel}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+            {t('common.cancel')}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.saveButton, { backgroundColor: colors.primary }]}
+          onPress={handleSave}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
+            {t('common.save')}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Country Code Picker Modal */}
@@ -194,6 +214,7 @@ interface MemberRowProps {
   onEdit: (member: Member) => void;
   onDelete: (member: Member) => void;
   onSave: (data: { full_name: string; country_code: string; phone: string }) => void;
+  onCancel: () => void;
   disabled: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
 }
@@ -206,6 +227,7 @@ function MemberRow({
   onEdit,
   onDelete,
   onSave,
+  onCancel,
   disabled,
   colors,
 }: MemberRowProps) {
@@ -216,6 +238,7 @@ function MemberRow({
       <MemberEditor
         member={member}
         onSave={onSave}
+        onCancel={onCancel}
         colors={colors}
       />
     );
@@ -508,6 +531,7 @@ export default function MembersScreen() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onSave={handleSaveEdit(item.id)}
+        onCancel={() => setEditingId(null)}
         disabled={!canWrite}
         colors={colors}
       />
@@ -741,6 +765,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
+  },
+  editorButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   memberRow: {
     paddingHorizontal: 16,

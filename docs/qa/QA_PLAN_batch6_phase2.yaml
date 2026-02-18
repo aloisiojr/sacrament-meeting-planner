@@ -1,0 +1,395 @@
+# =============================================================================
+# QA_PLAN_batch6_phase2.yaml
+# PRE Validation QA Plan for Batch 6 Phase 2
+# CRs: 87, 88, 89
+# Generated: 2026-02-18
+# =============================================================================
+
+metadata:
+  batch: 6
+  phase: 2
+  crs: [87, 88, 89]
+  generated: "2026-02-18"
+  baseline_tests: 2610
+  baseline_test_files: 55
+
+# =============================================================================
+# PRE-VALIDATION REPORT
+# =============================================================================
+
+pre_validation:
+  status: passed
+  validated: true
+  timestamp: "2026-02-18"
+
+
+# #############################################################################
+# CR-87: Replace Edit/Delete text with pencil/trash icons on swipe buttons
+# #############################################################################
+
+cr_87:
+  cr_id: CR-87
+  title: "Trocar texto Editar/Excluir nos botoes de swipe por icones de lapis e lixeira"
+  type: feature_request
+  user_request: |
+    Nos botoes de Editar e Excluir ao deslizar, trocar por icones de lapis e lixeira.
+
+  current_state_analysis:
+    summary: |
+      SwipeableCard currently renders text labels ("Edit"/"Delete" or i18n equivalents)
+      on the swipe action buttons. The user wants to replace these text labels with
+      pencil (edit) and trash (delete) icons. The component uses editLabel and deleteLabel
+      props passed from parent screens.
+
+    evidence:
+      - path: "src/components/SwipeableCard.tsx"
+        findings:
+          - "Lines 153-163: Edit button renders <Text> with {editLabel ?? 'Edit'}"
+          - "Lines 165-175: Delete button renders <Text> with {deleteLabel ?? 'Delete'}"
+          - "SwipeableCardProps (line 54-56): editLabel?: string, deleteLabel?: string"
+          - "actionText style (line 215-217): fontSize: 13, fontWeight: '600'"
+          - "Edit button uses accessibilityLabel={editLabel ?? 'Edit'} (line 158)"
+          - "Delete button uses accessibilityLabel={deleteLabel ?? 'Delete'} (line 170)"
+
+      - path: "src/app/(tabs)/settings/members.tsx"
+        findings:
+          - "Line 220: editLabel={t('common.edit')} passed to SwipeableCard"
+          - "Line 221: deleteLabel={t('common.delete')} passed to SwipeableCard"
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        findings:
+          - "Line 154: editLabel={t('common.edit')} passed to SwipeableCard"
+          - "Line 155: deleteLabel={t('common.delete')} passed to SwipeableCard"
+
+      - description: "Icon library check"
+        findings:
+          - "No icon library (e.g., @expo/vector-icons, react-native-vector-icons, lucide-react-native) is currently imported in SwipeableCard.tsx"
+          - "Options: 1) Use @expo/vector-icons (Ionicons, MaterialIcons, etc.) which is included with Expo, 2) Use Unicode characters (pencil U+270F, wastebasket U+1F5D1), 3) Use custom SVG"
+          - "The app is Expo-based (expo-router used), so @expo/vector-icons should be available"
+
+    changes_required:
+      - "Replace text labels in SwipeableCard edit button with a pencil icon"
+      - "Replace text labels in SwipeableCard delete button with a trash/bin icon"
+      - "Keep accessibilityLabel for screen readers (keep existing text labels for a11y)"
+      - "Ensure icon is appropriately sized and colored for the button"
+      - "Consider removing editLabel/deleteLabel props if text is no longer rendered (or keep for a11y)"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    This is a UI-only change in a single component (SwipeableCard.tsx). The Expo framework
+    includes @expo/vector-icons which provides Ionicons, MaterialIcons, etc. with pencil
+    and trash icons. Alternatively, simple Unicode characters could be used. The button
+    containers (Pressable with flex:1, centered content) are already sized and styled.
+    Replacing <Text> with an icon component is straightforward. accessibilityLabel should
+    be preserved for screen reader support. No architectural changes needed.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-87-01
+        description: "Edit swipe button renders a pencil/edit icon instead of text"
+        criteria: "SwipeableCard edit button no longer renders text label, uses icon component or Unicode icon character"
+
+      - id: MP-87-02
+        description: "Delete swipe button renders a trash/delete icon instead of text"
+        criteria: "SwipeableCard delete button no longer renders text label, uses icon component or Unicode icon character"
+
+      - id: MP-87-03
+        description: "Edit button retains accessibility label for screen readers"
+        criteria: "Edit button Pressable has accessibilityLabel with meaningful text (e.g., 'Edit' or i18n equivalent)"
+
+      - id: MP-87-04
+        description: "Delete button retains accessibility label for screen readers"
+        criteria: "Delete button Pressable has accessibilityLabel with meaningful text (e.g., 'Delete' or i18n equivalent)"
+
+      - id: MP-87-05
+        description: "Edit button still triggers onEdit callback when pressed"
+        criteria: "Pressing edit icon button calls handleEdit which calls onEdit?.()"
+
+      - id: MP-87-06
+        description: "Delete button still triggers onDelete callback when pressed"
+        criteria: "Pressing delete icon button calls handleDelete which calls onDelete?.()"
+
+      - id: MP-87-07
+        description: "Icon color contrasts with button background"
+        criteria: "Edit icon uses colors.onPrimary (white on primary bg), Delete icon uses white (#FFFFFF on error bg)"
+
+      - id: MP-87-08
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2610)"
+
+    should_pass:
+      - id: SP-87-01
+        description: "Icons are appropriately sized for the button area"
+        criteria: "Icon size is reasonable (16-24px) and centered within the button"
+
+      - id: SP-87-02
+        description: "Icons are recognizable as edit (pencil) and delete (trash)"
+        criteria: "Standard pencil/pen icon and trash/bin icon, universally recognizable"
+
+      - id: SP-87-03
+        description: "Swipe buttons visual appearance is improved with icons vs text"
+        criteria: "Icons fit well in the 70px-wide button area, cleaner look than truncated text"
+
+
+# #############################################################################
+# CR-88: Add explanatory text to topics screen
+# #############################################################################
+
+cr_88:
+  cr_id: CR-88
+  title: "Na tela de temas adicionar texto explicando o que a tela faz, especialmente ativar/desativar colecao"
+  type: feature_request
+  user_request: |
+    Na tela de temas adicionar texto explicando o que a tela faz, especialmente
+    ativar/desativar colecao.
+
+  current_state_analysis:
+    summary: |
+      The Topics screen (topics.tsx) currently has two sections: "Ward Topics" (with CRUD)
+      and "Collections" (with toggle switches). There is no explanatory text explaining
+      what the screen does, what ward topics are, or what activating/deactivating a collection
+      means. The user specifically wants explanation about the activate/deactivate collection
+      feature. This is similar to CR-80 which added description text to the Members screen.
+
+    evidence:
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        findings:
+          - "Lines 299-309: Header with back button and title t('topics.title') - no description text"
+          - "Lines 311-365: Ward Topics section - has sectionTitle but no description"
+          - "Lines 367-391: General Collections section - has sectionTitle but no description"
+          - "CollectionRow (lines 181-195): Only shows collection name + Switch toggle"
+          - "No explanatory text anywhere on the screen"
+
+      - path: "src/i18n/locales/en.json"
+        findings:
+          - "topics section (lines 171-179): Only has title, wardTopics, addTopic, topicTitle, topicLink, collections, activateCollection, deactivateCollection"
+          - "No 'description' or explanatory text keys exist for topics"
+
+      - path: "src/i18n/locales/pt-BR.json"
+        findings:
+          - "topics section (lines 171-179): Same keys as en.json, no description keys"
+
+      - path: "src/i18n/locales/es.json"
+        findings:
+          - "topics section (lines 171-179): Same keys as en.json, no description keys"
+
+      - description: "Existing pattern for explanatory text (CR-80 reference)"
+        findings:
+          - "members.tsx:547-549: Uses t('members.description') in a Text with styles.description"
+          - "styles.description: fontSize 13, textAlign 'center', paddingHorizontal 16, marginBottom 8"
+          - "This same pattern can be applied to topics screen"
+
+    changes_required:
+      - "Add i18n keys for topics screen description in all 3 locales (en, pt-BR, es)"
+      - "The description should explain: ward topics are custom themes, and activating/deactivating a collection makes those topics available/unavailable for speech assignment"
+      - "Add a description Text below the header (similar to members screen pattern)"
+      - "Optionally add a description below the Collections section title explaining toggle behavior"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    This follows the exact same pattern as CR-80 (members description text). The i18n system
+    supports all 3 locales. A Text element with textSecondary color and centered alignment
+    is the established pattern. No architectural changes needed. The topics.tsx screen
+    already has a ScrollView container where the text can be inserted.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-88-01
+        description: "New i18n key for topics description exists in en.json"
+        criteria: "topics section in en.json contains a 'description' or equivalent explanatory text key"
+
+      - id: MP-88-02
+        description: "New i18n key for topics description exists in pt-BR.json"
+        criteria: "topics section in pt-BR.json contains same key with Portuguese translation"
+
+      - id: MP-88-03
+        description: "New i18n key for topics description exists in es.json"
+        criteria: "topics section in es.json contains same key with Spanish translation"
+
+      - id: MP-88-04
+        description: "Topics screen renders the description text"
+        criteria: "topics.tsx renders t('topics.description') (or equivalent) in a Text element"
+
+      - id: MP-88-05
+        description: "Description text explains collections activate/deactivate functionality"
+        criteria: "The description text mentions that activating/deactivating collections makes topics available or unavailable for speech assignments"
+
+      - id: MP-88-06
+        description: "All three locale files have matching keys in topics section"
+        criteria: "en.json, pt-BR.json, and es.json have identical key structure in topics section"
+
+      - id: MP-88-07
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2610)"
+
+    should_pass:
+      - id: SP-88-01
+        description: "Description text is styled consistently with members screen description"
+        criteria: "Uses similar styling: fontSize 12-14, textSecondary color, center aligned, paddingHorizontal 16"
+
+      - id: SP-88-02
+        description: "Description text is positioned logically on the screen"
+        criteria: "Text appears below header or below section titles where it provides context"
+
+      - id: SP-88-03
+        description: "Portuguese translation is natural Brazilian Portuguese"
+        criteria: "Uses natural pt-BR phrasing, not literal translation"
+
+      - id: SP-88-04
+        description: "Spanish translation is natural Spanish"
+        criteria: "Uses natural Spanish phrasing, not literal translation"
+
+      - id: SP-88-05
+        description: "Description text does not break layout on small screens"
+        criteria: "Text wraps correctly, no numberOfLines constraint, reasonable font size"
+
+
+# #############################################################################
+# CR-89: Show collection topics on click (read-only, simple list)
+# #############################################################################
+
+cr_89:
+  cr_id: CR-89
+  title: "Ao clicar numa colecao, mostrar todos os temas (read-only, lista simples)"
+  type: feature_request
+  user_request: |
+    Ao clicar numa colecao, mostrar todos os temas (read-only, lista simples).
+
+  current_state_analysis:
+    summary: |
+      Currently, clicking on a collection row in the Topics screen does nothing - the row
+      only shows the collection name and a toggle Switch. There is no way to see the topics
+      that belong to a collection. The user wants to be able to tap a collection and see all
+      its topics in a read-only simple list. The data model supports this: general_topics table
+      has collection_id foreign key, and the useActiveTopics hook already fetches topics from
+      active collections.
+
+    evidence:
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        findings:
+          - "CollectionRow (lines 181-195): Only renders name + Switch, no onPress handler"
+          - "The View wrapper is not Pressable - no tap interaction"
+          - "collections.map (lines 374-383): Renders CollectionRow with name, active, onToggle, disabled"
+          - "No state for 'expanded collection' or 'selected collection'"
+          - "No topic list display for collections"
+
+      - path: "src/hooks/useTopics.ts"
+        findings:
+          - "useActiveTopics (line 308-389): Fetches topics from active collections via general_topics table"
+          - "general_topics table has: id, collection_id, title, link"
+          - "useCollections (line 183-224): Returns collections with id, name, language, active, configId"
+          - "No hook exists to fetch topics for a SPECIFIC collection by ID"
+
+      - path: "src/types/database.ts"
+        findings:
+          - "GeneralTopic (lines 110-115): { id, collection_id, title, link }"
+          - "GeneralCollection (lines 104-108): { id, name, language }"
+          - "The collection_id in GeneralTopic links to GeneralCollection"
+
+    changes_required:
+      - "Make CollectionRow tappable (Pressable or touchable wrapper)"
+      - "Add state to track which collection is expanded/selected"
+      - "Create a hook or query to fetch topics for a specific collection"
+      - "Render a read-only list of topic titles (and optionally links) below the collection row when expanded"
+      - "The list should be simple and read-only (no edit/delete)"
+      - "Consider: expand/collapse inline OR navigate to a detail screen OR show a modal"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    The data model already supports this via the general_topics table with collection_id.
+    The simplest approach is an expand/collapse pattern: tapping a collection row expands
+    it inline to show its topics. A new query (useCollectionTopics) or direct Supabase
+    query is needed to fetch topics by collection_id. The topics.tsx screen uses ScrollView,
+    so inline expansion will scroll naturally. No architectural changes needed.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-89-01
+        description: "Tapping a collection row shows the topics belonging to that collection"
+        criteria: "CollectionRow or its wrapper is tappable and displays a list of topics on tap"
+
+      - id: MP-89-02
+        description: "Topics displayed are fetched from general_topics table by collection_id"
+        criteria: "A Supabase query or hook fetches general_topics.select().eq('collection_id', id)"
+
+      - id: MP-89-03
+        description: "Topic list is read-only (no edit/delete actions)"
+        criteria: "Topics are displayed as simple Text elements or flat list, no SwipeableCard, no edit/delete buttons"
+
+      - id: MP-89-04
+        description: "Each topic displays at least the title"
+        criteria: "Topic title is visible in the expanded/displayed list"
+
+      - id: MP-89-05
+        description: "Collection toggle (Switch) still works independently of tap-to-view"
+        criteria: "Switch onValueChange still toggles collection active state without interference"
+
+      - id: MP-89-06
+        description: "Tapping the same collection again hides/collapses the topic list"
+        criteria: "Tapping an already-expanded collection collapses its topic list (toggle behavior)"
+
+      - id: MP-89-07
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2610)"
+
+    should_pass:
+      - id: SP-89-01
+        description: "Topic list has appropriate styling (indented, secondary text color)"
+        criteria: "Topics are visually nested under the collection, using textSecondary or similar subtle styling"
+
+      - id: SP-89-02
+        description: "Topic link is shown if available"
+        criteria: "If GeneralTopic.link is not null, it is displayed alongside the title"
+
+      - id: SP-89-03
+        description: "Loading state is handled while fetching topics"
+        criteria: "A loading indicator or placeholder is shown while topics are being fetched"
+
+      - id: SP-89-04
+        description: "Empty state is handled if collection has no topics"
+        criteria: "A message like 'No topics' is displayed if the collection has zero topics"
+
+      - id: SP-89-05
+        description: "Only one collection can be expanded at a time (or all can be expanded)"
+        criteria: "UX decision is consistent - either accordion (one at a time) or multi-expand"
+
+
+# =============================================================================
+# CROSS-CR DEPENDENCIES AND NOTES
+# =============================================================================
+
+cross_cr_notes:
+  - cr_pair: [87, 88]
+    note: |
+      CR-87 modifies SwipeableCard.tsx (swipe action buttons).
+      CR-88 modifies topics.tsx (adds explanatory text).
+      Both affect the topics screen display but in completely different components/areas.
+      No conflict.
+
+  - cr_pair: [87, 89]
+    note: |
+      CR-87 modifies SwipeableCard (action button icons).
+      CR-89 modifies topics.tsx (collection expand/collapse + fetch topics).
+      No conflict - SwipeableCard is used for ward topics, not for collections.
+
+  - cr_pair: [88, 89]
+    note: |
+      Both CR-88 and CR-89 modify topics.tsx.
+      CR-88 adds description text (above sections).
+      CR-89 adds expand/collapse for collections (within collections section).
+      They modify different parts of the same file. CR-88 could mention the tap-to-view
+      feature in its description text, but this is optional.
+
+implementation_order_recommendation:
+  - order: 1
+    cr: 87
+    reason: "Independent component change (SwipeableCard only), no dependencies"
+  - order: 2
+    cr: 88
+    reason: "Adds description text to topics screen, might reference CR-89 feature"
+  - order: 3
+    cr: 89
+    reason: "Most complex change - adds new data fetching, state management, and UI to topics screen"

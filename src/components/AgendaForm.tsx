@@ -510,6 +510,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       {/* Prayer selector modal */}
       {selectorModal?.type === 'prayer' && (
         <PrayerSelector
+          visible={true}
+          onClose={() => setSelectorModal(null)}
           selected={(() => {
             const nameField = `${selectorModal.field}_name` as keyof typeof agenda;
             const idField = `${selectorModal.field}_member_id` as keyof typeof agenda;

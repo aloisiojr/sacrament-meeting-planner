@@ -3,6 +3,9 @@
  * Handles CSV parsing, validation, and generation.
  */
 
+// Re-export splitPhoneNumber from shared countryCodes module
+export { splitPhoneNumber } from './countryCodes';
+
 export interface CsvMember {
   full_name: string;
   phone: string; // Full phone with country code, e.g., "+5511999999999"
@@ -133,39 +136,6 @@ function parseCsvLine(line: string): string[] {
   }
   result.push(current);
   return result;
-}
-
-/**
- * Extract country code and phone number from a full phone string.
- * E.g., "+5511999999999" -> { countryCode: "+55", phone: "11999999999" }
- */
-export function splitPhoneNumber(fullPhone: string): { countryCode: string; phone: string } {
-  if (!fullPhone || !fullPhone.startsWith('+')) {
-    return { countryCode: '+55', phone: fullPhone };
-  }
-
-  // Try known country code lengths (longest first to avoid ambiguity)
-  // 3-digit codes: +591, +595, +598, +593, +351, +244, +258
-  // 2-digit codes: +55, +52, +54, +56, +57, +58, +51, +44, +34, +33, +49, +39, +81
-  // 1-digit code:  +1
-  const phone = fullPhone.substring(1); // Remove '+'
-
-  if (phone.length >= 3 && /^(591|595|598|593|351|244|258)/.test(phone)) {
-    const code = phone.substring(0, 3);
-    return { countryCode: `+${code}`, phone: phone.substring(3) };
-  }
-
-  if (phone.length >= 2 && /^(55|52|54|56|57|58|51|44|34|33|49|39|81)/.test(phone)) {
-    const code = phone.substring(0, 2);
-    return { countryCode: `+${code}`, phone: phone.substring(2) };
-  }
-
-  if (phone.startsWith('1')) {
-    return { countryCode: '+1', phone: phone.substring(1) };
-  }
-
-  // Fallback: assume first 2 digits are country code
-  return { countryCode: `+${phone.substring(0, 2)}`, phone: phone.substring(2) };
 }
 
 /**

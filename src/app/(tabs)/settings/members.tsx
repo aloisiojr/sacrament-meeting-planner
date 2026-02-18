@@ -27,6 +27,7 @@ import { SwipeableCard } from '../../../components/SwipeableCard';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { generateCsv, parseCsv, splitPhoneNumber, type CsvErrorCode } from '../../../lib/csvUtils';
+import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -39,43 +40,6 @@ import {
   memberKeys,
 } from '../../../hooks/useMembers';
 import type { Member } from '../../../types/database';
-
-// --- Country Code Data ---
-
-interface CountryCode {
-  code: string;
-  flag: string;
-  label: string;
-}
-
-const COUNTRY_CODES: CountryCode[] = [
-  { code: '+55', flag: '\u{1F1E7}\u{1F1F7}', label: 'Brasil (+55)' },
-  { code: '+1', flag: '\u{1F1FA}\u{1F1F8}', label: 'USA (+1)' },
-  { code: '+52', flag: '\u{1F1F2}\u{1F1FD}', label: 'Mexico (+52)' },
-  { code: '+54', flag: '\u{1F1E6}\u{1F1F7}', label: 'Argentina (+54)' },
-  { code: '+56', flag: '\u{1F1E8}\u{1F1F1}', label: 'Chile (+56)' },
-  { code: '+57', flag: '\u{1F1E8}\u{1F1F4}', label: 'Colombia (+57)' },
-  { code: '+58', flag: '\u{1F1FB}\u{1F1EA}', label: 'Venezuela (+58)' },
-  { code: '+51', flag: '\u{1F1F5}\u{1F1EA}', label: 'Peru (+51)' },
-  { code: '+591', flag: '\u{1F1E7}\u{1F1F4}', label: 'Bolivia (+591)' },
-  { code: '+595', flag: '\u{1F1F5}\u{1F1FE}', label: 'Paraguay (+595)' },
-  { code: '+598', flag: '\u{1F1FA}\u{1F1FE}', label: 'Uruguay (+598)' },
-  { code: '+593', flag: '\u{1F1EA}\u{1F1E8}', label: 'Ecuador (+593)' },
-  { code: '+351', flag: '\u{1F1F5}\u{1F1F9}', label: 'Portugal (+351)' },
-  { code: '+244', flag: '\u{1F1E6}\u{1F1F4}', label: 'Angola (+244)' },
-  { code: '+258', flag: '\u{1F1F2}\u{1F1FF}', label: 'Mozambique (+258)' },
-  { code: '+44', flag: '\u{1F1EC}\u{1F1E7}', label: 'UK (+44)' },
-  { code: '+34', flag: '\u{1F1EA}\u{1F1F8}', label: 'Spain (+34)' },
-  { code: '+33', flag: '\u{1F1EB}\u{1F1F7}', label: 'France (+33)' },
-  { code: '+49', flag: '\u{1F1E9}\u{1F1EA}', label: 'Germany (+49)' },
-  { code: '+39', flag: '\u{1F1EE}\u{1F1F9}', label: 'Italy (+39)' },
-  { code: '+81', flag: '\u{1F1EF}\u{1F1F5}', label: 'Japan (+81)' },
-];
-
-function getFlagForCode(code: string): string {
-  const entry = COUNTRY_CODES.find((c) => c.code === code);
-  return entry?.flag ?? '\u{1F30D}'; // globe emoji fallback
-}
 
 // --- Inline Editor ---
 

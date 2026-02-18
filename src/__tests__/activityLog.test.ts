@@ -21,6 +21,18 @@ describe('logAction', () => {
     await logAction('ward-1', 'user-1', 'test@test.com', 'test:action', 'Test description');
     // Should not throw
   });
+
+  it('accepts optional userName parameter', async () => {
+    await expect(
+      logAction('ward-1', 'user-1', 'user@test.com', 'member:create', 'Created member', 'John Smith')
+    ).resolves.not.toThrow();
+  });
+
+  it('works without userName (backward compatible)', async () => {
+    await expect(
+      logAction('ward-1', 'user-1', 'user@test.com', 'member:create', 'Created member')
+    ).resolves.not.toThrow();
+  });
 });
 
 describe('createLogger', () => {
@@ -31,6 +43,16 @@ describe('createLogger', () => {
 
   it('returned function calls logAction', async () => {
     const log = createLogger('ward-1', 'user-1', 'user@test.com');
+    await expect(log('test:action', 'Test')).resolves.not.toThrow();
+  });
+
+  it('accepts optional userName parameter', () => {
+    const log = createLogger('ward-1', 'user-1', 'user@test.com', 'John Smith');
+    expect(typeof log).toBe('function');
+  });
+
+  it('returned function from logger with userName calls logAction', async () => {
+    const log = createLogger('ward-1', 'user-1', 'user@test.com', 'John Smith');
     await expect(log('test:action', 'Test')).resolves.not.toThrow();
   });
 });

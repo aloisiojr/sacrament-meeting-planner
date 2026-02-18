@@ -439,8 +439,8 @@ describe('STEP-05-08: OfflineQueue', () => {
 
 describe('STEP-05-08: OfflineGuard', () => {
   describe('ONLINE_ONLY_OPERATIONS', () => {
-    it('contains exactly 5 Edge Function operations', () => {
-      expect(ONLINE_ONLY_OPERATIONS).toHaveLength(5);
+    it('contains exactly 6 Edge Function operations', () => {
+      expect(ONLINE_ONLY_OPERATIONS).toHaveLength(6);
     });
 
     const expectedOps = [
@@ -448,6 +448,7 @@ describe('STEP-05-08: OfflineGuard', () => {
       'register-invited-user',
       'create-invitation',
       'update-user-role',
+      'update-user-name',
       'delete-user',
     ];
 
@@ -550,13 +551,14 @@ describe('Cross-module consistency', () => {
   });
 
   describe('Offline guard vs Edge Functions', () => {
-    it('all 5 blocked operations are auth/user-management Edge Functions', () => {
+    it('all 6 blocked operations are auth/user-management Edge Functions', () => {
       // These are the Edge Functions that cannot be queued offline
       const authFunctions = [
         'register-first-user',
         'register-invited-user',
         'create-invitation',
         'update-user-role',
+        'update-user-name',
         'delete-user',
       ];
       expect([...ONLINE_ONLY_OPERATIONS].sort()).toEqual(authFunctions.sort());

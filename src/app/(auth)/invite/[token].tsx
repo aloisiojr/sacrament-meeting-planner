@@ -30,6 +30,7 @@ export default function InviteRegistrationScreen() {
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,11 @@ export default function InviteRegistrationScreen() {
   };
 
   const handleRegister = async () => {
+    if (!fullName.trim()) {
+      setError(t('auth.nameRequired'));
+      return;
+    }
+
     if (password.length < 6) {
       setError(t('auth.passwordMinLength'));
       return;
@@ -87,7 +93,7 @@ export default function InviteRegistrationScreen() {
 
     try {
       const response = await supabase.functions.invoke('register-invited-user', {
-        body: { token, password },
+        body: { token, password, fullName: fullName.trim() },
       });
 
       const data = response.data;
@@ -268,6 +274,32 @@ export default function InviteRegistrationScreen() {
               ]}
               value={invitation?.email ?? ''}
               editable={false}
+            />
+          </View>
+
+          {/* Full Name */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('auth.fullName')}
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.inputBackground,
+                  borderColor: colors.inputBorder,
+                  color: colors.text,
+                },
+              ]}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder={t('auth.fullNamePlaceholder')}
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="name"
+              autoComplete="name"
+              editable={!submitting}
             />
           </View>
 

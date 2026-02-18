@@ -163,10 +163,14 @@ Deno.serve(async (req) => {
     // Auto-create meeting actor when changing TO bishopric (best-effort)
     if (input.newRole === 'bishopric') {
       try {
-        const actorName = (targetUser.email ?? '')
-          .split('@')[0]
-          .replace(/[._]/g, ' ')
-          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+        // Use full_name from app_metadata when available, fall back to email prefix
+        const fullName = targetUser.app_metadata?.full_name;
+        const actorName = fullName
+          ? fullName.trim()
+          : (targetUser.email ?? '')
+              .split('@')[0]
+              .replace(/[._]/g, ' ')
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
 
         if (actorName) {
           const { data: existing } = await supabaseAdmin

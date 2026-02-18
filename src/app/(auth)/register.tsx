@@ -25,6 +25,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [stakeName, setStakeName] = useState('');
   const [wardName, setWardName] = useState('');
   const [role, setRole] = useState<'bishopric' | 'secretary'>('bishopric');
@@ -44,6 +45,7 @@ export default function RegisterScreen() {
   }, []);
 
   const validate = (): string | null => {
+    if (!fullName.trim()) return t('auth.nameRequired');
     if (!email.trim()) return t('auth.emailRequired');
     if (!stakeName.trim()) return t('auth.stakeRequired');
     if (!wardName.trim()) return t('auth.wardRequired');
@@ -67,6 +69,7 @@ export default function RegisterScreen() {
         body: {
           email: email.trim(),
           password,
+          fullName: fullName.trim(),
           stakeName: stakeName.trim(),
           wardName: wardName.trim(),
           role,
@@ -153,6 +156,29 @@ export default function RegisterScreen() {
               </Text>
             </View>
           )}
+
+          {/* Full Name */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('auth.fullName')}
+            </Text>
+            <TextInput
+              style={[styles.input, {
+                backgroundColor: colors.inputBackground,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              }]}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder={t('auth.fullNamePlaceholder')}
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="name"
+              autoComplete="name"
+              editable={!loading}
+            />
+          </View>
 
           {/* Email */}
           <View style={styles.inputGroup}>

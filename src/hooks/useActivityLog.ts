@@ -49,7 +49,7 @@ export function useActivityLog({ search }: UseActivityLogOptions = {}) {
         const term = search.trim().replace(/[,.*()%]/g, '');
         if (term) {
           q = q.or(
-            `user_email.ilike.%${term}%,description.ilike.%${term}%,created_at::text.ilike.%${term}%`
+            `user_email.ilike.%${term}%,user_name.ilike.%${term}%,description.ilike.%${term}%,created_at::text.ilike.%${term}%`
           );
         }
       }

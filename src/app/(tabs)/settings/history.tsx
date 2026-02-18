@@ -47,7 +47,7 @@ function ActivityLogEntry({
           {formatDateTime(item.created_at)}
         </Text>
         <Text style={[styles.entryEmail, { color: colors.textSecondary }]}>
-          {item.user_email}
+          {item.user_name || item.user_email}
         </Text>
       </View>
       <Text style={[styles.entryDescription, { color: colors.text }]}>

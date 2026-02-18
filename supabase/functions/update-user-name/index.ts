@@ -1,6 +1,6 @@
-// Edge Function: list-users
-// Lists all users in the caller's ward with email and role.
-// Requires JWT with Bishopric role (settings:users permission).
+// Edge Function: update-user-name
+// Updates the caller's own full_name in app_metadata.
+// Any authenticated user can edit their own name.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -9,14 +9,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
 };
-
-interface WardUser {
-  id: string;
-  email: string;
-  role: string;
-  full_name: string;
-  created_at: string;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -39,49 +31,49 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Get user from JWT
+    // Get caller from JWT
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
+    if (callerError || !caller) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const wardId = user.app_metadata?.ward_id;
-    const userRole = user.app_metadata?.role;
+    const { fullName } = await req.json();
 
-    if (!wardId || !userRole) {
+    // Validate fullName
+    if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
       return new Response(
-        JSON.stringify({ error: 'User missing ward or role metadata' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Name is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check permission: Bishopric and Secretary can list users
-    if (!['bishopric', 'secretary'].includes(userRole)) {
-      return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Update caller's own app_metadata.full_name
+    // Spread existing app_metadata to preserve ward_id and role
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      caller.id,
+      {
+        app_metadata: {
+          ...caller.app_metadata,
+          full_name: fullName.trim(),
+        },
+      }
+    );
 
-    // Query ward users via RPC (efficient: queries auth.users with WHERE ward_id filter)
-    const { data: wardUsers, error: listError } = await supabaseAdmin
-      .rpc('list_ward_users', { target_ward_id: wardId });
-
-    if (listError) {
-      console.error('List users error:', listError);
+    if (updateError) {
+      console.error('Name update error:', updateError);
       return new Response(
-        JSON.stringify({ error: 'Failed to list users' }),
+        JSON.stringify({ error: 'Failed to update name' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     return new Response(
-      JSON.stringify({ users: wardUsers ?? [] }),
+      JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

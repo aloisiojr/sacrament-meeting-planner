@@ -19,6 +19,7 @@ export interface AuthContextValue {
   user: User | null;
   role: Role;
   wardId: string;
+  userName: string;
   loading: boolean;
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
@@ -56,14 +57,24 @@ function extractWardId(user: User | null): string {
   return user.app_metadata?.ward_id ?? '';
 }
 
+/**
+ * Extract full_name from Supabase user app_metadata.
+ * Returns empty string if not set.
+ */
+function extractUserName(user: User | null): string {
+  if (!user) return '';
+  return user.app_metadata?.full_name ?? '';
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Derive user, role, and wardId from session
+  // Derive user, role, wardId, and userName from session
   const user = session?.user ?? null;
   const role = extractRole(user);
   const wardId = extractWardId(user);
+  const userName = extractUserName(user);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -134,12 +145,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user,
       role,
       wardId,
+      userName,
       loading,
       signIn,
       signOut,
       hasPermission,
     }),
-    [session, user, role, wardId, loading, signIn, signOut, hasPermission]
+    [session, user, role, wardId, userName, loading, signIn, signOut, hasPermission]
   );
 
   return (

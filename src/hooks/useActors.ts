@@ -86,7 +86,7 @@ export function useActors(roleFilter: ActorRoleFilter = 'all') {
 
 /** Create a new meeting actor. */
 export function useCreateActor() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -111,7 +111,7 @@ export function useCreateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:create', `${data.name} adicionado como ator da reuniao`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:create', `${data.name} adicionado como ator da reuniao`, userName);
       }
     },
   });
@@ -119,7 +119,7 @@ export function useCreateActor() {
 
 /** Update an existing meeting actor. */
 export function useUpdateActor() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -139,7 +139,7 @@ export function useUpdateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:update', `${data.name} atualizado`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:update', `${data.name} atualizado`, userName);
       }
     },
   });
@@ -150,7 +150,7 @@ export function useUpdateActor() {
  * Agenda snapshot fields are preserved (actor_id set to NULL, name preserved).
  */
 export function useDeleteActor() {
-  const { wardId, user } = useAuth();
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -162,7 +162,7 @@ export function useDeleteActor() {
     onSuccess: (actorName) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `${actorName} removido`);
+        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `${actorName} removido`, userName);
       }
     },
   });

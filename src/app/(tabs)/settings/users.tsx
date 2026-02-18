@@ -28,6 +28,7 @@ interface WardUser {
   id: string;
   email: string;
   role: string;
+  full_name: string;
   created_at: string;
 }
 
@@ -287,7 +288,7 @@ export default function UserManagementScreen() {
               <View style={styles.userHeader}>
                 <View style={styles.userInfo}>
                   <Text style={[styles.userEmail, { color: colors.text }]}>
-                    {u.email}
+                    {u.full_name || u.email}
                   </Text>
                   <Text style={[styles.userRole, { color: colors.textSecondary }]}>
                     {t(`roles.${u.role}`)}
@@ -301,6 +302,18 @@ export default function UserManagementScreen() {
 
               {isExpanded && (
                 <View style={[styles.expandedSection, { borderTopColor: colors.divider }]}>
+                  {/* Name (read-only) */}
+                  {u.full_name ? (
+                    <View style={styles.fieldRow}>
+                      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                        {t('users.name')}
+                      </Text>
+                      <Text style={[styles.fieldValue, { color: colors.text }]}>
+                        {u.full_name}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   {/* Email (read-only) */}
                   <View style={styles.fieldRow}>
                     <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>

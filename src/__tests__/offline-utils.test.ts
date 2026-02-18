@@ -56,8 +56,8 @@ describe('offlineQueue utilities', () => {
 
 describe('offlineGuard utilities', () => {
   describe('ONLINE_ONLY_OPERATIONS', () => {
-    it('contains 5 operations', () => {
-      expect(ONLINE_ONLY_OPERATIONS).toHaveLength(5);
+    it('contains 6 operations', () => {
+      expect(ONLINE_ONLY_OPERATIONS).toHaveLength(6);
     });
 
     it('includes register-first-user', () => {
@@ -74,6 +74,10 @@ describe('offlineGuard utilities', () => {
 
     it('includes update-user-role', () => {
       expect(ONLINE_ONLY_OPERATIONS).toContain('update-user-role');
+    });
+
+    it('includes update-user-name', () => {
+      expect(ONLINE_ONLY_OPERATIONS).toContain('update-user-name');
     });
 
     it('includes delete-user', () => {

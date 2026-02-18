@@ -370,6 +370,7 @@ export default function MembersScreen() {
         name: t('members.csvHeaderName'),
         phone: t('members.csvHeaderPhone'),
       });
+      console.log('[Export] CSV length:', csv.length);
 
       if (Platform.OS === 'web') {
         // Web: Blob download
@@ -383,13 +384,17 @@ export default function MembersScreen() {
       } else {
         // Mobile: Write temp file and share via expo-sharing
         if (!FileSystem.cacheDirectory) {
+          console.warn('[Export] cacheDirectory is null');
           Alert.alert(t('common.error'), t('members.exportFailed'));
           return;
         }
         const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
+        console.log('[Export] fileUri:', fileUri);
         await FileSystem.writeAsStringAsync(fileUri, csv, {
           encoding: FileSystem.EncodingType.UTF8,
         });
+        console.log('[Export] File written successfully');
+        console.log('[Export] Opening share sheet...');
         await Sharing.shareAsync(fileUri, {
           mimeType: 'text/csv',
           dialogTitle: t('members.exportCsv'),
@@ -397,6 +402,7 @@ export default function MembersScreen() {
         });
       }
     } catch (err: any) {
+      console.error('Export CSV failed:', err);
       const msg = (err?.message ?? '').toLowerCase();
       if (msg !== 'user did not share' && !msg.includes('cancelled')) {
         Alert.alert(t('common.error'), t('members.exportFailed'));
@@ -475,12 +481,19 @@ export default function MembersScreen() {
           type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
           copyToCacheDirectory: true,
         });
+        console.log('[Import] DocumentPicker result:', {
+          uri: result.assets?.[0]?.uri,
+          name: result.assets?.[0]?.name,
+          mimeType: result.assets?.[0]?.mimeType,
+        });
         if (result.canceled || !result.assets?.[0]) return;
         const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
           encoding: FileSystem.EncodingType.UTF8,
         });
+        console.log('[Import] File content length:', content.length);
         importMutation.mutate(content);
       } catch (err: any) {
+        console.error('Import CSV failed:', err);
         const msg = (err?.message ?? '').toLowerCase();
         if (msg.includes('cancel') || msg.includes('cancelled')) return;
         const errorKey = (msg.includes('read') || msg.includes('encoding'))

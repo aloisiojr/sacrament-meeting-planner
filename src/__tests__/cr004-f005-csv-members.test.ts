@@ -53,7 +53,8 @@ describe('CR-004 F005: CSV & Members Screen Fixes', () => {
 
     it('handleExport should use members ?? [] for safety', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
-      expect(source).toContain("generateCsv(members ?? [])");
+      // CR-77/CR-78: now passes translated headers as second arg
+      expect(source).toContain("generateCsv(members ?? []");
     });
   });
 
@@ -84,9 +85,11 @@ describe('CR-004 F005: CSV & Members Screen Fixes', () => {
 
     it('importMutation should pass line, field, error params to i18n', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
-      expect(source).toContain('line: e.line');
+      // CR-78: line is now wrapped in String() for i18n interpolation
+      expect(source).toContain('line: String(e.line)');
       expect(source).toContain('field: e.field');
-      expect(source).toContain('error: e.message');
+      // CR-78: error now uses translateCsvError helper instead of raw e.message
+      expect(source).toContain('translateCsvError(e.code');
     });
 
     it('should NOT have hardcoded Line in import error formatting', () => {
@@ -99,7 +102,8 @@ describe('CR-004 F005: CSV & Members Screen Fixes', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
       const handleImportStart = source.indexOf('const handleImport = useCallback');
       const handleImportBlock = source.slice(handleImportStart, source.indexOf('const canImport'));
-      expect(handleImportBlock).toContain("t('members.importFailed')");
+      // CR-78: importFailed is now assigned via a ternary to errorKey variable
+      expect(handleImportBlock).toContain("'members.importFailed'");
     });
   });
 

@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-18"
-  total_features: 25
-  total_change_requests: 82
+  total_features: 30
+  total_change_requests: 90
   implemented_crs: 78
-  pending_crs: 4
+  pending_crs: 12
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -28,6 +28,8 @@ metadata:
     - docs/specs/history/SPEC_CR_batch4.md
     - docs/specs/history/SPEC_CONSOLIDATED_old.yaml
     - docs/CHANGE_REQUESTS.yaml
+    - docs/specs/SPEC_F026.yaml
+    - docs/specs/SPEC_F027_F031.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -274,12 +276,14 @@ features:
       via swipe-to-reveal. Campos: nome completo, codigo do pais (dropdown com
       bandeira emoji), telefone. Salvamento automatico ao clicar fora.
       Snapshot pattern: edicao de membro NAO propaga para discursos existentes.
-    modified_by_crs: [40, 55, 78, 82]
+    modified_by_crs: [40, 55, 78, 82, 83, 90]
     notes:
       - "CR-40: Resolveu inconsistencia de posicao do botao '+' (no header, nao FAB)"
       - "CR-55: Corrigiu desalinhamento do header quando canWrite=false"
       - "CR-78: Corrigiu unique constraint removendo phone da constraint (ward_id, full_name)"
       - "CR-82: GestureHandlerRootView para swipe funcionar"
+      - "CR-83: Save/Cancel explicito ao inves de auto-save no blur"
+      - "CR-90: Fix botao Delete no SwipeableCard"
       - "Observador: swipe desabilitado"
 
   - id: F004
@@ -291,13 +295,14 @@ features:
       document picker (mobile) ou file input (web). Formato: Nome Completo,
       Codigo Pais, Telefone. Import sobrescreve toda a lista via Supabase RPC
       import_members. Usa expo-file-system v19 new File/Paths API (CR-77/78).
-    modified_by_crs: [42, 54, 66, 77, 78]
+    modified_by_crs: [42, 54, 66, 77, 78, 86]
     notes:
       - "CR-42: Corrigiu botoes que nao funcionavam"
       - "CR-54: Corrigiu erro ao cancelar share sheet e msg hardcoded em ingles"
       - "CR-66: Corrigiu export vazio e import com erro generico"
       - "CR-77: Migrou para File/Paths API (cacheDirectory null fix)"
       - "CR-78: Migrou para File.text() (EncodingType undefined fix)"
+      - "CR-86: Dialogo de confirmacao antes de importar CSV"
 
   - id: F005
     name: "Ward Topics Management"
@@ -309,12 +314,14 @@ features:
       Swipe-to-reveal para editar/excluir. Botao "+" dentro da secao
       Temas da Ala (CR-21). Campo de busca/filtro (CR-39). Salvamento
       automatico. Snapshot pattern para temas em discursos existentes.
-    modified_by_crs: [8, 21, 39, 82]
+    modified_by_crs: [8, 21, 39, 82, 83, 90]
     notes:
       - "CR-8: Corrigiu lista de colecoes nao scrollavel"
       - "CR-21: Moveu botao '+' para dentro da secao Ward Topics"
       - "CR-39: Adicionou campo de busca para filtrar temas"
       - "CR-82: GestureHandlerRootView para swipe funcionar"
+      - "CR-83: Save/Cancel explicito ao inves de auto-save no blur"
+      - "CR-90: Fix botao Delete no SwipeableCard"
 
   - id: F006
     name: "General Collections & Import"
@@ -490,6 +497,86 @@ features:
       - "CSV help text so visivel quando canImport=true"
 
   # ---------------------------------------------------------------------------
+  # Batch 6 Phase 1 (F027-F031)
+  # ---------------------------------------------------------------------------
+
+  - id: F027
+    name: "Explicit Save/Cancel for Members and Topics"
+    status: pending
+    rfs: []
+    description: >
+      Substituir auto-save no blur por botoes explicitos Salvar e Cancelar
+      nos editores de membros (MemberEditor) e temas (TopicEditor). Botoes
+      posicionados abaixo dos campos, alinhados a direita. Cancelar descarta
+      alteracoes, Salvar valida e persiste.
+    modified_by_crs: [83]
+    notes:
+      - "CR-83: Salvar somente ao clicar Salvar, adicionar botao Cancelar"
+      - "Usa i18n keys existentes: common.save e common.cancel"
+      - "Afeta members.tsx e topics.tsx"
+
+  - id: F028
+    name: "Search Clear Button (X) for All Search Fields"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar botao X na direita de todos os campos de search do app para
+      limpar a string de busca e restaurar a lista completa. Componente
+      reutilizavel SearchInput. 10 campos afetados: members, topics, history,
+      timezone, HymnSelector, MemberSelectorModal, TopicSelectorModal,
+      PrayerSelector, ActorSelector, AgendaForm.
+    modified_by_crs: [84]
+    notes:
+      - "CR-84: Botao X padrao para todos os campos de search"
+      - "Criar componente SearchInput reutilizavel"
+      - "X visivel apenas quando campo tem texto"
+
+  - id: F029
+    name: "Complete International Country Codes List"
+    status: pending
+    rfs: []
+    description: >
+      Expandir a lista de codigos internacionais de telefone (COUNTRY_CODES)
+      de 21 para ~150+ paises. Extrair para arquivo compartilhado
+      (src/lib/countryCodes.ts) e atualizar splitPhoneNumber em csvUtils.ts
+      para usar a mesma fonte. Manter emojis de bandeira Unicode.
+    modified_by_crs: [85]
+    notes:
+      - "CR-85: Lista de codigos internacionais incompleta"
+      - "Extrair para src/lib/countryCodes.ts (single source of truth)"
+      - "Atualizar splitPhoneNumber para usar mesma lista"
+
+  - id: F030
+    name: "CSV Import Confirmation Dialog"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar dialogo de confirmacao (Alert.alert) ao clicar em Importar CSV,
+      ANTES de abrir o file picker. O dialogo avisa que a importacao substitui
+      toda a lista de membros e que designacoes existentes nao sao afetadas.
+      Textos i18n em pt-BR, en, es.
+    modified_by_crs: [86]
+    notes:
+      - "CR-86: Dialogo de confirmacao antes de importar CSV"
+      - "Usa padrao Alert.alert ja existente no app"
+      - "Novas i18n keys: members.importConfirmTitle, members.importConfirmMessage"
+
+  - id: F031
+    name: "Fix Delete Button for Members and Topics"
+    status: pending
+    rfs: []
+    description: >
+      Fix do bug onde o botao Delete revelado pelo swipe-to-reveal no
+      SwipeableCard nao faz nada quando pressionado. O botao Edit funciona
+      corretamente. Causa provavel: GestureDetector intercepta evento de
+      toque na area do botao Delete (rightmost). Fix no SwipeableCard.tsx.
+    modified_by_crs: [90]
+    notes:
+      - "CR-90: Bug - botao Delete nao faz nada"
+      - "Edit funciona com padrao identico de codigo"
+      - "Fix no componente compartilhado SwipeableCard.tsx"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
   # ---------------------------------------------------------------------------
 
@@ -648,7 +735,7 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (4 CRs pendentes de implementacao)
+# PENDING CHANGE REQUESTS (12 CRs pendentes de implementacao)
 # =============================================================================
 
 pending_crs:
@@ -747,6 +834,110 @@ pending_crs:
       - src/i18n/locales/pt-BR.json
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
+
+  - id: 83
+    type: ux
+    area: "Members & Topics (F003, F005)"
+    feature_id: F027
+    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+    related_crs: []
+    description: >
+      Membros e temas da ala: salvar somente ao clicar no botao Salvar,
+      adicionar botao Cancelar. Remover auto-save no onBlur.
+    acceptance_criteria:
+      - "Botao Salvar visivel no editor de membro/tema (alinhado a direita)"
+      - "Botao Cancelar visivel ao lado do Salvar"
+      - "onBlur nao dispara salvamento"
+      - "Cancelar fecha editor sem salvar"
+      - "Salvar valida e persiste os dados"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/members.tsx
+      - src/app/(tabs)/settings/topics.tsx
+
+  - id: 84
+    type: ux
+    area: "All search fields"
+    feature_id: F028
+    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+    related_crs: [39]
+    description: >
+      Adicionar botao X na direita de todos os campos de search do app
+      para limpar a string de busca. Criar componente reutilizavel SearchInput.
+    acceptance_criteria:
+      - "Componente SearchInput criado e reutilizavel"
+      - "Botao X visivel quando campo tem texto"
+      - "Botao X limpa campo e restaura lista completa"
+      - "10 campos de search migrados para SearchInput"
+    files_likely_impacted:
+      - src/components/SearchInput.tsx
+      - src/app/(tabs)/settings/members.tsx
+      - src/app/(tabs)/settings/topics.tsx
+      - src/app/(tabs)/settings/history.tsx
+      - src/app/(tabs)/settings/timezone.tsx
+      - src/components/HymnSelector.tsx
+      - src/components/MemberSelectorModal.tsx
+      - src/components/TopicSelectorModal.tsx
+      - src/components/PrayerSelector.tsx
+      - src/components/ActorSelector.tsx
+      - src/components/AgendaForm.tsx
+
+  - id: 85
+    type: bug
+    area: "Members (F003), CSV Import (F004)"
+    feature_id: F029
+    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+    related_crs: []
+    description: >
+      Lista de codigos internacionais de telefone incompleta (21 paises).
+      Expandir para ~150+ paises e extrair para arquivo compartilhado.
+    acceptance_criteria:
+      - "COUNTRY_CODES tem >= 100 entradas com code, flag, label"
+      - "splitPhoneNumber suporta todos os codigos da lista"
+      - "Ambos compartilham mesma fonte de dados (src/lib/countryCodes.ts)"
+      - "Brasil (+55) aparece primeiro na lista"
+    files_likely_impacted:
+      - src/lib/countryCodes.ts
+      - src/app/(tabs)/settings/members.tsx
+      - src/lib/csvUtils.ts
+
+  - id: 86
+    type: ux
+    area: "CSV Import (F004)"
+    feature_id: F030
+    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+    related_crs: [42, 54, 66, 77, 78]
+    description: >
+      Dialogo de confirmacao antes de importar CSV. Avisa que a importacao
+      substitui toda a lista de membros e que designacoes nao sao afetadas.
+    acceptance_criteria:
+      - "Alert.alert exibido ANTES de abrir file picker"
+      - "Mensagem explica substituicao total da lista"
+      - "Mensagem explica que designacoes nao sao afetadas"
+      - "Confirmar abre file picker, Cancelar fecha dialogo"
+      - "Textos traduzidos em pt-BR, en, es"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/members.tsx
+      - src/i18n/locales/en.json
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/es.json
+
+  - id: 90
+    type: bug
+    area: "SwipeableCard (F003, F005)"
+    feature_id: F031
+    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+    related_crs: [82]
+    description: >
+      Botao Delete no SwipeableCard nao funciona para membros nem temas.
+      Edit funciona com padrao identico. GestureDetector intercepta evento
+      de toque na area do botao Delete.
+    acceptance_criteria:
+      - "Botao Delete funciona quando card esta revelado (swiped)"
+      - "Dialogo de confirmacao exibido ao pressionar Delete"
+      - "Botao Edit continua funcionando (sem regressao)"
+      - "Fix no SwipeableCard.tsx (componente compartilhado)"
+    files_likely_impacted:
+      - src/components/SwipeableCard.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -941,6 +1132,44 @@ design_decisions:
       pt-BR: "Domingo, DD de [Mes] de YYYY". en: "Sunday, [Month] DD, YYYY".
       es: "Domingo, DD de [Mes] de YYYY". Usa idioma da ala, nao device locale.
 
+  - id: DD-21
+    title: "Explicit Save/Cancel para editores de membros e temas"
+    decided_in: CR-83
+    decision: >
+      MemberEditor e TopicEditor NAO salvam no onBlur. Salvamento e feito
+      SOMENTE ao clicar no botao Salvar. Botao Cancelar descarta alteracoes.
+      Botoes posicionados abaixo dos campos, alinhados a direita do card.
+      Usa i18n keys existentes common.save e common.cancel.
+    superseded:
+      - "Auto-save no onBlur (comportamento anterior de F003/F005)"
+
+  - id: DD-22
+    title: "Componente SearchInput reutilizavel com botao X"
+    decided_in: CR-84
+    decision: >
+      Todos os campos de search do app usam componente SearchInput que inclui
+      botao X para limpar busca. X visivel apenas quando campo tem texto.
+      Clicar X seta valor para '' e restaura lista completa. Componente e
+      drop-in replacement para TextInput com props iguais.
+
+  - id: DD-23
+    title: "Country codes: lista completa extraida para arquivo compartilhado"
+    decided_in: CR-85
+    decision: >
+      Lista de codigos internacionais extraida para src/lib/countryCodes.ts
+      como single source of truth. COUNTRY_CODES e splitPhoneNumber usam
+      a mesma fonte. Lista com ~150+ paises, Brasil (+55) primeiro, demais
+      em ordem alfabetica.
+
+  - id: DD-24
+    title: "Dialogo de confirmacao antes de importar CSV"
+    decided_in: CR-86
+    decision: >
+      Ao clicar em Importar CSV, exibir Alert.alert ANTES de abrir o file
+      picker. Mensagem explica: (1) importacao substitui toda a lista de
+      membros, (2) designacoes existentes nao sao afetadas. Confirmar abre
+      file picker. Cancelar fecha dialogo.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -956,6 +1185,7 @@ business_rules:
     rule: "Campos de texto com auto-save devem usar debounce >= 500ms com estado local (useState)"
     origin: CR-36
     implementation: "DebouncedTextInput component, flush on unmount"
+    exception: "CR-83: MemberEditor e TopicEditor usam Save/Cancel explicito ao inves de auto-save"
 
   - id: BR-03
     rule: "A palavra 'ator/atores/actor/actors' NAO aparece em nenhum label ou texto na UI"
@@ -1050,6 +1280,19 @@ business_rules:
   - id: BR-24
     rule: "Template WhatsApp null no DB: mostrar template padrao. String vazia: respeitar (usuario limpou intencionalmente)"
     origin: CR-63
+
+  - id: BR-25
+    rule: "Editores de membro e tema NAO salvam no onBlur. Salvamento e feito SOMENTE via botao Salvar"
+    origin: CR-83
+    supersedes: "Auto-save no blur (comportamento anterior)"
+
+  - id: BR-26
+    rule: "Todos os campos de search do app devem ter botao X para limpar busca (componente SearchInput)"
+    origin: CR-84
+
+  - id: BR-27
+    rule: "Dialogo de confirmacao ANTES de importar CSV (Alert.alert com aviso de substituicao total)"
+    origin: CR-86
 
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
@@ -1256,7 +1499,7 @@ out_of_scope:
   - "Lista de convites pendentes na UI (apenas botao convidar)"
 
 # =============================================================================
-# CR HISTORY REFERENCE (para lookup rapido de todas as 82 CRs)
+# CR HISTORY REFERENCE (para lookup rapido de todas as 90 CRs)
 # =============================================================================
 
 cr_history:
@@ -1289,3 +1532,9 @@ cr_history:
     status: "4 pendentes (76, 79, 80, 81), 3 implementadas (77, 78, 82)"
     file: "docs/specs/history/SPEC_CONSOLIDATED_old.yaml (CR-77, 78, 82)"
     summary: "Users screen regression, back button, members explanatory text, user name field, expo-file-system v19 migration, GestureHandlerRootView"
+
+  batch_6:
+    range: "CR-83 a CR-90"
+    status: "8 pendentes (83, 84, 85, 86, 87, 88, 89, 90)"
+    file: "docs/specs/SPEC_F027_F031.yaml (CR-83, 84, 85, 86, 90 - Fase 1)"
+    summary: "Save/Cancel explicito, search clear button, country codes completo, import confirmation dialog, swipe icons, topics explanatory text, collection detail view, delete button fix"

@@ -1,0 +1,1010 @@
+# =============================================================================
+# SPEC_F027_F031.yaml
+# Especificacao de requisitos para Batch 6, Fase 1 (CRs 83-86, 90)
+# Features F027-F031
+# Gerado: 2026-02-18
+# =============================================================================
+
+metadata:
+  batch: 6
+  phase: 1
+  features: [F027, F028, F029, F030, F031]
+  crs: [83, 84, 85, 86, 90]
+  created: "2026-02-18"
+  source_request: >
+    Pedido do usuario para 5 mudancas: salvar membros/temas com botao Save/Cancel
+    (CR-83), botao X para limpar campos de search (CR-84), lista completa de codigos
+    internacionais de telefone (CR-85), dialogo de confirmacao antes de importar CSV
+    (CR-86), e fix do bug do botao excluir nao funcionando (CR-90).
+
+# =============================================================================
+# F027 - Explicit Save/Cancel for Members and Topics (CR-83)
+# =============================================================================
+
+features:
+
+  - id: F027
+    name: "Explicit Save/Cancel for Members and Topics"
+    cr_id: CR-83
+    type: ux
+    priority: HIGH
+    status: pending
+
+    description: >
+      Atualmente, MemberEditor e TopicEditor salvam automaticamente no onBlur
+      (quando o usuario clica fora do campo). O usuario pediu para mudar esse
+      comportamento: salvar SOMENTE quando clicar num botao "Salvar" (posicionado
+      a direita do card do editor). Adicionar tambem um botao "Cancelar" para
+      ignorar a adicao ou edicao sem salvar.
+
+    scope:
+      in:
+        - "Remover auto-save no onBlur de MemberEditor"
+        - "Remover auto-save no onBlur de TopicEditor"
+        - "Adicionar botao Salvar a direita do card do editor (MemberEditor)"
+        - "Adicionar botao Salvar a direita do card do editor (TopicEditor)"
+        - "Adicionar botao Cancelar ao lado do Salvar (MemberEditor)"
+        - "Adicionar botao Cancelar ao lado do Salvar (TopicEditor)"
+        - "Botao Cancelar descarta alteracoes e fecha o editor"
+        - "Botao Salvar valida e persiste as alteracoes"
+        - "i18n keys common.save e common.cancel ja existem"
+      out:
+        - "Mudancas em campos da Agenda (estes usam DebouncedTextInput e auto-save por design)"
+        - "Mudancas em ActorSelector (gestao inline com padrao diferente)"
+        - "Mudancas no backend/Supabase"
+        - "Mudancas em navegacao"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary com 'member:write' que gerencia membros da ala
+
+      - id: P-2
+        description: >
+          Bishopric member ou Secretary com 'topic:write' que gerencia temas da ala
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario gerenciando membros"
+        i_want: "salvar alteracoes apenas quando clicar no botao Salvar"
+        so_that: "tenho controle explicito sobre quando os dados sao persistidos"
+
+      - id: US-2
+        as_a: "usuario adicionando um membro"
+        i_want: "poder cancelar a adicao sem que nada seja salvo"
+        so_that: "posso desistir de adicionar um membro sem efeitos colaterais"
+
+      - id: US-3
+        as_a: "usuario editando um tema"
+        i_want: "ver botoes Salvar e Cancelar no editor"
+        so_that: "sei exatamente como confirmar ou descartar as alteracoes"
+
+    acceptance_criteria:
+      - id: AC-F027-01
+        given: "O MemberEditor esta aberto (adicionando ou editando)"
+        when: "O usuario clica fora do campo de texto (blur)"
+        then: >
+          NADA acontece. O formulario permanece aberto com os dados digitados.
+          O onBlur NAO dispara salvamento.
+        priority: must
+        testable: true
+        test_approach: >
+          Render MemberEditor, digitar dados, simular blur no input. Verificar
+          que onSave NAO foi chamado.
+
+      - id: AC-F027-02
+        given: "O MemberEditor esta aberto com dados preenchidos"
+        when: "O usuario clica no botao Salvar"
+        then: >
+          Os dados sao validados (full_name nao vazio) e onSave e chamado com
+          os dados do formulario. O editor fecha apos salvamento com sucesso.
+        priority: must
+        testable: true
+        test_approach: >
+          Render MemberEditor, preencher nome, clicar botao Salvar. Verificar
+          que onSave foi chamado com os dados corretos.
+
+      - id: AC-F027-03
+        given: "O MemberEditor esta aberto"
+        when: "O usuario clica no botao Cancelar"
+        then: >
+          O editor fecha sem salvar. Todas as alteracoes digitadas sao descartadas.
+          onCancel e chamado. Para edicao, o membro volta ao estado original.
+          Para adicao, o formulario e removido.
+        priority: must
+        testable: true
+        test_approach: >
+          Render MemberEditor, digitar dados, clicar Cancelar. Verificar que
+          onSave NAO foi chamado e onCancel FOI chamado.
+
+      - id: AC-F027-04
+        given: "O MemberEditor esta aberto com nome vazio"
+        when: "O usuario clica no botao Salvar"
+        then: >
+          O salvamento e ignorado (mesma logica existente: if !trimmed return).
+          O editor permanece aberto para o usuario corrigir.
+        priority: must
+        testable: true
+        test_approach: >
+          Render MemberEditor, deixar nome vazio, clicar Salvar. Verificar que
+          onSave NAO foi chamado e o editor continua aberto.
+
+      - id: AC-F027-05
+        given: "O TopicEditor esta aberto (adicionando ou editando)"
+        when: "O usuario clica fora do campo de texto (blur)"
+        then: >
+          NADA acontece. O formulario permanece aberto. O onBlur NAO dispara
+          salvamento.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicEditor, digitar dados, simular blur. Verificar que
+          onSave NAO foi chamado.
+
+      - id: AC-F027-06
+        given: "O TopicEditor esta aberto com titulo preenchido"
+        when: "O usuario clica no botao Salvar"
+        then: >
+          Os dados sao validados (title nao vazio) e onSave e chamado. O editor
+          fecha apos salvamento com sucesso.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicEditor, preencher titulo, clicar Salvar. Verificar que
+          onSave foi chamado.
+
+      - id: AC-F027-07
+        given: "O TopicEditor esta aberto"
+        when: "O usuario clica no botao Cancelar"
+        then: >
+          O editor fecha sem salvar. Alteracoes descartadas.
+        priority: must
+        testable: true
+        test_approach: >
+          Render TopicEditor, digitar dados, clicar Cancelar. Verificar que
+          onSave NAO foi chamado e onCancel FOI chamado.
+
+      - id: AC-F027-08
+        given: "O MemberEditor ou TopicEditor esta aberto"
+        when: "O usuario olha para o layout do editor"
+        then: >
+          Os botoes Salvar e Cancelar sao visiveis abaixo dos campos de entrada,
+          alinhados a direita do card. Salvar usa cor primaria (colors.primary),
+          Cancelar usa estilo neutro (textSecondary). Os labels dos botoes usam
+          as i18n keys common.save e common.cancel.
+        priority: must
+        testable: true
+        test_approach: >
+          Render MemberEditor e verificar que os botoes Salvar e Cancelar
+          estao presentes com os textos i18n corretos.
+
+    design_notes: >
+      Posicionar os botoes Salvar e Cancelar em uma linha (flexDirection row)
+      abaixo dos campos de input, alinhados a direita (justifyContent flex-end).
+      Cancelar a esquerda, Salvar a direita. Salvar com backgroundColor
+      colors.primary e texto colors.onPrimary. Cancelar com estilo outline
+      ou texto simples. Gap de 8 entre os botoes.
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        action: MODIFY
+        details: >
+          1. Remover onBlur={handleSave} dos TextInputs do MemberEditor.
+          2. Adicionar botoes Salvar e Cancelar no MemberEditor.
+          3. Atualizar MemberRow para passar onCancel ao MemberEditor em modo edicao.
+          4. Atualizar handleSaveNew e callbacks para fechar editor via estado.
+          5. Adicionar styles para botoes do editor.
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        action: MODIFY
+        details: >
+          1. Remover onBlur={handleSave} dos TextInputs do TopicEditor.
+          2. Adicionar botoes Salvar e Cancelar no TopicEditor.
+          3. Adicionar prop onCancel ao TopicEditor e TopicEditorProps.
+          4. Atualizar TopicRow e chamadas para passar onCancel.
+          5. Adicionar styles para botoes do editor.
+
+    assumptions:
+      - id: A-F027-01
+        description: >
+          Os botoes Salvar e Cancelar ficam dentro do card do editor (abaixo
+          dos campos), nao fora dele.
+        confirmed: true
+        evidence: >
+          O usuario disse "botao Salvar que pode ficar a direita do card" -
+          interpretado como dentro do card, alinhado a direita.
+
+      - id: A-F027-02
+        description: >
+          O comportamento do blur agora e neutro (nao salva, nao cancela).
+          O usuario pode clicar fora e depois voltar ao campo para continuar editando.
+        confirmed: true
+        evidence: >
+          O usuario quer salvamento explicito. Blur nao deve ter efeito colateral.
+
+      - id: A-F027-03
+        description: >
+          As i18n keys common.save e common.cancel ja existem nos 3 idiomas
+          e devem ser reutilizadas (nao criar novas keys).
+        confirmed: true
+        evidence: >
+          en.json: save = "Save", cancel = "Cancel".
+          pt-BR.json: save = "Salvar", cancel = "Cancelar".
+          es.json: save = "Guardar", cancel = "Cancelar".
+
+    open_questions: []
+    inconsistencies: []
+
+# =============================================================================
+# F028 - Search Clear Button (X) for All Search Fields (CR-84)
+# =============================================================================
+
+  - id: F028
+    name: "Search Clear Button (X) for All Search Fields"
+    cr_id: CR-84
+    type: ux
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      Todos os campos de search do app devem ter um botao X na direita do campo
+      para limpar a string de busca e voltar a mostrar a lista completa. Esse e
+      um padrao UX comum em campos de busca. Atualmente nenhum campo de search
+      tem esse botao. A recomendacao do QA PRE e criar um componente reutilizavel
+      SearchInput para evitar duplicacao.
+
+    scope:
+      in:
+        - "Criar componente reutilizavel SearchInput com botao X de limpeza"
+        - "Substituir TextInput de search em members.tsx por SearchInput"
+        - "Substituir TextInput de search em topics.tsx por SearchInput"
+        - "Substituir TextInput de search em history.tsx por SearchInput"
+        - "Substituir TextInput de search em timezone.tsx por SearchInput"
+        - "Substituir TextInput de search em HymnSelector.tsx por SearchInput"
+        - "Substituir TextInput de search em MemberSelectorModal.tsx por SearchInput"
+        - "Substituir TextInput de search em TopicSelectorModal.tsx por SearchInput"
+        - "Substituir TextInput de search em PrayerSelector.tsx por SearchInput"
+        - "Substituir TextInput de search em ActorSelector.tsx por SearchInput"
+        - "Substituir TextInput de search em AgendaForm.tsx por SearchInput"
+      out:
+        - "Mudancas em TextInputs que NAO sao campos de search (ex: nome, telefone, titulo, link)"
+        - "Mudancas no DebouncedTextInput"
+        - "Mudancas no backend/Supabase"
+        - "Adicao de icones (usar texto 'X' ou unicode para manter simplicidade)"
+
+    personas:
+      - id: P-1
+        description: >
+          Qualquer usuario que interage com campos de busca no app
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario que busca membros por nome"
+        i_want: "clicar no X para limpar o campo de busca rapidamente"
+        so_that: "nao preciso selecionar e apagar o texto manualmente"
+
+      - id: US-2
+        as_a: "usuario que busca hinos por titulo"
+        i_want: "ver um botao X que limpa a busca e mostra todos os hinos"
+        so_that: "posso facilmente recomecar uma nova busca"
+
+    acceptance_criteria:
+      - id: AC-F028-01
+        given: "Qualquer campo de search do app"
+        when: "O campo esta vazio"
+        then: >
+          O botao X NAO e visivel. O campo mostra apenas o placeholder.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SearchInput com value vazio. Verificar que o botao X nao esta presente.
+
+      - id: AC-F028-02
+        given: "Qualquer campo de search do app"
+        when: "O usuario digita texto no campo"
+        then: >
+          O botao X aparece na extremidade direita do campo de busca.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SearchInput, digitar texto. Verificar que o botao X aparece.
+
+      - id: AC-F028-03
+        given: "Um campo de search com texto digitado"
+        when: "O usuario clica no botao X"
+        then: >
+          O texto do campo e limpo (setado para string vazia), a lista completa
+          volta a ser exibida, e o botao X desaparece.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SearchInput com texto, clicar X. Verificar que onChangeText foi
+          chamado com '' e o botao X desapareceu.
+
+      - id: AC-F028-04
+        given: "O componente SearchInput"
+        when: "Renderizado em qualquer tela"
+        then: >
+          O botao X esta posicionado dentro do campo, na direita (position absolute
+          ou flexbox), nao sobrepondo o texto. O icone X usa cor textSecondary.
+          O campo de texto tem paddingRight suficiente para nao sobrepor o botao X.
+        priority: must
+        testable: true
+        test_approach: >
+          Inspecionar estilos do SearchInput. Verificar padding e posicao do botao X.
+
+      - id: AC-F028-05
+        given: "O botao X e pressionado"
+        when: "O campo perde foco"
+        then: >
+          O teclado nao deve re-abrir. O campo limpa o texto sem re-focar.
+          O botao X some porque o campo agora esta vazio.
+        priority: should
+        testable: true
+        test_approach: >
+          Render SearchInput, digitar texto, clicar X. Verificar que o campo
+          nao retorna ao foco.
+
+      - id: AC-F028-06
+        given: "Todos os 10 campos de search identificados no QA PRE"
+        when: "A feature e implementada"
+        then: >
+          Cada um dos 10 campos usa o componente SearchInput e tem o botao X
+          funcional. Os campos sao: members, topics, history, timezone,
+          HymnSelector, MemberSelectorModal, TopicSelectorModal,
+          PrayerSelector, ActorSelector, AgendaForm.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar cada tela/componente individualmente.
+
+    design_notes: >
+      Componente SearchInput deve aceitar as mesmas props de TextInput mais
+      onClear opcional. Internamente wrapa o TextInput em uma View, com o
+      botao X posicionado absolutamente a direita. O X usa caractere unicode
+      ou texto simples (nao requer biblioteca de icones). Tamanho do X:
+      ~20x20, cor textSecondary, hitSlop para facilitar toque. paddingRight
+      do input deve ser >= 36 para evitar sobreposicao.
+
+    files_impacted:
+      - path: "src/components/SearchInput.tsx"
+        action: CREATE
+        details: >
+          Novo componente reutilizavel. Props: value, onChangeText, placeholder,
+          placeholderTextColor, style, colors (ou usar useTheme internamente).
+          Renderiza TextInput com botao X condicional.
+
+      - path: "src/app/(tabs)/settings/members.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/app/(tabs)/settings/history.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/app/(tabs)/settings/timezone.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/HymnSelector.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/MemberSelectorModal.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/TopicSelectorModal.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/PrayerSelector.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/ActorSelector.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+      - path: "src/components/AgendaForm.tsx"
+        action: MODIFY
+        details: "Substituir TextInput de search por SearchInput."
+
+    assumptions:
+      - id: A-F028-01
+        description: >
+          O botao X usa texto unicode (ex: '\u00D7' ou '\u2715') ao inves de
+          icone de biblioteca, para manter a simplicidade e evitar novas dependencias.
+        confirmed: true
+        evidence: >
+          O app nao usa biblioteca de icones (nao ha imports de expo/vector-icons
+          ou similar nas telas existentes). Usar texto e consistente.
+
+      - id: A-F028-02
+        description: >
+          O componente SearchInput aceita todas as props relevantes do TextInput
+          via spread para ser drop-in replacement.
+        confirmed: true
+        evidence: >
+          Cada campo de search usa props diferentes (autoCapitalize, autoCorrect,
+          etc). O componente precisa ser flexivel.
+
+      - id: A-F028-03
+        description: >
+          O SearchInput gerencia a visibilidade do X internamente baseado na
+          prop value (se value.length > 0, mostra X).
+        confirmed: true
+        evidence: >
+          Padrao UX standard: X so aparece quando ha texto.
+
+    open_questions: []
+    inconsistencies: []
+
+# =============================================================================
+# F029 - Complete International Country Codes List (CR-85)
+# =============================================================================
+
+  - id: F029
+    name: "Complete International Country Codes List"
+    cr_id: CR-85
+    type: bug
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      A lista COUNTRY_CODES em members.tsx tem apenas 21 paises. O usuario
+      pediu para tornar a lista mais completa. A funcao splitPhoneNumber em
+      csvUtils.ts tambem hardcoda os mesmos 21 codigos para parsing de CSV.
+      Ambos os locais devem ser atualizados em sincronia.
+
+    scope:
+      in:
+        - "Expandir COUNTRY_CODES em members.tsx para incluir todos os paises com codigos ITU-T"
+        - "Atualizar splitPhoneNumber em csvUtils.ts para suportar todos os codigos"
+        - "Manter ordenacao logica: primeiro o pais padrao (+55 Brasil), depois os demais em ordem alfabetica por label"
+        - "Manter formato existente: { code, flag, label } com emoji de bandeira Unicode"
+        - "Extrair a lista para arquivo compartilhado para evitar duplicacao"
+      out:
+        - "Mudancas na UI do seletor de codigo de pais (modal continua o mesmo)"
+        - "Mudancas no backend/Supabase"
+        - "Adicao de campo de busca no modal de codigo de pais (escopo futuro)"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary que gerencia membros de paises nao
+          incluidos na lista atual (ex: Australia, India, Filipinas, etc.)
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario registrando um membro de outro pais"
+        i_want: "encontrar o codigo do pais na lista de selecao"
+        so_that: "posso registrar o telefone com o codigo internacional correto"
+
+    acceptance_criteria:
+      - id: AC-F029-01
+        given: "O usuario abre o seletor de codigo de pais"
+        when: "A lista e exibida"
+        then: >
+          A lista contem pelo menos 100 paises com codigos internacionais,
+          cobrindo todos os continentes e paises relevantes para a Igreja SUD.
+          Cada entrada tem: code (ex: '+61'), flag (emoji Unicode), label (nome do pais + code).
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar que COUNTRY_CODES tem >= 100 entradas, cada uma com
+          code, flag e label preenchidos.
+
+      - id: AC-F029-02
+        given: "Um membro e exportado via CSV com codigo de pais novo (ex: +61)"
+        when: "O CSV e importado de volta"
+        then: >
+          A funcao splitPhoneNumber identifica corretamente o codigo +61
+          e separa o numero local. O membro e importado com country_code
+          correto.
+        priority: must
+        testable: true
+        test_approach: >
+          Chamar splitPhoneNumber('+61412345678'). Verificar que retorna
+          { countryCode: '+61', phone: '412345678' }.
+
+      - id: AC-F029-03
+        given: "A lista COUNTRY_CODES e a funcao splitPhoneNumber"
+        when: "Comparadas"
+        then: >
+          Ambas suportam o mesmo conjunto de codigos. Nenhum codigo esta
+          em uma e nao na outra. Idealmente compartilham a mesma fonte de dados.
+        priority: must
+        testable: true
+        test_approach: >
+          Extrair codigos de COUNTRY_CODES e da logica de splitPhoneNumber.
+          Verificar que sao identicos.
+
+      - id: AC-F029-04
+        given: "A lista COUNTRY_CODES"
+        when: "Ordenada"
+        then: >
+          Brasil (+55) aparece primeiro na lista (pais padrao).
+          Os demais paises seguem em ordem alfabetica pelo nome do pais
+          em ingles (label).
+        priority: should
+        testable: true
+        test_approach: >
+          Verificar que COUNTRY_CODES[0].code === '+55' e que os demais
+          estao em ordem alfabetica.
+
+      - id: AC-F029-05
+        given: "A lista COUNTRY_CODES atualizada"
+        when: "Exibida no modal"
+        then: >
+          Cada pais mostra a bandeira emoji correta. As bandeiras usam
+          Regional Indicator Symbol pairs Unicode (ex: '\u{1F1E6}\u{1F1FA}'
+          para Australia).
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar que cada entrada tem flag com 2 Regional Indicator
+          Symbols unicode corretos.
+
+    design_notes: >
+      Extrair a lista de paises para um arquivo separado (ex: src/lib/countryCodes.ts)
+      que exporta COUNTRY_CODES e uma funcao auxiliar para lookup. splitPhoneNumber
+      deve importar desta mesma fonte. A lista deve ser construida a partir de
+      codigos ITU-T E.164 oficiais. Para paises com multiplos codigos (ex: +1 para
+      USA e Canada), listar separadamente. A ordenacao prioritiza Brasil primeiro,
+      depois alfabetica. O modal de selecao pode se beneficiar de busca no futuro
+      (fora de escopo deste CR, mas a estrutura deve facilitar).
+
+    files_impacted:
+      - path: "src/lib/countryCodes.ts"
+        action: CREATE
+        details: >
+          Novo arquivo com a lista completa de COUNTRY_CODES e funcoes auxiliares:
+          getCountryCodes(), getFlagForCode(code), splitPhoneNumber(fullPhone).
+
+      - path: "src/app/(tabs)/settings/members.tsx"
+        action: MODIFY
+        details: >
+          1. Remover COUNTRY_CODES e getFlagForCode locais.
+          2. Importar de src/lib/countryCodes.ts.
+
+      - path: "src/lib/csvUtils.ts"
+        action: MODIFY
+        details: >
+          1. Remover logica hardcoded de splitPhoneNumber.
+          2. Importar splitPhoneNumber de src/lib/countryCodes.ts ou refatorar
+             para usar a lista compartilhada.
+
+    assumptions:
+      - id: A-F029-01
+        description: >
+          A lista completa inclui pelo menos todos os paises com presenca
+          da Igreja SUD (Americas, Europa, Asia-Pacifico, Africa) mais
+          paises com grandes populacoes. Estimativa: ~150-200 paises.
+        confirmed: true
+        evidence: >
+          O usuario disse "deixe mais completo" e o QA PRE confirmou que
+          tem apenas 21 entradas. Uma lista com cobertura global e esperada.
+
+      - id: A-F029-02
+        description: >
+          Codigos de pais com multiplas regioes (ex: +1 para USA, Canada,
+          Caribbean) sao listados separadamente por pais para facilitar
+          a selecao pelo usuario.
+        confirmed: true
+        evidence: >
+          A lista atual ja lista +1 apenas para USA. Canada e outros
+          paises +1 devem ter entradas proprias.
+
+      - id: A-F029-03
+        description: >
+          Nao e necessario adicionar campo de busca ao modal de selecao
+          de codigo de pais neste CR. Com a lista expandida, scroll ja
+          permite encontrar o pais. Busca pode ser adicionada em CR futuro.
+        confirmed: true
+        evidence: >
+          O usuario pediu apenas para "deixar mais completo". Nao mencionou busca.
+
+    open_questions:
+      - id: OQ-F029-01
+        question: >
+          Para paises com codigo +1 (EUA, Canada, etc.), devemos mostrar
+          todos individualmente ou agrupar? Recomendacao: listar separadamente
+          para clareza.
+        impact: LOW
+        default_if_unanswered: >
+          Listar separadamente: USA (+1), Canada (+1).
+
+    inconsistencies: []
+
+# =============================================================================
+# F030 - CSV Import Confirmation Dialog (CR-86)
+# =============================================================================
+
+  - id: F030
+    name: "CSV Import Confirmation Dialog"
+    cr_id: CR-86
+    type: ux
+    priority: MEDIUM
+    status: pending
+
+    description: >
+      Ao clicar no botao "Importar CSV", o app atualmente abre diretamente
+      o dialogo do sistema para selecionar arquivo. O usuario quer um dialogo
+      de confirmacao ANTES de abrir o file picker, avisando que: (1) ao fazer
+      o upload, toda a lista de membros da ala e substituida pela lista do
+      arquivo, e (2) isso nao mexe nas designacoes passadas ou presentes.
+      Somente se o usuario confirmar, o file picker e aberto.
+
+    scope:
+      in:
+        - "Adicionar Alert.alert de confirmacao ao clicar Importar CSV"
+        - "Texto do dialogo explica substituicao total da lista de membros"
+        - "Texto do dialogo explica que designacoes existentes nao sao afetadas"
+        - "Botao Confirmar abre o file picker"
+        - "Botao Cancelar fecha o dialogo sem abrir file picker"
+        - "Textos internacionalizados em pt-BR, en, es"
+      out:
+        - "Mudancas na logica de importacao/parsing do CSV"
+        - "Mudancas no RPC import_members"
+        - "Mudancas no backend/Supabase"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary com 'member:import' que importa membros via CSV
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario que vai importar membros"
+        i_want: "ver um aviso claro antes de prosseguir com a importacao"
+        so_that: "entendo que a lista atual sera completamente substituida"
+
+    acceptance_criteria:
+      - id: AC-F030-01
+        given: "O usuario esta na tela de Membros com permissao de import"
+        when: "O usuario clica no botao 'Importar CSV'"
+        then: >
+          Um dialogo de confirmacao (Alert.alert) e exibido ANTES de abrir
+          o file picker. O dialogo contem: titulo, mensagem explicativa,
+          e botoes Cancelar e Confirmar.
+        priority: must
+        testable: true
+        test_approach: >
+          Mockar Alert.alert. Clicar botao Importar CSV. Verificar que
+          Alert.alert foi chamado com os parametros corretos.
+
+      - id: AC-F030-02
+        given: "O dialogo de confirmacao esta aberto"
+        when: "O usuario le a mensagem"
+        then: >
+          A mensagem contem duas informacoes claras:
+          (1) Ao importar, toda a lista de membros da ala sera substituida
+          pela lista do arquivo CSV.
+          (2) Designacoes passadas e presentes (discursos) nao sao afetadas.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar o texto passado ao Alert.alert. Deve conter ambas
+          informacoes em i18n.
+
+      - id: AC-F030-03
+        given: "O dialogo de confirmacao esta aberto"
+        when: "O usuario clica em Confirmar"
+        then: >
+          O file picker do sistema e aberto (mesmo comportamento atual
+          do handleImport, que agora executa apos confirmacao).
+        priority: must
+        testable: true
+        test_approach: >
+          Mockar Alert.alert e simular click no botao Confirmar (segundo
+          botao). Verificar que DocumentPicker.getDocumentAsync e chamado.
+
+      - id: AC-F030-04
+        given: "O dialogo de confirmacao esta aberto"
+        when: "O usuario clica em Cancelar"
+        then: >
+          O dialogo fecha e o file picker NAO e aberto. Nenhum efeito
+          colateral ocorre.
+        priority: must
+        testable: true
+        test_approach: >
+          Mockar Alert.alert e simular click em Cancelar. Verificar que
+          DocumentPicker.getDocumentAsync NAO e chamado.
+
+      - id: AC-F030-05
+        given: "O app esta em qualquer idioma suportado (pt-BR, en, es)"
+        when: "O dialogo de confirmacao e exibido"
+        then: >
+          Titulo e mensagem sao exibidos no idioma correto, usando
+          i18n keys dedicadas.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar que as i18n keys existem nos 3 arquivos de locale.
+
+    i18n_keys:
+      new_keys:
+        - key: "members.importConfirmTitle"
+          en: "Import Members"
+          pt_BR: "Importar Membros"
+          es: "Importar Miembros"
+
+        - key: "members.importConfirmMessage"
+          en: "Importing a CSV file will replace the entire current member list with the contents of the file. Existing speech assignments (past and present) will not be affected. Do you want to continue?"
+          pt_BR: "Ao importar um arquivo CSV, toda a lista de membros atual sera substituida pelo conteudo do arquivo. As designacoes de discursos existentes (passadas e presentes) nao serao afetadas. Deseja continuar?"
+          es: "Al importar un archivo CSV, toda la lista de miembros actual sera reemplazada por el contenido del archivo. Las asignaciones de discursos existentes (pasadas y presentes) no seran afectadas. Desea continuar?"
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        action: MODIFY
+        details: >
+          1. Alterar handleImport para mostrar Alert.alert ANTES de abrir
+          o file picker.
+          2. Mover a logica existente de handleImport (DocumentPicker/web input)
+          para dentro do callback do botao Confirmar do Alert.
+          3. Usar t('members.importConfirmTitle') e t('members.importConfirmMessage').
+
+      - path: "src/i18n/locales/en.json"
+        action: MODIFY
+        details: "Adicionar keys members.importConfirmTitle e members.importConfirmMessage."
+
+      - path: "src/i18n/locales/pt-BR.json"
+        action: MODIFY
+        details: "Adicionar keys members.importConfirmTitle e members.importConfirmMessage."
+
+      - path: "src/i18n/locales/es.json"
+        action: MODIFY
+        details: "Adicionar keys members.importConfirmTitle e members.importConfirmMessage."
+
+    assumptions:
+      - id: A-F030-01
+        description: >
+          Usar Alert.alert nativo, mesmo padrao ja usado no app para
+          dialogo de confirmacao de exclusao de membro (handleDelete).
+        confirmed: true
+        evidence: >
+          O QA PRE confirmou que "Pattern Alert.alert ja e usado no app".
+          handleDelete em members.tsx e handleDelete em topics.tsx ja usam
+          Alert.alert com botoes Cancel e destructive.
+
+      - id: A-F030-02
+        description: >
+          O dialogo usa estilo padrao (nao destructive) para o botao
+          Confirmar, diferente do dialogo de exclusao que usa style: 'destructive'.
+        confirmed: true
+        evidence: >
+          Importar CSV nao e uma acao destrutiva no sentido de que e
+          recuperavel (importar novamente). Mas substitui a lista toda.
+          Usar estilo 'default' para Confirmar e 'cancel' para Cancelar.
+
+    open_questions: []
+    inconsistencies: []
+
+# =============================================================================
+# F031 - Fix Delete Button for Members and Topics (CR-90 BUG)
+# =============================================================================
+
+  - id: F031
+    name: "Fix Delete Button for Members and Topics"
+    cr_id: CR-90
+    type: bug
+    priority: HIGH
+    status: pending
+
+    description: >
+      O botao de excluir revelado pelo swipe-to-reveal em SwipeableCard nao
+      faz nada quando pressionado, tanto para membros quanto para temas.
+      O botao Edit funciona corretamente com padrao identico de codigo.
+      A hipotese do QA PRE e que o GestureDetector intercepta o evento de
+      toque na area do botao Delete (botao mais a direita, mais proximo da
+      borda). O Delete button esta na posicao rightmost, possivelmente sob
+      a area do GestureDetector que captura o pan gesture.
+
+    scope:
+      in:
+        - "Diagnosticar e corrigir o bug do botao Delete no SwipeableCard"
+        - "Garantir que onDelete e chamado ao pressionar o botao Delete"
+        - "Manter o botao Edit funcionando"
+        - "Testar em Members e Topics"
+      out:
+        - "Mudancas na logica de exclusao (mutations, RPC, etc.)"
+        - "Mudancas no backend/Supabase"
+        - "Redesign do SwipeableCard"
+
+    personas:
+      - id: P-1
+        description: >
+          Bishopric member ou Secretary que tenta excluir um membro ou tema via swipe
+
+    user_stories:
+      - id: US-1
+        as_a: "usuario que quer excluir um membro"
+        i_want: "que o botao Delete funcione quando eu pressiono"
+        so_that: "consigo remover membros indesejados da lista"
+
+    acceptance_criteria:
+      - id: AC-F031-01
+        given: "Um card de membro esta revelado (swiped) mostrando botoes Edit e Delete"
+        when: "O usuario pressiona o botao Delete"
+        then: >
+          O dialogo de confirmacao de exclusao e exibido (Alert.alert com
+          mensagem 'Are you sure...'). Se confirmado, o membro e excluido.
+        priority: must
+        testable: true
+        test_approach: >
+          Render SwipeableCard com onDelete. Revelar o card. Pressionar
+          botao Delete. Verificar que onDelete foi chamado.
+
+      - id: AC-F031-02
+        given: "Um card de tema esta revelado (swiped) mostrando botoes Edit e Delete"
+        when: "O usuario pressiona o botao Delete"
+        then: >
+          O dialogo de confirmacao de exclusao e exibido. Se confirmado,
+          o tema e excluido.
+        priority: must
+        testable: true
+        test_approach: >
+          Testar no TopicsScreen com swipe e click no Delete.
+
+      - id: AC-F031-03
+        given: "O botao Delete e pressionado"
+        when: "O card esta revelado"
+        then: >
+          O card fecha (anima de volta) e o onDelete callback e executado,
+          exatamente como ja acontece com o botao Edit.
+        priority: must
+        testable: true
+        test_approach: >
+          Verificar que handleDelete no SwipeableCard chama onReveal(null),
+          anima translateX para 0, e chama onDelete?.().
+
+      - id: AC-F031-04
+        given: "O botao Edit no SwipeableCard"
+        when: "Apos o fix do Delete"
+        then: >
+          O botao Edit continua funcionando normalmente. Nenhuma regressao.
+        priority: must
+        testable: true
+        test_approach: >
+          Testar botao Edit apos o fix. Verificar que handleEdit ainda
+          funciona.
+
+    root_cause_analysis: >
+      Analisando o SwipeableCard.tsx, o layout e:
+      1. actionsContainer (position absolute, right:0) com Edit e Delete buttons
+      2. GestureDetector wraping cardContent (Animated.View com zIndex:1)
+
+      Quando o card e swiped (translateX = -actionWidth), o cardContent se move
+      para a esquerda, revelando os botoes atras dele. POREM, o GestureDetector
+      continua cobrindo toda a largura original do card (incluindo a area onde
+      os botoes foram revelados). Especificamente, o Animated.View com zIndex:1
+      ainda ocupa o espaco visual sobre os action buttons, mesmo que esteja
+      transladado para a esquerda.
+
+      O botao Edit funciona provavelmente porque o GestureDetector tem
+      activeOffsetX([-20, 20]) - ou seja, toques sem movimento horizontal
+      passam por ele. MAS a area do Delete button pode estar completamente
+      coberta pela Animated.View transladada se o layout nao permitir que
+      eventos passem para baixo.
+
+      A correcao mais provavel: garantir que a area dos action buttons NAO
+      esta coberta pelo GestureDetector quando revelada. Opcoes:
+      (a) Usar pointerEvents='box-none' no Animated.View para que toques
+          passem por areas transparentes.
+      (b) Ajustar o layout para que os action buttons fiquem fora da area
+          do GestureDetector.
+      (c) Ajustar a largura do Animated.View para match a posicao transladada.
+
+      A opcao mais provavel e que o Animated.View com zIndex:1 cobre os
+      botoes. A solucao e usar overflow: 'hidden' no container e garantir
+      que o Animated.View nao cubra os botoes, ou mover os action buttons
+      para fora da hierarquia do GestureDetector.
+
+    files_impacted:
+      - path: "src/components/SwipeableCard.tsx"
+        action: MODIFY
+        details: >
+          Corrigir o bug de toque no botao Delete. A solucao exata depende
+          do diagnostico, mas provavelmente envolve:
+          1. Garantir que GestureDetector/Animated.View nao bloqueia toques
+             nos action buttons quando revelados.
+          2. Possivel uso de pointerEvents ou ajuste de layout/zIndex.
+          3. Verificar se hitSlop ou gesture configuration precisa de ajuste.
+
+    assumptions:
+      - id: A-F031-01
+        description: >
+          O bug e causado pela interacao entre GestureDetector e os botoes
+          de acao, nao por um problema na logica de onDelete em si.
+        confirmed: true
+        evidence: >
+          O QA PRE confirmou: "Edit funciona com padrao identico" e
+          "Hipotese: GestureDetector intercepta evento de toque na area
+          do botao delete (rightmost button)". handleDelete no
+          SwipeableCard tem a mesma estrutura que handleEdit.
+
+      - id: A-F031-02
+        description: >
+          O fix deve ser feito no SwipeableCard.tsx (componente compartilhado),
+          nao nas telas individuais de Members ou Topics.
+        confirmed: true
+        evidence: >
+          O bug e no componente SwipeableCard, usado por ambas as telas.
+          O fix no componente corrige ambos os cenarios.
+
+    open_questions: []
+    inconsistencies: []
+
+# =============================================================================
+# CROSS-FEATURE CONSIDERATIONS
+# =============================================================================
+
+cross_feature_notes:
+  - note: >
+      F027 (Save/Cancel) e F031 (Delete fix) afetam a mesma area do codigo
+      (SwipeableCard, members.tsx, topics.tsx). Devem ser desenvolvidas
+      considerando as interacoes entre si. O Save/Cancel muda o fluxo de
+      edicao que e revelado pelo mesmo SwipeableCard cujo Delete esta bugado.
+    features: [F027, F031]
+
+  - note: >
+      F028 (Search Clear) afeta todas as telas que usam campos de search,
+      incluindo members.tsx e topics.tsx que tambem sao afetadas por F027.
+      A ordem de implementacao recomendada e: F031 (fix Delete) -> F027
+      (Save/Cancel) -> F028 (Search Clear) para minimizar conflitos.
+    features: [F027, F028, F031]
+
+  - note: >
+      F029 (Country Codes) e independente das demais features e pode ser
+      desenvolvida em paralelo.
+    features: [F029]
+
+  - note: >
+      F030 (Import Confirmation) e independente, afeta apenas o fluxo de
+      import em members.tsx. Pode ser desenvolvida em paralelo com F029.
+    features: [F029, F030]
+
+# =============================================================================
+# IMPLEMENTATION ORDER RECOMMENDATION
+# =============================================================================
+
+implementation_order:
+  - order: 1
+    feature: F031
+    reason: >
+      Fix do bug do Delete deve ser feito primeiro porque F027 (Save/Cancel)
+      vai mudar o fluxo de edicao no SwipeableCard area e e melhor ter
+      o Delete funcionando antes de alterar o editor.
+
+  - order: 2
+    feature: F027
+    reason: >
+      Save/Cancel muda fundamentalmente o fluxo de edicao de membros e temas.
+      Deve ser feito apos o fix do Delete para que testes de regressao cubram
+      ambos os cenarios.
+
+  - order: 3
+    feature: F029
+    reason: >
+      Country Codes e independente, mas envolve refatoracao de arquivo
+      (extrair para lib/countryCodes.ts) que e mais segura com os outros
+      fixes ja estabilizados.
+
+  - order: 4
+    feature: F030
+    reason: >
+      Import Confirmation e uma mudanca simples e isolada no fluxo de import.
+      Pode ser feita a qualquer momento, mas fica apos F029 por depender
+      do mesmo arquivo (members.tsx).
+
+  - order: 5
+    feature: F028
+    reason: >
+      Search Clear afeta 11 arquivos e cria um componente novo. E a mudanca
+      com maior superficie de impacto e deve ser a ultima para que todas as
+      outras mudancas em members.tsx e topics.tsx ja estejam estabilizadas.

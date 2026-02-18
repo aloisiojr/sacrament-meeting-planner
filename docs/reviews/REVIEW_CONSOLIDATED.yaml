@@ -1,15 +1,15 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82 and CR-80
+# Consolidated code review for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90
 # Reviewed: 2026-02-18
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -400,55 +400,59 @@ cr80:
 
 pending_deploys:
 
-  - id: DEPLOY-CR82-01
-    description: "CR-82 fix: GestureHandlerRootView wrapper in root layout"
+  - id: DEPLOY-B6P1-01
+    description: "Batch 6, Phase 1: Members UX improvements and bug fixes (F027-F031)"
     branch: master
     commits:
-      - hash: ee9d84d
-        message: "fix(layout): add GestureHandlerRootView wrapper to root layout (CR-82)"
-      - hash: 37e880b
-        message: "test(layout): add tests for GestureHandlerRootView wrapper (CR-82)"
+      - hash: 298258c
+        message: "fix(swipeable): add pointerEvents box-none to fix Delete button touch (CR-90)"
+      - hash: 89b5dc9
+        message: "feat(members): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+      - hash: 1970e71
+        message: "feat(topics): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+      - hash: 8d0f6c4
+        message: "feat(lib): create countryCodes.ts with ~200 country codes and splitPhoneNumber (CR-85)"
+      - hash: 59eaba7
+        message: "refactor(members,csv): use shared countryCodes.ts as single source of truth (CR-85)"
+      - hash: 5d65fb1
+        message: "feat(i18n): add members.importConfirmTitle and importConfirmMessage keys (CR-86)"
+      - hash: 5837628
+        message: "feat(members): add confirmation dialog before CSV import (CR-86)"
+      - hash: 8f2b42a
+        message: "feat(components): create SearchInput component with clear X button (CR-84)"
+      - hash: 27daf39
+        message: "feat(settings): migrate search fields to SearchInput in 4 settings screens (CR-84)"
+      - hash: ede8904
+        message: "feat(components): migrate search fields to SearchInput in 6 modal/selector components (CR-84)"
+      - hash: 08303d0
+        message: "test(batch6): add tests for F027-F031 (CRs 83-86, 90)"
+      - hash: ac4b489
+        message: "fix(tests): update CR-39 tests for SearchInput migration in topics.tsx (R-B6P1-01)"
+      - hash: 27a4383
+        message: "fix(tests): update CSV import test to reference performImport after CR-86 refactor (R-B6P1-02)"
+      - hash: 3b780d4
+        message: "fix(tests): update CR-80 regression test for SearchInput migration in members.tsx (R-B6P1-03)"
+      - hash: 6a63ac6
+        message: "docs(ledger): update CODE_LEDGER with regression fixes and test results (R-B6P1-04)"
     instructions:
       - "Merge branch master into main"
-      - "Run: npx vitest run (verify all tests pass)"
-      - "Run: npx expo start --ios (verify Members and Topics screens load without GestureDetector error)"
-      - "Manual test: swipe left on a member row to verify action buttons appear"
-      - "Manual test: swipe left on a topic row to verify action buttons appear"
+      - "Run: npx vitest run (verify all 2610 tests pass)"
+      - "Run: npx expo start --ios"
+      - "Manual test: swipe left on member/topic row, tap Delete - should work (CR-90)"
+      - "Manual test: edit member name, verify Save/Cancel buttons appear (CR-83)"
+      - "Manual test: tap Cancel - changes discarded; tap Save - changes saved (CR-83)"
+      - "Manual test: edit topic, verify Save/Cancel buttons work (CR-83)"
+      - "Manual test: open phone code picker, verify ~172 countries listed (CR-85)"
+      - "Manual test: tap Import CSV, verify confirmation dialog appears first (CR-86)"
+      - "Manual test: type in any search field, verify X button appears and clears text (CR-84)"
+      - "Manual test: switch language (en, pt-BR, es) and verify all new UI strings"
       - "Run: eas build --platform ios (or android) for production build"
-    risk: very_low
+    risk: low
     notes: >
-      Single wrapper component added to root layout. No behavior changes to any
-      existing component. GestureHandlerRootView is a standard pattern required
-      by react-native-gesture-handler v2.x. The package was already installed.
-
-  - id: DEPLOY-CR80-01
-    description: "CR-80 feature: Members screen explanatory texts with i18n (pt-BR, en, es)"
-    branch: master
-    commits:
-      - hash: 9359348
-        message: "feat(i18n): add members.description and members.csvHelp keys in pt-BR/en/es (CR-80)"
-      - hash: 84bea70
-        message: "feat(members): add description and csvHelp explanatory texts (CR-80)"
-      - hash: dbd5488
-        message: "test(members): add tests for F026 explanatory texts (CR-80)"
-      - hash: 2d80bda
-        message: "docs(ledger): update CODE_LEDGER with CR-80 commits (CR-80)"
-      - hash: 2250706
-        message: "docs(tests): update TEST_CONSOLIDATED (CR-80)"
-    instructions:
-      - "Merge branch master into main"
-      - "Run: npx vitest run (verify all 2502 tests pass)"
-      - "Run: npx expo start --ios (verify Members screen shows description text below title)"
-      - "Visual test: verify description text is centered with secondary color below the Members title"
-      - "Visual test: verify CSV help text appears below Export/Import CSV buttons (requires member:import permission)"
-      - "Visual test: switch language to en, pt-BR, es and verify texts change correctly"
-      - "Visual test: verify that a user without member:import permission does NOT see CSV help text"
-      - "Functional test: verify search, add, edit, delete, CSV import/export still work"
-    risk: very_low
-    notes: >
-      UI-only change: adds 2 static Text elements with i18n translations.
-      No logic changes, no backend changes, no new dependencies. Description
-      text always visible; CSV help text gated by existing canImport permission.
+      All changes are frontend-only. No backend, no database, no new dependencies.
+      5 features: Delete fix (1 line), Save/Cancel buttons (2 screens), 172 country
+      codes (shared module), CSV import confirmation (Alert.alert), SearchInput with
+      X clear button (10 fields migrated). All 2610 tests passing.
 
 # =============================================================================
 # REVIEW HISTORY
@@ -470,3 +474,580 @@ review_history:
     verdict: approved
     commits_reviewed: [9359348, 84bea70, dbd5488, 2d80bda, 2250706]
     issues_found: 0
+
+  - date: "2026-02-18"
+    phase: "Batch 6, Phase 1"
+    crs: [CR-83, CR-84, CR-85, CR-86, CR-90]
+    features: [F027, F028, F029, F030, F031]
+    reviewer: reviewer-agent
+    verdict: changes_required
+    iteration: 1
+    commits_reviewed: [298258c, 89b5dc9, 1970e71, 8d0f6c4, 59eaba7, 5d65fb1, 5837628, 8f2b42a, 27daf39, ede8904]
+    issues_found: 4
+    issues_by_severity:
+      p0: 0
+      p1: 3
+      p2: 1
+
+  - date: "2026-02-18"
+    phase: "Batch 6, Phase 1"
+    crs: [CR-83, CR-84, CR-85, CR-86, CR-90]
+    features: [F027, F028, F029, F030, F031]
+    reviewer: reviewer-agent
+    verdict: approved
+    iteration: 2
+    commits_reviewed: [ac4b489, 27a4383, 3b780d4, 6a63ac6]
+    issues_found: 0
+    issues_by_severity:
+      p0: 0
+      p1: 0
+      p2: 0
+    notes: >
+      All 4 issues from iteration 1 resolved. Full test suite green: 55 files,
+      2610/2610 tests passing, 0 regressions. CODE_LEDGER updated with correct
+      test counts.
+
+# =============================================================================
+# BATCH 6, PHASE 1 REVIEW (Iteration 1)
+# CR-83 (F027 Save/Cancel), CR-84 (F028 Search Clear X),
+# CR-85 (F029 Country Codes), CR-86 (F030 CSV Import Confirm),
+# CR-90 (F031 Delete Button Fix)
+# =============================================================================
+
+batch6_phase1:
+  phase: "Batch 6, Phase 1"
+  phase_description: >
+    Members UX improvements and bug fixes: fix Delete button touch in
+    SwipeableCard, replace auto-save onBlur with explicit Save/Cancel buttons,
+    expand country codes to ~200 entries via shared module, add CSV import
+    confirmation dialog, and add clear X button to all 10 search fields via
+    reusable SearchInput component.
+  iteration: 1
+  verdict: changes_required
+
+  verdict_summary: >
+    The implementation of all 5 features (F027-F031) is correct and aligns
+    well with the SPEC, ARCH, and PLAN chain. All 10 PLAN steps were executed
+    and committed. New tests (108/108 passing) cover the new features
+    comprehensively. However, the full test suite shows 4 test regressions in
+    3 older test files (cr003-qa, cr004-csv, cr080-explanatory-texts) caused
+    by legitimate refactoring done in this batch. These older tests check for
+    implementation details (searchInput style name, handleImport function body)
+    that were changed by the Batch 6 migration to SearchInput component and
+    the CSV import confirmation dialog refactoring. The regressions are P1
+    (must fix) because the test suite must be clean before approval. The actual
+    application behavior is correct -- only the test assertions need updating.
+
+  chain_validation:
+    spec_vs_request:
+      status: pass
+      notes: >
+        SPEC_F027_F031.yaml covers all 5 CRs (83, 84, 85, 86, 90) with
+        complete acceptance criteria. Each feature maps directly to a user
+        request. No scope creep detected. ACs are faithful to user intent.
+
+    arch_vs_spec:
+      status: pass
+      notes: >
+        ARCH_M011.yaml maps all ACs to 8 components across 15 files. ADRs
+        (030, 031, 032) provide sound technical rationale. Component interfaces
+        support all features. SearchInput uses useTheme internally (ADR-030).
+        Country codes use single source of truth (ADR-031). SwipeableCard fix
+        uses pointerEvents box-none (ADR-032).
+
+    plan_vs_arch:
+      status: pass
+      notes: >
+        PLAN_P011.yaml has 10 steps that follow ARCH dependencies correctly.
+        Each step maps to specific files. Dependencies are respected (e.g.,
+        STEP-04 countryCodes before STEP-05 migration). Commit messages follow
+        Conventional Commits. Validation matrix covers all ACs.
+
+    code_vs_plan:
+      status: pass
+      notes: >
+        CODE_LEDGER tracks 10 commits matching all 10 PLAN steps. Files
+        modified in each commit match plan specification. ACs covered per
+        commit align with plan coverage. Implementation follows architecture.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: 298258c
+      step: STEP-01
+      cr: CR-90
+      message: "fix(swipeable): add pointerEvents box-none to fix Delete button touch (CR-90)"
+      files_changed: [src/components/SwipeableCard.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Animated.View at line 183 has pointerEvents='box-none' - correct"
+          - "Inner View at line 185 wraps {children} with backgroundColor from colors.card"
+          - "cardContent style retains zIndex:1, no backgroundColor in Animated.View inline style"
+          - "GestureDetector still wraps the Animated.View (line 180) - structure preserved"
+          - "Minimal, surgical fix - only 2 changes as specified in PLAN"
+
+    - hash: 89b5dc9
+      step: STEP-02
+      cr: CR-83
+      message: "feat(members): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "No onBlur={handleSave} on any TextInput in MemberEditor - confirmed via grep"
+          - "onCancel is required in MemberEditorProps (line 50) - correct"
+          - "Save/Cancel buttons rendered in editorButtons View (lines 111-130)"
+          - "Save button uses colors.primary bg and colors.onPrimary text - matches PLAN"
+          - "Cancel button uses colors.textSecondary text - matches PLAN"
+          - "Both buttons use t('common.save') and t('common.cancel') - correct i18n"
+          - "MemberRow passes onCancel to MemberEditor (line 182, prop passed down)"
+
+    - hash: 1970e71
+      step: STEP-03
+      cr: CR-83
+      message: "feat(topics): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+      files_changed: [src/app/(tabs)/settings/topics.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "No onBlur={handleSave} on any TextInput in TopicEditor - confirmed via grep"
+          - "onCancel is required in TopicEditorProps (line 42) - correct"
+          - "Save/Cancel buttons rendered at lines 89-108 - same pattern as MemberEditor"
+          - "TopicRow passes onCancel to TopicEditor (line 143)"
+          - "TopicsScreen passes onCancel callbacks correctly"
+
+    - hash: 8d0f6c4
+      step: STEP-04
+      cr: CR-85
+      message: "feat(lib): create countryCodes.ts with ~200 country codes and splitPhoneNumber (CR-85)"
+      files_changed: [src/lib/countryCodes.ts]
+      review:
+        correctness: pass
+        notes:
+          - "172 country code entries (>= 150 per AC-F029-01) - correct"
+          - "Brazil (+55) is first entry - correct (AC-F029-04)"
+          - "USA and Canada are separate entries both with +1 - correct"
+          - "Entries after index 0 are alphabetical by country name - verified"
+          - "Each entry has code (starts with +), non-empty flag, label with code - correct"
+          - "getFlagForCode returns correct flag or globe fallback - correct"
+          - "splitPhoneNumber uses longest-first matching via CODE_SETS_BY_LENGTH - correct"
+          - "splitPhoneNumber defaults to +55 for no-match or no-plus-prefix - correct"
+
+    - hash: 59eaba7
+      step: STEP-05
+      cr: CR-85
+      message: "refactor(members,csv): use shared countryCodes.ts as single source of truth (CR-85)"
+      files_changed: [src/app/(tabs)/settings/members.tsx, src/lib/csvUtils.ts]
+      review:
+        correctness: pass
+        notes:
+          - "members.tsx no longer has local CountryCode/COUNTRY_CODES/getFlagForCode - removed"
+          - "members.tsx imports from '../../../lib/countryCodes' (line 31)"
+          - "csvUtils.ts re-exports splitPhoneNumber from './countryCodes' (line 7)"
+          - "No circular dependencies - countryCodes is standalone"
+
+    - hash: 5d65fb1
+      step: STEP-06
+      cr: CR-86
+      message: "feat(i18n): add members.importConfirmTitle and importConfirmMessage keys (CR-86)"
+      files_changed: [src/i18n/locales/en.json, src/i18n/locales/pt-BR.json, src/i18n/locales/es.json]
+      review:
+        correctness: pass
+        notes:
+          - "importConfirmTitle and importConfirmMessage added to all 3 locale files"
+          - "en.json: correct English text matching PLAN specification"
+          - "pt-BR.json: correct Portuguese text matching PLAN specification"
+          - "es.json: correct Spanish text matching PLAN specification"
+          - "All 3 JSON files remain valid"
+
+    - hash: 5837628
+      step: STEP-07
+      cr: CR-86
+      message: "feat(members): add confirmation dialog before CSV import (CR-86)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "handleImport (line 488) shows Alert.alert before any file picker logic"
+          - "Alert uses t('members.importConfirmTitle') and t('members.importConfirmMessage')"
+          - "Cancel button with style 'cancel', Confirm button with style 'default'"
+          - "Confirm button calls performImport() (original import logic at line 445)"
+          - "performImport retains all original handleImport logic including error handling"
+
+    - hash: 8f2b42a
+      step: STEP-08
+      cr: CR-84
+      message: "feat(components): create SearchInput component with clear X button (CR-84)"
+      files_changed: [src/components/SearchInput.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "SearchInputProps extends Omit<TextInputProps, 'value' | 'onChangeText'> - correct"
+          - "useTheme() called internally (line 23) - per ADR-030"
+          - "TextInput has paddingRight: 36 (line 71) - correct"
+          - "X button visible only when value.length > 0 (line 44)"
+          - "X button calls onChangeText('') on press (line 47)"
+          - "X button uses unicode multiplication sign '\\u00D7' (line 53)"
+          - "hitSlop={8} on Pressable (line 48)"
+          - "accessibilityLabel='Clear search' and accessibilityRole='button' (lines 49-50)"
+          - "No manual re-focus on X press (no ref/focus logic) - per AC-F028-05"
+
+    - hash: 27daf39
+      step: STEP-09
+      cr: CR-84
+      message: "feat(settings): migrate search fields to SearchInput in 4 settings screens (CR-84)"
+      files_changed: [src/app/(tabs)/settings/members.tsx, src/app/(tabs)/settings/topics.tsx, src/app/(tabs)/settings/history.tsx, src/app/(tabs)/settings/timezone.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "All 4 settings screens import SearchInput and use <SearchInput> for search field"
+          - "Explicit color/border/background props removed (handled by SearchInput internally)"
+          - "Placeholder and behavior props preserved"
+
+    - hash: ede8904
+      step: STEP-10
+      cr: CR-84
+      message: "feat(components): migrate search fields to SearchInput in 6 modal/selector components (CR-84)"
+      files_changed: [src/components/HymnSelector.tsx, src/components/MemberSelectorModal.tsx, src/components/TopicSelectorModal.tsx, src/components/PrayerSelector.tsx, src/components/ActorSelector.tsx, src/components/AgendaForm.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "All 6 modal/selector components import SearchInput and use <SearchInput>"
+          - "Total of 10 search fields across the app now use SearchInput - per AC-F028-06"
+
+  issues:
+    - id: R-B6P1-01
+      severity: P1
+      category: bug
+      location: "src/__tests__/cr003-qa.test.ts:AC-39.1, AC-39.5"
+      description: >
+        Two tests fail because they expect a 'searchInput' style name to exist
+        in topics.tsx. After STEP-09 migration, the search field styling is now
+        handled internally by the SearchInput component. The 'searchInput' style
+        was removed from topics.tsx.
+      suggestion: >
+        Update tests AC-39.1 and AC-39.5 to check for '<SearchInput' usage in
+        topics.tsx instead of checking for 'searchInput' style name. Or update
+        to verify SearchInput component import and usage.
+
+    - id: R-B6P1-02
+      severity: P1
+      category: bug
+      location: "src/__tests__/cr004-f005-csv-members.test.ts:106"
+      description: >
+        Test extracts the handleImport function body and expects it to contain
+        'members.importFailed'. After STEP-07, handleImport was refactored to
+        show the confirmation dialog. The import/error logic (including
+        'members.importFailed') was moved to performImport.
+      suggestion: >
+        Update the test to extract the performImport function instead of
+        handleImport, or update the assertion to check that performImport
+        contains 'members.importFailed'. The old test logic is still valid --
+        it just needs to reference the renamed function.
+
+    - id: R-B6P1-03
+      severity: P1
+      category: bug
+      location: "src/__tests__/cr080-f026-members-explanatory-texts.test.ts:289"
+      description: >
+        Test expects 'searchInput' style name in members.tsx source code as a
+        regression check. After STEP-09 migration, the search field styling is
+        now handled internally by SearchInput component. The 'searchInput' style
+        was removed from members.tsx.
+      suggestion: >
+        Update the test to check for 'SearchInput' import or '<SearchInput'
+        usage instead of 'searchInput' style name. This preserves the intent
+        of verifying search functionality still exists.
+
+    - id: R-B6P1-04
+      severity: P2
+      category: quality
+      location: "docs/code/CODE_LEDGER.yaml:test_results"
+      description: >
+        CODE_LEDGER reports full_suite_tests: 2456 and full_suite_passing: 2456
+        with regressions: 0. But the actual test run shows 2610 tests with 4
+        failures (2606 passing). The count and regression status are incorrect.
+      suggestion: >
+        Update CODE_LEDGER test_results to reflect actual numbers after fixing
+        the regression tests. Should be full_suite_tests: 2610,
+        full_suite_passing: 2610, regressions: 0 (after fixes applied).
+
+  pending_deploys:
+    - type: "none"
+      description: >
+        No deploys needed for this batch. All changes are frontend-only (React
+        Native / Expo). No database migrations, no new environment variables,
+        no new third-party integrations, no static assets requiring CDN.
+      must_run_before: "N/A"
+      instructions: >
+        Standard Expo build and deploy process. After test regressions are
+        fixed, merge to main and build with eas build.
+
+  repository_status:
+    clean: false
+    uncommitted_files:
+      - ".devteam/phases/phase-001.yaml"
+      - ".devteam/phases/phase-002.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/CHANGE_REQUESTS.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M011.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P011.yaml"
+      - "docs/qa/QA_PLAN_batch6_phase1.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F027_F031.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: >
+      Project documents will be committed once issues are resolved and verdict
+      changes to approved. Documents are not committed with changes_required
+      verdict to avoid committing with known P1 issues.
+
+  ac_verification:
+    # F031 ACs
+    - ac_id: AC-F031-01
+      description: "Delete button responds to touch after swipe reveal"
+      status: verified
+      evidence: "Animated.View has pointerEvents='box-none' (line 183), touches pass through to Delete Pressable"
+    - ac_id: AC-F031-02
+      description: "Fix applies to both Members and Topics screens"
+      status: verified
+      evidence: "SwipeableCard is a shared component used by both screens"
+    - ac_id: AC-F031-03
+      description: "After Delete press, card animates closed and onDelete fires"
+      status: verified
+      evidence: "handleDelete (line 143) sets translateX to 0, calls onReveal(null), then onDelete()"
+    - ac_id: AC-F031-04
+      description: "Edit button still works after fix"
+      status: verified
+      evidence: "handleEdit (line 137) follows same pattern, unaffected by pointerEvents change"
+
+    # F027 ACs
+    - ac_id: AC-F027-01
+      description: "MemberEditor no longer auto-saves on blur"
+      status: verified
+      evidence: "No onBlur={handleSave} in members.tsx (confirmed via grep)"
+    - ac_id: AC-F027-02
+      description: "Save button calls handleSave with correct data"
+      status: verified
+      evidence: "Save Pressable onPress={handleSave} at line 123, handleSave validates and calls onSave"
+    - ac_id: AC-F027-03
+      description: "Cancel button calls onCancel without saving"
+      status: verified
+      evidence: "Cancel Pressable onPress={onCancel} at line 114"
+    - ac_id: AC-F027-04
+      description: "Empty name prevents save"
+      status: verified
+      evidence: "handleSave (line 69-73) checks trimmed name, returns if empty"
+    - ac_id: AC-F027-05
+      description: "TopicEditor no longer auto-saves on blur"
+      status: verified
+      evidence: "No onBlur={handleSave} in topics.tsx (confirmed via grep)"
+    - ac_id: AC-F027-06
+      description: "TopicEditor Save button works"
+      status: verified
+      evidence: "Save Pressable at line 99-107 calls handleSave"
+    - ac_id: AC-F027-07
+      description: "TopicEditor Cancel button works"
+      status: verified
+      evidence: "Cancel Pressable at line 91-98 calls onCancel"
+    - ac_id: AC-F027-08
+      description: "Save/Cancel buttons visible with correct i18n and colors"
+      status: verified
+      evidence: "Both editors use t('common.save'), t('common.cancel'), colors.primary/onPrimary/textSecondary"
+
+    # F029 ACs
+    - ac_id: AC-F029-01
+      description: "COUNTRY_CODES has >= 150 entries"
+      status: verified
+      evidence: "172 entries in countryCodes.ts (grep count of '{ code:' pattern)"
+    - ac_id: AC-F029-02
+      description: "splitPhoneNumber correctly handles all code lengths"
+      status: verified
+      evidence: "CODE_SETS_BY_LENGTH groups by digit length descending, longest match first"
+    - ac_id: AC-F029-03
+      description: "members.tsx and csvUtils.ts use shared countryCodes.ts"
+      status: verified
+      evidence: "members.tsx imports from countryCodes.ts (line 31), csvUtils.ts re-exports splitPhoneNumber (line 7)"
+    - ac_id: AC-F029-04
+      description: "Brazil (+55) first, then alphabetical"
+      status: verified
+      evidence: "COUNTRY_CODES[0] = Brazil (+55), remaining sorted A-Z by country name"
+    - ac_id: AC-F029-05
+      description: "Each entry has valid code, flag, and label"
+      status: verified
+      evidence: "All entries have '+' prefix code, Unicode Regional Indicator flag, 'Country (+code)' label"
+
+    # F030 ACs
+    - ac_id: AC-F030-01
+      description: "Import CSV triggers Alert before file picker"
+      status: verified
+      evidence: "handleImport (line 488) calls Alert.alert before any file picker logic"
+    - ac_id: AC-F030-02
+      description: "Alert message explains consequences"
+      status: verified
+      evidence: "Alert uses t('members.importConfirmMessage') which explains replacement and assignments safety"
+    - ac_id: AC-F030-03
+      description: "Confirm button opens file picker"
+      status: verified
+      evidence: "Confirm button onPress calls performImport() which opens DocumentPicker"
+    - ac_id: AC-F030-04
+      description: "Cancel button closes dialog without import"
+      status: verified
+      evidence: "Cancel button has style: 'cancel', no onPress handler (default close)"
+    - ac_id: AC-F030-05
+      description: "i18n keys exist in all 3 locales"
+      status: verified
+      evidence: "importConfirmTitle and importConfirmMessage present in en.json, pt-BR.json, es.json"
+
+    # F028 ACs
+    - ac_id: AC-F028-01
+      description: "X button not present when search is empty"
+      status: verified
+      evidence: "SearchInput line 44: {value.length > 0 && ...} conditional"
+    - ac_id: AC-F028-02
+      description: "X button visible when search has text"
+      status: verified
+      evidence: "Same conditional renders Pressable with X when value.length > 0"
+    - ac_id: AC-F028-03
+      description: "X button clears search text"
+      status: verified
+      evidence: "onPress={() => onChangeText('')} at line 47"
+    - ac_id: AC-F028-04
+      description: "X button styling correct"
+      status: verified
+      evidence: "paddingRight: 36 (line 71), X uses textSecondary color (line 52), hitSlop={8} (line 48)"
+    - ac_id: AC-F028-05
+      description: "X button does not re-focus field"
+      status: verified
+      evidence: "No ref/focus logic in SearchInput - just calls onChangeText('')"
+    - ac_id: AC-F028-06
+      description: "All 10 search fields use SearchInput"
+      status: verified
+      evidence: >
+        4 settings screens (members, topics, history, timezone) + 6 modals
+        (HymnSelector, MemberSelectorModal, TopicSelectorModal, PrayerSelector,
+        ActorSelector, AgendaForm) all import and use <SearchInput>
+
+  stats:
+    p0_count: 0
+    p1_count: 3
+    p2_count: 1
+    files_reviewed: 15
+    commits_reviewed: 10
+    new_tests: 108
+    new_tests_passing: 108
+    full_suite_tests: 2610
+    full_suite_passing: 2606
+    full_suite_failing: 4
+    regressions: 4
+
+# =============================================================================
+# BATCH 6, PHASE 1 REVIEW (Iteration 2 - Re-review after fixes)
+# All P1 issues resolved, verdict changed to APPROVED
+# =============================================================================
+
+batch6_phase1_iteration2:
+  phase: "Batch 6, Phase 1"
+  phase_description: >
+    Re-review after fixing 3 P1 test regressions and 1 P2 documentation issue
+    identified in iteration 1.
+  iteration: 2
+  verdict: approved
+
+  verdict_summary: >
+    All 4 issues from iteration 1 have been correctly resolved. The 3 P1 test
+    regressions were fixed by updating test assertions in 3 older test files to
+    reflect the SearchInput migration and performImport refactoring. The P2
+    CODE_LEDGER issue was fixed by updating test counts to 2610/2610. Full test
+    suite is now green: 55 test files, 2610/2610 tests passing, 0 regressions.
+    The implementation of all 5 features (F027-F031) remains correct and fully
+    aligned with the SPEC->ARCH->PLAN->CODE chain. All 22 acceptance criteria
+    verified. APPROVED for merge.
+
+  fixes_reviewed:
+    - issue_id: R-B6P1-01
+      severity: P1
+      hash: ac4b489
+      message: "fix(tests): update CR-39 tests for SearchInput migration in topics.tsx (R-B6P1-01)"
+      files_changed: [src/__tests__/cr003-qa.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "AC-39.1: Changed expect(content).toContain('searchInput') to toContain('SearchInput') - correct"
+          - "AC-39.5: Rewrote to verify SearchInput import in topics.tsx AND style properties in SearchInput.tsx"
+          - "AC-39.5 now checks height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15 in SearchInput.tsx"
+          - "Test intent preserved: verifies search styling consistency, just via shared component now"
+          - "Both tests pass - verified via full suite run"
+
+    - issue_id: R-B6P1-02
+      severity: P1
+      hash: 27a4383
+      message: "fix(tests): update CSV import test to reference performImport after CR-86 refactor (R-B6P1-02)"
+      files_changed: [src/__tests__/cr004-f005-csv-members.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Changed performImportStart to find 'const performImport = useCallback' instead of handleImport"
+          - "Changed slice boundary to end at 'const handleImport = useCallback' (performImport comes first)"
+          - "Still checks for 'members.importFailed' in the extracted function body - test intent preserved"
+          - "Added comment explaining the CR-86 refactoring context"
+          - "Test passes - verified via full suite run"
+
+    - issue_id: R-B6P1-03
+      severity: P1
+      hash: 3b780d4
+      message: "fix(tests): update CR-80 regression test for SearchInput migration in members.tsx (R-B6P1-03)"
+      files_changed: [src/__tests__/cr080-f026-members-explanatory-texts.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Single line change: 'searchInput' to 'SearchInput' in the regression test"
+          - "Test still verifies search functionality exists in members.tsx"
+          - "setSearch assertion unchanged - both checks together confirm search feature present"
+          - "Minimal fix, test intent fully preserved"
+          - "Test passes - verified via full suite run"
+
+    - issue_id: R-B6P1-04
+      severity: P2
+      hash: 6a63ac6
+      message: "docs(ledger): update CODE_LEDGER with regression fixes and test results (R-B6P1-04)"
+      files_changed: [docs/code/CODE_LEDGER.yaml]
+      review:
+        correctness: pass
+        notes:
+          - "Added 3 fix commits (CHG-37, CHG-38, CHG-39, CHG-40) to CODE_LEDGER"
+          - "Updated test_results: new_tests 163, full_suite_tests 2610, full_suite_passing 2610"
+          - "full_suite_files updated to 55, regressions: 0"
+          - "All numbers match actual test run output"
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  issues_summary: >
+    All 4 issues from iteration 1 resolved. No new issues found. Test suite
+    is fully green. Implementation is clean and correct.
+
+  qa_report:
+    verdict: APPROVED
+    new_tests: 163
+    new_tests_passing: 163
+    full_suite_tests: 2610
+    full_suite_passing: 2610
+    full_suite_files: 55
+    regressions: 0
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 4
+    commits_reviewed: 4
+    fixes_verified: 4
+    full_suite_tests: 2610
+    full_suite_passing: 2610
+    full_suite_failing: 0
+    regressions: 0

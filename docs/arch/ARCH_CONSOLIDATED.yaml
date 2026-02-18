@@ -8,13 +8,15 @@ metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-18"
   total_modules: 8
-  total_adrs: 20
+  total_adrs: 23
   total_crs_implemented: 82
+  pending_arch: "ARCH_M011 (CRs 83,84,85,86,90 - Batch 6 Phase 1)"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
     - docs/arch/history/ARCH_CR001.md through ARCH_CR81.md
     - docs/arch/history/ARCH_BUG401.md
+    - docs/arch/ARCH_M011.yaml
 
 # =============================================================================
 # TECH STACK
@@ -190,7 +192,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 90]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -201,6 +203,11 @@ modules:
       CR-79 adicionou secao informativa na tela Members.
       CR-78 removeu unique constraint de phone dos members (migration 012).
       CR-80 adicionou textos explicativos na tela Members (description + CSV help, i18n).
+      CR-83 Save/Cancel explicito em MemberEditor e TopicEditor (remove onBlur auto-save).
+      CR-84 SearchInput reutilizavel com botao X para limpar busca (10 campos migrados).
+      CR-85 countryCodes.ts como single source of truth (~200 paises, extracto de members.tsx + csvUtils.ts).
+      CR-86 Alert.alert de confirmacao antes de importar CSV.
+      CR-90 Fix botao Delete no SwipeableCard (pointerEvents='box-none').
 
   - id: M003
     name: SpeechModule
@@ -363,7 +370,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 90]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary).
@@ -372,6 +379,8 @@ modules:
       Tema: system detection + manual toggle (automatic/light/dark).
       i18n: ward language setting -> device locale (fallback).
       Per-screen back buttons (ADR-018).
+      CR-84 adicionou SearchInput reutilizavel com botao X (usado em 10 campos de busca).
+      CR-90 fix botao Delete no SwipeableCard (pointerEvents='box-none', ADR-032).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -612,6 +621,34 @@ adrs:
     consequences:
       - "Bishopric users get Preside/Conduct actor immediately after registration"
       - "Actor uses real name, not email prefix"
+
+  - id: ADR-030
+    title: "SearchInput as drop-in replacement with internal theming"
+    context: "10 search fields across the app all follow the same pattern. QA PRE recommended a reusable component."
+    decision: "SearchInput uses useTheme() internally and does not accept colors prop. Accepts all TextInput props via spread."
+    decided_in: "CR-84"
+    consequences:
+      - "Simpler API: no colors prop needed at call sites"
+      - "Consistent with existing standalone component patterns (ActorSelector, HymnSelector)"
+
+  - id: ADR-031
+    title: "Shared countryCodes.ts as single source of truth"
+    context: "Country codes duplicated between members.tsx (21 entries) and csvUtils.ts regex."
+    decision: "Create src/lib/countryCodes.ts exporting COUNTRY_CODES, getFlagForCode, and splitPhoneNumber. csvUtils.ts re-exports splitPhoneNumber for backward compatibility."
+    decided_in: "CR-85"
+    consequences:
+      - "Single place to add/modify country codes"
+      - "splitPhoneNumber uses COUNTRY_CODES array for matching instead of hardcoded regex"
+
+  - id: ADR-032
+    title: "pointerEvents='box-none' to fix gesture/button touch overlap in SwipeableCard"
+    context: "Animated.View (zIndex:1) covers action buttons even after translation. Delete button blocked."
+    decision: "Use pointerEvents='box-none' on Animated.View. Move backgroundColor to inner wrapper View."
+    decided_in: "CR-90"
+    consequences:
+      - "Delete button receives touch events correctly"
+      - "Edit button continues to work (no regression)"
+      - "Pan gesture unaffected (GestureDetector handles its own touch management)"
 
 # =============================================================================
 # DATABASE SCHEMA
@@ -918,7 +955,7 @@ cross_cutting:
 
   gestures:
     wrapper: "GestureHandlerRootView in root layout (CR-82)"
-    swipe: "SwipeableCard component for edit/delete actions"
+    swipe: "SwipeableCard component for edit/delete actions (CR-90: pointerEvents='box-none' fix for Delete button)"
     animations: "react-native-reanimated for accordion, LED, presentation transitions"
 
   deep_links:
@@ -952,8 +989,8 @@ file_structure:
       "settings/":
         "_layout.tsx": "Settings stack navigator"
         "index.tsx": "Settings menu (links para sub-telas)"
-        "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80)"
-        "topics.tsx": "CRUD topicos da ala + colecoes gerais"
+        "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86)"
+        "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
         "history.tsx": "Log de atividades com busca e paginacao"
         "whatsapp.tsx": "Editor de template WhatsApp com preview"
@@ -997,8 +1034,9 @@ file_structure:
     "StatusLED.tsx": "LED 3D animado de status de discurso"
     "StatusChangeModal.tsx": "Modal de mudanca de status"
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez)"
-    "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete"
+    "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-90: pointerEvents fix)"
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
+    "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84)"
     "OfflineBanner.tsx": "Banner vermelho de offline"
     "ErrorBoundary.tsx": "Error boundary do React"
     "QueryErrorView.tsx": "View de erro para queries"
@@ -1010,7 +1048,7 @@ file_structure:
   "src/lib/":
     "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
     "permissions.ts": "Mapa central de permissoes por role"
-    "csvUtils.ts": "Parse/generate CSV com error codes i18n (ADR-026)"
+    "csvUtils.ts": "Parse/generate CSV com error codes i18n (ADR-026). splitPhoneNumber re-exportado de countryCodes.ts (CR-85)"
     "activityLog.ts": "Utility para logging de acoes (com userName)"
     "whatsapp.ts": "Construcao de URL WhatsApp"
     "whatsappUtils.ts": "Template placeholders e resolucao"
@@ -1022,6 +1060,7 @@ file_structure:
     "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
     "offlineGuard.ts": "Guard para operacoes online-only"
     "notificationUtils.ts": "Utilitarios de notificacoes"
+    "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, splitPhoneNumber (CR-85, ADR-031)"
 
   "src/types/":
     "database.ts": "Tipos TypeScript para todas as tabelas do banco"
@@ -1102,7 +1141,10 @@ key_flows:
       - "generateCsv(members) cria CSV com BOM + header (funciona mesmo com lista vazia)"
       - "expo-file-system escreve arquivo; expo-sharing apresenta share sheet"
     steps_import:
-      - "User toca Import CSV, seleciona arquivo via expo-document-picker"
+      - "User toca Import CSV"
+      - "Alert.alert de confirmacao exibido (CR-86): avisa que lista sera substituida, designacoes nao afetadas"
+      - "Cancelar: fecha dialogo, nada acontece"
+      - "Confirmar: abre file picker via expo-document-picker"
       - "parseCsv retorna error codes (nao strings English) para i18n"
       - "Se valido: import_members RPC faz DELETE all + INSERT new"
       - "Erros mostrados com line numbers traduzidos (max 5, com '...and N more')"
@@ -1187,6 +1229,16 @@ change_requests_history:
     crs: "CR-80"
     scope: "Members screen explanatory texts with i18n (description + CSV help)"
     doc: "ARCH_M010.yaml"
+
+  batch_6_phase_1:
+    crs: "CR-83, CR-84, CR-85, CR-86, CR-90"
+    scope: "Save/Cancel buttons (F027), SearchInput with X clear (F028), country codes expansion (F029), CSV import confirm dialog (F030), Delete button fix (F031)"
+    doc: "ARCH_M011.yaml"
+    status: "pending implementation"
+    adrs: [ADR-030, ADR-031, ADR-032]
+    new_files:
+      - "src/components/SearchInput.tsx"
+      - "src/lib/countryCodes.ts"
 
 # =============================================================================
 # OBSERVABILITY

@@ -1,0 +1,1305 @@
+# =============================================================================
+# ARCH_M011 - Batch 6 Phase 1: Members UX Improvements & Bug Fixes
+# Features: F027 (Save/Cancel), F028 (Search Clear X), F029 (Country Codes),
+#           F030 (CSV Import Confirm), F031 (Delete Button Fix)
+# CRs: 83, 84, 85, 86, 90
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+module: "WardDataModule (M002) + UIShell (M008)"
+features: [F027, F028, F029, F030, F031]
+spec: SPEC_F027_F031
+crs: [83, 84, 85, 86, 90]
+
+# =============================================================================
+# ARCH_SUMMARY
+# =============================================================================
+
+ARCH_SUMMARY:
+  type: arch_summary
+  status: complete
+  components_count: 16
+  main_components:
+    - "SearchInput (new reusable component with X clear button)"
+    - "countryCodes.ts (new shared country codes data module)"
+    - "MemberEditor (add Save/Cancel buttons, remove onBlur save)"
+    - "TopicEditor (add Save/Cancel buttons, remove onBlur save)"
+    - "SwipeableCard (fix Delete button touch interception)"
+    - "members.tsx (import confirm dialog, use SearchInput, import countryCodes)"
+    - "topics.tsx (use SearchInput)"
+    - "10 search field migrations to SearchInput"
+    - "3 locale files (new i18n keys for import confirm)"
+  adrs:
+    - "ADR-030: SearchInput as drop-in replacement for search TextInput"
+    - "ADR-031: Shared countryCodes.ts as single source of truth"
+    - "ADR-032: pointerEvents='box-none' to fix gesture/button overlap"
+  implementation_order:
+    - "F031 (Delete Fix) -> F027 (Save/Cancel) -> F029 (Country Codes) -> F030 (CSV Confirm) -> F028 (Search Clear)"
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Implement 5 UX improvements and bug fixes for the Members and Topics
+    management experience: (1) explicit Save/Cancel buttons replacing auto-save
+    on blur, (2) clear button X on all search fields via reusable component,
+    (3) expanded international country codes list, (4) confirmation dialog
+    before CSV import, (5) fix non-functional Delete button on SwipeableCard.
+  principles:
+    - "Single Responsibility: each component has one clear role"
+    - "DRY: shared countryCodes.ts, reusable SearchInput"
+    - "Drop-in replacement: SearchInput accepts all TextInput props"
+    - "Minimal surface area: fix the bug at the component level (SwipeableCard)"
+    - "Follow existing patterns: Alert.alert for dialogs, i18n keys for text"
+    - "Implementation order minimizes merge conflicts in shared files"
+
+# =============================================================================
+# SYSTEM DIAGRAM
+# =============================================================================
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  Settings Stack                                                     │
+  │                                                                     │
+  │  ┌──────────────────────┐   ┌──────────────────────┐               │
+  │  │  members.tsx          │   │  topics.tsx           │               │
+  │  │  ┌──────────────────┐ │   │  ┌──────────────────┐ │               │
+  │  │  │ MemberEditor     │ │   │  │ TopicEditor      │ │               │
+  │  │  │ [Save] [Cancel]  │ │   │  │ [Save] [Cancel]  │ │  F027         │
+  │  │  │ (no onBlur save) │ │   │  │ (no onBlur save) │ │               │
+  │  │  └──────────────────┘ │   │  └──────────────────┘ │               │
+  │  │  ┌──────────────────┐ │   │  ┌──────────────────┐ │               │
+  │  │  │ SearchInput [X]  │ │   │  │ SearchInput [X]  │ │  F028         │
+  │  │  └──────────────────┘ │   │  └──────────────────┘ │               │
+  │  │  ┌──────────────────┐ │   │                        │               │
+  │  │  │ Alert.alert      │ │   │                        │               │
+  │  │  │ (import confirm) │ │   │                        │  F030         │
+  │  │  └──────────────────┘ │   │                        │               │
+  │  │  import countryCodes  │   │                        │               │
+  │  │  (from shared lib)    │   │                        │  F029         │
+  │  └──────────────────────┘   └──────────────────────┘               │
+  │                                                                     │
+  │  ┌──────────────────────────────────────────────────────────────┐   │
+  │  │  SwipeableCard.tsx (shared component)                        │   │
+  │  │  ┌────────────────┐ ┌──────────────────────────────────────┐ │   │
+  │  │  │ actionsContainer│ │ GestureDetector > Animated.View     │ │   │
+  │  │  │ [Edit] [Delete] │ │ pointerEvents='box-none' (FIX)     │ │   │
+  │  │  └────────────────┘ └──────────────────────────────────────┘ │   │
+  │  └──────────────────────────────────────────────────────────────┘   │
+  │  F031                                                               │
+  │                                                                     │
+  │  Other screens using SearchInput (F028):                            │
+  │  history.tsx, timezone.tsx, HymnSelector.tsx, MemberSelectorModal,  │
+  │  TopicSelectorModal, PrayerSelector, ActorSelector, AgendaForm      │
+  │                                                                     │
+  │  ┌──────────────────────────────────────────────────────────────┐   │
+  │  │  src/lib/countryCodes.ts (NEW - shared data)                 │   │
+  │  │  COUNTRY_CODES[] (~200 entries)                              │   │
+  │  │  getFlagForCode(code)                                        │   │
+  │  │  splitPhoneNumber(fullPhone)                                 │   │
+  │  └──────────────────────────────────────────────────────────────┘   │
+  │  F029                                                               │
+  └─────────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # F031 - Fix Delete Button (CR-90)
+  # ---------------------------------------------------------------------------
+
+  - id: C01
+    name: "SwipeableCard - pointerEvents fix"
+    feature: F031
+    file: "src/components/SwipeableCard.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Fix the Delete button not responding to touch events when the card is
+      swiped open. The root cause is the Animated.View (with zIndex:1) covering
+      the action buttons area even after being translated left. The fix adds
+      pointerEvents='box-none' to the Animated.View so touch events pass through
+      transparent areas to the action buttons underneath.
+
+  # ---------------------------------------------------------------------------
+  # F027 - Save/Cancel Buttons (CR-83)
+  # ---------------------------------------------------------------------------
+
+  - id: C02
+    name: "MemberEditor - Save/Cancel buttons"
+    feature: F027
+    file: "src/app/(tabs)/settings/members.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Remove onBlur={handleSave} from TextInputs. Add Save and Cancel buttons
+      below the input fields, aligned right (flexDirection row, justifyContent
+      flex-end). Save validates and calls onSave. Cancel calls onCancel.
+
+  - id: C03
+    name: "TopicEditor - Save/Cancel buttons"
+    feature: F027
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Remove onBlur={handleSave} from TextInputs. Add Save and Cancel buttons
+      below the input fields. Add onCancel prop to TopicEditorProps.
+      Save validates and calls onSave. Cancel calls onCancel.
+
+  - id: C04
+    name: "MemberRow - pass onCancel to MemberEditor"
+    feature: F027
+    file: "src/app/(tabs)/settings/members.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Pass onCancel callback to MemberEditor when in edit mode. onCancel sets
+      editingId to null (discards changes, closes editor). For new member form,
+      onCancel sets isAdding to false.
+
+  - id: C05
+    name: "TopicRow/TopicsScreen - pass onCancel to TopicEditor"
+    feature: F027
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Pass onCancel callback to TopicEditor. For editing, onCancel sets
+      editingId to null. For adding, onCancel sets isAdding to false.
+
+  # ---------------------------------------------------------------------------
+  # F029 - Complete Country Codes (CR-85)
+  # ---------------------------------------------------------------------------
+
+  - id: C06
+    name: "countryCodes.ts - shared country codes data module"
+    feature: F029
+    file: "src/lib/countryCodes.ts"
+    change_type: CREATE
+    responsibility: >
+      Single source of truth for international country codes. Exports:
+      COUNTRY_CODES array (~200 entries with code, flag, label),
+      getFlagForCode(code) helper, and splitPhoneNumber(fullPhone) function.
+      Brazil (+55) is first, rest sorted alphabetically by country name.
+      Countries sharing +1 (USA, Canada) listed separately.
+
+  - id: C07
+    name: "members.tsx - import from countryCodes.ts"
+    feature: F029
+    file: "src/app/(tabs)/settings/members.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Remove local COUNTRY_CODES array and getFlagForCode function. Import both
+      from src/lib/countryCodes.ts. Remove CountryCode interface (now in
+      countryCodes.ts).
+
+  - id: C08
+    name: "csvUtils.ts - use shared splitPhoneNumber"
+    feature: F029
+    file: "src/lib/csvUtils.ts"
+    change_type: MODIFY
+    responsibility: >
+      Remove local splitPhoneNumber implementation. Re-export splitPhoneNumber
+      from countryCodes.ts (to maintain backward compatibility for existing
+      imports in members.tsx).
+
+  # ---------------------------------------------------------------------------
+  # F030 - CSV Import Confirmation (CR-86)
+  # ---------------------------------------------------------------------------
+
+  - id: C09
+    name: "members.tsx - import confirmation Alert"
+    feature: F030
+    file: "src/app/(tabs)/settings/members.tsx"
+    change_type: MODIFY
+    responsibility: >
+      Wrap handleImport logic in Alert.alert confirmation dialog. Alert shows
+      BEFORE opening file picker. Confirm button triggers existing import logic.
+      Cancel button closes dialog without side effects. Uses new i18n keys
+      members.importConfirmTitle and members.importConfirmMessage.
+
+  - id: C10
+    name: "i18n keys for import confirmation"
+    feature: F030
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    change_type: MODIFY
+    responsibility: >
+      Add members.importConfirmTitle and members.importConfirmMessage keys
+      in all 3 locale files.
+
+  # ---------------------------------------------------------------------------
+  # F028 - Search Clear Button (CR-84)
+  # ---------------------------------------------------------------------------
+
+  - id: C11
+    name: "SearchInput component"
+    feature: F028
+    file: "src/components/SearchInput.tsx"
+    change_type: CREATE
+    responsibility: >
+      Reusable search input component with X clear button. Wraps TextInput in a
+      View container. X button visible only when value.length > 0. Pressing X
+      calls onChangeText('') and does not re-focus the field. Accepts all
+      TextInput props via spread. X uses unicode character. paddingRight on
+      TextInput >= 36 to avoid text overlapping the X button.
+
+  - id: C12
+    name: "members.tsx - use SearchInput"
+    feature: F028
+    file: "src/app/(tabs)/settings/members.tsx"
+    change_type: MODIFY
+    responsibility: "Replace search TextInput with SearchInput component."
+
+  - id: C13
+    name: "topics.tsx - use SearchInput"
+    feature: F028
+    file: "src/app/(tabs)/settings/topics.tsx"
+    change_type: MODIFY
+    responsibility: "Replace search TextInput with SearchInput component."
+
+  - id: C14
+    name: "history.tsx, timezone.tsx - use SearchInput"
+    feature: F028
+    files:
+      - "src/app/(tabs)/settings/history.tsx"
+      - "src/app/(tabs)/settings/timezone.tsx"
+    change_type: MODIFY
+    responsibility: "Replace search TextInput with SearchInput component."
+
+  - id: C15
+    name: "Modal/Selector components - use SearchInput"
+    feature: F028
+    files:
+      - "src/components/HymnSelector.tsx"
+      - "src/components/MemberSelectorModal.tsx"
+      - "src/components/TopicSelectorModal.tsx"
+      - "src/components/PrayerSelector.tsx"
+      - "src/components/ActorSelector.tsx"
+    change_type: MODIFY
+    responsibility: "Replace search TextInput with SearchInput component."
+
+  - id: C16
+    name: "AgendaForm.tsx - use SearchInput"
+    feature: F028
+    file: "src/components/AgendaForm.tsx"
+    change_type: MODIFY
+    responsibility: "Replace search TextInput with SearchInput component."
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # ---------------------------------------------------------------------------
+  # F031 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-01
+    name: "SwipeableCard pointerEvents fix"
+    feature: F031
+    file: "src/components/SwipeableCard.tsx"
+    description: >
+      Add pointerEvents='box-none' to the Animated.View that wraps the card
+      content. This allows touch events to pass through transparent/empty areas
+      of the Animated.View down to the action buttons (Edit/Delete) underneath.
+
+    current_code: |
+      <Animated.View
+        style={[
+          styles.cardContent,
+          { backgroundColor: colors.card },
+          animatedStyle,
+        ]}
+      >
+        {children}
+      </Animated.View>
+
+    new_code: |
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.cardContent,
+          { backgroundColor: colors.card },
+          animatedStyle,
+        ]}
+      >
+        {children}
+      </Animated.View>
+
+    analysis: >
+      When the card is swiped left (translateX = -actionWidth), the Animated.View
+      moves visually but its touchable area still covers the full original width.
+      The action buttons are absolutely positioned behind it. With zIndex:1, the
+      Animated.View intercepts all touches, preventing Delete from receiving
+      press events.
+
+      pointerEvents='box-none' tells React Native: "This view itself does not
+      receive touch events, but its children can." Since the card content (children)
+      is physically offset to the left, the area over the action buttons becomes
+      passthrough. The children inside Animated.View still receive touches normally.
+
+      The Edit button works in the current code because it is positioned to the
+      LEFT of the Delete button in the actionsContainer. When the card slides
+      left by actionWidth, Edit falls under the area where the card content
+      children still visually cover (the left portion), so touches happen through
+      the children. Delete, being rightmost, falls in the uncovered area where
+      the Animated.View background (solid color) blocks touches.
+
+      With pointerEvents='box-none', we also need to ensure the children inside
+      the Animated.View still block touches where they have content. We add a
+      wrapping View with the card background color inside the Animated.View to
+      maintain the solid background while letting the Animated.View itself be
+      transparent to touches.
+
+    alternative_approach: |
+      Instead of pointerEvents on the Animated.View, we could wrap children in
+      an inner Pressable/View that has the background color and acts as touch target.
+      The Animated.View would then have no backgroundColor. This achieves the
+      same effect but requires restructuring the JSX. The pointerEvents approach
+      is simpler and less invasive.
+
+    final_approach: |
+      Use pointerEvents='box-none' on the Animated.View and move backgroundColor
+      to an inner wrapper View. This ensures:
+      (a) The Animated.View itself does not block touches (passes through to buttons)
+      (b) The inner wrapper View (with backgroundColor) blocks touches only
+          where the card content visually exists
+      (c) Children inside the inner wrapper receive touches normally
+
+    implementation: |
+      <GestureDetector gesture={panGesture}>
+        <Animated.View
+          style={[styles.cardContent, animatedStyle]}
+          pointerEvents="box-none"
+        >
+          <View style={{ backgroundColor: colors.card }}>
+            {children}
+          </View>
+        </Animated.View>
+      </GestureDetector>
+
+    notes:
+      - "cardContent style retains zIndex:1 for layering"
+      - "backgroundColor moves from Animated.View to inner View"
+      - "Inner View is a natural touch target (blocks touches over card content area)"
+      - "GestureDetector pan gesture still works because activeOffsetX allows non-pan touches through"
+
+  # ---------------------------------------------------------------------------
+  # F027 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-02
+    name: "MemberEditor Save/Cancel"
+    feature: F027
+    file: "src/app/(tabs)/settings/members.tsx"
+    description: >
+      Modify MemberEditor to remove onBlur auto-save and add explicit
+      Save/Cancel buttons.
+
+    interface_change: |
+      interface MemberEditorProps {
+        member?: Member;
+        onSave: (data: { full_name: string; country_code: string; phone: string }) => void;
+        onCancel: () => void;  // NEW: was optional, now required
+        colors: ReturnType<typeof useTheme>['colors'];
+      }
+
+    changes:
+      - action: "Remove onBlur={handleSave} from both TextInputs (name and phone)"
+      - action: "Add button row below phoneRow"
+        jsx: |
+          <View style={styles.editorButtons}>
+            <Pressable
+              style={[styles.cancelButton]}
+              onPress={onCancel}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+                {t('common.cancel')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.saveButton, { backgroundColor: colors.primary }]}
+              onPress={handleSave}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
+                {t('common.save')}
+              </Text>
+            </Pressable>
+          </View>
+
+    styles: |
+      editorButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 8,
+        marginTop: 8,
+      },
+      cancelButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+      },
+      cancelButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+      },
+      saveButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+      },
+      saveButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+      },
+
+    callers:
+      - location: "handleSaveNew callback"
+        change: "No change needed (already handles save correctly)"
+      - location: "MemberRow render (edit mode)"
+        change: "Pass onCancel={() => setEditingId(null)} to MemberEditor"
+        code: |
+          <MemberEditor
+            member={member}
+            onSave={onSave}
+            onCancel={() => onCancel?.()}
+            colors={colors}
+          />
+      - location: "MemberRow props"
+        change: "Add onCancel prop and forward to MemberEditor"
+      - location: "New member form (isAdding)"
+        change: "onCancel={() => setIsAdding(false)} (already passed)"
+
+  - id: CT-03
+    name: "TopicEditor Save/Cancel"
+    feature: F027
+    file: "src/app/(tabs)/settings/topics.tsx"
+    description: >
+      Modify TopicEditor to remove onBlur auto-save and add explicit
+      Save/Cancel buttons. Same pattern as MemberEditor.
+
+    interface_change: |
+      interface TopicEditorProps {
+        topic?: WardTopic;
+        onSave: (data: { title: string; link: string | null }) => void;
+        onCancel: () => void;  // NEW
+        colors: ReturnType<typeof useTheme>['colors'];
+      }
+
+    changes:
+      - action: "Remove onBlur={handleSave} from both TextInputs (title and link)"
+      - action: "Add button row below link input (same layout as MemberEditor)"
+      - action: "Pass onCancel from TopicRow and isAdding block"
+
+    callers:
+      - location: "TopicRow (edit mode)"
+        change: "Pass onCancel={() => setEditingId(null)} to TopicEditor"
+      - location: "isAdding block"
+        change: "Pass onCancel={() => setIsAdding(false)} to TopicEditor"
+
+  # ---------------------------------------------------------------------------
+  # F029 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-04
+    name: "countryCodes.ts module"
+    feature: F029
+    file: "src/lib/countryCodes.ts"
+    description: >
+      New shared module for international country codes. Single source of truth
+      for both the UI picker and CSV import parsing.
+
+    exports: |
+      // Type
+      export interface CountryCode {
+        code: string;     // e.g., '+55'
+        flag: string;     // Regional Indicator Symbol pair, e.g., '\u{1F1E7}\u{1F1F7}'
+        label: string;    // e.g., 'Brazil (+55)'
+      }
+
+      // Data: ~200 entries, Brazil first, then alphabetical by country name
+      export const COUNTRY_CODES: CountryCode[];
+
+      // Helpers
+      export function getFlagForCode(code: string): string;
+      export function splitPhoneNumber(fullPhone: string): { countryCode: string; phone: string };
+
+    data_requirements:
+      - "Brazil (+55) is always first in the array"
+      - "Countries sharing +1 (USA, Canada, etc.) listed as separate entries"
+      - "Sorted alphabetically by country name in English after Brazil"
+      - "Each entry has correct Regional Indicator Symbol emoji flag"
+      - "At least 150 entries covering all continents"
+
+    splitPhoneNumber_algorithm: >
+      Uses the COUNTRY_CODES array for matching instead of hardcoded regex.
+      Extracts all unique codes, groups by length (longest first: 4-digit, 3-digit,
+      2-digit, 1-digit), tries matching longest first to avoid ambiguity.
+      Default fallback: assume +55 (Brazil) if no match or no + prefix.
+
+  - id: CT-05
+    name: "members.tsx remove local country codes"
+    feature: F029
+    file: "src/app/(tabs)/settings/members.tsx"
+    description: >
+      Replace local COUNTRY_CODES, CountryCode interface, and getFlagForCode
+      with imports from src/lib/countryCodes.ts.
+
+    removals:
+      - "interface CountryCode { code, flag, label }"
+      - "const COUNTRY_CODES: CountryCode[] = [...]  (21 entries)"
+      - "function getFlagForCode(code: string): string"
+
+    additions:
+      - "import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes'"
+
+  - id: CT-06
+    name: "csvUtils.ts delegate to shared splitPhoneNumber"
+    feature: F029
+    file: "src/lib/csvUtils.ts"
+    description: >
+      Remove local splitPhoneNumber implementation. Re-export from countryCodes.ts
+      to maintain backward compatibility for existing callers.
+
+    current: |
+      export function splitPhoneNumber(fullPhone: string): { countryCode: string; phone: string } {
+        // ...hardcoded 21 country codes...
+      }
+
+    new: |
+      // Re-export from shared country codes module
+      export { splitPhoneNumber } from './countryCodes';
+
+    notes:
+      - "members.tsx imports splitPhoneNumber from csvUtils.ts - this re-export preserves that import"
+      - "Alternatively, members.tsx can update its import path to countryCodes.ts directly"
+
+  # ---------------------------------------------------------------------------
+  # F030 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-07
+    name: "Import confirmation Alert.alert"
+    feature: F030
+    file: "src/app/(tabs)/settings/members.tsx"
+    description: >
+      Wrap the handleImport function to show Alert.alert before proceeding
+      with file picker.
+
+    current_flow: |
+      handleImport -> directly opens DocumentPicker/web file input
+
+    new_flow: |
+      handleImport -> Alert.alert(title, message, [Cancel, Confirm])
+        -> Cancel: do nothing
+        -> Confirm: proceed with existing import logic (DocumentPicker/web file input)
+
+    implementation: |
+      const handleImport = useCallback(async () => {
+        Alert.alert(
+          t('members.importConfirmTitle'),
+          t('members.importConfirmMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('common.confirm'),
+              style: 'default',
+              onPress: () => performImport(),
+            },
+          ]
+        );
+      }, [t]);
+
+      const performImport = useCallback(async () => {
+        // ... existing handleImport logic (DocumentPicker / web file input) ...
+      }, [importMutation, t]);
+
+    notes:
+      - "Existing handleImport body moves to new performImport function"
+      - "handleImport now only shows the confirmation dialog"
+      - "Alert buttons: Cancel (style 'cancel') and Confirm (style 'default')"
+      - "NOT style 'destructive' for Confirm (import is reversible by re-importing)"
+
+  - id: CT-08
+    name: "i18n keys for import confirmation"
+    feature: F030
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    description: "Add i18n keys for CSV import confirmation dialog."
+
+    keys:
+      - key: "members.importConfirmTitle"
+        en: "Import Members"
+        pt_BR: "Importar Membros"
+        es: "Importar Miembros"
+
+      - key: "members.importConfirmMessage"
+        en: "Importing a CSV file will replace the entire current member list with the contents of the file. Existing speech assignments (past and present) will not be affected. Do you want to continue?"
+        pt_BR: "Ao importar um arquivo CSV, toda a lista de membros atual sera substituida pelo conteudo do arquivo. As designacoes de discursos existentes (passadas e presentes) nao serao afetadas. Deseja continuar?"
+        es: "Al importar un archivo CSV, toda la lista de miembros actual sera reemplazada por el contenido del archivo. Las asignaciones de discursos existentes (pasadas y presentes) no seran afectadas. Desea continuar?"
+
+    notes:
+      - "Also need common.confirm key -- check if it already exists"
+      - "If common.confirm does not exist, add it: en='Confirm', pt_BR='Confirmar', es='Confirmar'"
+
+  # ---------------------------------------------------------------------------
+  # F028 Contracts
+  # ---------------------------------------------------------------------------
+
+  - id: CT-09
+    name: "SearchInput component interface"
+    feature: F028
+    file: "src/components/SearchInput.tsx"
+    description: >
+      New reusable component for search fields with X clear button.
+
+    interface: |
+      import { TextInputProps } from 'react-native';
+
+      interface SearchInputProps extends Omit<TextInputProps, 'value' | 'onChangeText'> {
+        value: string;
+        onChangeText: (text: string) => void;
+        colors: {
+          text: string;
+          inputBorder: string;
+          inputBackground: string;
+          placeholder: string;
+          textSecondary: string;
+        };
+      }
+
+    behavior:
+      - "When value is empty: X button is hidden"
+      - "When value has text: X button is visible (right side of input)"
+      - "Pressing X: calls onChangeText(''), does NOT re-focus the field"
+      - "X character: Unicode '\u00D7' (multiplication sign) or '\u2715' (multiplication X)"
+      - "X button color: colors.textSecondary"
+      - "X button size: ~20x20 with hitSlop for easier touch"
+      - "TextInput paddingRight: >= 36 to avoid text under the X"
+
+    layout: |
+      <View style={[containerStyle, style]}>
+        <TextInput
+          {...restProps}
+          value={value}
+          onChangeText={onChangeText}
+          style={[inputStyle, { paddingRight: 36, color, borderColor, backgroundColor }]}
+        />
+        {value.length > 0 && (
+          <Pressable
+            style={clearButtonStyle}
+            onPress={() => onChangeText('')}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            accessibilityLabel="Clear search"
+            accessibilityRole="button"
+          >
+            <Text style={{ color: colors.textSecondary, fontSize: 18 }}>{'\u00D7'}</Text>
+          </Pressable>
+        )}
+      </View>
+
+    notes:
+      - "Component accepts colors prop (not useTheme internally) to match existing pattern in members.tsx/topics.tsx"
+      - "Alternatively: use useTheme() internally. Decision: accept colors prop for consistency with MemberEditor/TopicEditor pattern"
+      - "Actually: looking at the codebase more carefully, many components DO use useTheme internally (ActorSelector, HymnSelector, etc). SearchInput should use useTheme internally and NOT require colors prop. This is cleaner since it's a standalone component, not an inline sub-component."
+
+    final_interface: |
+      interface SearchInputProps extends Omit<TextInputProps, 'value' | 'onChangeText'> {
+        value: string;
+        onChangeText: (text: string) => void;
+      }
+      // Uses useTheme() internally for colors
+
+  - id: CT-10
+    name: "SearchInput migration - settings screens"
+    feature: F028
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+      - "src/app/(tabs)/settings/topics.tsx"
+      - "src/app/(tabs)/settings/history.tsx"
+      - "src/app/(tabs)/settings/timezone.tsx"
+    description: >
+      Replace search TextInput in each settings screen with SearchInput.
+
+    migration_pattern: |
+      // BEFORE:
+      <TextInput
+        style={[styles.searchInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t('common.search')}
+        placeholderTextColor={colors.placeholder}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+
+      // AFTER:
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder={t('common.search')}
+        placeholderTextColor={colors.placeholder}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+
+    notes:
+      - "Remove explicit color/border/background styles from call site (handled internally by SearchInput)"
+      - "Keep placeholder, placeholderTextColor, autoCapitalize, autoCorrect props"
+      - "SearchInput applies its own styling internally using useTheme"
+      - "searchInput style in StyleSheet can be removed if no longer used"
+      - "timezone.tsx uses t('timezoneSelector.search') as placeholder instead of t('common.search')"
+
+  - id: CT-11
+    name: "SearchInput migration - modal/selector components"
+    feature: F028
+    files:
+      - "src/components/HymnSelector.tsx"
+      - "src/components/MemberSelectorModal.tsx"
+      - "src/components/TopicSelectorModal.tsx"
+      - "src/components/PrayerSelector.tsx"
+      - "src/components/ActorSelector.tsx"
+      - "src/components/AgendaForm.tsx"
+    description: >
+      Replace search TextInput in each modal/selector component with SearchInput.
+      Same migration pattern as CT-10.
+
+    notes:
+      - "These components already use useTheme() internally"
+      - "HymnSelector, PrayerSelector have their search field inside a Modal"
+      - "AgendaForm may have search field in a specific section"
+      - "MemberSelectorModal/TopicSelectorModal search within a modal context"
+
+# =============================================================================
+# FLOWS
+# =============================================================================
+
+flows:
+
+  - id: FL-01
+    name: "Delete button press (after fix)"
+    feature: F031
+    steps:
+      - "User swipes card left to reveal Edit and Delete buttons"
+      - "Card content (Animated.View) translates left by actionWidth"
+      - "Animated.View has pointerEvents='box-none': does not intercept touches"
+      - "Inner wrapper View has backgroundColor: blocks touches over visible card area"
+      - "Action buttons area (behind card) is now fully touchable"
+      - "User taps Delete button"
+      - "handleDelete fires: translateX animates to 0, onReveal(null), onDelete()"
+      - "Parent component receives onDelete callback, shows Alert.alert confirmation"
+
+  - id: FL-02
+    name: "Save member with explicit button"
+    feature: F027
+    steps:
+      - "User opens MemberEditor (add new or edit existing)"
+      - "User fills in name, optionally country code and phone"
+      - "User clicks Save button"
+      - "handleSave validates: if full_name is empty, returns (editor stays open)"
+      - "If valid: onSave({full_name, country_code, phone}) is called"
+      - "Parent component (MembersScreen) calls createMember.mutate or updateMember.mutate"
+      - "On success: editor closes (isAdding=false or editingId=null)"
+      - "User clicks outside (blur): NOTHING happens (no auto-save)"
+
+  - id: FL-03
+    name: "Cancel member edit"
+    feature: F027
+    steps:
+      - "User opens MemberEditor (add new or edit existing)"
+      - "User types some data (or modifies existing)"
+      - "User clicks Cancel button"
+      - "onCancel() is called"
+      - "Editor closes without saving"
+      - "For edit: member reverts to original state (no mutation called)"
+      - "For add: form disappears (isAdding=false)"
+
+  - id: FL-04
+    name: "CSV import with confirmation dialog"
+    feature: F030
+    steps:
+      - "User taps 'Import CSV' button"
+      - "Alert.alert shows with title and message explaining consequences"
+      - "Message: (1) entire member list will be replaced, (2) existing speech assignments not affected"
+      - "User taps Cancel: dialog closes, nothing happens"
+      - "User taps Confirm: file picker opens (existing import logic)"
+      - "User selects file -> parseCsv -> import_members RPC"
+
+  - id: FL-05
+    name: "Search with X clear button"
+    feature: F028
+    steps:
+      - "User sees search field with placeholder, no X button visible"
+      - "User types search query"
+      - "X button appears on right side of search field"
+      - "List filters based on search text (existing behavior)"
+      - "User taps X button"
+      - "onChangeText('') is called, search text clears"
+      - "List shows all items (filter reset)"
+      - "X button disappears (value is now empty)"
+      - "Keyboard does not re-open"
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-030
+    title: "SearchInput as drop-in replacement with internal theming"
+    context: >
+      10 search fields across the app all follow the same pattern: TextInput
+      with search styling. The QA PRE recommended a reusable component.
+      Decision: should SearchInput accept colors prop or use useTheme internally?
+    decision: >
+      SearchInput uses useTheme() internally. It does NOT accept a colors prop.
+      This is consistent with other standalone components (ActorSelector,
+      HymnSelector, PrayerSelector) that use useTheme internally. Unlike
+      inline sub-components (MemberEditor, TopicEditor) that receive colors
+      from parent, SearchInput is a standalone reusable component.
+    consequences:
+      - "Simpler API: no colors prop needed at call sites"
+      - "Consistent with existing component patterns in the codebase"
+      - "SearchInput manages its own input styling internally"
+      - "Call sites only pass value, onChangeText, placeholder, and input behavior props"
+
+  - id: ADR-031
+    title: "Shared countryCodes.ts as single source of truth"
+    context: >
+      Country codes are currently duplicated: COUNTRY_CODES array in members.tsx
+      (21 entries) and hardcoded regex in splitPhoneNumber in csvUtils.ts
+      (same 21 codes). Both need to be expanded to ~200 codes.
+    decision: >
+      Create src/lib/countryCodes.ts as the single source of truth. Export
+      COUNTRY_CODES array, getFlagForCode helper, and splitPhoneNumber function.
+      csvUtils.ts re-exports splitPhoneNumber for backward compatibility.
+      members.tsx imports COUNTRY_CODES and getFlagForCode from countryCodes.ts.
+    consequences:
+      - "Single place to add/modify country codes"
+      - "splitPhoneNumber uses the actual COUNTRY_CODES array for matching"
+      - "No duplication between UI and parsing logic"
+      - "Backward compatible: existing imports from csvUtils.ts still work via re-export"
+
+  - id: ADR-032
+    title: "pointerEvents='box-none' to fix gesture/button touch overlap"
+    context: >
+      SwipeableCard's Animated.View (zIndex:1) covers the action buttons even
+      after translating left. The Edit button works because it falls under
+      the card content area (left portion), but Delete (rightmost) is blocked
+      by the Animated.View's touch area extending beyond its visible content.
+    decision: >
+      Use pointerEvents='box-none' on the Animated.View and move backgroundColor
+      to an inner wrapper View. The Animated.View becomes transparent to touches
+      except through its children. The inner View with backgroundColor acts as
+      the natural touch target for the card content area.
+    consequences:
+      - "Delete button receives touch events correctly"
+      - "Edit button continues to work (no regression)"
+      - "Card content (children) still receives touches normally"
+      - "Pan gesture still works (GestureDetector wraps the Animated.View)"
+      - "Minimal code change (no layout restructuring)"
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  no_security_impact: false
+  notes:
+    - "F027: UI-only change (Save/Cancel buttons). No permission changes."
+    - "F028: UI-only change (SearchInput component). No data access changes."
+    - "F029: Data-only change (country codes list). No new API calls or permissions."
+    - "F030: UI-only change (Alert.alert before import). Import logic unchanged."
+    - "F031: UI-only change (touch event fix). No permission or data access changes."
+    - "All existing permission checks (canWrite, canImport, etc.) remain unchanged."
+
+# =============================================================================
+# FILE IMPACT SUMMARY
+# =============================================================================
+
+file_impact_summary:
+
+  created:
+    - file: "src/lib/countryCodes.ts"
+      feature: F029
+      description: "Shared country codes data module (~500 lines)"
+
+    - file: "src/components/SearchInput.tsx"
+      feature: F028
+      description: "Reusable search input with X clear button (~80 lines)"
+
+  modified:
+    - file: "src/components/SwipeableCard.tsx"
+      feature: F031
+      lines_changed_est: 5
+      description: "Add pointerEvents='box-none', move backgroundColor to inner View"
+
+    - file: "src/app/(tabs)/settings/members.tsx"
+      features: [F027, F028, F029, F030]
+      lines_changed_est: 60
+      description: >
+        Remove onBlur save, add Save/Cancel buttons, replace TextInput
+        with SearchInput, remove local COUNTRY_CODES, add import confirm Alert
+
+    - file: "src/app/(tabs)/settings/topics.tsx"
+      features: [F027, F028]
+      lines_changed_est: 35
+      description: >
+        Remove onBlur save, add Save/Cancel buttons, add onCancel prop,
+        replace TextInput with SearchInput
+
+    - file: "src/lib/csvUtils.ts"
+      feature: F029
+      lines_changed_est: 15
+      description: "Remove splitPhoneNumber, re-export from countryCodes.ts"
+
+    - file: "src/i18n/locales/en.json"
+      feature: F030
+      lines_changed_est: 3
+      description: "Add importConfirmTitle, importConfirmMessage, possibly common.confirm"
+
+    - file: "src/i18n/locales/pt-BR.json"
+      feature: F030
+      lines_changed_est: 3
+      description: "Add importConfirmTitle, importConfirmMessage, possibly common.confirm"
+
+    - file: "src/i18n/locales/es.json"
+      feature: F030
+      lines_changed_est: 3
+      description: "Add importConfirmTitle, importConfirmMessage, possibly common.confirm"
+
+    - file: "src/app/(tabs)/settings/history.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/app/(tabs)/settings/timezone.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/HymnSelector.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/MemberSelectorModal.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/TopicSelectorModal.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/PrayerSelector.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/ActorSelector.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+    - file: "src/components/AgendaForm.tsx"
+      feature: F028
+      lines_changed_est: 5
+      description: "Replace search TextInput with SearchInput"
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+
+implementation_order:
+  - order: 1
+    feature: F031
+    cr: CR-90
+    reason: >
+      Fix the Delete button first because F027 changes the editor flow in
+      the same SwipeableCard area. Having Delete working before modifying
+      the editor prevents testing confusion.
+    files: ["src/components/SwipeableCard.tsx"]
+    dependencies: none
+
+  - order: 2
+    feature: F027
+    cr: CR-83
+    reason: >
+      Save/Cancel changes the fundamental edit flow for members and topics.
+      Should be done after Delete fix and before Search Clear (which touches
+      the same files).
+    files: ["src/app/(tabs)/settings/members.tsx", "src/app/(tabs)/settings/topics.tsx"]
+    dependencies: [F031]
+
+  - order: 3
+    feature: F029
+    cr: CR-85
+    reason: >
+      Country codes extraction creates a new file and modifies members.tsx
+      and csvUtils.ts. Independent of F027/F031 but done after F027 to
+      avoid merge conflicts in members.tsx.
+    files: ["src/lib/countryCodes.ts", "src/app/(tabs)/settings/members.tsx", "src/lib/csvUtils.ts"]
+    dependencies: [F027]
+
+  - order: 4
+    feature: F030
+    cr: CR-86
+    reason: >
+      Simple isolated change to handleImport in members.tsx plus i18n keys.
+      Done after F029 since both modify members.tsx.
+    files: ["src/app/(tabs)/settings/members.tsx", "src/i18n/locales/en.json", "src/i18n/locales/pt-BR.json", "src/i18n/locales/es.json"]
+    dependencies: [F029]
+
+  - order: 5
+    feature: F028
+    cr: CR-84
+    reason: >
+      Search Clear is the last because it touches 11 files (largest surface area).
+      All other changes to members.tsx and topics.tsx should be stable before
+      this migration.
+    files: ["src/components/SearchInput.tsx", "src/app/(tabs)/settings/members.tsx", "src/app/(tabs)/settings/topics.tsx", "src/app/(tabs)/settings/history.tsx", "src/app/(tabs)/settings/timezone.tsx", "src/components/HymnSelector.tsx", "src/components/MemberSelectorModal.tsx", "src/components/TopicSelectorModal.tsx", "src/components/PrayerSelector.tsx", "src/components/ActorSelector.tsx", "src/components/AgendaForm.tsx"]
+    dependencies: [F027, F029, F030]
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+
+risks:
+  - id: R-01
+    severity: MEDIUM
+    feature: F031
+    description: >
+      pointerEvents='box-none' might affect how the pan gesture is detected
+      on the Animated.View. If GestureDetector relies on the Animated.View
+      receiving touch events to start the pan, the gesture might not activate.
+    mitigation: >
+      GestureDetector from react-native-gesture-handler manages its own touch
+      handling independently of React Native's pointerEvents. The pan gesture
+      is configured with activeOffsetX which requires horizontal movement to
+      activate. Simple taps (no horizontal movement) will pass through to the
+      action buttons. Verify with manual testing on both iOS and Android.
+
+  - id: R-02
+    severity: LOW
+    feature: F027
+    description: >
+      Removing onBlur auto-save changes user behavior. Users accustomed to
+      clicking away to save might lose data if they navigate away without
+      clicking Save.
+    mitigation: >
+      This is the intended behavior requested by the user. The editor remains
+      open until Save or Cancel is explicitly clicked. Navigation away from
+      the Settings > Members screen would require explicit navigation action
+      (back button) which is a clear user intent.
+
+  - id: R-03
+    severity: LOW
+    feature: F029
+    description: >
+      Large country codes file (~500 lines) added to the bundle. Some entries
+      might have incorrect flag emojis or codes.
+    mitigation: >
+      Country codes are static data based on ITU-T E.164 standard. Flag emojis
+      use Unicode Regional Indicator Symbol pairs which are deterministic.
+      The list can be verified against ITU data. Bundle impact is negligible
+      for a mobile app.
+
+  - id: R-04
+    severity: VERY_LOW
+    feature: F028
+    description: >
+      SearchInput migration touches 11 files. Risk of missing a search field
+      or introducing a styling inconsistency.
+    mitigation: >
+      Each migration follows the exact same pattern (replace TextInput with
+      SearchInput). The QA PRE identified all 10 search fields. Automated
+      tests will verify the presence of SearchInput in each location.
+
+  - id: R-05
+    severity: VERY_LOW
+    feature: F030
+    description: "Alert.alert is a well-tested native dialog. Minimal risk."
+    mitigation: "Follows existing pattern from handleDelete dialogs."
+
+# =============================================================================
+# TESTING STRATEGY
+# =============================================================================
+
+testing_strategy:
+
+  # F031 tests
+  - id: TS-01
+    feature: F031
+    type: component
+    description: "SwipeableCard: Delete button onPress fires when card is revealed"
+    approach: >
+      Render SwipeableCard with onDelete mock. Simulate swipe to reveal.
+      Press Delete button. Verify onDelete was called.
+
+  - id: TS-02
+    feature: F031
+    type: regression
+    description: "SwipeableCard: Edit button still works after fix"
+    approach: >
+      Render SwipeableCard with onEdit mock. Simulate swipe to reveal.
+      Press Edit button. Verify onEdit was called.
+
+  # F027 tests
+  - id: TS-03
+    feature: F027
+    type: component
+    description: "MemberEditor: Save and Cancel buttons are rendered"
+    approach: >
+      Render MemberEditor. Verify buttons with text t('common.save') and
+      t('common.cancel') are present.
+
+  - id: TS-04
+    feature: F027
+    type: component
+    description: "MemberEditor: onBlur does NOT trigger save"
+    approach: >
+      Render MemberEditor with onSave mock. Type in name field. Simulate
+      blur. Verify onSave was NOT called.
+
+  - id: TS-05
+    feature: F027
+    type: component
+    description: "MemberEditor: Save button triggers onSave with correct data"
+    approach: >
+      Render MemberEditor. Fill name. Press Save. Verify onSave called
+      with { full_name, country_code, phone }.
+
+  - id: TS-06
+    feature: F027
+    type: component
+    description: "MemberEditor: Cancel button triggers onCancel"
+    approach: >
+      Render MemberEditor with onCancel mock. Press Cancel. Verify onCancel called.
+      Verify onSave NOT called.
+
+  - id: TS-07
+    feature: F027
+    type: component
+    description: "MemberEditor: Save with empty name does not call onSave"
+    approach: >
+      Render MemberEditor. Leave name empty. Press Save. Verify onSave NOT called.
+
+  - id: TS-08
+    feature: F027
+    type: component
+    description: "TopicEditor: Same tests as TS-03 through TS-07 for TopicEditor"
+
+  # F029 tests
+  - id: TS-09
+    feature: F029
+    type: unit
+    description: "countryCodes: COUNTRY_CODES has >= 100 entries"
+    approach: "expect(COUNTRY_CODES.length).toBeGreaterThanOrEqual(100)"
+
+  - id: TS-10
+    feature: F029
+    type: unit
+    description: "countryCodes: Brazil is first entry"
+    approach: "expect(COUNTRY_CODES[0].code).toBe('+55')"
+
+  - id: TS-11
+    feature: F029
+    type: unit
+    description: "countryCodes: splitPhoneNumber handles all codes"
+    approach: >
+      Test splitPhoneNumber for representative codes: +55, +1, +44, +61,
+      +91, +351, +86, +7. Verify correct code/phone split.
+
+  - id: TS-12
+    feature: F029
+    type: unit
+    description: "countryCodes: all entries have valid code, flag, label"
+    approach: >
+      Iterate COUNTRY_CODES. Verify code starts with '+', flag is non-empty
+      string, label contains the code.
+
+  - id: TS-13
+    feature: F029
+    type: unit
+    description: "countryCodes: USA and Canada are separate entries with +1"
+    approach: >
+      Filter COUNTRY_CODES by code '+1'. Verify at least 2 entries exist
+      (USA and Canada).
+
+  # F030 tests
+  - id: TS-14
+    feature: F030
+    type: component
+    description: "Import CSV: Alert.alert is shown before opening file picker"
+    approach: >
+      Mock Alert.alert. Press Import CSV button. Verify Alert.alert called
+      with correct title and message i18n keys.
+
+  - id: TS-15
+    feature: F030
+    type: component
+    description: "Import CSV: Cancel does not open file picker"
+    approach: >
+      Mock Alert.alert. Press Import CSV. Simulate Cancel button press.
+      Verify DocumentPicker.getDocumentAsync NOT called.
+
+  - id: TS-16
+    feature: F030
+    type: component
+    description: "Import CSV: Confirm opens file picker"
+    approach: >
+      Mock Alert.alert. Press Import CSV. Simulate Confirm button press.
+      Verify DocumentPicker.getDocumentAsync IS called.
+
+  - id: TS-17
+    feature: F030
+    type: i18n
+    description: "i18n keys exist in all 3 locales"
+    approach: >
+      Verify members.importConfirmTitle and members.importConfirmMessage
+      exist in en.json, pt-BR.json, es.json.
+
+  # F028 tests
+  - id: TS-18
+    feature: F028
+    type: component
+    description: "SearchInput: X button not visible when value is empty"
+    approach: >
+      Render SearchInput with value=''. Query for clear button.
+      Verify not present.
+
+  - id: TS-19
+    feature: F028
+    type: component
+    description: "SearchInput: X button visible when value has text"
+    approach: >
+      Render SearchInput with value='test'. Verify clear button present.
+
+  - id: TS-20
+    feature: F028
+    type: component
+    description: "SearchInput: X button clears text"
+    approach: >
+      Render SearchInput with value='test' and onChangeText mock.
+      Press X button. Verify onChangeText called with ''.
+
+  - id: TS-21
+    feature: F028
+    type: integration
+    description: "All 10 search fields use SearchInput"
+    approach: >
+      Verify each of the 10 files has import of SearchInput and renders it
+      for the search field.

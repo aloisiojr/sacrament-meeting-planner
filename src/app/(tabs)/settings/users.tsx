@@ -331,7 +331,7 @@ export default function UserManagementScreen() {
                 } else {
                   setExpandedUserId(u.id);
                   if (isSelf) {
-                    setEditingName(u.full_name);
+                    setEditingName(u.full_name || '');
                   }
                 }
               }}
@@ -383,15 +383,15 @@ export default function UserManagementScreen() {
                           styles.saveButton,
                           { backgroundColor: colors.primary },
                           (!editingName.trim() ||
-                            editingName.trim() === u.full_name ||
+                            editingName.trim() === (u.full_name || '') ||
                             updateNameMutation.isPending) && {
                             opacity: 0.5,
                           },
                         ]}
-                        onPress={() => handleSaveName(u.full_name)}
+                        onPress={() => handleSaveName(u.full_name || '')}
                         disabled={
                           !editingName.trim() ||
-                          editingName.trim() === u.full_name ||
+                          editingName.trim() === (u.full_name || '') ||
                           updateNameMutation.isPending
                         }
                         accessibilityRole="button"

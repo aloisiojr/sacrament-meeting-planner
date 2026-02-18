@@ -421,14 +421,14 @@ describe('AC-11/AC-12/AC-13: Users screen name edit behavior', () => {
     const expandedSection = usersSource.slice(
       usersSource.indexOf('<View style={[styles.expandedSection')
     );
-    expect(expandedSection).toContain('handleSaveName(u.full_name)');
+    expect(expandedSection).toContain("handleSaveName(u.full_name || '')");
   });
 
   it('Save button is disabled when name is unchanged', () => {
     const expandedSection = usersSource.slice(
       usersSource.indexOf('<View style={[styles.expandedSection')
     );
-    expect(expandedSection).toContain('editingName.trim() === u.full_name');
+    expect(expandedSection).toContain("editingName.trim() === (u.full_name || '')");
   });
 
   it('Save button is disabled when name is empty', () => {
@@ -484,7 +484,7 @@ describe('AC-11/AC-12/AC-13: Users screen name edit behavior', () => {
   });
 
   it('editingName is initialized when expanding self card', () => {
-    expect(usersSource).toContain('setEditingName(u.full_name)');
+    expect(usersSource).toContain("setEditingName(u.full_name || '')");
   });
 
   it('TextInput for self uses autoCapitalize words', () => {

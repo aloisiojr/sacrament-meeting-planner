@@ -20,6 +20,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
+import { logAction } from '../../../lib/activityLog';
 import type { Role } from '../../../types/database';
 
 const ROLES: Role[] = ['bishopric', 'secretary', 'observer'];
@@ -69,10 +70,11 @@ export default function UserManagementScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
-  const { user: currentUser, session } = useAuth();
+  const { user: currentUser, session, userName } = useAuth();
   const queryClient = useQueryClient();
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('observer');
@@ -157,6 +159,37 @@ export default function UserManagementScreen() {
     },
   });
 
+  // Update own name mutation
+  const updateNameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      return callEdgeFunction('update-user-name', {
+        fullName: newName.trim(),
+      });
+    },
+    onSuccess: (_data, newName) => {
+      queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
+      supabase.auth.refreshSession();
+      Alert.alert(t('common.success'), t('users.nameUpdated'));
+      // Log the name change
+      if (currentUser) {
+        logAction(
+          currentUser.app_metadata?.ward_id ?? '',
+          currentUser.id,
+          currentUser.email ?? '',
+          'user:name-update',
+          `Name updated to "${newName.trim()}"`,
+          newName.trim()
+        );
+      }
+    },
+    onError: (_err, _newName, _context) => {
+      Alert.alert(t('common.error'), t('users.nameUpdateFailed'));
+      // Revert editingName to the current user's full_name
+      const currentFullName = users.find((u) => u.id === currentUser?.id)?.full_name ?? '';
+      setEditingName(currentFullName);
+    },
+  });
+
   const handleInvite = useCallback(() => {
     if (!inviteEmail.trim()) return;
     inviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
@@ -220,6 +253,16 @@ export default function UserManagementScreen() {
     inviteMutation.reset();
   }, [inviteMutation]);
 
+  const handleSaveName = useCallback(
+    (currentFullName: string) => {
+      // EC-4: No API call when name unchanged
+      if (editingName.trim() === currentFullName) return;
+      if (!editingName.trim()) return;
+      updateNameMutation.mutate(editingName.trim());
+    },
+    [editingName, updateNameMutation]
+  );
+
   const currentUserId = currentUser?.id;
 
   return (
@@ -282,12 +325,24 @@ export default function UserManagementScreen() {
             <Pressable
               key={u.id}
               style={[styles.userCard, { backgroundColor: colors.card }]}
-              onPress={() => setExpandedUserId(isExpanded ? null : u.id)}
+              onPress={() => {
+                if (isExpanded) {
+                  setExpandedUserId(null);
+                } else {
+                  setExpandedUserId(u.id);
+                  if (isSelf) {
+                    setEditingName(u.full_name);
+                  }
+                }
+              }}
               accessibilityRole="button"
             >
               <View style={styles.userHeader}>
                 <View style={styles.userInfo}>
-                  <Text style={[styles.userEmail, { color: colors.text }]}>
+                  <Text
+                    style={[styles.userDisplayName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
                     {u.full_name || u.email}
                   </Text>
                   <Text style={[styles.userRole, { color: colors.textSecondary }]}>
@@ -302,8 +357,55 @@ export default function UserManagementScreen() {
 
               {isExpanded && (
                 <View style={[styles.expandedSection, { borderTopColor: colors.divider }]}>
-                  {/* Name (read-only) */}
-                  {u.full_name ? (
+                  {/* Name: editable for self, read-only for others */}
+                  {isSelf ? (
+                    <View style={styles.fieldRow}>
+                      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                        {t('users.name')}
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.nameInput,
+                          {
+                            color: colors.text,
+                            borderColor: colors.divider,
+                            backgroundColor: colors.surfaceVariant,
+                          },
+                        ]}
+                        value={editingName}
+                        onChangeText={setEditingName}
+                        autoCapitalize="words"
+                        placeholder={t('auth.fullNamePlaceholder')}
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      <Pressable
+                        style={[
+                          styles.saveButton,
+                          { backgroundColor: colors.primary },
+                          (!editingName.trim() ||
+                            editingName.trim() === u.full_name ||
+                            updateNameMutation.isPending) && {
+                            opacity: 0.5,
+                          },
+                        ]}
+                        onPress={() => handleSaveName(u.full_name)}
+                        disabled={
+                          !editingName.trim() ||
+                          editingName.trim() === u.full_name ||
+                          updateNameMutation.isPending
+                        }
+                        accessibilityRole="button"
+                      >
+                        {updateNameMutation.isPending ? (
+                          <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                          <Text style={styles.saveButtonText}>
+                            {t('common.save')}
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  ) : u.full_name ? (
                     <View style={styles.fieldRow}>
                       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                         {t('users.name')}
@@ -598,7 +700,7 @@ const styles = StyleSheet.create({
   userInfo: {
     flex: 1,
   },
-  userEmail: {
+  userDisplayName: {
     fontSize: 16,
     fontWeight: '500',
   },
@@ -647,6 +749,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  saveButton: {
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',

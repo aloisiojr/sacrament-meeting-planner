@@ -120,7 +120,7 @@ describe('BUG-401: Fix Systemic HTTP 401 on Authenticated Edge Functions', () =>
 
     it('should include session in useAuth destructure alongside currentUser', () => {
       const source = readSourceFile('app/(tabs)/settings/users.tsx');
-      expect(source).toContain('const { user: currentUser, session } = useAuth()');
+      expect(source).toContain('const { user: currentUser, session, userName } = useAuth()');
     });
 
     it('should include enabled: !!session in useQuery options', () => {

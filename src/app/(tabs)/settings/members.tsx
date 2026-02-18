@@ -605,6 +605,7 @@ export default function MembersScreen() {
 
         {/* Member list */}
         <FlatList
+          style={styles.flex}
           data={members}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

@@ -308,6 +308,11 @@ export default function TopicsScreen() {
             <View style={styles.headerSpacer} />
           </View>
 
+          {/* Screen description */}
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
+            {t('topics.description')}
+          </Text>
+
           {/* Ward Topics Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -419,6 +424,12 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 50,
+  },
+  description: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   addButton: {
     width: 36,

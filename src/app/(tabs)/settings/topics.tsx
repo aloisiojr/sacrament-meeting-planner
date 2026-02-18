@@ -363,7 +363,7 @@ export default function TopicsScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header with back button (fixed) */}
+        {/* Header with back button */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} accessibilityRole="button">
             <Text style={[styles.backButton, { color: colors.primary }]}>
@@ -374,12 +374,12 @@ export default function TopicsScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* Screen description (fixed) */}
+        {/* Screen description */}
         <Text style={[styles.description, { color: colors.textSecondary }]}>
           {t('topics.description')}
         </Text>
 
-        {/* Search field for Ward Topics (fixed) */}
+        {/* Search field for Ward Topics */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             {t('topics.wardTopics')}
@@ -404,7 +404,7 @@ export default function TopicsScreen() {
           />
         </View>
 
-        {/* Scrollable content */}
+        {/* Scrollable content: topics list and collections */}
         <ScrollView
           style={styles.flex}
           keyboardShouldPersistTaps="handled"

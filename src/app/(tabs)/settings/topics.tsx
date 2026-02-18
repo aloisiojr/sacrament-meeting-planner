@@ -38,10 +38,11 @@ import type { WardTopic } from '../../../types/database';
 interface TopicEditorProps {
   topic?: WardTopic;
   onSave: (data: { title: string; link: string | null }) => void;
+  onCancel: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function TopicEditor({ topic, onSave, colors }: TopicEditorProps) {
+function TopicEditor({ topic, onSave, onCancel, colors }: TopicEditorProps) {
   const { t } = useTranslation();
   const [title, setTitle] = useState(topic?.title ?? '');
   const [link, setLink] = useState(topic?.link ?? '');
@@ -68,7 +69,6 @@ function TopicEditor({ topic, onSave, colors }: TopicEditorProps) {
         onChangeText={setTitle}
         placeholder={t('topics.topicTitle')}
         placeholderTextColor={colors.placeholder}
-        onBlur={handleSave}
         returnKeyType="next"
         autoCapitalize="sentences"
       />
@@ -78,12 +78,33 @@ function TopicEditor({ topic, onSave, colors }: TopicEditorProps) {
         onChangeText={setLink}
         placeholder={t('topics.topicLink')}
         placeholderTextColor={colors.placeholder}
-        onBlur={handleSave}
         keyboardType="url"
         autoCapitalize="none"
         autoCorrect={false}
         textContentType="URL"
       />
+
+      {/* Save/Cancel buttons */}
+      <View style={styles.editorButtons}>
+        <Pressable
+          style={styles.cancelButton}
+          onPress={onCancel}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+            {t('common.cancel')}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.saveButton, { backgroundColor: colors.primary }]}
+          onPress={handleSave}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
+            {t('common.save')}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -98,6 +119,7 @@ interface TopicRowProps {
   onEdit: (topic: WardTopic) => void;
   onDelete: (topic: WardTopic) => void;
   onSave: (data: { title: string; link: string | null }) => void;
+  onCancel: () => void;
   disabled: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
 }
@@ -110,13 +132,14 @@ function TopicRow({
   onEdit,
   onDelete,
   onSave,
+  onCancel,
   disabled,
   colors,
 }: TopicRowProps) {
   const { t } = useTranslation();
 
   if (isEditing) {
-    return <TopicEditor topic={topic} onSave={onSave} colors={colors} />;
+    return <TopicEditor topic={topic} onSave={onSave} onCancel={onCancel} colors={colors} />;
   }
 
   return (
@@ -316,7 +339,7 @@ export default function TopicsScreen() {
             </View>
 
             {isAdding && (
-              <TopicEditor onSave={handleSaveNew} colors={colors} />
+              <TopicEditor onSave={handleSaveNew} onCancel={() => setIsAdding(false)} colors={colors} />
             )}
 
             {filteredTopics && filteredTopics.length > 0 ? (
@@ -330,6 +353,7 @@ export default function TopicsScreen() {
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onSave={handleSaveEdit(item.id)}
+                  onCancel={() => setEditingId(null)}
                   disabled={!canWrite}
                   colors={colors}
                 />
@@ -449,6 +473,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     marginBottom: 8,
+  },
+  editorButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   topicRow: {
     paddingHorizontal: 16,

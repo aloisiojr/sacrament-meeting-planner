@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-90
+# Consolidated code review for CR-82, CR-80, CR-83..CR-90, CR-91..CR-98
 # Reviewed: 2026-02-18
-# Version: 5
+# Version: 6
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -486,6 +486,41 @@ pending_deploys:
       3 features: swipe icons (Unicode chars, no library), topics description (i18n text),
       collection expand/collapse (new hook + UI component). All 2716 tests passing.
 
+  - id: DEPLOY-B7P1-01
+    description: "Batch 7, Phase 1: Bug fixes for RLS trigger, duplicate key, deep link, speech fields, prayer fields (F035-F039)"
+    branch: master
+    commits:
+      - hash: bdba1aa
+        message: "fix(db): add SECURITY DEFINER to enqueue_speech_notification trigger (CR-91)"
+      - hash: e091833
+        message: "fix(members): change keyExtractor to item.label to fix duplicate key warning (CR-92)"
+      - hash: 313dc67
+        message: "fix(deeplink): change protocol from wardmanager:// to sacrmeetman:// (CR-93)"
+      - hash: 1420ed2
+        message: "fix(speeches): hide speech slots for all non-speeches types (CR-95)"
+      - hash: 7a60ea8
+        message: "fix(prayer): add visible/onClose props to PrayerSelector for immediate modal open (CR-98)"
+      - hash: ccb480e
+        message: "test(batch7-phase1): add tests for F035, F036, F037, F038, F039"
+    instructions:
+      - "Merge branch master into main"
+      - "Run: npx vitest run (verify all 2789 tests pass)"
+      - "IMPORTANT: Deploy migration 013_fix_notification_trigger_security_definer.sql to Supabase"
+      - "Run: supabase db push (or apply migration via Supabase Dashboard)"
+      - "Verify migration applied: SELECT prosrc FROM pg_proc WHERE proname = 'enqueue_speech_notification' -> SECURITY DEFINER"
+      - "Run: npx expo start --ios"
+      - "Manual test: designate a speaker in Speeches tab - no RLS error dialog (CR-91)"
+      - "Manual test: open phone country picker - no duplicate key warning in console (CR-92)"
+      - "Manual test: create invitation, verify deep link uses sacrmeetman:// (CR-93)"
+      - "Manual test: change sunday type from speeches to testimony_meeting - speech slots disappear (CR-95)"
+      - "Manual test: click opening/closing prayer field in Agenda - modal opens immediately (CR-98)"
+      - "Run: eas build --platform ios (or android) for production build"
+    risk: low
+    notes: >
+      Mixed frontend + backend changes. Migration 013 adds SECURITY DEFINER to
+      trigger function (must be deployed to Supabase). All other changes are
+      frontend-only. 5 bug fixes, 0 new dependencies, 2789 tests passing (57 files).
+
 # =============================================================================
 # REVIEW HISTORY
 # =============================================================================
@@ -557,6 +592,25 @@ review_history:
       106 new tests all passing. Full suite 2716/2716 (56 files).
       Only issue: P2 CODE_LEDGER test count needs correction.
       APPROVED - P2 is non-blocking.
+
+  - date: "2026-02-18"
+    phase: "Batch 7, Phase 1"
+    crs: [CR-91, CR-92, CR-93, CR-95, CR-98]
+    features: [F035, F036, F037, F038, F039]
+    reviewer: reviewer-agent
+    verdict: approved
+    iteration: 1
+    commits_reviewed: [bdba1aa, e091833, 313dc67, 1420ed2, 7a60ea8, ccb480e]
+    issues_found: 0
+    issues_by_severity:
+      p0: 0
+      p1: 0
+      p2: 0
+    notes: >
+      All 5 bug fixes correctly implemented. Chain validation intact across
+      SPEC->ARCH->PLAN->CODE. Migration 013 adds SECURITY DEFINER correctly.
+      73 new tests all passing. Full suite 2789/2789 (57 files), 0 regressions.
+      One deploy required: migration 013 to Supabase. APPROVED.
 
 # =============================================================================
 # BATCH 6, PHASE 1 REVIEW (Iteration 1)
@@ -1455,4 +1509,444 @@ batch6_phase2:
     full_suite_tests: 2716
     full_suite_passing: 2716
     full_suite_files: 56
+    regressions: 0
+
+# =============================================================================
+# BATCH 7, PHASE 1 REVIEW (Iteration 1)
+# CR-91 (F035 RLS Fix), CR-92 (F036 Duplicate Key), CR-93 (F037 Deep Link),
+# CR-95 (F038 Speech Fields), CR-98 (F039 Prayer Fields)
+# =============================================================================
+
+batch7_phase1:
+  phase: "Batch 7, Phase 1"
+  phase_description: >
+    Fix 5 independent bugs: (1) RLS policy error on notification_queue trigger
+    by adding SECURITY DEFINER, (2) duplicate key warning in country code
+    dropdown by using item.label, (3) deep link protocol change from
+    wardmanager:// to sacrmeetman://, (4) speech fields not hiding when
+    changing sunday type from speeches to other types, (5) prayer fields not
+    clickable due to missing visible/onClose props on PrayerSelector.
+  iteration: 1
+  verdict: approved
+
+  verdict_summary: >
+    All 5 bug fixes (F035-F039) are correctly implemented and fully aligned
+    with the SPEC->ARCH->PLAN->CODE chain. F035 creates migration 013 with
+    SECURITY DEFINER on enqueue_speech_notification() -- function body is
+    identical to 003_notification_triggers.sql, only the security attribute
+    added. F036 changes keyExtractor from item.code to item.label in the
+    country code FlatList. F037 changes app.json scheme and create-invitation
+    Edge Function from wardmanager:// to sacrmeetman://, with bundleIdentifier
+    and package unchanged. F038 replaces isExcludedFromAgenda usage with direct
+    type check (!exception || exception.reason === 'speeches'), correctly
+    removing the import from speeches.tsx while preserving it in agenda.tsx.
+    F039 adds visible/onClose props to PrayerSelector following ActorSelector
+    pattern, with useEffect sync and onClose calls on all modal close paths.
+    73 new tests all passing. Full suite clean: 57 files, 2789/2789, 0
+    regressions. One deploy required: migration 013 to Supabase. APPROVED.
+
+  chain_validation:
+    spec_vs_request:
+      status: pass
+      notes: >
+        SPEC_F035_F039.yaml covers all 5 CRs (91, 92, 93, 95, 98) with
+        complete acceptance criteria (31 ACs total). Each feature maps
+        directly to a user-reported bug. Root cause analysis and fix
+        approach are accurate. No scope creep detected.
+
+    arch_vs_spec:
+      status: pass
+      notes: >
+        ARCH_M013.yaml maps all ACs to 5 existing modules (M001-M005).
+        No new components. ADRs (035, 036) provide sound rationale for
+        SECURITY DEFINER and PrayerSelector visible/onClose pattern.
+        Contracts define exact changes for each integration point.
+        Zero file overlap between fixes.
+
+    plan_vs_arch:
+      status: pass
+      notes: >
+        PLAN_P013.yaml has 6 steps (5 fixes + 1 regression verification).
+        All steps parallelizable except STEP-06 which depends on all others.
+        Each step maps to specific files matching ARCH specification. AC
+        traceability matrix covers all 31 ACs and 12 edge cases. Test
+        descriptions (T-01 through T-15) are thorough.
+
+    code_vs_plan:
+      status: pass
+      notes: >
+        CODE_LEDGER tracks 5 implementation commits plus test commit,
+        matching all 6 PLAN steps. Files modified in each commit match
+        plan specification exactly. ACs covered per commit align with
+        plan coverage matrix. Commit messages follow Conventional Commits.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: bdba1aa
+      step: STEP-01
+      cr: CR-91
+      message: "fix(db): add SECURITY DEFINER to enqueue_speech_notification trigger (CR-91)"
+      files_changed: [supabase/migrations/013_fix_notification_trigger_security_definer.sql]
+      review:
+        correctness: pass
+        notes:
+          - "CREATE OR REPLACE FUNCTION enqueue_speech_notification() with SECURITY DEFINER at line 86"
+          - "Function body is character-for-character identical to 003_notification_triggers.sql (lines 14-85)"
+          - "All 4 status cases preserved: assigned_not_invited (Case 1), assigned_confirmed (Case 4), gave_up (Case 5), not_assigned (cancellation)"
+          - "No DROP/CREATE TRIGGER statement -- existing trigger reuses the replaced function"
+          - "No new policies added to notification_queue (RLS remains without client access)"
+          - "Consistent with list_ward_users RPC precedent in migration 006"
+          - "Header comments explain root cause, fix approach, and precedent"
+        issues: []
+
+    - hash: e091833
+      step: STEP-02
+      cr: CR-92
+      message: "fix(members): change keyExtractor to item.label to fix duplicate key warning (CR-92)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Line 146: keyExtractor={(item) => item.label} -- previously item.code"
+          - "item.label is unique per entry (e.g., 'United States (+1)' vs 'Canada (+1)')"
+          - "Highlighting comparison item.code === countryCode at line 151 unchanged -- correct"
+          - "Single line change, minimal and surgical"
+        issues: []
+
+    - hash: 313dc67
+      step: STEP-03
+      cr: CR-93
+      message: "fix(deeplink): change protocol from wardmanager:// to sacrmeetman:// (CR-93)"
+      files_changed: [app.json, supabase/functions/create-invitation/index.ts]
+      review:
+        correctness: pass
+        notes:
+          - "app.json line 10: scheme is 'sacrmeetman' -- correct"
+          - "create-invitation/index.ts line 170: sacrmeetman://invite/${invitationToken} -- correct"
+          - "ios.bundleIdentifier remains 'com.wardmanager.app' at line 18 -- unchanged"
+          - "android.package remains 'com.wardmanager.app' at line 27 -- unchanged"
+          - "Zero references to wardmanager:// in src/ or supabase/ (only in test negative assertions)"
+        issues: []
+
+    - hash: 1420ed2
+      step: STEP-04
+      cr: CR-95
+      message: "fix(speeches): hide speech slots for all non-speeches types (CR-95)"
+      files_changed: [src/app/(tabs)/speeches.tsx, src/__tests__/cr002-qa.test.ts, src/__tests__/cr001-qa-extended.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "speeches.tsx line 276: (!exception || exception.reason === 'speeches') -- correct new condition"
+          - "isExcludedFromAgenda no longer imported in speeches.tsx -- confirmed via grep"
+          - "agenda.tsx line 25 still imports isExcludedFromAgenda -- no regression"
+          - "agenda.tsx line 165 still uses isExcludedFromAgenda for expandable condition -- correct"
+          - "useAgenda.ts line 43 still exports isExcludedFromAgenda -- function preserved"
+          - "cr002-qa.test.ts line 421-428: updated to check speeches.tsx does NOT contain isExcludedFromAgenda and contains new pattern"
+          - "cr001-qa-extended.test.ts lines 379-386: updated to verify direct type check pattern"
+          - "New condition correctly hides slots for ALL non-speeches types (testimony_meeting, general_conference, stake_conference, ward_conference, primary_presentation, other)"
+          - "Default case (no exception): (!exception || ...) evaluates to true, showing speech slots -- correct"
+        issues: []
+
+    - hash: 7a60ea8
+      step: STEP-05
+      cr: CR-98
+      message: "fix(prayer): add visible/onClose props to PrayerSelector for immediate modal open (CR-98)"
+      files_changed: [src/components/PrayerSelector.tsx, src/components/AgendaForm.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "PrayerSelector.tsx line 7: useEffect imported from React -- correct"
+          - "PrayerSelectorProps lines 40-43: visible?: boolean and onClose?: () => void -- optional props"
+          - "Lines 60-62: useEffect(() => { if (visible) setModalVisible(true); }, [visible]) -- correct sync"
+          - "handleSelectMember line 70: onClose?.() called after setModalVisible(false)"
+          - "handleCustomName line 82: onClose?.() called after setModalVisible(false)"
+          - "Modal onRequestClose line 121: onClose?.() called after setModalVisible(false)"
+          - "Cancel button lines 139-144: onClose?.() called after setModalVisible(false)"
+          - "AgendaForm.tsx line 513: visible={true} passed to PrayerSelector"
+          - "AgendaForm.tsx line 514: onClose={() => setSelectorModal(null)} passed to PrayerSelector"
+          - "Follows ActorSelector pattern exactly (visible prop + onClose callback)"
+          - "Backward compatible: visible and onClose are optional props"
+          - "handleClear line 88: only calls onSelect(null), does NOT call onClose -- correct"
+          - "disabled prop still prevents opening (line 95: !disabled && setModalVisible(true))"
+        issues: []
+
+    - hash: ccb480e
+      step: tests
+      cr: CR-91+CR-92+CR-93+CR-95+CR-98
+      message: "test(batch7-phase1): add tests for F035, F036, F037, F038, F039"
+      files_changed: [src/__tests__/batch7-f035-f039.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "73 tests covering all 31 ACs and 12 edge cases across 5 features"
+          - "F035 tests: verify SECURITY DEFINER keyword, all 4 status cases, no DROP TRIGGER, no new policies"
+          - "F036 tests: verify keyExtractor uses item.label, COUNTRY_CODES has +1/+7 duplicates, labels unique"
+          - "F037 tests: verify scheme=sacrmeetman, deep link sacrmeetman://, zero wardmanager:// refs, unchanged bundleId/package"
+          - "F038 tests: verify no isExcludedFromAgenda import in speeches.tsx, new condition pattern, SundayTypeDropdown presence, agenda.tsx unchanged"
+          - "F039 tests: verify visible/onClose props in PrayerSelectorProps, useEffect sync, onClose calls, AgendaForm passes visible={true}"
+          - "Uses readSourceFile/readProjectFile pattern consistent with existing test conventions"
+          - "All 73 tests pass"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  issues_summary: >
+    No issues found. All 5 bug fixes are clean, minimal, and correct. Each fix
+    alters only the files specified in the PLAN with no unnecessary changes. The
+    SECURITY DEFINER migration preserves the function body exactly. All test
+    updates for the isExcludedFromAgenda removal are correct. The PrayerSelector
+    visible/onClose implementation follows the established ActorSelector pattern
+    consistently. No regressions introduced.
+
+  pending_deploys:
+    - type: "database_migration"
+      description: >
+        Migration 013_fix_notification_trigger_security_definer.sql must be
+        deployed to Supabase to fix the RLS error on notification_queue.
+        This is a function-level change only (no schema changes).
+      must_run_before: "production use of speech designation"
+      instructions: >
+        Run: supabase db push (or apply via Supabase Dashboard).
+        Verify: SELECT proname, prosecdef FROM pg_proc WHERE proname = 'enqueue_speech_notification'
+        Expected: prosecdef = true (SECURITY DEFINER).
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/phases/phase-001.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/CHANGE_REQUESTS.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M013.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P013.yaml"
+      - "docs/qa/QA_PLAN_batch7_phase1.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F035_F039.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: >
+      Git working tree is clean for code files. All code is committed.
+      Documentation files listed above are pending commit by the Orchestrator,
+      which is normal workflow.
+
+  ac_verification:
+    # F035 ACs (CR-91)
+    - ac_id: AC-F035-01
+      description: "Funcao trigger usa SECURITY DEFINER"
+      status: verified
+      evidence: >
+        supabase/migrations/013_fix_notification_trigger_security_definer.sql line 86:
+        $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+    - ac_id: AC-F035-02
+      description: "notification_queue permanece sem policies de client"
+      status: verified
+      evidence: >
+        002_rls_policies.sql line 308: ALTER TABLE notification_queue ENABLE ROW LEVEL SECURITY;
+        Line 310 comment: "No policies = no client access." No INSERT/UPDATE policies
+        for authenticated users. Only service_role and triggers have access.
+
+    - ac_id: AC-F035-03
+      description: "Trigger continua disparando corretamente"
+      status: verified
+      evidence: >
+        Migration 013 function body is identical to 003_notification_triggers.sql.
+        All 4 cases: assigned_not_invited (line 23), assigned_confirmed (line 40),
+        gave_up (line 57), not_assigned cancellation (line 74). No DROP/CREATE TRIGGER.
+
+    - ac_id: AC-F035-04
+      description: "Nenhum dialogo de erro ao designar orador"
+      status: verified
+      evidence: >
+        SECURITY DEFINER makes function execute as owner (postgres), bypassing RLS
+        on notification_queue. INSERT succeeds without RLS error.
+
+    # F036 ACs (CR-92)
+    - ac_id: AC-F036-01
+      description: "FlatList usa key unico para cada pais"
+      status: verified
+      evidence: "members.tsx line 146: keyExtractor={(item) => item.label}"
+
+    - ac_id: AC-F036-02
+      description: "Sem warning de duplicate key no console"
+      status: verified
+      evidence: >
+        item.label is unique per COUNTRY_CODES entry: 'United States (+1)' vs
+        'Canada (+1)', 'Russia (+7)' vs 'Kazakhstan (+7)'.
+
+    - ac_id: AC-F036-03
+      description: "Ambos paises com +1 continuam selecionaveis"
+      status: verified
+      evidence: >
+        COUNTRY_CODES has separate entries for US and Canada. Both render and are
+        selectable via Pressable onPress. keyExtractor ensures unique keys.
+
+    - ac_id: AC-F036-04
+      description: "Ambos paises com +7 continuam selecionaveis"
+      status: verified
+      evidence: >
+        COUNTRY_CODES has separate entries for Russia and Kazakhstan. Same rendering
+        and selection mechanism as +1 entries.
+
+    - ac_id: AC-F036-05
+      description: "Pais selecionado continua sendo destacado"
+      status: verified
+      evidence: >
+        members.tsx line 151: item.code === countryCode && { backgroundColor: colors.primaryContainer }
+        Highlighting comparison unchanged.
+
+    # F037 ACs (CR-93)
+    - ac_id: AC-F037-01
+      description: "app.json usa scheme sacrmeetman"
+      status: verified
+      evidence: "app.json line 10: \"scheme\": \"sacrmeetman\""
+
+    - ac_id: AC-F037-02
+      description: "Edge Function gera deep link com sacrmeetman://"
+      status: verified
+      evidence: >
+        create-invitation/index.ts line 170:
+        const deepLink = `sacrmeetman://invite/${invitationToken}`;
+
+    - ac_id: AC-F037-03
+      description: "Nenhuma referencia a wardmanager:// no codigo fonte"
+      status: verified
+      evidence: >
+        Grep for wardmanager:// in src/ returns 0 non-test matches.
+        Grep for wardmanager:// in supabase/ returns 0 matches.
+        Only references are in test files as negative assertions (not.toContain).
+
+    - ac_id: AC-F037-04
+      description: "Bundle identifier e package Android NAO foram alterados"
+      status: verified
+      evidence: >
+        app.json line 18: "bundleIdentifier": "com.wardmanager.app"
+        app.json line 27: "package": "com.wardmanager.app"
+        Both unchanged.
+
+    # F038 ACs (CR-95)
+    - ac_id: AC-F038-01
+      description: "Speech slots visiveis quando tipo e speeches"
+      status: verified
+      evidence: >
+        speeches.tsx line 276: (!exception || exception.reason === 'speeches')
+        When no exception (null), evaluates to true. When exception.reason === 'speeches',
+        evaluates to true. Speech slots rendered.
+
+    - ac_id: AC-F038-02
+      description: "Speech slots escondidos para testimony_meeting"
+      status: verified
+      evidence: >
+        (!exception || exception.reason === 'speeches') evaluates to false when
+        exception.reason === 'testimony_meeting'.
+
+    - ac_id: AC-F038-03
+      description: "Speech slots escondidos para general_conference"
+      status: verified
+      evidence: "Same condition evaluates to false for general_conference."
+
+    - ac_id: AC-F038-04
+      description: "Speech slots escondidos para stake_conference"
+      status: verified
+      evidence: "Same condition evaluates to false for stake_conference."
+
+    - ac_id: AC-F038-05
+      description: "Speech slots escondidos para ward_conference"
+      status: verified
+      evidence: "Same condition evaluates to false for ward_conference."
+
+    - ac_id: AC-F038-06
+      description: "Speech slots escondidos para primary_presentation"
+      status: verified
+      evidence: "Same condition evaluates to false for primary_presentation."
+
+    - ac_id: AC-F038-07
+      description: "Speech slots escondidos para other"
+      status: verified
+      evidence: "Same condition evaluates to false for other."
+
+    - ac_id: AC-F038-08
+      description: "Dropdown de tipo continua visivel e funcional"
+      status: verified
+      evidence: >
+        SundayTypeDropdown is rendered by SundayCard component, outside the speech
+        slots conditional block in speeches.tsx. Always visible when card is expanded.
+
+    - ac_id: AC-F038-09
+      description: "Trocar de volta para speeches mostra speech slots"
+      status: verified
+      evidence: >
+        When user selects 'speeches' in dropdown, exception.reason changes to 'speeches'.
+        Condition (!exception || exception.reason === 'speeches') evaluates to true.
+        Speech slots re-rendered.
+
+    # F039 ACs (CR-98)
+    - ac_id: AC-F039-01
+      description: "Clicar no campo Oracao de Abertura abre o modal"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 278-279: setSelectorModal({ type: 'prayer', field: 'opening_prayer' })
+        Line 511-513: PrayerSelector rendered with visible={true} when selectorModal.type === 'prayer'.
+        PrayerSelector useEffect opens modal when visible=true.
+
+    - ac_id: AC-F039-02
+      description: "Clicar no campo Oracao de Fechamento abre o modal"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 468-470: setSelectorModal({ type: 'prayer', field: 'closing_prayer' })
+        Same PrayerSelector rendering with visible={true}.
+
+    - ac_id: AC-F039-03
+      description: "Selecionar membro atribui como orador da oracao"
+      status: verified
+      evidence: >
+        PrayerSelector handleSelectMember (line 66-74): calls onSelect with memberId and name,
+        then setModalVisible(false) and onClose(). AgendaForm onSelect handler (lines 522-534)
+        updates agenda via updateAgenda.mutate.
+
+    - ac_id: AC-F039-04
+      description: "Fechar o modal reseta o estado do selectorModal"
+      status: verified
+      evidence: >
+        PrayerSelector onClose calls are made in: cancel button (line 141), onRequestClose
+        (line 121), handleSelectMember (line 70), handleCustomName (line 82).
+        AgendaForm passes onClose={() => setSelectorModal(null)} (line 514).
+
+    - ac_id: AC-F039-05
+      description: "Nome customizado funciona para nao-membros"
+      status: verified
+      evidence: >
+        PrayerSelector handleCustomName (lines 77-85): sets memberId: null, name: trimmed,
+        calls onSelect then onClose.
+
+    - ac_id: AC-F039-06
+      description: "Campos de oracao desabilitados para Observador"
+      status: verified
+      evidence: >
+        PrayerSelector line 95: onPress={() => !disabled && setModalVisible(true)}.
+        AgendaForm line 536: disabled={isObserver} passed to PrayerSelector.
+
+    - ac_id: AC-F039-07
+      description: "PrayerSelector aceita prop visible e onClose"
+      status: verified
+      evidence: >
+        PrayerSelectorProps lines 40-43: visible?: boolean; onClose?: () => void;
+        useEffect lines 60-62: if (visible) setModalVisible(true).
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 9
+    commits_reviewed: 6
+    new_tests: 73
+    new_tests_passing: 73
+    full_suite_tests: 2789
+    full_suite_passing: 2789
+    full_suite_files: 57
     regressions: 0

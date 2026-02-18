@@ -1,7 +1,7 @@
 # =============================================================================
 # QA_CONSOLIDATED.yaml
 # Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
-# CR-87, CR-88, CR-89
+# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98
 # Updated: 2026-02-18
 # =============================================================================
 
@@ -1874,3 +1874,821 @@ cr_89:
     No regressions detected.
 
   issues_for_coder: []
+
+
+# #############################################################################
+# CR-91: Fix RLS policy error on notification_queue (F035)
+# #############################################################################
+
+cr_91:
+  cr_id: CR-91
+  title: "Fix RLS policy error on notification_queue"
+  type: bugfix
+  spec: specs/SPEC_F035_F039.yaml
+  qa_plan: qa/QA_PLAN_batch7_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Bug confirmed via code analysis. enqueue_speech_notification() trigger
+      function (003_notification_triggers.sql:12) does NOT use SECURITY DEFINER.
+      notification_queue has RLS enabled with NO policies (002_rls_policies.sql:308).
+      When the trigger fires on speech status change, the INSERT into notification_queue
+      is blocked by RLS because it runs in the authenticated user's context.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: bdba1aa
+        message: "fix(db): add SECURITY DEFINER to enqueue_speech_notification trigger (CR-91)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2789
+    tester_suite_total: 2789
+
+    must_pass_results:
+
+      - id: MP-F035-01
+        description: "enqueue_speech_notification() function uses SECURITY DEFINER"
+        status: PASSED
+        evidence: |
+          supabase/migrations/013_fix_notification_trigger_security_definer.sql:86:
+            $$ LANGUAGE plpgsql SECURITY DEFINER;
+          CREATE OR REPLACE FUNCTION enqueue_speech_notification() RETURNS TRIGGER
+          now includes SECURITY DEFINER. Function body is identical to original in
+          003_notification_triggers.sql.
+
+      - id: MP-F035-02
+        description: "notification_queue RLS remains enabled with NO client policies"
+        status: PASSED
+        evidence: |
+          supabase/migrations/002_rls_policies.sql:308-310 unchanged:
+            ALTER TABLE notification_queue ENABLE ROW LEVEL SECURITY;
+            -- No policies = no client access. Only service_role key (Edge Functions) can access.
+          No new INSERT policies added for authenticated users.
+
+      - id: MP-F035-03
+        description: "Trigger still fires on speech status changes (INSERT/UPDATE)"
+        status: PASSED
+        evidence: |
+          Migration 013 uses CREATE OR REPLACE FUNCTION (not DROP/CREATE TRIGGER).
+          The existing speech_notification_trigger (003_notification_triggers.sql:88-91)
+          remains unchanged: AFTER INSERT OR UPDATE ON speeches FOR EACH ROW
+          EXECUTE FUNCTION enqueue_speech_notification().
+
+      - id: MP-F035-04
+        description: "Trigger correctly inserts designation notification on assigned_not_invited"
+        status: PASSED
+        evidence: |
+          013_fix_notification_trigger_security_definer.sql:22-36:
+            IF NEW.status = 'assigned_not_invited' THEN
+              INSERT INTO notification_queue (...) VALUES (..., 'designation', ..., 'secretary',
+              'pending', now() + INTERVAL '5 minutes');
+          Identical to original trigger body.
+
+      - id: MP-F035-05
+        description: "Trigger correctly inserts speaker_confirmed notification"
+        status: PASSED
+        evidence: |
+          013_fix_notification_trigger_security_definer.sql:39-53:
+            IF NEW.status = 'assigned_confirmed' ... THEN
+              INSERT INTO notification_queue (...) VALUES (..., 'speaker_confirmed', ...,
+              'secretary_and_bishopric', 'pending', now());
+
+      - id: MP-F035-06
+        description: "Trigger correctly inserts speaker_withdrew notification"
+        status: PASSED
+        evidence: |
+          013_fix_notification_trigger_security_definer.sql:56-70:
+            IF NEW.status = 'gave_up' ... THEN
+              INSERT INTO notification_queue (...) VALUES (..., 'speaker_withdrew', ...,
+              'bishopric', 'pending', now());
+
+      - id: MP-F035-07
+        description: "Trigger correctly cancels pending notifications on not_assigned"
+        status: PASSED
+        evidence: |
+          013_fix_notification_trigger_security_definer.sql:73-81:
+            IF NEW.status = 'not_assigned' ... THEN
+              UPDATE notification_queue SET status = 'cancelled'
+              WHERE ward_id = NEW.ward_id AND sunday_date = NEW.sunday_date
+              AND speech_position = NEW.position AND type = 'designation'
+              AND status = 'pending';
+
+      - id: MP-F035-08
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 57 test files, 2789/2789 tests passed.
+          Zero failures, zero skipped. Includes new batch7 tests.
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-F035-01
+        description: "Assigning a speaker does not produce RLS error"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          With SECURITY DEFINER, enqueue_speech_notification() now runs with the
+          privileges of the function owner (postgres superuser), bypassing RLS on
+          notification_queue. The INSERT will succeed without RLS violation.
+
+      - id: SP-F035-02
+        description: "Error dialog is not shown when assigning a speaker"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          The RLS violation was the root cause of the MutationCache error which
+          triggered the error dialog. With SECURITY DEFINER, no RLS violation occurs,
+          so no error propagates to the mutation cache, and no dialog is shown.
+
+    should_pass_total: 2
+    should_pass_passed: 2
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F035-01
+        title: "Funcao trigger usa SECURITY DEFINER"
+        status: SATISFIED
+        evidence: "Migration 013 line 86: $$ LANGUAGE plpgsql SECURITY DEFINER"
+
+      - id: AC-F035-02
+        title: "notification_queue permanece sem policies de client"
+        status: SATISFIED
+        evidence: "002_rls_policies.sql:308-310 unchanged. No new policies added."
+
+      - id: AC-F035-03
+        title: "Trigger continua disparando corretamente"
+        status: SATISFIED
+        evidence: "CREATE OR REPLACE preserves existing trigger. All 4 status cases preserved."
+
+      - id: AC-F035-04
+        title: "Nenhum dialogo de erro exibido ao designar orador"
+        status: SATISFIED
+        evidence: "RLS violation eliminated by SECURITY DEFINER. No error propagation."
+
+  verdict: passed
+  verdict_rationale: |
+    All 8 must_pass checks passed. All 2 should_pass checks passed (by analysis).
+    All 4 acceptance criteria satisfied. Migration 013 adds SECURITY DEFINER to
+    the trigger function without modifying the trigger itself (CREATE OR REPLACE).
+    Function body identical to original. notification_queue RLS unchanged.
+    2789/2789 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-92: Fix duplicate key error in country dropdown (F036)
+# #############################################################################
+
+cr_92:
+  cr_id: CR-92
+  title: "Fix duplicate key error in country dropdown"
+  type: bugfix
+  spec: specs/SPEC_F035_F039.yaml
+  qa_plan: qa/QA_PLAN_batch7_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Bug confirmed. FlatList keyExtractor at members.tsx:146 used item.code which
+      is not unique (+1 for US/CA, +7 for RU/KZ). Error message ".$+7" confirms
+      the +7 duplicate.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: e091833
+        message: "fix(members): change keyExtractor to item.label (CR-92)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2789
+    tester_suite_total: 2789
+
+    must_pass_results:
+
+      - id: MP-F036-01
+        description: "FlatList keyExtractor uses a unique key for each country code entry"
+        status: PASSED
+        evidence: |
+          members.tsx:146: keyExtractor={(item) => item.label}
+          Changed from item.code to item.label. All 172 labels in COUNTRY_CODES are
+          unique (e.g., 'United States (+1)' vs 'Canada (+1)').
+
+      - id: MP-F036-02
+        description: "No duplicate key warning when opening country code picker"
+        status: PASSED
+        evidence: |
+          All labels verified unique via test (batch7-f035-f039.test.ts AC-F036-02).
+          172 entries, 172 unique labels. No duplicate keys possible.
+
+      - id: MP-F036-03
+        description: "Both US (+1) and Canada (+1) are still selectable"
+        status: PASSED
+        evidence: |
+          countryCodes.ts has both 'United States (+1)' and 'Canada (+1)' entries.
+          FlatList renders all entries. onPress sets countryCode to item.code ('+1'
+          for both). Both entries render and can be selected independently.
+
+      - id: MP-F036-04
+        description: "Both Russia (+7) and Kazakhstan (+7) are still selectable"
+        status: PASSED
+        evidence: |
+          countryCodes.ts has both 'Russia (+7)' and 'Kazakhstan (+7)' entries.
+          Same pattern as US/CA. Both selectable with item.code '+7'.
+
+      - id: MP-F036-05
+        description: "Selected country code is still highlighted correctly"
+        status: PASSED
+        evidence: |
+          members.tsx:151: item.code === countryCode && { backgroundColor: colors.primaryContainer }
+          Highlighting comparison unchanged - still uses item.code for visual highlighting.
+          Note: both US and Canada highlight when +1 is selected (acceptable per EC-F036-01).
+
+      - id: MP-F036-06
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 57 test files, 2789/2789 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 6
+    must_pass_passed: 6
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-F036-01
+        description: "Country code picker scrolls and renders smoothly"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          keyExtractor change from item.code to item.label has no performance impact.
+          item.label is a string, same as item.code. FlatList rendering unchanged.
+          Virtualized list handles 172 items efficiently.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F036-01
+        title: "FlatList usa key unico para cada pais"
+        status: SATISFIED
+        evidence: "keyExtractor={(item) => item.label}. All 172 labels unique."
+
+      - id: AC-F036-02
+        title: "Sem warning de duplicate key no console"
+        status: SATISFIED
+        evidence: "Labels unique, so no duplicate key React warning."
+
+      - id: AC-F036-03
+        title: "Ambos paises com +1 continuam selecionaveis"
+        status: SATISFIED
+        evidence: "US and Canada both render and can be selected."
+
+      - id: AC-F036-04
+        title: "Ambos paises com +7 continuam selecionaveis"
+        status: SATISFIED
+        evidence: "Russia and Kazakhstan both render and can be selected."
+
+      - id: AC-F036-05
+        title: "Pais selecionado continua sendo destacado"
+        status: SATISFIED
+        evidence: "item.code === countryCode comparison preserved for highlighting."
+
+  verdict: passed
+  verdict_rationale: |
+    All 6 must_pass checks passed. All 1 should_pass checks passed (by analysis).
+    All 5 acceptance criteria satisfied. Single-line fix: keyExtractor changed from
+    item.code to item.label. 172 unique labels confirmed. Highlighting unchanged.
+    2789/2789 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-93: Change deep link protocol to sacrmeetman:// (F037)
+# #############################################################################
+
+cr_93:
+  cr_id: CR-93
+  title: "Change deep link protocol to sacrmeetman://"
+  type: bugfix
+  spec: specs/SPEC_F035_F039.yaml
+  qa_plan: qa/QA_PLAN_batch7_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Protocol change needed in 2 locations: app.json (scheme) and
+      create-invitation Edge Function (deep link construction).
+      Custom URL schemes don't work in Expo Go (expected behavior).
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 313dc67
+        message: "fix(deeplink): change protocol wardmanager -> sacrmeetman (CR-93)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2789
+    tester_suite_total: 2789
+
+    must_pass_results:
+
+      - id: MP-F037-01
+        description: "app.json scheme is 'sacrmeetman'"
+        status: PASSED
+        evidence: |
+          app.json:10: "scheme": "sacrmeetman"
+          Changed from "wardmanager" to "sacrmeetman".
+
+      - id: MP-F037-02
+        description: "create-invitation Edge Function uses sacrmeetman:// protocol"
+        status: PASSED
+        evidence: |
+          supabase/functions/create-invitation/index.ts:170:
+            const deepLink = `sacrmeetman://invite/${invitationToken}`;
+          Changed from wardmanager:// to sacrmeetman://.
+
+      - id: MP-F037-03
+        description: "No remaining references to wardmanager:// in source code"
+        status: PASSED
+        evidence: |
+          Grep for 'wardmanager://' in src/: Only hits are in test files
+          (batch7-f035-f039.test.ts) that verify wardmanager:// is NOT present.
+          No non-test source files contain wardmanager://.
+          Grep for 'wardmanager://' in supabase/: Zero matches.
+
+      - id: MP-F037-04
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 57 test files, 2789/2789 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 4
+    must_pass_passed: 4
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-F037-01
+        description: "iOS bundle identifier unchanged"
+        status: PASSED
+        evidence: |
+          app.json:18: "bundleIdentifier": "com.wardmanager.app"
+          Unchanged. Bundle identifier is a build config, not a URL scheme.
+
+      - id: SP-F037-02
+        description: "Android package unchanged"
+        status: PASSED
+        evidence: |
+          app.json:26: "package": "com.wardmanager.app"
+          Unchanged.
+
+    should_pass_total: 2
+    should_pass_passed: 2
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F037-01
+        title: "app.json usa scheme sacrmeetman"
+        status: SATISFIED
+        evidence: "app.json:10 'scheme': 'sacrmeetman'"
+
+      - id: AC-F037-02
+        title: "Edge Function gera deep link com sacrmeetman://"
+        status: SATISFIED
+        evidence: "create-invitation/index.ts:170 uses sacrmeetman://invite/"
+
+      - id: AC-F037-03
+        title: "Nenhuma referencia a wardmanager:// no codigo fonte"
+        status: SATISFIED
+        evidence: "Zero non-test references in src/ and supabase/ directories."
+
+      - id: AC-F037-04
+        title: "Bundle identifier e package Android NAO foram alterados"
+        status: SATISFIED
+        evidence: "ios.bundleIdentifier and android.package both unchanged."
+
+  verdict: passed
+  verdict_rationale: |
+    All 4 must_pass checks passed. All 2 should_pass checks passed.
+    All 4 acceptance criteria satisfied. Two-file change: app.json scheme and
+    Edge Function deep link. Zero remaining wardmanager:// references in source.
+    Bundle identifier and Android package unchanged.
+    2789/2789 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-95: Fix speech fields not hiding on sunday type change (F038)
+# #############################################################################
+
+cr_95:
+  cr_id: CR-95
+  title: "Fix speech fields not hiding when changing sunday type"
+  type: bugfix
+  spec: specs/SPEC_F035_F039.yaml
+  qa_plan: qa/QA_PLAN_batch7_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Bug confirmed. speeches.tsx:277 used isExcludedFromAgenda() which only
+      returns true for general_conference and stake_conference. Other non-speech
+      types (testimony_meeting, ward_conference, primary_presentation, other)
+      did NOT hide speech slots.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 1420ed2
+        message: "fix(speeches): hide speech slots for non-speeches types (CR-95)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2789
+    tester_suite_total: 2789
+
+    must_pass_results:
+
+      - id: MP-F038-01
+        description: "Speech slots visible when sunday type is 'speeches'"
+        status: PASSED
+        evidence: |
+          speeches.tsx:276: (!exception || exception.reason === 'speeches')
+          When exception is null (default = speeches) or exception.reason === 'speeches',
+          the condition is true and [1, 2, 3].map renders speech slots.
+
+      - id: MP-F038-02
+        description: "Speech slots hidden when sunday type is 'testimony_meeting'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'testimony_meeting', the condition
+          (!exception || exception.reason === 'speeches') evaluates to
+          (false || false) = false. Speech slots not rendered.
+
+      - id: MP-F038-03
+        description: "Speech slots hidden when sunday type is 'general_conference'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'general_conference', condition is false.
+          Speech slots not rendered.
+
+      - id: MP-F038-04
+        description: "Speech slots hidden when sunday type is 'stake_conference'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'stake_conference', condition is false.
+          Speech slots not rendered.
+
+      - id: MP-F038-05
+        description: "Speech slots hidden when sunday type is 'ward_conference'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'ward_conference', condition is false.
+          Speech slots not rendered. (Previously NOT hidden - this was the bug.)
+
+      - id: MP-F038-06
+        description: "Speech slots hidden when sunday type is 'primary_presentation'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'primary_presentation', condition is false.
+          Speech slots not rendered. (Previously NOT hidden - this was the bug.)
+
+      - id: MP-F038-07
+        description: "Speech slots hidden when sunday type is 'other'"
+        status: PASSED
+        evidence: |
+          When exception.reason = 'other', condition is false.
+          Speech slots not rendered. (Previously NOT hidden - this was the bug.)
+
+      - id: MP-F038-08
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 57 test files, 2789/2789 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-F038-01
+        description: "Type dropdown remains visible and functional when expanded"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          SundayCard.tsx renders SundayTypeDropdown inside the expanded block
+          independent of the children (speech slots). The dropdown is always
+          visible when the card is expanded, regardless of sunday type.
+
+      - id: SP-F038-02
+        description: "Changing type back to 'speeches' shows speech slots again"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          speeches.tsx:276: (!exception || exception.reason === 'speeches')
+          When user changes type back to 'speeches', exception.reason becomes
+          'speeches', condition is true, and [1, 2, 3].map renders speech slots.
+
+    should_pass_total: 2
+    should_pass_passed: 2
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F038-01
+        title: "Speech slots visiveis quando tipo e 'speeches'"
+        status: SATISFIED
+        evidence: "(!exception || exception.reason === 'speeches') is true for speeches."
+
+      - id: AC-F038-02
+        title: "Speech slots escondidos para testimony_meeting"
+        status: SATISFIED
+        evidence: "Condition is false for testimony_meeting."
+
+      - id: AC-F038-03
+        title: "Speech slots escondidos para general_conference"
+        status: SATISFIED
+        evidence: "Condition is false for general_conference."
+
+      - id: AC-F038-04
+        title: "Speech slots escondidos para stake_conference"
+        status: SATISFIED
+        evidence: "Condition is false for stake_conference."
+
+      - id: AC-F038-05
+        title: "Speech slots escondidos para ward_conference"
+        status: SATISFIED
+        evidence: "Condition is false for ward_conference."
+
+      - id: AC-F038-06
+        title: "Speech slots escondidos para primary_presentation"
+        status: SATISFIED
+        evidence: "Condition is false for primary_presentation."
+
+      - id: AC-F038-07
+        title: "Speech slots escondidos para other"
+        status: SATISFIED
+        evidence: "Condition is false for other."
+
+      - id: AC-F038-08
+        title: "Dropdown de tipo continua visivel e funcional"
+        status: SATISFIED
+        evidence: "SundayTypeDropdown independent of speech slots rendering."
+
+      - id: AC-F038-09
+        title: "Trocar de volta para speeches mostra speech slots"
+        status: SATISFIED
+        evidence: "Condition evaluates to true when reason is 'speeches'."
+
+  regression_check: |
+    isExcludedFromAgenda is no longer imported or used in speeches.tsx.
+    Verified: speeches.tsx does not contain 'isExcludedFromAgenda'.
+    isExcludedFromAgenda still exists in useAgenda.ts and is still used correctly
+    in agenda.tsx for the expandable check (different purpose).
+
+  verdict: passed
+  verdict_rationale: |
+    All 8 must_pass checks passed. All 2 should_pass checks passed (by analysis).
+    All 9 acceptance criteria satisfied. Condition changed from
+    !(exception && isExcludedFromAgenda(exception.reason)) to
+    (!exception || exception.reason === 'speeches'). This correctly hides speech
+    slots for ALL non-speech types, not just general_conference and stake_conference.
+    isExcludedFromAgenda removed from speeches.tsx import. agenda.tsx usage unchanged.
+    2789/2789 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-98: Fix prayer fields not clickable (F039)
+# #############################################################################
+
+cr_98:
+  cr_id: CR-98
+  title: "Fix prayer fields not clickable"
+  type: bugfix
+  spec: specs/SPEC_F035_F039.yaml
+  qa_plan: qa/QA_PLAN_batch7_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Bug confirmed. PrayerSelector did not accept visible/onClose props.
+      When rendered by AgendaForm, its internal modalVisible state started as
+      false, so the modal never auto-opened. User had to find and click a second
+      button at the bottom of the form. Other selectors (ActorSelector,
+      HymnSelectorModal) received visible={true} and opened immediately.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 7a60ea8
+        message: "fix(prayer): add visible/onClose props to PrayerSelector (CR-98)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2789
+    tester_suite_total: 2789
+
+    must_pass_results:
+
+      - id: MP-F039-01
+        description: "Clicking 'Opening Prayer' field opens the member selector modal"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:513: PrayerSelector rendered with visible={true} when
+          selectorModal.type === 'prayer'.
+          PrayerSelector.tsx:60-62: useEffect(() => { if (visible) setModalVisible(true); }, [visible]);
+          When visible={true}, the modal opens immediately via the useEffect.
+
+      - id: MP-F039-02
+        description: "Clicking 'Closing Prayer' field opens the member selector modal"
+        status: PASSED
+        evidence: |
+          Same mechanism as opening prayer. selectorModal.field determines which
+          prayer field is being edited. Both use the same PrayerSelector with visible={true}.
+
+      - id: MP-F039-03
+        description: "Selecting a member from the modal assigns them as prayer person"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:66-74: handleSelectMember calls onSelect with member data,
+          then setModalVisible(false), onClose?.().
+          AgendaForm.tsx:522-533: onSelect callback calls updateAgenda.mutate().
+
+      - id: MP-F039-04
+        description: "Closing the modal resets the selector state"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:514: onClose={() => setSelectorModal(null)}
+          All close paths (selection, cancel, back) call onClose to reset state.
+
+      - id: MP-F039-05
+        description: "Custom name option works for non-member prayer persons"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:77-85: handleCustomName calls
+          onSelect({ memberId: null, name: trimmed }), then closes modal.
+
+      - id: MP-F039-06
+        description: "Prayer fields are disabled for Observer role"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:536: disabled={isObserver} passed to PrayerSelector.
+          PrayerSelector.tsx:95: onPress={() => !disabled && setModalVisible(true)).
+
+      - id: MP-F039-07
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 57 test files, 2789/2789 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 7
+    must_pass_passed: 7
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-F039-01
+        description: "Clear button (x) on prayer field works to remove assignment"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          PrayerSelector.tsx:87-89: handleClear calls onSelect(null).
+
+      - id: SP-F039-02
+        description: "Search functionality works in prayer selector modal"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          PrayerSelector.tsx:64: useMembers(search) fetches filtered members.
+          SearchInput with autoFocus for immediate search.
+
+      - id: SP-F039-03
+        description: "Prayer selector follows same UX pattern as other selectors"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          PrayerSelector now accepts visible and onClose props (lines 41-43),
+          matching ActorSelector and HymnSelectorModal pattern.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F039-01
+        title: "Clicar no campo Oracao de Abertura abre o modal"
+        status: SATISFIED
+        evidence: "visible={true} + useEffect opens modal immediately."
+
+      - id: AC-F039-02
+        title: "Clicar no campo Oracao de Fechamento abre o modal"
+        status: SATISFIED
+        evidence: "Same mechanism via selectorModal.field = 'closing_prayer'."
+
+      - id: AC-F039-03
+        title: "Selecionar membro atribui como orador da oracao"
+        status: SATISFIED
+        evidence: "handleSelectMember calls onSelect, updateAgenda.mutate fires."
+
+      - id: AC-F039-04
+        title: "Fechar o modal reseta o estado"
+        status: SATISFIED
+        evidence: "onClose={() => setSelectorModal(null)} on all close paths."
+
+      - id: AC-F039-05
+        title: "Nome customizado funciona para nao-membros"
+        status: SATISFIED
+        evidence: "handleCustomName calls onSelect({ memberId: null, name: trimmed })."
+
+      - id: AC-F039-06
+        title: "Campos de oracao desabilitados para Observador"
+        status: SATISFIED
+        evidence: "disabled={isObserver} prevents modal opening."
+
+      - id: AC-F039-07
+        title: "PrayerSelector aceita prop visible e onClose"
+        status: SATISFIED
+        evidence: "visible?: boolean and onClose?: () => void in PrayerSelectorProps."
+
+  verdict: passed
+  verdict_rationale: |
+    All 7 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    All 7 acceptance criteria satisfied. PrayerSelector now accepts visible and
+    onClose props, matching ActorSelector and HymnSelectorModal pattern.
+    useEffect syncs internal modalVisible state with external visible prop.
+    All close paths call onClose to reset state.
+    2789/2789 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CROSS-CUTTING: Batch 7 Phase 1
+# #############################################################################
+
+batch7_phase1_cross_cutting:
+  - id: CC-B7P1-01
+    description: "All 5 fixes do not conflict with each other"
+    status: PASSED
+    evidence: |
+      F035: supabase/migrations/013_fix_notification_trigger_security_definer.sql (new file)
+      F036: src/app/(tabs)/settings/members.tsx (keyExtractor line only)
+      F037: app.json + supabase/functions/create-invitation/index.ts
+      F038: src/app/(tabs)/speeches.tsx (rendering condition only)
+      F039: src/components/PrayerSelector.tsx + src/components/AgendaForm.tsx
+      Zero file overlap between any pair of fixes.
+
+  - id: CC-B7P1-02
+    description: "Full test suite passes after all fixes"
+    status: PASSED
+    evidence: |
+      npx vitest run: 57 test files, 2789/2789 tests passed.
+      Zero failures, zero skipped. 73 new tests added for batch7.
+
+  - id: CC-B7P1-03
+    description: "No new dependencies introduced"
+    status: PASSED
+    evidence: |
+      All fixes use existing code patterns. No package.json changes.
+      New migration file follows existing migration numbering convention (013).

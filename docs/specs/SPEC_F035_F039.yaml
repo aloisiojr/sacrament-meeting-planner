@@ -1,0 +1,692 @@
+# =============================================================================
+# SPEC_F035_F039.yaml
+# Specification for Batch 7 Phase 1 - Bug Fixes
+# Features: F035, F036, F037, F038, F039
+# CRs: CR-91, CR-92, CR-93, CR-95, CR-98
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 7
+phase: 1
+created: "2026-02-18"
+last_updated: "2026-02-18"
+
+features:
+
+  # ===========================================================================
+  # F035 / CR-91: Fix RLS policy error on notification_queue
+  # ===========================================================================
+
+  - id: F035
+    name: "Fix RLS policy error on notification_queue"
+    cr_id: 91
+    type: bugfix
+    priority: critical
+
+    description: >
+      Ao designar um orador na aba Discursos, o trigger
+      enqueue_speech_notification() tenta inserir na tabela notification_queue,
+      mas a RLS bloqueia a operacao porque nao ha policies para usuarios
+      autenticados. Resultado: erro "new row violates row-level security policy
+      for table 'notification_queue'" e dialogo de erro visivel ao usuario.
+
+    user_report: >
+      "Quando eu designei um orador, eu recebi esse erro no console:
+      ERROR [MutationCache] Error: new row violates row-level security policy
+      for table 'notification_queue'. Ja na tela apareceu um dialogo mostrando:
+      'Erro. Falha ao Salvar. Verifique sua conexao e tente novamente.'"
+
+    root_cause: >
+      A funcao de trigger enqueue_speech_notification() (003_notification_triggers.sql:12)
+      nao usa SECURITY DEFINER. Quando o trigger e disparado por um UPDATE na
+      tabela speeches feito por um usuario autenticado, o INSERT na notification_queue
+      executa no contexto de seguranca desse usuario. Como notification_queue tem
+      RLS habilitada SEM policies (002_rls_policies.sql:308-310), o INSERT e bloqueado.
+
+    fix_approach: >
+      Adicionar SECURITY DEFINER a funcao enqueue_speech_notification() para que
+      execute com privilegios do owner (superuser), ignorando RLS na
+      notification_queue. Esta e a abordagem correta porque: (1) o trigger e
+      logica server-side, nao codigo client; (2) notification_queue deve
+      permanecer inacessivel a clientes; (3) apenas o trigger e Edge Functions
+      (com service_role key) devem escrever nela.
+
+    acceptance_criteria:
+      - id: AC-F035-01
+        description: "Funcao trigger usa SECURITY DEFINER"
+        given: "A funcao enqueue_speech_notification() existe no banco"
+        when: "Um arquivo de migracao (novo ou alterado) define a funcao"
+        then: "A definicao inclui SECURITY DEFINER"
+        status: pending
+
+      - id: AC-F035-02
+        description: "Tabela notification_queue permanece sem policies de client"
+        given: "notification_queue tem RLS habilitada"
+        when: "Verificamos as policies da tabela"
+        then: "Nao ha policies para authenticated users (somente service_role/trigger tem acesso)"
+        status: pending
+
+      - id: AC-F035-03
+        description: "Trigger continua disparando corretamente em mudancas de status de discursos"
+        given: "Um discurso muda de status"
+        when: "O trigger speech_notification_trigger dispara"
+        then: "Insere/cancela corretamente na notification_queue sem erro de RLS"
+        status: pending
+
+      - id: AC-F035-04
+        description: "Nenhum dialogo de erro exibido ao designar orador"
+        given: "Usuario com permissao de designar oradores"
+        when: "Designa um orador na aba Discursos"
+        then: "A designacao e salva com sucesso, sem dialogo de erro"
+        status: pending
+
+    edge_cases:
+      - id: EC-F035-01
+        case: "Trigger com status assigned_not_invited (designation notification)"
+        expected: "INSERT na notification_queue funciona sem erro de RLS"
+        status: pending
+      - id: EC-F035-02
+        case: "Trigger com status assigned_confirmed (speaker_confirmed notification)"
+        expected: "INSERT na notification_queue funciona sem erro de RLS"
+        status: pending
+      - id: EC-F035-03
+        case: "Trigger com status gave_up (speaker_withdrew notification)"
+        expected: "INSERT na notification_queue funciona sem erro de RLS"
+        status: pending
+      - id: EC-F035-04
+        case: "Trigger com status not_assigned (cancellation)"
+        expected: "UPDATE na notification_queue funciona sem erro de RLS"
+        status: pending
+
+    files_impacted:
+      - path: "supabase/migrations/003_notification_triggers.sql"
+        change: "Adicionar SECURITY DEFINER a funcao enqueue_speech_notification()"
+        alternative: "Ou criar nova migracao que altera a funcao"
+
+    dependencies: []
+    related_features: [F017]
+    related_crs: []
+
+  # ===========================================================================
+  # F036 / CR-92: Fix duplicate key error in country dropdown
+  # ===========================================================================
+
+  - id: F036
+    name: "Fix duplicate key error in country dropdown"
+    cr_id: 92
+    type: bugfix
+    priority: low
+
+    description: >
+      Ao abrir o dropdown de codigos de pais no MemberEditor, React loga um
+      warning de "duplicate key" porque o keyExtractor usa item.code, mas
+      existem codigos duplicados legitimos na lista COUNTRY_CODES: +1 (US e
+      Canada) e +7 (Russia e Kazakhstan).
+
+    user_report: >
+      "Quando eu cliquei no dropbox dos paises, recebi esse erro no console:
+      ERROR Encountered two children with the same key, `%s`. Keys should be
+      unique so that components maintain their identity across updates."
+
+    root_cause: >
+      FlatList em members.tsx:144-146 usa keyExtractor={(item) => item.code}.
+      COUNTRY_CODES em src/lib/countryCodes.ts tem entradas legitimas com
+      codigos duplicados: +1 (United States e Canada, NANP compartilhado)
+      e +7 (Russia e Kazakhstan). O erro referencia ".$+7" confirmando
+      a duplicata.
+
+    fix_approach: >
+      Alterar keyExtractor para usar item.label (que e unico, ex: "United States (+1)"
+      vs "Canada (+1)") ou um identificador baseado em indice. item.label e preferido
+      por ser estavel e unico.
+
+    acceptance_criteria:
+      - id: AC-F036-01
+        description: "FlatList usa key unico para cada pais"
+        given: "FlatList renderiza COUNTRY_CODES no modal de selecao de pais"
+        when: "O modal e aberto"
+        then: "keyExtractor retorna valor unico para cada entrada (nao item.code)"
+        status: pending
+
+      - id: AC-F036-02
+        description: "Sem warning de duplicate key no console"
+        given: "COUNTRY_CODES contem entradas com codigos duplicados (+1, +7)"
+        when: "O modal de selecao de pais e aberto"
+        then: "Nenhum warning 'Encountered two children with the same key' no console"
+        status: pending
+
+      - id: AC-F036-03
+        description: "Ambos paises com +1 continuam selecionaveis"
+        given: "US e Canada compartilham +1"
+        when: "Usuario abre modal e seleciona cada um"
+        then: "Ambos renderizam e sao selecionaveis separadamente"
+        status: pending
+
+      - id: AC-F036-04
+        description: "Ambos paises com +7 continuam selecionaveis"
+        given: "Russia e Kazakhstan compartilham +7"
+        when: "Usuario abre modal e seleciona cada um"
+        then: "Ambos renderizam e sao selecionaveis separadamente"
+        status: pending
+
+      - id: AC-F036-05
+        description: "Pais selecionado continua sendo destacado corretamente"
+        given: "Um pais esta selecionado"
+        when: "O modal de selecao e aberto"
+        then: "O pais selecionado aparece com backgroundColor primaryContainer"
+        status: pending
+
+    edge_cases:
+      - id: EC-F036-01
+        case: "Selecionar Canada (+1) quando US (+1) ja esta selecionado"
+        expected: "O code muda para +1 mas o highlighting visual mostra Canada como selecionado"
+        note: "A comparacao de highlighting usa item.code === countryCode, o que pode causar ambiguidade visual. Isso e aceitavel - o fix foca em remover o warning de duplicate key."
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "Alterar keyExtractor de item.code para item.label"
+        line: 146
+
+    dependencies: []
+    related_features: [F003, F029]
+    related_crs: [85]
+
+  # ===========================================================================
+  # F037 / CR-93: Change deep link protocol to sacrmeetman://
+  # ===========================================================================
+
+  - id: F037
+    name: "Change deep link protocol to sacrmeetman://"
+    cr_id: 93
+    type: bugfix
+    priority: medium
+
+    description: >
+      O protocolo de deep link do app esta configurado como wardmanager://
+      mas o usuario precisa que seja sacrmeetman://. A alteracao e necessaria
+      em dois locais: app.json (scheme do Expo) e create-invitation Edge
+      Function (construcao do deep link).
+
+    user_report: >
+      "Quando vou convidar um usuario novo: 1. O protocolo esta wardmanager://
+      eu preciso que seja sacrmeetman:// 2. O link nao funciona, isso e pq
+      nao e um app e sim Expo Go?"
+
+    root_cause: >
+      O scheme do app esta configurado como "wardmanager" em app.json:10, e
+      a Edge Function create-invitation constroi o deep link como
+      wardmanager://invite/${token} em index.ts:170. O usuario deseja
+      que o protocolo seja sacrmeetman://.
+
+    fix_approach: >
+      1. Alterar app.json "scheme" de "wardmanager" para "sacrmeetman".
+      2. Alterar create-invitation Edge Function para usar sacrmeetman://.
+      3. Nenhuma mudanca client-side necessaria (expo-linking le o scheme
+      de app.json automaticamente).
+      NOTA: Deep links com custom URL schemes NAO funcionam no Expo Go;
+      apenas em builds standalone (EAS Build). Isso e comportamento esperado.
+
+    acceptance_criteria:
+      - id: AC-F037-01
+        description: "app.json usa scheme sacrmeetman"
+        given: "O arquivo app.json define o scheme do app"
+        when: "Verificamos o valor do campo scheme"
+        then: "O valor e 'sacrmeetman'"
+        status: pending
+
+      - id: AC-F037-02
+        description: "Edge Function gera deep link com sacrmeetman://"
+        given: "A Edge Function create-invitation gera um deep link"
+        when: "Um convite e criado"
+        then: "O deep link gerado e sacrmeetman://invite/${token}"
+        status: pending
+
+      - id: AC-F037-03
+        description: "Nenhuma referencia a wardmanager:// no codigo fonte"
+        given: "O protocolo foi alterado"
+        when: "Buscamos por wardmanager:// em src/ e supabase/"
+        then: "Zero resultados encontrados"
+        status: pending
+
+      - id: AC-F037-04
+        description: "Bundle identifier e package Android NAO foram alterados"
+        given: "ios.bundleIdentifier e android.package sao config de build"
+        when: "Verificamos app.json"
+        then: "ios.bundleIdentifier e android.package permanecem inalterados"
+        status: pending
+
+    edge_cases:
+      - id: EC-F037-01
+        case: "Links existentes com wardmanager:// gerados antes da mudanca"
+        expected: "Links antigos nao funcionarao com o novo scheme. Isso e aceitavel pois convites expiram em 30 dias."
+        status: pending
+      - id: EC-F037-02
+        case: "Deep links no Expo Go"
+        expected: "NAO funcionam (comportamento esperado - custom URL schemes so funcionam em builds standalone)"
+        status: pending
+
+    files_impacted:
+      - path: "app.json"
+        change: "Alterar 'scheme' de 'wardmanager' para 'sacrmeetman'"
+        line: 10
+      - path: "supabase/functions/create-invitation/index.ts"
+        change: "Alterar deep link de wardmanager:// para sacrmeetman://"
+        line: 170
+
+    dependencies: []
+    related_features: [F001, F018]
+    related_crs: []
+
+  # ===========================================================================
+  # F038 / CR-95: Fix speech fields not hiding on sunday type change
+  # ===========================================================================
+
+  - id: F038
+    name: "Fix speech fields not hiding when changing sunday type"
+    cr_id: 95
+    type: bugfix
+    priority: high
+
+    description: >
+      Na aba Discursos, ao mudar o tipo de domingo de "Discursos" para qualquer
+      outro tipo (ex: Reuniao de Testemunho), os campos de designacao de
+      discursantes (posicoes 1, 2, 3) continuam visiveis quando deveriam
+      desaparecer. Apenas Conferencia Geral e Conferencia de Estaca escondem
+      os campos.
+
+    user_report: >
+      "Quando eu abro um domingo na aba Discursos com 'Domingo de Discursos'
+      selecionado e seleciono outra opcao, as opcoes de designacao de 1, 2 e 3
+      discursantes e temas nao some, como deveria."
+
+    root_cause: >
+      Em speeches.tsx:276-278, a renderizacao dos speech slots usa
+      isExcludedFromAgenda(exception.reason) como filtro. Essa funcao
+      (useAgenda.ts:43) so retorna true para 'general_conference' e
+      'stake_conference'. Para os demais tipos nao-discursos (testimony_meeting,
+      ward_conference, primary_presentation, other), a funcao retorna false,
+      e os speech slots continuam visiveis. O correto e: speech slots devem
+      aparecer SOMENTE quando o tipo e 'speeches'.
+
+    fix_approach: >
+      Alterar a condicao em speeches.tsx:277 para verificar se o tipo atual
+      e 'speeches' ao inves de usar isExcludedFromAgenda. A nova condicao:
+      {isExpanded && isSpeechesType && [1, 2, 3].map(...)}
+      onde isSpeechesType = !exception || exception.reason === 'speeches'.
+      Isso garante que para QUALQUER tipo diferente de 'speeches', os slots
+      de discurso nao aparecem.
+
+    acceptance_criteria:
+      - id: AC-F038-01
+        description: "Speech slots visiveis quando tipo e 'speeches'"
+        given: "Card de domingo expandido com tipo 'speeches'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso sao renderizadas"
+        status: pending
+
+      - id: AC-F038-02
+        description: "Speech slots escondidos quando tipo e 'testimony_meeting'"
+        given: "Card de domingo expandido com tipo alterado para 'testimony_meeting'"
+        when: "O tipo e alterado no dropdown"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-03
+        description: "Speech slots escondidos quando tipo e 'general_conference'"
+        given: "Card de domingo expandido com tipo 'general_conference'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-04
+        description: "Speech slots escondidos quando tipo e 'stake_conference'"
+        given: "Card de domingo expandido com tipo 'stake_conference'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-05
+        description: "Speech slots escondidos quando tipo e 'ward_conference'"
+        given: "Card de domingo expandido com tipo 'ward_conference'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-06
+        description: "Speech slots escondidos quando tipo e 'primary_presentation'"
+        given: "Card de domingo expandido com tipo 'primary_presentation'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-07
+        description: "Speech slots escondidos quando tipo e 'other'"
+        given: "Card de domingo expandido com tipo 'other'"
+        when: "O card esta expandido"
+        then: "As posicoes 1, 2, 3 de discurso NAO sao renderizadas"
+        status: pending
+
+      - id: AC-F038-08
+        description: "Dropdown de tipo continua visivel e funcional"
+        given: "Card de domingo expandido"
+        when: "Independente do tipo selecionado"
+        then: "SundayTypeDropdown e renderizado e funcional"
+        status: pending
+
+      - id: AC-F038-09
+        description: "Trocar de volta para 'speeches' mostra speech slots novamente"
+        given: "Card de domingo com tipo nao-speeches"
+        when: "Usuario seleciona 'speeches' no dropdown"
+        then: "As posicoes 1, 2, 3 reaparecem"
+        status: pending
+
+    edge_cases:
+      - id: EC-F038-01
+        case: "Domingo sem excecao registrada (default = speeches)"
+        expected: "Speech slots visiveis (exception == null => tipo e 'speeches')"
+        status: pending
+      - id: EC-F038-02
+        case: "Mudar tipo com discursos ja designados"
+        expected: "Speech slots desaparecem (discursos existentes nao sao afetados no DB, regra BR-08 trata separadamente)"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/speeches.tsx"
+        change: "Alterar condicao de renderizacao de speech slots para verificar tipo === 'speeches'"
+        line: 276-278
+
+    dependencies: []
+    related_features: [F007, F008]
+    related_crs: [6, 7, 56]
+    notes: >
+      Esta correcao pode impactar testes existentes que verificam o uso de
+      isExcludedFromAgenda em speeches.tsx. Os testes devem ser atualizados
+      para refletir a nova logica.
+
+  # ===========================================================================
+  # F039 / CR-98: Fix prayer fields not clickable
+  # ===========================================================================
+
+  - id: F039
+    name: "Fix prayer fields not clickable"
+    cr_id: 98
+    type: bugfix
+    priority: high
+
+    description: >
+      Os campos de oracao de abertura e fechamento na aba Agenda nao respondem
+      ao clique do usuario. Ao clicar, nada acontece visivelmente. O problema
+      e que o PrayerSelector gerencia seu proprio estado de modal (modalVisible),
+      inicializado como false, e nao recebe uma prop 'visible' para auto-abrir
+      quando renderizado condicionalmente pelo AgendaForm.
+
+    user_report: >
+      "O campo oracao de abertura e fechamento nao esta clicavel, a gente
+      clica e nao acontece nada."
+
+    root_cause: >
+      Em AgendaForm.tsx, ao clicar no SelectorField de oracao, o estado
+      selectorModal e setado para { type: 'prayer', field: 'opening_prayer' }.
+      Isso renderiza condicionalmente o PrayerSelector (linhas 511-536).
+      Porem, PrayerSelector.tsx inicializa modalVisible = false (linha 50),
+      e nao recebe prop 'visible' para auto-abrir. O PrayerSelector renderiza
+      um SEGUNDO botao (Pressable, linhas 81-103) que o usuario precisaria
+      clicar para abrir o modal, mas esse botao aparece no final do form,
+      nao na posicao do campo de oracao. Resultado: "nada acontece" para o
+      usuario. Contraste: ActorSelector e HymnSelectorModal recebem
+      visible={true} e abrem imediatamente.
+
+    fix_approach: >
+      Opcao A (recomendada): Adicionar prop 'visible' ao PrayerSelector e
+      usar useEffect para sincronizar modalVisible com a prop. AgendaForm
+      passa visible={true}. Quando o modal fecha, PrayerSelector chama
+      onClose callback para resetar selectorModal para null. Segue o padrao
+      ja usado por ActorSelector.
+
+    acceptance_criteria:
+      - id: AC-F039-01
+        description: "Clicar no campo 'Oracao de Abertura' abre o modal do PrayerSelector"
+        given: "Agenda expandida com campo de oracao de abertura visivel"
+        when: "Usuario clica no campo de oracao de abertura"
+        then: "Modal com lista de membros e campo de busca abre imediatamente"
+        status: pending
+
+      - id: AC-F039-02
+        description: "Clicar no campo 'Oracao de Fechamento' abre o modal do PrayerSelector"
+        given: "Agenda expandida com campo de oracao de fechamento visivel"
+        when: "Usuario clica no campo de oracao de fechamento"
+        then: "Modal com lista de membros e campo de busca abre imediatamente"
+        status: pending
+
+      - id: AC-F039-03
+        description: "Selecionar membro atribui como orador da oracao"
+        given: "Modal do PrayerSelector aberto"
+        when: "Usuario seleciona um membro da lista"
+        then: "O membro e atribuido como orador, agenda atualizada, modal fecha"
+        status: pending
+
+      - id: AC-F039-04
+        description: "Fechar o modal reseta o estado do selectorModal"
+        given: "Modal do PrayerSelector aberto"
+        when: "Usuario fecha o modal (botao fechar ou voltar)"
+        then: "selectorModal e resetado para null"
+        status: pending
+
+      - id: AC-F039-05
+        description: "Nome customizado funciona para nao-membros"
+        given: "Modal do PrayerSelector aberto"
+        when: "Usuario digita um nome e confirma"
+        then: "Nome customizado e atribuido, member_id = null, agenda atualizada"
+        status: pending
+
+      - id: AC-F039-06
+        description: "Campos de oracao desabilitados para Observador"
+        given: "Usuario logado como observador"
+        when: "Tenta clicar no campo de oracao"
+        then: "Nada acontece (disabled=true previne abertura do modal)"
+        status: pending
+
+      - id: AC-F039-07
+        description: "PrayerSelector aceita prop 'visible' e 'onClose'"
+        given: "PrayerSelector e renderizado pelo AgendaForm"
+        when: "AgendaForm passa visible={true}"
+        then: "Modal do PrayerSelector abre automaticamente"
+        status: pending
+
+    edge_cases:
+      - id: EC-F039-01
+        case: "Botao X para limpar oracao designada"
+        expected: "Clicar X chama onSelect(null), limpando a designacao"
+        status: pending
+      - id: EC-F039-02
+        case: "Busca no modal filtra membros"
+        expected: "Digitar no campo de busca filtra a lista de membros"
+        status: pending
+      - id: EC-F039-03
+        case: "Fechar modal e reabrir para outro campo de oracao"
+        expected: "Fechar oracao de abertura e clicar em oracao de fechamento abre modal correto"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/PrayerSelector.tsx"
+        change: "Adicionar props 'visible' e 'onClose'; useEffect para sincronizar modalVisible com visible"
+        lines: "31-40, 50"
+      - path: "src/components/AgendaForm.tsx"
+        change: "Passar visible={true} e onClose ao PrayerSelector"
+        lines: "511-536"
+
+    dependencies: []
+    related_features: [F012, F015]
+    related_crs: [74]
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  - id: XC-01
+    concern: "Os 5 fixes nao tem conflito de arquivos entre si"
+    details: >
+      F035: supabase/migrations/003_notification_triggers.sql (ou nova migracao)
+      F036: src/app/(tabs)/settings/members.tsx (apenas keyExtractor)
+      F037: app.json + supabase/functions/create-invitation/index.ts
+      F038: src/app/(tabs)/speeches.tsx (apenas condicao de renderizacao)
+      F039: src/components/PrayerSelector.tsx + src/components/AgendaForm.tsx
+      Nenhum overlap de arquivos entre os fixes.
+
+  - id: XC-02
+    concern: "Nenhuma dependencia nova introduzida"
+    details: >
+      Todos os fixes usam padroes de codigo existentes. package.json inalterado.
+
+  - id: XC-03
+    concern: "Testes existentes devem ser atualizados"
+    details: >
+      F038 pode impactar testes que verificam uso de isExcludedFromAgenda
+      em speeches.tsx (cr001-qa.test.ts, cr001-qa-extended.test.ts,
+      cr002-qa.test.ts, cr004-f008-agenda-actors.test.ts).
+      Os testes devem ser atualizados para refletir a nova logica.
+
+# =============================================================================
+# OPEN QUESTIONS (resolvidas durante analise)
+# =============================================================================
+
+open_questions: []
+  # Nenhuma open question pendente. Todos os 5 bugs foram confirmados pelo QA
+  # com root cause analysis, reproduction steps e fix approach definidos.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: A-1
+    assumption: >
+      SECURITY DEFINER na funcao de trigger e a abordagem correta (ao inves
+      de adicionar INSERT policy para authenticated users na notification_queue)
+    reason: >
+      notification_queue NAO deve ser acessivel diretamente por clientes.
+      O design intencional (002_rls_policies.sql:310) e que apenas service_role
+      (Edge Functions) e triggers tenham acesso.
+    impact_if_wrong: >
+      Se a equipe preferir INSERT policy, a implementacao muda (adicionar policy
+      ao inves de alterar funcao). Ambas solucionam o bug.
+    needs_confirmation: false
+    resolved: true
+    resolution: "SECURITY DEFINER confirmado como padrao correto no QA_PLAN"
+
+  - id: A-2
+    assumption: >
+      keyExtractor usando item.label e suficiente (labels sao unicos no
+      COUNTRY_CODES)
+    reason: >
+      Cada entrada em COUNTRY_CODES tem label unico: "United States (+1)" vs
+      "Canada (+1)". Nao ha labels duplicados.
+    impact_if_wrong: >
+      Se houver labels duplicados, precisaria usar indice. Mas revisao do
+      codigo confirmou que labels sao unicos.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Confirmado por analise do codigo em countryCodes.ts"
+
+  - id: A-3
+    assumption: >
+      Links existentes com wardmanager:// gerados antes da mudanca deixarao de
+      funcionar, e isso e aceitavel
+    reason: >
+      Convites expiram em 30 dias (BR-14). Apos a mudanca, convites antigos
+      podem nao funcionar com o novo scheme, mas novos convites usarao
+      sacrmeetman://.
+    impact_if_wrong: >
+      Usuarios com convites pendentes (wardmanager://) nao conseguirao usar
+      o link. Precisariam ser reconvidados.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Aceitavel - convites expiram em 30 dias"
+
+  - id: A-4
+    assumption: >
+      A funcao isExcludedFromAgenda NAO deve ser alterada (usada corretamente
+      na aba Agenda para um proposito diferente)
+    reason: >
+      isExcludedFromAgenda e usada corretamente em agenda.tsx para determinar
+      quais domingos sao expansiveis. O bug e apenas em speeches.tsx que usa
+      a funcao para um proposito diferente (controlar visibilidade de speech
+      slots). A correcao deve ser em speeches.tsx, nao em useAgenda.ts.
+    impact_if_wrong: >
+      Se isExcludedFromAgenda fosse alterada, quebraria a logica da aba Agenda.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Confirmado - correcao e em speeches.tsx apenas"
+
+  - id: A-5
+    assumption: >
+      PrayerSelector deve seguir padrao de ActorSelector (prop visible + onClose)
+    reason: >
+      ActorSelector ja usa esse padrao com sucesso. HymnSelectorModal tambem
+      recebe visible. Manter consistencia entre componentes.
+    impact_if_wrong: >
+      Se a equipe preferir outra abordagem (ex: eliminar o Pressable do
+      PrayerSelector e controlar modal diretamente do AgendaForm), a
+      implementacao muda mas o resultado e o mesmo.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Padrao confirmado no QA_PLAN como Opcao A (recomendada)"
+
+# =============================================================================
+# INCONSISTENCIES COM SPEC_CONSOLIDATED
+# =============================================================================
+
+inconsistencies:
+  - id: INC-1
+    type: contradiction
+    description: >
+      SPEC_CONSOLIDATED lista CR-7 como implementado ("Opcao diferente de
+      Domingo com Discursos selecionada continua mostrando discursos"), mas o
+      bug persiste em speeches.tsx (CR-95/F038). O CR-7 foi implementado
+      corretamente na epoca, mas usou isExcludedFromAgenda que so cobre
+      general_conference e stake_conference. Para os demais tipos, o bug
+      continuou.
+    existing_spec: >
+      CR-7 (status: implemented): "Escondeu secao de discursos quando nao e
+      domingo com discursos" (F007 notes)
+    new_request: >
+      CR-95: speech fields NAO somem para testimony_meeting, ward_conference,
+      primary_presentation, other
+    resolution: >
+      CR-7 foi parcialmente eficaz. CR-95 corrige completamente o
+      comportamento. Ao atualizar o SPEC_CONSOLIDATED, F007/F008 deve
+      referenciar CR-95 como correcao adicional.
+
+  - id: INC-2
+    type: overlap
+    description: >
+      F039 (prayer fields not clickable) e uma regressao funcional de CR-74
+      (prayer fields com nomes customizados). O CR-74 foi marcado como
+      implementado mas o componente PrayerSelector nao se integra
+      corretamente com AgendaForm (falta prop visible).
+    existing_spec: >
+      CR-74 (status: implemented): "Adicionou suporte a nomes customizados
+      para oracoes" (F015 notes)
+    new_request: >
+      CR-98: campos de oracao nao sao clicaveis
+    resolution: >
+      CR-74 implementou o PrayerSelector com funcionalidade de nome
+      customizado, mas nao integrou corretamente com AgendaForm (faltou
+      prop visible). CR-98 completa a integracao.
+
+# =============================================================================
+# VALIDATION GATE (primeira invocacao NAO se aplica - este e o SPEC final)
+# =============================================================================
+
+validation_gate:
+  GATE-07: true   # Todas respostas incorporadas (N/A - bugs confirmados pelo QA)
+  GATE-08: true   # ZERO open questions pendentes
+  GATE-09: true   # Todas assumptions confirmadas/resolvidas
+  GATE-10: true   # SPEC_F035_F039.yaml salvo no disco
+  GATE-11: true   # SPEC_CONSOLIDATED.yaml atualizado (version incrementada)
+  GATE-12: true   # Status e "complete"

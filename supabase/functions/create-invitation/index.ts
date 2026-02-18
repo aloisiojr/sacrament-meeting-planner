@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     }
 
     // Build deep link
-    const deepLink = `wardmanager://invite/${invitationToken}`;
+    const deepLink = `sacrmeetman://invite/${invitationToken}`;
 
     return new Response(
       JSON.stringify({

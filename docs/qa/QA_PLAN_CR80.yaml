@@ -1,0 +1,255 @@
+# =============================================================================
+# QA_PLAN_CR80.yaml
+# PRE Validation & QA Plan for CR-80
+# Feature: Members screen explanatory texts (i18n pt/en/es)
+# Generated: 2026-02-18
+# =============================================================================
+
+cr_id: CR-80
+title: "Tela de Membros precisa de textos explicativos (i18n pt/en/es)"
+type: feature_request
+
+# =============================================================================
+# PRE VALIDATION
+# =============================================================================
+
+pre_validation:
+  timestamp: "2026-02-18"
+  status: validated
+  validated: true
+
+  # ---------------------------------------------------------------------------
+  # Current state analysis
+  # ---------------------------------------------------------------------------
+
+  current_state:
+    members_screen: "src/app/(tabs)/settings/members.tsx"
+    i18n_files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    i18n_config: "src/i18n/index.ts"
+
+    observations:
+      - key: "no_explanatory_texts"
+        detail: |
+          The Members screen (members.tsx) currently has NO explanatory/description
+          texts. It shows only: title "Members", search bar, CSV import/export buttons,
+          add button, and member list. There are no subtitle, description, hints, or
+          helper texts explaining what the screen does, how to use swipe gestures,
+          phone number format, or CSV import/export behavior.
+
+      - key: "i18n_members_section_keys"
+        detail: |
+          Current "members" keys in locale files:
+          title, addMember, fullName, phone, countryCode, importCsv, exportCsv,
+          exportFailed, importFailed, importEmpty, importErrorLine, importSuccess,
+          deleteConfirm, csvHeaderName, csvHeaderPhone, csvErrorEmptyFile,
+          csvErrorInvalidHeader, csvErrorInsufficientColumns, csvErrorNameRequired,
+          csvErrorNoData, importReadError.
+          None of these are explanatory/descriptive texts for the UI.
+
+      - key: "three_languages_supported"
+        detail: |
+          i18n supports pt-BR, en, es. All three locale files exist and have
+          identical key structures. The i18n system (i18next + react-i18next)
+          is fully configured with fallback to pt-BR.
+
+      - key: "similar_screens_pattern"
+        detail: |
+          Other screens in the app use subtitle/description patterns:
+          - Login screen: uses styles.subtitle for app description
+          - Register screen: uses styles.subtitle for context
+          - Forgot password: uses styles.description for instruction text
+          - Invite screen: uses styles.subtitle for context
+          The Members screen does NOT follow this pattern.
+
+      - key: "empty_state_exists"
+        detail: |
+          Members screen has a ListEmptyComponent that shows "No results found"
+          (common.noResults). This is a generic text, not a helpful empty state
+          message specific to members.
+
+      - key: "no_swipe_hint"
+        detail: |
+          SwipeableCard component provides swipe-to-reveal edit/delete actions,
+          but there is no visual hint or explanatory text telling users they can
+          swipe member rows.
+
+  # ---------------------------------------------------------------------------
+  # Feasibility assessment
+  # ---------------------------------------------------------------------------
+
+  feasibility:
+    status: feasible
+    rationale: |
+      The feature requires:
+      1. Adding new i18n keys to all 3 locale files (en.json, pt-BR.json, es.json)
+      2. Adding explanatory Text components to the Members screen UI
+      No architectural changes needed. The i18n system and screen structure
+      already support this pattern (see login, register, forgot-password screens).
+
+    affected_files:
+      - path: "src/i18n/locales/en.json"
+        change: "Add new keys to members section"
+      - path: "src/i18n/locales/pt-BR.json"
+        change: "Add new keys to members section"
+      - path: "src/i18n/locales/es.json"
+        change: "Add new keys to members section"
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "Add explanatory Text components using new i18n keys"
+
+    risks:
+      - "Texts must be concise to not clutter the mobile screen"
+      - "All 3 locales must have matching keys (no missing translations)"
+
+# =============================================================================
+# QA PLAN - VALIDATION CHECKS
+# =============================================================================
+
+validation_checks:
+
+  # ---------------------------------------------------------------------------
+  # MUST_PASS (automated / static verification)
+  # ---------------------------------------------------------------------------
+
+  must_pass:
+
+    - id: MP-80-01
+      description: "New i18n keys exist in en.json members section"
+      type: static
+      verification: |
+        Check that en.json contains new explanatory text keys in the "members"
+        section. At minimum, keys for: screen description/subtitle, empty state
+        message specific to members, and/or swipe hint.
+
+    - id: MP-80-02
+      description: "New i18n keys exist in pt-BR.json members section with Portuguese translations"
+      type: static
+      verification: |
+        Check that pt-BR.json contains the same new keys as en.json in the
+        "members" section, with proper Portuguese (Brazilian) translations.
+
+    - id: MP-80-03
+      description: "New i18n keys exist in es.json members section with Spanish translations"
+      type: static
+      verification: |
+        Check that es.json contains the same new keys as en.json in the
+        "members" section, with proper Spanish translations.
+
+    - id: MP-80-04
+      description: "All three locale files have identical key structure in members section"
+      type: static
+      verification: |
+        Parse all three locale files and compare the set of keys under "members".
+        They must be identical (no missing keys in any locale).
+
+    - id: MP-80-05
+      description: "Members screen uses t() for new explanatory texts"
+      type: static
+      verification: |
+        Check that members.tsx references the new i18n keys via t('members.xxx')
+        calls. Texts must NOT be hardcoded strings.
+
+    - id: MP-80-06
+      description: "No i18n keys removed or renamed (backward compatibility)"
+      type: static
+      verification: |
+        Verify that all existing keys in the "members" section of each locale
+        file are preserved. No existing key should be removed or renamed.
+
+    - id: MP-80-07
+      description: "Existing test suite passes without regressions"
+      type: automated
+      verification: |
+        Run: npx vitest run
+        All existing tests must pass. Zero failures, zero regressions.
+
+  # ---------------------------------------------------------------------------
+  # SHOULD_PASS (manual / code analysis verification)
+  # ---------------------------------------------------------------------------
+
+  should_pass:
+
+    - id: SP-80-01
+      description: "Explanatory texts are visible on the Members screen"
+      type: manual
+      verification: |
+        Navigate to Settings > Members. Verify that explanatory text(s) are
+        displayed on the screen (e.g., description below title, empty state
+        message, or swipe hint). Text should be styled consistently with
+        the rest of the app (using colors.textSecondary or similar).
+
+    - id: SP-80-02
+      description: "Texts are properly translated when language is changed to Portuguese"
+      type: manual
+      verification: |
+        Change app language to pt-BR. Navigate to Members screen. Verify
+        explanatory texts display in Portuguese.
+
+    - id: SP-80-03
+      description: "Texts are properly translated when language is changed to Spanish"
+      type: manual
+      verification: |
+        Change app language to es. Navigate to Members screen. Verify
+        explanatory texts display in Spanish.
+
+    - id: SP-80-04
+      description: "Texts are properly translated when language is changed to English"
+      type: manual
+      verification: |
+        Change app language to en. Navigate to Members screen. Verify
+        explanatory texts display in English.
+
+    - id: SP-80-05
+      description: "Explanatory texts do not break layout on small screens"
+      type: manual
+      verification: |
+        View the Members screen on a small device or narrow viewport.
+        Texts should wrap properly and not overflow or overlap other elements.
+
+    - id: SP-80-06
+      description: "Empty state message is specific and helpful when no members exist"
+      type: manual
+      verification: |
+        If an empty state message is added, verify that with zero members
+        the screen shows a helpful message (not just generic "No results").
+
+# =============================================================================
+# EVIDENCE LOG (PRE phase)
+# =============================================================================
+
+evidence:
+  files_examined:
+    - path: "src/app/(tabs)/settings/members.tsx"
+      lines: 779
+      finding: "No explanatory texts present. Only title, search, CSV buttons, member list."
+
+    - path: "src/i18n/locales/en.json"
+      section: "members (lines 144-166)"
+      finding: "20 keys exist, all functional (labels, errors, actions). No descriptive texts."
+
+    - path: "src/i18n/locales/pt-BR.json"
+      section: "members (lines 144-166)"
+      finding: "Same 20 keys as en.json. Portuguese translations present. No descriptive texts."
+
+    - path: "src/i18n/locales/es.json"
+      section: "members (lines 144-166)"
+      finding: "Same 20 keys as en.json. Spanish translations present. No descriptive texts."
+
+    - path: "src/i18n/index.ts"
+      lines: 108
+      finding: "i18n fully configured. Supports pt-BR, en, es. Fallback to pt-BR."
+
+  searches_performed:
+    - query: "members.(description|subtitle|explanation|hint|help|info|emptyState)"
+      scope: "src/"
+      result: "0 matches - confirms no explanatory text keys exist"
+
+    - query: "Glob **/member*"
+      scope: "src/"
+      result: "Only src/app/(tabs)/settings/members.tsx found"
+
+    - query: "(description|subtitle|explanation|hint|emptyState|pageDescription)"
+      scope: "src/**/*.tsx"
+      result: "Found patterns in login, register, forgot-password, invite screens - confirms the app uses this pattern elsewhere"

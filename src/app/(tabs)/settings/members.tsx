@@ -543,6 +543,11 @@ export default function MembersScreen() {
           )}
         </View>
 
+        {/* Screen description */}
+        <Text style={[styles.description, { color: colors.textSecondary }]}>
+          {t('members.description')}
+        </Text>
+
         {/* Search */}
         <View style={styles.searchContainer}>
           <TextInput
@@ -558,6 +563,7 @@ export default function MembersScreen() {
 
         {/* CSV Import/Export */}
         {canImport && (
+          <>
           <View style={styles.csvActions}>
             <Pressable
               style={[styles.csvButton, { borderColor: colors.primary }]}
@@ -585,6 +591,10 @@ export default function MembersScreen() {
               )}
             </Pressable>
           </View>
+          <Text style={[styles.csvHelp, { color: colors.textSecondary }]}>
+            {t('members.csvHelp')}
+          </Text>
+          </>
         )}
 
         {/* Add new member form */}
@@ -640,6 +650,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  description: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
   addButton: {
     width: 36,
     height: 36,
@@ -681,6 +697,11 @@ const styles = StyleSheet.create({
   csvButtonText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  csvHelp: {
+    fontSize: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   editor: {
     paddingHorizontal: 16,

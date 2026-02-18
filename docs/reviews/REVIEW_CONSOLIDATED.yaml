@@ -1,15 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90
+# Consolidated code review for CR-82, CR-80, CR-83..CR-90
 # Reviewed: 2026-02-18
+# Version: 5
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -454,6 +455,37 @@ pending_deploys:
       codes (shared module), CSV import confirmation (Alert.alert), SearchInput with
       X clear button (10 fields migrated). All 2610 tests passing.
 
+  - id: DEPLOY-B6P2-01
+    description: "Batch 6, Phase 2: Swipe icons, topics description, collection topics view (F032-F034)"
+    branch: master
+    commits:
+      - hash: 4e0fbb7
+        message: "feat(swipeable): replace edit/delete text labels with pencil and trash icons (CR-87)"
+      - hash: 5fdfe6e
+        message: "feat(i18n): add topics.description and topics.noTopics keys in all locales (CR-88)"
+      - hash: 47b3530
+        message: "feat(topics): add description text, collection expand/collapse with topic list (CR-88, CR-89)"
+      - hash: aa92e9b
+        message: "test(batch6): add tests for F032-F034 (CRs 87-89)"
+    instructions:
+      - "Merge branch master into main"
+      - "Run: npx vitest run (verify all 2716 tests pass)"
+      - "Run: npx expo start --ios"
+      - "Manual test: swipe left on member/topic row, verify pencil and trash icons (CR-87)"
+      - "Manual test: verify icons have proper contrast on primary/error backgrounds"
+      - "Manual test: open Topics screen, verify description text below header (CR-88)"
+      - "Manual test: tap a collection, verify topics list expands with chevron change (CR-89)"
+      - "Manual test: tap same collection again, verify it collapses (CR-89)"
+      - "Manual test: verify Switch toggle still works independently of collection tap (CR-89)"
+      - "Manual test: verify loading spinner when first expanding a collection (CR-89)"
+      - "Manual test: switch language (en, pt-BR, es) and verify all new UI strings"
+      - "Run: eas build --platform ios (or android) for production build"
+    risk: low
+    notes: >
+      All changes are frontend-only. No backend, no database, no new dependencies.
+      3 features: swipe icons (Unicode chars, no library), topics description (i18n text),
+      collection expand/collapse (new hook + UI component). All 2716 tests passing.
+
 # =============================================================================
 # REVIEW HISTORY
 # =============================================================================
@@ -506,6 +538,25 @@ review_history:
       All 4 issues from iteration 1 resolved. Full test suite green: 55 files,
       2610/2610 tests passing, 0 regressions. CODE_LEDGER updated with correct
       test counts.
+
+  - date: "2026-02-18"
+    phase: "Batch 6, Phase 2"
+    crs: [CR-87, CR-88, CR-89]
+    features: [F032, F033, F034]
+    reviewer: reviewer-agent
+    verdict: approved
+    iteration: 1
+    commits_reviewed: [4e0fbb7, 5fdfe6e, 47b3530, aa92e9b]
+    issues_found: 1
+    issues_by_severity:
+      p0: 0
+      p1: 0
+      p2: 1
+    notes: >
+      All 3 features correctly implemented. Chain validation intact.
+      106 new tests all passing. Full suite 2716/2716 (56 files).
+      Only issue: P2 CODE_LEDGER test count needs correction.
+      APPROVED - P2 is non-blocking.
 
 # =============================================================================
 # BATCH 6, PHASE 1 REVIEW (Iteration 1)
@@ -1050,4 +1101,358 @@ batch6_phase1_iteration2:
     full_suite_tests: 2610
     full_suite_passing: 2610
     full_suite_failing: 0
+    regressions: 0
+
+# =============================================================================
+# BATCH 6, PHASE 2 REVIEW (Iteration 1)
+# CR-87 (F032 Swipe Icons), CR-88 (F033 Topics Description),
+# CR-89 (F034 Collection Topics View)
+# =============================================================================
+
+batch6_phase2:
+  phase: "Batch 6, Phase 2"
+  phase_description: >
+    Swipe action icon replacement (pencil/trash instead of text labels),
+    topics screen explanatory text with i18n, and collection expand/collapse
+    to view topics in a read-only list.
+  iteration: 1
+  verdict: approved
+
+  verdict_summary: >
+    All 3 features (F032, F033, F034) are correctly implemented and fully
+    aligned with the SPEC->ARCH->PLAN->CODE chain. F032 replaces swipe action
+    text labels with Unicode pencil (U+270F) and wastebasket (U+1F5D1) icons
+    in SwipeableCard.tsx while preserving accessibilityLabel for screen readers.
+    F033 adds a topics.description i18n key in all 3 locales and renders it
+    below the header in topics.tsx using the established CR-80 pattern.
+    F034 adds a useCollectionTopics hook, CollectionTopicsList component, and
+    accordion expand/collapse in CollectionRow with chevron indicators, loading
+    state, empty state, and independent Switch toggle. All 106 new tests
+    passing, full suite clean (56 files, 2716/2716, 0 regressions). One P2
+    documentation issue: CODE_LEDGER reports new_tests: 0 but actual count
+    is 106. APPROVED.
+
+  chain_validation:
+    spec_vs_request:
+      status: pass
+      notes: >
+        SPEC_F032_F034.yaml covers all 3 CRs (87, 88, 89) with complete
+        acceptance criteria. Each feature maps directly to a user request.
+        No scope creep detected. ACs are faithful to user intent.
+
+    arch_vs_spec:
+      status: pass
+      notes: >
+        ARCH_M012.yaml maps all ACs to components across 5 modified files.
+        ADRs (033, 034, 035) provide sound technical rationale. ADR-033
+        justifies Unicode over icon library (zero bundle impact). ADR-034
+        reuses CR-80 pattern for description text. ADR-035 chooses accordion
+        pattern with react-query for collection topics. Component interfaces
+        support all features.
+
+    plan_vs_arch:
+      status: pass
+      notes: >
+        PLAN_P012.yaml has 7 steps that follow ARCH dependencies correctly.
+        Each step maps to specific files. Dependencies respected (e.g.,
+        STEP-04 i18n before STEP-05 description text, STEP-06 hook before
+        STEP-07 UI). Commit messages follow Conventional Commits.
+
+    code_vs_plan:
+      status: pass
+      notes: >
+        CODE_LEDGER tracks commits matching all PLAN steps. Files modified
+        in each commit match plan specification. ACs covered per commit
+        align with plan coverage. Implementation follows architecture.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: 4e0fbb7
+      step: STEP-01
+      cr: CR-87
+      message: "feat(swipeable): replace edit/delete text labels with pencil and trash icons (CR-87)"
+      files_changed: [src/components/SwipeableCard.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Edit button: Text content changed from {editLabel ?? 'Edit'} to {'\\u270F'} (pencil)"
+          - "Delete button: Text content changed from {deleteLabel ?? 'Delete'} to {'\\uD83D\\uDDD1'} (wastebasket)"
+          - "accessibilityLabel preserved: editLabel ?? 'Edit' and deleteLabel ?? 'Delete' on Pressable"
+          - "editLabel and deleteLabel kept in SwipeableCardProps for accessibility"
+          - "New actionIcon style: fontSize 20, textAlign center - appropriate sizing"
+          - "Edit icon uses colors.onPrimary, Delete icon uses '#FFFFFF' - proper contrast"
+          - "Old actionText style retained (not removed) but no longer used for buttons"
+          - "handleEdit and handleDelete callbacks unchanged"
+        issues: []
+
+    - hash: 5fdfe6e
+      step: STEP-04
+      cr: CR-88
+      message: "feat(i18n): add topics.description and topics.noTopics keys in all locales (CR-88)"
+      files_changed: [src/i18n/locales/en.json, src/i18n/locales/pt-BR.json, src/i18n/locales/es.json]
+      review:
+        correctness: pass
+        notes:
+          - "topics.description added to en.json: mentions ward topics, activating/deactivating, speeches"
+          - "topics.description added to pt-BR.json: natural Brazilian Portuguese translation"
+          - "topics.description added to es.json: natural Spanish translation"
+          - "topics.noTopics added to all 3 locales for empty collection state"
+          - "All 3 JSON files remain valid"
+          - "Key structure matches across all 3 locales"
+        issues: []
+
+    - hash: 47b3530
+      step: STEP-05+06+07
+      cr: CR-88+CR-89
+      message: "feat(topics): add description text, collection expand/collapse with topic list (CR-88, CR-89)"
+      files_changed: [src/app/(tabs)/settings/topics.tsx, src/hooks/useTopics.ts]
+      review:
+        correctness: pass
+        notes:
+          - "topics.tsx: Description text rendered between header and Ward Topics section"
+          - "topics.tsx: Uses [styles.description, { color: colors.textSecondary }] - matches CR-80 pattern"
+          - "topics.tsx: Description style: fontSize 13, textAlign center, paddingHorizontal 16, marginBottom 8"
+          - "topics.tsx: No numberOfLines on description - text wraps naturally"
+          - "topics.tsx: CollectionRow refactored with Pressable for name+chevron, Switch as sibling"
+          - "topics.tsx: isExpanded and onPress props added to CollectionRow"
+          - "topics.tsx: Chevron uses U+25BC (down) when expanded, U+25B6 (right) when collapsed"
+          - "topics.tsx: expandedCollectionId state (string | null) for accordion pattern"
+          - "topics.tsx: handleCollectionPress toggles via setExpandedCollectionId(prev => prev === id ? null : id)"
+          - "topics.tsx: CollectionTopicsList renders topics with title, optional link, loading, empty states"
+          - "topics.tsx: ActivityIndicator with size small, color={colors.primary} for loading"
+          - "topics.tsx: Empty state uses t('topics.noTopics') with italic styling"
+          - "topics.tsx: Topic titles use textSecondary color, links use primary color"
+          - "topics.tsx: hairlineWidth separator between topics"
+          - "topics.tsx: CollectionTopicsList does NOT use SwipeableCard (read-only)"
+          - "topics.tsx: collectionTopicsContainer has paddingLeft 32 for visual nesting"
+          - "useTopics.ts: New useCollectionTopics hook added"
+          - "useTopics.ts: Queries general_topics table with eq('collection_id', collectionId)"
+          - "useTopics.ts: Orders by title ascending"
+          - "useTopics.ts: enabled: !!collectionId for conditional fetching"
+          - "useTopics.ts: topicKeys updated with collectionTopics entry"
+          - "useTopics.ts: ActivityIndicator imported from react-native in topics.tsx"
+        issues: []
+
+    - hash: aa92e9b
+      step: tests
+      cr: CR-87+CR-88+CR-89
+      message: "test(batch6): add tests for F032-F034 (CRs 87-89)"
+      files_changed: [src/__tests__/batch6-f032-f034.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "106 tests covering all ACs: AC-F032-01..05, AC-F033-01..06, AC-F034-01..08"
+          - "5 edge case tests: EC-01..EC-05"
+          - "Regression tests for SwipeableCard (6) and Topics screen (8) and useTopics hook (6)"
+          - "Uses readSourceFile pattern consistent with existing project test conventions"
+          - "All tests pass (106/106)"
+        issues: []
+
+  issues:
+    - id: R-B6P2-01
+      severity: P2
+      category: quality
+      location: "docs/code/CODE_LEDGER.yaml:test_results"
+      description: >
+        CODE_LEDGER reports new_tests: 0 and new_tests_passing: 0 in the
+        batch6_phase2 section, but the actual batch6-f032-f034.test.ts file
+        contains 106 tests, all passing. The full_suite_tests should be 2716
+        (was 2610), and full_suite_files should be 56 (was 55). The test
+        results section needs correction.
+      suggestion: >
+        Update CODE_LEDGER batch6_phase2 test_results: new_tests: 106,
+        new_tests_passing: 106, full_suite_tests: 2716, full_suite_passing: 2716,
+        full_suite_files: 56.
+
+  pending_deploys:
+    - type: "none"
+      description: >
+        No deploys needed for this batch. All changes are frontend-only (React
+        Native / Expo). No database migrations, no new environment variables,
+        no new third-party integrations, no static assets requiring CDN.
+      must_run_before: "N/A"
+      instructions: >
+        Standard Expo build and deploy process. Merge to main and build with
+        eas build.
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/phases/phase-001.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/qa/QA_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_batch6_phase2.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: >
+      Git working tree is clean for code files. Documentation files listed above
+      are pending commit by the Orchestrator, which is normal workflow.
+
+  ac_verification:
+    # F032 ACs (CR-87)
+    - ac_id: AC-F032-01
+      description: "Edit button shows pencil icon, Delete button shows wastebasket icon"
+      status: verified
+      evidence: >
+        SwipeableCard.tsx: Edit button Text renders {'\\u270F'} (pencil), Delete button
+        Text renders {'\\uD83D\\uDDD1'} (wastebasket). Old text labels removed from
+        button content. Verified by 4 tests (MP-87-01, MP-87-02 and negative checks).
+
+    - ac_id: AC-F032-02
+      description: "Edit button onPress calls onEdit callback"
+      status: verified
+      evidence: >
+        handleEdit fires onEdit?.() after closing card via withSpring(0) and onReveal(null).
+        onPress={handleEdit} on Pressable. Verified by 2 tests.
+
+    - ac_id: AC-F032-03
+      description: "Delete button onPress calls onDelete callback"
+      status: verified
+      evidence: >
+        handleDelete fires onDelete?.() after closing card. onPress={handleDelete} on
+        Pressable. Verified by 2 tests.
+
+    - ac_id: AC-F032-04
+      description: "accessibilityLabel uses text labels, not Unicode icons"
+      status: verified
+      evidence: >
+        Edit Pressable: accessibilityLabel={editLabel ?? 'Edit'}. Delete Pressable:
+        accessibilityLabel={deleteLabel ?? 'Delete'}. No Unicode chars in any
+        accessibilityLabel. editLabel/deleteLabel kept in SwipeableCardProps.
+        Verified by 4 tests.
+
+    - ac_id: AC-F032-05
+      description: "Icon styling (fontSize, color, contrast)"
+      status: verified
+      evidence: >
+        actionIcon style: fontSize 20, textAlign center. Edit icon uses colors.onPrimary
+        on colors.primary background. Delete icon uses '#FFFFFF' on colors.error background.
+        Verified by 8 tests.
+
+    # F033 ACs (CR-88)
+    - ac_id: AC-F033-01
+      description: "Description text visible below header"
+      status: verified
+      evidence: >
+        topics.tsx renders t('topics.description') between {/* Screen description */}
+        comment and {/* Ward Topics Section */} comment. Text element with
+        styles.description and textSecondary color. Verified by 2 tests.
+
+    - ac_id: AC-F033-02
+      description: "Text explains ward topics and collection activation"
+      status: verified
+      evidence: >
+        en.json topics.description contains: 'ward topics', 'activating', 'deactivating',
+        'speeches', 'added', 'edited', 'deleted'. Comprehensive explanation of screen
+        functionality. Verified by 4 tests.
+
+    - ac_id: AC-F033-03
+      description: "i18n key exists in all 3 locale files"
+      status: verified
+      evidence: >
+        topics.description and topics.noTopics present in en.json, pt-BR.json, es.json.
+        All are non-empty strings. Verified by 6 tests.
+
+    - ac_id: AC-F033-04
+      description: "Description styling matches CR-80 pattern"
+      status: verified
+      evidence: >
+        description style: fontSize 13, textAlign center, paddingHorizontal 16,
+        marginBottom 8. Uses colors.textSecondary. Matches members screen pattern.
+        Verified by 5 tests.
+
+    - ac_id: AC-F033-05
+      description: "Text wraps naturally on small screens"
+      status: verified
+      evidence: >
+        No numberOfLines on description Text. paddingHorizontal 16 for margins.
+        Verified by 2 tests.
+
+    - ac_id: AC-F033-06
+      description: "All 3 locale files have same topics keys structure"
+      status: verified
+      evidence: >
+        en, pt-BR, es all have identical topics key sets. Required keys all present:
+        title, wardTopics, addTopic, topicTitle, topicLink, collections, description,
+        noTopics. All 3 JSON files valid. Verified by 3 tests.
+
+    # F034 ACs (CR-89)
+    - ac_id: AC-F034-01
+      description: "Tapping collection shows topics below"
+      status: verified
+      evidence: >
+        expandedCollectionId state (useState<string | null>(null)).
+        handleCollectionPress toggles state. CollectionTopicsList rendered
+        conditionally when expandedCollectionId === item.id. collectionId
+        passed to CollectionTopicsList. Verified by 4 tests.
+
+    - ac_id: AC-F034-02
+      description: "Tapping expanded collection collapses it"
+      status: verified
+      evidence: >
+        setExpandedCollectionId((prev) => (prev === collectionId ? null : collectionId)).
+        Toggle behavior confirmed. Verified by 1 test.
+
+    - ac_id: AC-F034-03
+      description: "Topics fetched from general_topics by collection_id"
+      status: verified
+      evidence: >
+        useCollectionTopics hook queries from('general_topics').select().eq('collection_id',
+        collectionId).order('title', {ascending: true}). Enabled only when collectionId
+        is truthy. topicKeys includes collectionTopics entry. Renders topic.title and
+        topic.link (conditional). Link uses primary color. Verified by 8 tests.
+
+    - ac_id: AC-F034-04
+      description: "Loading state shows ActivityIndicator"
+      status: verified
+      evidence: >
+        ActivityIndicator imported from react-native. Rendered when isLoading is true.
+        size="small", color={colors.primary}. Verified by 3 tests.
+
+    - ac_id: AC-F034-05
+      description: "Empty state shows noTopics message"
+      status: verified
+      evidence: >
+        Renders t('topics.noTopics') when !topics || topics.length === 0.
+        collectionTopicsEmptyText style has fontStyle 'italic'. Verified by 3 tests.
+
+    - ac_id: AC-F034-06
+      description: "Switch toggle works independently of collection tap"
+      status: verified
+      evidence: >
+        Switch is outside Pressable (sibling, not child). Switch has
+        onValueChange={onToggle}. Pressable has onPress={onPress}. isExpanded
+        and onPress in CollectionRow props. Verified by 4 tests.
+
+    - ac_id: AC-F034-07
+      description: "Accordion pattern (one collection expanded at a time)"
+      status: verified
+      evidence: >
+        expandedCollectionId is string | null (not array/set). Toggle via
+        prev === collectionId ? null : collectionId. Only one expanded at a time.
+        Verified by 2 tests.
+
+    - ac_id: AC-F034-08
+      description: "Visual nesting and styling of expanded topics"
+      status: verified
+      evidence: >
+        Chevron: U+25BC (down) when expanded, U+25B6 (right) when collapsed.
+        chevron style: fontSize 10, width 16. collectionPressable: flex 1,
+        flexDirection row. collectionTopicsContainer: paddingLeft 32.
+        Topic titles use textSecondary. hairlineWidth separators.
+        No SwipeableCard/onEdit/onDelete in CollectionTopicsList (read-only).
+        Verified by 8 tests.
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 1
+    files_reviewed: 8
+    commits_reviewed: 4
+    new_tests: 106
+    new_tests_passing: 106
+    full_suite_tests: 2716
+    full_suite_passing: 2716
+    full_suite_files: 56
     regressions: 0

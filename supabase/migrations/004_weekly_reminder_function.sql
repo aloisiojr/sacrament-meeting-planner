@@ -33,7 +33,7 @@ BEGIN
       SELECT 1 FROM sunday_exceptions
       WHERE ward_id = ward.id
         AND date = next_sunday
-        AND reason IN ('general_conference', 'stake_conference', 'no_meeting')
+        AND reason IN ('general_conference', 'stake_conference')
     ) INTO has_exception;
 
     -- Skip if next sunday has a blocking exception

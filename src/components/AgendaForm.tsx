@@ -481,8 +481,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           roleFilter={(selectorModal.roleFilter ?? 'all') as import('../hooks/useActors').ActorRoleFilter}
           onSelect={(actor) => {
             if (selectorModal.field === 'recognizing') {
-              updateField('recognized_names', [actor.name]);
-              setSelectorModal(null);
+              const current = agenda?.recognized_names ?? [];
+              const exists = current.includes(actor.name);
+              const updated = exists
+                ? current.filter((n) => n !== actor.name)
+                : [...current, actor.name];
+              updateField('recognized_names', updated.length > 0 ? updated : null);
               return;
             }
             const nameField = `${selectorModal.field}_name`;
@@ -491,6 +495,10 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             setSelectorModal(null);
           }}
           onClose={() => setSelectorModal(null)}
+          {...(selectorModal.field === 'recognizing' ? {
+            selectedNames: agenda?.recognized_names ?? [],
+            multiSelect: true,
+          } : {})}
         />
       )}
 

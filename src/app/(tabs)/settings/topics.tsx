@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +31,7 @@ import {
   useDeleteWardTopic,
   useCollections,
   useToggleCollection,
+  useCollectionTopics,
 } from '../../../hooks/useTopics';
 import { getCurrentLanguage } from '../../../i18n';
 import type { WardTopic } from '../../../types/database';
@@ -205,6 +207,59 @@ function CollectionRow({ name, active, isExpanded, onToggle, onPress, disabled, 
   );
 }
 
+// --- Collection Topics List (expanded view) ---
+
+interface CollectionTopicsListProps {
+  collectionId: string;
+  colors: ReturnType<typeof useTheme>['colors'];
+}
+
+function CollectionTopicsList({ collectionId, colors }: CollectionTopicsListProps) {
+  const { t } = useTranslation();
+  const { data: topics, isLoading } = useCollectionTopics(collectionId);
+
+  if (isLoading) {
+    return (
+      <View style={styles.collectionTopicsLoading}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!topics || topics.length === 0) {
+    return (
+      <View style={styles.collectionTopicsEmpty}>
+        <Text style={[styles.collectionTopicsEmptyText, { color: colors.textSecondary }]}>
+          {t('topics.noTopics')}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.collectionTopicsContainer, { backgroundColor: colors.surface }]}>
+      {topics.map((topic, index) => (
+        <View
+          key={topic.id}
+          style={[
+            styles.collectionTopicItem,
+            index < topics.length - 1 && { borderBottomColor: colors.divider, borderBottomWidth: StyleSheet.hairlineWidth },
+          ]}
+        >
+          <Text style={[styles.collectionTopicTitle, { color: colors.textSecondary }]}>
+            {topic.title}
+          </Text>
+          {topic.link && (
+            <Text style={[styles.collectionTopicLink, { color: colors.primary }]} numberOfLines={1}>
+              {topic.link}
+            </Text>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // --- Main Screen ---
 
 export default function TopicsScreen() {
@@ -218,6 +273,7 @@ export default function TopicsScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [expandedCollectionId, setExpandedCollectionId] = useState<string | null>(null);
 
   const canWrite = hasPermission('topic:write');
   const canToggle = hasPermission('collection:toggle');
@@ -296,6 +352,10 @@ export default function TopicsScreen() {
     },
     [toggleCollection]
   );
+
+  const handleCollectionPress = useCallback((collectionId: string) => {
+    setExpandedCollectionId((prev) => (prev === collectionId ? null : collectionId));
+  }, []);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -388,16 +448,20 @@ export default function TopicsScreen() {
 
             {collections && collections.length > 0 ? (
               collections.map((item) => (
-                <CollectionRow
-                  key={item.id}
-                  name={item.name}
-                  active={item.active}
-                  isExpanded={false}
-                  onToggle={(active) => handleToggleCollection(item.id, active)}
-                  onPress={() => {}}
-                  disabled={!canToggle}
-                  colors={colors}
-                />
+                <React.Fragment key={item.id}>
+                  <CollectionRow
+                    name={item.name}
+                    active={item.active}
+                    isExpanded={expandedCollectionId === item.id}
+                    onToggle={(active) => handleToggleCollection(item.id, active)}
+                    onPress={() => handleCollectionPress(item.id)}
+                    disabled={!canToggle}
+                    colors={colors}
+                  />
+                  {expandedCollectionId === item.id && (
+                    <CollectionTopicsList collectionId={item.id} colors={colors} />
+                  )}
+                </React.Fragment>
               ))
             ) : (
               <View style={styles.empty}>
@@ -548,6 +612,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     flex: 1,
     marginRight: 12,
+  },
+  collectionTopicsContainer: {
+    paddingLeft: 32,
+    paddingRight: 16,
+  },
+  collectionTopicItem: {
+    paddingVertical: 8,
+    paddingLeft: 8,
+  },
+  collectionTopicTitle: {
+    fontSize: 14,
+  },
+  collectionTopicLink: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  collectionTopicsLoading: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  collectionTopicsEmpty: {
+    paddingVertical: 12,
+    paddingLeft: 40,
+  },
+  collectionTopicsEmptyText: {
+    fontSize: 13,
+    fontStyle: 'italic',
   },
   empty: {
     padding: 24,

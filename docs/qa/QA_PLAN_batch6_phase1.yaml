@@ -1,0 +1,704 @@
+# =============================================================================
+# QA_PLAN_batch6_phase1.yaml
+# PRE Validation QA Plan for Batch 6 Phase 1
+# CRs: 83, 84, 85, 86, 90
+# Generated: 2026-02-18
+# =============================================================================
+
+metadata:
+  batch: 6
+  phase: 1
+  crs: [83, 84, 85, 86, 90]
+  generated: "2026-02-18"
+  baseline_tests: 2502
+  baseline_test_files: 54
+
+# =============================================================================
+# PRE-VALIDATION REPORT
+# =============================================================================
+
+pre_validation:
+  status: passed
+  validated: true
+  timestamp: "2026-02-18"
+
+# #############################################################################
+# CR-83: Save/Cancel buttons for members and ward topics
+# #############################################################################
+
+cr_83:
+  cr_id: CR-83
+  title: "Membros e temas da ala: salvar somente ao clicar Salvar, adicionar botao Cancelar"
+  type: feature_request
+  user_request: |
+    Para adicao e edicao de membros e temas da ala, eu mudei de ideia, vamos salvar somente
+    quando o usuario clicar num botao Salvar (que pode ficar a direita do card). Coloque
+    tambem um botao de cancelar para ignorar a adicao ou edicao do membro.
+
+  current_state_analysis:
+    summary: |
+      Currently both MemberEditor and TopicEditor save automatically onBlur (when the user
+      taps outside the input). There are no explicit Save/Cancel buttons. The user wants to
+      change this behavior to require explicit Save button click.
+
+    evidence:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        findings:
+          - "MemberEditor (line 89-184): Name input has onBlur={handleSave} (line 119)"
+          - "MemberEditor: Phone input has onBlur={handleSave} (line 140)"
+          - "MemberEditor has onCancel prop (line 85) but does NOT render a Cancel button"
+          - "MemberEditor renders NO Save button - only saves onBlur"
+          - "handleSaveNew (line 294-306): creates member via mutation, no explicit trigger"
+          - "handleSaveEdit (line 314-327): updates member via mutation, no explicit trigger"
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        findings:
+          - "TopicEditor (line 44-88): Title input has onBlur={handleSave} (line 71)"
+          - "TopicEditor: Link input has onBlur={handleSave} (line 81)"
+          - "TopicEditor has NO onCancel prop at all (line 41)"
+          - "TopicEditor renders NO Save button - only saves onBlur"
+          - "handleSaveNew (line 209-221): creates topic via mutation, no explicit trigger"
+          - "handleSaveEdit (line 229-242): updates topic via mutation, no explicit trigger"
+
+    changes_required:
+      - "Remove onBlur={handleSave} from all inputs in MemberEditor"
+      - "Remove onBlur={handleSave} from all inputs in TopicEditor"
+      - "Add Save button (to the right of the card) in MemberEditor"
+      - "Add Cancel button in MemberEditor"
+      - "Add Save button (to the right of the card) in TopicEditor"
+      - "Add Cancel button in TopicEditor"
+      - "Add onCancel prop to TopicEditor interface"
+      - "Add i18n keys if needed (common.save and common.cancel already exist)"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    common.save and common.cancel i18n keys already exist in all 3 locales.
+    MemberEditor already accepts onCancel prop (line 85) but doesn't use it in UI.
+    TopicEditor needs onCancel prop added. Both editors need Save/Cancel buttons added
+    and onBlur={handleSave} removed. No architectural changes needed.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-83-01
+        description: "MemberEditor does NOT save onBlur for name field"
+        criteria: "No onBlur={handleSave} on name TextInput in MemberEditor"
+
+      - id: MP-83-02
+        description: "MemberEditor does NOT save onBlur for phone field"
+        criteria: "No onBlur={handleSave} on phone TextInput in MemberEditor"
+
+      - id: MP-83-03
+        description: "TopicEditor does NOT save onBlur for title field"
+        criteria: "No onBlur={handleSave} on title TextInput in TopicEditor"
+
+      - id: MP-83-04
+        description: "TopicEditor does NOT save onBlur for link field"
+        criteria: "No onBlur={handleSave} on link TextInput in TopicEditor"
+
+      - id: MP-83-05
+        description: "MemberEditor renders a Save button"
+        criteria: "MemberEditor renders Pressable/button with Save text (t('common.save'))"
+
+      - id: MP-83-06
+        description: "MemberEditor renders a Cancel button"
+        criteria: "MemberEditor renders Pressable/button with Cancel text (t('common.cancel'))"
+
+      - id: MP-83-07
+        description: "TopicEditor renders a Save button"
+        criteria: "TopicEditor renders Pressable/button with Save text (t('common.save'))"
+
+      - id: MP-83-08
+        description: "TopicEditor renders a Cancel button"
+        criteria: "TopicEditor renders Pressable/button with Cancel text (t('common.cancel'))"
+
+      - id: MP-83-09
+        description: "MemberEditor Save button calls onSave with data"
+        criteria: "Save button onPress triggers handleSave which calls onSave()"
+
+      - id: MP-83-10
+        description: "MemberEditor Cancel button calls onCancel"
+        criteria: "Cancel button onPress calls onCancel()"
+
+      - id: MP-83-11
+        description: "TopicEditor Save button calls onSave with data"
+        criteria: "Save button onPress triggers handleSave which calls onSave()"
+
+      - id: MP-83-12
+        description: "TopicEditor Cancel button calls onCancel"
+        criteria: "Cancel button onPress calls onCancel()"
+
+      - id: MP-83-13
+        description: "TopicEditor accepts onCancel prop"
+        criteria: "TopicEditorProps interface includes onCancel callback"
+
+      - id: MP-83-14
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2502)"
+
+    should_pass:
+      - id: SP-83-01
+        description: "Save and Cancel buttons are positioned appropriately in MemberEditor"
+        criteria: "Buttons in a row at bottom of editor, Save on right side of card"
+
+      - id: SP-83-02
+        description: "Save and Cancel buttons are positioned appropriately in TopicEditor"
+        criteria: "Buttons in a row at bottom of editor, Save on right side of card"
+
+      - id: SP-83-03
+        description: "New member: Cancel discards addition without creating member"
+        criteria: "Cancel sets isAdding=false without calling createMember.mutate"
+
+      - id: SP-83-04
+        description: "Edit member: Cancel reverts to display mode without saving changes"
+        criteria: "Cancel sets editingId=null without calling updateMember.mutate"
+
+      - id: SP-83-05
+        description: "New topic: Cancel discards addition without creating topic"
+        criteria: "Cancel sets isAdding=false without calling createTopic.mutate"
+
+      - id: SP-83-06
+        description: "Edit topic: Cancel reverts to display mode without saving changes"
+        criteria: "Cancel sets editingId=null without calling updateTopic.mutate"
+
+
+# #############################################################################
+# CR-84: Clear (X) button for all search fields
+# #############################################################################
+
+cr_84:
+  cr_id: CR-84
+  title: "Adicionar botao X para limpar campo de search em todos os campos de busca do app"
+  type: feature_request
+  user_request: |
+    Adicionar um botao de X na direita do campo de search para todos os campos de search
+    do app, esse e um botao para apagar a string que esta sendo procurada e voltar a
+    mostrar a lista completa. E um botao geralmente padrao em campos assim.
+
+  current_state_analysis:
+    summary: |
+      There are 10 search fields across the app. None of them have a clear (X) button.
+      All use a simple TextInput with onChangeText={setSearch}. The X button should appear
+      when the search field has text and clear it when tapped.
+
+    evidence:
+      - description: "All 10 search field locations identified"
+        locations:
+          - file: "src/app/(tabs)/settings/members.tsx"
+            line: 553
+            context: "Members screen search"
+            state_var: "search, setSearch"
+
+          - file: "src/app/(tabs)/settings/topics.tsx"
+            line: 308
+            context: "Topics screen search (ward topics)"
+            state_var: "search, setSearch"
+
+          - file: "src/app/(tabs)/settings/history.tsx"
+            line: 107
+            context: "Activity history search"
+            state_var: "searchText, updateSearch"
+
+          - file: "src/app/(tabs)/settings/timezone.tsx"
+            line: 208
+            context: "Timezone selector search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/HymnSelector.tsx"
+            line: 104
+            context: "Hymn selector modal search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/MemberSelectorModal.tsx"
+            line: 64
+            context: "Member selector modal search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/TopicSelectorModal.tsx"
+            line: 81
+            context: "Topic selector modal search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/PrayerSelector.tsx"
+            line: 115
+            context: "Prayer selector modal search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/ActorSelector.tsx"
+            line: 199
+            context: "Actor selector modal search"
+            state_var: "search, setSearch"
+
+          - file: "src/components/AgendaForm.tsx"
+            line: 703
+            context: "Agenda form recognizing visitors search"
+            state_var: "search, setSearch"
+
+      - description: "No existing clear button found"
+        evidence: "Grep for clearSearch/clear.*search returns no matches in src/"
+
+    changes_required:
+      - "Add X clear button to all 10 search TextInputs"
+      - "X button should only be visible when search field has text (search.length > 0)"
+      - "X button should clear search text (setSearch('')) and optionally refocus"
+      - "X button positioned at right side of search input"
+      - "Consider creating a reusable SearchInput component or applying consistently"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    Standard UX pattern. Each search field uses useState for search text. Adding a
+    conditional X button Pressable inside the search container is straightforward.
+    No architectural changes needed. Could be done inline in each file or via a
+    reusable SearchInput component (preferred for DRY).
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-84-01
+        description: "Members screen search has clear (X) button when text present"
+        criteria: "members.tsx search container renders clear button when search.length > 0"
+
+      - id: MP-84-02
+        description: "Topics screen search has clear (X) button when text present"
+        criteria: "topics.tsx search container renders clear button when search.length > 0"
+
+      - id: MP-84-03
+        description: "History screen search has clear (X) button when text present"
+        criteria: "history.tsx search container renders clear button when searchText.length > 0"
+
+      - id: MP-84-04
+        description: "Timezone screen search has clear (X) button when text present"
+        criteria: "timezone.tsx search container renders clear button when search.length > 0"
+
+      - id: MP-84-05
+        description: "HymnSelector search has clear (X) button when text present"
+        criteria: "HymnSelector.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-06
+        description: "MemberSelectorModal search has clear (X) button when text present"
+        criteria: "MemberSelectorModal.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-07
+        description: "TopicSelectorModal search has clear (X) button when text present"
+        criteria: "TopicSelectorModal.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-08
+        description: "PrayerSelector search has clear (X) button when text present"
+        criteria: "PrayerSelector.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-09
+        description: "ActorSelector search has clear (X) button when text present"
+        criteria: "ActorSelector.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-10
+        description: "AgendaForm search has clear (X) button when text present"
+        criteria: "AgendaForm.tsx renders clear button when search.length > 0"
+
+      - id: MP-84-11
+        description: "Clear button clears search text (sets to empty string)"
+        criteria: "onPress of X button calls setSearch('') or equivalent"
+
+      - id: MP-84-12
+        description: "Clear button is NOT visible when search field is empty"
+        criteria: "X button conditionally rendered only when search has text"
+
+      - id: MP-84-13
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2502)"
+
+    should_pass:
+      - id: SP-84-01
+        description: "X button is positioned at right side of search input"
+        criteria: "Button positioned with absolute right or flex row layout"
+
+      - id: SP-84-02
+        description: "X button has appropriate size for touch target (>= 24px)"
+        criteria: "Button has minimum 24px touch area for accessibility"
+
+      - id: SP-84-03
+        description: "All 10 search fields use consistent X button styling"
+        criteria: "Same visual appearance across all search fields"
+
+
+# #############################################################################
+# CR-85: Complete international country codes list
+# #############################################################################
+
+cr_85:
+  cr_id: CR-85
+  title: "Lista de codigos internacionais de telefone incompleta, faltam muitos paises"
+  type: bugfix
+  user_request: |
+    A lista de codigos internacionais e pequena, nao tem todos os paises,
+    deixe mais completo.
+
+  current_state_analysis:
+    summary: |
+      The COUNTRY_CODES array in members.tsx contains only 21 countries. This is a small
+      subset of the world's ~195 countries. The user wants a more complete list. Additionally,
+      the splitPhoneNumber function in csvUtils.ts hardcodes the same 21 country codes for
+      parsing imported CSV data.
+
+    evidence:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        findings:
+          - "COUNTRY_CODES array (lines 51-73): Only 21 entries"
+          - "Countries present: Brasil, USA, Mexico, Argentina, Chile, Colombia, Venezuela, Peru, Bolivia, Paraguay, Uruguay, Ecuador, Portugal, Angola, Mozambique, UK, Spain, France, Germany, Italy, Japan"
+          - "Missing major countries: Canada, Australia, India, China, South Korea, Philippines, Russia, South Africa, Nigeria, Kenya, Ghana, Guatemala, Honduras, El Salvador, Costa Rica, Panama, Dominican Republic, Puerto Rico, Cuba, Haiti, New Zealand, Ireland, Netherlands, Belgium, Switzerland, Austria, Sweden, Norway, Denmark, Finland, Poland, Czech Republic, Romania, Hungary, Greece, Turkey, Israel, Saudi Arabia, UAE, Egypt, Morocco, Tunisia, Cape Verde, Timor-Leste, Indonesia, Thailand, Vietnam, Malaysia, Singapore, Taiwan, Hong Kong, and many more"
+          - "getFlagForCode (line 75-78): Falls back to globe emoji for unknown codes"
+
+      - path: "src/lib/csvUtils.ts"
+        findings:
+          - "splitPhoneNumber (lines 142-169): Hardcodes same 21 country codes"
+          - "3-digit codes (line 153): 591|595|598|593|351|244|258"
+          - "2-digit codes (line 158): 55|52|54|56|57|58|51|44|34|33|49|39|81"
+          - "1-digit code (line 163): just '1'"
+          - "Fallback (line 167-168): assumes first 2 digits are country code"
+          - "Adding new countries to COUNTRY_CODES also requires updating splitPhoneNumber regex patterns"
+
+    changes_required:
+      - "Expand COUNTRY_CODES array to include all ~195 countries with their codes and flag emojis"
+      - "Update splitPhoneNumber in csvUtils.ts to recognize all new country codes"
+      - "Consider extracting COUNTRY_CODES to a shared constants file for DRY"
+      - "Maintain alphabetical order or group by region for usability"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    This is a data-only change (expanding a static array and regex patterns). No architectural
+    changes needed. Country code to flag emoji mapping is deterministic (Unicode regional
+    indicator symbols). The country code picker modal already supports scrolling via FlatList
+    (members.tsx:159). Consider adding search to the country code picker if list becomes long.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-85-01
+        description: "COUNTRY_CODES list has significantly more entries (>= 100 countries)"
+        criteria: "COUNTRY_CODES array length >= 100"
+
+      - id: MP-85-02
+        description: "All major LDS-presence countries are included"
+        criteria: "List includes at minimum: Brazil, USA, Mexico, Argentina, Chile, Colombia, Peru, Philippines, Guatemala, Honduras, Ecuador, Bolivia, Paraguay, Uruguay, Portugal, Angola, Mozambique, Cape Verde, UK, Spain, France, Germany, Italy, Japan, South Korea, Australia, New Zealand, Canada, India, Nigeria, Ghana, South Africa, Kenya, Dominican Republic, El Salvador, Costa Rica, Panama, Puerto Rico, Haiti, Cuba, Taiwan, Hong Kong, Singapore, Thailand, Fiji, Samoa, Tonga"
+
+      - id: MP-85-03
+        description: "splitPhoneNumber in csvUtils.ts recognizes all new country codes"
+        criteria: "splitPhoneNumber regex patterns updated to include all country codes from expanded list"
+
+      - id: MP-85-04
+        description: "Each country entry has code, flag emoji, and label"
+        criteria: "All entries follow CountryCode interface: { code: string; flag: string; label: string }"
+
+      - id: MP-85-05
+        description: "No duplicate country codes in the list"
+        criteria: "Each code appears exactly once in COUNTRY_CODES"
+
+      - id: MP-85-06
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2502)"
+
+    should_pass:
+      - id: SP-85-01
+        description: "Countries are sorted in a logical order (alphabetical by label or grouped by region)"
+        criteria: "List is organized consistently, not random"
+
+      - id: SP-85-02
+        description: "Country code picker modal is usable with large list"
+        criteria: "FlatList performance is acceptable, consider adding search to picker if >100 items"
+
+      - id: SP-85-03
+        description: "Flag emojis are correct Unicode regional indicator symbols"
+        criteria: "Each flag matches its country code"
+
+
+# #############################################################################
+# CR-86: Confirmation dialog before Import CSV
+# #############################################################################
+
+cr_86:
+  cr_id: CR-86
+  title: "Dialogo de confirmacao antes de Importar CSV"
+  type: feature_request
+  user_request: |
+    Adicionar um dialogo de confirmacao logo ao clicar no botao Importar CSV. Nesse dialogo
+    a gente avisa que ao fazer o upload, toda a lista de membros da ala e substituida pela
+    lista do arquivo. Avisamos tambem que isso nao mexe nas designacoes passadas ou presentes.
+    Se confirmar ai sim abrimos o dialogo do sistema para selecionar arquivo.
+
+  current_state_analysis:
+    summary: |
+      Currently handleImport (members.tsx:457-497) goes directly to the file picker without
+      any confirmation. The user wants an Alert dialog first warning that import replaces
+      the entire member list and that it does not affect past or present assignments.
+      Only after confirmation should the file picker open.
+
+    evidence:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        findings:
+          - "handleImport (line 457-497): Immediately opens DocumentPicker or web file input"
+          - "No Alert.alert or confirmation dialog before file picker"
+          - "importMutation (line 409-454): Uses RPC import_members which is atomic DELETE all + INSERT new"
+          - "The existing csvHelp text mentions 'Import loads a CSV file and replaces the entire member list'"
+          - "But there is no interactive confirmation before the destructive action"
+
+      - path: "src/i18n/locales/en.json"
+        findings:
+          - "No i18n key for import confirmation message exists"
+          - "Need new keys for confirmation title and message"
+
+    changes_required:
+      - "Add Alert.alert() confirmation dialog before file picker in handleImport"
+      - "Dialog message should warn: import replaces entire member list"
+      - "Dialog message should also state: past/present assignments are not affected"
+      - "Only open file picker after user confirms"
+      - "Add new i18n keys for confirmation dialog text in all 3 locales (en, pt-BR, es)"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    Alert.alert already used extensively in the app (e.g., handleDelete at line 338).
+    Adding a confirmation dialog is a simple wrapping of the existing handleImport logic.
+    New i18n keys need to be added to all 3 locale files.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-86-01
+        description: "Import button triggers confirmation dialog before file picker"
+        criteria: "handleImport shows Alert.alert before DocumentPicker or file input"
+
+      - id: MP-86-02
+        description: "Confirmation dialog warns that import replaces entire member list"
+        criteria: "Alert message contains text about replacing/substituting member list"
+
+      - id: MP-86-03
+        description: "Confirmation dialog states that assignments are not affected"
+        criteria: "Alert message mentions that past/present assignments/designacoes are not affected"
+
+      - id: MP-86-04
+        description: "File picker only opens after user confirms"
+        criteria: "DocumentPicker.getDocumentAsync called only in Alert confirm callback"
+
+      - id: MP-86-05
+        description: "Cancel in confirmation dialog does NOT open file picker"
+        criteria: "Alert cancel button does not trigger file picker"
+
+      - id: MP-86-06
+        description: "i18n keys for confirmation exist in en.json"
+        criteria: "New confirmation-related keys exist in members section of en.json"
+
+      - id: MP-86-07
+        description: "i18n keys for confirmation exist in pt-BR.json"
+        criteria: "New confirmation-related keys exist in members section of pt-BR.json"
+
+      - id: MP-86-08
+        description: "i18n keys for confirmation exist in es.json"
+        criteria: "New confirmation-related keys exist in members section of es.json"
+
+      - id: MP-86-09
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2502)"
+
+    should_pass:
+      - id: SP-86-01
+        description: "Confirmation dialog has appropriate title"
+        criteria: "Dialog uses t('common.confirm') or similar appropriate title"
+
+      - id: SP-86-02
+        description: "Confirmation dialog has confirm and cancel buttons"
+        criteria: "Alert has at least 2 buttons: cancel (style: cancel) and confirm"
+
+      - id: SP-86-03
+        description: "Translations are accurate in all 3 languages"
+        criteria: "Portuguese and Spanish translations are natural and correct"
+
+
+# #############################################################################
+# CR-90: [BUG] Delete button for members and ward topics does nothing
+# #############################################################################
+
+cr_90:
+  cr_id: CR-90
+  title: "[BUG] Botao de excluir para membros e temas da ala nao faz nada"
+  type: bugfix
+  user_request: |
+    [BUG] O botao de excluir para membros e temas da ala nao faz nada.
+
+  current_state_analysis:
+    summary: |
+      The delete button (red button revealed on swipe) does not work for either members
+      or ward topics. The edit button (blue button) DOES work. Both use the same SwipeableCard
+      component pattern. The bug is in SwipeableCard.tsx where the action buttons are behind
+      the Animated.View with GestureDetector. When the card slides left to reveal action buttons,
+      the GestureDetector may be intercepting touch events on the action button area.
+
+    evidence:
+      - path: "src/components/SwipeableCard.tsx"
+        findings:
+          - "Action buttons container (line 152): position absolute, right 0, behind card content"
+          - "cardContent (line 180-190): Animated.View with GestureDetector has zIndex: 1 (line 221)"
+          - "Edit button (line 154-163): Pressable with onPress={handleEdit} - WORKS"
+          - "Delete button (line 166-175): Pressable with onPress={handleDelete} - DOES NOT WORK"
+          - "handleEdit (line 137-141): calls onReveal(null) then onEdit?.()"
+          - "handleDelete (line 143-147): calls onReveal(null) then onDelete?.()"
+          - "Both handlers follow identical pattern but delete does not fire"
+
+      - path: "src/app/(tabs)/settings/members.tsx"
+        findings:
+          - "MemberRow (line 225-248): SwipeableCard wraps member content"
+          - "onEdit={() => onEdit(member)} at line 230 - works"
+          - "onDelete={() => onDelete(member)} at line 231 - does not work"
+          - "handleDelete (line 329-358): calls Alert.alert with delete confirmation"
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        findings:
+          - "TopicRow (line 122-144): SwipeableCard wraps topic content"
+          - "onEdit={() => onEdit(topic)} at line 128 - works"
+          - "onDelete={() => onDelete(topic)} at line 129 - does not work"
+          - "handleDelete (line 244-256): calls Alert.alert with delete confirmation"
+
+    reproduction_steps:
+      - step: 1
+        action: "Navigate to Settings > Members"
+        expected: "Members list is displayed"
+      - step: 2
+        action: "Swipe left on any member row"
+        expected: "Edit (blue) and Delete (red) buttons are revealed"
+      - step: 3
+        action: "Tap the Delete (red) button"
+        expected: "Confirmation dialog should appear asking to confirm deletion"
+        actual: "Nothing happens. No confirmation dialog appears."
+      - step: 4
+        action: "Tap the Edit (blue) button"
+        expected: "Member enters edit mode with inline editor"
+        actual: "Works correctly - member enters edit mode"
+      - step: 5
+        action: "Navigate to Settings > Topics"
+        expected: "Topics list is displayed"
+      - step: 6
+        action: "Swipe left on any ward topic row"
+        expected: "Edit and Delete buttons are revealed"
+      - step: 7
+        action: "Tap the Delete (red) button"
+        expected: "Confirmation dialog should appear"
+        actual: "Nothing happens"
+
+    root_cause_analysis:
+      hypothesis: |
+        The most likely cause is a touch event interception issue. The GestureDetector wraps
+        the Animated.View (cardContent, zIndex: 1) which slides left. The action buttons are
+        behind the card in a position:absolute container. When both edit and delete buttons
+        are rendered (both onEdit and onDelete are provided), they share the 140px action width
+        with flex:1 each (70px each). The delete button is on the RIGHT side (further from
+        the card edge). The issue could be:
+
+        1. The delete button's touch area overlaps with the edge of the still-present
+           GestureDetector's gesture recognition zone, causing the pan gesture to consume
+           the touch event before the Pressable can handle it.
+
+        2. The Animated.View, despite being translated left visually, may still have its
+           gesture detection zone covering the original position, intercepting taps meant
+           for the delete button.
+
+        3. There could be a race condition where handleDelete calls onReveal(null) which
+           triggers a re-render that unmounts the action buttons before onDelete fires,
+           but this seems unlikely since both are called synchronously.
+
+        The fix likely involves either:
+        a) Adjusting the GestureDetector's hit slop or gesture configuration
+        b) Using pointerEvents on the Animated.View to not intercept touches when revealed
+        c) Repositioning the action buttons or adjusting zIndex
+        d) Using Pressable with hitSlop on the delete button
+
+      affected_files:
+        - "src/components/SwipeableCard.tsx"
+
+  feasibility: confirmed
+  feasibility_rationale: |
+    The bug is reproducible and the root cause is likely in SwipeableCard.tsx gesture/touch
+    handling. The fix should be in that single component, affecting both members and topics
+    simultaneously since they both use SwipeableCard. No architectural changes needed.
+
+  validation_checks:
+
+    must_pass:
+      - id: MP-90-01
+        description: "Delete button in SwipeableCard fires onDelete callback when tapped"
+        criteria: "Tapping delete button after swipe calls onDelete handler"
+
+      - id: MP-90-02
+        description: "Members screen: delete button shows confirmation dialog"
+        criteria: "After swipe, tapping delete shows Alert.alert with delete confirmation"
+
+      - id: MP-90-03
+        description: "Topics screen: delete button shows confirmation dialog"
+        criteria: "After swipe, tapping delete shows Alert.alert with delete confirmation"
+
+      - id: MP-90-04
+        description: "Edit button continues to work after fix"
+        criteria: "Edit button still fires onEdit callback correctly"
+
+      - id: MP-90-05
+        description: "SwipeableCard swipe gesture still works correctly"
+        criteria: "Pan gesture still reveals/hides action buttons with snap behavior"
+
+      - id: MP-90-06
+        description: "Only one card can be revealed at a time"
+        criteria: "activeId/onReveal single-reveal management still works"
+
+      - id: MP-90-07
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run passes all tests (>= 2502)"
+
+    should_pass:
+      - id: SP-90-01
+        description: "Confirming delete in dialog actually deletes the member"
+        criteria: "deleteMember.mutate is called and member is removed from list"
+
+      - id: SP-90-02
+        description: "Confirming delete in dialog actually deletes the topic"
+        criteria: "deleteTopic.mutate is called and topic is removed from list"
+
+      - id: SP-90-03
+        description: "Delete button visual appearance unchanged"
+        criteria: "Red background, white text, same styling"
+
+
+# =============================================================================
+# CROSS-CR DEPENDENCIES AND NOTES
+# =============================================================================
+
+cross_cr_notes:
+  - cr_pair: [83, 90]
+    note: |
+      CR-83 modifies MemberEditor and TopicEditor adding Save/Cancel buttons.
+      CR-90 fixes the delete button in SwipeableCard.
+      Both affect the same screens (members, topics) but different components.
+      CR-90 should be fixed FIRST since the delete functionality is more fundamental.
+      CR-83 changes the save mechanism which is independent of the delete flow.
+
+  - cr_pair: [84, 83]
+    note: |
+      CR-84 adds X clear button to search fields. CR-83 adds Save/Cancel buttons to editors.
+      Both modify members.tsx and topics.tsx but in different sections. No conflict.
+
+  - cr_pair: [85, 86]
+    note: |
+      CR-85 expands country codes and CR-86 adds import confirmation dialog.
+      Both modify members.tsx but in different functions (COUNTRY_CODES constant vs handleImport).
+      No conflict.
+
+implementation_order_recommendation:
+  - order: 1
+    cr: 90
+    reason: "Bug fix should come first - delete button is broken and blocks CR-83 testing"
+  - order: 2
+    cr: 83
+    reason: "Changes editor behavior for members and topics - depends on working delete"
+  - order: 3
+    cr: 84
+    reason: "Independent UI enhancement - X clear buttons for all search fields"
+  - order: 4
+    cr: 85
+    reason: "Data expansion - larger country codes list, mostly additive"
+  - order: 5
+    cr: 86
+    reason: "Independent UI enhancement - import confirmation dialog"

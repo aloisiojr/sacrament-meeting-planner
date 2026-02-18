@@ -1,0 +1,680 @@
+# =============================================================================
+# PLAN_P011.yaml
+# Batch 6, Phase 1: Members UX Improvements & Bug Fixes
+# Features: F027 (Save/Cancel), F028 (Search Clear X), F029 (Country Codes),
+#           F030 (CSV Import Confirm), F031 (Delete Button Fix)
+# CRs: 83, 84, 85, 86, 90
+# SPEC: docs/specs/SPEC_F027_F031.yaml
+# ARCH: docs/arch/ARCH_M011.yaml
+# Generated: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement 5 UX improvements and bug fixes for Members and Topics management:
+  fix Delete button touch interception in SwipeableCard, replace auto-save onBlur
+  with explicit Save/Cancel buttons, expand country codes to ~200 entries with
+  shared module, add CSV import confirmation dialog, and add clear X button to
+  all 10 search fields via reusable SearchInput component.
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Regression"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto com o codigo"
+
+steps:
+
+  # ===========================================================================
+  # F031 - Fix Delete Button (CR-90) - 1 file
+  # ===========================================================================
+
+  - id: STEP-01
+    description: >
+      Fix SwipeableCard Delete button not responding to touch. Add
+      pointerEvents='box-none' to the Animated.View that wraps card content
+      so touches pass through transparent areas to action buttons underneath.
+      Move backgroundColor from Animated.View style to a new inner wrapper
+      <View style={{ backgroundColor: colors.card }}> inside the Animated.View,
+      so the card content area still blocks touches where it has visual content.
+      Per ADR-032, the GestureDetector pan gesture still works because it manages
+      its own touch handling independently of React Native pointerEvents.
+    files:
+      - "src/components/SwipeableCard.tsx"
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "Animated.View has pointerEvents='box-none' prop"
+      - "backgroundColor moved from Animated.View to inner <View> wrapping {children}"
+      - "cardContent style retains zIndex:1 but no longer has backgroundColor in Animated.View inline style"
+      - "GestureDetector still wraps the Animated.View (structure unchanged)"
+    tests:
+      - type: component
+        description: >
+          T-01: Render SwipeableCard with onDelete mock. Verify the Animated.View
+          has pointerEvents='box-none'. Verify inner wrapper View exists with
+          backgroundColor. Press Delete button, verify onDelete was called.
+          (AC-F031-01, AC-F031-03)
+      - type: regression
+        description: >
+          T-02: Render SwipeableCard with onEdit mock. Press Edit button after
+          swipe reveal. Verify onEdit was called (no regression).
+          (AC-F031-04)
+    covers:
+      acceptance_criteria: ["AC-F031-01", "AC-F031-02", "AC-F031-03", "AC-F031-04"]
+      edge_cases: []
+    risks:
+      - risk: "pointerEvents='box-none' might affect pan gesture detection"
+        mitigation: >
+          GestureDetector from react-native-gesture-handler manages touches
+          independently of React Native's pointerEvents. Pan requires
+          activeOffsetX movement which is unaffected. Simple taps pass through.
+    commit_message: "fix(swipeable): add pointerEvents box-none to fix Delete button touch (CR-90)"
+
+  # ===========================================================================
+  # F027 - Save/Cancel Buttons (CR-83) - 2 files
+  # ===========================================================================
+
+  - id: STEP-02
+    description: >
+      Modify MemberEditor in members.tsx to remove auto-save on blur and add
+      explicit Save/Cancel buttons. Changes:
+      1. Remove onBlur={handleSave} from both TextInputs (name and phone).
+      2. Make onCancel required in MemberEditorProps (was optional).
+      3. Add editorButtons View below phoneRow with Cancel and Save Pressables.
+         Cancel: color textSecondary, calls onCancel. Save: backgroundColor
+         primary, color onPrimary, calls handleSave.
+      4. Add styles: editorButtons (flexDirection row, justifyContent flex-end,
+         gap 8, marginTop 8), cancelButton/saveButton (paddingVertical 8,
+         paddingHorizontal 16, borderRadius 6), text styles (fontSize 14,
+         fontWeight 600).
+      5. Update MemberRow to pass onCancel to MemberEditor in edit mode.
+         Add onCancel prop to MemberRowProps. In renderItem, pass
+         onCancel={() => setEditingId(null)}.
+      6. Use t('common.save') and t('common.cancel') for button labels.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "MemberEditor no longer has onBlur={handleSave} on any TextInput"
+      - "MemberEditorProps.onCancel is required (not optional)"
+      - "Save button with t('common.save') and Cancel button with t('common.cancel') are rendered"
+      - "Save button has backgroundColor colors.primary and text color colors.onPrimary"
+      - "Cancel button text uses colors.textSecondary"
+      - "Clicking Save calls handleSave (which validates full_name and calls onSave)"
+      - "Clicking Cancel calls onCancel"
+      - "MemberRow passes onCancel to MemberEditor in edit mode"
+      - "New member form (isAdding) already passes onCancel={() => setIsAdding(false)}"
+      - "editorButtons style has flexDirection row, justifyContent flex-end, gap 8, marginTop 8"
+    tests:
+      - type: component
+        description: >
+          T-03: Render MemberEditor with onSave and onCancel mocks. Verify
+          Save and Cancel buttons are present with correct i18n text.
+          (AC-F027-08)
+      - type: component
+        description: >
+          T-04: Render MemberEditor, type name, simulate blur on input.
+          Verify onSave was NOT called. (AC-F027-01)
+      - type: component
+        description: >
+          T-05: Render MemberEditor, fill name "John", press Save.
+          Verify onSave called with { full_name: 'John', country_code: '+55', phone: '' }.
+          (AC-F027-02)
+      - type: component
+        description: >
+          T-06: Render MemberEditor, type data, press Cancel.
+          Verify onCancel called and onSave NOT called. (AC-F027-03)
+      - type: component
+        description: >
+          T-07: Render MemberEditor with empty name, press Save.
+          Verify onSave NOT called. (AC-F027-04)
+    covers:
+      acceptance_criteria: ["AC-F027-01", "AC-F027-02", "AC-F027-03", "AC-F027-04", "AC-F027-08"]
+      edge_cases: []
+    risks:
+      - risk: "Users accustomed to auto-save on blur may lose data"
+        mitigation: >
+          This is the intended behavior requested by the user. Editor remains
+          open until Save or Cancel is explicitly clicked.
+    commit_message: "feat(members): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+
+  - id: STEP-03
+    description: >
+      Modify TopicEditor in topics.tsx to remove auto-save on blur and add
+      explicit Save/Cancel buttons. Same pattern as STEP-02. Changes:
+      1. Remove onBlur={handleSave} from both TextInputs (title and link).
+      2. Add onCancel prop to TopicEditorProps (required).
+      3. Add editorButtons View below link input with Cancel and Save.
+         Same styling as MemberEditor.
+      4. Add styles: editorButtons, cancelButton, saveButton, cancelButtonText,
+         saveButtonText (same values as members.tsx).
+      5. Update TopicRow to add onCancel prop and pass it to TopicEditor.
+         In TopicRow edit mode: pass onCancel from props.
+      6. In TopicsScreen: pass onCancel={() => setEditingId(null)} to TopicRow.
+         For isAdding TopicEditor: pass onCancel={() => setIsAdding(false)}.
+      7. Use t('common.save') and t('common.cancel') for button labels.
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "TopicEditor no longer has onBlur={handleSave} on any TextInput"
+      - "TopicEditorProps has required onCancel: () => void"
+      - "Save and Cancel buttons rendered below the link input"
+      - "TopicRow has onCancel prop and passes it to TopicEditor"
+      - "TopicsScreen passes onCancel={() => setEditingId(null)} to TopicRow for edit"
+      - "isAdding TopicEditor receives onCancel={() => setIsAdding(false)}"
+    tests:
+      - type: component
+        description: >
+          T-08: Render TopicEditor, verify Save and Cancel buttons present.
+          (AC-F027-08 for topics)
+      - type: component
+        description: >
+          T-09: Render TopicEditor, type title, simulate blur. Verify onSave
+          NOT called. (AC-F027-05)
+      - type: component
+        description: >
+          T-10: Render TopicEditor, fill title, press Save. Verify onSave
+          called with correct data. (AC-F027-06)
+      - type: component
+        description: >
+          T-11: Render TopicEditor, type data, press Cancel. Verify onCancel
+          called, onSave NOT called. (AC-F027-07)
+    covers:
+      acceptance_criteria: ["AC-F027-05", "AC-F027-06", "AC-F027-07", "AC-F027-08"]
+      edge_cases: []
+    risks:
+      - risk: "Styling inconsistency between MemberEditor and TopicEditor buttons"
+        mitigation: "Same style values used in both; coder can reference STEP-02 styles"
+    commit_message: "feat(topics): replace onBlur auto-save with Save/Cancel buttons (CR-83)"
+
+  # ===========================================================================
+  # F029 - Complete Country Codes (CR-85) - 3 files (1 new)
+  # ===========================================================================
+
+  - id: STEP-04
+    description: >
+      Create src/lib/countryCodes.ts as single source of truth for country codes
+      (ADR-031). Export:
+      1. CountryCode interface: { code: string; flag: string; label: string }
+      2. COUNTRY_CODES array with ~200 entries. Brazil (+55) first, then
+         alphabetical by country name in English. Each entry has Regional
+         Indicator Symbol emoji flag. Countries sharing +1 (USA, Canada)
+         listed separately.
+      3. getFlagForCode(code: string): string - returns flag emoji for code,
+         globe fallback if not found.
+      4. splitPhoneNumber(fullPhone: string): { countryCode: string; phone: string }
+         - extracts all unique codes from COUNTRY_CODES, groups by length
+         (longest first: 4-digit, 3-digit, 2-digit, 1-digit), tries matching
+         longest first. Default fallback: +55 if no match or no + prefix.
+    files:
+      - "src/lib/countryCodes.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03"]
+    done_when:
+      - "File src/lib/countryCodes.ts exists"
+      - "COUNTRY_CODES has >= 150 entries"
+      - "COUNTRY_CODES[0].code === '+55' (Brazil first)"
+      - "Remaining entries sorted alphabetically by country name"
+      - "USA and Canada are separate entries both with code '+1'"
+      - "Each entry has code starting with '+', non-empty flag, label containing the code"
+      - "getFlagForCode returns correct flag or globe fallback"
+      - "splitPhoneNumber correctly handles all code lengths (1-4 digits)"
+      - "splitPhoneNumber defaults to +55 when no match"
+    tests:
+      - type: unit
+        description: >
+          T-12: COUNTRY_CODES.length >= 150. (AC-F029-01)
+      - type: unit
+        description: >
+          T-13: COUNTRY_CODES[0].code === '+55'. (AC-F029-04)
+      - type: unit
+        description: >
+          T-14: All entries have valid code (starts with +), non-empty flag,
+          label containing the code. (AC-F029-05)
+      - type: unit
+        description: >
+          T-15: USA and Canada are separate entries with +1. (AC-F029-01)
+      - type: unit
+        description: >
+          T-16: Entries after index 0 are sorted alphabetically by country name
+          (extracted from label before the parenthesized code). (AC-F029-04)
+      - type: unit
+        description: >
+          T-17: splitPhoneNumber('+61412345678') returns
+          { countryCode: '+61', phone: '412345678' }.
+          splitPhoneNumber('+5511999999999') returns
+          { countryCode: '+55', phone: '11999999999' }.
+          splitPhoneNumber('+14155551234') returns
+          { countryCode: '+1', phone: '4155551234' }.
+          splitPhoneNumber('+447911123456') returns
+          { countryCode: '+44', phone: '7911123456' }.
+          splitPhoneNumber('11999999999') returns
+          { countryCode: '+55', phone: '11999999999' } (no + fallback).
+          (AC-F029-02)
+    covers:
+      acceptance_criteria: ["AC-F029-01", "AC-F029-02", "AC-F029-04", "AC-F029-05"]
+      edge_cases:
+        - "Phone without + prefix defaults to +55"
+        - "Empty phone returns +55 and empty string"
+    risks:
+      - risk: "Some flag emojis may render incorrectly on certain platforms"
+        mitigation: "Using standard Unicode Regional Indicator Symbol pairs"
+      - risk: "Large file (~500 lines) but static data, negligible bundle impact"
+        mitigation: "Country codes are constant data, tree-shaking irrelevant"
+    commit_message: "feat(lib): create countryCodes.ts with ~200 country codes and splitPhoneNumber (CR-85)"
+
+  - id: STEP-05
+    description: >
+      Update members.tsx and csvUtils.ts to use shared countryCodes.ts. Changes:
+      1. In members.tsx: remove local CountryCode interface, COUNTRY_CODES array
+         (21 entries), and getFlagForCode function. Add import:
+         import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes';
+      2. In csvUtils.ts: remove local splitPhoneNumber function (lines 142-169).
+         Add re-export: export { splitPhoneNumber } from './countryCodes';
+         This preserves backward compatibility for existing imports from csvUtils.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+      - "src/lib/csvUtils.ts"
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "members.tsx no longer has local CountryCode interface"
+      - "members.tsx no longer has local COUNTRY_CODES array"
+      - "members.tsx no longer has local getFlagForCode function"
+      - "members.tsx imports COUNTRY_CODES, getFlagForCode, CountryCode from ../../../lib/countryCodes"
+      - "csvUtils.ts no longer has local splitPhoneNumber implementation"
+      - "csvUtils.ts re-exports splitPhoneNumber from ./countryCodes"
+      - "Existing import { splitPhoneNumber } from csvUtils in members.tsx still works"
+    tests:
+      - type: unit
+        description: >
+          T-18: Import COUNTRY_CODES from countryCodes.ts and from members.tsx
+          module context. Verify they reference the same data.
+          (AC-F029-03 - both sources are in sync)
+      - type: unit
+        description: >
+          T-19: Import splitPhoneNumber from csvUtils.ts. Verify it works for
+          a representative phone number (backward compatibility check).
+          (AC-F029-03)
+    covers:
+      acceptance_criteria: ["AC-F029-03"]
+      edge_cases: []
+    risks:
+      - risk: "Circular import between csvUtils and countryCodes"
+        mitigation: "countryCodes.ts is standalone, csvUtils re-exports from it, no circular dependency"
+    commit_message: "refactor(members,csv): use shared countryCodes.ts as single source of truth (CR-85)"
+
+  # ===========================================================================
+  # F030 - CSV Import Confirmation (CR-86) - 4 files
+  # ===========================================================================
+
+  - id: STEP-06
+    description: >
+      Add i18n keys for CSV import confirmation dialog in all 3 locale files.
+      Keys to add inside the "members" object:
+      - members.importConfirmTitle: en="Import Members", pt_BR="Importar Membros",
+        es="Importar Miembros"
+      - members.importConfirmMessage: en="Importing a CSV file will replace the
+        entire current member list with the contents of the file. Existing speech
+        assignments (past and present) will not be affected. Do you want to
+        continue?", pt_BR="Ao importar um arquivo CSV, toda a lista de membros
+        atual sera substituida pelo conteudo do arquivo. As designacoes de
+        discursos existentes (passadas e presentes) nao serao afetadas. Deseja
+        continuar?", es="Al importar un archivo CSV, toda la lista de miembros
+        actual sera reemplazada por el contenido del archivo. Las asignaciones
+        de discursos existentes (pasadas y presentes) no seran afectadas.
+        Desea continuar?"
+      Note: common.confirm already exists in all locales (verified in en.json).
+    files:
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "en.json has members.importConfirmTitle = 'Import Members'"
+      - "en.json has members.importConfirmMessage with full English text"
+      - "pt-BR.json has members.importConfirmTitle = 'Importar Membros'"
+      - "pt-BR.json has members.importConfirmMessage with full Portuguese text"
+      - "es.json has members.importConfirmTitle = 'Importar Miembros'"
+      - "es.json has members.importConfirmMessage with full Spanish text"
+      - "All 3 files remain valid JSON"
+    tests:
+      - type: unit
+        description: >
+          T-20: Import all 3 locale files. Verify members.importConfirmTitle
+          and members.importConfirmMessage exist and are non-empty strings
+          in each. (AC-F030-05)
+    covers:
+      acceptance_criteria: ["AC-F030-05"]
+      edge_cases: []
+    risks:
+      - risk: "JSON syntax error breaking all translations"
+        mitigation: "Test validates JSON parse succeeds for all 3 files"
+    commit_message: "feat(i18n): add members.importConfirmTitle and importConfirmMessage keys (CR-86)"
+
+  - id: STEP-07
+    description: >
+      Modify handleImport in members.tsx to show Alert.alert confirmation
+      before opening the file picker. Changes:
+      1. Rename existing handleImport to performImport (keeps all current logic:
+         Platform.OS web check, DocumentPicker, etc.).
+      2. Create new handleImport that shows Alert.alert with:
+         - title: t('members.importConfirmTitle')
+         - message: t('members.importConfirmMessage')
+         - buttons: [{ text: t('common.cancel'), style: 'cancel' },
+                     { text: t('common.confirm'), style: 'default',
+                       onPress: () => performImport() }]
+      3. The existing onPress={handleImport} on the import CSV button
+         continues to work (handleImport now shows the alert first).
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: ["STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Clicking Import CSV button triggers Alert.alert (not file picker directly)"
+      - "Alert shows title t('members.importConfirmTitle')"
+      - "Alert shows message t('members.importConfirmMessage')"
+      - "Alert has Cancel button (style 'cancel') and Confirm button (style 'default')"
+      - "Cancel closes the dialog without opening file picker"
+      - "Confirm button triggers performImport which opens file picker"
+      - "performImport contains the exact same logic as the old handleImport"
+    tests:
+      - type: component
+        description: >
+          T-21: Mock Alert.alert. Press Import CSV button. Verify Alert.alert
+          was called with correct title, message, and 2 buttons.
+          (AC-F030-01, AC-F030-02)
+      - type: component
+        description: >
+          T-22: Mock Alert.alert and DocumentPicker.getDocumentAsync. Press
+          Import CSV. Simulate Cancel button (first button). Verify
+          DocumentPicker NOT called. (AC-F030-04)
+      - type: component
+        description: >
+          T-23: Mock Alert.alert and DocumentPicker.getDocumentAsync. Press
+          Import CSV. Simulate Confirm button (second button onPress).
+          Verify performImport is invoked (DocumentPicker called).
+          (AC-F030-03)
+    covers:
+      acceptance_criteria: ["AC-F030-01", "AC-F030-02", "AC-F030-03", "AC-F030-04"]
+      edge_cases: []
+    risks:
+      - risk: "Alert.alert callback scope might miss dependencies"
+        mitigation: >
+          performImport is a stable useCallback with explicit dependencies.
+          Alert.alert button onPress just calls () => performImport().
+    commit_message: "feat(members): add confirmation dialog before CSV import (CR-86)"
+
+  # ===========================================================================
+  # F028 - Search Clear Button X (CR-84) - 11 files (1 new)
+  # ===========================================================================
+
+  - id: STEP-08
+    description: >
+      Create SearchInput reusable component (src/components/SearchInput.tsx).
+      Per ADR-030, uses useTheme() internally (no colors prop needed).
+      Implementation:
+      1. SearchInputProps extends Omit<TextInputProps, 'value' | 'onChangeText'>
+         with required value: string and onChangeText: (text: string) => void.
+      2. Renders a View container wrapping TextInput and conditional X button.
+      3. TextInput gets same styling as existing search inputs: height 40,
+         borderWidth 1, borderRadius 8, paddingHorizontal 12, fontSize 15,
+         PLUS paddingRight 36 (to avoid text under X button).
+      4. X button: visible only when value.length > 0. Uses Pressable with
+         unicode '\u00D7' (multiplication sign), color textSecondary, fontSize 18.
+         Positioned absolutely right:8, centered vertically. hitSlop 8.
+         onPress calls onChangeText('') without re-focusing the field.
+      5. accessibilityLabel="Clear search" and accessibilityRole="button" on X.
+    files:
+      - "src/components/SearchInput.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07"]
+    done_when:
+      - "File src/components/SearchInput.tsx exists"
+      - "Component uses useTheme() internally for colors"
+      - "TextInput has paddingRight >= 36"
+      - "X button (unicode multiplication sign) visible only when value.length > 0"
+      - "X button calls onChangeText('') on press"
+      - "X button has hitSlop and accessibility attributes"
+      - "Component accepts all TextInput props via spread (except value and onChangeText)"
+    tests:
+      - type: component
+        description: >
+          T-24: Render SearchInput with value=''. Verify X button is NOT present.
+          (AC-F028-01)
+      - type: component
+        description: >
+          T-25: Render SearchInput with value='test'. Verify X button IS visible.
+          (AC-F028-02)
+      - type: component
+        description: >
+          T-26: Render SearchInput with value='test' and onChangeText mock.
+          Press X button. Verify onChangeText called with ''.
+          (AC-F028-03)
+      - type: component
+        description: >
+          T-27: Render SearchInput. Verify TextInput style has paddingRight >= 36.
+          Verify X button has accessibilityLabel and uses textSecondary color.
+          (AC-F028-04)
+    covers:
+      acceptance_criteria: ["AC-F028-01", "AC-F028-02", "AC-F028-03", "AC-F028-04", "AC-F028-05"]
+      edge_cases: []
+    risks:
+      - risk: "X button overlapping text on small screens"
+        mitigation: "paddingRight 36 ensures minimum 36px gap between text and X"
+    commit_message: "feat(components): create SearchInput component with clear X button (CR-84)"
+
+  - id: STEP-09
+    description: >
+      Migrate search TextInput to SearchInput in the 4 settings screens:
+      members.tsx, topics.tsx, history.tsx, timezone.tsx. For each file:
+      1. Add import: import { SearchInput } from '../../../components/SearchInput'
+         (or appropriate relative path).
+      2. Replace <TextInput ... value={search} onChangeText={setSearch} .../>
+         with <SearchInput value={search} onChangeText={setSearch} ... />.
+      3. Remove explicit style props that SearchInput handles internally
+         (color, borderColor, backgroundColor). Keep placeholder,
+         placeholderTextColor, autoCapitalize, autoCorrect.
+      4. Remove or keep searchInput style depending on whether other TextInputs
+         use it. If only the search field used it, it can be removed.
+      Note: timezone.tsx uses t('timezoneSelector.search') as placeholder.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+      - "src/app/(tabs)/settings/topics.tsx"
+      - "src/app/(tabs)/settings/history.tsx"
+      - "src/app/(tabs)/settings/timezone.tsx"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "members.tsx search field uses SearchInput instead of TextInput"
+      - "topics.tsx search field uses SearchInput instead of TextInput"
+      - "history.tsx search field uses SearchInput instead of TextInput"
+      - "timezone.tsx search field uses SearchInput instead of TextInput"
+      - "All 4 files import SearchInput from components/SearchInput"
+      - "Explicit color/border/background style removed from search props (handled by SearchInput internally)"
+      - "Existing placeholder and autoCapitalize/autoCorrect props preserved"
+    tests:
+      - type: integration
+        description: >
+          T-28: For each of the 4 settings screens, verify SearchInput
+          is imported and rendered for the search field. (AC-F028-06 partial)
+    covers:
+      acceptance_criteria: ["AC-F028-06"]
+      edge_cases: []
+    risks:
+      - risk: "SearchInput styling might differ slightly from existing TextInput styles"
+        mitigation: "SearchInput uses same values as existing searchInput style"
+    commit_message: "feat(settings): migrate search fields to SearchInput in 4 settings screens (CR-84)"
+
+  - id: STEP-10
+    description: >
+      Migrate search TextInput to SearchInput in the 6 modal/selector
+      components: HymnSelector.tsx, MemberSelectorModal.tsx,
+      TopicSelectorModal.tsx, PrayerSelector.tsx, ActorSelector.tsx,
+      AgendaForm.tsx. Same migration pattern as STEP-09:
+      1. Add import of SearchInput.
+      2. Replace search <TextInput> with <SearchInput>.
+      3. Remove explicit color/border/background style props.
+      4. Keep placeholder and behavior props.
+    files:
+      - "src/components/HymnSelector.tsx"
+      - "src/components/MemberSelectorModal.tsx"
+      - "src/components/TopicSelectorModal.tsx"
+      - "src/components/PrayerSelector.tsx"
+      - "src/components/ActorSelector.tsx"
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-08"]
+    parallelizable_with: ["STEP-09"]
+    done_when:
+      - "HymnSelector.tsx search field uses SearchInput"
+      - "MemberSelectorModal.tsx search field uses SearchInput"
+      - "TopicSelectorModal.tsx search field uses SearchInput"
+      - "PrayerSelector.tsx search field uses SearchInput"
+      - "ActorSelector.tsx search field uses SearchInput"
+      - "AgendaForm.tsx search field uses SearchInput"
+      - "All 6 files import SearchInput from components/SearchInput or ./SearchInput"
+      - "Explicit styling removed from search call sites"
+    tests:
+      - type: integration
+        description: >
+          T-29: For each of the 6 components, verify SearchInput is imported
+          and rendered for the search field. (AC-F028-06 complete)
+    covers:
+      acceptance_criteria: ["AC-F028-06"]
+      edge_cases: []
+    risks:
+      - risk: "Some components may have non-standard search TextInput patterns"
+        mitigation: >
+          All components follow the same pattern based on SPEC analysis.
+          Coder should inspect each file to confirm the search TextInput
+          before replacing.
+    commit_message: "feat(components): migrate search fields to SearchInput in 6 modal/selector components (CR-84)"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # F031 ACs
+  - ac_id: AC-F031-01
+    how_to_verify: "Render SwipeableCard, swipe to reveal, press Delete. onDelete callback fires."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F031-02
+    how_to_verify: "Topics screen uses SwipeableCard. Fix in STEP-01 applies to both members and topics."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F031-03
+    how_to_verify: "After pressing Delete, card animates closed (translateX -> 0), onReveal(null), onDelete() called."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F031-04
+    how_to_verify: "After fix, render SwipeableCard with onEdit. Press Edit. Verify onEdit still works."
+    covered_by_steps: ["STEP-01"]
+
+  # F027 ACs
+  - ac_id: AC-F027-01
+    how_to_verify: "Render MemberEditor, type name, simulate blur. onSave NOT called."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F027-02
+    how_to_verify: "Render MemberEditor, fill name, press Save. onSave called with correct data."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F027-03
+    how_to_verify: "Render MemberEditor, press Cancel. onCancel called, onSave NOT called."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F027-04
+    how_to_verify: "Render MemberEditor with empty name, press Save. onSave NOT called."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F027-05
+    how_to_verify: "Render TopicEditor, type title, simulate blur. onSave NOT called."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F027-06
+    how_to_verify: "Render TopicEditor, fill title, press Save. onSave called."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F027-07
+    how_to_verify: "Render TopicEditor, press Cancel. onCancel called, onSave NOT called."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F027-08
+    how_to_verify: "Render MemberEditor and TopicEditor. Save/Cancel buttons visible with correct i18n text and colors."
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  # F029 ACs
+  - ac_id: AC-F029-01
+    how_to_verify: "COUNTRY_CODES.length >= 150. Each entry has code, flag, label."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F029-02
+    how_to_verify: "splitPhoneNumber('+61412345678') returns { countryCode: '+61', phone: '412345678' }."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F029-03
+    how_to_verify: "members.tsx and csvUtils.ts both use countryCodes.ts as source. Import and verify same data."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F029-04
+    how_to_verify: "COUNTRY_CODES[0].code === '+55'. Remaining entries sorted alphabetically."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F029-05
+    how_to_verify: "Each entry has flag with 2 Regional Indicator Symbols unicode."
+    covered_by_steps: ["STEP-04"]
+
+  # F030 ACs
+  - ac_id: AC-F030-01
+    how_to_verify: "Mock Alert.alert. Press Import CSV. Verify Alert.alert called before DocumentPicker."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-F030-02
+    how_to_verify: "Verify Alert.alert message contains both key pieces of info (replace list, assignments unaffected)."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-F030-03
+    how_to_verify: "Simulate Confirm button press. Verify DocumentPicker opened."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-F030-04
+    how_to_verify: "Simulate Cancel button press. Verify DocumentPicker NOT opened."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-F030-05
+    how_to_verify: "Verify i18n keys exist in en.json, pt-BR.json, es.json."
+    covered_by_steps: ["STEP-06"]
+
+  # F028 ACs
+  - ac_id: AC-F028-01
+    how_to_verify: "Render SearchInput with empty value. X button not present."
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-F028-02
+    how_to_verify: "Render SearchInput with text. X button visible."
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-F028-03
+    how_to_verify: "Press X. onChangeText called with ''. X disappears."
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-F028-04
+    how_to_verify: "Inspect styles: paddingRight >= 36, X uses textSecondary color."
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-F028-05
+    how_to_verify: "Press X. Field does not re-focus (no keyboard re-open)."
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-F028-06
+    how_to_verify: "All 10 search fields across the app use SearchInput component."
+    covered_by_steps: ["STEP-09", "STEP-10"]

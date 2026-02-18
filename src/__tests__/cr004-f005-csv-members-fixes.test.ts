@@ -727,9 +727,10 @@ describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
       expect(source).toContain('function translateCsvError');
     });
 
-    it('should contain cacheDirectory null guard', () => {
+    it('should use File/Paths API from expo-file-system v19 (no cacheDirectory guard needed)', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
-      expect(source).toContain('!FileSystem.cacheDirectory');
+      expect(source).toContain('new File(Paths.cache');
+      expect(source).not.toContain('!FileSystem.cacheDirectory');
     });
 
     it('should use translateCsvError in import error mapping', () => {
@@ -775,7 +776,6 @@ describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
       expect(source).toContain("console.log('[Export] fileUri:'");
       expect(source).toContain("console.log('[Export] File written successfully')");
       expect(source).toContain("console.log('[Export] Opening share sheet...')");
-      expect(source).toContain("console.warn('[Export] cacheDirectory is null')");
     });
 
     it('members.tsx should have debug logs in handleImport', () => {

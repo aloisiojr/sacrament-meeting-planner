@@ -1,0 +1,152 @@
+type: spec
+version: 1
+cr_id: CR-70
+category: UI_ENHANCEMENT
+priority: LOW
+
+title: >
+  Increase size and touch area of edit and delete icons in the actor list
+
+description: >
+  The edit (✎) and delete (✖) icons in the ActorSelector component are too small,
+  making them difficult to tap on mobile devices. The request is to increase both
+  the visual size (fontSize) and the occupied space (padding, gap, hitSlop) of
+  these action icons to improve usability and touch target compliance.
+
+scope:
+  in:
+    - "Increase the fontSize of the edit and delete action icons"
+    - "Increase the padding around each icon to enlarge the touch target"
+    - "Increase the gap between the edit and delete icons"
+    - "Increase the hitSlop on the Pressable wrappers for better touch detection"
+  out:
+    - "Changing the icon glyphs themselves (keep ✎ and ✖)"
+    - "Changing icon colors or any other visual styling beyond size/spacing"
+    - "Changing the layout of the actor row (name area, row height, etc.)"
+    - "Changes to the actor CRUD logic or any other business logic"
+    - "Changes to any screen or component other than ActorSelector"
+
+personas:
+  - id: P-1
+    description: "Ward secretary or bishopric member managing actors in the ActorSelector bottom sheet"
+
+user_stories:
+  - id: US-1
+    as_a: "Ward secretary"
+    i_want: "larger and easier-to-tap edit and delete icons next to each actor"
+    so_that: "I can quickly and accurately tap the intended action without accidentally tapping the wrong icon or the actor name"
+
+current_implementation:
+  file: "src/components/ActorSelector.tsx"
+  icon_style:
+    actionIcon:
+      fontSize: 24
+      padding: 4
+  container_style:
+    actorActions:
+      flexDirection: "row"
+      gap: 20
+      marginLeft: 16
+  pressable_hitSlop: 12
+  icons:
+    edit: "✎ (U+270E)"
+    delete: "✖ (U+2716)"
+
+acceptance_criteria:
+  - id: AC-1
+    given: "The ActorSelector bottom sheet with a list of actors"
+    when: "The user views an actor row"
+    then: >
+      The edit and delete icons are visually larger than the current 24px fontSize.
+      The new fontSize should be 28px.
+    priority: must
+
+  - id: AC-2
+    given: "The ActorSelector bottom sheet with a list of actors"
+    when: "The user views the action icons area"
+    then: >
+      The padding around each icon is increased from 4px to 8px, making each
+      icon occupy more screen space and providing a larger touch target.
+    priority: must
+
+  - id: AC-3
+    given: "The ActorSelector bottom sheet with a list of actors"
+    when: "The user views the edit and delete icons side by side"
+    then: >
+      The gap between the two icons is increased from 20px to 28px, providing
+      clearer visual separation and reducing accidental mis-taps.
+    priority: must
+
+  - id: AC-4
+    given: "The Pressable wrappers around each icon"
+    when: "The user taps near (but not exactly on) an icon"
+    then: >
+      The hitSlop is increased from 12px to 16px, extending the touchable area
+      beyond the visible icon bounds for easier tapping.
+    priority: must
+
+  - id: AC-5
+    given: "The ActorSelector after the icon size changes"
+    when: "The user views the actor list"
+    then: >
+      The overall layout remains visually balanced. The actor name still has
+      flex: 1 and truncates with numberOfLines={1} if needed. The icons do not
+      overflow or clip.
+    priority: must
+
+  - id: AC-6
+    given: "The ActorSelector after the icon size changes"
+    when: "The user taps the edit icon"
+    then: "The edit inline input appears as before (no functional regression)"
+    priority: must
+
+  - id: AC-7
+    given: "The ActorSelector after the icon size changes"
+    when: "The user taps the delete icon"
+    then: "The delete confirmation Alert appears as before (no functional regression)"
+    priority: must
+
+edge_cases:
+  - id: EC-1
+    case: "Actor name is very long, pushing icons to the right edge"
+    expected: >
+      The actor name truncates via numberOfLines={1} and the icons remain
+      fully visible with their increased size. The marginLeft on actorActions
+      ensures minimum spacing from the name text.
+
+  - id: EC-2
+    case: "Screen is narrow (small phone)"
+    expected: >
+      The icons and gap should still fit comfortably within the row. The total
+      width of the actions area (28px icon + 8px padding x2 per icon + 28px gap)
+      is approximately 100px, which is well within any supported screen width.
+
+files_likely_impacted:
+  - path: "src/components/ActorSelector.tsx"
+    action: "MODIFY"
+    details: >
+      1. Change `actionIcon.fontSize` from 24 to 28.
+      2. Change `actionIcon.padding` from 4 to 8.
+      3. Change `actorActions.gap` from 20 to 28.
+      4. Change `hitSlop` prop on both Pressable components from 12 to 16.
+
+assumptions:
+  - id: A-1
+    description: >
+      The size increase values (fontSize 24->28, padding 4->8, gap 20->28,
+      hitSlop 12->16) are reasonable increments that improve usability without
+      making the icons disproportionately large relative to the actor row.
+    confirmed: false
+    default_if_not_confirmed: >
+      Use the proposed values. They can be fine-tuned after visual review.
+
+has_open_questions: false
+
+definition_of_done:
+  - "actionIcon fontSize is increased from 24 to 28"
+  - "actionIcon padding is increased from 4 to 8"
+  - "actorActions gap is increased from 20 to 28"
+  - "hitSlop on both icon Pressables is increased from 12 to 16"
+  - "No visual overflow or clipping on standard screen sizes"
+  - "Edit and delete functionality works identically to before the change"
+  - "No changes to icon glyphs, colors, or any other component"

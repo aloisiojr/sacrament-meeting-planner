@@ -107,6 +107,9 @@ estimated_iterations: 4
 | CR4_F008 | Agenda & Actors Enhancements | CR-71, CR-72, CR-73, CR-74, CR-75 | Complete | [ARCH_CR4_F008](ARCH_CR4_F008.md) |
 | CR4_F003 | Infrastructure Integration (Sync, Offline, Notifications) | CR-52, CR-53 | Complete | [ARCH_CR4_F003](ARCH_CR4_F003.md) |
 | CR4_F009 | Import Hymns CLI Script | CR-51 | Complete | [ARCH_CR4_F009](ARCH_CR4_F009.md) |
+| CR76 | Fix Users Screen Edge Function Error (Regression CR-64) | CR-76 | Complete | [ARCH_CR76](ARCH_CR76.md) |
+| BUG401 | Fix Systemic HTTP 401 on All Authenticated Edge Functions | BUG-401 | Complete | [ARCH_BUG401](ARCH_BUG401.md) |
+| CR5 | Batch 5: Actor Icons, CSV Fixes, Members UX, Users Name | CR-70, CR-77, CR-78, CR-79, CR-80 | Complete | [ARCH_CR5](ARCH_CR5.md) |
 
 ## Module Dependencies
 
@@ -258,6 +261,12 @@ scripts/                          # Admin CLI scripts (not Edge Functions)
 | ADR-019 | Use Supabase built-in password reset flow | CR4_F007 |
 | ADR-020 | Independent can_conduct and can_preside actor fields | CR4_F008 |
 | ADR-021 | Auto-create actors for bishopric users in Edge Functions | CR4_F008 |
+| ADR-022 | Extract server-side error details from FunctionsHttpError | CR76 |
+| ADR-023 | Remove manual Authorization header from Edge Function calls | CR76 |
+| ADR-024 | Validate session before Edge Function invoke to prevent ANON key fallback | BUG401 |
+| ADR-025 | Guard useQuery with enabled: !!session for authenticated queries | BUG401 |
+| ADR-026 | Use error codes in csvUtils.ts instead of English strings | CR5 |
+| ADR-027 | Rename update-user-role Edge Function to update-user | CR5 |
 
 ## Security Model
 

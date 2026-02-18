@@ -480,9 +480,8 @@ export default function MembersScreen() {
           mimeType: result.assets?.[0]?.mimeType,
         });
         if (result.canceled || !result.assets?.[0]) return;
-        const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
+        const pickedFile = new File(result.assets[0].uri);
+        const content = await pickedFile.text();
         console.log('[Import] File content length:', content.length);
         importMutation.mutate(content);
       } catch (err: any) {

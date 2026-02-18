@@ -1,6 +1,7 @@
 # =============================================================================
 # QA_CONSOLIDATED.yaml
-# Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90
+# Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
+# CR-87, CR-88, CR-89
 # Updated: 2026-02-18
 # =============================================================================
 
@@ -1277,5 +1278,599 @@ cr_86:
     New i18n keys added to all 3 locales (en, pt-BR, es) with accurate translations.
     handleImport refactored into handleImport (dialog) + performImport (file picker).
     2610/2610 tests passing.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-87: Replace Edit/Delete text with pencil/trash icons on swipe buttons
+# #############################################################################
+
+cr_87:
+  cr_id: CR-87
+  title: "Trocar texto Editar/Excluir nos botoes de swipe por icones de lapis e lixeira"
+  type: feature_request
+  spec: specs/SPEC_F032_F034.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      QA Plan validated against SPEC. SwipeableCard currently renders text labels
+      on swipe action buttons. Validation checks cover icon rendering, a11y labels,
+      callbacks, contrast, and test suite.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 4e0fbb7
+        message: "feat(swipeable): replace Edit/Delete text with Unicode icons pencil/trash (CR-87)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2716
+    tester_suite_total: 2716
+
+    must_pass_results:
+
+      - id: MP-87-01
+        description: "Edit swipe button renders a pencil/edit icon instead of text"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:160-162: Edit button renders <Text style={[styles.actionIcon, { color: colors.onPrimary }]}>{'\u270F'}</Text>.
+          U+270F is the Pencil Unicode character. No text label (editLabel) is rendered
+          as visible content. The old actionText style with fontSize:13 is replaced by
+          actionIcon style with fontSize:20.
+
+      - id: MP-87-02
+        description: "Delete swipe button renders a trash/delete icon instead of text"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:172-174: Delete button renders <Text style={[styles.actionIcon, { color: '#FFFFFF' }]}>{'\uD83D\uDDD1'}</Text>.
+          This is the UTF-16 surrogate pair for U+1F5D1 (Wastebasket). No text label
+          (deleteLabel) is rendered as visible content.
+
+      - id: MP-87-03
+        description: "Edit button retains accessibility label for screen readers"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:158: accessibilityLabel={editLabel ?? 'Edit'}.
+          The Pressable retains the descriptive text for screen readers even though
+          the visible content is now an icon. When parent passes editLabel (e.g.,
+          t('common.edit')), that text is used for accessibility.
+
+      - id: MP-87-04
+        description: "Delete button retains accessibility label for screen readers"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:170: accessibilityLabel={deleteLabel ?? 'Delete'}.
+          Same pattern as edit button. Screen readers announce "Delete" or i18n
+          equivalent, not the Unicode character.
+
+      - id: MP-87-05
+        description: "Edit button still triggers onEdit callback when pressed"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:156: onPress={handleEdit}. handleEdit (lines 137-141)
+          calls translateX.value = withSpring(0, SPRING_CONFIG), onReveal(null),
+          and onEdit?.(). No change from previous behavior.
+
+      - id: MP-87-06
+        description: "Delete button still triggers onDelete callback when pressed"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:168: onPress={handleDelete}. handleDelete (lines 143-147)
+          calls translateX.value = withSpring(0, SPRING_CONFIG), onReveal(null),
+          and onDelete?.(). No change from previous behavior.
+
+      - id: MP-87-07
+        description: "Icon color contrasts with button background"
+        status: PASSED
+        evidence: |
+          SwipeableCard.tsx:160: Edit icon uses color: colors.onPrimary (white on
+          primary background, line 155: backgroundColor: colors.primary).
+          SwipeableCard.tsx:172: Delete icon uses color: '#FFFFFF' (white on error
+          background, line 167: backgroundColor: colors.error).
+          Both provide high contrast.
+
+      - id: MP-87-08
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 56 test files, 2716/2716 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-87-01
+        description: "Icons are appropriately sized for the button area"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          SwipeableCard.tsx:219-222: actionIcon style has fontSize: 20, textAlign: 'center'.
+          Each action button has flex: 1 within the 140px-wide actionsContainer (70px each).
+          fontSize 20 is well-sized for a 70px button, centered via textAlign and
+          alignItems/justifyContent center on the Pressable.
+
+      - id: SP-87-02
+        description: "Icons are recognizable as edit (pencil) and delete (trash)"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          U+270F (Pencil) is universally recognized as an edit/pencil icon.
+          U+1F5D1 (Wastebasket) is universally recognized as a delete/trash icon.
+          Both are standard Unicode characters rendered natively on iOS and Android.
+
+      - id: SP-87-03
+        description: "Swipe buttons visual appearance is improved with icons vs text"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          Icons (20px) fit well in the 70px-wide buttons. Previously text labels could
+          truncate on narrow screens or in languages with long translations (e.g.,
+          "Excluir" in Portuguese). Icons are language-agnostic and visually cleaner.
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F032-01
+        title: "Icons replace text on swipe action buttons"
+        status: SATISFIED
+        evidence: |
+          Edit button: U+270F Pencil at SwipeableCard.tsx:161.
+          Delete button: U+1F5D1 Wastebasket at SwipeableCard.tsx:173.
+          No text rendered inside buttons. Only icon characters.
+
+      - id: AC-F032-02
+        title: "Edit button onPress calls onEdit callback"
+        status: SATISFIED
+        evidence: "SwipeableCard.tsx:156 onPress={handleEdit}, handleEdit line 140 calls onEdit?.()"
+
+      - id: AC-F032-03
+        title: "Delete button onPress calls onDelete callback"
+        status: SATISFIED
+        evidence: "SwipeableCard.tsx:168 onPress={handleDelete}, handleDelete line 146 calls onDelete?.()"
+
+      - id: AC-F032-04
+        title: "Accessibility labels retained for screen readers"
+        status: SATISFIED
+        evidence: |
+          Edit: accessibilityLabel={editLabel ?? 'Edit'} (line 158).
+          Delete: accessibilityLabel={deleteLabel ?? 'Delete'} (line 170).
+
+      - id: AC-F032-05
+        title: "Icons visible with proper contrast and sizing"
+        status: SATISFIED
+        evidence: |
+          Edit icon: colors.onPrimary on colors.primary bg. Delete icon: #FFFFFF on colors.error bg.
+          fontSize: 20, textAlign: 'center'. Within spec range of 18-24px.
+
+  verdict: passed
+  verdict_rationale: |
+    All 8 must_pass checks passed. All 3 should_pass checks passed (by analysis).
+    All 5 acceptance criteria (AC-F032-01 through AC-F032-05) satisfied.
+    Reviewer approved with 0 issues. 2716/2716 tests passing.
+    Edit button uses U+270F Pencil, Delete button uses U+1F5D1 Wastebasket.
+    accessibilityLabel preserved for both buttons. Icon fontSize 20 with center alignment.
+    No regressions detected.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-88: Add explanatory text to topics screen
+# #############################################################################
+
+cr_88:
+  cr_id: CR-88
+  title: "Na tela de temas adicionar texto explicando o que a tela faz"
+  type: feature_request
+  spec: specs/SPEC_F032_F034.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Topics screen had no explanatory text. i18n system supports 3 locales.
+      Follows same pattern as CR-80 (members description text).
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 98dbee2
+        message: "feat(i18n): add topics.description and topics.noTopics keys in 3 locales (CR-88)"
+      - hash: 8431360
+        message: "feat(topics): add explanatory description text below header (CR-88)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2716
+    tester_suite_total: 2716
+
+    must_pass_results:
+
+      - id: MP-88-01
+        description: "New i18n key for topics description exists in en.json"
+        status: PASSED
+        evidence: |
+          en.json line 180: "description": "Create custom ward topics or activate predefined
+          topic collections. Ward topics can be added, edited, and deleted. Activating a
+          collection makes its topics available when assigning speeches. Deactivating removes
+          them from the selection list."
+
+      - id: MP-88-02
+        description: "New i18n key for topics description exists in pt-BR.json"
+        status: PASSED
+        evidence: |
+          pt-BR.json line 180: "description": "Crie temas customizados da ala ou ative colecoes
+          de temas pre-definidos. Temas da ala podem ser adicionados, editados e excluidos.
+          Ativar uma colecao torna seus temas disponiveis ao designar discursos. Desativar
+          remove da lista de selecao."
+
+      - id: MP-88-03
+        description: "New i18n key for topics description exists in es.json"
+        status: PASSED
+        evidence: |
+          es.json line 180: "description": "Cree temas personalizados del barrio o active
+          colecciones de temas predefinidos. Los temas del barrio se pueden agregar, editar
+          y eliminar. Activar una coleccion hace que sus temas esten disponibles al asignar
+          discursos. Desactivar los elimina de la lista de seleccion."
+
+      - id: MP-88-04
+        description: "Topics screen renders the description text"
+        status: PASSED
+        evidence: |
+          topics.tsx:383-385: Renders <Text style={[styles.description, { color: colors.textSecondary }]}>
+          {t('topics.description')}</Text>. Positioned between the header (lines 372-380)
+          and the Ward Topics section (line 388). Uses the t() i18n function.
+
+      - id: MP-88-05
+        description: "Description text explains collections activate/deactivate functionality"
+        status: PASSED
+        evidence: |
+          EN: "Activating a collection makes its topics available when assigning speeches.
+          Deactivating removes them from the selection list."
+          PT: "Ativar uma colecao torna seus temas disponiveis ao designar discursos.
+          Desativar remove da lista de selecao."
+          ES: "Activar una coleccion hace que sus temas esten disponibles al asignar
+          discursos. Desactivar los elimina de la lista de seleccion."
+          All 3 locales explicitly explain activate/deactivate semantics.
+
+      - id: MP-88-06
+        description: "All three locale files have matching keys in topics section"
+        status: PASSED
+        evidence: |
+          Verified via script: all 3 locale files have exactly 10 identical keys in the
+          "topics" section: activateCollection, addTopic, collections, deactivateCollection,
+          description, noTopics, title, topicLink, topicTitle, wardTopics.
+          PARITY CHECK: PASS. 2 new keys added: description and noTopics.
+
+      - id: MP-88-07
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 56 test files, 2716/2716 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 7
+    must_pass_passed: 7
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-88-01
+        description: "Description text is styled consistently with members screen description"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:505-509: styles.description has fontSize: 13, textAlign: 'center',
+          paddingHorizontal: 16, marginBottom: 8. Color is colors.textSecondary.
+          This matches members.tsx styles.description exactly (fontSize 13, textAlign
+          'center', paddingHorizontal 16, marginBottom 8).
+
+      - id: SP-88-02
+        description: "Description text is positioned logically on the screen"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:382-385: Text appears below the header (line 372-380) and above the
+          Ward Topics section (line 388). This is between the screen title and the first
+          functional section, same logical position as members.tsx description.
+
+      - id: SP-88-03
+        description: "Portuguese translation is natural Brazilian Portuguese"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          "Crie temas customizados da ala ou ative colecoes de temas pre-definidos."
+          Natural pt-BR: "Crie" (imperative), "customizados" (commonly used in Brazilian
+          Portuguese), "da ala" (specific LDS terminology), "designar discursos" (correct
+          LDS speech assignment term in Portuguese).
+
+      - id: SP-88-04
+        description: "Spanish translation is natural Spanish"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          "Cree temas personalizados del barrio o active colecciones de temas predefinidos."
+          Natural Spanish: "Cree" (formal imperative), "personalizados" (correct Spanish
+          word), "del barrio" (LDS terminology), "asignar discursos" (correct assignment
+          term in Spanish).
+
+      - id: SP-88-05
+        description: "Description text does not break layout on small screens"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          styles.description: fontSize 13, paddingHorizontal 16. No numberOfLines constraint,
+          no fixed width. Text wraps naturally within the ScrollView. Small font size (13px)
+          appropriate for secondary/helper text on mobile screens.
+
+    should_pass_total: 5
+    should_pass_passed: 5
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F033-01
+        title: "Description text visible below header"
+        status: SATISFIED
+        evidence: "topics.tsx:383-385 renders t('topics.description') between header and Ward Topics section."
+
+      - id: AC-F033-02
+        title: "Description explains activate/deactivate functionality"
+        status: SATISFIED
+        evidence: "All 3 locales mention activating/deactivating collections and speech assignment availability."
+
+      - id: AC-F033-03
+        title: "i18n key exists in all 3 locales"
+        status: SATISFIED
+        evidence: "topics.description key present in en.json, pt-BR.json, es.json with correct translations."
+
+      - id: AC-F033-04
+        title: "Styling follows CR-80 pattern"
+        status: SATISFIED
+        evidence: "fontSize 13, textAlign center, paddingHorizontal 16, color textSecondary. Identical to members."
+
+      - id: AC-F033-06
+        title: "Locale files have matching key structure"
+        status: SATISFIED
+        evidence: "10 identical keys in topics section across all 3 locales. 0 removals, 2 additions."
+
+  verdict: passed
+  verdict_rationale: |
+    All 7 must_pass checks passed. All 5 should_pass checks passed (by analysis).
+    All 5 acceptance criteria satisfied. Reviewer approved with 0 issues.
+    Description text added to topics screen between header and Ward Topics section.
+    Text explains ward topics CRUD and collection activate/deactivate semantics.
+    i18n keys added in all 3 locales (en, pt-BR, es) with natural translations.
+    Styling matches CR-80 pattern exactly. Key parity verified: 10 keys across all locales.
+    2716/2716 tests passing. No regressions.
+
+  issues_for_coder: []
+
+
+# #############################################################################
+# CR-89: Show collection topics on click (read-only, expand/collapse)
+# #############################################################################
+
+cr_89:
+  cr_id: CR-89
+  title: "Ao clicar numa colecao, mostrar todos os temas (read-only, lista simples)"
+  type: feature_request
+  spec: specs/SPEC_F032_F034.yaml
+  qa_plan: qa/QA_PLAN_batch6_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      CollectionRow was not tappable. No way to see topics in a collection.
+      Data model supports it (general_topics.collection_id FK). Recommended
+      expand/collapse inline accordion pattern.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 445f7b7
+        message: "feat(hooks): add useCollectionTopics hook for lazy-loading collection topics (CR-89)"
+      - hash: d2c9c0a
+        message: "feat(topics): make CollectionRow tappable with chevron indicator (CR-89)"
+      - hash: 9e41fec
+        message: "feat(topics): add expand/collapse collection topics view with accordion pattern (CR-89)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_suite_passed: 2716
+    tester_suite_total: 2716
+
+    must_pass_results:
+
+      - id: MP-89-01
+        description: "Tapping a collection row shows the topics belonging to that collection"
+        status: PASSED
+        evidence: |
+          topics.tsx:188-191: CollectionRow has a Pressable wrapper with onPress prop.
+          topics.tsx:356-358: handleCollectionPress toggles expandedCollectionId state.
+          topics.tsx:461-463: When expandedCollectionId === item.id, renders
+          <CollectionTopicsList collectionId={item.id} colors={colors} />.
+          CollectionTopicsList (lines 217-261) fetches and renders the collection topics.
+
+      - id: MP-89-02
+        description: "Topics displayed are fetched from general_topics table by collection_id"
+        status: PASSED
+        evidence: |
+          useTopics.ts:232-247: useCollectionTopics hook queries supabase
+          .from('general_topics').select('*').eq('collection_id', collectionId!)
+          .order('title', { ascending: true }). Returns GeneralTopic[].
+          Query key: topicKeys.collectionTopics(collectionId) at line 29-30.
+          Enabled only when collectionId is truthy (line 245).
+
+      - id: MP-89-03
+        description: "Topic list is read-only (no edit/delete actions)"
+        status: PASSED
+        evidence: |
+          topics.tsx:239-261: CollectionTopicsList renders topics using simple View and
+          Text elements. No SwipeableCard, no Pressable with edit/delete handlers, no
+          action buttons. Each topic is a View with Text for title and optional Text
+          for link. The list is purely display-only.
+
+      - id: MP-89-04
+        description: "Each topic displays at least the title"
+        status: PASSED
+        evidence: |
+          topics.tsx:249: <Text style={[styles.collectionTopicTitle, { color: colors.textSecondary }]}>
+          {topic.title}</Text>. Title is always rendered for every topic in the list.
+          Additionally, if topic.link exists, it is shown at line 252-255.
+
+      - id: MP-89-05
+        description: "Collection toggle (Switch) still works independently of tap-to-view"
+        status: PASSED
+        evidence: |
+          topics.tsx:200-205: Switch is rendered OUTSIDE the Pressable area.
+          CollectionRow structure: View > [Pressable (chevron + name), Switch].
+          The Pressable wraps only the chevron and collection name (line 188-199),
+          while the Switch (line 200-205) is a sibling at the same level.
+          Switch onValueChange={onToggle} is independent of Pressable onPress.
+
+      - id: MP-89-06
+        description: "Tapping the same collection again hides/collapses the topic list"
+        status: PASSED
+        evidence: |
+          topics.tsx:356-358: handleCollectionPress uses toggle logic:
+          setExpandedCollectionId((prev) => (prev === collectionId ? null : collectionId)).
+          If the same collection is tapped again, expandedCollectionId becomes null,
+          which hides the CollectionTopicsList (conditional at line 461).
+
+      - id: MP-89-07
+        description: "Existing test suite passes without regressions"
+        status: PASSED
+        evidence: |
+          npx vitest run: 56 test files, 2716/2716 tests passed.
+          Zero failures, zero skipped.
+
+    must_pass_total: 7
+    must_pass_passed: 7
+    must_pass_failed: 0
+
+    should_pass_results:
+
+      - id: SP-89-01
+        description: "Topic list has appropriate styling (indented, secondary text color)"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:616-617: collectionTopicsContainer has paddingLeft: 32, paddingRight: 16.
+          topics.tsx:620-623: collectionTopicItem has paddingVertical: 8, paddingLeft: 8.
+          topics.tsx:624-625: collectionTopicTitle uses fontSize: 14, color: colors.textSecondary.
+          Topics are visually nested under the collection row with larger left padding.
+
+      - id: SP-89-02
+        description: "Topic link is shown if available"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:252-255: Conditional rendering {topic.link && (<Text style={[
+          styles.collectionTopicLink, { color: colors.primary }]} numberOfLines={1}>
+          {topic.link}</Text>)}. Link shown in primary color with fontSize 12 and marginTop 2.
+
+      - id: SP-89-03
+        description: "Loading state is handled while fetching topics"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:221-227: When isLoading is true, renders:
+          <View style={styles.collectionTopicsLoading}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+          Loading style: paddingVertical 16, alignItems center (lines 631-634).
+
+      - id: SP-89-04
+        description: "Empty state is handled if collection has no topics"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:229-236: When topics is null or empty, renders:
+          <Text style={[styles.collectionTopicsEmptyText, { color: colors.textSecondary }]}>
+            {t('topics.noTopics')}
+          </Text>
+          en.json: "No topics in this collection", pt-BR: "Nenhum tema nesta colecao",
+          es: "No hay temas en esta coleccion". Styled with fontSize 13, fontStyle italic.
+
+      - id: SP-89-05
+        description: "Only one collection can be expanded at a time (accordion pattern)"
+        status: PASSED_BY_ANALYSIS
+        evidence: |
+          topics.tsx:276: expandedCollectionId is a single string|null state.
+          topics.tsx:357: handleCollectionPress sets expandedCollectionId to the tapped
+          collection's ID or null (toggle). Since only one ID is stored, expanding a
+          new collection automatically collapses the previous one (accordion behavior).
+
+    should_pass_total: 5
+    should_pass_passed: 5
+    should_pass_failed: 0
+
+  spec_compliance:
+    acceptance_criteria:
+      - id: AC-F034-01
+        title: "Tapping collection shows its topics"
+        status: SATISFIED
+        evidence: "CollectionRow Pressable + handleCollectionPress + CollectionTopicsList renders topics."
+
+      - id: AC-F034-02
+        title: "Tapping again collapses the topic list"
+        status: SATISFIED
+        evidence: "Toggle logic: prev === collectionId ? null : collectionId."
+
+      - id: AC-F034-03
+        title: "Topics fetched from general_topics by collection_id"
+        status: SATISFIED
+        evidence: "useCollectionTopics hook: supabase.from('general_topics').select('*').eq('collection_id', id).order('title')."
+
+      - id: AC-F034-04
+        title: "Loading state shown while fetching"
+        status: SATISFIED
+        evidence: "ActivityIndicator rendered when isLoading is true."
+
+      - id: AC-F034-05
+        title: "Empty state shown when no topics"
+        status: SATISFIED
+        evidence: "t('topics.noTopics') rendered when topics array is empty."
+
+      - id: AC-F034-06
+        title: "Switch toggle works independently of tap"
+        status: SATISFIED
+        evidence: "Switch is sibling to Pressable, not nested inside it. Events are independent."
+
+      - id: AC-F034-07
+        title: "Accordion pattern (one expanded at a time)"
+        status: SATISFIED
+        evidence: "Single expandedCollectionId state variable enforces one-at-a-time expansion."
+
+      - id: AC-F034-08
+        title: "Topic list styled as nested, read-only"
+        status: SATISFIED
+        evidence: "paddingLeft 32, textSecondary color, no SwipeableCard, no action buttons."
+
+  verdict: passed
+  verdict_rationale: |
+    All 7 must_pass checks passed. All 5 should_pass checks passed (by analysis).
+    All 8 acceptance criteria (AC-F034-01 through AC-F034-08) satisfied.
+    Reviewer approved with 0 issues. 2716/2716 tests passing.
+    New useCollectionTopics hook added for lazy-loading collection topics by ID.
+    CollectionRow made tappable with Pressable wrapper and chevron indicator.
+    Expand/collapse accordion pattern implemented with single expandedCollectionId state.
+    Switch toggle independent of tap (sibling elements, not nested).
+    Topics rendered read-only with title and optional link. Loading and empty states handled.
+    No regressions detected.
 
   issues_for_coder: []

@@ -396,17 +396,77 @@ describe('AC-10: Legacy user backward compatibility in Users screen', () => {
 // =============================================================================
 
 describe('AC-11/AC-12/AC-13: Users screen name edit behavior', () => {
-  it('expanded card shows name field when full_name is non-empty', () => {
-    expect(usersSource).toContain("t('users.name')");
-  });
-
-  it('expanded card shows name as read-only text (not TextInput)', () => {
-    // The current implementation shows name as Text (fieldValue), not editable TextInput
-    // in the expanded section
+  it('self user card expanded shows editable TextInput for name', () => {
+    // When isSelf is true, expanded card should show TextInput (not read-only Text)
     const expandedSection = usersSource.slice(
       usersSource.indexOf('<View style={[styles.expandedSection')
     );
-    // The name display is a Text element with fieldValue style
+    // Self user gets editable input
+    expect(expandedSection).toContain('isSelf ?');
+    expect(expandedSection).toContain('editingName');
+    expect(expandedSection).toContain('setEditingName');
+    expect(expandedSection).toContain('styles.nameInput');
+  });
+
+  it('self user card has Save button in expanded section', () => {
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    expect(expandedSection).toContain('styles.saveButton');
+    expect(expandedSection).toContain('styles.saveButtonText');
+    expect(expandedSection).toContain("t('common.save')");
+  });
+
+  it('Save button calls handleSaveName with current full_name', () => {
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    expect(expandedSection).toContain('handleSaveName(u.full_name)');
+  });
+
+  it('Save button is disabled when name is unchanged', () => {
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    expect(expandedSection).toContain('editingName.trim() === u.full_name');
+  });
+
+  it('Save button is disabled when name is empty', () => {
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    expect(expandedSection).toContain('!editingName.trim()');
+  });
+
+  it('users.tsx has updateNameMutation that calls update-user-name EF', () => {
+    expect(usersSource).toContain('updateNameMutation');
+    expect(usersSource).toContain("callEdgeFunction('update-user-name'");
+  });
+
+  it('updateNameMutation onSuccess invalidates users query', () => {
+    expect(usersSource).toContain(
+      'queryClient.invalidateQueries({ queryKey: userManagementKeys.users })'
+    );
+  });
+
+  it('updateNameMutation onSuccess refreshes auth session', () => {
+    expect(usersSource).toContain('supabase.auth.refreshSession()');
+  });
+
+  it('updateNameMutation onSuccess shows nameUpdated alert', () => {
+    expect(usersSource).toContain("t('users.nameUpdated')");
+  });
+
+  it('updateNameMutation onError shows nameUpdateFailed alert', () => {
+    expect(usersSource).toContain("t('users.nameUpdateFailed')");
+  });
+
+  it('other user card shows name as read-only text (not TextInput)', () => {
+    // Non-self users get read-only Text display
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    // After the isSelf ternary, the else branch shows fieldValue style
     expect(expandedSection).toContain('styles.fieldValue');
     expect(expandedSection).toContain('{u.full_name}');
   });
@@ -421,6 +481,17 @@ describe('AC-11/AC-12/AC-13: Users screen name edit behavior', () => {
 
   it('role selector is disabled for self user', () => {
     expect(usersSource).toContain('disabled={isSelf');
+  });
+
+  it('editingName is initialized when expanding self card', () => {
+    expect(usersSource).toContain('setEditingName(u.full_name)');
+  });
+
+  it('TextInput for self uses autoCapitalize words', () => {
+    const expandedSection = usersSource.slice(
+      usersSource.indexOf('<View style={[styles.expandedSection')
+    );
+    expect(expandedSection).toContain('autoCapitalize="words"');
   });
 });
 
@@ -818,19 +889,32 @@ describe('EC-3: Long name handling', () => {
 // =============================================================================
 
 describe('EC-4/EC-5: Name edit behavior (self-edit feature)', () => {
-  it('users.tsx imports callEdgeFunction (available for name update)', () => {
-    expect(usersSource).toContain('callEdgeFunction');
+  it('handleSaveName has no-change guard (EC-4)', () => {
+    // handleSaveName should skip API call when name is unchanged
+    expect(usersSource).toContain('editingName.trim() === currentFullName');
   });
 
-  it('update-user-name EF is properly defined and deployable', () => {
-    // The EF exists and has all necessary components
-    expect(updateUserNameSource).toContain('Deno.serve');
-    expect(updateUserNameSource).toContain('corsHeaders');
-    expect(updateUserNameSource).toContain('update-user-name');
+  it('handleSaveName has empty-name guard', () => {
+    expect(usersSource).toContain("if (!editingName.trim()) return");
+  });
+
+  it('updateNameMutation onError reverts editingName (EC-5)', () => {
+    // On error, editingName should revert to the current user's full_name
+    expect(usersSource).toContain('setEditingName(currentFullName)');
+  });
+
+  it('users.tsx has updateNameMutation calling update-user-name EF', () => {
+    expect(usersSource).toContain("callEdgeFunction('update-user-name'");
+    expect(usersSource).toContain('fullName: newName.trim()');
   });
 
   it('update-user-name is in ONLINE_ONLY_OPERATIONS', () => {
     expect(offlineGuardSource).toContain("'update-user-name'");
+  });
+
+  it('updateNameMutation logs the name change to activity log (R-5)', () => {
+    expect(usersSource).toContain("'user:name-update'");
+    expect(usersSource).toContain('logAction');
   });
 });
 

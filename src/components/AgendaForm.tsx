@@ -9,7 +9,6 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Switch,
   Pressable,
@@ -30,6 +29,7 @@ import { MemberSelectorModal } from './MemberSelectorModal';
 import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
+import { SearchInput } from './SearchInput';
 import type {
   SundayAgenda,
   MeetingActor,
@@ -699,12 +699,11 @@ function HymnSelectorModal({
 
           {/* Search */}
           <View style={styles.sheetSearchRow}>
-            <TextInput
-              style={[styles.searchInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
+            <SearchInput
+              style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
               placeholder={t('common.search')}
-              placeholderTextColor={colors.textTertiary}
             />
             <Pressable onPress={onClose} style={styles.sheetCloseBtn}>
               <Text style={[styles.sheetCloseText, { color: colors.primary }]}>{t('common.close')}</Text>

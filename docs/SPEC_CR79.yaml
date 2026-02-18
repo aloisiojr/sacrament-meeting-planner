@@ -1,0 +1,225 @@
+type: spec
+version: 1
+cr_id: CR-79
+feature_id: F001
+category: BUG
+priority: LOW
+
+title: >
+  [BUG DE UI] Users screen (Settings > Users) missing back button in header --
+  user is trapped with no way to return to Settings
+
+description: >
+  The Users screen at Settings > Users (src/app/(tabs)/settings/users.tsx) does
+  not have a back button in its header. Every other settings sub-screen (Members,
+  Topics, History, WhatsApp, Timezone, Theme, About) follows the same header
+  pattern: a row with [Back button | Title | Right element/spacer]. The Users
+  screen instead has a custom header with [Title | Invite button] but no back
+  button. Since the settings layout (settings/_layout.tsx) uses headerShown:false
+  and animation:'none', there is no native navigation bar with a back gesture.
+  The user is trapped on the Users screen with no visible way to return to
+  Settings (except swipe-back gesture on iOS, which is not discoverable and not
+  available on Android/web).
+
+symptom:
+  what_user_sees: >
+    After navigating to Settings > Users, there is no back button or visible
+    navigation control to return to the Settings screen. The header only shows
+    the "Users" title and the "Invite" button.
+  affected_platforms: "All (iOS, Android, Web)"
+  workaround: >
+    On iOS, the user can use the native swipe-back gesture. On Android and Web,
+    the user must use the device/browser back button or navigate to another tab.
+
+root_cause:
+  description: >
+    The users.tsx component was implemented with a different header layout than
+    the other settings sub-screens. It uses a header with flexDirection:'row',
+    justifyContent:'space-between' containing only the title and invite button.
+    The back button (Pressable with router.back() and t('common.back')) was
+    omitted. All other settings sub-screens follow a consistent pattern with
+    the back button on the left, title in the center, and an action/spacer on
+    the right.
+
+  pattern_in_other_screens: |
+    The standard header pattern used by ALL other settings sub-screens is:
+
+    <View style={styles.header}>
+      <Pressable onPress={() => router.back()} accessibilityRole="button">
+        <Text style={[styles.backButton, { color: colors.primary }]}>
+          {t('common.back')}
+        </Text>
+      </Pressable>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>{t('screen.title')}</Text>
+      <View style={styles.headerSpacer} />  {/* or action button */}
+    </View>
+
+    Screens using this pattern:
+    - members.tsx (line 492-511): Back | Title | Add button
+    - topics.tsx (line 277-285): Back | Title | Spacer
+    - history.tsx (line 93-103): Back | Title | Spacer
+    - whatsapp.tsx (line 142-152): Back | Title | Spacer
+    - timezone.tsx (line 182-192): Back | Title | Spacer
+    - theme.tsx (line 30-40): Back | Title | Spacer
+    - about.tsx (line 22-32): Back | Title | Spacer
+
+  current_users_header: |
+    The users.tsx header (lines 225-237) is different:
+
+    <View style={styles.header}>
+      <Text style={[styles.title, { color: colors.text }]}>
+        {t('users.title')}
+      </Text>
+      <Pressable ... onPress={openInviteModal}>
+        <Text>{t('users.inviteUser')}</Text>
+      </Pressable>
+    </View>
+
+    Missing: back button on the left
+    Different: title style uses 'title' (fontSize:28, bold) instead of 'headerTitle'
+
+scope:
+  in:
+    - "Add a back button to the users.tsx header following the established pattern"
+    - "Restructure the header to match the standard 3-element layout: [Back | Title | Invite]"
+    - "Use the same styling as other sub-screens (backButton, headerTitle styles)"
+    - "Keep the Invite button functionality in the header (right side)"
+  out:
+    - "Changes to the settings layout (settings/_layout.tsx)"
+    - "Changes to other settings sub-screens"
+    - "Changes to Edge Functions or backend"
+    - "Changes to navigation structure or routing"
+    - "Adding a back button to the settings index screen (it is the root)"
+
+personas:
+  - id: P-1
+    description: >
+      Bishopric member or Secretary with 'settings:users' permission --
+      the only users who can access the Users screen
+
+user_stories:
+  - id: US-1
+    as_a: "Bishopric member or Secretary on the Users screen"
+    i_want: "a back button in the header to return to the Settings screen"
+    so_that: "I can navigate back without relying on platform-specific gestures"
+
+acceptance_criteria:
+  - id: AC-1
+    given: "The Users screen (Settings > Users)"
+    when: "The screen is displayed"
+    then: >
+      A back button is visible on the left side of the header, displaying the
+      localized text from t('common.back') in the primary color (colors.primary).
+    priority: must
+    testable: true
+    test_approach: >
+      Render users.tsx and verify a Pressable with accessibilityRole='button'
+      exists containing text matching t('common.back').
+
+  - id: AC-2
+    given: "The Users screen with the back button visible"
+    when: "The user presses the back button"
+    then: >
+      router.back() is called, navigating the user back to the Settings index
+      screen (settings/index.tsx).
+    priority: must
+    testable: true
+    test_approach: >
+      Mock useRouter, simulate press on the back button Pressable, and verify
+      router.back() was called.
+
+  - id: AC-3
+    given: "The Users screen header"
+    when: "Comparing with other settings sub-screens"
+    then: >
+      The header follows the same 3-element layout pattern used by all other
+      settings sub-screens: back button on the left, title in the center, and
+      the Invite button on the right. The title uses the 'headerTitle' style
+      (fontSize ~18-22, fontWeight '700') consistent with other sub-screens,
+      NOT the old 'title' style (fontSize 28).
+    priority: must
+    testable: true
+    test_approach: >
+      Visual inspection or snapshot test comparing header structure with members.tsx.
+
+  - id: AC-4
+    given: "The Users screen header after the fix"
+    when: "The Invite button is pressed"
+    then: >
+      The invite modal opens as before. No regression in invite functionality.
+    priority: must
+    testable: true
+    test_approach: >
+      Render users.tsx, press the invite button, verify the modal is displayed.
+
+  - id: AC-5
+    given: "The Users screen"
+    when: "The screen is rendered"
+    then: >
+      The back button has accessibilityRole='button' for screen reader
+      compatibility, following the same accessibility pattern as other sub-screens.
+    priority: must
+    testable: true
+    test_approach: >
+      Check the Pressable wrapping the back text has accessibilityRole='button'.
+
+edge_cases:
+  - id: EC-1
+    case: "User navigates directly to /settings/users via deep link (no history stack)"
+    expected: >
+      router.back() navigates to the closest available route. The behavior
+      is the same as in other sub-screens (members, topics, etc.) since they
+      all use the same router.back() pattern.
+
+  - id: EC-2
+    case: "Header layout on small screen widths"
+    expected: >
+      The 3-element header (Back | Title | Invite) fits within the screen width.
+      The invite button text may truncate on very small screens. This is the same
+      behavior as members.tsx which has a similar 3-element header.
+
+files_likely_impacted:
+  - path: "src/app/(tabs)/settings/users.tsx"
+    action: "MODIFY"
+    details: |
+      1. ADD import for useRouter from expo-router
+      2. ADD router = useRouter() in the component
+      3. RESTRUCTURE the header View (lines 225-237) to follow the standard pattern:
+         - Left: Back button Pressable with router.back()
+         - Center: Title using headerTitle style
+         - Right: Invite button (existing)
+      4. UPDATE StyleSheet: change 'title' to 'headerTitle' style with smaller font,
+         add 'backButton' style matching other sub-screens (fontSize:16, fontWeight:'600')
+      5. REMOVE or update the old 'title' style entry in styles
+
+assumptions:
+  - id: A-1
+    description: >
+      The t('common.back') translation key already exists and is used by all
+      other settings sub-screens.
+    confirmed: true
+    evidence: "Used in members.tsx:495, topics.tsx:280, history.tsx:96, etc."
+
+  - id: A-2
+    description: >
+      useRouter from expo-router is NOT currently imported in users.tsx. It
+      needs to be added.
+    confirmed: true
+    evidence: "users.tsx imports do not include useRouter (lines 1-22)"
+
+  - id: A-3
+    description: >
+      The settings layout uses headerShown:false, so there is no native
+      back button provided by expo-router's Stack navigator.
+    confirmed: true
+    evidence: "settings/_layout.tsx:10 sets headerShown: false"
+
+definition_of_done:
+  - "Back button is visible on the left side of the Users screen header"
+  - "Pressing the back button calls router.back() and returns to Settings"
+  - "Header follows the same 3-element layout as other settings sub-screens"
+  - "Back button uses t('common.back') for localized text"
+  - "Back button has accessibilityRole='button'"
+  - "Invite button remains functional on the right side of the header"
+  - "No regressions in existing Users screen functionality"
+  - "Title style is consistent with other settings sub-screens (headerTitle)"

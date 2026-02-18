@@ -55,7 +55,6 @@ export interface CsvParseResult {
 export function parseCsv(csvContent: string): CsvParseResult {
   const errors: CsvValidationError[] = [];
   const members: CsvMember[] = [];
-  const seenPhones = new Set<string>();
 
   // Strip UTF-8 BOM if present (common in Excel-exported CSVs)
   const cleanContent = csvContent.replace(/^\uFEFF/, '').trim();
@@ -76,17 +75,6 @@ export function parseCsv(csvContent: string): CsvParseResult {
     return { success: false, members: [], errors };
   }
 
-  // Validate header column names against supported languages (case-insensitive)
-  const nameCol = headerParts[0].toLowerCase();
-  const phoneCol = headerParts[1].toLowerCase();
-  const validName = SUPPORTED_CSV_HEADERS.NAME_COLUMNS.some((n) => n.toLowerCase() === nameCol);
-  const validPhone = SUPPORTED_CSV_HEADERS.PHONE_COLUMNS.some((p) => p.toLowerCase() === phoneCol);
-
-  if (!validName || !validPhone) {
-    errors.push({ line: 1, field: 'header', message: 'Unrecognized CSV header columns', code: 'UNRECOGNIZED_HEADER' });
-    return { success: false, members: [], errors };
-  }
-
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -100,7 +88,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
     }
 
     const fullName = parts[0].trim();
-    const fullPhone = parts[1].trim();
+    let fullPhone = parts[1].trim();
 
     // Validate name
     if (!fullName) {
@@ -108,32 +96,9 @@ export function parseCsv(csvContent: string): CsvParseResult {
       continue;
     }
 
-    // Validate phone format (+xxyyyyyyyy)
-    if (fullPhone && !/^\+\d{8,15}$/.test(fullPhone)) {
-      errors.push({
-        line: i + 1,
-        field: 'Telefone Completo',
-        message: `Invalid phone format: "${fullPhone}". Expected: +xxyyyyyyyy`,
-        code: 'INVALID_PHONE',
-        params: { phone: fullPhone },
-      });
-      continue;
-    }
-
-    // Check for duplicate phone
-    if (fullPhone && seenPhones.has(fullPhone)) {
-      errors.push({
-        line: i + 1,
-        field: 'Telefone Completo',
-        message: `Duplicate phone: ${fullPhone}`,
-        code: 'DUPLICATE_PHONE',
-        params: { phone: fullPhone },
-      });
-      continue;
-    }
-
-    if (fullPhone) {
-      seenPhones.add(fullPhone);
+    // Sanitize phone: if it contains non-digit/non-plus chars, treat as empty
+    if (fullPhone && !/^[+\d]*$/.test(fullPhone)) {
+      fullPhone = '';
     }
 
     members.push({ full_name: fullName, phone: fullPhone });

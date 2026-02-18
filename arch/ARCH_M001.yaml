@@ -1,0 +1,275 @@
+# =============================================================================
+# ARCH_M001.yaml
+# Architecture definition for CR-82 bugfix
+# GestureDetector must be used as a descendant of GestureHandlerRootView
+# Generated: 2026-02-18
+# Phase: 1 of 1
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  change_requests: [CR-82]
+  type: bugfix
+  phase: "1 of 1"
+  phase_description: "Wrap app tree with GestureHandlerRootView in root layout"
+  spec_ref: specs/SPEC_F001.yaml
+  description: >
+    Fix CR-82: GestureDetector components in SwipeableCard throw because the
+    app tree is not wrapped in GestureHandlerRootView. Single-file fix in
+    src/app/_layout.tsx - import and wrap with GestureHandlerRootView.
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  - id: COMP-01
+    name: RootLayout
+    file: src/app/_layout.tsx
+    responsibility: >
+      Root layout component that wraps the entire app tree with all required
+      providers and root views. After this fix, it also wraps with
+      GestureHandlerRootView to enable gesture recognition app-wide.
+    type: existing_component
+    modification: wrap_with_gesture_handler_root_view
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - id: CONTRACT-01
+    name: GestureHandlerRootView wrapper
+    component: COMP-01
+    type: component_integration
+    input:
+      description: "react-native-gesture-handler exports GestureHandlerRootView"
+      import_statement: "import { GestureHandlerRootView } from 'react-native-gesture-handler'"
+      package: "react-native-gesture-handler ~2.28.0"
+    output:
+      description: >
+        GestureHandlerRootView wraps the entire provider tree inside ErrorBoundary.
+        All GestureDetector descendants (SwipeableCard) can register gestures.
+    props:
+      style: "{{ flex: 1 }}"
+    placement: "Inside ErrorBoundary, outside QueryClientProvider"
+
+  - id: CONTRACT-02
+    name: SwipeableCard gesture recognition
+    component: "src/components/SwipeableCard.tsx"
+    type: dependency_contract
+    depends_on: CONTRACT-01
+    description: >
+      SwipeableCard uses GestureDetector at line 180 for pan gesture.
+      It requires an ancestor GestureHandlerRootView in the component tree.
+      After CONTRACT-01 is satisfied, SwipeableCard gestures work without
+      any modification to SwipeableCard itself.
+    screens_affected:
+      - path: src/app/(tabs)/settings/members.tsx
+        line: 225
+        via: "MemberRow component"
+      - path: src/app/(tabs)/settings/topics.tsx
+        line: 123
+        via: "TopicRow component"
+
+# =============================================================================
+# ARCHITECTURE DECISION RECORDS (ADRs)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-M001-01
+    title: Place GestureHandlerRootView at root layout level
+    status: accepted
+    context: >
+      react-native-gesture-handler v2.x requires GestureHandlerRootView as an
+      ancestor of any GestureDetector. The app currently has no such wrapper.
+      Two options: (A) wrap at root layout level to cover all screens, or
+      (B) wrap individually at each screen that uses gestures.
+    decision: >
+      Option A: Wrap at root layout level in src/app/_layout.tsx. This is the
+      standard pattern recommended by react-native-gesture-handler documentation.
+    consequences:
+      positive:
+        - All current GestureDetector usages (SwipeableCard) are covered
+        - Future gesture-based components automatically covered
+        - Single place to manage gesture handler initialization
+      negative:
+        - GestureHandlerRootView initializes even for screens without gestures
+      neutral:
+        - Negligible performance overhead (GestureHandlerRootView is a thin View wrapper)
+
+  - id: ADR-M001-02
+    title: Place inside ErrorBoundary but outside all other providers
+    status: accepted
+    context: >
+      The current provider hierarchy is ErrorBoundary > QueryClientProvider >
+      I18nextProvider > ThemeProvider > InnerLayout (AuthProvider > SyncProvider >
+      NavigationGuard > Slot). GestureHandlerRootView needs to be inserted
+      somewhere in this chain.
+    decision: >
+      Insert GestureHandlerRootView as child of ErrorBoundary and parent of
+      QueryClientProvider. This keeps ErrorBoundary as the outermost error
+      catcher while placing the gesture root above all providers and screens.
+    consequences:
+      positive:
+        - ErrorBoundary catches any gesture handler initialization errors
+        - GestureHandlerRootView does not depend on any React context
+        - Clean separation - gesture infrastructure is a platform concern, not app logic
+      negative: []
+      neutral:
+        - Provider order unchanged except for the new wrapper layer
+
+  - id: ADR-M001-03
+    title: Use style={{ flex: 1 }} on GestureHandlerRootView
+    status: accepted
+    context: >
+      GestureHandlerRootView is a View-based component. Without explicit
+      flex styling, it would collapse to zero height.
+    decision: >
+      Apply style={{ flex: 1 }} as documented in the react-native-gesture-handler
+      installation guide.
+    consequences:
+      positive:
+        - Layout fills the screen correctly
+        - No visual change to any screen
+      negative: []
+
+# =============================================================================
+# FILE CHANGES
+# =============================================================================
+
+file_changes:
+
+  - file: src/app/_layout.tsx
+    changes:
+
+      - id: CHG-01
+        type: add_import
+        description: "Import GestureHandlerRootView from react-native-gesture-handler"
+        location: "After existing imports (after line 11)"
+        code: "import { GestureHandlerRootView } from 'react-native-gesture-handler';"
+
+      - id: CHG-02
+        type: wrap_jsx
+        description: >
+          Wrap the existing provider tree in RootLayout with GestureHandlerRootView.
+          The wrapper goes inside ErrorBoundary but outside QueryClientProvider.
+        location: "RootLayout function (lines 104-116)"
+        before: |
+          export default function RootLayout() {
+            return (
+              <ErrorBoundary>
+                <QueryClientProvider client={queryClient}>
+                  <I18nextProvider i18n={i18n}>
+                    <ThemeProvider>
+                      <InnerLayout />
+                    </ThemeProvider>
+                  </I18nextProvider>
+                </QueryClientProvider>
+              </ErrorBoundary>
+            );
+          }
+        after: |
+          export default function RootLayout() {
+            return (
+              <ErrorBoundary>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <QueryClientProvider client={queryClient}>
+                    <I18nextProvider i18n={i18n}>
+                      <ThemeProvider>
+                        <InnerLayout />
+                      </ThemeProvider>
+                    </I18nextProvider>
+                  </QueryClientProvider>
+                </GestureHandlerRootView>
+              </ErrorBoundary>
+            );
+          }
+
+    files_not_modified:
+      - path: src/components/SwipeableCard.tsx
+        reason: "Component correctly uses GestureDetector; root view was missing"
+      - path: src/app/(tabs)/settings/members.tsx
+        reason: "Screen correctly uses SwipeableCard; no change needed"
+      - path: src/app/(tabs)/settings/topics.tsx
+        reason: "Screen correctly uses SwipeableCard; no change needed"
+
+# =============================================================================
+# PROVIDER HIERARCHY (AFTER FIX)
+# =============================================================================
+
+provider_hierarchy_after_fix:
+  description: "Updated provider/wrapper nesting order in RootLayout"
+  order:
+    - name: ErrorBoundary
+      file: src/components/ErrorBoundary.tsx
+      purpose: "Catch and display unhandled errors"
+    - name: GestureHandlerRootView
+      file: "react-native-gesture-handler (external)"
+      purpose: "Enable gesture recognition for all GestureDetector descendants"
+      style: "{{ flex: 1 }}"
+      note: "NEW - added by CR-82"
+    - name: QueryClientProvider
+      file: "@tanstack/react-query (external)"
+      purpose: "Provide React Query client for data fetching"
+    - name: I18nextProvider
+      file: "react-i18next (external)"
+      purpose: "Provide i18n translation context"
+    - name: ThemeProvider
+      file: src/contexts/ThemeContext.tsx
+      purpose: "Provide theme colors and dark/light mode"
+    - name: AuthProvider
+      file: src/contexts/AuthContext.tsx
+      purpose: "Provide authentication state"
+      note: "Inside InnerLayout"
+    - name: SyncProvider
+      file: src/providers/SyncProvider.tsx
+      purpose: "Handle data synchronization"
+      note: "Inside InnerLayout"
+    - name: NavigationGuard
+      file: src/app/_layout.tsx
+      purpose: "Redirect based on auth state"
+      note: "Inside InnerLayout"
+    - name: Slot
+      file: "expo-router (external)"
+      purpose: "Render current route/screen"
+      note: "Inside InnerLayout"
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+
+risk_assessment:
+  - risk: "GestureHandlerRootView may conflict with existing View hierarchy"
+    likelihood: very_low
+    impact: low
+    mitigation: >
+      GestureHandlerRootView is a View subclass with flex:1. It behaves
+      identically to a regular View wrapper. Standard pattern in thousands
+      of React Native apps.
+
+  - risk: "Multiple GestureHandlerRootView instances cause issues"
+    likelihood: none
+    impact: none
+    mitigation: >
+      Grep confirms zero existing usages of GestureHandlerRootView in the
+      codebase. There will be exactly one instance after this fix.
+
+# =============================================================================
+# SCOPE BOUNDARIES
+# =============================================================================
+
+scope:
+  in_scope:
+    - "Add GestureHandlerRootView import to src/app/_layout.tsx"
+    - "Wrap app tree with GestureHandlerRootView inside ErrorBoundary"
+    - "Enable gesture recognition for SwipeableCard on Members and Topics screens"
+
+  out_of_scope:
+    - "Changes to SwipeableCard.tsx"
+    - "Changes to members.tsx or topics.tsx"
+    - "Adding new gesture-based components"
+    - "Changes to any file besides src/app/_layout.tsx"

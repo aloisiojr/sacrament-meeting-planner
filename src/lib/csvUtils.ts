@@ -63,7 +63,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const lines = cleanContent.trim().split(/\r?\n/);
 
   if (lines.length === 0) {
-    errors.push({ line: 0, field: 'file', message: 'Empty CSV file' });
+    errors.push({ line: 0, field: 'file', message: 'Empty CSV file', code: 'EMPTY_FILE' });
     return { success: false, members: [], errors };
   }
 
@@ -72,7 +72,18 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const headerParts = header.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
 
   if (headerParts.length < 2) {
-    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 2 columns: Nome, Telefone Completo' });
+    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 2 columns: Nome, Telefone Completo', code: 'INVALID_HEADER' });
+    return { success: false, members: [], errors };
+  }
+
+  // Validate header column names against supported languages (case-insensitive)
+  const nameCol = headerParts[0].toLowerCase();
+  const phoneCol = headerParts[1].toLowerCase();
+  const validName = SUPPORTED_CSV_HEADERS.NAME_COLUMNS.some((n) => n.toLowerCase() === nameCol);
+  const validPhone = SUPPORTED_CSV_HEADERS.PHONE_COLUMNS.some((p) => p.toLowerCase() === phoneCol);
+
+  if (!validName || !validPhone) {
+    errors.push({ line: 1, field: 'header', message: 'Unrecognized CSV header columns', code: 'UNRECOGNIZED_HEADER' });
     return { success: false, members: [], errors };
   }
 
@@ -84,7 +95,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
     const parts = parseCsvLine(line);
 
     if (parts.length < 2) {
-      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 2 columns' });
+      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 2 columns', code: 'INSUFFICIENT_COLUMNS' });
       continue;
     }
 
@@ -93,7 +104,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
 
     // Validate name
     if (!fullName) {
-      errors.push({ line: i + 1, field: 'Nome', message: 'Name is required' });
+      errors.push({ line: i + 1, field: 'Nome', message: 'Name is required', code: 'NAME_REQUIRED' });
       continue;
     }
 
@@ -103,6 +114,8 @@ export function parseCsv(csvContent: string): CsvParseResult {
         line: i + 1,
         field: 'Telefone Completo',
         message: `Invalid phone format: "${fullPhone}". Expected: +xxyyyyyyyy`,
+        code: 'INVALID_PHONE',
+        params: { phone: fullPhone },
       });
       continue;
     }
@@ -113,6 +126,8 @@ export function parseCsv(csvContent: string): CsvParseResult {
         line: i + 1,
         field: 'Telefone Completo',
         message: `Duplicate phone: ${fullPhone}`,
+        code: 'DUPLICATE_PHONE',
+        params: { phone: fullPhone },
       });
       continue;
     }
@@ -129,7 +144,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
   }
 
   if (members.length === 0) {
-    errors.push({ line: 0, field: 'data', message: 'No valid data rows found' });
+    errors.push({ line: 0, field: 'data', message: 'No valid data rows found', code: 'NO_DATA' });
     return { success: false, members: [], errors };
   }
 

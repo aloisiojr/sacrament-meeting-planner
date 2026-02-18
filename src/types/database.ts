@@ -195,6 +195,10 @@ export interface SundayAgenda {
   has_special_presentation: boolean;
   special_presentation_description: string | null;
   intermediate_hymn_id: string | null;
+  // Speaker overrides (last-minute swap)
+  speaker_1_override: string | null;
+  speaker_2_override: string | null;
+  speaker_3_override: string | null;
   // Closing
   closing_hymn_id: string | null;
   closing_prayer_member_id: string | null;

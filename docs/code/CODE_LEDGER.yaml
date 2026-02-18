@@ -1,16 +1,16 @@
 # =============================================================================
 # CODE_LEDGER.yaml
 # Tracks commits made for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
-# CR-87, CR-88, CR-89
+# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98
 # Generated: 2026-02-18
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89]
-  plan_ref: plans/PLAN_P012.yaml
-  arch_ref: arch/ARCH_M012.yaml
-  spec_ref: specs/SPEC_F032_F034.yaml
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98]
+  plan_ref: plans/PLAN_P013.yaml
+  arch_ref: arch/ARCH_M013.yaml
+  spec_ref: specs/SPEC_F035_F039.yaml
 
 commits:
 
@@ -426,6 +426,104 @@ commits:
 test_results:
   new_tests: 106
   new_tests_passing: 106
+  full_suite_tests: 2716
+  full_suite_passing: 2716
+  full_suite_files: 56
+  regressions: 0
+
+  # --- Batch 7, Phase 1: CR-91, CR-92, CR-93, CR-95, CR-98 ---
+
+  - step: STEP-01
+    cr: CR-91
+    plan_ref: plans/PLAN_P013.yaml
+    plan_step: STEP-01
+    hash: bdba1aa
+    message: "fix(db): add SECURITY DEFINER to enqueue_speech_notification trigger (CR-91)"
+    files_changed:
+      - supabase/migrations/013_fix_notification_trigger_security_definer.sql
+    changes:
+      - id: CHG-65
+        description: "Created migration 013 with CREATE OR REPLACE FUNCTION enqueue_speech_notification() SECURITY DEFINER"
+    acs_covered: [AC-F035-01, AC-F035-02, AC-F035-03, AC-F035-04]
+    ecs_covered: [EC-F035-01, EC-F035-02, EC-F035-03, EC-F035-04]
+
+  - step: STEP-02
+    cr: CR-92
+    plan_ref: plans/PLAN_P013.yaml
+    plan_step: STEP-02
+    hash: e091833
+    message: "fix(members): change keyExtractor to item.label to fix duplicate key warning (CR-92)"
+    files_changed:
+      - src/app/(tabs)/settings/members.tsx
+    changes:
+      - id: CHG-66
+        description: "Changed FlatList keyExtractor from item.code to item.label in country code picker"
+    acs_covered: [AC-F036-01, AC-F036-02, AC-F036-03, AC-F036-04, AC-F036-05]
+    ecs_covered: [EC-F036-01]
+
+  - step: STEP-03
+    cr: CR-93
+    plan_ref: plans/PLAN_P013.yaml
+    plan_step: STEP-03
+    hash: 313dc67
+    message: "fix(deeplink): change protocol from wardmanager:// to sacrmeetman:// (CR-93)"
+    files_changed:
+      - app.json
+      - supabase/functions/create-invitation/index.ts
+    changes:
+      - id: CHG-67
+        description: "Changed expo.scheme from 'wardmanager' to 'sacrmeetman' in app.json"
+      - id: CHG-68
+        description: "Changed deep link from wardmanager://invite/ to sacrmeetman://invite/ in create-invitation Edge Function"
+    acs_covered: [AC-F037-01, AC-F037-02, AC-F037-03, AC-F037-04]
+    ecs_covered: [EC-F037-01, EC-F037-02]
+
+  - step: STEP-04
+    cr: CR-95
+    plan_ref: plans/PLAN_P013.yaml
+    plan_step: STEP-04
+    hash: 1420ed2
+    message: "fix(speeches): hide speech slots for all non-speeches types (CR-95)"
+    files_changed:
+      - src/app/(tabs)/speeches.tsx
+      - src/__tests__/cr002-qa.test.ts
+      - src/__tests__/cr001-qa-extended.test.ts
+    changes:
+      - id: CHG-69
+        description: "Removed import of isExcludedFromAgenda from useAgenda in speeches.tsx"
+      - id: CHG-70
+        description: "Changed rendering condition from !(exception && isExcludedFromAgenda(exception.reason)) to (!exception || exception.reason === 'speeches')"
+      - id: CHG-71
+        description: "Updated cr002-qa.test.ts to assert speeches.tsx does NOT contain isExcludedFromAgenda and contains new pattern"
+      - id: CHG-72
+        description: "Updated cr001-qa-extended.test.ts to verify speeches.tsx uses direct type check instead of isExcludedFromAgenda"
+    acs_covered: [AC-F038-01, AC-F038-02, AC-F038-03, AC-F038-04, AC-F038-05, AC-F038-06, AC-F038-07, AC-F038-08, AC-F038-09]
+    ecs_covered: [EC-F038-01, EC-F038-02]
+
+  - step: STEP-05
+    cr: CR-98
+    plan_ref: plans/PLAN_P013.yaml
+    plan_step: STEP-05
+    hash: 7a60ea8
+    message: "fix(prayer): add visible/onClose props to PrayerSelector for immediate modal open (CR-98)"
+    files_changed:
+      - src/components/PrayerSelector.tsx
+      - src/components/AgendaForm.tsx
+    changes:
+      - id: CHG-73
+        description: "Added useEffect import to PrayerSelector.tsx"
+      - id: CHG-74
+        description: "Added visible?: boolean and onClose?: () => void props to PrayerSelectorProps interface"
+      - id: CHG-75
+        description: "Added useEffect to sync modalVisible with visible prop"
+      - id: CHG-76
+        description: "Added onClose?.() calls to all modal close handlers (cancel button, onRequestClose, handleSelectMember, handleCustomName)"
+      - id: CHG-77
+        description: "Added visible={true} and onClose={() => setSelectorModal(null)} to PrayerSelector in AgendaForm.tsx"
+    acs_covered: [AC-F039-01, AC-F039-02, AC-F039-03, AC-F039-04, AC-F039-05, AC-F039-06, AC-F039-07]
+    ecs_covered: [EC-F039-01, EC-F039-02, EC-F039-03]
+
+batch7_phase1_test_results:
   full_suite_tests: 2716
   full_suite_passing: 2716
   full_suite_files: 56

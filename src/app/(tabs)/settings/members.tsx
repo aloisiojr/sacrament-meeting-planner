@@ -252,17 +252,13 @@ function MemberRow({
 
 function translateCsvError(
   code: CsvErrorCode | undefined,
-  params: Record<string, string> | undefined,
-  t: (key: string, opts?: Record<string, string>) => string
+  t: (key: string) => string
 ): string {
   switch (code) {
     case 'EMPTY_FILE': return t('members.csvErrorEmptyFile');
     case 'INVALID_HEADER': return t('members.csvErrorInvalidHeader');
-    case 'UNRECOGNIZED_HEADER': return t('members.csvErrorUnrecognizedHeader');
     case 'INSUFFICIENT_COLUMNS': return t('members.csvErrorInsufficientColumns');
     case 'NAME_REQUIRED': return t('members.csvErrorNameRequired');
-    case 'INVALID_PHONE': return t('members.csvErrorInvalidPhone', params);
-    case 'DUPLICATE_PHONE': return t('members.csvErrorDuplicatePhone', params);
     case 'NO_DATA': return t('members.csvErrorNoData');
     default: return code ?? 'Unknown error';
   }
@@ -417,7 +413,7 @@ export default function MembersScreen() {
 
       if (!result.success) {
         const errorMessages = result.errors
-          .map((e) => t('members.importErrorLine', { line: String(e.line), field: e.field, error: translateCsvError(e.code, e.params, t) }))
+          .map((e) => t('members.importErrorLine', { line: String(e.line), field: e.field, error: translateCsvError(e.code, t) }))
           .join('\n');
         throw new Error(errorMessages);
       }

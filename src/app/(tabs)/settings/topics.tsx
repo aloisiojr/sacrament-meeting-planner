@@ -173,17 +173,28 @@ function TopicRow({
 interface CollectionRowProps {
   name: string;
   active: boolean;
+  isExpanded: boolean;
   onToggle: (active: boolean) => void;
+  onPress: () => void;
   disabled: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
 }
 
-function CollectionRow({ name, active, onToggle, disabled, colors }: CollectionRowProps) {
+function CollectionRow({ name, active, isExpanded, onToggle, onPress, disabled, colors }: CollectionRowProps) {
   return (
     <View style={[styles.collectionRow, { borderBottomColor: colors.divider }]}>
-      <Text style={[styles.collectionName, { color: colors.text }]} numberOfLines={1}>
-        {name}
-      </Text>
+      <Pressable
+        style={styles.collectionPressable}
+        onPress={onPress}
+        accessibilityRole="button"
+      >
+        <Text style={[styles.chevron, { color: colors.textSecondary }]}>
+          {isExpanded ? '\u25BC' : '\u25B6'}
+        </Text>
+        <Text style={[styles.collectionName, { color: colors.text }]} numberOfLines={1}>
+          {name}
+        </Text>
+      </Pressable>
       <Switch
         value={active}
         onValueChange={onToggle}
@@ -381,7 +392,9 @@ export default function TopicsScreen() {
                   key={item.id}
                   name={item.name}
                   active={item.active}
+                  isExpanded={false}
                   onToggle={(active) => handleToggleCollection(item.id, active)}
+                  onPress={() => {}}
                   disabled={!canToggle}
                   colors={colors}
                 />
@@ -519,6 +532,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  collectionPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chevron: {
+    fontSize: 10,
+    width: 16,
+    textAlign: 'center',
   },
   collectionName: {
     fontSize: 16,

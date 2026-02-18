@@ -132,9 +132,12 @@ export function buildPresentationCards(
     const speech1 = speeches.find((s) => s.position === 1);
     const speech2 = speeches.find((s) => s.position === 2);
 
+    const speaker1Name = agenda?.speaker_1_override ?? speech1?.speaker_name ?? '';
+    const speaker2Name = agenda?.speaker_2_override ?? speech2?.speaker_name ?? '';
+
     const speechFields: PresentationField[] = [
-      { label: `1\u00BA ${t('speeches.speaker')}`, value: speech1?.speaker_name ?? '', type: 'text' },
-      { label: `2\u00BA ${t('speeches.speaker')}`, value: speech2?.speaker_name ?? '', type: 'text' },
+      { label: `1\u00BA ${t('speeches.speaker')}`, value: speaker1Name, type: 'text' },
+      { label: `2\u00BA ${t('speeches.speaker')}`, value: speaker2Name, type: 'text' },
     ];
 
     if (agenda?.has_special_presentation) {
@@ -154,8 +157,9 @@ export function buildPresentationCards(
 
     // Card 4: Last Speech
     const speech3 = speeches.find((s) => s.position === 3);
+    const speaker3Name = agenda?.speaker_3_override ?? speech3?.speaker_name ?? '';
     const lastFields: PresentationField[] = [
-      { label: `3\u00BA ${t('speeches.speaker')}`, value: speech3?.speaker_name ?? '', type: 'text' },
+      { label: `3\u00BA ${t('speeches.speaker')}`, value: speaker3Name, type: 'text' },
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
       { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];

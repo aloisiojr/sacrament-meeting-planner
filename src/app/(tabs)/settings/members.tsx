@@ -26,7 +26,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { SwipeableCard } from '../../../components/SwipeableCard';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
-import { generateCsv, parseCsv, splitPhoneNumber } from '../../../lib/csvUtils';
+import { generateCsv, parseCsv, splitPhoneNumber, type CsvErrorCode } from '../../../lib/csvUtils';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -248,6 +248,26 @@ function MemberRow({
   );
 }
 
+// --- CSV Error Translation Helper ---
+
+function translateCsvError(
+  code: CsvErrorCode | undefined,
+  params: Record<string, string> | undefined,
+  t: (key: string, opts?: Record<string, string>) => string
+): string {
+  switch (code) {
+    case 'EMPTY_FILE': return t('members.csvErrorEmptyFile');
+    case 'INVALID_HEADER': return t('members.csvErrorInvalidHeader');
+    case 'UNRECOGNIZED_HEADER': return t('members.csvErrorUnrecognizedHeader');
+    case 'INSUFFICIENT_COLUMNS': return t('members.csvErrorInsufficientColumns');
+    case 'NAME_REQUIRED': return t('members.csvErrorNameRequired');
+    case 'INVALID_PHONE': return t('members.csvErrorInvalidPhone', params);
+    case 'DUPLICATE_PHONE': return t('members.csvErrorDuplicatePhone', params);
+    case 'NO_DATA': return t('members.csvErrorNoData');
+    default: return code ?? 'Unknown error';
+  }
+}
+
 // --- Main Screen ---
 
 export default function MembersScreen() {
@@ -350,7 +370,10 @@ export default function MembersScreen() {
     exportingRef.current = true;
 
     try {
-      const csv = generateCsv(members ?? []);
+      const csv = generateCsv(members ?? [], {
+        name: t('members.csvHeaderName'),
+        phone: t('members.csvHeaderPhone'),
+      });
 
       if (Platform.OS === 'web') {
         // Web: Blob download
@@ -363,6 +386,10 @@ export default function MembersScreen() {
         URL.revokeObjectURL(url);
       } else {
         // Mobile: Write temp file and share via expo-sharing
+        if (!FileSystem.cacheDirectory) {
+          Alert.alert(t('common.error'), t('members.exportFailed'));
+          return;
+        }
         const fileUri = `${FileSystem.cacheDirectory}membros.csv`;
         await FileSystem.writeAsStringAsync(fileUri, csv, {
           encoding: FileSystem.EncodingType.UTF8,
@@ -390,7 +417,7 @@ export default function MembersScreen() {
 
       if (!result.success) {
         const errorMessages = result.errors
-          .map((e) => t('members.importErrorLine', { line: e.line, field: e.field, error: e.message }))
+          .map((e) => t('members.importErrorLine', { line: String(e.line), field: e.field, error: translateCsvError(e.code, e.params, t) }))
           .join('\n');
         throw new Error(errorMessages);
       }
@@ -457,8 +484,13 @@ export default function MembersScreen() {
           encoding: FileSystem.EncodingType.UTF8,
         });
         importMutation.mutate(content);
-      } catch {
-        Alert.alert(t('common.error'), t('members.importFailed'));
+      } catch (err: any) {
+        const msg = (err?.message ?? '').toLowerCase();
+        if (msg.includes('cancel') || msg.includes('cancelled')) return;
+        const errorKey = (msg.includes('read') || msg.includes('encoding'))
+          ? 'members.importReadError'
+          : 'members.importFailed';
+        Alert.alert(t('common.error'), t(errorKey));
       }
     }
   }, [importMutation, t]);

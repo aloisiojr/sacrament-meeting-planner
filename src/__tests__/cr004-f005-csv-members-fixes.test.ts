@@ -85,10 +85,11 @@ describe('CR-54: Export CSV cancel detection & double-tap guard', () => {
   });
 
   describe('Import error messages use i18n', () => {
-    it('import catch block should use t("members.importFailed") not hardcoded English', () => {
+    it('import catch block should use t() for importFailed and importReadError, not hardcoded English', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
       // The catch block for DocumentPicker errors should use i18n
-      expect(source).toContain("t('members.importFailed')");
+      expect(source).toContain("'members.importFailed'");
+      expect(source).toContain("'members.importReadError'");
       // Should NOT have hardcoded 'Failed to read file'
       expect(source).not.toContain("'Failed to read file'");
     });
@@ -405,9 +406,9 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
       // Should build errorMessages by mapping over result.errors
       expect(source).toContain("t('members.importErrorLine'");
-      expect(source).toContain('line: e.line');
+      expect(source).toContain('line: String(e.line)');
       expect(source).toContain('field: e.field');
-      expect(source).toContain('error: e.message');
+      expect(source).toContain('translateCsvError(e.code, e.params, t)');
     });
 
     it('should throw importEmpty message when CSV has 0 members', () => {

@@ -1,0 +1,363 @@
+# =============================================================================
+# PLAN_P001.yaml
+# Execution plan for CR-82 bugfix
+# GestureDetector must be used as a descendant of GestureHandlerRootView
+# Generated: 2026-02-18
+# Status: pending
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  plan_id: PLAN_P001
+  change_requests: [CR-82]
+  type: bugfix
+  phase: "1 of 1"
+  phase_description: "Corrigir GestureDetector sem GestureHandlerRootView no SwipeableCard/MembersScreen"
+  total_steps: 2
+  estimated_complexity: very_low
+  spec_ref: specs/SPEC_F001.yaml
+  arch_ref: arch/ARCH_M001.yaml
+  description: >
+    Fix CR-82: Import GestureHandlerRootView from react-native-gesture-handler
+    and wrap the app tree in src/app/_layout.tsx with it. The wrapper goes
+    inside ErrorBoundary but outside all other providers. Two atomic steps:
+    (1) add import + wrap JSX, (2) add/update tests.
+
+# =============================================================================
+# PRE-CONDITIONS
+# =============================================================================
+
+pre_conditions:
+  - "react-native-gesture-handler ~2.28.0 is installed (already in dependencies)"
+  - "GestureHandlerRootView is not used anywhere in src/ (grep confirms 0 results)"
+  - "SwipeableCard uses GestureDetector at src/components/SwipeableCard.tsx:180"
+  - "RootLayout in src/app/_layout.tsx wraps ErrorBoundary > QueryClientProvider > I18nextProvider > ThemeProvider > InnerLayout"
+  - "All existing tests pass (npx vitest run)"
+
+# =============================================================================
+# AC TRACEABILITY MATRIX
+# =============================================================================
+
+ac_traceability:
+  - ac_id: AC-001
+    description: "Import GestureHandlerRootView from react-native-gesture-handler"
+    covered_by_steps: [1]
+    covered_by_tests: [T-001]
+
+  - ac_id: AC-002
+    description: "Wrapper com flex:1 dentro de ErrorBoundary fora dos providers"
+    covered_by_steps: [1]
+    covered_by_tests: [T-002, T-003]
+
+  - ac_id: AC-003
+    description: "Members renderiza sem erro"
+    covered_by_steps: [1]
+    covered_by_tests: [T-004]
+    note: "Runtime verification - GestureDetector error no longer thrown"
+
+  - ac_id: AC-004
+    description: "Topics renderiza sem erro"
+    covered_by_steps: [1]
+    covered_by_tests: [T-005]
+    note: "Runtime verification - GestureDetector error no longer thrown"
+
+  - ac_id: AC-005
+    description: "Swipe funciona em Members"
+    covered_by_steps: [1]
+    covered_by_tests: [T-006]
+    note: "Runtime verification - gesture system enabled by root view"
+
+  - ac_id: AC-006
+    description: "Swipe funciona em Topics"
+    covered_by_steps: [1]
+    covered_by_tests: [T-007]
+    note: "Runtime verification - gesture system enabled by root view"
+
+# =============================================================================
+# EDGE CASE TRACEABILITY
+# =============================================================================
+
+edge_case_traceability:
+  - ec_id: EC-001
+    description: "Nao duplicar wrapper em sub-layouts"
+    covered_by_steps: [1]
+    covered_by_tests: [T-008]
+    note: "Grep confirms 0 existing usages; only 1 instance added at root"
+
+  - ec_id: EC-002
+    description: "Testes existentes continuam passando"
+    covered_by_steps: [2]
+    covered_by_tests: [T-009]
+    note: "Full test suite run after changes"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ===========================================================================
+  # STEP 1: Add import + wrap JSX with GestureHandlerRootView
+  # ===========================================================================
+
+  - number: 1
+    title: "Add GestureHandlerRootView import and wrap app tree in _layout.tsx"
+    cr: CR-82
+    acs_covered: [AC-001, AC-002, AC-003, AC-004, AC-005, AC-006]
+    ecs_covered: [EC-001]
+    adrs_applied: [ADR-M001-01, ADR-M001-02, ADR-M001-03]
+    description: >
+      Two changes in src/app/_layout.tsx:
+      (1) Add import statement for GestureHandlerRootView from react-native-gesture-handler
+          after the existing imports (after line 11).
+      (2) In the RootLayout function, wrap the existing provider tree with
+          GestureHandlerRootView style={{ flex: 1 }} inside ErrorBoundary but
+          outside QueryClientProvider.
+    file: src/app/_layout.tsx
+    changes:
+
+      - id: CHG-01
+        type: add_import
+        description: "Import GestureHandlerRootView from react-native-gesture-handler"
+        location: "After line 11 (after i18n import)"
+        code: "import { GestureHandlerRootView } from 'react-native-gesture-handler';"
+
+      - id: CHG-02
+        type: wrap_jsx
+        description: "Wrap provider tree with GestureHandlerRootView inside ErrorBoundary"
+        location: "RootLayout function (lines 104-116)"
+        old: |
+          export default function RootLayout() {
+            return (
+              <ErrorBoundary>
+                <QueryClientProvider client={queryClient}>
+                  <I18nextProvider i18n={i18n}>
+                    <ThemeProvider>
+                      <InnerLayout />
+                    </ThemeProvider>
+                  </I18nextProvider>
+                </QueryClientProvider>
+              </ErrorBoundary>
+            );
+          }
+        new: |
+          export default function RootLayout() {
+            return (
+              <ErrorBoundary>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <QueryClientProvider client={queryClient}>
+                    <I18nextProvider i18n={i18n}>
+                      <ThemeProvider>
+                        <InnerLayout />
+                      </ThemeProvider>
+                    </I18nextProvider>
+                  </QueryClientProvider>
+                </GestureHandlerRootView>
+              </ErrorBoundary>
+            );
+          }
+
+    hierarchy_after_fix: >
+      ErrorBoundary > GestureHandlerRootView > QueryClientProvider >
+      I18nextProvider > ThemeProvider > AuthProvider > SyncProvider >
+      NavigationGuard > Slot
+
+    done_when:
+      - "src/app/_layout.tsx contains: import { GestureHandlerRootView } from 'react-native-gesture-handler'"
+      - "src/app/_layout.tsx contains: <GestureHandlerRootView style={{ flex: 1 }}>"
+      - "GestureHandlerRootView is child of ErrorBoundary and parent of QueryClientProvider"
+      - "No other files modified"
+
+    commit:
+      message: "fix(layout): add GestureHandlerRootView wrapper to root layout (CR-82)"
+
+  # ===========================================================================
+  # STEP 2: Add tests for the fix
+  # ===========================================================================
+
+  - number: 2
+    title: "Add tests verifying GestureHandlerRootView wrapper in root layout"
+    cr: CR-82
+    acs_covered: [AC-001, AC-002, AC-003, AC-004, AC-005, AC-006]
+    ecs_covered: [EC-001, EC-002]
+    depends_on: [1]
+    description: >
+      Create test file src/__tests__/cr082-gesture-handler-root.test.ts with
+      source-code-based tests (same pattern as existing tests like
+      cr004-f005-csv-members-fixes.test.ts). Tests verify:
+      (1) GestureHandlerRootView is imported from react-native-gesture-handler
+      (2) GestureHandlerRootView wraps the provider tree in RootLayout
+      (3) style={{ flex: 1 }} is applied
+      (4) SwipeableCard still uses GestureDetector (dependency verification)
+      (5) Members screen uses SwipeableCard (AC-003, AC-005)
+      (6) Topics screen uses SwipeableCard (AC-004, AC-006)
+      (7) No duplicate GestureHandlerRootView in sub-layouts (EC-001)
+      (8) All existing tests continue passing (EC-002)
+    file: src/__tests__/cr082-gesture-handler-root.test.ts
+    test_ids:
+
+      - id: T-001
+        ac: AC-001
+        title: "should import GestureHandlerRootView from react-native-gesture-handler"
+        test: |
+          it('should import GestureHandlerRootView from react-native-gesture-handler', () => {
+            const source = readSourceFile('app/_layout.tsx');
+            expect(source).toContain("import { GestureHandlerRootView } from 'react-native-gesture-handler'");
+          });
+
+      - id: T-002
+        ac: AC-002
+        title: "should wrap provider tree with GestureHandlerRootView"
+        test: |
+          it('should wrap provider tree with GestureHandlerRootView', () => {
+            const source = readSourceFile('app/_layout.tsx');
+            expect(source).toContain('<GestureHandlerRootView');
+            expect(source).toContain('</GestureHandlerRootView>');
+          });
+
+      - id: T-003
+        ac: AC-002
+        title: "should apply flex:1 style to GestureHandlerRootView"
+        test: |
+          it('should apply flex:1 style to GestureHandlerRootView', () => {
+            const source = readSourceFile('app/_layout.tsx');
+            expect(source).toContain('<GestureHandlerRootView style={{ flex: 1 }}>');
+          });
+
+      - id: T-004
+        ac: AC-003
+        title: "should have SwipeableCard in Members screen (gesture descendant)"
+        test: |
+          it('should have SwipeableCard in Members screen (gesture descendant)', () => {
+            const source = readSourceFile('app/(tabs)/settings/members.tsx');
+            expect(source).toContain('SwipeableCard');
+          });
+
+      - id: T-005
+        ac: AC-004
+        title: "should have SwipeableCard in Topics screen (gesture descendant)"
+        test: |
+          it('should have SwipeableCard in Topics screen (gesture descendant)', () => {
+            const source = readSourceFile('app/(tabs)/settings/topics.tsx');
+            expect(source).toContain('SwipeableCard');
+          });
+
+      - id: T-006
+        ac: AC-005
+        title: "should have GestureDetector in SwipeableCard for pan gesture"
+        test: |
+          it('should have GestureDetector in SwipeableCard for pan gesture', () => {
+            const source = readSourceFile('components/SwipeableCard.tsx');
+            expect(source).toContain('GestureDetector');
+            expect(source).toContain('Gesture.Pan()');
+          });
+
+      - id: T-007
+        ac: AC-006
+        title: "SwipeableCard should import from react-native-gesture-handler"
+        test: |
+          it('SwipeableCard should import from react-native-gesture-handler', () => {
+            const source = readSourceFile('components/SwipeableCard.tsx');
+            expect(source).toContain("from 'react-native-gesture-handler'");
+            expect(source).toContain('GestureDetector');
+          });
+
+      - id: T-008
+        ec: EC-001
+        title: "should have GestureHandlerRootView only in root layout (no duplicates)"
+        test: |
+          it('should have GestureHandlerRootView only in root layout (no duplicates)', () => {
+            const rootLayout = readSourceFile('app/_layout.tsx');
+            expect(rootLayout).toContain('GestureHandlerRootView');
+
+            // Verify sub-layouts do not duplicate the wrapper
+            const fs = require('fs');
+            const path = require('path');
+            const srcDir = path.join(__dirname, '..');
+            const tabsLayout = path.join(srcDir, 'app/(tabs)/_layout.tsx');
+            if (fs.existsSync(tabsLayout)) {
+              const tabsSource = fs.readFileSync(tabsLayout, 'utf-8');
+              expect(tabsSource).not.toContain('GestureHandlerRootView');
+            }
+            const settingsLayout = path.join(srcDir, 'app/(tabs)/settings/_layout.tsx');
+            if (fs.existsSync(settingsLayout)) {
+              const settingsSource = fs.readFileSync(settingsLayout, 'utf-8');
+              expect(settingsSource).not.toContain('GestureHandlerRootView');
+            }
+          });
+
+      - id: T-009
+        ec: EC-002
+        title: "GestureHandlerRootView placement: inside ErrorBoundary, outside QueryClientProvider"
+        test: |
+          it('GestureHandlerRootView placement: inside ErrorBoundary, outside QueryClientProvider', () => {
+            const source = readSourceFile('app/_layout.tsx');
+            const errorBoundaryIdx = source.indexOf('<ErrorBoundary>');
+            const gestureIdx = source.indexOf('<GestureHandlerRootView');
+            const queryIdx = source.indexOf('<QueryClientProvider');
+            expect(errorBoundaryIdx).toBeLessThan(gestureIdx);
+            expect(gestureIdx).toBeLessThan(queryIdx);
+          });
+
+    done_when:
+      - "src/__tests__/cr082-gesture-handler-root.test.ts exists with all 9 tests"
+      - "npx vitest run src/__tests__/cr082-gesture-handler-root.test.ts passes (all 9 tests green)"
+      - "npx vitest run passes (full test suite, EC-002)"
+
+    commit:
+      message: "test(layout): add tests for GestureHandlerRootView wrapper (CR-82)"
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependencies:
+  step_1: []          # No dependencies - modifies only _layout.tsx
+  step_2: [step_1]    # Tests verify changes made in Step 1
+
+# =============================================================================
+# POST-CONDITIONS (after all steps complete)
+# =============================================================================
+
+post_conditions:
+  source_code:
+    - "import { GestureHandlerRootView } from 'react-native-gesture-handler' in _layout.tsx"
+    - "<GestureHandlerRootView style={{ flex: 1 }}> wrapping provider tree"
+    - "Hierarchy: ErrorBoundary > GestureHandlerRootView > QueryClientProvider > I18nextProvider > ThemeProvider > InnerLayout"
+    - "Only src/app/_layout.tsx modified (no changes to SwipeableCard, members, topics)"
+    - "No duplicate GestureHandlerRootView in any sub-layout"
+
+  tests:
+    - "9 new tests in src/__tests__/cr082-gesture-handler-root.test.ts all pass"
+    - "Full test suite (npx vitest run) passes with no regressions"
+
+  runtime_behavior:
+    - "CR-82 FIXED: GestureDetector error no longer thrown on Members screen"
+    - "CR-82 FIXED: GestureDetector error no longer thrown on Topics screen"
+    - "Swipe-to-reveal actions work on member rows"
+    - "Swipe-to-reveal actions work on topic rows"
+    - "App layout unchanged on all screens (flex:1 transparent wrapper)"
+    - "Web platform continues to work (GestureHandlerRootView renders as View)"
+
+# =============================================================================
+# EXECUTION NOTES
+# =============================================================================
+
+execution_notes:
+  - >
+    Step 1 is the actual fix. It is a minimal 2-line change: one import line
+    and two JSX lines (opening + closing tags). The file remains 127 lines.
+  - >
+    Step 2 adds tests to verify the fix and guard against regressions.
+    The test file uses the same readSourceFile pattern used throughout the
+    project (e.g., cr004-f005-csv-members-fixes.test.ts).
+  - >
+    After completing both steps, verify with:
+      npx vitest run src/__tests__/cr082-gesture-handler-root.test.ts
+      npx vitest run
+  - >
+    No TypeScript compilation changes expected since GestureHandlerRootView
+    is a standard React component from an already-installed package.
+  - >
+    CRITICAL: The GestureHandlerRootView MUST have style={{ flex: 1 }}.
+    Without it, the view collapses to zero height and the app shows blank.

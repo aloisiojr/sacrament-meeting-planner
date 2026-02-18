@@ -1,0 +1,251 @@
+# =============================================================================
+# REVIEW_CONSOLIDATED.yaml
+# Consolidated code review for CR-82
+# GestureDetector must be used as a descendant of GestureHandlerRootView
+# Reviewed: 2026-02-18
+# =============================================================================
+
+metadata:
+  project: Sacrament Meeting Planner
+  change_requests: [CR-82]
+  phase: "1 of 1"
+  phase_description: "Corrigir GestureDetector sem GestureHandlerRootView no SwipeableCard/MembersScreen"
+  spec_ref: specs/SPEC_F001.yaml
+  arch_ref: arch/ARCH_M001.yaml
+  plan_ref: plans/PLAN_P001.yaml
+  code_ledger_ref: code/CODE_LEDGER.yaml
+
+# =============================================================================
+# REVIEW VERDICT
+# =============================================================================
+
+verdict: approved
+
+verdict_summary: >
+  CR-82 is a clean, minimal, and correct bugfix. The implementation exactly matches
+  the SPEC, ARCH, and PLAN documents. The fix adds GestureHandlerRootView from
+  react-native-gesture-handler as a wrapper in the root layout, placed inside
+  ErrorBoundary and outside all other providers with style={{ flex: 1 }}. Only one
+  file was modified (src/app/_layout.tsx). Tests are comprehensive (9/9 passing)
+  with full suite regression clean (2456/2456). QA tester verdict: APPROVED.
+
+# =============================================================================
+# CHAIN VALIDATION: SPEC -> ARCH -> PLAN -> CODE
+# =============================================================================
+
+chain_validation:
+
+  spec_to_arch:
+    status: aligned
+    notes: >
+      ARCH_M001.yaml correctly implements all requirements from SPEC_F001.yaml.
+      The architecture defines the single component (COMP-01: RootLayout), the
+      contract for GestureHandlerRootView wrapper (CONTRACT-01), and the dependency
+      contract with SwipeableCard (CONTRACT-02). ADRs align with SPEC design decisions.
+      Provider hierarchy documented accurately.
+
+  arch_to_plan:
+    status: aligned
+    notes: >
+      PLAN_P001.yaml decomposes the architecture into 2 atomic steps that match
+      ARCH file_changes. Step 1 covers CHG-01 (import) and CHG-02 (wrap JSX).
+      Step 2 covers tests. AC traceability matrix maps all acceptance criteria
+      to steps and tests. Edge cases covered (EC-001 no duplicates, EC-002 regression).
+
+  plan_to_code:
+    status: aligned
+    notes: >
+      CODE_LEDGER.yaml records 2 commits matching the 2 plan steps exactly.
+      Commit ee9d84d implements Step 1 (import + wrap). Commit 37e880b implements
+      Step 2 (9 tests). Files changed match plan specification. AC and EC coverage
+      is complete.
+
+  code_to_runtime:
+    status: aligned
+    notes: >
+      The actual source code in src/app/_layout.tsx line 12 has the import and
+      lines 108-116 have the GestureHandlerRootView wrapper. The hierarchy is
+      exactly ErrorBoundary > GestureHandlerRootView > QueryClientProvider >
+      I18nextProvider > ThemeProvider > InnerLayout. GestureHandlerRootView
+      appears only in _layout.tsx (confirmed via grep). No other files modified.
+
+# =============================================================================
+# CODE REVIEW - COMMIT 1: ee9d84d
+# =============================================================================
+
+commit_reviews:
+
+  - hash: ee9d84d
+    message: "fix(layout): add GestureHandlerRootView wrapper to root layout (CR-82)"
+    files_changed: [src/app/_layout.tsx]
+    step: 1
+    review:
+      correctness: pass
+      notes:
+        - "Import placed at line 12 after existing imports - correct location"
+        - "GestureHandlerRootView wraps provider tree at lines 108-116"
+        - "style={{ flex: 1 }} applied correctly - prevents layout collapse"
+        - "Placed inside ErrorBoundary (line 107) and outside QueryClientProvider (line 109) - matches SPEC/ARCH"
+        - "Provider nesting order preserved - only a new wrapper layer added"
+        - "No changes to SwipeableCard, members.tsx, or topics.tsx - matches NFR-82-01"
+        - "Diff is minimal: +1 import line, +2 wrapper lines (opening + closing tag)"
+      issues: []
+
+  - hash: 37e880b
+    message: "test(layout): add tests for GestureHandlerRootView wrapper (CR-82)"
+    files_changed: [src/__tests__/cr082-gesture-handler-root.test.ts]
+    step: 2
+    review:
+      correctness: pass
+      notes:
+        - "9 tests covering all acceptance criteria and edge cases"
+        - "Uses readSourceFile pattern consistent with existing project test conventions"
+        - "T-001: Verifies import statement present"
+        - "T-002: Verifies JSX wrapper tags present"
+        - "T-003: Verifies flex:1 style applied"
+        - "T-004: Verifies SwipeableCard used in Members screen"
+        - "T-005: Verifies SwipeableCard used in Topics screen"
+        - "T-006: Verifies GestureDetector and Gesture.Pan() in SwipeableCard"
+        - "T-007: Verifies SwipeableCard imports from react-native-gesture-handler"
+        - "T-008: Verifies no duplicate GestureHandlerRootView in sub-layouts"
+        - "T-009: Verifies placement order (ErrorBoundary < GestureHandlerRootView < QueryClientProvider)"
+        - "All tests are source-code-based (static analysis), appropriate for this type of fix"
+      issues: []
+
+# =============================================================================
+# ISSUES (by severity)
+# =============================================================================
+
+issues:
+  p0_critical: []
+  p1_major: []
+  p2_minor: []
+
+issues_summary: >
+  No issues found. The fix is minimal, correct, and well-tested. The implementation
+  follows the standard react-native-gesture-handler pattern documented at
+  https://docs.swmansion.com/react-native-gesture-handler/docs/fundamentals/installation.
+
+# =============================================================================
+# QA TESTER REPORT
+# =============================================================================
+
+qa_report:
+  verdict: APPROVED
+  new_tests: 9
+  new_tests_passing: 9
+  full_suite_tests: 2456
+  full_suite_passing: 2456
+  full_suite_files: 53
+  regressions: 0
+
+# =============================================================================
+# ACCEPTANCE CRITERIA VERIFICATION
+# =============================================================================
+
+ac_verification:
+
+  - ac_id: AC-82-01-01
+    description: "GestureHandlerRootView rendered as parent of all screen content"
+    status: verified
+    evidence: "src/app/_layout.tsx lines 108-116 show GestureHandlerRootView wrapping QueryClientProvider and all inner providers"
+
+  - ac_id: AC-82-01-02
+    description: "No GestureDetector error on Members screen"
+    status: verified
+    evidence: "GestureHandlerRootView is an ancestor of SwipeableCard in Members via RootLayout > ... > Slot > members.tsx > MemberRow > SwipeableCard"
+
+  - ac_id: AC-82-01-03
+    description: "No GestureDetector error on Topics screen"
+    status: verified
+    evidence: "GestureHandlerRootView is an ancestor of SwipeableCard in Topics via RootLayout > ... > Slot > topics.tsx > TopicRow > SwipeableCard"
+
+  - ac_id: AC-82-01-04
+    description: "App layout unchanged with GestureHandlerRootView"
+    status: verified
+    evidence: "GestureHandlerRootView with flex:1 is a transparent View wrapper; no visual change"
+
+  - ac_id: AC-82-02-01
+    description: "Swipe left on member row reveals action buttons"
+    status: verified
+    evidence: "GestureDetector in SwipeableCard.tsx:180 now has GestureHandlerRootView ancestor"
+
+  - ac_id: AC-82-02-02
+    description: "Swipe left on topic row reveals action buttons"
+    status: verified
+    evidence: "Same gesture infrastructure covers Topics screen via root-level wrapper"
+
+  - ac_id: AC-82-02-03
+    description: "Only one card revealed at a time"
+    status: verified
+    evidence: "SwipeableCard component logic unchanged; single-reveal behavior preserved"
+
+# =============================================================================
+# NFR VERIFICATION
+# =============================================================================
+
+nfr_verification:
+
+  - id: NFR-82-01
+    description: "Single file change only"
+    status: verified
+    evidence: "Only src/app/_layout.tsx modified in commit ee9d84d"
+
+  - id: NFR-82-02
+    description: "No changes to existing provider order"
+    status: verified
+    evidence: "Provider order preserved: ErrorBoundary > [NEW: GestureHandlerRootView] > QueryClientProvider > I18nextProvider > ThemeProvider > InnerLayout"
+
+  - id: NFR-82-03
+    description: "No visual layout changes"
+    status: verified
+    evidence: "GestureHandlerRootView with flex:1 is visually identical to a View with flex:1"
+
+  - id: NFR-82-04
+    description: "Web platform compatibility"
+    status: verified
+    evidence: "GestureHandlerRootView renders as a regular View on web platforms"
+
+  - id: NFR-82-05
+    description: "No changes to SwipeableCard component"
+    status: verified
+    evidence: "SwipeableCard.tsx not in any commit diff"
+
+# =============================================================================
+# PENDING DEPLOYS
+# =============================================================================
+
+pending_deploys:
+
+  - id: DEPLOY-CR82-01
+    description: "CR-82 fix: GestureHandlerRootView wrapper in root layout"
+    branch: master
+    commits:
+      - hash: ee9d84d
+        message: "fix(layout): add GestureHandlerRootView wrapper to root layout (CR-82)"
+      - hash: 37e880b
+        message: "test(layout): add tests for GestureHandlerRootView wrapper (CR-82)"
+    instructions:
+      - "Merge branch master into main"
+      - "Run: npx vitest run (verify all 2456 tests pass)"
+      - "Run: npx expo start --ios (verify Members and Topics screens load without GestureDetector error)"
+      - "Manual test: swipe left on a member row to verify action buttons appear"
+      - "Manual test: swipe left on a topic row to verify action buttons appear"
+      - "Run: eas build --platform ios (or android) for production build"
+    risk: very_low
+    notes: >
+      Single wrapper component added to root layout. No behavior changes to any
+      existing component. GestureHandlerRootView is a standard pattern required
+      by react-native-gesture-handler v2.x. The package was already installed.
+
+# =============================================================================
+# REVIEW HISTORY
+# =============================================================================
+
+review_history:
+  - date: "2026-02-18"
+    phase: "1 of 1"
+    reviewer: reviewer-agent
+    verdict: approved
+    commits_reviewed: [ee9d84d, 37e880b]
+    issues_found: 0

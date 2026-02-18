@@ -8,10 +8,37 @@ export interface CsvMember {
   phone: string; // Full phone with country code, e.g., "+5511999999999"
 }
 
+export type CsvErrorCode =
+  | 'EMPTY_FILE'
+  | 'INVALID_HEADER'
+  | 'UNRECOGNIZED_HEADER'
+  | 'INSUFFICIENT_COLUMNS'
+  | 'NAME_REQUIRED'
+  | 'INVALID_PHONE'
+  | 'DUPLICATE_PHONE'
+  | 'NO_DATA';
+
+export interface CsvHeaders {
+  name: string;
+  phone: string;
+}
+
+export const SUPPORTED_CSV_HEADERS = {
+  NAME_COLUMNS: ['Nome', 'Name', 'Nombre'],
+  PHONE_COLUMNS: ['Telefone Completo', 'Full Phone', 'Telefono Completo'],
+};
+
+export const CSV_DEFAULT_HEADERS: CsvHeaders = {
+  name: 'Nome',
+  phone: 'Telefone Completo',
+};
+
 export interface CsvValidationError {
   line: number;
   field: string;
   message: string;
+  code?: CsvErrorCode;
+  params?: Record<string, string>;
 }
 
 export interface CsvParseResult {

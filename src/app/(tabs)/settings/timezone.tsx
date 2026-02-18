@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Pressable,
   FlatList,
-  TextInput,
   Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { SearchInput } from '../../../components/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 
@@ -204,14 +204,10 @@ export default function TimezoneScreen() {
       )}
 
       <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder={t('timezoneSelector.search')}
-          placeholderTextColor={colors.textSecondary}
+        <SearchInput
           value={search}
           onChangeText={setSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
+          placeholder={t('timezoneSelector.search')}
         />
       </View>
 
@@ -269,11 +265,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 12,
     overflow: 'hidden',
-  },
-  searchInput: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
   },
   list: {
     marginHorizontal: 16,

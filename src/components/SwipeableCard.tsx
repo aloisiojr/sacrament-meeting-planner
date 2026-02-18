@@ -179,13 +179,12 @@ export function SwipeableCard({
       {/* Card content (slides left to reveal actions) */}
       <GestureDetector gesture={panGesture}>
         <Animated.View
-          style={[
-            styles.cardContent,
-            { backgroundColor: colors.card },
-            animatedStyle,
-          ]}
+          style={[styles.cardContent, animatedStyle]}
+          pointerEvents="box-none"
         >
-          {children}
+          <View style={{ backgroundColor: colors.card }}>
+            {children}
+          </View>
         </Animated.View>
       </GestureDetector>
     </View>

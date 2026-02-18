@@ -60,13 +60,14 @@ export function InviteManagementSection() {
         const url = buildWhatsAppUrl(
           speech.speaker_phone,
           '', // countryCode already in phone
-          '', // Will use default template
+          '', // Will use default template for language
           {
             speakerName: speech.speaker_name ?? '',
             date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
             topic: speech.topic_title ?? '',
             position: `${speech.position}\u00BA`,
-          }
+          },
+          locale
         );
         await openWhatsApp(url);
       }
@@ -97,7 +98,8 @@ export function InviteManagementSection() {
                     date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
                     topic: speech.topic_title ?? '',
                     position: `${speech.position}\u00BA`,
-                  }
+                  },
+                  locale
                 );
                 await openWhatsApp(url);
               }

@@ -7,6 +7,7 @@
  * CR-55: Header spacer when canWrite=false — title stays centered
  * CR-66: Empty CSV export should generate file with headers; import errors should
  *        be formatted with i18n and show line/field details
+ * CR-77/CR-78 Phase 2: Relaxed parseCsv, console.error logging, removed error codes
  */
 
 import { describe, it, expect } from 'vitest';
@@ -272,10 +273,14 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
 
   describe('parseCsv validation and error messages', () => {
     it('should return errors with line, field, and message for each invalid row', () => {
+      // CR-78 Phase 2: "invalid-phone" is now treated as empty (not an error)
+      // Only the empty name row generates an error (NAME_REQUIRED)
       const csv = 'Nome,Telefone Completo\nJohn,invalid-phone\n,+5511999999999';
       const result = parseCsv(csv);
       expect(result.success).toBe(false);
-      expect(result.errors.length).toBeGreaterThanOrEqual(1);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].code).toBe('NAME_REQUIRED');
+      expect(result.errors[0].line).toBe(3);
       // Each error should have line, field, message
       for (const err of result.errors) {
         expect(err).toHaveProperty('line');
@@ -287,14 +292,13 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       }
     });
 
-    it('should detect invalid phone format', () => {
+    it('should treat invalid phone format as empty (not reject line)', () => {
+      // CR-78 Phase 2: phone "12345" matches /^[+\d]*$/, so it is accepted as-is
       const csv = 'Nome,Telefone Completo\nJohn,12345';
       const result = parseCsv(csv);
-      expect(result.success).toBe(false);
-      const phoneError = result.errors.find((e) => e.field === 'Telefone Completo');
-      expect(phoneError).toBeDefined();
-      expect(phoneError!.message).toContain('Invalid phone format');
-      expect(phoneError!.code).toBe('INVALID_PHONE');
+      expect(result.success).toBe(true);
+      expect(result.members[0].full_name).toBe('John');
+      expect(result.members[0].phone).toBe('12345');
     });
 
     it('should detect missing name', () => {
@@ -305,13 +309,14 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       expect(nameError).toBeDefined();
     });
 
-    it('should detect duplicate phones', () => {
+    it('should accept duplicate phones (all members imported)', () => {
+      // CR-78 Phase 2: duplicate phones are allowed
       const csv = 'Nome,Telefone Completo\nJohn,+5511999999999\nJane,+5511999999999';
       const result = parseCsv(csv);
-      expect(result.success).toBe(false);
-      const dupError = result.errors.find((e) => e.message.includes('Duplicate'));
-      expect(dupError).toBeDefined();
-      expect(dupError!.code).toBe('DUPLICATE_PHONE');
+      expect(result.success).toBe(true);
+      expect(result.members).toHaveLength(2);
+      expect(result.members[0].phone).toBe('+5511999999999');
+      expect(result.members[1].phone).toBe('+5511999999999');
     });
 
     it('should reject file with no data rows', () => {
@@ -413,7 +418,8 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
       expect(source).toContain("t('members.importErrorLine'");
       expect(source).toContain('line: String(e.line)');
       expect(source).toContain('field: e.field');
-      expect(source).toContain('translateCsvError(e.code, e.params, t)');
+      // CR-78 Phase 2: translateCsvError no longer takes params
+      expect(source).toContain('translateCsvError(e.code, t)');
     });
 
     it('should throw importEmpty message when CSV has 0 members', () => {
@@ -468,10 +474,10 @@ describe('CSV round-trip: export then import', () => {
 });
 
 // =====================================================================
-// CR-77/CR-78: Error codes, multi-language headers, and i18n
+// CR-77/CR-78 Phase 2: Relaxed parseCsv, console.error, cleaned types
 // =====================================================================
-describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
-  describe('parseCsv multi-language header support', () => {
+describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
+  describe('parseCsv accepts any header text (positional mapping)', () => {
     it('should accept pt-BR headers', () => {
       const result = parseCsv('Nome,Telefone Completo\nMaria,+5511999999999');
       expect(result.success).toBe(true);
@@ -487,13 +493,22 @@ describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject unrecognized headers', () => {
+    it('should accept arbitrary header text ("Foo,Bar")', () => {
+      // CR-78 Phase 2: parseCsv no longer validates column names
       const result = parseCsv('Foo,Bar\nMaria,+5511999999999');
-      expect(result.success).toBe(false);
-      expect(result.errors[0].code).toBe('UNRECOGNIZED_HEADER');
+      expect(result.success).toBe(true);
+      expect(result.members[0].full_name).toBe('Maria');
+      expect(result.members[0].phone).toBe('+5511999999999');
     });
 
-    it('should validate headers case-insensitively', () => {
+    it('should accept real user CSV header ("Nome,Telefone")', () => {
+      const result = parseCsv('Nome,Telefone\nMaria Silva,+5511999999999');
+      expect(result.success).toBe(true);
+      expect(result.members[0].full_name).toBe('Maria Silva');
+      expect(result.members[0].phone).toBe('+5511999999999');
+    });
+
+    it('should accept case-variant headers', () => {
       const result = parseCsv('nome,telefone completo\nMaria,+5511999999999');
       expect(result.success).toBe(true);
     });
@@ -521,37 +536,125 @@ describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
     });
   });
 
-  describe('parseCsv error params', () => {
-    it('INVALID_PHONE error should include params.phone', () => {
-      const result = parseCsv('Nome,Telefone Completo\nJohn,12345');
-      expect(result.success).toBe(false);
-      const err = result.errors.find((e) => e.code === 'INVALID_PHONE');
-      expect(err).toBeDefined();
-      expect(err!.params).toBeDefined();
-      expect(err!.params!.phone).toBe('12345');
+  describe('Phone sanitization (/^[+\\d]*$/ rule)', () => {
+    it('phone "VERIFICAR" should be treated as empty', () => {
+      const csv = 'Nome,Telefone\nJohn,VERIFICAR';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].full_name).toBe('John');
+      expect(result.members[0].phone).toBe('');
     });
 
-    it('DUPLICATE_PHONE error should include params.phone', () => {
-      const result = parseCsv('Nome,Telefone Completo\nJohn,+5511999999999\nJane,+5511999999999');
+    it('phone "(11) 9999-9999" should be treated as empty', () => {
+      const csv = 'Nome,Telefone\nJohn,(11) 9999-9999';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('');
+    });
+
+    it('phone "abc123" should be treated as empty', () => {
+      const csv = 'Nome,Telefone\nJohn,abc123';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('');
+    });
+
+    it('phone "+5511999999999" should be accepted normally', () => {
+      const csv = 'Nome,Telefone\nJohn,+5511999999999';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('+5511999999999');
+    });
+
+    it('phone "+55129915075245" (>15 digits) should be accepted', () => {
+      const csv = 'Nome,Telefone\nJohn,+55129915075245';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('+55129915075245');
+    });
+
+    it('phone "12345" (digits only, no +) should be accepted', () => {
+      const csv = 'Nome,Telefone\nJohn,12345';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('12345');
+    });
+
+    it('empty phone should be accepted', () => {
+      const csv = 'Nome,Telefone\nJohn,';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('');
+    });
+
+    it('variable-length phones should all be accepted', () => {
+      const csv = 'Nome,Telefone\nA,+5511999999999\nB,+18015735415\nC,+55129915075245';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members).toHaveLength(3);
+      expect(result.members[0].phone).toBe('+5511999999999');
+      expect(result.members[1].phone).toBe('+18015735415');
+      expect(result.members[2].phone).toBe('+55129915075245');
+    });
+  });
+
+  describe('Duplicate phones accepted', () => {
+    it('two members with same phone should both be imported', () => {
+      const csv = 'Nome,Telefone\nJohn,+5511999999999\nJane,+5511999999999';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members).toHaveLength(2);
+    });
+
+    it('multiple members with same phone should all be imported', () => {
+      const csv = 'Nome,Telefone\nA,+5511959409095\nB,+5511959409095\nC,+5511959409095\nD,+5511959409095';
+      const result = parseCsv(csv);
+      expect(result.success).toBe(true);
+      expect(result.members).toHaveLength(4);
+    });
+  });
+
+  describe('Remaining 5 error codes still work', () => {
+    it('EMPTY_FILE: empty content returns error', () => {
+      const result = parseCsv('');
       expect(result.success).toBe(false);
-      const err = result.errors.find((e) => e.code === 'DUPLICATE_PHONE');
-      expect(err).toBeDefined();
-      expect(err!.params).toBeDefined();
-      expect(err!.params!.phone).toBe('+5511999999999');
+      expect(result.errors[0].code).toBe('EMPTY_FILE');
+    });
+
+    it('INVALID_HEADER: single column header returns error', () => {
+      const result = parseCsv('Nome');
+      expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('INVALID_HEADER');
+    });
+
+    it('INSUFFICIENT_COLUMNS: data row with single column returns error', () => {
+      const result = parseCsv('Nome,Telefone\nJohn');
+      expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('INSUFFICIENT_COLUMNS');
+    });
+
+    it('NAME_REQUIRED: empty name returns error', () => {
+      const result = parseCsv('Nome,Telefone\n,+5511999999999');
+      expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('NAME_REQUIRED');
+    });
+
+    it('NO_DATA: header-only CSV returns error', () => {
+      const result = parseCsv('Nome,Telefone\n');
+      expect(result.success).toBe(false);
+      expect(result.errors[0].code).toBe('NO_DATA');
     });
   });
 
   describe('i18n keys for CSV errors and headers exist in all locales', () => {
+    // Only the 5 remaining error code keys + header keys + importReadError
     const newKeys = [
       'csvHeaderName',
       'csvHeaderPhone',
       'csvErrorEmptyFile',
       'csvErrorInvalidHeader',
-      'csvErrorUnrecognizedHeader',
       'csvErrorInsufficientColumns',
       'csvErrorNameRequired',
-      'csvErrorInvalidPhone',
-      'csvErrorDuplicatePhone',
       'csvErrorNoData',
       'importReadError',
     ];
@@ -573,16 +676,23 @@ describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
       });
     }
 
-    it('csvErrorInvalidPhone keys should have {{phone}} placeholder in all locales', () => {
-      expect(ptBR.members.csvErrorInvalidPhone).toContain('{{phone}}');
-      expect(en.members.csvErrorInvalidPhone).toContain('{{phone}}');
-      expect(es.members.csvErrorInvalidPhone).toContain('{{phone}}');
+    // Verify removed keys do NOT exist
+    it('csvErrorUnrecognizedHeader should NOT exist in any locale', () => {
+      expect(ptBR.members.csvErrorUnrecognizedHeader).toBeUndefined();
+      expect(en.members.csvErrorUnrecognizedHeader).toBeUndefined();
+      expect(es.members.csvErrorUnrecognizedHeader).toBeUndefined();
     });
 
-    it('csvErrorDuplicatePhone keys should have {{phone}} placeholder in all locales', () => {
-      expect(ptBR.members.csvErrorDuplicatePhone).toContain('{{phone}}');
-      expect(en.members.csvErrorDuplicatePhone).toContain('{{phone}}');
-      expect(es.members.csvErrorDuplicatePhone).toContain('{{phone}}');
+    it('csvErrorInvalidPhone should NOT exist in any locale', () => {
+      expect(ptBR.members.csvErrorInvalidPhone).toBeUndefined();
+      expect(en.members.csvErrorInvalidPhone).toBeUndefined();
+      expect(es.members.csvErrorInvalidPhone).toBeUndefined();
+    });
+
+    it('csvErrorDuplicatePhone should NOT exist in any locale', () => {
+      expect(ptBR.members.csvErrorDuplicatePhone).toBeUndefined();
+      expect(en.members.csvErrorDuplicatePhone).toBeUndefined();
+      expect(es.members.csvErrorDuplicatePhone).toBeUndefined();
     });
   });
 
@@ -630,6 +740,55 @@ describe('CR-77/CR-78: Error codes, multi-language headers, and i18n', () => {
     it('should differentiate error types in handleImport catch', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
       expect(source).toContain('importReadError');
+    });
+
+    it('translateCsvError should NOT have UNRECOGNIZED_HEADER case', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).not.toContain("'UNRECOGNIZED_HEADER'");
+    });
+
+    it('translateCsvError should NOT have INVALID_PHONE case', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).not.toContain("'INVALID_PHONE'");
+    });
+
+    it('translateCsvError should NOT have DUPLICATE_PHONE case', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).not.toContain("'DUPLICATE_PHONE'");
+    });
+  });
+
+  describe('console.error in catch blocks (CR-77, CR-78)', () => {
+    it('members.tsx should have console.error in handleExport catch', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain("console.error('Export CSV failed:'");
+    });
+
+    it('members.tsx should have console.error in handleImport catch', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain("console.error('Import CSV failed:'");
+    });
+
+    it('members.tsx should have debug logs in handleExport', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain("console.log('[Export] CSV length:'");
+      expect(source).toContain("console.log('[Export] fileUri:'");
+      expect(source).toContain("console.log('[Export] File written successfully')");
+      expect(source).toContain("console.log('[Export] Opening share sheet...')");
+      expect(source).toContain("console.warn('[Export] cacheDirectory is null')");
+    });
+
+    it('members.tsx should have debug logs in handleImport', () => {
+      const source = readSourceFile('app/(tabs)/settings/members.tsx');
+      expect(source).toContain("console.log('[Import] DocumentPicker result:'");
+      expect(source).toContain("console.log('[Import] File content length:'");
+    });
+  });
+
+  describe('SUPPORTED_CSV_HEADERS removed from csvUtils.ts', () => {
+    it('csvUtils.ts should NOT export SUPPORTED_CSV_HEADERS', () => {
+      const source = readSourceFile('lib/csvUtils.ts');
+      expect(source).not.toContain('SUPPORTED_CSV_HEADERS');
     });
   });
 });

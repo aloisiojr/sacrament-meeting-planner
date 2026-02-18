@@ -209,24 +209,25 @@ describe('STEP-06-07: CSV Import/Export', () => {
       expect(result.errors[0].field).toBe('header');
     });
 
-    it('rejects invalid phone format (no +)', () => {
+    it('accepts phone without + prefix (CR-78: relaxed phone)', () => {
       const csv = 'Nome,Telefone Completo\nJohn,11999999999';
       const result = parseCsv(csv);
-      expect(result.success).toBe(false);
-      expect(result.errors[0].field).toBe('Telefone Completo');
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('11999999999');
     });
 
-    it('rejects invalid phone format (too short)', () => {
+    it('accepts short phone (CR-78: no length validation)', () => {
       const csv = 'Nome,Telefone Completo\nJohn,+551199';
       const result = parseCsv(csv);
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.members[0].phone).toBe('+551199');
     });
 
-    it('rejects duplicate phones', () => {
+    it('accepts duplicate phones (CR-78: no duplicate check)', () => {
       const csv = 'Nome,Telefone Completo\nJohn,+5511999999999\nJane,+5511999999999';
       const result = parseCsv(csv);
-      expect(result.success).toBe(false);
-      expect(result.errors[0].message).toContain('Duplicate');
+      expect(result.success).toBe(true);
+      expect(result.members).toHaveLength(2);
     });
 
     it('rejects empty name', () => {

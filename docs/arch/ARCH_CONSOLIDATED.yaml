@@ -7,11 +7,11 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-18"
-  last_updated_by: "phase-002"
+  last_updated_by: "batch-7-phase-1"
   total_modules: 8
-  total_adrs: 25
+  total_adrs: 27
   total_crs_implemented: 82
-  pending_arch: "ARCH_M012 (CRs 87,88,89 - Batch 6 Phase 2)"
+  pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
@@ -19,6 +19,7 @@ metadata:
     - docs/arch/history/ARCH_BUG401.md
     - docs/arch/ARCH_M011.yaml
     - docs/arch/ARCH_M012.yaml
+    - docs/arch/ARCH_M013.yaml
 
 # =============================================================================
 # TECH STACK
@@ -41,7 +42,7 @@ tech_stack:
   file_system: "expo-file-system v19 (new File/Paths API)"
   notifications: "Expo Push Notifications"
   storage: "AsyncStorage (offline queue, theme preference)"
-  deep_links: "expo-linking (wardmanager://invite/{token})"
+  deep_links: "expo-linking (sacrmeetman://invite/{token})"
   csv: "expo-document-picker + expo-file-system + expo-sharing"
 
 # =============================================================================
@@ -239,6 +240,7 @@ modules:
       Lazy creation: registros criados ao expandir o card.
       Snapshot pattern: nome/telefone do orador e titulo/link do topico copiados como texto.
       Status lifecycle: not_assigned -> assigned_not_invited -> assigned_invited -> assigned_confirmed | gave_up.
+      CR-95: Speech slots condicionados a tipo === 'speeches' (nao usa mais isExcludedFromAgenda).
 
   - id: M004
     name: AgendaModule
@@ -268,6 +270,7 @@ modules:
       CR-73 mudou Recognizing para usar ActorSelector com can_recognize.
       CR-74 adicionou nomes customizados para oracoes via MemberSelectorModal.
       CR-75 domingos excluidos aparecem como cards nao-expandiveis.
+      CR-98 PrayerSelector recebe visible/onClose (padrao ActorSelector) para auto-abrir modal.
       Modo Apresentacao: read-only, accordion com 4 secoes (normal) ou 3 (especial).
 
   - id: M005
@@ -291,6 +294,7 @@ modules:
       weekly_confirmation, speaker_confirmed (immediate), speaker_withdrew (immediate).
       DB triggers enfileiram em notification_queue; cron EF processa e envia via Expo Push API.
       Observers nao recebem push. Token registrado no login/abertura do app.
+      CR-91: enqueue_speech_notification() usa SECURITY DEFINER para bypass RLS (ADR-035).
 
   - id: M006
     name: SyncEngine
@@ -507,7 +511,7 @@ adrs:
     decided_in: "M008"
     consequences:
       - "Convention over configuration for routes"
-      - "Deep link support built-in for wardmanager://invite/{token}"
+      - "Deep link support built-in for sacrmeetman://invite/{token} (changed from wardmanager:// in CR-93)"
 
   - id: ADR-010
     title: "Replace sunday type enum with corrected list"
@@ -675,6 +679,26 @@ adrs:
       - "Consistent with SwipeableCard one-at-a-time pattern"
       - "TanStack Query caching makes re-expansion instant"
 
+  - id: ADR-035
+    title: "SECURITY DEFINER para trigger enqueue_speech_notification"
+    context: "Trigger tenta INSERT em notification_queue no contexto do usuario autenticado, mas notification_queue tem RLS sem policies para authenticated users."
+    decision: "Adicionar SECURITY DEFINER a funcao enqueue_speech_notification() via nova migracao (013). Precedente: list_ward_users RPC ja usa SECURITY DEFINER."
+    decided_in: "CR-91"
+    consequences:
+      - "Trigger funciona sem erro de RLS"
+      - "notification_queue permanece inacessivel a clientes"
+      - "Padrao consistente com list_ward_users RPC"
+
+  - id: ADR-036
+    title: "PrayerSelector com props visible/onClose (padrao ActorSelector)"
+    context: "PrayerSelector gerencia seu proprio estado de modal (modalVisible=false). AgendaForm renderiza PrayerSelector condicionalmente mas nao tem como auto-abrir o modal."
+    decision: "Adicionar props opcionais visible e onClose ao PrayerSelector. useEffect sincroniza modalVisible com visible. AgendaForm passa visible={true} e onClose."
+    decided_in: "CR-98"
+    consequences:
+      - "Clicar no campo de oracao abre modal imediatamente"
+      - "Padrao consistente com ActorSelector e HymnSelectorModal"
+      - "Backward compatible (props opcionais)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -752,7 +776,7 @@ database_schema:
     - name: notification_queue
       description: "Fila de notificacoes push"
       columns: [id, ward_id, type, sunday_date, speech_position, speaker_name, target_role, status, send_after, created_at]
-      rls: "INSERT via DB triggers only"
+      rls: "INSERT via DB triggers only (SECURITY DEFINER, ADR-035)"
 
     # --- Global tables (SELECT only for authenticated) ---
     - name: hymns
@@ -805,6 +829,7 @@ database_schema:
     - "010_enable_realtime_publication.sql"
     - "011_add_user_name_support.sql"
     - "012_drop_members_phone_unique_constraint.sql"
+    - "013_fix_notification_trigger_security_definer.sql"
 
   key_relationships:
     - "members.ward_id -> wards.id"
@@ -984,8 +1009,9 @@ cross_cutting:
     animations: "react-native-reanimated for accordion, LED, presentation transitions"
 
   deep_links:
-    scheme: "wardmanager://invite/{token}"
+    scheme: "sacrmeetman://invite/{token}"
     handler: "expo-linking routes to (auth)/invite/[token].tsx"
+    notes: "Changed from wardmanager:// to sacrmeetman:// (CR-93, ADR-009 updated)"
 
   activity_logging:
     utility: "src/lib/activityLog.ts"
@@ -1098,7 +1124,7 @@ file_structure:
 
   "supabase/":
     "config.toml": "Configuracao local do Supabase"
-    "migrations/": "12 migrations SQL"
+    "migrations/": "13 migrations SQL"
     "functions/":
       "register-first-user/": "Registro do primeiro usuario (cria ala)"
       "register-invited-user/": "Registro via convite"
@@ -1130,7 +1156,7 @@ key_flows:
 
   invite_registration:
     steps:
-      - "User abre deep link wardmanager://invite/{token}"
+      - "User abre deep link sacrmeetman://invite/{token}"
       - "Expo Router rota para (auth)/invite/[token].tsx"
       - "Screen valida token via EF, mostra campos read-only (stake, ward, role)"
       - "User preenche Nome e Password"
@@ -1272,6 +1298,15 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-033, ADR-034]
     new_files: []
+
+  batch_7_phase_1:
+    crs: "CR-91, CR-92, CR-93, CR-95, CR-98"
+    scope: "Bug fixes: RLS policy on notification trigger (F035), duplicate key in country dropdown (F036), deep link protocol change (F037), speech fields visibility (F038), prayer fields clickable (F039)"
+    doc: "ARCH_M013.yaml"
+    status: "pending implementation"
+    adrs: [ADR-035, ADR-036]
+    new_files:
+      - "supabase/migrations/013_fix_notification_trigger_security_definer.sql"
 
 # =============================================================================
 # OBSERVABILITY

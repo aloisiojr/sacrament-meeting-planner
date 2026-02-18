@@ -1,0 +1,589 @@
+# =============================================================================
+# QA_PLAN_batch7_phase1.yaml
+# PRE Validation Plan for Batch 7 Phase 1 - Bug Fixes
+# Features: F035, F036, F037, F038, F039
+# Created: 2026-02-18
+# =============================================================================
+
+meta:
+  batch: 7
+  phase: 1
+  type: bugfix
+  features:
+    - F035 (CR-91)
+    - F036 (CR-92)
+    - F037 (CR-93)
+    - F038 (CR-95)
+    - F039 (CR-98)
+  pre_validation_timestamp: "2026-02-18"
+  pre_validation_status: passed
+
+
+# #############################################################################
+# F035 / CR-91: Fix RLS policy error on notification_queue
+# #############################################################################
+
+f035:
+  cr_id: CR-91
+  title: "Fix RLS policy error on notification_queue"
+  type: bugfix
+  user_report: |
+    "Quando eu designei um orador, eu recebi esse erro no console:
+    ERROR [MutationCache] Error: new row violates row-level security policy
+    for table 'notification_queue' MutationCache$argument_0.onError
+    (src/app/_layout.tsx:24:22). Ja na tela apareceu um dialogo mostrando:
+    'Erro. Falha ao Salvar. Verifique sua conexao e tente novamente.'"
+
+  bug_confirmed: true
+  root_cause_analysis: |
+    The notification_queue table has RLS enabled at
+    supabase/migrations/002_rls_policies.sql:308 with the comment
+    "No policies = no client access. Only service_role key (Edge Functions)
+    can access." However, the DB trigger function `enqueue_speech_notification()`
+    (003_notification_triggers.sql:12-85) runs in the context of the
+    authenticated user who performs the UPDATE on the speeches table. When the
+    trigger fires and attempts to INSERT into notification_queue, RLS blocks
+    the INSERT because there are no policies allowing authenticated users to write.
+
+    The trigger should run with elevated privileges (SECURITY DEFINER) so it
+    can insert into notification_queue regardless of the calling user's RLS
+    context. Alternatively, an INSERT policy for authenticated users could be
+    added, but SECURITY DEFINER on the trigger function is the correct approach
+    since the notification_queue should NOT be directly accessible from client
+    code.
+
+  reproduction_steps:
+    - "1. Login as a user with speech assignment permissions"
+    - "2. Open the Speeches tab"
+    - "3. Expand a sunday card"
+    - "4. Assign a speaker to a speech slot (click speaker button, select member)"
+    - "5. The mutation updates the speeches table, which fires the enqueue_speech_notification trigger"
+    - "6. The trigger tries to INSERT into notification_queue"
+    - "7. RLS blocks the INSERT because no policy allows authenticated users to write"
+    - "8. Error propagates: RLS violation -> mutation error -> error dialog shown to user"
+
+  affected_files:
+    - path: "supabase/migrations/003_notification_triggers.sql"
+      issue: "enqueue_speech_notification() function does NOT use SECURITY DEFINER"
+      line: 12
+    - path: "supabase/migrations/002_rls_policies.sql"
+      issue: "notification_queue has RLS enabled with NO policies (line 308-310)"
+      line: 308
+
+  fix_approach: |
+    Add SECURITY DEFINER to the enqueue_speech_notification() function so it
+    runs with the privileges of the function owner (superuser), bypassing RLS
+    on notification_queue. This is the correct pattern because:
+    1. The trigger is server-side logic, not client code
+    2. notification_queue should remain inaccessible to clients
+    3. Only the trigger (and Edge Functions with service_role key) should write to it
+
+  validation_checks:
+    must_pass:
+      - id: MP-F035-01
+        description: "enqueue_speech_notification() function uses SECURITY DEFINER"
+        criteria: "CREATE OR REPLACE FUNCTION enqueue_speech_notification() ... SECURITY DEFINER"
+        evidence_source: "supabase/migrations/003_notification_triggers.sql or new migration file"
+
+      - id: MP-F035-02
+        description: "notification_queue RLS remains enabled with NO client policies"
+        criteria: "002_rls_policies.sql still has ALTER TABLE notification_queue ENABLE ROW LEVEL SECURITY with no policies"
+        evidence_source: "supabase/migrations/002_rls_policies.sql:308-310"
+
+      - id: MP-F035-03
+        description: "Trigger still fires on speech status changes (INSERT/UPDATE)"
+        criteria: "speech_notification_trigger AFTER INSERT OR UPDATE ON speeches still exists"
+        evidence_source: "migration files"
+
+      - id: MP-F035-04
+        description: "Trigger correctly inserts designation notification on assigned_not_invited"
+        criteria: "INSERT INTO notification_queue with type='designation' when NEW.status='assigned_not_invited'"
+        evidence_source: "trigger function code"
+
+      - id: MP-F035-05
+        description: "Trigger correctly inserts speaker_confirmed notification"
+        criteria: "INSERT INTO notification_queue with type='speaker_confirmed' when NEW.status='assigned_confirmed'"
+        evidence_source: "trigger function code"
+
+      - id: MP-F035-06
+        description: "Trigger correctly inserts speaker_withdrew notification"
+        criteria: "INSERT INTO notification_queue with type='speaker_withdrew' when NEW.status='gave_up'"
+        evidence_source: "trigger function code"
+
+      - id: MP-F035-07
+        description: "Trigger correctly cancels pending notifications on not_assigned"
+        criteria: "UPDATE notification_queue SET status='cancelled' when NEW.status='not_assigned'"
+        evidence_source: "trigger function code"
+
+      - id: MP-F035-08
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run: all tests pass, zero failures"
+        evidence_source: "test runner output"
+
+    should_pass:
+      - id: SP-F035-01
+        description: "Assigning a speaker does not produce RLS error"
+        criteria: "No 'violates row-level security policy' error when assigning speaker"
+        evidence_source: "manual test or code analysis"
+
+      - id: SP-F035-02
+        description: "Error dialog is not shown when assigning a speaker"
+        criteria: "No 'Falha ao Salvar' dialog after speaker assignment"
+        evidence_source: "manual test or code analysis"
+
+
+# #############################################################################
+# F036 / CR-92: Fix duplicate key error in country dropdown
+# #############################################################################
+
+f036:
+  cr_id: CR-92
+  title: "Fix duplicate key error in country dropdown"
+  type: bugfix
+  user_report: |
+    "Quando eu cliquei no dropbox dos paises, recebi esse erro no console:
+    ERROR Encountered two children with the same key, `%s`. Keys should be
+    unique so that components maintain their identity across updates.
+    Non-unique keys may cause children to be duplicated and/or omitted -
+    the behavior is unsupported and could change in a future version.
+    .$+7 MemberEditor (src/app/(tabs)/settings/members.tsx:144:13)"
+
+  bug_confirmed: true
+  root_cause_analysis: |
+    The FlatList at members.tsx:144-146 renders COUNTRY_CODES with
+    keyExtractor={(item) => item.code}. However, COUNTRY_CODES in
+    src/lib/countryCodes.ts has legitimate duplicate codes:
+    - '+1' appears for both United States and Canada (shared NANP code)
+    - '+7' appears for both Russia and Kazakhstan (shared code)
+
+    The error message references `.$+7`, confirming the +7 duplicate.
+    Using item.code as the key is incorrect because keys must be unique.
+
+  reproduction_steps:
+    - "1. Go to Settings > Members"
+    - "2. Add or edit a member"
+    - "3. Click the country code dropdown (flag+code button)"
+    - "4. Country code picker modal opens with FlatList"
+    - "5. React logs error about duplicate key .$+7"
+
+  affected_files:
+    - path: "src/app/(tabs)/settings/members.tsx"
+      issue: "keyExtractor uses item.code which is not unique for +1 (US/CA) and +7 (RU/KZ)"
+      line: 146
+
+  fix_approach: |
+    Change the keyExtractor to use item.label (which IS unique - e.g.,
+    'United States (+1)' vs 'Canada (+1)') or use the index. item.label
+    is preferred because it is a stable, unique identifier for each entry.
+
+  validation_checks:
+    must_pass:
+      - id: MP-F036-01
+        description: "FlatList keyExtractor uses a unique key for each country code entry"
+        criteria: "keyExtractor does NOT use item.code alone; uses item.label or index-based key"
+        evidence_source: "members.tsx FlatList for COUNTRY_CODES"
+
+      - id: MP-F036-02
+        description: "No duplicate key warning when opening country code picker"
+        criteria: "No 'Encountered two children with the same key' error in console"
+        evidence_source: "code analysis - all keys are unique"
+
+      - id: MP-F036-03
+        description: "Both US (+1) and Canada (+1) are still selectable"
+        criteria: "Both entries render in the list and can be selected"
+        evidence_source: "code analysis"
+
+      - id: MP-F036-04
+        description: "Both Russia (+7) and Kazakhstan (+7) are still selectable"
+        criteria: "Both entries render in the list and can be selected"
+        evidence_source: "code analysis"
+
+      - id: MP-F036-05
+        description: "Selected country code is still highlighted correctly"
+        criteria: "item.code === countryCode comparison still works for highlighting"
+        evidence_source: "members.tsx"
+
+      - id: MP-F036-06
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run: all tests pass, zero failures"
+        evidence_source: "test runner output"
+
+    should_pass:
+      - id: SP-F036-01
+        description: "Country code picker scrolls and renders smoothly"
+        criteria: "No visual glitches or rendering issues from key change"
+        evidence_source: "code analysis"
+
+
+# #############################################################################
+# F037 / CR-93: Change deep link protocol to sacrmeetman://
+# #############################################################################
+
+f037:
+  cr_id: CR-93
+  title: "Change deep link protocol to sacrmeetman://"
+  type: bugfix
+  user_report: |
+    "Quando vou convidar um usuario novo:
+    1. O protocolo esta wardmanager:// eu preciso que seja sacrmeetman://
+    2. O link nao funciona, isso e pq nao e um app e sim Expo Go?"
+    (NOTA: Deep links com custom URL schemes nao funcionam no Expo Go,
+    apenas em builds standalone - isso e comportamento esperado)
+
+  bug_confirmed: true
+  root_cause_analysis: |
+    The app uses 'wardmanager' as its URL scheme in two locations:
+    1. app.json:10 - "scheme": "wardmanager" (Expo app scheme)
+    2. supabase/functions/create-invitation/index.ts:170 -
+       constructs deep link as `wardmanager://invite/${invitationToken}`
+
+    The user wants the protocol changed to 'sacrmeetman'. Both locations
+    need to be updated.
+
+    Note: The fact that the link doesn't work in Expo Go is EXPECTED
+    behavior. Custom URL schemes only work in standalone builds (EAS Build).
+    This is NOT a bug to fix - it's a known Expo limitation.
+
+  reproduction_steps:
+    - "1. Login as a user with invitation permissions"
+    - "2. Go to Settings > Invite User"
+    - "3. Create an invitation"
+    - "4. The deep link generated uses wardmanager:// protocol"
+    - "5. Expected: sacrmeetman:// protocol"
+
+  affected_files:
+    - path: "app.json"
+      issue: "scheme is 'wardmanager', should be 'sacrmeetman'"
+      line: 10
+    - path: "supabase/functions/create-invitation/index.ts"
+      issue: "Deep link uses wardmanager:// protocol"
+      line: 170
+
+  fix_approach: |
+    1. Change app.json "scheme" from "wardmanager" to "sacrmeetman"
+    2. Change create-invitation Edge Function to use sacrmeetman:// protocol
+    3. No client-side code changes needed since expo-linking reads the scheme
+       from app.json automatically
+
+  notes: |
+    Deep links with custom URL schemes do NOT work in Expo Go. This is
+    expected behavior and not a bug. Custom schemes only work in standalone
+    builds (EAS Build). The user's observation about the link not working
+    in Expo Go is correct but this is by design.
+
+  validation_checks:
+    must_pass:
+      - id: MP-F037-01
+        description: "app.json scheme is 'sacrmeetman'"
+        criteria: "app.json contains \"scheme\": \"sacrmeetman\""
+        evidence_source: "app.json"
+
+      - id: MP-F037-02
+        description: "create-invitation Edge Function uses sacrmeetman:// protocol"
+        criteria: "Deep link is constructed as sacrmeetman://invite/${token}"
+        evidence_source: "supabase/functions/create-invitation/index.ts"
+
+      - id: MP-F037-03
+        description: "No remaining references to wardmanager:// in source code"
+        criteria: "grep for wardmanager:// returns 0 hits in src/ and supabase/ directories"
+        evidence_source: "grep results"
+
+      - id: MP-F037-04
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run: all tests pass, zero failures"
+        evidence_source: "test runner output"
+
+    should_pass:
+      - id: SP-F037-01
+        description: "iOS bundle identifier unchanged (com.wardmanager.app is a build config, not URL scheme)"
+        criteria: "ios.bundleIdentifier in app.json remains unchanged"
+        evidence_source: "app.json"
+
+      - id: SP-F037-02
+        description: "Android package unchanged"
+        criteria: "android.package in app.json remains unchanged"
+        evidence_source: "app.json"
+
+
+# #############################################################################
+# F038 / CR-95: Fix speech fields not hiding when changing sunday type
+# #############################################################################
+
+f038:
+  cr_id: CR-95
+  title: "Fix speech fields not hiding when changing sunday type"
+  type: bugfix
+  user_report: |
+    "Quando eu abro um domingo na aba Discursos com 'Domingo de Discursos'
+    selecionado e seleciono outra opcao, as opcoes de designacao de 1, 2 e 3
+    discursantes e temas nao some, como deveria."
+
+  bug_confirmed: true
+  root_cause_analysis: |
+    In speeches.tsx:276-278, the speech slots (positions 1, 2, 3) are rendered
+    conditionally:
+
+      {isExpanded &&
+        !(exception && isExcludedFromAgenda(exception.reason)) &&
+        [1, 2, 3].map((pos) => { ... })}
+
+    The function isExcludedFromAgenda() (src/hooks/useAgenda.ts:43) only returns
+    true for 'general_conference' and 'stake_conference'. So when the user
+    changes from "speeches" to any other type (testimony_meeting, ward_conference,
+    primary_presentation, other), the condition:
+      !(exception && isExcludedFromAgenda(exception.reason))
+    remains TRUE (because these types are NOT excluded from agenda), and the
+    speech slots STILL appear.
+
+    The correct behavior: speech slots should ONLY appear when the sunday type
+    is 'speeches' (SUNDAY_TYPE_SPEECHES). Any other type should hide them.
+
+    Note: The SundayCard.tsx:348 renders {children} inside the expanded content,
+    so the children from speeches.tsx are what needs to be filtered. The issue
+    is in speeches.tsx's rendering logic, not in SundayCard.
+
+  reproduction_steps:
+    - "1. Open Speeches tab"
+    - "2. Expand a sunday card (click on it)"
+    - "3. The card shows the type dropdown (currently 'Discursos') and 3 speech slots"
+    - "4. Change the dropdown to 'Reuniao de Testemunho' or any non-speech type"
+    - "5. Expected: speech slots (1, 2, 3 positions) should disappear"
+    - "6. Actual: speech slots remain visible"
+
+  affected_files:
+    - path: "src/app/(tabs)/speeches.tsx"
+      issue: "Uses isExcludedFromAgenda() which only checks for general_conference/stake_conference, not all non-speech types"
+      line: 277
+
+  fix_approach: |
+    Change the condition at speeches.tsx:277 to check if the current sunday
+    type is 'speeches' instead of using isExcludedFromAgenda. The condition
+    should be:
+      {isExpanded && isSpeechesType && [1, 2, 3].map(...)}
+    Where isSpeechesType = (exception?.reason ?? SUNDAY_TYPE_SPEECHES) === SUNDAY_TYPE_SPEECHES.
+    Or equivalently: !exception || exception.reason === 'speeches'
+
+  validation_checks:
+    must_pass:
+      - id: MP-F038-01
+        description: "Speech slots visible when sunday type is 'speeches'"
+        criteria: "When expanded and type='speeches', positions 1/2/3 render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-02
+        description: "Speech slots hidden when sunday type is 'testimony_meeting'"
+        criteria: "When expanded and type='testimony_meeting', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-03
+        description: "Speech slots hidden when sunday type is 'general_conference'"
+        criteria: "When expanded and type='general_conference', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-04
+        description: "Speech slots hidden when sunday type is 'stake_conference'"
+        criteria: "When expanded and type='stake_conference', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-05
+        description: "Speech slots hidden when sunday type is 'ward_conference'"
+        criteria: "When expanded and type='ward_conference', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-06
+        description: "Speech slots hidden when sunday type is 'primary_presentation'"
+        criteria: "When expanded and type='primary_presentation', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-07
+        description: "Speech slots hidden when sunday type is 'other'"
+        criteria: "When expanded and type='other', positions 1/2/3 do NOT render"
+        evidence_source: "speeches.tsx rendering logic"
+
+      - id: MP-F038-08
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run: all tests pass, zero failures"
+        evidence_source: "test runner output"
+
+    should_pass:
+      - id: SP-F038-01
+        description: "Type dropdown remains visible and functional when expanded (regardless of type)"
+        criteria: "SundayTypeDropdown always renders when expanded (SundayCard.tsx:342-347)"
+        evidence_source: "SundayCard.tsx"
+
+      - id: SP-F038-02
+        description: "Changing type back to 'speeches' shows speech slots again"
+        criteria: "Selecting speeches type re-renders the 3 speech slots"
+        evidence_source: "speeches.tsx rendering logic"
+
+
+# #############################################################################
+# F039 / CR-98: Fix prayer fields not clickable
+# #############################################################################
+
+f039:
+  cr_id: CR-98
+  title: "Fix prayer fields not clickable"
+  type: bugfix
+  user_report: |
+    "O campo oracao de abertura e fechamento nao esta clicavel, a gente
+    clica e nao acontece nada"
+
+  bug_confirmed: true
+  root_cause_analysis: |
+    In AgendaForm.tsx, the opening prayer (line 273-285) and closing prayer
+    (line 463-475) use the generic SelectorField component for display:
+
+      <SelectorField
+        value={agenda.opening_prayer_name ?? ''}
+        placeholder={t('agenda.openingPrayer')}
+        onPress={() => {
+          if (!isObserver) {
+            setSelectorModal({ type: 'prayer', field: 'opening_prayer' });
+          }
+        }}
+        disabled={isObserver}
+        colors={colors}
+      />
+
+    When the user clicks the SelectorField, it sets selectorModal.type='prayer'.
+    This conditionally renders the PrayerSelector component at lines 511-536:
+
+      {selectorModal?.type === 'prayer' && (
+        <PrayerSelector
+          selected={...}
+          onSelect={...}
+          placeholder={...}
+          disabled={isObserver}
+        />
+      )}
+
+    HOWEVER, PrayerSelector (src/components/PrayerSelector.tsx) manages its
+    own internal modalVisible state, initialized to false (line 50):
+      const [modalVisible, setModalVisible] = useState(false);
+
+    The PrayerSelector renders:
+    1. A Pressable button (lines 81-103) - this is a SECOND clickable button
+    2. A Modal (lines 105-189) - only visible when modalVisible=true
+
+    When PrayerSelector is conditionally rendered via selectorModal state,
+    its modal starts CLOSED (modalVisible=false). The user would need to
+    find and click the PrayerSelector's own button to open the modal.
+
+    But this second button is rendered at the bottom of the form (below
+    all the fields), not in the location of the prayer field itself. The
+    user clicks the prayer field SelectorField, the PrayerSelector button
+    appears at the bottom of the form but the user doesn't see it or
+    know to click it. Result: "nothing happens" from user's perspective.
+
+    Contrast with other selector types in AgendaForm:
+    - ActorSelector (line 479): receives visible={true} prop, opens immediately
+    - HymnSelectorModal (line 499): receives visible={true} prop, opens immediately
+    - PrayerSelector (line 512): does NOT receive visible prop, stays closed
+
+  reproduction_steps:
+    - "1. Open the Agenda tab"
+    - "2. Expand a sunday agenda"
+    - "3. Click on the 'Opening Prayer' field (Oracao de Abertura)"
+    - "4. Expected: a member selector modal should open"
+    - "5. Actual: nothing visible happens (PrayerSelector renders at bottom of form with closed modal)"
+    - "6. Same issue with 'Closing Prayer' field (Oracao de Fechamento)"
+
+  affected_files:
+    - path: "src/components/PrayerSelector.tsx"
+      issue: "Does not accept a 'visible' prop to auto-open its modal"
+      line: 31-40
+    - path: "src/components/AgendaForm.tsx"
+      issue: "Renders PrayerSelector without a 'visible' prop, so modal stays closed"
+      line: 511-536
+
+  fix_approach: |
+    Option A (recommended): Add a 'visible' prop to PrayerSelector and use
+    it to control modalVisible state (via useEffect or initializing state).
+    AgendaForm would pass visible={true} to PrayerSelector. When the modal
+    closes, PrayerSelector calls a callback to reset selectorModal to null.
+
+    Option B: Change AgendaForm to render PrayerSelector's modal directly
+    (bypassing PrayerSelector's own button), similar to how HymnSelectorModal
+    works.
+
+    Option A is simpler and follows the pattern of ActorSelector which also
+    takes a visible prop.
+
+  validation_checks:
+    must_pass:
+      - id: MP-F039-01
+        description: "Clicking 'Opening Prayer' field opens the member selector modal"
+        criteria: "PrayerSelector modal opens immediately when user clicks the prayer field"
+        evidence_source: "AgendaForm.tsx + PrayerSelector.tsx"
+
+      - id: MP-F039-02
+        description: "Clicking 'Closing Prayer' field opens the member selector modal"
+        criteria: "PrayerSelector modal opens immediately when user clicks the prayer field"
+        evidence_source: "AgendaForm.tsx + PrayerSelector.tsx"
+
+      - id: MP-F039-03
+        description: "Selecting a member from the modal assigns them as prayer person"
+        criteria: "onSelect callback fires with member data, agenda is updated"
+        evidence_source: "AgendaForm.tsx handlePrayerSelect / onSelect"
+
+      - id: MP-F039-04
+        description: "Closing the modal resets the selector state"
+        criteria: "selectorModal is set to null when modal closes"
+        evidence_source: "AgendaForm.tsx"
+
+      - id: MP-F039-05
+        description: "Custom name option works for non-member prayer persons"
+        criteria: "Typing a custom name and confirming assigns it as prayer person"
+        evidence_source: "PrayerSelector.tsx handleCustomName"
+
+      - id: MP-F039-06
+        description: "Prayer fields are disabled for Observer role"
+        criteria: "disabled={isObserver} prevents modal from opening"
+        evidence_source: "AgendaForm.tsx"
+
+      - id: MP-F039-07
+        description: "Existing test suite passes without regressions"
+        criteria: "npx vitest run: all tests pass, zero failures"
+        evidence_source: "test runner output"
+
+    should_pass:
+      - id: SP-F039-01
+        description: "Clear button (x) on prayer field works to remove assignment"
+        criteria: "Clicking X calls onSelect(null), clearing the prayer person"
+        evidence_source: "PrayerSelector.tsx handleClear"
+
+      - id: SP-F039-02
+        description: "Search functionality works in prayer selector modal"
+        criteria: "Typing in search field filters member list"
+        evidence_source: "PrayerSelector.tsx useMembers(search)"
+
+      - id: SP-F039-03
+        description: "Prayer selector follows same UX pattern as other selectors"
+        criteria: "Similar behavior to ActorSelector and HymnSelectorModal"
+        evidence_source: "code analysis"
+
+
+# #############################################################################
+# CROSS-CUTTING VALIDATION
+# #############################################################################
+
+cross_cutting:
+  - id: CC-01
+    description: "All 5 fixes do not conflict with each other"
+    criteria: "No overlapping file changes that could cause merge conflicts"
+    evidence: |
+      F035: supabase/migrations/003_notification_triggers.sql (or new migration)
+      F036: src/app/(tabs)/settings/members.tsx (keyExtractor only)
+      F037: app.json + supabase/functions/create-invitation/index.ts
+      F038: src/app/(tabs)/speeches.tsx (rendering condition only)
+      F039: src/components/PrayerSelector.tsx + src/components/AgendaForm.tsx
+      No overlapping files between any pair of fixes.
+
+  - id: CC-02
+    description: "Full test suite passes after all fixes"
+    criteria: "npx vitest run: all test files pass, zero failures, zero skipped"
+
+  - id: CC-03
+    description: "No new dependencies introduced"
+    criteria: "package.json unchanged (all fixes use existing code patterns)"

@@ -1,0 +1,573 @@
+# =============================================================================
+# PLAN_P013.yaml
+# Batch 7, Phase 1: Bug Fixes
+# Features: F035 (RLS Notification Fix), F036 (Duplicate Key Fix),
+#           F037 (Deep Link Protocol), F038 (Speech Fields Hiding),
+#           F039 (Prayer Fields Clickable)
+# CRs: 91, 92, 93, 95, 98
+# SPEC: docs/specs/SPEC_F035_F039.yaml
+# ARCH: docs/arch/ARCH_M013.yaml
+# Generated: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Fix 5 independent bugs: (1) add SECURITY DEFINER to notification trigger
+  function to resolve RLS policy error on notification_queue, (2) fix duplicate
+  key warning in country dropdown by using item.label as keyExtractor,
+  (3) change deep link protocol from wardmanager:// to sacrmeetman:// in
+  app.json and create-invitation Edge Function, (4) fix speech fields not
+  hiding when changing sunday type by checking type === 'speeches' instead
+  of isExcludedFromAgenda, (5) fix prayer fields not clickable by adding
+  visible/onClose props to PrayerSelector following ActorSelector pattern.
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # ===========================================================================
+  # F035 / CR-91: Fix RLS policy error on notification_queue
+  # ===========================================================================
+
+  - id: STEP-01
+    description: >
+      Create new migration file supabase/migrations/013_fix_notification_trigger_security_definer.sql
+      that redefines enqueue_speech_notification() with SECURITY DEFINER.
+      The migration uses CREATE OR REPLACE FUNCTION with the exact same body as
+      003_notification_triggers.sql but adds SECURITY DEFINER attribute. This
+      ensures the trigger executes with owner (postgres) privileges, bypassing
+      RLS on notification_queue. Changes:
+      1. CREATE OR REPLACE FUNCTION enqueue_speech_notification() RETURNS TRIGGER
+         AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+      2. Body is identical to existing function in 003_notification_triggers.sql
+         (Cases 1, 4, 5, and cancellation logic).
+      3. No changes to the trigger binding (speech_notification_trigger already exists).
+      4. No changes to notification_queue RLS policies (intentionally no client access).
+    files:
+      - "supabase/migrations/013_fix_notification_trigger_security_definer.sql"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "File supabase/migrations/013_fix_notification_trigger_security_definer.sql exists"
+      - "Function definition includes SECURITY DEFINER keyword"
+      - "Function body is identical to 003_notification_triggers.sql (all 4 cases preserved)"
+      - "No new policies added to notification_queue (RLS remains without client access)"
+      - "No DROP/CREATE TRIGGER statement (existing trigger reuses the replaced function)"
+    tests:
+      - type: unit
+        description: >
+          T-01: Read migration file content. Verify it contains
+          'SECURITY DEFINER' keyword. Verify it contains 'CREATE OR REPLACE
+          FUNCTION enqueue_speech_notification()'. Verify it contains all 4
+          status cases (assigned_not_invited, assigned_confirmed, gave_up,
+          not_assigned). (AC-F035-01, AC-F035-03)
+      - type: unit
+        description: >
+          T-02: Read 002_rls_policies.sql. Verify notification_queue section
+          has RLS enabled but NO INSERT/UPDATE policies for authenticated users.
+          (AC-F035-02)
+    covers:
+      acceptance_criteria: ["AC-F035-01", "AC-F035-02", "AC-F035-03", "AC-F035-04"]
+      edge_cases: ["EC-F035-01", "EC-F035-02", "EC-F035-03", "EC-F035-04"]
+    risks:
+      - risk: "SECURITY DEFINER allows function to bypass all RLS"
+        mitigation: >
+          Function is a trigger (server-side), not callable by clients.
+          notification_queue remains without client policies. Precedent:
+          list_ward_users RPC already uses SECURITY DEFINER (migration 006).
+    commit_message: "fix(db): add SECURITY DEFINER to enqueue_speech_notification trigger (CR-91)"
+
+  # ===========================================================================
+  # F036 / CR-92: Fix duplicate key error in country dropdown
+  # ===========================================================================
+
+  - id: STEP-02
+    description: >
+      Fix duplicate key warning in country code FlatList by changing the
+      keyExtractor from item.code to item.label. In
+      src/app/(tabs)/settings/members.tsx:
+      1. Change line ~146: keyExtractor={(item) => item.code} to
+         keyExtractor={(item) => item.label}.
+      item.label is unique for each entry (e.g., "United States (+1)" vs
+      "Canada (+1)") while item.code can be duplicated (+1, +7).
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "keyExtractor in country code FlatList uses item.label instead of item.code"
+      - "No React warning 'Encountered two children with the same key' in console"
+      - "US (+1) and Canada (+1) both render and are selectable independently"
+      - "Russia (+7) and Kazakhstan (+7) both render and are selectable independently"
+      - "Highlighting of selected country still works (item.code === countryCode comparison unchanged)"
+    tests:
+      - type: unit
+        description: >
+          T-03: Read members.tsx. Verify the FlatList for COUNTRY_CODES uses
+          keyExtractor={(item) => item.label} (not item.code). (AC-F036-01)
+      - type: unit
+        description: >
+          T-04: Verify COUNTRY_CODES has entries sharing +1 (US, Canada) and
+          +7 (Russia, Kazakhstan). Verify all item.label values are unique
+          across the entire COUNTRY_CODES array. (AC-F036-02, AC-F036-03, AC-F036-04)
+    covers:
+      acceptance_criteria: ["AC-F036-01", "AC-F036-02", "AC-F036-03", "AC-F036-04", "AC-F036-05"]
+      edge_cases: ["EC-F036-01"]
+    risks:
+      - risk: "Highlighting ambiguity for countries sharing same code"
+        mitigation: >
+          The highlighting comparison (item.code === countryCode) remains unchanged.
+          Both US and Canada will highlight when +1 is selected. This is acceptable
+          per SPEC EC-F036-01 - the fix focuses on removing the duplicate key warning.
+    commit_message: "fix(members): change keyExtractor to item.label to fix duplicate key warning (CR-92)"
+
+  # ===========================================================================
+  # F037 / CR-93: Change deep link protocol to sacrmeetman://
+  # ===========================================================================
+
+  - id: STEP-03
+    description: >
+      Change deep link protocol from wardmanager:// to sacrmeetman:// in two
+      files:
+      1. app.json line 10: Change "scheme": "wardmanager" to
+         "scheme": "sacrmeetman".
+      2. supabase/functions/create-invitation/index.ts line 170: Change
+         `wardmanager://invite/${invitationToken}` to
+         `sacrmeetman://invite/${invitationToken}`.
+      3. Do NOT change ios.bundleIdentifier or android.package (remain
+         com.wardmanager.app).
+    files:
+      - "app.json"
+      - "supabase/functions/create-invitation/index.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05"]
+    done_when:
+      - "app.json 'scheme' field value is 'sacrmeetman'"
+      - "create-invitation Edge Function deep link uses sacrmeetman://invite/${token}"
+      - "No references to wardmanager:// in src/ or supabase/ directories (excluding docs)"
+      - "ios.bundleIdentifier remains 'com.wardmanager.app' (unchanged)"
+      - "android.package remains 'com.wardmanager.app' (unchanged)"
+    tests:
+      - type: unit
+        description: >
+          T-05: Read app.json. Parse JSON. Verify expo.scheme === 'sacrmeetman'.
+          Verify expo.ios.bundleIdentifier and expo.android.package are unchanged
+          (com.wardmanager.app). (AC-F037-01, AC-F037-04)
+      - type: unit
+        description: >
+          T-06: Read supabase/functions/create-invitation/index.ts. Verify it
+          contains 'sacrmeetman://invite/' and does NOT contain 'wardmanager://'.
+          (AC-F037-02)
+      - type: unit
+        description: >
+          T-07: Search for 'wardmanager://' in all files under src/ and supabase/.
+          Verify zero matches. (AC-F037-03)
+    covers:
+      acceptance_criteria: ["AC-F037-01", "AC-F037-02", "AC-F037-03", "AC-F037-04"]
+      edge_cases: ["EC-F037-01", "EC-F037-02"]
+    risks:
+      - risk: "Existing invitation links with wardmanager:// will stop working"
+        mitigation: >
+          Invitations expire in 30 days (BR-14). After the change, pending
+          invitations with wardmanager:// will need to be re-generated.
+          Acceptable trade-off per SPEC A-3.
+    commit_message: "fix(deeplink): change protocol from wardmanager:// to sacrmeetman:// (CR-93)"
+
+  # ===========================================================================
+  # F038 / CR-95: Fix speech fields not hiding on sunday type change
+  # ===========================================================================
+
+  - id: STEP-04
+    description: >
+      Fix speech slots remaining visible when sunday type changes from 'speeches'
+      to any non-speech type. In src/app/(tabs)/speeches.tsx:
+      1. Change the rendering condition on line 277 from:
+         !(exception && isExcludedFromAgenda(exception.reason))
+         to:
+         (!exception || exception.reason === 'speeches')
+      2. Remove the import of isExcludedFromAgenda from useAgenda.ts (line 38):
+         Remove: import { isExcludedFromAgenda } from '../../hooks/useAgenda';
+         (isExcludedFromAgenda is only used in this one place in speeches.tsx;
+         agenda.tsx has its own import and continues using it correctly)
+      3. Update affected tests that assert speeches.tsx uses isExcludedFromAgenda:
+         - src/__tests__/cr002-qa.test.ts:421-430 - test asserts speeches.tsx
+           contains 'isExcludedFromAgenda'. Update to assert it does NOT contain
+           'isExcludedFromAgenda' and instead contains the new condition pattern
+           "exception.reason === 'speeches'" or "!exception".
+         - src/__tests__/cr001-qa-extended.test.ts:365-417 - tests verify
+           speeches.tsx uses isExcludedFromAgenda. Update assertions to verify
+           the new pattern.
+      Note: isExcludedFromAgenda function itself in useAgenda.ts is NOT modified
+      (it is correctly used by agenda.tsx for a different purpose).
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/__tests__/cr002-qa.test.ts"
+      - "src/__tests__/cr001-qa-extended.test.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-05"]
+    done_when:
+      - "speeches.tsx line ~277 uses (!exception || exception.reason === 'speeches') instead of !(exception && isExcludedFromAgenda(exception.reason))"
+      - "speeches.tsx no longer imports isExcludedFromAgenda from useAgenda"
+      - "Speech slots visible ONLY when type is 'speeches' (no exception or exception.reason === 'speeches')"
+      - "Speech slots hidden for ALL other types: testimony_meeting, general_conference, stake_conference, ward_conference, primary_presentation, other"
+      - "SundayTypeDropdown remains visible and functional regardless of type"
+      - "Switching back to 'speeches' re-shows speech slots"
+      - "Tests in cr002-qa.test.ts updated to reflect new pattern"
+      - "Tests in cr001-qa-extended.test.ts updated to reflect new pattern"
+      - "isExcludedFromAgenda function in useAgenda.ts remains unchanged"
+      - "agenda.tsx import and usage of isExcludedFromAgenda remains unchanged"
+    tests:
+      - type: unit
+        description: >
+          T-08: Read speeches.tsx. Verify it does NOT import isExcludedFromAgenda.
+          Verify the rendering condition uses (!exception || exception.reason === 'speeches').
+          (AC-F038-01 through AC-F038-09)
+      - type: unit
+        description: >
+          T-09: Read speeches.tsx. Verify SundayTypeDropdown is rendered outside
+          the speech slots conditional (always visible regardless of type).
+          (AC-F038-08)
+      - type: unit
+        description: >
+          T-10: Read agenda.tsx. Verify it still imports and uses
+          isExcludedFromAgenda (no regression to agenda tab). Verify
+          useAgenda.ts still exports isExcludedFromAgenda. (regression check)
+    covers:
+      acceptance_criteria: ["AC-F038-01", "AC-F038-02", "AC-F038-03", "AC-F038-04", "AC-F038-05", "AC-F038-06", "AC-F038-07", "AC-F038-08", "AC-F038-09"]
+      edge_cases: ["EC-F038-01", "EC-F038-02"]
+    risks:
+      - risk: "Removing isExcludedFromAgenda import from speeches.tsx may break existing tests"
+        mitigation: >
+          Tests that assert speeches.tsx contains 'isExcludedFromAgenda' are
+          updated in this same step. cr002-qa.test.ts:421-430 and
+          cr001-qa-extended.test.ts:365-417 are the affected test sections.
+      - risk: "isExcludedFromAgenda function might be used elsewhere in speeches.tsx"
+        mitigation: >
+          Grep confirms isExcludedFromAgenda is used only at line 277 in
+          speeches.tsx. Safe to remove the import.
+    commit_message: "fix(speeches): hide speech slots for all non-speeches types (CR-95)"
+
+  # ===========================================================================
+  # F039 / CR-98: Fix prayer fields not clickable
+  # ===========================================================================
+
+  - id: STEP-05
+    description: >
+      Fix prayer fields not responding to clicks by adding visible/onClose
+      props to PrayerSelector and integrating with AgendaForm. Changes:
+      1. In src/components/PrayerSelector.tsx:
+         a. Add optional props to PrayerSelectorProps:
+            visible?: boolean -- when true, auto-opens the modal
+            onClose?: () => void -- called when the modal closes
+         b. Add useEffect to sync modalVisible with visible prop:
+            useEffect(() => { if (visible) setModalVisible(true); }, [visible]);
+         c. In all modal close handlers (cancel button onPress at line ~127,
+            Modal onRequestClose at line ~109), add onClose?.() call after
+            setModalVisible(false).
+         d. In handleSelectMember and handleCustomName, add onClose?.() call
+            after setModalVisible(false).
+         e. Import useEffect from React (add to existing import).
+      2. In src/components/AgendaForm.tsx:
+         a. Pass visible={true} and onClose={() => setSelectorModal(null)}
+            to PrayerSelector at line ~512-535.
+         b. The existing onSelect handler already calls setSelectorModal(null)
+            on selection, but onClose handles the case where user closes the
+            modal without selecting.
+    files:
+      - "src/components/PrayerSelector.tsx"
+      - "src/components/AgendaForm.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "PrayerSelectorProps has optional 'visible' prop (boolean)"
+      - "PrayerSelectorProps has optional 'onClose' prop (() => void)"
+      - "useEffect syncs modalVisible with visible prop (opens modal when visible becomes true)"
+      - "All modal close paths call onClose() if provided"
+      - "AgendaForm passes visible={true} to PrayerSelector when selectorModal?.type === 'prayer'"
+      - "AgendaForm passes onClose={() => setSelectorModal(null)} to PrayerSelector"
+      - "Clicking prayer field in AgendaForm opens PrayerSelector modal immediately"
+      - "Closing the modal resets selectorModal to null via onClose"
+      - "Selecting a member still updates the agenda and closes the modal"
+      - "Name customizado still works (type name and confirm)"
+      - "Clear button (X) on existing prayer still works"
+      - "PrayerSelector works standalone without visible/onClose (backward compatible)"
+    tests:
+      - type: unit
+        description: >
+          T-11: Read PrayerSelector.tsx. Verify PrayerSelectorProps interface
+          includes 'visible?: boolean' and 'onClose?: () => void'. Verify
+          useEffect exists that sets modalVisible(true) when visible is true.
+          (AC-F039-07)
+      - type: unit
+        description: >
+          T-12: Read AgendaForm.tsx. Verify PrayerSelector is rendered with
+          visible={true} and onClose prop when selectorModal?.type === 'prayer'.
+          (AC-F039-01, AC-F039-02)
+      - type: unit
+        description: >
+          T-13: Read PrayerSelector.tsx. Verify all modal close handlers
+          (cancel button, onRequestClose, handleSelectMember, handleCustomName)
+          call onClose?.() after setModalVisible(false). (AC-F039-04)
+      - type: unit
+        description: >
+          T-14: Read PrayerSelector.tsx. Verify handleClear function still
+          calls onSelect(null). Verify disabled prop still prevents opening.
+          (AC-F039-05, AC-F039-06)
+    covers:
+      acceptance_criteria: ["AC-F039-01", "AC-F039-02", "AC-F039-03", "AC-F039-04", "AC-F039-05", "AC-F039-06", "AC-F039-07"]
+      edge_cases: ["EC-F039-01", "EC-F039-02", "EC-F039-03"]
+    risks:
+      - risk: "useEffect may cause infinite loop if visible prop changes frequently"
+        mitigation: >
+          useEffect only runs when visible changes. visible is set by AgendaForm
+          based on selectorModal state (stable reference). The effect only calls
+          setModalVisible(true), it does NOT toggle - closing is handled by
+          explicit user action (cancel/select), which calls onClose to reset
+          selectorModal to null, unmounting the PrayerSelector entirely.
+      - risk: "Modal may flash briefly if visible=true on mount"
+        mitigation: >
+          PrayerSelector is only rendered when selectorModal?.type === 'prayer'.
+          It mounts with visible=true and useEffect opens the modal on mount.
+          The modal animationType='slide' ensures smooth appearance.
+    commit_message: "fix(prayer): add visible/onClose props to PrayerSelector for immediate modal open (CR-98)"
+
+  # ===========================================================================
+  # STEP-06: Regression verification and test suite
+  # ===========================================================================
+
+  - id: STEP-06
+    description: >
+      Run full test suite to verify no regressions from the 5 bug fixes.
+      Verify:
+      1. All existing notification trigger tests pass (STEP-01 migration changes).
+      2. All existing members screen tests pass (STEP-02 keyExtractor change).
+      3. All existing auth/deeplink tests pass (STEP-03 scheme change).
+      4. All existing speeches tests pass, including updated tests (STEP-04 changes).
+      5. All existing agenda/prayer tests pass (STEP-05 changes).
+      6. No broken imports or type errors across the project.
+      7. Specifically verify:
+         - cr002-qa.test.ts updated assertions pass (no isExcludedFromAgenda in speeches.tsx)
+         - cr001-qa-extended.test.ts updated assertions pass
+         - agenda.tsx still uses isExcludedFromAgenda correctly (no regression)
+         - useAgenda.ts still exports isExcludedFromAgenda (no regression)
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "All existing tests in the project pass (vitest)"
+      - "No TypeScript compilation errors"
+      - "No ESLint errors in modified files"
+      - "cr002-qa.test.ts passes with updated assertions"
+      - "cr001-qa-extended.test.ts passes with updated assertions"
+      - "All new tests from STEP-01 through STEP-05 pass"
+    tests:
+      - type: regression
+        description: >
+          T-15: Run full test suite (vitest). Verify zero regressions in
+          existing tests. All new tests from STEP-01 through STEP-05 pass.
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Tests asserting isExcludedFromAgenda in speeches.tsx will fail if not updated"
+        mitigation: >
+          STEP-04 includes updating cr002-qa.test.ts and cr001-qa-extended.test.ts.
+          These must be completed before running regression suite.
+    commit_message: "test(batch7-phase1): verify no regressions after F035, F036, F037, F038, F039 fixes"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # F035 ACs
+  - ac_id: AC-F035-01
+    how_to_verify: "Read migration 013. Verify function definition includes SECURITY DEFINER keyword."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F035-02
+    how_to_verify: "Read 002_rls_policies.sql. Verify notification_queue has RLS enabled but NO policies for authenticated users."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F035-03
+    how_to_verify: "Read migration 013. Verify all 4 status cases are present in function body (assigned_not_invited, assigned_confirmed, gave_up, not_assigned)."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-F035-04
+    how_to_verify: "With SECURITY DEFINER, trigger executes as owner bypassing RLS. No error dialog on speech designation."
+    covered_by_steps: ["STEP-01"]
+
+  # F036 ACs
+  - ac_id: AC-F036-01
+    how_to_verify: "Read members.tsx. Verify FlatList keyExtractor uses item.label (unique per entry)."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F036-02
+    how_to_verify: "No 'duplicate key' warning. item.label is unique: 'United States (+1)' vs 'Canada (+1)'."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F036-03
+    how_to_verify: "Verify COUNTRY_CODES contains both US and Canada entries with code +1. Both render with unique keys."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F036-04
+    how_to_verify: "Verify COUNTRY_CODES contains both Russia and Kazakhstan entries with code +7. Both render with unique keys."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-F036-05
+    how_to_verify: "Verify highlighting comparison (item.code === countryCode) is unchanged. Selected country highlighted."
+    covered_by_steps: ["STEP-02"]
+
+  # F037 ACs
+  - ac_id: AC-F037-01
+    how_to_verify: "Read app.json. Verify expo.scheme === 'sacrmeetman'."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F037-02
+    how_to_verify: "Read create-invitation/index.ts. Verify deep link contains sacrmeetman://invite/."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F037-03
+    how_to_verify: "Grep for wardmanager:// in src/ and supabase/. Verify zero matches."
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-F037-04
+    how_to_verify: "Read app.json. Verify ios.bundleIdentifier and android.package are unchanged."
+    covered_by_steps: ["STEP-03"]
+
+  # F038 ACs
+  - ac_id: AC-F038-01
+    how_to_verify: "Read speeches.tsx. Verify rendering condition evaluates to true when no exception (default = speeches)."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-02
+    how_to_verify: "Read speeches.tsx. Verify condition (!exception || exception.reason === 'speeches') evaluates to false for testimony_meeting."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-03
+    how_to_verify: "Same condition evaluates to false for general_conference."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-04
+    how_to_verify: "Same condition evaluates to false for stake_conference."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-05
+    how_to_verify: "Same condition evaluates to false for ward_conference."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-06
+    how_to_verify: "Same condition evaluates to false for primary_presentation."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-07
+    how_to_verify: "Same condition evaluates to false for other."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-08
+    how_to_verify: "Read speeches.tsx. Verify SundayTypeDropdown is rendered outside the speech slots conditional block."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-F038-09
+    how_to_verify: "Condition (!exception || exception.reason === 'speeches') evaluates to true when exception.reason is 'speeches'."
+    covered_by_steps: ["STEP-04"]
+
+  # F039 ACs
+  - ac_id: AC-F039-01
+    how_to_verify: "Read AgendaForm.tsx. Verify PrayerSelector rendered with visible={true} when selectorModal.type === 'prayer' for opening_prayer."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-02
+    how_to_verify: "Same verification for closing_prayer field."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-03
+    how_to_verify: "Read PrayerSelector.tsx. Verify handleSelectMember calls onSelect then onClose, updating agenda."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-04
+    how_to_verify: "Read PrayerSelector.tsx. Verify cancel button and onRequestClose call onClose?.() after setModalVisible(false)."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-05
+    how_to_verify: "Read PrayerSelector.tsx. Verify handleCustomName flow works and calls onClose."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-06
+    how_to_verify: "Read PrayerSelector.tsx. Verify disabled prop prevents opening (line 83: !disabled && setModalVisible(true))."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-F039-07
+    how_to_verify: "Read PrayerSelector.tsx. Verify visible and onClose props in PrayerSelectorProps interface."
+    covered_by_steps: ["STEP-05"]
+
+# =============================================================================
+# EDGE CASE COVERAGE
+# =============================================================================
+
+edge_case_coverage:
+  - ec_id: EC-F035-01
+    description: "Trigger with status assigned_not_invited (designation notification)"
+    how_covered: "STEP-01: SECURITY DEFINER allows INSERT in notification_queue for all status changes"
+    covered_by_steps: ["STEP-01"]
+
+  - ec_id: EC-F035-02
+    description: "Trigger with status assigned_confirmed (speaker_confirmed notification)"
+    how_covered: "STEP-01: Same SECURITY DEFINER fix applies to all INSERT cases"
+    covered_by_steps: ["STEP-01"]
+
+  - ec_id: EC-F035-03
+    description: "Trigger with status gave_up (speaker_withdrew notification)"
+    how_covered: "STEP-01: Same SECURITY DEFINER fix applies to all INSERT cases"
+    covered_by_steps: ["STEP-01"]
+
+  - ec_id: EC-F035-04
+    description: "Trigger with status not_assigned (cancellation UPDATE)"
+    how_covered: "STEP-01: SECURITY DEFINER also allows UPDATE on notification_queue"
+    covered_by_steps: ["STEP-01"]
+
+  - ec_id: EC-F036-01
+    description: "Selecting Canada (+1) when US (+1) is already selected"
+    how_covered: "STEP-02: Both highlight (item.code === countryCode) - acceptable visual ambiguity per SPEC"
+    covered_by_steps: ["STEP-02"]
+
+  - ec_id: EC-F037-01
+    description: "Existing links with wardmanager:// generated before change"
+    how_covered: "STEP-03: Acceptable - invitations expire in 30 days (BR-14)"
+    covered_by_steps: ["STEP-03"]
+
+  - ec_id: EC-F037-02
+    description: "Deep links in Expo Go"
+    how_covered: "STEP-03: Custom URL schemes only work in standalone builds (expected behavior)"
+    covered_by_steps: ["STEP-03"]
+
+  - ec_id: EC-F038-01
+    description: "Sunday without exception registered (default = speeches)"
+    how_covered: "STEP-04: (!exception || ...) evaluates to true when exception is null"
+    covered_by_steps: ["STEP-04"]
+
+  - ec_id: EC-F038-02
+    description: "Changing type with speeches already assigned"
+    how_covered: "STEP-04: Speech slots disappear visually; existing speeches in DB not affected"
+    covered_by_steps: ["STEP-04"]
+
+  - ec_id: EC-F039-01
+    description: "Clear button (X) for assigned prayer"
+    how_covered: "STEP-05: handleClear still calls onSelect(null), unchanged"
+    covered_by_steps: ["STEP-05"]
+
+  - ec_id: EC-F039-02
+    description: "Search in modal filters members"
+    how_covered: "STEP-05: Search functionality unchanged, useMembers(search) still works"
+    covered_by_steps: ["STEP-05"]
+
+  - ec_id: EC-F039-03
+    description: "Close modal and reopen for different prayer field"
+    how_covered: "STEP-05: onClose resets selectorModal to null, allowing new selection to mount fresh PrayerSelector"
+    covered_by_steps: ["STEP-05"]

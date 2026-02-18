@@ -1,0 +1,310 @@
+# =============================================================================
+# ARCH_M013.yaml
+# Architecture for Batch 7 Phase 1 - Bug Fixes
+# Features: F035, F036, F037, F038, F039
+# CRs: CR-91, CR-92, CR-93, CR-95, CR-98
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Corrigir 5 bugs independentes sem alterar a arquitetura existente"
+  principles:
+    - "Minimal change: cada fix altera o minimo de arquivos necessario"
+    - "Zero overlap: nenhum arquivo e alterado por mais de um fix"
+    - "Zero dependencias novas: nenhum pacote adicionado"
+    - "Seguir padroes existentes: replicar patterns ja usados no codebase"
+
+diagram: |
+  F035: [speeches table] --trigger--> [enqueue_speech_notification()] --INSERT--> [notification_queue]
+        SECURITY DEFINER adicionado a funcao ^
+
+  F036: [COUNTRY_CODES] --keyExtractor(item.label)--> [FlatList]   (antes: item.code)
+
+  F037: [app.json scheme: sacrmeetman] + [create-invitation EF: sacrmeetman://]
+
+  F038: [speeches.tsx] -- isSpeechesType --> [speech slots 1,2,3]  (antes: !isExcludedFromAgenda)
+
+  F039: [AgendaForm] --visible={true} + onClose--> [PrayerSelector]  (padrao ActorSelector)
+
+# =============================================================================
+# COMPONENTS (affected, not new)
+# =============================================================================
+
+components:
+  - name: "NotificationModule (M005)"
+    responsibility: "Push notifications via fila no banco com DB triggers"
+    dependencies: []
+    change_for_f035: >
+      Nova migracao (013) altera funcao enqueue_speech_notification() para
+      incluir SECURITY DEFINER. Nenhuma mudanca de interface ou contrato.
+
+  - name: "WardDataModule (M002)"
+    responsibility: "Dados mestres da ala incluindo membros"
+    dependencies: []
+    change_for_f036: >
+      Alterar keyExtractor do FlatList de COUNTRY_CODES em members.tsx
+      de item.code para item.label. Mudanca pontual, sem impacto em contrato.
+
+  - name: "AuthModule (M001)"
+    responsibility: "Autenticacao, sessao, deep links"
+    dependencies: []
+    change_for_f037: >
+      Alterar scheme em app.json de 'wardmanager' para 'sacrmeetman'.
+      Alterar create-invitation Edge Function para gerar sacrmeetman://.
+
+  - name: "SpeechModule (M003)"
+    responsibility: "Ciclo de vida de discursos"
+    dependencies: []
+    change_for_f038: >
+      Alterar condicao de renderizacao de speech slots em speeches.tsx.
+      Substituir !isExcludedFromAgenda(exception.reason) por verificacao
+      direta de tipo === 'speeches'. Remover import de isExcludedFromAgenda.
+
+  - name: "AgendaModule (M004)"
+    responsibility: "Formulario da agenda e selecao de oracoes"
+    dependencies: []
+    change_for_f039: >
+      Adicionar props 'visible' e 'onClose' ao PrayerSelector.tsx.
+      AgendaForm.tsx passa visible={true} e onClose ao renderizar PrayerSelector.
+      Segue padrao identico ao ActorSelector.
+
+# =============================================================================
+# CONTRACTS (changes per fix)
+# =============================================================================
+
+contracts:
+  - name: "enqueue_speech_notification"
+    component: "NotificationModule (M005)"
+    type: "DB trigger function"
+    change: "Add SECURITY DEFINER attribute"
+    methods:
+      - name: "enqueue_speech_notification()"
+        input: "TRIGGER (on speeches INSERT/UPDATE)"
+        output: "NEW (trigger return)"
+        change_detail: >
+          Funcao recebe atributo SECURITY DEFINER. Assinatura, logica e
+          retorno permanecem identicos. Unica diferenca: executa com
+          privilegios do owner (postgres) ao inves do usuario autenticado.
+
+  - name: "FlatList_country_keyExtractor"
+    component: "WardDataModule (M002)"
+    type: "React component prop"
+    change: "keyExtractor function change"
+    methods:
+      - name: "keyExtractor"
+        input: "CountryCode item"
+        output: "string (was item.code, now item.label)"
+        change_detail: >
+          Retorno muda de item.code (ex: '+1', duplicado para US/CA)
+          para item.label (ex: 'United States (+1)', unico).
+
+  - name: "PrayerSelectorProps"
+    component: "AgendaModule (M004)"
+    type: "React component interface"
+    change: "Add visible and onClose props"
+    methods:
+      - name: "PrayerSelector"
+        input: "PrayerSelectorProps (antes: selected, onSelect, placeholder, disabled)"
+        output: "JSX.Element"
+        change_detail: >
+          Adicionar props opcionais:
+            visible?: boolean -- quando true, auto-abre o modal
+            onClose?: () => void -- chamado quando o modal fecha
+          useEffect sincroniza modalVisible com prop visible.
+          Quando modal fecha internamente, chama onClose se fornecido.
+          Props sao opcionais para manter backward compatibility.
+
+  - name: "AgendaForm_PrayerSelector_usage"
+    component: "AgendaModule (M004)"
+    type: "Component composition"
+    change: "Pass visible and onClose to PrayerSelector"
+    methods:
+      - name: "AgendaForm render"
+        input: "selectorModal state"
+        output: "PrayerSelector with visible={true} onClose={resetSelectorModal}"
+        change_detail: >
+          Quando selectorModal?.type === 'prayer', renderiza PrayerSelector
+          com visible={true} e onClose={() => setSelectorModal(null)}.
+
+# =============================================================================
+# DATA MODEL (no changes to schema; migration only changes function attribute)
+# =============================================================================
+
+data_model:
+  entities: []
+  migrations:
+    - name: "013_fix_notification_trigger_security_definer.sql"
+      description: >
+        CREATE OR REPLACE FUNCTION enqueue_speech_notification() com
+        SECURITY DEFINER. Nenhuma mudanca no corpo da funcao. Apenas
+        adiciona o atributo de seguranca.
+      tables_affected: []
+      notes: >
+        Nao altera schema de tabelas. Nao altera trigger binding.
+        Apenas redefine a funcao com SECURITY DEFINER.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  f035_security_definer:
+    risk: "SECURITY DEFINER permite funcao bypassar RLS"
+    mitigation: >
+      A funcao e um trigger automatico (server-side), nao invocavel
+      diretamente por clientes. notification_queue permanece sem policies
+      para authenticated users, mantendo o isolamento. Apenas triggers
+      e Edge Functions (com service_role key) podem escrever nela.
+    precedent: "list_ward_users RPC ja usa SECURITY DEFINER (migration 006)"
+
+  f037_scheme_change:
+    risk: "Links existentes com wardmanager:// param de funcionar"
+    mitigation: >
+      Convites expiram em 30 dias (BR-14). Apos a mudanca, convites
+      pendentes com wardmanager:// nao funcionarao, mas novos convites
+      usarao sacrmeetman://. Impacto aceitavel.
+    note: >
+      bundleIdentifier (iOS) e package (Android) NAO sao alterados.
+      Apenas o URL scheme muda.
+
+# =============================================================================
+# OBSERVABILITY (no changes)
+# =============================================================================
+
+observability:
+  notes: >
+    Nenhuma mudanca em logging ou monitoramento. Os 5 fixes sao
+    transparentes para o activity_log e notification_queue.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-035
+    title: "SECURITY DEFINER para trigger enqueue_speech_notification"
+    context: >
+      Trigger tenta INSERT em notification_queue no contexto do usuario
+      autenticado, mas notification_queue tem RLS sem policies para
+      authenticated users. Resultado: erro de RLS.
+    decision: >
+      Adicionar SECURITY DEFINER a funcao enqueue_speech_notification()
+      via nova migracao (013). Funcao executa com privilegios do owner
+      (postgres), bypassando RLS na notification_queue. Precedente:
+      list_ward_users RPC ja usa SECURITY DEFINER (migracao 006).
+    consequences:
+      - "Trigger funciona sem erro de RLS"
+      - "notification_queue permanece inacessivel a clientes"
+      - "Padrao consistente com list_ward_users RPC"
+
+  - id: ADR-036
+    title: "PrayerSelector com props visible/onClose (padrao ActorSelector)"
+    context: >
+      PrayerSelector gerencia seu proprio estado de modal (modalVisible),
+      inicializado como false. AgendaForm renderiza PrayerSelector
+      condicionalmente mas nao tem como auto-abrir o modal. Contraste:
+      ActorSelector recebe visible={true} e abre imediatamente.
+    decision: >
+      Adicionar props opcionais 'visible' e 'onClose' ao PrayerSelector.
+      useEffect sincroniza modalVisible com visible. Quando o modal fecha,
+      chama onClose. AgendaForm passa visible={true} e
+      onClose={() => setSelectorModal(null)}. Props sao opcionais para
+      manter backward compatibility caso PrayerSelector seja usado
+      standalone em outro local.
+    consequences:
+      - "Clicar no campo de oracao abre modal imediatamente"
+      - "Padrao consistente com ActorSelector e HymnSelectorModal"
+      - "Backward compatible (props opcionais)"
+
+# =============================================================================
+# FILES IMPACTED (summary)
+# =============================================================================
+
+files_impacted:
+  f035:
+    new_files:
+      - path: "supabase/migrations/013_fix_notification_trigger_security_definer.sql"
+        description: "Nova migracao: redefine enqueue_speech_notification() com SECURITY DEFINER"
+    modified_files: []
+
+  f036:
+    new_files: []
+    modified_files:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "keyExtractor: item.code -> item.label (linha ~146)"
+        scope: "1 linha"
+
+  f037:
+    new_files: []
+    modified_files:
+      - path: "app.json"
+        change: "scheme: 'wardmanager' -> 'sacrmeetman' (linha 10)"
+        scope: "1 linha"
+      - path: "supabase/functions/create-invitation/index.ts"
+        change: "deep link: wardmanager:// -> sacrmeetman:// (linha ~170)"
+        scope: "1 linha"
+
+  f038:
+    new_files: []
+    modified_files:
+      - path: "src/app/(tabs)/speeches.tsx"
+        change: >
+          Substituir condicao de linha ~277:
+          ANTES: !(exception && isExcludedFromAgenda(exception.reason))
+          DEPOIS: (!exception || exception.reason === 'speeches')
+          Remover import de isExcludedFromAgenda de useAgenda.ts
+        scope: "2-3 linhas"
+
+  f039:
+    new_files: []
+    modified_files:
+      - path: "src/components/PrayerSelector.tsx"
+        change: >
+          Adicionar props visible? e onClose? a PrayerSelectorProps.
+          Adicionar useEffect para sincronizar modalVisible com visible.
+          Chamar onClose nos handlers de fechamento do modal.
+        scope: "~15-20 linhas adicionadas/modificadas"
+      - path: "src/components/AgendaForm.tsx"
+        change: >
+          Passar visible={true} e onClose={() => setSelectorModal(null)}
+          ao PrayerSelector na renderizacao condicional (~linhas 511-535).
+        scope: "2-3 linhas"
+
+# =============================================================================
+# CROSS-CUTTING
+# =============================================================================
+
+cross_cutting:
+  file_overlap: "ZERO overlap entre os 5 fixes"
+  new_dependencies: "ZERO novas dependencias"
+  test_impact: >
+    F038 pode impactar testes que verificam uso de isExcludedFromAgenda
+    em speeches.tsx (cr001-qa.test.ts, cr002-qa.test.ts, etc).
+    Testes devem ser atualizados para refletir nova logica.
+  i18n_impact: "ZERO novas i18n keys"
+  arch_consolidated_updates:
+    - "tech_stack.deep_links: wardmanager:// -> sacrmeetman://"
+    - "cross_cutting.deep_links.scheme: wardmanager -> sacrmeetman"
+    - "modules.M005.notes: SECURITY DEFINER adicionado ao trigger"
+    - "modules.M004.notes: PrayerSelector com visible/onClose props"
+    - "modules.M003.notes: speech slots condicionados a tipo === 'speeches'"
+    - "database_schema.migrations: adicionar 013_fix_notification_trigger_security_definer.sql"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true   # Componentes tem responsabilidade unica (nenhum componente novo)
+  GATE-03: true   # Contratos definidos para cada integracao alterada
+  GATE-04: true   # ADRs registrados: ADR-035 (F035 security definer), ADR-036 (F039 prayer visible)
+  GATE-05: true   # ARCH_M013.yaml salvo no disco
+  GATE-06: true   # ARCH_CONSOLIDATED sera atualizado a seguir
+  GATE-07: true   # ARCH_SUMMARY preenchido abaixo
+  GATE-08: true   # Maximo 10 componentes por modulo respeitado (0 novos componentes)

@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-18"
-  total_features: 33
-  total_change_requests: 90
-  implemented_crs: 78
-  pending_crs: 12
+  total_features: 38
+  total_change_requests: 100
+  implemented_crs: 90
+  pending_crs: 10
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -31,6 +31,7 @@ metadata:
     - docs/specs/SPEC_F026.yaml
     - docs/specs/SPEC_F027_F031.yaml
     - docs/specs/SPEC_F032_F034.yaml
+    - docs/specs/SPEC_F035_F039.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -482,7 +483,7 @@ features:
 
   - id: F026
     name: "Members Screen Explanatory Texts (i18n)"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Textos explicativos na tela de Membros para guiar o usuario. Inclui:
@@ -503,7 +504,7 @@ features:
 
   - id: F027
     name: "Explicit Save/Cancel for Members and Topics"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Substituir auto-save no blur por botoes explicitos Salvar e Cancelar
@@ -518,7 +519,7 @@ features:
 
   - id: F028
     name: "Search Clear Button (X) for All Search Fields"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Adicionar botao X na direita de todos os campos de search do app para
@@ -534,7 +535,7 @@ features:
 
   - id: F029
     name: "Complete International Country Codes List"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Expandir a lista de codigos internacionais de telefone (COUNTRY_CODES)
@@ -549,7 +550,7 @@ features:
 
   - id: F030
     name: "CSV Import Confirmation Dialog"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Adicionar dialogo de confirmacao (Alert.alert) ao clicar em Importar CSV,
@@ -564,7 +565,7 @@ features:
 
   - id: F031
     name: "Fix Delete Button for Members and Topics"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Fix do bug onde o botao Delete revelado pelo swipe-to-reveal no
@@ -583,7 +584,7 @@ features:
 
   - id: F032
     name: "Swipe Action Icons (pencil/trash) instead of Text"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Substituir texto dos botoes de acao do SwipeableCard ("Editar"/"Excluir")
@@ -600,7 +601,7 @@ features:
 
   - id: F033
     name: "Topics Screen Explanatory Text"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Adicionar texto explicativo na tela de Temas, abaixo do header, explicando
@@ -616,7 +617,7 @@ features:
 
   - id: F034
     name: "Collection Topics View (expand/collapse read-only list)"
-    status: pending
+    status: implemented
     rfs: []
     description: >
       Ao clicar numa colecao na tela de Temas, expandir inline e mostrar todos
@@ -631,6 +632,90 @@ features:
       - "Novo hook useCollectionTopics em useTopics.ts"
       - "Switch toggle independente do tap na colecao"
       - "Depende de F033 para key topics.noTopics"
+
+  # ---------------------------------------------------------------------------
+  # Batch 7 Phase 1 (F035-F039) - Bug Fixes
+  # ---------------------------------------------------------------------------
+
+  - id: F035
+    name: "Fix RLS policy error on notification_queue"
+    status: pending
+    rfs: []
+    description: >
+      Fix do bug onde designar um orador causa erro de RLS na tabela
+      notification_queue. O trigger enqueue_speech_notification() nao usa
+      SECURITY DEFINER, executando no contexto do usuario autenticado que
+      nao tem acesso a notification_queue. Fix: adicionar SECURITY DEFINER
+      a funcao de trigger.
+    modified_by_crs: [91]
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    notes:
+      - "CR-91: Bug critico - erro de RLS ao designar orador"
+      - "Trigger deve usar SECURITY DEFINER para bypass de RLS"
+      - "notification_queue permanece sem policies de client"
+
+  - id: F036
+    name: "Fix duplicate key error in country dropdown"
+    status: pending
+    rfs: []
+    description: >
+      Fix do warning de React "duplicate key" no dropdown de codigos de pais.
+      keyExtractor usa item.code mas existem duplicatas legitimas (+1 US/Canada,
+      +7 Russia/Kazakhstan). Fix: usar item.label como key (unico).
+    modified_by_crs: [92]
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    notes:
+      - "CR-92: Warning de duplicate key no FlatList de COUNTRY_CODES"
+      - "item.label e unico (ex: 'United States (+1)' vs 'Canada (+1)')"
+      - "Unico arquivo afetado: members.tsx (keyExtractor)"
+
+  - id: F037
+    name: "Change deep link protocol to sacrmeetman://"
+    status: pending
+    rfs: []
+    description: >
+      Alterar protocolo de deep link de wardmanager:// para sacrmeetman://.
+      Afeta app.json (scheme) e create-invitation Edge Function (construcao
+      do deep link). Deep links NAO funcionam no Expo Go (comportamento
+      esperado, apenas em builds standalone).
+    modified_by_crs: [93]
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    notes:
+      - "CR-93: Protocolo wardmanager:// deve ser sacrmeetman://"
+      - "Alterar app.json scheme e Edge Function create-invitation"
+      - "Deep links com custom schemes NAO funcionam no Expo Go (esperado)"
+
+  - id: F038
+    name: "Fix speech fields not hiding on sunday type change"
+    status: pending
+    rfs: []
+    description: >
+      Fix do bug onde speech slots (posicoes 1, 2, 3) continuam visiveis ao
+      mudar tipo de domingo na aba Discursos. O codigo usava
+      isExcludedFromAgenda() (que so filtra general_conference e
+      stake_conference). Fix: verificar se tipo === 'speeches' diretamente.
+    modified_by_crs: [95]
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    notes:
+      - "CR-95: Speech fields nao somem ao mudar tipo de domingo"
+      - "Correcao completa do que CR-7 fez parcialmente"
+      - "Usa verificacao direta de tipo === 'speeches' ao inves de isExcludedFromAgenda"
+
+  - id: F039
+    name: "Fix prayer fields not clickable"
+    status: pending
+    rfs: []
+    description: >
+      Fix do bug onde campos de oracao (abertura e fechamento) na aba Agenda
+      nao respondem ao clique. PrayerSelector nao recebe prop 'visible' para
+      auto-abrir modal (como ActorSelector e HymnSelectorModal fazem).
+      Fix: adicionar props 'visible' e 'onClose' ao PrayerSelector.
+    modified_by_crs: [98]
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    notes:
+      - "CR-98: Campos de oracao nao sao clicaveis"
+      - "PrayerSelector precisa de props visible + onClose (padrao ActorSelector)"
+      - "Completa integracao que CR-74 iniciou"
 
   # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
@@ -791,268 +876,153 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (12 CRs pendentes de implementacao)
+# PENDING CHANGE REQUESTS (10 CRs pendentes de implementacao - Batch 7)
 # =============================================================================
 
 pending_crs:
 
-  - id: 76
-    type: bug_regression
-    regression_of: 64
-    area: "Users screen (F018)"
-    related_crs: [64, 23]
-    description: >
-      Regressao do CR-64. Ao clicar em "Usuarios" na aba Configuracoes,
-      aparece erro "Edge Function returned non-2xx status code". A Edge
-      Function list-users pode estar retornando erro para o papel do usuario
-      logado, ou a resposta pode ter mudado de formato apos o fix do CR-64.
-    likely_root_cause: >
-      A Edge Function list-users pode ter um bug na autorizacao ou no
-      processamento da resposta. Verificar se a funcao aceita corretamente
-      o role do usuario logado (bishopric ou secretary) e se o formato de
-      resposta esta correto.
-    files_likely_impacted:
-      - supabase/functions/list-users/index.ts
-      - src/app/(tabs)/settings/users.tsx
+  # --- Batch 7 Phase 1 (Bug Fixes) ---
 
-  - id: 79
-    type: ui_bug
-    area: "Users screen (F018)"
-    related_crs: [33, 64]
-    description: >
-      Tela de Usuarios sem botao de voltar no header. Viola a convencao
-      global estabelecida pelo CR-33: toda tela acessada via Stack DEVE
-      ter botao de voltar no header.
-    acceptance_criteria:
-      - "Botao de voltar visivel no header da tela de Usuarios"
-      - "Botao usa common.back i18n key e estilo consistente (fontSize 16, fontWeight 600)"
-      - "Tapping navega de volta para Settings index"
-    notes: >
-      Se a convencao global (CR-33) foi implementada via settings/_layout.tsx
-      Stack screenOptions headerLeft, pode ser que a tela de usuarios nao
-      esteja usando a Stack corretamente. Verificar se users.tsx esta
-      registrado como screen no Stack navigator.
-    files_likely_impacted:
-      - src/app/(tabs)/settings/users.tsx
-      - src/app/(tabs)/settings/_layout.tsx
-
-  - id: 80
-    type: ux
-    area: "Members screen (F003/F004)"
-    feature_id: F026
-    spec_file: "docs/specs/SPEC_F026.yaml"
+  - id: 91
+    type: bug_critical
+    area: "Push Notifications (F017)"
+    feature_id: F035
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
     related_crs: []
     description: >
-      Tela de Membros precisa de textos explicativos sobre funcionalidades.
-      Adicionar textos informativos sobre: como exportar membros, como
-      importar membros, formato esperado do CSV. Textos devem ser
-      internacionalizados em pt-BR, en e es.
+      Erro RLS policy ao designar orador: trigger enqueue_speech_notification()
+      nao usa SECURITY DEFINER. INSERT em notification_queue bloqueado.
     acceptance_criteria:
-      - "Texto descritivo visivel abaixo do titulo da tela de Membros"
-      - "Texto de ajuda CSV visivel perto dos botoes de importar/exportar"
-      - "Explicacao sobre exportar CSV (salva todos os membros em arquivo)"
-      - "Explicacao sobre importar CSV (carrega arquivo e substitui toda a lista)"
-      - "Explicacao do formato esperado (Nome, Telefone Completo com codigo do pais)"
-      - "CSV help text oculto quando usuario nao tem permissao de import/export"
-      - "Todos os textos traduzidos em pt-BR, en, es"
+      - "Funcao trigger usa SECURITY DEFINER"
+      - "notification_queue permanece sem policies de client"
+      - "Nenhum erro ao designar orador"
+    files_likely_impacted:
+      - supabase/migrations/003_notification_triggers.sql
+
+  - id: 92
+    type: bug
+    area: "Members (F003)"
+    feature_id: F036
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    related_crs: [85]
+    description: >
+      Duplicate key error no dropdown de paises. keyExtractor usa item.code
+      mas +1 (US/Canada) e +7 (Russia/Kazakhstan) sao duplicados.
+    acceptance_criteria:
+      - "keyExtractor usa item.label (unico)"
+      - "Sem warning de duplicate key no console"
     files_likely_impacted:
       - src/app/(tabs)/settings/members.tsx
-      - src/i18n/locales/pt-BR.json
-      - src/i18n/locales/en.json
-      - src/i18n/locales/es.json
 
-  - id: 81
-    type: feature
-    area: "User management (F018)"
-    related_crs: [72]
-    description: >
-      Adicionar campo Nome para usuario. Quando usuario com role "bishopric"
-      se registra, o nome deve ser automaticamente adicionado como ator para
-      dirigir/presidir. Activity logs devem mostrar nome do usuario (amigavel)
-      ao inves de apenas email. Tela de usuarios deve exibir o nome.
-    acceptance_criteria:
-      - "Campo Nome no registro e edicao de usuario"
-      - "Auto-criacao de ator com can_preside+can_conduct ao registrar bishopric"
-      - "Activity logs exibem nome do usuario ao inves de email"
-      - "Tela de usuarios mostra nome ao lado do email/role"
-      - "Textos traduzidos em pt-BR, en, es"
-    notes: >
-      Relacionado ao CR-72 que ja implementou auto-adicao de bispado como
-      ator na aceitacao de convite. Este CR expande para incluir o nome
-      como campo obrigatorio e melhorar a experiencia de logs e listagem.
-    files_likely_impacted:
-      - supabase/functions/register-first-user/index.ts
-      - supabase/functions/register-invited-user/index.ts
-      - supabase/functions/list-users/index.ts
-      - src/app/(tabs)/settings/users.tsx
-      - src/app/(auth)/login.tsx
-      - src/lib/activityLog.ts
-      - src/i18n/locales/pt-BR.json
-      - src/i18n/locales/en.json
-      - src/i18n/locales/es.json
-
-  - id: 83
-    type: ux
-    area: "Members & Topics (F003, F005)"
-    feature_id: F027
-    spec_file: "docs/specs/SPEC_F027_F031.yaml"
+  - id: 93
+    type: bug
+    area: "Auth/Invitations (F001, F018)"
+    feature_id: F037
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
     related_crs: []
     description: >
-      Membros e temas da ala: salvar somente ao clicar no botao Salvar,
-      adicionar botao Cancelar. Remover auto-save no onBlur.
+      Deep link protocol deve ser sacrmeetman:// ao inves de wardmanager://.
     acceptance_criteria:
-      - "Botao Salvar visivel no editor de membro/tema (alinhado a direita)"
-      - "Botao Cancelar visivel ao lado do Salvar"
-      - "onBlur nao dispara salvamento"
-      - "Cancelar fecha editor sem salvar"
-      - "Salvar valida e persiste os dados"
+      - "app.json scheme e 'sacrmeetman'"
+      - "Edge Function gera sacrmeetman://invite/${token}"
+      - "Nenhuma referencia a wardmanager:// no codigo"
     files_likely_impacted:
-      - src/app/(tabs)/settings/members.tsx
-      - src/app/(tabs)/settings/topics.tsx
+      - app.json
+      - supabase/functions/create-invitation/index.ts
 
-  - id: 84
-    type: ux
-    area: "All search fields"
-    feature_id: F028
-    spec_file: "docs/specs/SPEC_F027_F031.yaml"
-    related_crs: [39]
+  - id: 95
+    type: bug
+    area: "Speeches (F007, F008)"
+    feature_id: F038
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    related_crs: [6, 7, 56]
     description: >
-      Adicionar botao X na direita de todos os campos de search do app
-      para limpar a string de busca. Criar componente reutilizavel SearchInput.
+      Ao mudar tipo de domingo de 'Discursos' para outro, campos de
+      designacao de discursantes nao somem. Usa isExcludedFromAgenda()
+      que so filtra 2 de 6 tipos.
     acceptance_criteria:
-      - "Componente SearchInput criado e reutilizavel"
-      - "Botao X visivel quando campo tem texto"
-      - "Botao X limpa campo e restaura lista completa"
-      - "10 campos de search migrados para SearchInput"
+      - "Speech slots visiveis SOMENTE quando tipo e 'speeches'"
+      - "Todos os outros tipos escondem speech slots"
     files_likely_impacted:
-      - src/components/SearchInput.tsx
-      - src/app/(tabs)/settings/members.tsx
-      - src/app/(tabs)/settings/topics.tsx
-      - src/app/(tabs)/settings/history.tsx
-      - src/app/(tabs)/settings/timezone.tsx
-      - src/components/HymnSelector.tsx
-      - src/components/MemberSelectorModal.tsx
-      - src/components/TopicSelectorModal.tsx
+      - src/app/(tabs)/speeches.tsx
+
+  - id: 98
+    type: bug
+    area: "Agenda (F012, F015)"
+    feature_id: F039
+    spec_file: "docs/specs/SPEC_F035_F039.yaml"
+    related_crs: [74]
+    description: >
+      Campos de oracao de abertura e fechamento nao sao clicaveis.
+      PrayerSelector nao recebe prop 'visible' para auto-abrir modal.
+    acceptance_criteria:
+      - "Clicar no campo de oracao abre modal imediatamente"
+      - "PrayerSelector aceita props visible + onClose"
+      - "Padrao consistente com ActorSelector"
+    files_likely_impacted:
       - src/components/PrayerSelector.tsx
-      - src/components/ActorSelector.tsx
       - src/components/AgendaForm.tsx
 
-  - id: 85
-    type: bug
-    area: "Members (F003), CSV Import (F004)"
-    feature_id: F029
-    spec_file: "docs/specs/SPEC_F027_F031.yaml"
-    related_crs: []
-    description: >
-      Lista de codigos internacionais de telefone incompleta (21 paises).
-      Expandir para ~150+ paises e extrair para arquivo compartilhado.
-    acceptance_criteria:
-      - "COUNTRY_CODES tem >= 100 entradas com code, flag, label"
-      - "splitPhoneNumber suporta todos os codigos da lista"
-      - "Ambos compartilham mesma fonte de dados (src/lib/countryCodes.ts)"
-      - "Brasil (+55) aparece primeiro na lista"
-    files_likely_impacted:
-      - src/lib/countryCodes.ts
-      - src/app/(tabs)/settings/members.tsx
-      - src/lib/csvUtils.ts
+  # --- Batch 7 Phase 2 (Features & UX) ---
 
-  - id: 86
-    type: ux
-    area: "CSV Import (F004)"
-    feature_id: F030
-    spec_file: "docs/specs/SPEC_F027_F031.yaml"
-    related_crs: [42, 54, 66, 77, 78]
-    description: >
-      Dialogo de confirmacao antes de importar CSV. Avisa que a importacao
-      substitui toda a lista de membros e que designacoes nao sao afetadas.
-    acceptance_criteria:
-      - "Alert.alert exibido ANTES de abrir file picker"
-      - "Mensagem explica substituicao total da lista"
-      - "Mensagem explica que designacoes nao sao afetadas"
-      - "Confirmar abre file picker, Cancelar fecha dialogo"
-      - "Textos traduzidos em pt-BR, en, es"
-    files_likely_impacted:
-      - src/app/(tabs)/settings/members.tsx
-      - src/i18n/locales/en.json
-      - src/i18n/locales/pt-BR.json
-      - src/i18n/locales/es.json
-
-  - id: 90
-    type: bug
-    area: "SwipeableCard (F003, F005)"
-    feature_id: F031
-    spec_file: "docs/specs/SPEC_F027_F031.yaml"
-    related_crs: [82]
-    description: >
-      Botao Delete no SwipeableCard nao funciona para membros nem temas.
-      Edit funciona com padrao identico. GestureDetector intercepta evento
-      de toque na area do botao Delete.
-    acceptance_criteria:
-      - "Botao Delete funciona quando card esta revelado (swiped)"
-      - "Dialogo de confirmacao exibido ao pressionar Delete"
-      - "Botao Edit continua funcionando (sem regressao)"
-      - "Fix no SwipeableCard.tsx (componente compartilhado)"
-    files_likely_impacted:
-      - src/components/SwipeableCard.tsx
-
-  - id: 87
+  - id: 94
     type: ui
-    area: "SwipeableCard (F003, F005)"
-    feature_id: F032
-    spec_file: "docs/specs/SPEC_F032_F034.yaml"
-    related_crs: [90]
+    area: "WhatsApp Template (F010, F024)"
+    related_crs: [14, 63]
     description: >
-      Nos botoes de Editar e Excluir ao deslizar, trocar texto por icones
-      de lapis (pencil) e lixeira (wastebasket) usando caracteres Unicode.
-    acceptance_criteria:
-      - "Botao Edit mostra icone de lapis ao inves de texto"
-      - "Botao Delete mostra icone de lixeira ao inves de texto"
-      - "accessibilityLabel mantem texto descritivo para screen readers"
-      - "Icones visiveis e com contraste adequado"
+      Trocar template padrao de convite WhatsApp para incluir posicao do
+      discurso, tema e link.
     files_likely_impacted:
-      - src/components/SwipeableCard.tsx
-
-  - id: 88
-    type: ux
-    area: "Topics screen (F005)"
-    feature_id: F033
-    spec_file: "docs/specs/SPEC_F032_F034.yaml"
-    related_crs: [80]
-    description: >
-      Na tela de temas adicionar texto explicando o que a tela faz,
-      especialmente ativar/desativar colecao. Segue padrao de CR-80.
-    acceptance_criteria:
-      - "Texto descritivo visivel abaixo do header da tela de Temas"
-      - "Texto explica temas da ala vs colecoes"
-      - "Texto explica ativar/desativar colecoes"
-      - "Segue padrao visual de CR-80 (fontSize 13, textSecondary, center)"
-      - "Textos traduzidos em pt-BR, en, es"
-    files_likely_impacted:
-      - src/app/(tabs)/settings/topics.tsx
-      - src/i18n/locales/en.json
+      - src/lib/whatsappTemplate.ts
       - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
-  - id: 89
-    type: feature
-    area: "Topics screen (F005, F006)"
-    feature_id: F034
-    spec_file: "docs/specs/SPEC_F032_F034.yaml"
-    related_crs: [88]
+  - id: 96
+    type: ux
+    area: "Search fields"
+    related_crs: [39, 84]
     description: >
-      Ao clicar numa colecao, mostrar todos os temas (read-only, lista simples)
-      com padrao expand/collapse inline (acordeao).
-    acceptance_criteria:
-      - "Tap na colecao expande e mostra lista de temas"
-      - "Tap novamente colapsa a lista"
-      - "Temas buscados de general_topics por collection_id"
-      - "Loading state enquanto busca"
-      - "Empty state se nao tem temas"
-      - "Switch toggle funciona independentemente do tap"
-      - "Padrao acordeao (uma colecao expandida por vez)"
+      Campos de busca (membros, temas, atores) devem ser fixos no topo e
+      preencher espaco disponivel, com botao fechar a direita.
     files_likely_impacted:
-      - src/app/(tabs)/settings/topics.tsx
-      - src/hooks/useTopics.ts
+      - src/components/SearchInput.tsx
+      - src/components/ActorSelector.tsx
+      - src/components/MemberSelectorModal.tsx
+
+  - id: 97
+    type: feature
+    area: "Agenda (F012, F013)"
+    related_crs: [73]
+    description: >
+      Campo 'Reconhecendo a Presenca' deve permitir selecao multipla de nomes.
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+      - src/components/ActorSelector.tsx
+
+  - id: 99
+    type: ui
+    area: "Agenda (F012)"
+    related_crs: [29, 69]
+    description: >
+      Trocar labels dos discursos na edicao de agenda: '1o Orador' para
+      '1o Discurso' (idem 2o e 3o).
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 100
+    type: feature
+    area: "Agenda (F012)"
+    related_crs: [26]
+    description: >
+      Campo de discursante read-only com icone de edicao para 'Troca de
+      Ultima Hora' - campo texto manual, icone X para reverter ao
+      designado original.
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -1315,6 +1285,47 @@ design_decisions:
       Hook useCollectionTopics em useTopics.ts. Chevron indicator
       (> / v) a esquerda do nome da colecao para indicar tappable.
 
+  - id: DD-28
+    title: "SECURITY DEFINER para triggers que acessam tabelas protegidas"
+    decided_in: CR-91
+    decision: >
+      Funcoes de trigger que inserem em tabelas com RLS sem policies de client
+      (como notification_queue) devem usar SECURITY DEFINER para executar com
+      privilegios do owner. Isso garante que logica server-side (triggers) nao
+      e bloqueada pela RLS enquanto mantem a tabela inacessivel a clientes.
+
+  - id: DD-29
+    title: "Speech slots condicionados a tipo === 'speeches' (nao isExcludedFromAgenda)"
+    decided_in: CR-95
+    decision: >
+      Na aba Discursos (speeches.tsx), a renderizacao dos speech slots (posicoes
+      1, 2, 3) deve verificar diretamente se o tipo de domingo e 'speeches'.
+      Nao usar isExcludedFromAgenda() pois essa funcao tem semantica diferente
+      (usada na aba Agenda para expandibilidade de cards). A condicao correta:
+      !exception || exception.reason === 'speeches'.
+    superseded:
+      - "Uso de isExcludedFromAgenda em speeches.tsx (filtrava apenas 2 de 6 tipos)"
+
+  - id: DD-30
+    title: "Deep link protocol sacrmeetman:// (substituiu wardmanager://)"
+    decided_in: CR-93
+    decision: >
+      O URL scheme do app e 'sacrmeetman'. Deep links gerados pela Edge
+      Function create-invitation usam sacrmeetman://invite/${token}.
+      Custom URL schemes NAO funcionam no Expo Go (apenas builds standalone).
+    superseded:
+      - "URL scheme 'wardmanager' (app.json original)"
+
+  - id: DD-31
+    title: "PrayerSelector com prop visible (padrao consistente com outros selectors)"
+    decided_in: CR-98
+    decision: >
+      PrayerSelector aceita prop 'visible' para auto-abrir seu modal quando
+      renderizado condicionalmente, e 'onClose' para notificar o parent quando
+      o modal e fechado. Segue padrao identico a ActorSelector (visible prop)
+      e HymnSelectorModal (visible prop). AgendaForm passa visible={true}
+      ao renderizar PrayerSelector via selectorModal state.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -1443,6 +1454,25 @@ business_rules:
     rule: "Temas de colecao visiveis via expand/collapse inline (acordeao, uma por vez)"
     origin: CR-89
     notes: "Tap na colecao expande lista read-only de temas. Switch toggle independente."
+
+  - id: BR-29
+    rule: "Triggers de DB que inserem em tabelas protegidas por RLS devem usar SECURITY DEFINER"
+    origin: CR-91
+    notes: "enqueue_speech_notification() precisa SECURITY DEFINER para inserir em notification_queue"
+
+  - id: BR-30
+    rule: "Speech slots na aba Discursos visiveis SOMENTE quando tipo de domingo e 'speeches'"
+    origin: CR-95
+    supersedes: "Logica anterior usava isExcludedFromAgenda (filtrava apenas 2 de 6 tipos)"
+
+  - id: BR-31
+    rule: "Deep link protocol do app e sacrmeetman:// (nao wardmanager://)"
+    origin: CR-93
+
+  - id: BR-32
+    rule: "Componentes de selecao modal (PrayerSelector, ActorSelector, HymnSelectorModal) devem aceitar prop 'visible' para auto-abrir"
+    origin: CR-98
+    notes: "Padrao consistente: componente recebe visible={true} e abre modal imediatamente"
 
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
@@ -1679,14 +1709,21 @@ cr_history:
 
   batch_5:
     range: "CR-76 a CR-82"
-    status: "4 pendentes (76, 79, 80, 81), 3 implementadas (77, 78, 82)"
+    status: "todas implementadas"
     file: "docs/specs/history/SPEC_CONSOLIDATED_old.yaml (CR-77, 78, 82)"
     summary: "Users screen regression, back button, members explanatory text, user name field, expo-file-system v19 migration, GestureHandlerRootView"
 
   batch_6:
     range: "CR-83 a CR-90"
-    status: "8 pendentes (83, 84, 85, 86, 87, 88, 89, 90)"
+    status: "todas implementadas"
     files:
       - "docs/specs/SPEC_F027_F031.yaml (CR-83, 84, 85, 86, 90 - Fase 1)"
       - "docs/specs/SPEC_F032_F034.yaml (CR-87, 88, 89 - Fase 2)"
     summary: "Save/Cancel explicito, search clear button, country codes completo, import confirmation dialog, swipe icons, topics explanatory text, collection detail view, delete button fix"
+
+  batch_7:
+    range: "CR-91 a CR-100"
+    status: "10 pendentes (91-100), Fase 1 em progresso (91, 92, 93, 95, 98)"
+    files:
+      - "docs/specs/SPEC_F035_F039.yaml (CR-91, 92, 93, 95, 98 - Fase 1: Bug Fixes)"
+    summary: "RLS policy fix, duplicate key fix, deep link protocol change, speech fields visibility fix, prayer fields clickable fix, WhatsApp template update, search fields UX, multi-select recognizing, agenda speaker labels, last-minute speaker change"

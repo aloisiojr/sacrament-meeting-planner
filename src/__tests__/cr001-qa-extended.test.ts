@@ -376,38 +376,13 @@ describe('CR-07: Hide speeches for non-speech sundays (structural)', () => {
   describe('speeches.tsx hides speech slots for non-speech types', () => {
     const speechesContent = readFile('app', '(tabs)', 'speeches.tsx');
 
-    it('imports isExcludedFromAgenda or isSpecialMeeting', () => {
-      const hasExcluded = speechesContent.includes('isExcludedFromAgenda');
-      const hasSpecial = speechesContent.includes('isSpecialMeeting');
-      expect(hasExcluded || hasSpecial).toBe(true);
+    it('does not import isExcludedFromAgenda (uses direct type check instead)', () => {
+      expect(speechesContent).not.toContain('isExcludedFromAgenda');
     });
 
-    it('[BUG DETECTED] should hide SpeechSlot for ALL exception types, not just excluded ones', () => {
-      // CR-07 AC-1: "When exception.reason is not null (i.e., not a speeches-type sunday),
-      // the speech slots are hidden in the expanded SundayCard"
-      //
-      // Current code uses: !(exception && isExcludedFromAgenda(exception.reason))
-      // This only hides for general_conference and stake_conference
-      // but NOT for testimony_meeting, ward_conference, primary_presentation, other
-      //
-      // Correct code should be: !exception
-      // OR: !(exception && (isExcludedFromAgenda(exception.reason) || isSpecialMeeting(exception.reason)))
-      //
-      // This test documents the bug.
-      const hasCorrectCondition =
-        speechesContent.includes('!exception') &&
-        !speechesContent.includes('isExcludedFromAgenda(exception.reason)');
-
-      // If this test fails, it means the bug still exists:
-      // speeches.tsx shows SpeechSlots for special meeting types
-      // when it should hide them for ALL non-speech types.
-      //
-      // KNOWN BUG: This test is expected to FAIL until the fix is applied.
-      // The fix is: change the condition in speeches.tsx from
-      //   !(exception && isExcludedFromAgenda(exception.reason))
-      // to:
-      //   !exception
-      expect(hasCorrectCondition).toBe(false); // Documenting current (buggy) state
+    it('uses (!exception || exception.reason === \'speeches\') to hide speech slots for all non-speech types', () => {
+      expect(speechesContent).toContain("exception.reason === 'speeches'");
+      expect(speechesContent).toContain('!exception');
     });
   });
 

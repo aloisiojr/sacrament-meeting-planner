@@ -239,11 +239,14 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain("field: 'recognizing', roleFilter: 'can_recognize'");
     });
 
-    it('actor selection for recognizing should set recognized_names array', () => {
+    it('actor selection for recognizing should toggle recognized_names array', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
       // Recognizing has special handling that bypasses the generic actor select pattern
       expect(source).toContain("selectorModal.field === 'recognizing'");
-      expect(source).toContain("updateField('recognized_names', [actor.name])");
+      // Multi-select toggle: add or remove names from the array
+      expect(source).toContain("current.includes(actor.name)");
+      expect(source).toContain("current.filter");
+      expect(source).toContain("[...current, actor.name]");
       // The recognizing field opens actor selector with field='recognizing'
       expect(source).toContain("field: 'recognizing', roleFilter: 'can_recognize'");
     });
@@ -326,14 +329,14 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain("type: 'prayer', field: 'closing_prayer'");
     });
 
-    it('speaker modal should still use MemberSelectorModal', () => {
+    it('speaker fields should use inline SpeakerField with override support', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      // Speaker selector is separate from prayer selector
-      const speakerSection = source.slice(
-        source.indexOf('Speaker selector modal'),
-        source.indexOf('</View>', source.indexOf('Speaker selector modal'))
-      );
-      expect(speakerSection).toContain('MemberSelectorModal');
+      // SpeakerField now uses read-only display with inline override editing
+      expect(source).toContain('overrideName');
+      expect(source).toContain('onEditOverride');
+      expect(source).toContain('speaker_1_override');
+      expect(source).toContain('speaker_2_override');
+      expect(source).toContain('speaker_3_override');
     });
   });
 

@@ -100,10 +100,11 @@ describe('CR-004 F005: CSV & Members Screen Fixes', () => {
 
     it('handleImport catch should use t(members.importFailed)', () => {
       const source = readSourceFile('app/(tabs)/settings/members.tsx');
-      const handleImportStart = source.indexOf('const handleImport = useCallback');
-      const handleImportBlock = source.slice(handleImportStart, source.indexOf('const canImport'));
+      // After CR-86 refactoring, error handling moved to performImport
+      const performImportStart = source.indexOf('const performImport = useCallback');
+      const performImportBlock = source.slice(performImportStart, source.indexOf('const handleImport = useCallback'));
       // CR-78: importFailed is now assigned via a ternary to errorKey variable
-      expect(handleImportBlock).toContain("'members.importFailed'");
+      expect(performImportBlock).toContain("'members.importFailed'");
     });
   });
 

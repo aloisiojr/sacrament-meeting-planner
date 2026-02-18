@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -66,6 +67,7 @@ async function callEdgeFunction(
 export default function UserManagementScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const router = useRouter();
   const { user: currentUser, session } = useAuth();
   const queryClient = useQueryClient();
 
@@ -223,6 +225,11 @@ export default function UserManagementScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
         <View style={styles.header}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button">
+            <Text style={[styles.backButton, { color: colors.primary }]}>
+              {t('common.back')}
+            </Text>
+          </Pressable>
           <Text style={[styles.title, { color: colors.text }]}>
             {t('users.title')}
           </Text>
@@ -524,8 +531,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  backButton: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   inviteButton: {
     paddingHorizontal: 16,

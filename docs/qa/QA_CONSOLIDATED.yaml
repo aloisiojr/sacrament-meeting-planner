@@ -2,7 +2,8 @@
 # QA_CONSOLIDATED.yaml
 # Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
 # CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98,
-# CR-94, CR-96, CR-97, CR-99, CR-100 (PRE)
+# CR-94, CR-96, CR-97, CR-99, CR-100 (PRE),
+# CR-101, CR-102, CR-103, CR-104, CR-108, CR-109 (PRE+POST)
 # Updated: 2026-02-18
 # =============================================================================
 
@@ -3042,3 +3043,458 @@ batch7_phase2_post:
       - "speaker_2_override TEXT DEFAULT NULL"
       - "speaker_3_override TEXT DEFAULT NULL"
     type_updated: "src/types/database.ts:199-201 - speaker_1/2/3_override: string | null"
+
+# #############################################################################
+# CR-101: Hide 3 LED status on non-speech Sundays (F045)
+# #############################################################################
+
+cr_101:
+  cr_id: CR-101
+  title: "Hide 3 LED status indicators when Sunday has no speeches"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: SundayCard.tsx rendered LEDs unconditionally.
+      isSpeechesType flag existed but was not used to gate LED rendering.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 63a72ea
+        message: "fix(sunday-card): conditionally render LEDs only for speeches type (CR-101)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR101-MP-01
+        description: "SundayCard only renders LEDs when isSpeechesType is true"
+        status: PASSED
+        evidence: |
+          src/components/SundayCard.tsx:322-338: LEDs section wrapped in
+          {isSpeechesType && (<View style={styles.leds}>...</View>)}.
+          When isSpeechesType is false (non-speech Sundays), no StatusLED renders.
+
+      - id: CR101-MP-02
+        description: "Non-speech Sundays show no LEDs in Speeches tab"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:269: const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES;
+          SundayCard.tsx:266-267: currentType derived from exception?.reason ?? SUNDAY_TYPE_SPEECHES.
+          When exception.reason !== 'speeches', isSpeechesType is false, LEDs not rendered.
+
+      - id: CR101-MP-03
+        description: "Speech Sundays still show 3 LEDs"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:322-338: When isSpeechesType is true, the View with
+          styles.leds renders 3 StatusLED components via speechStatuses.map().
+          Speech status array still computed at lines 272-275 for positions 1, 2, 3.
+
+    must_pass_total: 3
+    must_pass_passed: 3
+
+    should_pass_results:
+      - id: CR101-SP-01
+        description: "Home tab NextSundaysSection inherits LED fix from SundayCard"
+        status: PASSED
+        evidence: |
+          NextSundaysSection.tsx:168 uses <SundayCard> component.
+          Fix in SundayCard.tsx propagates automatically. No additional
+          changes needed in NextSundaysSection for LED visibility.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+
+# #############################################################################
+# CR-102: Hide yellow label on contracted card for speech Sundays (F046)
+# #############################################################################
+
+cr_102:
+  cr_id: CR-102
+  title: "Hide yellow exception label on contracted agenda card for speech Sundays"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: agenda.tsx computed exceptionLabel for ALL exceptions
+      including reason='speeches', showing redundant yellow "Discursos" label.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 81c4181
+        message: "fix(agenda): hide exception label for speeches type sundays (CR-102)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR102-MP-01
+        description: "Agenda card does not show yellow label for speech Sundays"
+        status: PASSED
+        evidence: |
+          agenda.tsx:265-267:
+            const exceptionLabel = (exception && exception.reason !== 'speeches')
+              ? t(`sundayExceptions.${exception.reason}`, exception.reason)
+              : null;
+          When exception.reason === 'speeches', exceptionLabel is null, no label rendered.
+
+      - id: CR102-MP-02
+        description: "Non-speech exception Sundays still show yellow label"
+        status: PASSED
+        evidence: |
+          agenda.tsx:265: condition (exception && exception.reason !== 'speeches')
+          is true for testimony_meeting, general_conference, stake_conference, etc.
+          Lines 292-299 render the yellow label when exceptionLabel is truthy.
+
+    must_pass_total: 2
+    must_pass_passed: 2
+
+    should_pass_results:
+      - id: CR102-SP-01
+        description: "SundayCard in Speeches tab already handles this correctly"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:308: {!isSpeechesType && (...)} already gates exception
+          text rendering. This was correct before CR-102 and remains unchanged.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+
+# #############################################################################
+# CR-103: WhatsApp template shows old version in settings (F047)
+# #############################################################################
+
+cr_103:
+  cr_id: CR-103
+  title: "WhatsApp settings page shows old template instead of current default"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: settings/whatsapp.tsx initialized template only
+      from DB value, no fallback to getDefaultTemplate() for null DB values.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 6ac1c9d
+        message: "fix(settings): initialize WhatsApp template with language-aware default fallback (CR-103)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR103-MP-01
+        description: "Settings page imports getDefaultTemplate from whatsappUtils"
+        status: PASSED
+        evidence: |
+          settings/whatsapp.tsx:18:
+            import { getDefaultTemplate } from '../../../lib/whatsappUtils';
+
+      - id: CR103-MP-02
+        description: "Settings page falls back to default template when DB is empty"
+        status: PASSED
+        evidence: |
+          settings/whatsapp.tsx:76-86:
+            if (ward.whatsapp_template === null || ward.whatsapp_template === undefined) {
+              setTemplate(getDefaultTemplate(ward.language ?? 'pt-BR'));
+            } else if (ward.whatsapp_template === '') {
+              setTemplate('');  // user intentionally cleared
+            } else {
+              setTemplate(ward.whatsapp_template);  // DB has custom value
+            }
+          Correctly handles null (default), empty (respected), and custom values.
+
+      - id: CR103-MP-03
+        description: "Settings page shows current default, not empty string"
+        status: PASSED
+        evidence: |
+          settings/whatsapp.tsx:62: Query now selects 'whatsapp_template, language'
+          (added 'language' to .select()). Line 79: uses ward.language ?? 'pt-BR'
+          for getDefaultTemplate fallback. Template state never starts as ''
+          when DB has null (uses default template instead).
+
+    must_pass_total: 3
+    must_pass_passed: 3
+
+    should_pass_results:
+      - id: CR103-SP-01
+        description: "Preview section reflects the correct template"
+        status: PASSED
+        evidence: |
+          settings/whatsapp.tsx:124: const preview = resolveTemplate(template);
+          Since template is now correctly initialized with the default template
+          (when DB is null), preview shows the correct resolved content.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+
+# #############################################################################
+# CR-104: WhatsApp template missing quotes, collection name, link (F048)
+# #############################################################################
+
+cr_104:
+  cr_id: CR-104
+  title: "WhatsApp message missing quotes around title, collection name, and link"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: WhatsAppVariables missing collection/link fields,
+      and templates missing quotes around {titulo}.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 0ccc825
+        message: "fix(whatsapp): add quotes around {titulo} placeholder in default templates (CR-104)"
+      - hash: 8e2cc8f
+        message: "fix(invite): add collection/link vars and human-readable date to WhatsApp message (CR-104, CR-108)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR104-MP-01
+        description: "InviteManagementSection passes collection to WhatsApp variables"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:69: collection: speech.topic_collection ?? '',
+          InviteManagementSection.tsx:103: collection: speech.topic_collection ?? '',
+          Both handleNotInvitedAction and handleInvitedAction include collection.
+
+      - id: CR104-MP-02
+        description: "InviteManagementSection passes link to WhatsApp variables"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:70: link: speech.topic_link ?? '',
+          InviteManagementSection.tsx:104: link: speech.topic_link ?? '',
+          Both handlers include link in the WhatsAppVariables object.
+
+      - id: CR104-MP-03
+        description: "Default templates have quotes around {titulo}"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:9: DEFAULT_TEMPLATE_PT_BR contains '"{titulo}"'
+            '...com o título "{titulo}" {link}...'
+          whatsappUtils.ts:12: DEFAULT_TEMPLATE_EN contains '"{titulo}"'
+            '...titled "{titulo}" {link}...'
+          whatsappUtils.ts:15: DEFAULT_TEMPLATE_ES contains '"{titulo}"'
+            '...con el titulo "{titulo}" {link}...'
+          All 3 templates have double quotes around {titulo}.
+
+    must_pass_total: 3
+    must_pass_passed: 3
+
+    should_pass_results:
+      - id: CR104-SP-01
+        description: "Speech type has topic_collection and topic_link fields"
+        status: PASSED
+        evidence: |
+          src/types/database.ts:141-142:
+            topic_link: string | null;
+            topic_collection: string | null;
+          Both fields exist in the Speech type interface.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+
+# #############################################################################
+# CR-108: Invite management {data} placeholder locale-aware format (F048)
+# #############################################################################
+
+cr_108:
+  cr_id: CR-108
+  title: "Invite management date placeholder uses locale-aware formatting"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: formatDate() returned compact "22 FEV" instead
+      of locale-aware formatDateHumanReadable().
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 8e2cc8f
+        message: "fix(invite): add collection/link vars and human-readable date to WhatsApp message (CR-104, CR-108)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR108-MP-01
+        description: "WhatsApp date uses locale-aware human-readable format"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:66:
+            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+          Uses formatDateHumanReadable instead of formatDate. Produces
+          "22 de Fevereiro de 2026" (pt-BR) instead of "22 FEV".
+
+      - id: CR108-MP-02
+        description: "Both WhatsApp actions use updated date format"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:66: handleNotInvitedAction uses formatDateHumanReadable
+          InviteManagementSection.tsx:100: handleInvitedAction uses formatDateHumanReadable
+          Both handlers use the locale-aware date format.
+
+    must_pass_total: 2
+    must_pass_passed: 2
+
+    should_pass_results:
+      - id: CR108-SP-01
+        description: "formatDateHumanReadable is imported from dateUtils"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:21:
+            import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
+          formatDateHumanReadable is imported alongside existing imports.
+
+    should_pass_total: 1
+    should_pass_passed: 1
+
+# #############################################################################
+# CR-109: Home next assignments card expand for speech Sundays (F049)
+# #############################################################################
+
+cr_109:
+  cr_id: CR-109
+  title: "Next Assignments card does not expand to show 3 speeches on speech Sundays"
+  type: bugfix
+  spec: specs/SPEC_F045_F049.yaml
+  qa_plan: qa/QA_PLAN_batch8_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    summary: |
+      Root cause confirmed: NextSundaysSection.tsx used !entry.exception
+      which is always false after CR-56 auto-assignment. Pattern from
+      speeches.tsx needed replication.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 781eb7d
+        message: "fix(home): fix SpeechSlots condition to render for speeches type sundays (CR-109)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 60
+    tester_tests_total: 60
+    tester_suite_passed: 2983
+    tester_suite_total: 2983
+
+    must_pass_results:
+      - id: CR109-MP-01
+        description: "NextSundaysSection renders SpeechSlots for speech Sundays"
+        status: PASSED
+        evidence: |
+          NextSundaysSection.tsx:181:
+            (!entry.exception || entry.exception.reason === 'speeches') &&
+          Changed from !entry.exception to allow speech Sundays with
+          auto-assigned exception entries (reason='speeches').
+
+      - id: CR109-MP-02
+        description: "Non-speech Sundays do not show SpeechSlots in NextSundaysSection"
+        status: PASSED
+        evidence: |
+          NextSundaysSection.tsx:181: When entry.exception.reason !== 'speeches'
+          (e.g., 'testimony_meeting'), the condition
+          (!entry.exception || entry.exception.reason === 'speeches')
+          evaluates to false, preventing SpeechSlot rendering.
+
+      - id: CR109-MP-03
+        description: "Speeches tab condition remains correct"
+        status: PASSED
+        evidence: |
+          speeches.tsx:276:
+            (!exception || exception.reason === 'speeches') &&
+          Condition unchanged from pre-validation. Still correctly gates
+          SpeechSlot rendering in the Speeches tab.
+
+    must_pass_total: 3
+    must_pass_passed: 3
+
+    should_pass_results:
+      - id: CR109-SP-01
+        description: "NextAssignmentsSection speech slot rendering is appropriate"
+        status: PASSED
+        evidence: |
+          NextAssignmentsSection.tsx:159-173: Renders SpeechSlots unconditionally
+          when expanded. This is acceptable because findNextPendingSunday (from
+          speechUtils.ts) only returns speech-type Sundays with pending assignments.
+          The function filters by entry where speeches need assignment, which
+          inherently means speech-type Sundays.
+
+    should_pass_total: 1
+    should_pass_passed: 1

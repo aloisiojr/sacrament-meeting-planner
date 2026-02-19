@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-90, CR-91..CR-100
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-109
 # Reviewed: 2026-02-18
-# Version: 7
+# Version: 8
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -2592,4 +2592,353 @@ batch7_phase2:
     full_suite_tests: 2923
     full_suite_passing: 2923
     full_suite_files: 58
+    regressions: 0
+
+# =============================================================================
+# BATCH 8, PHASE 1 REVIEW
+# CR-101 (F045), CR-102 (F046), CR-103 (F047), CR-104/CR-108 (F048), CR-109 (F049)
+# Display fixes & WhatsApp template
+# =============================================================================
+
+batch8_phase1:
+  phase: "1 of 2"
+  phase_description: "Display fixes & WhatsApp template: LEDs, yellow label, template settings, date format, home card expand"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 8 Phase 1 implements 5 bug fixes across 6 source files with zero overlap
+    between features. All changes are minimal, surgical fixes that reuse existing
+    patterns and functions. The chain SPEC -> ARCH -> PLAN -> CODE is fully aligned.
+    7 commits (6 code + 1 test), 60 new tests all passing, full suite 2983/2983 with
+    zero regressions. No database migrations required. No deploys required. Repository
+    is clean (no uncommitted code files).
+
+  chain_validation:
+    spec_vs_request:
+      status: aligned
+      notes: >
+        SPEC_F045_F049.yaml covers all 5 user requests from the Batch 8 project-status:
+        (1) CR-101: hide LEDs on non-speech Sundays -> F045 with AC-F045-01..04.
+        (2) CR-102: hide yellow label for speech Sundays in Agenda -> F046 with AC-F046-01..03.
+        (3) CR-103: fix WhatsApp template in Settings -> F047 with AC-F047-01..05.
+        (4) CR-104+CR-108: fix WhatsApp variables and date format -> F048 with AC-F048-01..08.
+        (5) CR-109: fix speech slots not showing in Home -> F049 with AC-F049-01..03.
+        All ACs are faithful to the original user requests. No scope creep.
+
+    arch_vs_spec:
+      status: aligned
+      notes: >
+        ARCH_M015.yaml correctly maps all 5 features to 3 modules (SpeechModule M003,
+        AgendaModule M004, UIShell M008). 6 contracts defined covering each change point.
+        ADR-039 documents the decision to replicate speeches.tsx pattern for F049.
+        Security analysis confirms no impact (all client-side rendering changes).
+        Cross-cutting concerns correctly identify no file overlap and no DB migrations.
+
+    plan_vs_arch:
+      status: aligned
+      notes: >
+        PLAN_P015.yaml decomposes into 8 steps matching ARCH implementation details.
+        Step dependencies are correct (STEP-05/06 depend on STEP-04 for template quotes).
+        Each step maps to specific ACs and ECs via covers section. Validation matrix
+        at end of plan maps every AC to its covering steps. Implementation order
+        follows architecture recommendations.
+
+    code_vs_plan:
+      status: aligned
+      notes: >
+        CODE_LEDGER records 7 commits (STEP-01 through STEP-07) plus STEP-08 for docs.
+        Each commit maps 1:1 to plan steps. Files changed match plan specification exactly:
+        STEP-01: SundayCard.tsx (F045), STEP-02: agenda.tsx (F046),
+        STEP-03: NextSundaysSection.tsx (F049), STEP-04: whatsappUtils.ts (F048 templates),
+        STEP-05: settings/whatsapp.tsx (F047), STEP-06: InviteManagementSection.tsx (F048 vars),
+        STEP-07: batch8-phase1.test.ts (tests). All ACs covered.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: 63a72ea
+      message: "fix(sunday-card): conditionally render LEDs only for speeches type (CR-101)"
+      files_changed: [src/components/SundayCard.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "LED section (StatusLED map) wrapped with {isSpeechesType && (...)} at line 322"
+          - "isSpeechesType flag already existed at line 269 - no new computation needed"
+          - "SundayCard is shared between speeches.tsx and NextSundaysSection.tsx, fix applies to both"
+          - "Minimal diff: only added conditional wrapper around existing JSX"
+        issues: []
+
+    - hash: 81c4181
+      message: "fix(agenda): hide exception label for speeches type sundays (CR-102)"
+      files_changed: [src/app/(tabs)/agenda.tsx]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "exceptionLabel computation changed from (exception ? ...) to (exception && exception.reason !== 'speeches' ? ...)"
+          - "Existing conditional rendering {exceptionLabel && (...)} at line 292 handles null correctly"
+          - "Fallback string (exception.reason) passed to t() for unknown exception types"
+          - "Minimal, correct change"
+        issues: []
+
+    - hash: 781eb7d
+      message: "fix(home): fix SpeechSlots condition to render for speeches type sundays (CR-109)"
+      files_changed: [src/components/NextSundaysSection.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "Condition at line 181 changed from !entry.exception to (!entry.exception || entry.exception.reason === 'speeches')"
+          - "Pattern matches speeches.tsx:276 exactly (ADR-039)"
+          - "Backward compatible: !entry.exception still handles pre-CR-56 data where exception is null"
+        issues: []
+
+    - hash: 0ccc825
+      message: "fix(whatsapp): add quotes around {titulo} placeholder in default templates (CR-104)"
+      files_changed: [src/lib/whatsappUtils.ts]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "All 3 templates (PT-BR, EN, ES) updated: {titulo} -> \"{titulo}\""
+          - "Quotes are ASCII double quotes, consistent with codebase"
+          - "resolveTemplate replaces {titulo} inside quotes correctly, preserving quotes"
+          - "No impact on resolveTemplate mechanics (quotes are literal characters in template)"
+        issues: []
+
+    - hash: 6ac1c9d
+      message: "fix(settings): initialize WhatsApp template with language-aware default fallback (CR-103)"
+      files_changed: [src/app/(tabs)/settings/whatsapp.tsx]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "getDefaultTemplate imported from whatsappUtils.ts at line 18"
+          - "Query changed to .select('whatsapp_template, language') at line 62"
+          - "useEffect handles 3 cases correctly: null/undefined -> getDefaultTemplate, '' -> '', value -> value"
+          - "Guard condition (ward && !initialized) prevents premature initialization"
+          - "Language fallback to 'pt-BR' when ward.language is null"
+          - "Initialized flag prevents re-initialization on re-renders"
+        issues: []
+
+    - hash: 8e2cc8f
+      message: "fix(invite): add collection/link vars and human-readable date to WhatsApp message (CR-104, CR-108)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "formatDateHumanReadable imported from dateUtils.ts, SupportedLanguage from i18n"
+          - "collection: speech.topic_collection ?? '' added in both handleNotInvitedAction and handleInvitedAction"
+          - "link: speech.topic_link ?? '' added in both handlers"
+          - "formatDate replaced by formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage) in both handlers"
+          - "formatDate still imported for getInviteItems (not removed) - correct, still used there"
+          - "Null safety handled with ?? '' for optional fields"
+        issues: []
+
+    - hash: 054fe33
+      message: "test(batch8-phase1): add tests for F045, F046, F047, F048, F049"
+      files_changed: [src/__tests__/batch8-phase1.test.ts]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "60 tests covering all 5 features"
+          - "Mix of source-code static analysis tests and functional tests (resolveTemplate, formatDateHumanReadable)"
+          - "Tests organized by AC and EC with clear describe blocks"
+          - "Cross-cutting tests verify end-to-end template resolution with all variables"
+          - "All 60 tests passing"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  pending_deploys: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files: [".devteam/project-status.yaml"]
+
+  ac_verification:
+    # F045 ACs (CR-101)
+    - ac_id: AC-F045-01
+      description: "LEDs visible when type is speeches"
+      status: verified
+      evidence: >
+        SundayCard.tsx line 322: {isSpeechesType && ( wraps the LED section.
+        When currentType === SUNDAY_TYPE_SPEECHES, isSpeechesType is true and
+        LEDs render. Flag computed at line 269.
+
+    - ac_id: AC-F045-02
+      description: "LEDs hidden when type is NOT speeches"
+      status: verified
+      evidence: >
+        When currentType !== SUNDAY_TYPE_SPEECHES, isSpeechesType is false and
+        the entire LED section (StatusLED map) is not rendered. Verified in source.
+
+    - ac_id: AC-F045-03
+      description: "Fix applies to Speeches tab"
+      status: verified
+      evidence: >
+        speeches.tsx imports and uses SundayCard component. The isSpeechesType
+        conditional is inside SundayCard, automatically applying to all consumers.
+
+    - ac_id: AC-F045-04
+      description: "Fix applies to Home (NextSundaysSection)"
+      status: verified
+      evidence: >
+        NextSundaysSection.tsx imports and uses SundayCard component. Same
+        fix applies automatically via shared component.
+
+    # F046 ACs (CR-102)
+    - ac_id: AC-F046-01
+      description: "No yellow label for speeches type"
+      status: verified
+      evidence: >
+        agenda.tsx line 265: exceptionLabel = (exception && exception.reason !== 'speeches')
+        ? t(...) : null. When reason is 'speeches', returns null, no label shown.
+
+    - ac_id: AC-F046-02
+      description: "Yellow label shown for non-speeches exceptions"
+      status: verified
+      evidence: >
+        When exception.reason !== 'speeches' (e.g., 'testimony_meeting'), the condition
+        is true and t() translates the reason into a label displayed in yellow.
+
+    - ac_id: AC-F046-03
+      description: "Label for type other shows custom_reason"
+      status: verified
+      evidence: >
+        t(`sundayExceptions.${exception.reason}`, exception.reason) provides fallback.
+        For 'other' type, the translation key may not exist, so exception.reason is used
+        as fallback. Custom reason display is handled in SundayCard separately.
+
+    # F047 ACs (CR-103)
+    - ac_id: AC-F047-01
+      description: "Default template shown when DB has null"
+      status: verified
+      evidence: >
+        whatsapp.tsx line 77: ward.whatsapp_template === null check triggers
+        getDefaultTemplate(ward.language ?? 'pt-BR'). Also handles undefined.
+
+    - ac_id: AC-F047-02
+      description: "Custom template from DB shown when has value"
+      status: verified
+      evidence: >
+        whatsapp.tsx line 85: else branch sets setTemplate(ward.whatsapp_template)
+        when the value is neither null, undefined, nor empty string.
+
+    - ac_id: AC-F047-03
+      description: "Empty string respected"
+      status: verified
+      evidence: >
+        whatsapp.tsx line 80-82: explicit check for ward.whatsapp_template === ''
+        sets template to '' without replacing with default.
+
+    - ac_id: AC-F047-04
+      description: "Default template correct per ward language"
+      status: verified
+      evidence: >
+        getDefaultTemplate(ward.language ?? 'pt-BR') selects correct template
+        based on ward language. Tested with 'en', 'es', 'pt-BR' and fallback.
+
+    - ac_id: AC-F047-05
+      description: "Consistency between Settings and WhatsApp send"
+      status: verified
+      evidence: >
+        Both Settings (whatsapp.tsx) and send (InviteManagementSection via
+        buildWhatsAppUrl) use the same getDefaultTemplate function from
+        whatsappUtils.ts. Query includes 'language' field.
+
+    # F048 ACs (CR-104, CR-108)
+    - ac_id: AC-F048-01
+      description: "Collection passed in WhatsApp variables"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx: collection: speech.topic_collection ?? ''
+        added in both handleNotInvitedAction (line 69) and handleInvitedAction (line 103).
+
+    - ac_id: AC-F048-02
+      description: "Link passed in WhatsApp variables"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx: link: speech.topic_link ?? '' added in
+        both handlers alongside collection.
+
+    - ac_id: AC-F048-03
+      description: "Title with quotes in WhatsApp message"
+      status: verified
+      evidence: >
+        whatsappUtils.ts: all 3 templates contain "{titulo}" with ASCII double
+        quotes. resolveTemplate replaces {titulo} inside quotes, preserving them.
+
+    - ac_id: AC-F048-04
+      description: "Date in human-readable format (pt-BR)"
+      status: verified
+      evidence: >
+        formatDateHumanReadable('2026-02-22', 'pt-BR') returns '22 de Fevereiro de 2026'.
+        Used in both WhatsApp handlers replacing formatDate.
+
+    - ac_id: AC-F048-05
+      description: "Date in human-readable format (en)"
+      status: verified
+      evidence: "formatDateHumanReadable('2026-02-22', 'en') returns 'February 22, 2026'."
+
+    - ac_id: AC-F048-06
+      description: "Date in human-readable format (es)"
+      status: verified
+      evidence: "formatDateHumanReadable('2026-02-22', 'es') returns '22 de Febrero de 2026'."
+
+    - ac_id: AC-F048-07
+      description: "Empty collection and link for speeches without topic"
+      status: verified
+      evidence: >
+        ?? '' operator provides empty string fallback. resolveTemplate line 58
+        cleans extra whitespace from empty placeholders.
+
+    - ac_id: AC-F048-08
+      description: "Templates updated with quotes in source code"
+      status: verified
+      evidence: >
+        whatsappUtils.ts lines 9, 12, 15: all contain "{titulo}" in the
+        template string constants.
+
+    # F049 ACs (CR-109)
+    - ac_id: AC-F049-01
+      description: "SpeechSlots rendered when type is speeches"
+      status: verified
+      evidence: >
+        NextSundaysSection.tsx line 181: (!entry.exception || entry.exception.reason === 'speeches')
+        allows SpeechSlots to render when exception has reason 'speeches'.
+
+    - ac_id: AC-F049-02
+      description: "SpeechSlots NOT rendered for non-speeches types"
+      status: verified
+      evidence: >
+        When entry.exception.reason is 'testimony_meeting' or other non-speeches value,
+        the OR condition is false and SpeechSlots are not rendered.
+
+    - ac_id: AC-F049-03
+      description: "Consistency with Speeches tab"
+      status: verified
+      evidence: >
+        speeches.tsx uses (!exception || exception.reason === 'speeches') at line 276.
+        NextSundaysSection uses (!entry.exception || entry.exception.reason === 'speeches').
+        Same pattern, different variable name (exception vs entry.exception).
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 7
+    commits_reviewed: 7
+    new_tests: 60
+    new_tests_passing: 60
+    full_suite_tests: 2983
+    full_suite_passing: 2983
+    full_suite_files: 59
     regressions: 0

@@ -37,10 +37,10 @@ export interface StatusChangeModalProps {
 
 export const STATUS_INDICATOR_COLORS: Record<SpeechStatus, string> = {
   not_assigned: '#9CA3AF',
-  assigned_not_invited: '#FBBF24',
-  assigned_invited: '#FBBF24',
-  assigned_confirmed: '#34D399',
-  gave_up: '#F87171',
+  assigned_not_invited: '#F97316',
+  assigned_invited: '#EAB308',
+  assigned_confirmed: '#22C55E',
+  gave_up: '#7F1D1D',
 };
 
 // --- Component ---

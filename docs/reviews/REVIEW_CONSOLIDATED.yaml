@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123
 # Reviewed: 2026-02-19
-# Version: 11
+# Version: 12
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml, specs/SPEC_F065_F068.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml, arch/ARCH_M019.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml, plans/PLAN_P019.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -4160,4 +4160,353 @@ batch9_phase2:
     full_suite_tests: 3216
     full_suite_passing: 3216
     full_suite_files: 62
+    regressions: 0
+
+# =============================================================================
+# BATCH 9 PHASE 3 REVIEW: CR-118, CR-120, CR-123
+# Features: F065, F066, F067 (F068 already implemented)
+# =============================================================================
+
+batch9_phase3:
+  phase: "3 of 3"
+  phase_description: "UX Polish: SearchInput flex:1 + close button, auto-scroll on expand, recognizing field proportional"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 9 Phase 3 implements 3 UX polish features (F065, F066, F067) plus confirms
+    F068 was already implemented. All 3 features are clean, minimal implementations
+    that follow the SPEC, ARCH, and PLAN documents faithfully. The chain validation
+    passes at all 4 levels. Zero P0/P1/P2 issues found. No database migrations needed.
+    All code is committed (git clean). Full test suite passes (3296/3296 across 63 files).
+    80 new tests added covering all acceptance criteria and edge cases.
+
+  chain_validation:
+    spec_vs_request:
+      status: aligned
+      notes: >
+        SPEC_F065_F068.yaml covers all 4 CRs from the user request:
+        - CR-118: SearchInput flex:1 defensivo + close button in 4 Settings screens (F065)
+        - CR-120: Auto-scroll to expanded card in speeches.tsx and agenda.tsx (F066)
+        - CR-123: Recognizing field proportional with one actor per line (F067)
+        - CR-124: Custom name in prayer fields (F068) - correctly identified as already implemented
+        ACs faithfully represent user intent. No feature creep.
+
+    arch_vs_spec:
+      status: aligned
+      notes: >
+        ARCH_M019.yaml maps all SPEC requirements to components:
+        - F065: SearchInput.tsx (flex:1 defensivo), members/topics/history/timezone.tsx (searchContainer row + close)
+        - F066: speeches.tsx and agenda.tsx (handleToggle scrollToIndex with viewPosition:0)
+        - F067: AgendaForm.tsx (Pressable customizado replacing SelectorField for recognizing)
+        ADRs 046, 047, 048 document the technical decisions correctly. Contracts defined
+        for each integration. Zero database changes, zero new hooks, all client-side.
+
+    plan_vs_arch:
+      status: aligned
+      notes: >
+        PLAN_P019.yaml decomposes the architecture into 8 atomic steps (STEP-01 through STEP-08)
+        following the dependency order. Dependencies between steps are correct (STEP-02 depends
+        on STEP-01, STEP-07 depends on all feature steps). Step descriptions match ARCH components
+        exactly. F068 correctly has no steps (already implemented).
+
+    code_vs_plan:
+      status: aligned
+      notes: >
+        CODE_LEDGER.yaml records 8 commits for Batch 9 Phase 3 matching the plan steps:
+        - STEP-01 (ff29a6a): SearchInput flex:1 defensivo -> matches PLAN STEP-01
+        - STEP-02 (244b6e3): Close button in 4 Settings screens -> matches PLAN STEP-02
+        - STEP-03 (e7bd14e): Auto-scroll speeches.tsx -> matches PLAN STEP-03
+        - STEP-04 (8a8e56e): Auto-scroll agenda.tsx -> matches PLAN STEP-04
+        - STEP-05 (96fdc83): Recognizing field Pressable -> matches PLAN STEP-05
+        - STEP-06 (15ef52e): Tests for F065/F066/F067 -> matches PLAN STEP-07
+        - STEP-07 (97f1e5f): Update cr004-f008 tests for CR-123 -> matches PLAN STEP-08
+        - STEP-08 (b9a010b): Update batch7 recognizing test for CR-123 -> matches PLAN STEP-08
+        PLAN STEP-06 (i18n verification) confirmed common.close already exists, no code needed.
+        All files changed match plan specification.
+
+  commit_reviews:
+    - hash: ff29a6a
+      message: "fix(search-input): add flex:1 defensivo to SearchInput container (CR-118)"
+      files_changed: [src/components/SearchInput.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "styles.container now has flex: 1 at line 63 - correct per ADR-046"
+          - "position: 'relative' and justifyContent: 'center' preserved"
+          - "Backward compatible: in column layout, flex:1 has no visual effect on width"
+          - "Modals that already pass flex:1 via style prop have harmless redundancy"
+        issues: []
+
+    - hash: 244b6e3
+      message: "feat(settings): add close button and row layout to search in 4 Settings screens (CR-118)"
+      files_changed:
+        - src/app/(tabs)/settings/members.tsx
+        - src/app/(tabs)/settings/topics.tsx
+        - src/app/(tabs)/settings/history.tsx
+        - src/app/(tabs)/settings/timezone.tsx
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "All 4 screens now have searchContainer with flexDirection:'row', alignItems:'center', gap:12"
+          - "Pressable close button after SearchInput with t('common.close')"
+          - "members.tsx, topics.tsx, timezone.tsx use setSearch('') - correct"
+          - "history.tsx uses updateSearch('') - correct (uses different setter name)"
+          - "closeButtonText style consistent: fontSize:16, fontWeight:'500' in all 4 screens"
+          - "accessibilityRole='button' on all close Pressables"
+          - "SearchInput fills remaining space via internal flex:1 from STEP-01"
+        issues: []
+
+    - hash: e7bd14e
+      message: "feat(speeches): auto-scroll to expanded card on toggle (CR-120)"
+      files_changed: [src/app/(tabs)/speeches.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "handleToggle (lines 158-182): scrollToIndex in else branch only (expanding)"
+          - "Index calculated via listItems.findIndex with type==='sunday' && key===date"
+          - "setTimeout(300ms) delay per ADR-047 for layout computation"
+          - "viewPosition: 0 aligns card top with viewport top"
+          - "animated: true for smooth transition"
+          - "listItems added to useCallback dependencies [expandedDate, lazyCreate, listItems]"
+          - "Collapse branch (setExpandedDate(null)) has no scroll - correct"
+          - "getItemLayout preserved for initialScrollIndex"
+          - "onScrollToIndexFailed fallback preserved as safety net"
+        issues: []
+
+    - hash: 8a8e56e
+      message: "feat(agenda): auto-scroll to expanded card on toggle (CR-120)"
+      files_changed: [src/app/(tabs)/agenda.tsx]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "handleToggle (lines 121-144): same pattern as speeches.tsx"
+          - "Index calculated with type==='sunday' && data.date===date with type cast"
+          - "setTimeout(300ms), viewPosition:0, animated:true"
+          - "listItems in useCallback dependencies [expandedDate, lazyCreate, listItems]"
+          - "Collapse branch has no scroll"
+          - "getItemLayout and onScrollToIndexFailed preserved"
+        issues: []
+
+    - hash: 96fdc83
+      message: "feat(agenda): replace SelectorField with Pressable for recognizing field (CR-123)"
+      files_changed: [src/components/AgendaForm.tsx]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "SelectorField replaced by Pressable at lines 192-214 in recognizing FieldRow"
+          - "Uses styles.selectorField for visual consistency (borderWidth, borderRadius, padding)"
+          - "borderColor: colors.border applied dynamically"
+          - "When recognized_names has items: .map() renders each as individual <Text> with recognizingName style"
+          - "Each name has numberOfLines={1} for truncation of long names"
+          - "When empty: placeholder with t('agenda.recognizing') in textTertiary color"
+          - "disabled={isObserver} and onPress guarded by isObserver check"
+          - "recognizingName style: fontSize:15, paddingVertical:2 - matches SelectorField text size"
+          - "Other SelectorFields (presiding, conducting, hymns, prayers) unchanged"
+        issues: []
+
+    - hash: 15ef52e
+      message: "test(batch9-phase3): add tests for F065, F066, F067"
+      files_changed: [src/__tests__/batch9-phase3.test.ts]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "80 new tests covering all ACs (F065-01..12, F066-01..07, F067-01..07)"
+          - "Edge cases covered (EC-F065-01..02, EC-F066-01..03, EC-F067-01..03)"
+          - "Source-code-based testing pattern consistent with project conventions"
+          - "i18n verification for common.close in all 3 locales"
+          - "Close button style consistency verified across all 4 screens"
+          - "Dependencies and index calculation logic verified"
+        issues: []
+
+    - hash: 97f1e5f
+      message: "fix(tests): update recognizing field tests for CR-123 Pressable change"
+      files_changed: [src/__tests__/cr004-f008-agenda-actors.test.ts]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "3 tests updated from expecting SelectorField/join to expecting Pressable/map"
+          - "Assertions now verify Pressable + individual Text rendering pattern"
+          - "Observer disabled check still verified"
+        issues: []
+
+    - hash: b9a010b
+      message: "fix(tests): update batch7 recognizing field test for CR-123 change"
+      files_changed: [src/__tests__/batch7-f040-f044.test.ts]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "AC-F042-03 test updated to expect .map() instead of .join(', ')"
+          - "Correctly reflects the CR-123 change in AgendaForm"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  pending_deploys: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/project-status.yaml"
+    notes: >
+      Git working tree is clean for code files. All code is committed.
+      Only .devteam/project-status.yaml is modified (normal workflow -
+      committed by the Orchestrator).
+
+  ac_verification:
+    # F065
+    - ac_id: AC-F065-01
+      description: "SearchInput container has flex:1 defensivo"
+      status: verified
+      evidence: "SearchInput.tsx line 63: container: { flex: 1, position: 'relative', justifyContent: 'center' }"
+
+    - ac_id: AC-F065-02
+      description: "SearchInput fills space in members.tsx"
+      status: verified
+      evidence: "members.tsx searchContainer: flexDirection:'row', alignItems:'center', gap:12. SearchInput fills via internal flex:1."
+
+    - ac_id: AC-F065-03
+      description: "Close button visible in members.tsx"
+      status: verified
+      evidence: "members.tsx lines 563-567: Pressable with t('common.close') and accessibilityRole='button'."
+
+    - ac_id: AC-F065-04
+      description: "Close clears search in members.tsx"
+      status: verified
+      evidence: "members.tsx line 563: onPress={() => setSearch('')}."
+
+    - ac_id: AC-F065-05
+      description: "SearchInput fills space in topics.tsx"
+      status: verified
+      evidence: "topics.tsx searchContainer: flexDirection:'row', alignItems:'center', gap:12."
+
+    - ac_id: AC-F065-06
+      description: "Close button visible in topics.tsx"
+      status: verified
+      evidence: "topics.tsx lines 405-409: Pressable close with t('common.close')."
+
+    - ac_id: AC-F065-07
+      description: "SearchInput fills space in history.tsx"
+      status: verified
+      evidence: "history.tsx searchContainer: flexDirection:'row', alignItems:'center', gap:12."
+
+    - ac_id: AC-F065-08
+      description: "Close button visible in history.tsx"
+      status: verified
+      evidence: "history.tsx lines 112-116: Pressable close with t('common.close')."
+
+    - ac_id: AC-F065-09
+      description: "SearchInput fills space in timezone.tsx"
+      status: verified
+      evidence: "timezone.tsx searchContainer: flexDirection:'row', alignItems:'center', gap:12."
+
+    - ac_id: AC-F065-10
+      description: "Close button visible in timezone.tsx"
+      status: verified
+      evidence: "timezone.tsx lines 212-216: Pressable close with t('common.close')."
+
+    - ac_id: AC-F065-11
+      description: "Modals not affected (regression check)"
+      status: verified
+      evidence: "MemberSelectorModal, ActorSelector, HymnSelector, PrayerSelector all still contain SearchInput. flex:1 on container is redundant with their existing style prop but harmless."
+
+    - ac_id: AC-F065-12
+      description: "AgendaForm search not affected"
+      status: verified
+      evidence: "AgendaForm.tsx still uses sheetSearchRow pattern for inline hymn search."
+
+    # F066
+    - ac_id: AC-F066-01
+      description: "Auto-scroll after expand in speeches.tsx"
+      status: verified
+      evidence: "speeches.tsx lines 167-178: scrollToIndex with viewPosition:0 in else branch after setTimeout(300ms)."
+
+    - ac_id: AC-F066-02
+      description: "Auto-scroll after expand in agenda.tsx"
+      status: verified
+      evidence: "agenda.tsx lines 129-140: scrollToIndex with viewPosition:0 in else branch after setTimeout(300ms)."
+
+    - ac_id: AC-F066-03
+      description: "Card top aligned with viewport top"
+      status: verified
+      evidence: "viewPosition: 0 in both speeches.tsx and agenda.tsx scrollToIndex calls."
+
+    - ac_id: AC-F066-04
+      description: "Collapsing does NOT trigger scroll"
+      status: verified
+      evidence: "speeches.tsx line 160-161: if (expandedDate === date) { setExpandedDate(null) } -- no scrollToIndex. agenda.tsx lines 123-124: same pattern."
+
+    - ac_id: AC-F066-05
+      description: "Scroll is animated"
+      status: verified
+      evidence: "animated: true in both scrollToIndex calls."
+
+    - ac_id: AC-F066-06
+      description: "Switching cards triggers auto-scroll to new card"
+      status: verified
+      evidence: "scrollToIndex is in the else branch (expanding), which runs when switching from one card to another (previous card implicitly collapses)."
+
+    - ac_id: AC-F066-07
+      description: "initialScrollIndex not affected"
+      status: verified
+      evidence: "speeches.tsx preserves getItemLayout (line 336-343) and onScrollToIndexFailed (lines 366-374). agenda.tsx preserves both (lines 188-203)."
+
+    # F067
+    - ac_id: AC-F067-01
+      description: "Each recognized_name as individual Text"
+      status: verified
+      evidence: "AgendaForm.tsx lines 200-207: agenda.recognized_names!.map((name, idx) => <Text key={idx} style={[styles.recognizingName]} numberOfLines={1}>{name}</Text>)"
+
+    - ac_id: AC-F067-02
+      description: "Field height grows proportionally"
+      status: verified
+      evidence: "Pressable uses styles.selectorField (no fixed height). Each Text adds a line, so container grows with number of names."
+
+    - ac_id: AC-F067-03
+      description: "Placeholder when no names selected"
+      status: verified
+      evidence: "Lines 210-212: placeholder <Text> with t('agenda.recognizing') in textTertiary color when recognized_names is empty/null."
+
+    - ac_id: AC-F067-04
+      description: "onPress opens ActorSelector"
+      status: verified
+      evidence: "Line 194-196: onPress opens ActorSelector with field:'recognizing', roleFilter:'can_recognize'."
+
+    - ac_id: AC-F067-05
+      description: "Observer cannot click"
+      status: verified
+      evidence: "Line 198: disabled={isObserver}. Line 194: isObserver ? undefined : () => { ... }"
+
+    - ac_id: AC-F067-06
+      description: "Visual consistency with SelectorField"
+      status: verified
+      evidence: "Line 193: styles.selectorField applied (borderWidth:1, borderRadius:6, paddingHorizontal:10, paddingVertical:8). borderColor dynamic via colors.border."
+
+    - ac_id: AC-F067-07
+      description: "Other SelectorFields unchanged"
+      status: verified
+      evidence: "Presiding (line 170), conducting (line 180), opening hymn (line 230), opening prayer (line 244) all still use <SelectorField>."
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 10
+    commits_reviewed: 8
+    new_tests: 80
+    new_tests_passing: 80
+    full_suite_tests: 3296
+    full_suite_passing: 3296
+    full_suite_files: 63
     regressions: 0

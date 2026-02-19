@@ -8,7 +8,8 @@
 # CR-112, CR-113, CR-117, CR-122, CR-125 (PRE+POST),
 # CR-114, CR-115, CR-116, CR-119, CR-121 (PRE+POST),
 # CR-118, CR-120, CR-123 (PRE+POST),
-# CR-126, CR-127, CR-129, CR-130 (PRE+POST)
+# CR-126, CR-127, CR-129, CR-130 (PRE+POST),
+# CR-128, CR-131, CR-132, CR-133 (PRE+POST)
 # Updated: 2026-02-19
 # =============================================================================
 
@@ -5305,3 +5306,199 @@ cr_130:
       - id: VC-CROSS-01
         status: passed
         evidence: "npx vitest run: 64 test files, 3380 tests all passing. Baseline was 3296 tests (63 files). +84 new tests, +1 test file."
+# #############################################################################
+# CR-128: Theme X button positioning (Batch 10 Phase 2)
+# #############################################################################
+
+cr_128:
+  cr_id: CR-128
+  title: "Theme X button positioning - move outside dropdown field"
+  type: feature_request
+  spec: specs/SPEC_F073.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Confirmed topic X (clear) button in SpeechSlot.tsx was inside the topicField
+      Pressable (within bordered container), while speaker X button was correctly
+      outside as a sibling. Clear baseline documented with line references.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 71987d9
+        message: "feat(speech-slot): move topic X button outside dropdown field as sibling (CR-128)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-128-01
+        status: passed
+        evidence: "SpeechSlot.tsx lines 200-233: topicField Pressable (lines 202-223) is now inside a topicRow View (line 201). The X button (lines 224-232) is a SEPARATE Pressable sibling of topicField, outside the bordered container."
+      - id: VC-128-02
+        status: passed
+        evidence: "SpeechSlot.tsx lines 286-292: topicRow style uses flexDirection:'row', alignItems:'center', gap:12. The topic field and X button are siblings in this row container, matching the speaker row pattern."
+      - id: VC-128-03
+        status: passed
+        evidence: "SpeechSlot.tsx lines 218-222: Dropdown arrow (unicode down triangle) is still rendered INSIDE the topicField Pressable, after topicText. Arrow is inside field, X is outside."
+      - id: VC-128-04
+        status: passed
+        evidence: "SpeechSlot.tsx line 227: X button onPress calls handleClearTopic. handleClearTopic (lines 126-129) calls onClearTopic?.(speech.id). Functionality preserved."
+      - id: VC-128-05
+        status: passed
+        evidence: "SpeechSlot.tsx line 224: X button conditionally rendered with {topicDisplay && canAssign && ...}. Same conditions as before - hidden when no topic or user lacks permission."
+
+# #############################################################################
+# CR-131: Hymn search field width (Batch 10 Phase 2)
+# #############################################################################
+
+cr_131:
+  cr_id: CR-131
+  title: "Hymn search field width - match theme and member search widths"
+  type: feature_request
+  spec: specs/SPEC_F074.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Found AgendaForm HymnSelectorModal searchInput had different styles from
+      TopicSelectorModal and MemberSelectorModal (borderRadius:6 vs 8,
+      paddingHorizontal:10 vs 12, no explicit height, marginBottom:8).
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 651fbf7
+        message: "fix(agenda): simplify searchInput style to inherit from SearchInput base (CR-131)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-131-01
+        status: passed
+        evidence: "HymnSelector.tsx searchInput style (lines 191-198): flex:1, height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15. Matches TopicSelectorModal (line 136) and MemberSelectorModal (line 128) exactly."
+      - id: VC-131-02
+        status: passed
+        evidence: "AgendaForm.tsx searchInput style (lines 891-893): now only 'flex:1'. All other styling inherited from SearchInput base component (height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15). Previous overrides (borderRadius:6, paddingHorizontal:10, marginBottom:8) removed."
+      - id: VC-131-03
+        status: passed
+        evidence: "SearchInput.tsx base styles (lines 67-74): height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, paddingRight:36, fontSize:15. All selectors using SearchInput now inherit consistent base styling. AgendaForm no longer overrides with different values."
+      - id: VC-131-04
+        status: passed
+        evidence: "HymnSelector uses SearchInput with search query passed to useHymns/useSacramentalHymns hooks. Search filtering via filterHymns in AgendaForm. Code paths unchanged, only style inheritance simplified."
+
+# #############################################################################
+# CR-132: Auto-scroll on card expand (Batch 10 Phase 2)
+# #############################################################################
+
+cr_132:
+  cr_id: CR-132
+  title: "Auto-scroll on card expand - align card top with screen top"
+  type: feature_request
+  spec: specs/SPEC_F075.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Auto-scroll was already partially implemented in both tabs (ADR-047) but
+      broken by getItemLayout returning fixed heights (70/64) that don't account
+      for expanded cards, causing scrollToIndex to miscalculate positions.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: ce73721
+        message: "fix(speeches): remove getItemLayout and increase scroll delay to 400ms (CR-132)"
+      - hash: 6984288
+        message: "fix(agenda): remove getItemLayout, initialScrollIndex and increase scroll delay to 400ms (CR-132)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-132-01
+        status: passed
+        evidence: "agenda.tsx lines 128-139: handleToggle calls scrollToIndex with viewPosition:0 (top alignment) and setTimeout delay of 400ms (increased from 300ms). getItemLayout removed so FlatList measures actual item heights dynamically."
+      - id: VC-132-02
+        status: passed
+        evidence: "speeches.tsx lines 168-180: handleToggle calls scrollToIndex with viewPosition:0 (top alignment) and setTimeout delay of 400ms (increased from 300ms). getItemLayout removed from FlatList props."
+      - id: VC-132-03
+        status: passed
+        evidence: "speeches.tsx: getItemLayout callback removed entirely (no longer defined). FlatList at line 361 has no getItemLayout prop. Without getItemLayout, FlatList measures each item's actual rendered height, correctly handling variable sizes for expanded/collapsed cards."
+      - id: VC-132-04
+        status: passed
+        evidence: "speeches.tsx lines 160-163: handleToggle only auto-scrolls in the else branch (when expanding). When expandedDate === date, it sets expandedDate(null) and returns without scrolling. Same pattern in agenda.tsx lines 122-124."
+
+# #############################################################################
+# CR-133: Custom prayer name fields (Batch 10 Phase 2)
+# #############################################################################
+
+cr_133:
+  cr_id: CR-133
+  title: "Custom prayer name fields - allow custom names without adding as member"
+  type: feature_request
+  spec: specs/SPEC_F076.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Custom prayer names already implemented via PrayerSelector component with
+      memberId:null support. PR improves discoverability with hint text and
+      pre-populates search when re-editing a custom name.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 7399634
+        message: "feat(prayer): add custom name hint text for discoverability in PrayerSelector (CR-133)"
+      - hash: 8035a42
+        message: "feat(prayer): pre-populate search field when re-editing custom prayer name (CR-133)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-133-01
+        status: passed
+        evidence: "PrayerSelector.tsx lines 87-95: handleCustomName creates PrayerSelection with memberId:null and name=trimmed custom text. No member is created - only prayer field is updated."
+      - id: VC-133-02
+        status: passed
+        evidence: "AgendaForm.tsx lines 504-514: onSelect handler saves selection.name to prayer_name field and selection.memberId to prayer_member_id field. When custom name selected, memberId=null so prayer_member_id=null in DB."
+      - id: VC-133-03
+        status: passed
+        evidence: "PrayerSelector.tsx lines 164-167: New customNameHintText displayed permanently below search header with t('agenda.customNameHint'). Lines 170-182: customNameButton appears when user types text. i18n keys exist in pt-BR ('Digite um nome para usar nome personalizado'), en ('Type a name to use a custom name'), es ('Escriba un nombre para usar un nombre personalizado')."
+      - id: VC-133-04
+        status: passed
+        evidence: "PrayerSelector.tsx lines 76-85: handleSelectMember creates PrayerSelection with memberId=member.id and name=member.full_name. Unaffected by custom name changes."
+      - id: VC-133-05
+        status: passed
+        evidence: "PrayerSelector.tsx handleCustomName (lines 87-95): onSelect({memberId:null, name:trimmed}). AgendaForm saves to sunday_agenda table (prayer_name/prayer_member_id fields), never to members table. No useMembers mutation or insert in the custom name flow."
+
+    additional_improvements:
+      - description: "Pre-populate search when re-editing custom name"
+        evidence: "PrayerSelector.tsx lines 63-72: useEffect on visible checks if selected has memberId===null (custom name). If so, pre-populates search and customName state with existing custom name. Allows easy editing of previously entered custom names."
+      - description: "Hint text for custom name discoverability"
+        evidence: "PrayerSelector.tsx lines 164-167: customNameHintText always visible below header. Lines 289-293: customNameHintText style with fontSize:13, paddingHorizontal:16, paddingBottom:8."
+
+    cross_cutting:
+      - id: VC-CROSS-01
+        status: passed
+        evidence: "npx vitest run: 65 test files, 3449 tests all passing. Baseline was 3380 tests (64 files). +69 new tests, +1 test file."

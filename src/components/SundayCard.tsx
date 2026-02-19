@@ -319,21 +319,23 @@ export const SundayCard = React.memo(function SundayCard({
           )}
         </View>
 
-        <View style={styles.leds}>
-          {speechStatuses.map((status, idx) => (
-            <StatusLED
-              key={idx}
-              status={status}
-              size={14}
-              onPress={
-                onStatusPress && speeches[idx]
-                  ? () => onStatusPress(speeches[idx])
-                  : undefined
-              }
-              disabled={typeDisabled}
-            />
-          ))}
-        </View>
+        {isSpeechesType && (
+          <View style={styles.leds}>
+            {speechStatuses.map((status, idx) => (
+              <StatusLED
+                key={idx}
+                status={status}
+                size={14}
+                onPress={
+                  onStatusPress && speeches[idx]
+                    ? () => onStatusPress(speeches[idx])
+                    : undefined
+                }
+                disabled={typeDisabled}
+              />
+            ))}
+          </View>
+        )}
       </Pressable>
 
       {/* Type dropdown (shown when expanded) */}

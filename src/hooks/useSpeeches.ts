@@ -315,3 +315,34 @@ export function useRemoveAssignment() {
     },
   });
 }
+
+/**
+ * Delete all speeches for a given sunday date.
+ * Used when changing sunday type away from 'speeches' to clean up orphaned data.
+ */
+export function useDeleteSpeechesByDate() {
+  const { wardId, user, userName } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sundayDate: string) => {
+      const { error } = await supabase
+        .from('speeches')
+        .delete()
+        .eq('ward_id', wardId!)
+        .eq('sunday_date', sundayDate);
+      if (error) throw error;
+    },
+    onSuccess: (_, sundayDate) => {
+      queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (wardId && user) {
+        logAction(
+          wardId, user.id, user.email ?? '',
+          'speech_cleanup',
+          `Speeches for ${formatDateHumanReadable(sundayDate, getCurrentLanguage())} deleted on type change`,
+          userName
+        );
+      }
+    },
+  });
+}

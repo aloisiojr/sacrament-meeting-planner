@@ -6,7 +6,8 @@
 # CR-101, CR-102, CR-103, CR-104, CR-108, CR-109 (PRE+POST),
 # CR-105, CR-106, CR-107, CR-110, CR-111 (PRE+POST),
 # CR-112, CR-113, CR-117, CR-122, CR-125 (PRE+POST),
-# CR-114, CR-115, CR-116, CR-119, CR-121 (PRE+POST)
+# CR-114, CR-115, CR-116, CR-119, CR-121 (PRE+POST),
+# CR-118, CR-120, CR-123 (PRE+POST)
 # Updated: 2026-02-19
 # =============================================================================
 
@@ -4758,3 +4759,313 @@ cr_121:
           }. Color is colors.textTertiary (muted/tertiary color).
           fontSize 11 is smaller than field text (14). fontStyle italic provides
           visual distinction. textTertiary color is subdued. Non-intrusive styling confirmed.
+
+# #############################################################################
+# CR-118: SearchInput flex:1 + close button in Settings screens
+# #############################################################################
+
+cr_118:
+  cr_id: CR-118
+  title: "SearchInput flex:1 defensivo + close button in 4 Settings screens"
+  type: feature_request
+  spec: specs/SPEC_F065_F068.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase3.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      SearchInput component already used with flex:1 via consumer style props.
+      All 6 modal contexts have correct layout pattern. Settings screens
+      (members, topics, history, timezone) need flexDirection:row + close button.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "3 of 3"
+    commits:
+      - hash: ff29a6a
+        message: "fix(search-input): add flex:1 defensivo to SearchInput container (CR-118)"
+      - hash: 244b6e3
+        message: "feat(settings): add close button and row layout to search in 4 Settings screens (CR-118)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 3296
+    tester_tests_total: 3296
+
+    must_pass_results:
+      - id: MP-118-01
+        description: "SearchInput container style includes flex:1"
+        status: PASSED
+        evidence: |
+          src/components/SearchInput.tsx:62-66 styles.container = {
+            flex: 1, position: 'relative', justifyContent: 'center'
+          }. flex:1 confirmed.
+
+      - id: MP-118-02
+        description: "MemberSelectorModal search row has SearchInput with flex:1 and Close button"
+        status: PASSED
+        evidence: |
+          src/components/MemberSelectorModal.tsx:62-76: header style has
+          flexDirection:'row', alignItems:'center', gap:12. SearchInput with
+          searchInput style (flex:1). Close Pressable at right.
+
+      - id: MP-118-03
+        description: "TopicSelectorModal search row has SearchInput with flex:1 and Close button"
+        status: PASSED
+        evidence: |
+          src/components/TopicSelectorModal.tsx:79-92: header style has
+          flexDirection:'row'. SearchInput with flex:1. Close button at right.
+
+      - id: MP-118-04
+        description: "ActorSelector search row has SearchInput with flex:1 and Close button"
+        status: PASSED
+        evidence: |
+          src/components/ActorSelector.tsx:207-218: searchRow style has
+          flexDirection:'row', alignItems:'center', gap:12. SearchInput
+          with flex:1. Close button at right.
+
+      - id: MP-118-05
+        description: "HymnSelector search row has SearchInput with flex:1 and Close button"
+        status: PASSED
+        evidence: |
+          src/components/HymnSelector.tsx:102-121: modalHeader style has
+          flexDirection:'row'. SearchInput with flex:1. Cancel/close button at right.
+
+      - id: MP-118-06
+        description: "PrayerSelector search row has SearchInput with flex:1 and Close button"
+        status: PASSED
+        evidence: |
+          src/components/PrayerSelector.tsx:130-155: modalHeader style has
+          flexDirection:'row', gap:12. SearchInput with flex:1. Close button at right.
+
+      - id: MP-118-07
+        description: "AgendaForm HymnSelectorModal search row has SearchInput with flex:1 and Close"
+        status: PASSED
+        evidence: |
+          src/components/AgendaForm.tsx:740-750: sheetSearchRow style has
+          flexDirection:'row', alignItems:'center', gap:12. SearchInput with
+          searchInput style (flex:1). Close button at right.
+
+      - id: MP-118-08
+        description: "Settings members.tsx has close button in search row"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/settings/members.tsx:557-567: searchContainer has
+          flexDirection:'row', alignItems:'center', gap:12.
+          Pressable with t('common.close') and onPress setSearch('').
+
+      - id: MP-118-09
+        description: "Settings topics.tsx has close button in search row"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/settings/topics.tsx:399-410: searchContainer has
+          flexDirection:'row', alignItems:'center', gap:12.
+          Pressable with t('common.close') and onPress setSearch('').
+
+      - id: MP-118-10
+        description: "Settings history.tsx has close button in search row"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/settings/history.tsx:106-117: searchContainer has
+          flexDirection:'row', alignItems:'center', gap:12.
+          Pressable with t('common.close') and onPress updateSearch('').
+
+      - id: MP-118-11
+        description: "Settings timezone.tsx has close button in search row"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/settings/timezone.tsx:206-217: searchContainer has
+          flexDirection:'row', alignItems:'center', gap:12.
+          Pressable with t('common.close') and onPress setSearch('').
+
+    should_pass_results:
+      - id: SP-118-01
+        description: "SearchInput clear (X) button still appears when text is entered"
+        status: PASSED
+        evidence: |
+          SearchInput.tsx:44 - value.length > 0 renders clearButton Pressable.
+          Unchanged from pre-validation.
+
+      - id: SP-118-02
+        description: "All existing tests pass"
+        status: PASSED
+        evidence: |
+          npx vitest run: 63 test files, 3296/3296 tests passed.
+
+# #############################################################################
+# CR-120: Auto-scroll on card expand
+# #############################################################################
+
+cr_120:
+  cr_id: CR-120
+  title: "Auto-scroll to show expanded card after toggle"
+  type: feature_request
+  spec: specs/SPEC_F065_F068.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase3.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Neither speeches.tsx nor agenda.tsx had auto-scroll logic after card expand.
+      FlatList refs existed. Implementation via scrollToIndex with viewPosition:0
+      and setTimeout(300ms) was planned.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "3 of 3"
+    commits:
+      - hash: e7bd14e
+        message: "feat(speeches): auto-scroll to expanded card on toggle (CR-120)"
+      - hash: 8a8e56e
+        message: "feat(agenda): auto-scroll to expanded card on toggle (CR-120)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 3296
+    tester_tests_total: 3296
+
+    must_pass_results:
+      - id: MP-120-01
+        description: "speeches.tsx handleToggle calls scrollToIndex after expansion"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/speeches.tsx:166-178: After setExpandedDate(date) in else
+          branch, finds index via listItems.findIndex, then setTimeout(300ms) calls
+          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }).
+
+      - id: MP-120-02
+        description: "agenda.tsx handleToggle calls scrollToIndex after expansion"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/agenda.tsx:128-140: After setExpandedDate(date) in else
+          branch, finds index via listItems.findIndex, then setTimeout(300ms) calls
+          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }).
+
+      - id: MP-120-03
+        description: "Auto-scroll uses viewPosition:0 to align card top with screen top"
+        status: PASSED
+        evidence: |
+          speeches.tsx:175 - viewPosition: 0.
+          agenda.tsx:137 - viewPosition: 0.
+          Both use viewPosition:0 which aligns item top with viewport top.
+
+      - id: MP-120-04
+        description: "Auto-scroll only triggers on expand, not on collapse"
+        status: PASSED
+        evidence: |
+          speeches.tsx:160-161: if (expandedDate === date) { setExpandedDate(null); }
+          - collapse branch has NO scrollToIndex.
+          speeches.tsx:162-178: else branch has scrollToIndex - expand only.
+          agenda.tsx:123-124: collapse branch has NO scrollToIndex.
+          agenda.tsx:125-140: else branch has scrollToIndex - expand only.
+
+    should_pass_results:
+      - id: SP-120-01
+        description: "setTimeout used to defer scroll after render"
+        status: PASSED
+        evidence: |
+          speeches.tsx:171 - setTimeout(() => { scrollToIndex... }, 300).
+          agenda.tsx:133 - setTimeout(() => { scrollToIndex... }, 300).
+          300ms delay allows layout to complete before scrolling.
+
+      - id: SP-120-02
+        description: "All existing tests pass"
+        status: PASSED
+        evidence: |
+          npx vitest run: 63 test files, 3296/3296 tests passed.
+
+# #############################################################################
+# CR-123: Recognizing field proportional height with one actor per line
+# #############################################################################
+
+cr_123:
+  cr_id: CR-123
+  title: "Recognizing field proportional height with one actor per line"
+  type: feature_request
+  spec: specs/SPEC_F065_F068.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase3.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Recognizing field used SelectorField with numberOfLines={1} and join(', ').
+      Truncated multiple actor names. Needed to display one actor per line with
+      proportional height growth.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "3 of 3"
+    commits:
+      - hash: 96fdc83
+        message: "feat(agenda): replace SelectorField with Pressable for recognizing field (CR-123)"
+      - hash: 97f1e5f
+        message: "fix(tests): update recognizing field tests for CR-123 Pressable change"
+      - hash: b9a010b
+        message: "fix(tests): update batch7 recognizing field test for CR-123 change"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 3296
+    tester_tests_total: 3296
+
+    must_pass_results:
+      - id: MP-123-01
+        description: "Recognizing field displays actors on separate lines"
+        status: PASSED
+        evidence: |
+          src/components/AgendaForm.tsx:199-208: recognized_names are rendered
+          via .map((name, idx) => <Text>) with individual Text elements per name.
+          Each name gets its own line via recognizingName style with paddingVertical:2.
+          No join(', ') - each name is a separate element.
+
+      - id: MP-123-02
+        description: "Recognizing field allows multi-line (not truncated by numberOfLines={1} on container)"
+        status: PASSED
+        evidence: |
+          src/components/AgendaForm.tsx:192-214: The recognizing field uses a
+          Pressable (not SelectorField). Each individual name Text has
+          numberOfLines={1} for single-name truncation, but the container
+          Pressable has no numberOfLines limit. Container grows with each name.
+
+      - id: MP-123-03
+        description: "Field height grows proportionally with number of selected actors"
+        status: PASSED
+        evidence: |
+          src/components/AgendaForm.tsx:811-816: selectorField style has
+          paddingVertical:8 but NO fixed height or maxHeight.
+          AgendaForm.tsx:820-823: recognizingName style has fontSize:15,
+          paddingVertical:2. Each name adds ~19px. Container grows naturally.
+
+    should_pass_results:
+      - id: SP-123-01
+        description: "Empty state shows placeholder text correctly"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:199: (agenda.recognized_names?.length ?? 0) > 0 ? ... :
+          AgendaForm.tsx:210-212: placeholder Text with t('agenda.recognizing')
+          in colors.textTertiary color when no names selected.
+
+      - id: SP-123-02
+        description: "Presentation mode NOT affected (keeps comma format)"
+        status: PASSED
+        evidence: |
+          src/hooks/usePresentationMode.ts:83: still uses
+          agenda.recognized_names.join(', '). Presentation mode unchanged.
+
+      - id: SP-123-03
+        description: "All existing tests pass"
+        status: PASSED
+        evidence: |
+          npx vitest run: 63 test files, 3296/3296 tests passed.

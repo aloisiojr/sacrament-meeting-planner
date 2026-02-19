@@ -198,22 +198,29 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       </View>
 
       {/* Topic field */}
-      <Pressable
-        style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-        onPress={handleTopicPress}
-        disabled={!canAssign || !speech}
-        accessibilityRole="button"
-        accessibilityLabel={t('speeches.selectTopic')}
-      >
-        <Text
-          style={[
-            styles.topicText,
-            { color: topicDisplay ? colors.text : colors.placeholder },
-          ]}
-          numberOfLines={1}
+      <View style={styles.topicRow}>
+        <Pressable
+          style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+          onPress={handleTopicPress}
+          disabled={!canAssign || !speech}
+          accessibilityRole="button"
+          accessibilityLabel={t('speeches.selectTopic')}
         >
-          {topicDisplay ?? t('speeches.selectTopic')}
-        </Text>
+          <Text
+            style={[
+              styles.topicText,
+              { color: topicDisplay ? colors.text : colors.placeholder },
+            ]}
+            numberOfLines={1}
+          >
+            {topicDisplay ?? t('speeches.selectTopic')}
+          </Text>
+          {canAssign && (
+            <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
+              {'\u25BC'}
+            </Text>
+          )}
+        </Pressable>
         {topicDisplay && canAssign && (
           <Pressable
             hitSlop={8}
@@ -223,12 +230,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
             <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
           </Pressable>
         )}
-        {canAssign && (
-          <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-            {'\u25BC'}
-          </Text>
-        )}
-      </Pressable>
+      </View>
 
       {/* Status Change Modal */}
       <StatusChangeModal
@@ -281,15 +283,21 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     paddingHorizontal: 4,
   },
+  topicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+    marginLeft: 28,
+  },
   topicField: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 34,
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
-    marginTop: 6,
-    marginLeft: 28,
   },
   topicText: {
     flex: 1,

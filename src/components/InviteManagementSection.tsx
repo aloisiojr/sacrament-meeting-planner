@@ -1,5 +1,5 @@
 /**
- * InviteManagementSection: Secretary-only section showing speeches
+ * InviteManagementSection: Secretary and Bishopric section showing speeches
  * with status 'assigned_not_invited' or 'assigned_invited'.
  * Each item shows compact date, speech number, and action button.
  * Sorted by date (closest first).
@@ -135,7 +135,7 @@ export function InviteManagementSection() {
     [t, changeStatus, locale]
   );
 
-  // Only visible for Secretary
+  // Only visible for Secretary and Bishopric
   if (!hasPermission('home:invite_mgmt')) return null;
 
   if (speechesError) {

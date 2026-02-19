@@ -30,6 +30,7 @@ const PERMISSIONS_MAP: Record<Role, ReadonlySet<Permission>> = {
     'settings:users',
     'invite:manage',
     'home:next_assignments',
+    'home:invite_mgmt',
     'agenda:read',
     'agenda:write',
     'agenda:assign_speaker',

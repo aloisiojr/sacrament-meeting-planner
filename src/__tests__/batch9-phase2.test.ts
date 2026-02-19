@@ -51,32 +51,33 @@ describe('F060 (CR-114): Add X button to remove topic assignment', () => {
       expect(content).toContain("'\\u00D7'");
     });
 
-    it('should have X button inside topicField Pressable', () => {
+    it('should have X button as sibling of topicField Pressable inside topicRow', () => {
       const content = getSpeechSlot();
-      // Find the topic field section
-      const topicFieldIdx = content.indexOf('styles.topicField');
-      const topicFieldEnd = content.indexOf('</Pressable>', topicFieldIdx);
-      const topicSection = content.substring(topicFieldIdx, topicFieldEnd);
-      // Should contain the clear topic button within
+      // F073 (CR-128) moved X outside topicField, now it's a sibling in topicRow View
+      const jsxStart = content.indexOf('return (');
+      const jsxContent = content.substring(jsxStart);
+      const topicRowIdx = jsxContent.indexOf('styles.topicRow');
+      const topicRowEnd = jsxContent.indexOf('</View>', jsxContent.indexOf('handleClearTopic', topicRowIdx));
+      const topicSection = jsxContent.substring(topicRowIdx, topicRowEnd);
+      // Should contain the clear topic button within topicRow
       expect(topicSection).toContain('handleClearTopic');
       expect(topicSection).toContain("'\\u00D7'");
     });
 
-    it('X button should be between topic text and dropdown arrow', () => {
+    it('X button should be after topicField Pressable (as sibling in topicRow)', () => {
       const content = getSpeechSlot();
-      // Find topic field section (the outer Pressable with topicField style)
-      const topicFieldIdx = content.indexOf('{/* Topic field */}');
-      const topicFieldEnd = content.indexOf('{/* Status Change Modal */}');
-      const topicSection = content.substring(topicFieldIdx, topicFieldEnd);
-      // Order: topicText -> clearTopic X -> fieldArrow
-      const topicTextIdx = topicSection.indexOf('topicText');
+      // F073 (CR-128): X is now outside topicField, after the dropdown arrow
+      const jsxStart = content.indexOf('return (');
+      const jsxContent = content.substring(jsxStart);
+      const topicRowIdx = jsxContent.indexOf('styles.topicRow');
+      const topicRowEnd = jsxContent.indexOf('</View>', jsxContent.indexOf('handleClearTopic', topicRowIdx));
+      const topicSection = jsxContent.substring(topicRowIdx, topicRowEnd);
+      // Order: topicField (with topicText + arrow) -> clearTopic X (outside)
+      const topicFieldIdx = topicSection.indexOf('styles.topicField');
       const clearTopicIdx = topicSection.indexOf('handleClearTopic');
-      const arrowIdx = topicSection.indexOf('fieldArrow');
-      expect(topicTextIdx).toBeGreaterThan(-1);
+      expect(topicFieldIdx).toBeGreaterThan(-1);
       expect(clearTopicIdx).toBeGreaterThan(-1);
-      expect(arrowIdx).toBeGreaterThan(-1);
-      expect(topicTextIdx).toBeLessThan(clearTopicIdx);
-      expect(clearTopicIdx).toBeLessThan(arrowIdx);
+      expect(topicFieldIdx).toBeLessThan(clearTopicIdx);
     });
   });
 
@@ -590,11 +591,11 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
 
   // --- AC-F063-04: Topic field aligned with speaker field ---
   describe('AC-F063-04: Topic field aligned with speaker field', () => {
-    it('topicField has marginLeft: 28', () => {
+    it('topicRow has marginLeft: 28 (F073 moved from topicField to topicRow)', () => {
       const content = getSpeechSlot();
-      const topicFieldIdx = content.indexOf('topicField:');
-      const topicFieldEnd = content.indexOf('},', topicFieldIdx);
-      const section = content.substring(topicFieldIdx, topicFieldEnd);
+      const topicRowIdx = content.indexOf('topicRow:');
+      const topicRowEnd = content.indexOf('},', topicRowIdx);
+      const section = content.substring(topicRowIdx, topicRowEnd);
       expect(section).toContain('marginLeft: 28');
     });
 

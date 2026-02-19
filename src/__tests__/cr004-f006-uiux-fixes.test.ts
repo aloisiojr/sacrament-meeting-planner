@@ -119,7 +119,7 @@ describe('CR-004 F006: UI/UX Small Fixes', () => {
       const source = readSourceFile('app/(tabs)/speeches.tsx');
       const renderItemStart = source.indexOf('const renderItem = useCallback(');
       expect(renderItemStart).toBeGreaterThan(-1);
-      const renderItemBlock = source.slice(renderItemStart, source.indexOf('const getItemLayout'));
+      const renderItemBlock = source.slice(renderItemStart, source.indexOf('if (speechesError'));
       const lastBracketStart = renderItemBlock.lastIndexOf('[');
       const lastBracketEnd = renderItemBlock.lastIndexOf(']');
       const depsStr = renderItemBlock.slice(lastBracketStart, lastBracketEnd + 1);

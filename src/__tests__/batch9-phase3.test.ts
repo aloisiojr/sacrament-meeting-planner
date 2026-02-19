@@ -336,13 +336,13 @@ describe('F066 (CR-120): Auto-scroll on card expand', () => {
       expect(section).toContain('animated: true');
     });
 
-    it('scroll is delayed by 300ms setTimeout', () => {
+    it('scroll is delayed by 400ms setTimeout (updated by F075/CR-132)', () => {
       const content = getSpeeches();
       const handleToggleIdx = content.indexOf('const handleToggle');
       const handleToggleEnd = content.indexOf('];', handleToggleIdx);
       const section = content.substring(handleToggleIdx, handleToggleEnd);
       expect(section).toContain('setTimeout');
-      expect(section).toContain('300');
+      expect(section).toContain('400');
     });
   });
 
@@ -357,13 +357,13 @@ describe('F066 (CR-120): Auto-scroll on card expand', () => {
       expect(section).toContain('viewPosition: 0');
     });
 
-    it('agenda.tsx scroll is delayed by 300ms setTimeout', () => {
+    it('agenda.tsx scroll is delayed by 400ms setTimeout (updated by F075/CR-132)', () => {
       const content = getAgenda();
       const handleToggleIdx = content.indexOf('const handleToggle');
       const handleToggleEnd = content.indexOf('[expandedDate, lazyCreate, listItems]', handleToggleIdx);
       const section = content.substring(handleToggleIdx, handleToggleEnd);
       expect(section).toContain('setTimeout');
-      expect(section).toContain('300');
+      expect(section).toContain('400');
     });
 
     it('agenda.tsx scroll uses animated: true', () => {
@@ -439,16 +439,16 @@ describe('F066 (CR-120): Auto-scroll on card expand', () => {
     });
   });
 
-  // --- AC-F066-07: initialScrollIndex still works ---
+  // --- AC-F066-07: initialScrollIndex not affected (updated by F075/CR-132) ---
   describe('AC-F066-07: initialScrollIndex not affected', () => {
-    it('speeches.tsx preserves getItemLayout', () => {
+    it('speeches.tsx getItemLayout removed by F075 for accurate scroll', () => {
       const content = getSpeeches();
-      expect(content).toContain('getItemLayout={getItemLayout}');
+      expect(content).not.toContain('getItemLayout={getItemLayout}');
     });
 
-    it('agenda.tsx preserves getItemLayout', () => {
+    it('agenda.tsx getItemLayout removed by F075 for accurate scroll', () => {
       const content = getAgenda();
-      expect(content).toContain('getItemLayout={getItemLayout}');
+      expect(content).not.toContain('getItemLayout={getItemLayout}');
     });
 
     it('speeches.tsx preserves onScrollToIndexFailed', () => {

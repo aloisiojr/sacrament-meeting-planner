@@ -607,7 +607,8 @@ describe('F039 (CR-98): Fix prayer fields not clickable', () => {
     it('should have useEffect that opens modal when visible is true', () => {
       const source = getPrayerSelectorSource();
       expect(source).toContain('useEffect(() => {');
-      expect(source).toContain('if (visible) setModalVisible(true)');
+      expect(source).toContain('if (visible) {');
+      expect(source).toContain('setModalVisible(true)');
     });
 
     it('should import useEffect from React', () => {

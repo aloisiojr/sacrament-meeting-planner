@@ -501,7 +501,7 @@ describe('F070 (CR-127): Delete speech assignments on sunday type change', () =>
       const content = getSpeeches();
       const depsSection = content.substring(
         content.lastIndexOf('handleRemoveException'),
-        content.indexOf('getItemLayout')
+        content.indexOf('if (speechesError')
       );
       expect(depsSection).toContain('handleDeleteSpeeches');
     });

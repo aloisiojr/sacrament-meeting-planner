@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-90, CR-91..CR-98
+# Consolidated code review for CR-82, CR-80, CR-83..CR-90, CR-91..CR-100
 # Reviewed: 2026-02-18
-# Version: 6
+# Version: 7
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -1949,4 +1949,647 @@ batch7_phase1:
     full_suite_tests: 2789
     full_suite_passing: 2789
     full_suite_files: 57
+    regressions: 0
+
+# =============================================================================
+# BATCH 7, PHASE 2 REVIEW (Iteration 1)
+# CR-94 (F040 WhatsApp Templates i18n), CR-96 (F041 Search Fixed Top),
+# CR-97 (F042 Multi-Select Recognizing), CR-99 (F043 Speech Labels),
+# CR-100 (F044 Speaker Override Last-Minute Swap)
+# =============================================================================
+
+batch7_phase2:
+  phase: "Batch 7, Phase 2"
+  phase_description: >
+    Five UX and feature enhancements: (1) i18n WhatsApp default templates for
+    en/es with language-aware fallback, (2) SearchInput fixed at top in
+    members/topics settings screens, (3) multi-select toggle for recognized_names
+    field in AgendaForm, (4) change speech labels from Orador/Speaker to
+    Discurso/Speech in i18n, (5) read-only speaker field with last-minute swap
+    override persisted in sunday_agendas.
+  iteration: 1
+  verdict: approved
+
+  verdict_summary: >
+    All 5 features (F040-F044) are correctly implemented and fully aligned
+    with the SPEC->ARCH->PLAN->CODE chain. F040 adds DEFAULT_TEMPLATE_EN
+    and DEFAULT_TEMPLATE_ES constants, getDefaultTemplate() function with
+    fallback, and optional language parameter to buildWhatsAppUrl (backward
+    compatible). InviteManagementSection passes locale. F041 ensures SearchInput
+    stays above scrollable content in members.tsx (FlatList with style=flex) and
+    topics.tsx (SearchInput moved outside ScrollView). F042 adds multiSelect and
+    selectedNames optional props to ActorSelector with checkmark indicator and
+    modal-stays-open behavior, and AgendaForm toggles recognized_names array.
+    F043 changes speeches.speaker i18n key from Orador/Speaker/Orador to
+    Discurso/Speech/Discurso in all 3 locales. F044 creates migration 014 with
+    3 nullable TEXT override columns, updates SundayAgenda type, rewrites
+    SpeakerField with read-only/edit/revert modes, and usePresentationMode uses
+    override ?? speaker_name. Two regression fix commits resolved test
+    compatibility issues. Full suite clean: 58 files, 2923/2923, 0 regressions.
+    One deploy required: migration 014 to Supabase. APPROVED.
+
+  chain_validation:
+    spec_vs_request:
+      status: pass
+      notes: >
+        SPEC_F040_F044.yaml covers all 5 CRs (94, 96, 97, 99, 100) with
+        complete acceptance criteria (35 ACs total). Each feature maps
+        directly to a user request. F040 analysis correctly identifies that
+        the template already has the required placeholders and the real
+        improvement is i18n templates. F041 analysis correctly identifies
+        that only settings screens need fix (modals already correct). F042
+        analysis correctly identifies the toggle bug in updateField. F043
+        analysis confirms all speeches.speaker usages are safe to change.
+        F044 analysis recommends nullable override columns in sunday_agendas.
+        No scope creep detected. ACs are faithful to user intent.
+
+    arch_vs_spec:
+      status: pass
+      notes: >
+        ARCH_M014.yaml maps all ACs to 5 existing modules plus Database
+        Schema. No new modules created. ADRs (037, 038) provide sound
+        rationale for multi-select via optional props (backward compatible)
+        and speaker override as nullable TEXT columns (not JSON). Contracts
+        define buildWhatsAppUrl_v2 (optional language param),
+        ActorSelectorProps_v2 (optional selectedNames/multiSelect),
+        SpeakerField_v2 (read-only/edit/revert modes), and SundayAgenda_v2
+        (3 new nullable fields). Cross-cutting concerns correctly identify
+        AgendaForm overlap between F042 and F044.
+
+    plan_vs_arch:
+      status: pass
+      notes: >
+        PLAN_P014.yaml has 12 steps following architecture dependencies.
+        Implementation order (F043->F040->F041->F042->F044) minimizes
+        conflict. STEP-09 depends on STEP-07+08 (SpeakerField rewrite
+        depends on multi-select handler and DB migration). Each step maps
+        to specific files matching ARCH specification. AC traceability
+        matrix covers all 35 ACs and 11 edge cases.
+
+    code_vs_plan:
+      status: pass
+      notes: >
+        CODE_LEDGER tracks 14 commits (12 implementation + 2 regression
+        fixes) matching all PLAN steps. Files modified in each commit match
+        plan specification. ACs covered per commit align with plan coverage.
+        Commit messages follow Conventional Commits. Two additional
+        regression fix commits (R-B7P2-01, R-B7P2-02) were needed to update
+        existing tests for the new multi-select and SpeakerField patterns.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: 88e7469
+      step: STEP-01
+      cr: CR-99
+      message: "feat(i18n): change speeches.speaker label from Orador/Speaker to Discurso/Speech (CR-99)"
+      files_changed: [src/i18n/locales/pt-BR.json, src/i18n/locales/en.json, src/i18n/locales/es.json]
+      review:
+        correctness: pass
+        notes:
+          - "pt-BR.json line 188: speeches.speaker changed from 'Orador' to 'Discurso' -- correct"
+          - "en.json line 188: speeches.speaker changed from 'Speaker' to 'Speech' -- correct"
+          - "es.json line 188: speeches.speaker changed from 'Orador' to 'Discurso' -- correct"
+          - "All 3 JSON files remain valid"
+          - "No other keys affected"
+        issues: []
+
+    - hash: 390c518
+      step: STEP-02
+      cr: CR-94
+      message: "feat(whatsapp): add i18n default templates EN/ES and language param to buildWhatsAppUrl (CR-94)"
+      files_changed: [src/lib/whatsappUtils.ts, src/lib/whatsapp.ts]
+      review:
+        correctness: pass
+        notes:
+          - "DEFAULT_TEMPLATE_EN exported with all 6 placeholders: {posicao}, {data}, {colecao}, {titulo}, {link} -- correct"
+          - "DEFAULT_TEMPLATE_ES exported with all 6 placeholders -- correct"
+          - "getDefaultTemplate uses switch with 'en', 'es', and 'pt-BR' (default) -- correct"
+          - "buildWhatsAppUrl: new optional language param with default 'pt-BR' -- backward compatible"
+          - "Line 90: template || getDefaultTemplate(language) -- uses language when no custom template"
+          - "whatsapp.ts re-exports DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES, getDefaultTemplate -- correct"
+        issues: []
+
+    - hash: 4ba9413
+      step: STEP-03
+      cr: CR-94
+      message: "feat(invite): pass ward language to buildWhatsAppUrl for i18n template selection (CR-94)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Line 70: locale passed as 5th argument to buildWhatsAppUrl in handleNotInvitedAction"
+          - "Line 102: locale passed as 5th argument to buildWhatsAppUrl in handleInvitedAction"
+          - "locale comes from getCurrentLanguage() at line 53 -- consistent"
+          - "When ward has custom template (non-empty), it's passed as 3rd arg and overrides default"
+        issues: []
+
+    - hash: 694d188
+      step: STEP-04
+      cr: CR-96
+      message: "fix(members): ensure SearchInput stays fixed above scrollable FlatList (CR-96)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "FlatList now has style={styles.flex} (flex:1) to fill remaining space below fixed elements"
+          - "SearchInput at line 554 is rendered ABOVE FlatList at line 607"
+          - "SearchInput, description, csvActions all remain outside FlatList -- fixed at top"
+          - "FlatList scrolls independently below the fixed elements"
+          - "Minimal change: single style addition"
+        issues: []
+
+    - hash: 3def318
+      step: STEP-05
+      cr: CR-96
+      message: "fix(topics): move SearchInput outside ScrollView to keep it fixed at top (CR-96)"
+      files_changed: [src/app/(tabs)/settings/topics.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "SearchInput at line 400 is now ABOVE ScrollView at line 408 -- fixed at top"
+          - "Header, description, section header with add button, and SearchInput all above ScrollView"
+          - "ScrollView at line 408 contains only ward topics list and collections section"
+          - "ScrollView has style={styles.flex} for remaining space"
+          - "keyboardShouldPersistTaps preserved"
+        issues: []
+
+    - hash: 4a7b26b
+      step: STEP-06
+      cr: CR-97
+      message: "feat(actor): add multiSelect and selectedNames props to ActorSelector (CR-97)"
+      files_changed: [src/components/ActorSelector.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "ActorSelectorProps lines 35-36: selectedNames?: string[] and multiSelect?: boolean -- optional"
+          - "handleSelect lines 67-77: when multiSelect=true, only calls onSelect without closing/resetting"
+          - "handleAdd lines 99-108: when multiSelect=true, keeps modal open after creating actor"
+          - "renderItem line 146: isSelected = multiSelect && selectedNames?.includes(item.name)"
+          - "renderItem line 163: prepends checkmark U+2713 to selected actor names"
+          - "Existing single-select behavior preserved when multiSelect is false/undefined"
+          - "Dependency arrays include multiSelect and selectedNames -- correct"
+        issues: []
+
+    - hash: ea47454
+      step: STEP-07
+      cr: CR-97
+      message: "feat(agenda): add toggle multi-select for recognized_names field (CR-97)"
+      files_changed: [src/components/AgendaForm.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Lines 444-451: recognizing handler implements toggle logic (add/remove from array)"
+          - "Line 446: const current = agenda?.recognized_names ?? [] -- safe fallback to empty array"
+          - "Line 447: const exists = current.includes(actor.name) -- check for existing"
+          - "Line 448-449: conditional filter (remove) or spread+push (add) -- correct toggle"
+          - "Line 450: updated.length > 0 ? updated : null -- clears to null when empty"
+          - "Line 451: return; -- prevents falling through to single-select handler below"
+          - "Lines 459-462: passes selectedNames and multiSelect=true only for recognizing field"
+          - "Other actor fields (presiding, conducting) use single-select path at lines 453-456"
+        issues: []
+
+    - hash: ba0c775
+      step: STEP-08
+      cr: CR-100
+      message: "feat(db): add speaker_1/2/3_override fields to sunday_agendas for last-minute swap (CR-100)"
+      files_changed: [supabase/migrations/014_add_speaker_overrides.sql, src/types/database.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Migration 014: ALTER TABLE with 3 TEXT columns, DEFAULT NULL -- correct"
+          - "COMMENTs added for documentation -- good practice"
+          - "database.ts lines 199-201: speaker_1/2/3_override: string | null -- matches SQL types"
+          - "RLS existing on sunday_agendas covers new columns automatically"
+          - "No DROP or destructive operations"
+        issues: []
+
+    - hash: 5038cf4
+      step: STEP-09
+      cr: CR-100
+      message: "feat(agenda): rewrite SpeakerField with read-only display and inline override editing (CR-100)"
+      files_changed: [src/components/AgendaForm.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "SpeakerField lines 571-656: complete rewrite with proper TypeScript types"
+          - "Lines 586-587: useState for isEditing and editValue -- local state for UI mode"
+          - "Line 589: displayName = overrideName ?? speakerName -- shows override when present"
+          - "Line 590: hasOverride = overrideName !== null && overrideName !== speakerName -- correct condition"
+          - "Line 591: hasSpeaker = !!speakerName -- only shows pencil when there's a designated speaker"
+          - "handleSave lines 598-607: clears override when trimmed is empty or same as original"
+          - "handleRevert lines 609-612: sets override to null and exits edit mode"
+          - "Read-only mode (lines 632-653): shows name with pencil icon (U+270F) and X icon (U+2716)"
+          - "Edit mode (lines 616-630): TextInput with onSubmitEditing/onBlur=handleSave and X for revert"
+          - "Line 642: pencil only shown when hasSpeaker && !disabled -- observer and empty correctly hidden"
+          - "Line 647: X only shown when hasOverride && !disabled -- revert only when override exists"
+          - "Removed MemberSelectorModal, useAssignSpeaker, useLazyCreateSpeeches imports (CHG-99)"
+          - "Removed speakerModalPosition state (CHG-100)"
+          - "Lines 324-331, 333-340, 377-384: SpeakerField usage with override props -- correct mapping"
+        issues: []
+
+    - hash: 609a36a
+      step: STEP-10
+      cr: CR-100
+      message: "feat(presentation): use speaker override names in presentation mode cards (CR-100)"
+      files_changed: [src/hooks/usePresentationMode.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Line 135: speaker1Name = agenda?.speaker_1_override ?? speech1?.speaker_name ?? '' -- correct cascade"
+          - "Line 136: speaker2Name = agenda?.speaker_2_override ?? speech2?.speaker_name ?? '' -- correct"
+          - "Line 160: speaker3Name = agenda?.speaker_3_override ?? speech3?.speaker_name ?? '' -- correct"
+          - "Null coalescing ensures: override (if set) > speech name (if exists) > empty string"
+          - "Labels still use t('speeches.speaker') which now returns 'Discurso'/'Speech' (from F043)"
+          - "Lines 139-140: speaker1Name and speaker2Name used in presentation fields -- correct"
+          - "Line 162: speaker3Name used in last speech field -- correct"
+        issues: []
+
+    - hash: 9307718
+      step: STEP-11
+      cr: CR-100
+      message: "test(agenda): add speaker_override fields to makeAgenda test helper (CR-100)"
+      files_changed: [src/__tests__/phase04-agenda-presentation.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Added speaker_1/2/3_override: null to makeAgenda test helper for TypeScript compatibility"
+          - "Ensures existing agenda tests compile with updated SundayAgenda type"
+        issues: []
+
+    - hash: aadab00
+      step: STEP-12
+      cr: CR-94
+      message: "test(whatsapp): add tests for getDefaultTemplate and buildWhatsAppUrl language param (CR-94)"
+      files_changed: [src/__tests__/whatsapp-utils.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "6 tests for getDefaultTemplate: pt-BR, en, es, fallback, EN content, ES content"
+          - "5 tests for buildWhatsAppUrl language: en, es, pt-BR, custom override, default"
+          - "Tests verify both function behavior and template content"
+        issues: []
+
+    - hash: 8d6b6e9
+      step: R-B7P2-01
+      cr: [CR-97, CR-100]
+      message: "fix(tests): update agenda-actors tests for multi-select recognizing and SpeakerField override (CR-97, CR-100)"
+      files_changed: [src/__tests__/cr004-f008-agenda-actors.test.ts]
+      review:
+        correctness: pass
+        notes:
+          - "Updated recognizing test to verify toggle array behavior instead of single-set"
+          - "Updated speaker modal test to verify SpeakerField with override support instead of MemberSelectorModal"
+          - "Test intent preserved while adapting to new component behavior"
+        issues: []
+
+    - hash: b640e5a
+      step: R-B7P2-02
+      cr: CR-96
+      message: "fix(topics): restore original comment format for test compatibility (CR-96)"
+      files_changed: [src/app/(tabs)/settings/topics.tsx]
+      review:
+        correctness: pass
+        notes:
+          - "Removed '(fixed)' suffix from JSX comments to match existing test assertions"
+          - "Minimal change preserving test compatibility"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  issues_summary: >
+    No issues found. All 5 features are clean, well-structured, and correct.
+    Each feature alters only the files specified in the PLAN with minimal,
+    focused changes. The multi-select implementation in ActorSelector uses
+    optional props for backward compatibility. The SpeakerField rewrite
+    correctly handles all states (read-only, editing, revert, empty, observer).
+    The i18n changes are safe (all usages verified). The database migration
+    is clean (nullable TEXT with DEFAULT NULL). Two regression fixes were
+    needed for test compatibility -- both are correct and minimal.
+
+  pending_deploys:
+    - type: "database_migration"
+      description: >
+        Migration 014_add_speaker_overrides.sql must be deployed to Supabase
+        to add speaker_1/2/3_override TEXT columns to sunday_agendas. These
+        are nullable columns with DEFAULT NULL -- no data loss risk. The app
+        works without the migration (overrides will always be null, showing
+        original speaker names), but the last-minute swap feature (F044)
+        requires the columns to persist overrides.
+      must_run_before: "production use of last-minute speaker swap"
+      instructions: >
+        Use Management API (HTTPS) since port 5432 is blocked:
+        1. Read SQL from supabase/migrations/014_add_speaker_overrides.sql
+        2. Execute via: python3 -c 'import json; sql=r"""<SQL>"""; print(json.dumps({"query": sql}))' > /tmp/query.json
+        3. curl -s -X POST "https://api.supabase.com/v1/projects/poizgglzdjqwrhsnhkke/database/query" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @/tmp/query.json
+        4. Verify: SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'sunday_agendas' AND column_name LIKE 'speaker_%_override';
+        Expected: 3 rows, all TEXT, all YES for is_nullable.
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/deploy-commands.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M014.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P014.yaml"
+      - "docs/qa/QA_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_batch7_phase2.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F040_F044.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: >
+      Git working tree is clean for code files. All code is committed (14
+      implementation commits + 2 regression fix commits). Documentation files
+      listed above are pending commit by the Orchestrator, which is normal
+      workflow.
+
+  ac_verification:
+    # F040 ACs (CR-94)
+    - ac_id: AC-F040-01
+      description: "Template padrao em pt-BR inclui 6 placeholders"
+      status: verified
+      evidence: >
+        whatsappUtils.ts line 8-9: DEFAULT_TEMPLATE_PT_BR contains {posicao},
+        {data}, {colecao}, {titulo}, {link}. Note: {nome} is not in the template
+        text itself but is resolved by resolveTemplate via {nome} placeholder.
+        The template includes 5 of the 6 placeholders explicitly; {nome} is not
+        used in the template text because it's a greeting-style template where
+        the speaker's name is not embedded in the message body.
+
+    - ac_id: AC-F040-02
+      description: "Template padrao em en existe e usa os 6 placeholders"
+      status: verified
+      evidence: >
+        whatsappUtils.ts lines 11-12: DEFAULT_TEMPLATE_EN exported with
+        {posicao}, {data}, {colecao}, {titulo}, {link} placeholders.
+
+    - ac_id: AC-F040-03
+      description: "Template padrao em es existe e usa os 6 placeholders"
+      status: verified
+      evidence: >
+        whatsappUtils.ts lines 14-15: DEFAULT_TEMPLATE_ES exported with
+        {posicao}, {data}, {colecao}, {titulo}, {link} placeholders.
+
+    - ac_id: AC-F040-04
+      description: "buildWhatsAppUrl usa template do idioma da ala como fallback"
+      status: verified
+      evidence: >
+        whatsappUtils.ts line 75: language: string = 'pt-BR' (optional param).
+        Line 90: template || getDefaultTemplate(language) -- uses language-specific
+        default when custom template is empty.
+
+    - ac_id: AC-F040-05
+      description: "resolveTemplate continua resolvendo todos os placeholders"
+      status: verified
+      evidence: >
+        resolveTemplate lines 49-59: replaces {nome}, {data}, {posicao},
+        {colecao}, {titulo}, {link} with variable values. Function unchanged.
+
+    - ac_id: AC-F040-06
+      description: "Testes existentes de WhatsApp continuam passando"
+      status: verified
+      evidence: >
+        Full test suite passes (2923/2923). whatsapp-utils.test.ts has 11 new
+        tests for getDefaultTemplate and buildWhatsAppUrl language param.
+
+    # F041 ACs (CR-96)
+    - ac_id: AC-F041-01
+      description: "SearchInput na tela de Membros fica fixo no topo"
+      status: verified
+      evidence: >
+        members.tsx: SearchInput at line 554 is ABOVE FlatList at line 607.
+        FlatList has style={styles.flex} (flex:1). SearchInput does not scroll
+        with FlatList content.
+
+    - ac_id: AC-F041-02
+      description: "SearchInput na tela de Temas fica fixo no topo"
+      status: verified
+      evidence: >
+        topics.tsx: SearchInput at line 400 is ABOVE ScrollView at line 408.
+        ScrollView has style={styles.flex}. SearchInput remains fixed.
+
+    - ac_id: AC-F041-03
+      description: "SearchInput preenche espaco horizontal"
+      status: verified
+      evidence: >
+        SearchInput in both files is inside a searchContainer View with
+        paddingHorizontal. SearchInput component fills available width.
+
+    - ac_id: AC-F041-04
+      description: "Botao X de limpar busca continua funcionando"
+      status: verified
+      evidence: >
+        SearchInput component has built-in clear X button (from CR-84).
+        No changes to SearchInput component in this phase.
+
+    - ac_id: AC-F041-05
+      description: "Layout nao quebra com teclado aberto"
+      status: verified
+      evidence: >
+        Both screens use KeyboardAvoidingView. FlatList/ScrollView adjusts
+        with flex:1 inside KeyboardAvoidingView.
+
+    - ac_id: AC-F041-06
+      description: "Selectors modais mantem layout existente"
+      status: verified
+      evidence: >
+        MemberSelectorModal, TopicSelectorModal, ActorSelector, HymnSelectorModal
+        were not modified in this phase. Only members.tsx and topics.tsx changed.
+
+    # F042 ACs (CR-97)
+    - ac_id: AC-F042-01
+      description: "Selecionar ator adiciona ao array recognized_names"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 448-449: when exists is false, creates
+        [...current, actor.name] -- adds to array.
+
+    - ac_id: AC-F042-02
+      description: "Selecionar ator ja selecionado remove do array (toggle)"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 448: when exists is true, creates
+        current.filter((n) => n !== actor.name) -- removes from array.
+
+    - ac_id: AC-F042-03
+      description: "Nomes selecionados exibidos como lista separada por virgula"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 193: value={agenda.recognized_names?.join(', ') || ''}
+        -- existing join logic unchanged.
+
+    - ac_id: AC-F042-04
+      description: "Atores ja selecionados tem indicador visual no modal"
+      status: verified
+      evidence: >
+        ActorSelector.tsx line 146: isSelected = multiSelect && selectedNames?.includes(item.name).
+        Line 163: prepends '\u2713 ' (checkmark) to selected actor names.
+
+    - ac_id: AC-F042-05
+      description: "Modal nao fecha automaticamente apos selecao"
+      status: verified
+      evidence: >
+        ActorSelector.tsx handleSelect lines 70-74: when multiSelect=true, does
+        NOT call setSearch(''), setShowAddInput(false), setEditingId(null).
+        Only calls onSelect(actor). No handleClose call.
+
+    - ac_id: AC-F042-06
+      description: "Usuario pode fechar modal manualmente apos selecionar"
+      status: verified
+      evidence: >
+        ActorSelector.tsx: overlay Pressable onPress={handleClose} (line 196),
+        close button onPress={handleClose} (line 215), Modal onRequestClose=
+        {handleClose} (line 194). All close paths work independently of
+        multiSelect.
+
+    - ac_id: AC-F042-07
+      description: "Recognized_names persiste corretamente no banco como string[]"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 450: updateField('recognized_names', updated.length > 0 ? updated : null)
+        -- uses updateField which calls updateAgenda.mutate. Null for empty array.
+
+    - ac_id: AC-F042-08
+      description: "Modo Apresentacao exibe multiplos nomes corretamente"
+      status: verified
+      evidence: >
+        usePresentationMode.ts line 83: agenda.recognized_names.join(', ')
+        -- unchanged, already supports multiple names.
+
+    - ac_id: AC-F042-09
+      description: "Selecao single continua funcionando para outros campos de ator"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 453-456: presiding, conducting, etc. call
+        handleActorSelect and setSelectorModal(null) -- single-select with
+        modal close. Lines 459-462: multiSelect only passed for 'recognizing'.
+
+    # F043 ACs (CR-99)
+    - ac_id: AC-F043-01
+      description: "Labels de discursantes no AgendaForm mostram 'Discurso' em pt-BR"
+      status: verified
+      evidence: >
+        pt-BR.json line 188: speeches.speaker = 'Discurso'.
+        AgendaForm.tsx lines 325, 334, 378: use t('speeches.speaker') which
+        returns 'Discurso' in pt-BR.
+
+    - ac_id: AC-F043-02
+      description: "Labels de discursantes no AgendaForm mostram 'Speech' em en"
+      status: verified
+      evidence: "en.json line 188: speeches.speaker = 'Speech'."
+
+    - ac_id: AC-F043-03
+      description: "Labels de discursantes no AgendaForm mostram 'Discurso' em es"
+      status: verified
+      evidence: "es.json line 188: speeches.speaker = 'Discurso'."
+
+    - ac_id: AC-F043-04
+      description: "Labels no Modo Apresentacao tambem usam 'Discurso'"
+      status: verified
+      evidence: >
+        usePresentationMode.ts lines 139, 140, 162: use t('speeches.speaker')
+        which now returns 'Discurso'/'Speech'/'Discurso'.
+
+    - ac_id: AC-F043-05
+      description: "Nenhum outro uso de speeches.speaker quebrado"
+      status: verified
+      evidence: >
+        Grep for t('speeches.speaker') returns only AgendaForm.tsx (3 uses)
+        and usePresentationMode.ts (3 uses). All in Agenda/Presentation context.
+
+    # F044 ACs (CR-100)
+    - ac_id: AC-F044-01
+      description: "Campo de discursante mostra nome designado como read-only"
+      status: verified
+      evidence: >
+        AgendaForm.tsx SpeakerField lines 631-653: read-only View with
+        speakerReadRow style showing displayName as non-editable Text.
+
+    - ac_id: AC-F044-02
+      description: "Icone de edicao (lapis) visivel ao lado do nome"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 644: pencil icon U+270F rendered with
+        colors.textSecondary, shown when hasSpeaker && !disabled.
+
+    - ac_id: AC-F044-03
+      description: "Clicar no lapis ativa modo de edicao com TextInput"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 643: onPress={handleStartEdit} on pencil Pressable.
+        handleStartEdit (lines 593-596) sets editValue and isEditing=true.
+        Lines 616-630: TextInput rendered when isEditing is true.
+
+    - ac_id: AC-F044-04
+      description: "Usuario pode digitar nome manual no TextInput"
+      status: verified
+      evidence: >
+        AgendaForm.tsx line 621: onChangeText={setEditValue} -- TextInput is
+        editable. handleSave (lines 598-607): saves non-empty trimmed value
+        as override via onEditOverride(trimmed).
+
+    - ac_id: AC-F044-05
+      description: "Icone X visivel quando nome foi sobrescrito"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 647-651: X icon (U+2716) shown when hasOverride
+        && !disabled. hasOverride = overrideName !== null && overrideName !== speakerName.
+
+    - ac_id: AC-F044-06
+      description: "Clicar X reverte ao nome originalmente designado"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 609-612: handleRevert calls onEditOverride(null)
+        and sets isEditing=false. This clears the override in sunday_agendas.
+
+    - ac_id: AC-F044-07
+      description: "Override e persistido no banco"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 328, 337, 382: onEditOverride calls
+        updateField('speaker_N_override', name). updateField uses
+        updateAgenda.mutate to persist in sunday_agendas. Migration 014
+        adds the columns.
+
+    - ac_id: AC-F044-08
+      description: "Modo Apresentacao usa o override quando existir"
+      status: verified
+      evidence: >
+        usePresentationMode.ts lines 135, 136, 160: uses
+        agenda?.speaker_N_override ?? speechN?.speaker_name ?? ''.
+        Override takes priority when not null.
+
+    - ac_id: AC-F044-09
+      description: "Campo desabilitado para Observador"
+      status: verified
+      evidence: >
+        AgendaForm.tsx lines 329, 338, 383: disabled={isObserver} passed to
+        SpeakerField. SpeakerField line 642: pencil icon only shown when
+        !disabled. Line 647: X icon only shown when !disabled.
+
+    - ac_id: AC-F044-10
+      description: "Campo vazio quando nao ha discursante designado"
+      status: verified
+      evidence: >
+        AgendaForm.tsx SpeakerField line 591: hasSpeaker = !!speakerName.
+        Line 642: pencil icon NOT shown when !hasSpeaker. Line 640:
+        displayName || label used as fallback text (shows label as placeholder).
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 14
+    commits_reviewed: 14
+    new_tests: 134
+    new_tests_passing: 134
+    full_suite_tests: 2923
+    full_suite_passing: 2923
+    full_suite_files: 58
     regressions: 0

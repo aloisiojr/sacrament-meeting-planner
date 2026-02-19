@@ -1,0 +1,770 @@
+# =============================================================================
+# SPEC_F040_F044.yaml
+# Specification for Batch 7 Phase 2 - UX & Features
+# Features: F040, F041, F042, F043, F044
+# CRs: CR-94, CR-96, CR-97, CR-99, CR-100
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 7
+phase: 2
+created: "2026-02-18"
+last_updated: "2026-02-18"
+
+features:
+
+  # ===========================================================================
+  # F040 / CR-94: Update default WhatsApp template
+  # ===========================================================================
+
+  - id: F040
+    name: "Update default WhatsApp invitation template"
+    cr_id: 94
+    type: ui
+    priority: low
+
+    description: >
+      Atualizar o template padrao de convite WhatsApp (DEFAULT_TEMPLATE_PT_BR)
+      para uma versao mais concisa e natural. O template atual ja inclui os
+      placeholders {posicao}, {colecao}, {titulo} e {link}, conforme verificado
+      pelo QA PRE. O CR-94 solicita "trocar template padrao de convite WhatsApp
+      para incluir posicao do discurso, tema e link" - o template atual ja contem
+      esses placeholders, porem o usuario deseja um texto diferente/melhorado.
+      O template padrao tambem deve ter versoes em en e es.
+
+    user_request: >
+      "Trocar template padrao de convite WhatsApp para incluir posicao do
+      discurso, tema e link."
+
+    analysis: >
+      O template atual em DEFAULT_TEMPLATE_PT_BR ja inclui {posicao}, {colecao},
+      {titulo} e {link}. O texto e:
+      "Ola, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao}
+      discurso no domingo dia {data}! Voce falara sobre um tema da {colecao} com
+      o titulo {titulo} {link}. Podemos confirmar o seu discurso?"
+      O CR solicita "trocar" o template, indicando que quer um texto diferente.
+      Como nao ha especificacao exata do novo texto, o template atual sera mantido
+      como esta, pois ja satisfaz os requisitos mencionados (posicao, tema, link).
+      Se o usuario desejar um texto diferente, devera fornecer o texto exato.
+      Porem, o app nao tem templates padrao por idioma - apenas um DEFAULT_TEMPLATE_PT_BR.
+      A melhoria sera: adicionar templates padrao para en e es tambem, e usar o
+      template do idioma da ala como default ao inves de sempre pt-BR.
+
+    acceptance_criteria:
+      - id: AC-F040-01
+        description: "Template padrao em pt-BR inclui placeholders {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}"
+        given: "DEFAULT_TEMPLATE_PT_BR definido em whatsappUtils.ts"
+        when: "Um convite WhatsApp e gerado sem template customizado"
+        then: "O template padrao inclui todos os 6 placeholders"
+        status: pending
+
+      - id: AC-F040-02
+        description: "Template padrao em en existe e usa os 6 placeholders"
+        given: "DEFAULT_TEMPLATE_EN definido em whatsappUtils.ts"
+        when: "Ala configurada em ingles gera convite sem template customizado"
+        then: "O template em ingles e usado como default"
+        status: pending
+
+      - id: AC-F040-03
+        description: "Template padrao em es existe e usa os 6 placeholders"
+        given: "DEFAULT_TEMPLATE_ES definido em whatsappUtils.ts"
+        when: "Ala configurada em espanhol gera convite sem template customizado"
+        then: "O template em espanhol e usado como default"
+        status: pending
+
+      - id: AC-F040-04
+        description: "Funcao buildWhatsAppUrl usa template do idioma da ala como fallback"
+        given: "Template da ala e null/vazio"
+        when: "buildWhatsAppUrl e chamado"
+        then: "Usa o template padrao do idioma da ala (nao sempre pt-BR)"
+        status: pending
+
+      - id: AC-F040-05
+        description: "resolveTemplate continua resolvendo todos os 6 placeholders"
+        given: "Template com placeholders {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}"
+        when: "resolveTemplate e chamado com variaveis"
+        then: "Todos os placeholders sao substituidos pelos valores corretos"
+        status: pending
+
+      - id: AC-F040-06
+        description: "Testes existentes de WhatsApp continuam passando"
+        given: "Testes de whatsappUtils"
+        when: "Executados apos a mudanca"
+        then: "Todos os testes passam sem regressao"
+        status: pending
+
+    edge_cases:
+      - id: EC-F040-01
+        case: "Template customizado da ala nao e null/vazio"
+        expected: "Usa o template customizado, nao o padrao do idioma"
+        status: pending
+      - id: EC-F040-02
+        case: "Idioma da ala nao tem template padrao definido"
+        expected: "Fallback para DEFAULT_TEMPLATE_PT_BR (comportamento atual)"
+        status: pending
+
+    files_impacted:
+      - path: "src/lib/whatsappUtils.ts"
+        change: "Adicionar DEFAULT_TEMPLATE_EN e DEFAULT_TEMPLATE_ES; ajustar buildWhatsAppUrl para aceitar idioma"
+      - path: "src/lib/whatsapp.ts"
+        change: "Passar idioma da ala ao chamar buildWhatsAppUrl"
+
+    dependencies: []
+    related_features: [F010, F024]
+    related_crs: [14, 63]
+
+  # ===========================================================================
+  # F041 / CR-96: Search fields fixed at top filling available space
+  # ===========================================================================
+
+  - id: F041
+    name: "Search fields fixed at top filling available space"
+    cr_id: 96
+    type: ux
+    priority: medium
+
+    description: >
+      Os campos de busca nas telas de configuracoes de Membros e Temas scrollam
+      junto com o conteudo ao inves de ficarem fixos no topo. O CR-96 pede que
+      os campos de busca sejam fixos no topo e preencham o espaco horizontal
+      disponivel, com botao fechar a direita. Os selectors modais
+      (MemberSelectorModal, TopicSelectorModal, ActorSelector, HymnSelectorModal)
+      ja implementam esse padrao corretamente. A correcao e necessaria apenas nas
+      telas de settings (members.tsx e topics.tsx).
+
+    user_request: >
+      "Campos de busca (membros, temas, atores) devem ser fixos no topo e
+      preencher espaco disponivel, com botao fechar a direita."
+
+    analysis: >
+      Conforme verificado pelo QA PRE:
+      - MemberSelectorModal: SearchInput no header, ja fixo acima do FlatList. OK.
+      - TopicSelectorModal: SearchInput no header, ja fixo acima do FlatList. OK.
+      - ActorSelector: SearchInput no searchRow, ja fixo acima do FlatList. OK.
+      - HymnSelectorModal: SearchInput no sheetSearchRow, ja fixo acima do FlatList. OK.
+      - members.tsx (Settings): SearchInput dentro do scrollable content. PRECISA FIX.
+      - topics.tsx (Settings): SearchInput dentro do scrollable content. PRECISA FIX.
+      O "botao fechar a direita" mencionado no CR se refere aos modais/selectors que
+      ja tem botao fechar. Para as telas de settings, nao faz sentido ter botao fechar
+      (ja tem back button no header). O foco e apenas fixar o search no topo.
+
+    acceptance_criteria:
+      - id: AC-F041-01
+        description: "SearchInput na tela de Membros fica fixo no topo"
+        given: "Tela de gerenciamento de membros em Settings"
+        when: "Usuario scrolla a lista de membros para baixo"
+        then: "SearchInput permanece fixo no topo, nao scrolla com o conteudo"
+        status: pending
+
+      - id: AC-F041-02
+        description: "SearchInput na tela de Temas fica fixo no topo"
+        given: "Tela de gerenciamento de temas em Settings"
+        when: "Usuario scrolla a lista de temas para baixo"
+        then: "SearchInput permanece fixo no topo, nao scrolla com o conteudo"
+        status: pending
+
+      - id: AC-F041-03
+        description: "SearchInput preenche espaco horizontal disponivel (flex:1)"
+        given: "SearchInput renderizado em members.tsx e topics.tsx"
+        when: "Tela e exibida"
+        then: "SearchInput usa flex:1 para preencher espaco horizontal"
+        status: pending
+
+      - id: AC-F041-04
+        description: "Botao X de limpar busca continua funcionando"
+        given: "SearchInput com texto digitado"
+        when: "Usuario clica no X"
+        then: "Texto e limpo e lista completa e restaurada"
+        status: pending
+
+      - id: AC-F041-05
+        description: "Layout nao quebra com teclado aberto"
+        given: "SearchInput fixo no topo"
+        when: "Teclado virtual abre ao focar no campo"
+        then: "Lista ajusta verticalmente, search permanece visivel"
+        status: pending
+
+      - id: AC-F041-06
+        description: "Selectors modais mantem layout existente"
+        given: "MemberSelectorModal, TopicSelectorModal, ActorSelector, HymnSelectorModal"
+        when: "Abertos normalmente"
+        then: "Layout existente nao e afetado (ja estao corretos)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F041-01
+        case: "Lista vazia (sem membros/temas)"
+        expected: "SearchInput fixo no topo mesmo sem itens na lista"
+        status: pending
+      - id: EC-F041-02
+        case: "Texto explicativo abaixo do header (F026/F033)"
+        expected: "Texto explicativo scrolla com o conteudo, search fica fixo acima da lista"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "Mover SearchInput para fora do ScrollView, posicionar fixo acima da lista"
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        change: "Mover SearchInput para fora do ScrollView, posicionar fixo acima da lista"
+
+    dependencies: []
+    related_features: [F003, F005, F028]
+    related_crs: [39, 84]
+
+  # ===========================================================================
+  # F042 / CR-97: Multi-select for 'Reconhecendo a Presenca' field
+  # ===========================================================================
+
+  - id: F042
+    name: "Multi-select for Reconhecendo a Presenca field"
+    cr_id: 97
+    type: feature
+    priority: medium
+
+    description: >
+      O campo 'Reconhecendo a Presenca' na agenda permite selecionar apenas UM
+      ator por vez - cada nova selecao substitui a anterior. O tipo no banco de
+      dados ja suporta array (string[]), e a exibicao ja mostra nomes separados
+      por virgula. O problema e apenas na logica de selecao: o handler faz
+      updateField('recognized_names', [actor.name]) substituindo o array inteiro
+      por um array de um elemento. O CR-97 pede selecao multipla (toggle).
+
+    user_request: >
+      "Campo 'Reconhecendo a Presenca' deve permitir selecao multipla de nomes."
+
+    analysis: >
+      Conforme QA PRE:
+      - DB: recognized_names e string[] | null - ja suporta multiplos nomes.
+      - Display: agenda.recognized_names?.join(', ') - ja exibe multiplos.
+      - Selecao: updateField('recognized_names', [actor.name]) - BUG: substitui.
+      - Presentation Mode: recognized_names.join(', ') - OK, ja suporta.
+      A solucao envolve: (1) alterar o handler de selecao no AgendaForm para
+      toggle (adicionar/remover do array), (2) no ActorSelector, indicar
+      visualmente quais atores ja estao selecionados, (3) nao fechar o modal
+      automaticamente apos selecao (permitir selecionar varios), (4) adicionar
+      botao "Confirmar" ou fechar manualmente para concluir a selecao.
+
+    acceptance_criteria:
+      - id: AC-F042-01
+        description: "Selecionar ator adiciona ao array recognized_names"
+        given: "Modal de selecao de atores aberto para 'Reconhecendo a Presenca'"
+        when: "Usuario clica em um ator NAO selecionado"
+        then: "O nome do ator e adicionado ao array recognized_names"
+        status: pending
+
+      - id: AC-F042-02
+        description: "Selecionar ator ja selecionado remove do array (toggle)"
+        given: "Modal de selecao de atores com ator ja selecionado"
+        when: "Usuario clica em um ator que ja esta no array"
+        then: "O nome do ator e removido do array recognized_names"
+        status: pending
+
+      - id: AC-F042-03
+        description: "Nomes selecionados exibidos como lista separada por virgula"
+        given: "Multiplos atores selecionados para 'Reconhecendo a Presenca'"
+        when: "O campo e exibido no AgendaForm"
+        then: "Exibe todos os nomes separados por ', '"
+        status: pending
+
+      - id: AC-F042-04
+        description: "Atores ja selecionados tem indicador visual no modal"
+        given: "Modal de selecao de atores aberto"
+        when: "Alguns atores ja estao no array recognized_names"
+        then: "Atores selecionados tem destaque visual (checkmark ou background diferente)"
+        status: pending
+
+      - id: AC-F042-05
+        description: "Modal nao fecha automaticamente apos selecao"
+        given: "Modal de selecao para campo 'Reconhecendo a Presenca'"
+        when: "Usuario seleciona um ator"
+        then: "Modal permanece aberto para permitir selecoes adicionais"
+        status: pending
+
+      - id: AC-F042-06
+        description: "Usuario pode fechar modal manualmente apos selecionar"
+        given: "Modal de selecao para campo 'Reconhecendo a Presenca'"
+        when: "Usuario termina de selecionar e fecha o modal (overlay ou botao)"
+        then: "Modal fecha e selecoes sao preservadas"
+        status: pending
+
+      - id: AC-F042-07
+        description: "Recognized_names persiste corretamente no banco como string[]"
+        given: "Usuario selecionou multiplos atores"
+        when: "Auto-save dispara (ou modal fecha)"
+        then: "Array completo e salvo em recognized_names no banco"
+        status: pending
+
+      - id: AC-F042-08
+        description: "Modo Apresentacao exibe multiplos nomes corretamente"
+        given: "Multiplos nomes em recognized_names"
+        when: "Modo Apresentacao e aberto"
+        then: "Nomes exibidos separados por virgula"
+        status: pending
+
+      - id: AC-F042-09
+        description: "Selecao single continua funcionando para outros campos de ator"
+        given: "Campos 'Presidindo', 'Dirigindo', 'Pianista', 'Regente'"
+        when: "Usuario seleciona um ator"
+        then: "Comportamento single-select inalterado (modal fecha, valor substituido)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F042-01
+        case: "recognized_names e null (nenhum selecionado ainda)"
+        expected: "Selecionar primeiro ator cria array com 1 elemento"
+        status: pending
+      - id: EC-F042-02
+        case: "Remover todos os atores selecionados"
+        expected: "recognized_names volta para null ou array vazio"
+        status: pending
+      - id: EC-F042-03
+        case: "Ator com nome identico a outro"
+        expected: "Toggle funciona por nome exato (string match)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/AgendaForm.tsx"
+        change: "Alterar handler de selecao do campo 'recognizing' para toggle (add/remove do array). Nao fechar modal apos selecao."
+      - path: "src/components/ActorSelector.tsx"
+        change: "Adicionar prop opcional 'selectedNames' (string[]) para indicar atores ja selecionados. Adicionar prop 'multiSelect' (boolean) para nao fechar apos selecao."
+
+    dependencies: []
+    related_features: [F012, F013]
+    related_crs: [73]
+
+  # ===========================================================================
+  # F043 / CR-99: Change speech labels from 'Orador' to 'Discurso'
+  # ===========================================================================
+
+  - id: F043
+    name: "Change speech labels from Orador to Discurso in Agenda"
+    cr_id: 99
+    type: ui
+    priority: low
+
+    description: >
+      Na edicao de agenda (AgendaForm) e no Modo Apresentacao, os labels dos
+      campos de discursantes mostram "1o Orador", "2o Orador", "3o Orador".
+      O CR-99 solicita trocar para "1o Discurso", "2o Discurso", "3o Discurso".
+      A mudanca afeta apenas os labels na aba Agenda e no Modo Apresentacao.
+      Os labels na aba Discursos (speeches.tsx) usam i18n key diferente
+      ("speeches.speech1", etc.) e nao sao afetados.
+
+    user_request: >
+      "Trocar labels dos discursos na edicao de agenda: '1o Orador' para
+      '1o Discurso' (idem 2o e 3o)."
+
+    analysis: >
+      O label atual usa t('speeches.speaker') que retorna "Orador" (pt-BR),
+      "Speaker" (en), "Orador" (es). Opcoes de implementacao:
+      a) Alterar o valor de 'speeches.speaker' diretamente para 'Discurso'/
+         'Speech'/'Discurso'. RISCO: a key 'speeches.speaker' pode ser usada em
+         outros contextos onde "Orador"/"Speaker" e o significado correto.
+      b) Criar nova key 'agenda.speechLabel' com valor 'Discurso'/'Speech'/
+         'Discurso' e usar em AgendaForm e usePresentationMode.
+      Buscando no codebase, 'speeches.speaker' e usado em:
+      - AgendaForm.tsx (3 usos) -> deve mudar para 'Discurso'
+      - usePresentationMode.ts (3 usos) -> deve mudar para 'Discurso'
+      - phase04-agenda-presentation.test.ts (1 uso no teste)
+      Todos os usos sao em contexto de Agenda/Presentation. Nao ha uso em
+      contexto onde "Orador" seria correto. Logo, opcao (a) e segura.
+
+    acceptance_criteria:
+      - id: AC-F043-01
+        description: "Labels de discursantes no AgendaForm mostram 'Discurso' em pt-BR"
+        given: "Ala com idioma pt-BR, agenda aberta"
+        when: "Card de agenda expandido com discursos"
+        then: "Labels mostram '1o Discurso', '2o Discurso', '3o Discurso'"
+        status: pending
+
+      - id: AC-F043-02
+        description: "Labels de discursantes no AgendaForm mostram 'Speech' em en"
+        given: "Ala com idioma en, agenda aberta"
+        when: "Card de agenda expandido com discursos"
+        then: "Labels mostram '1st Speech', '2nd Speech', '3rd Speech'"
+        status: pending
+
+      - id: AC-F043-03
+        description: "Labels de discursantes no AgendaForm mostram 'Discurso' em es"
+        given: "Ala com idioma es, agenda aberta"
+        when: "Card de agenda expandido com discursos"
+        then: "Labels mostram '1er Discurso', '2do Discurso', '3er Discurso'"
+        status: pending
+
+      - id: AC-F043-04
+        description: "Labels de discursantes no Modo Apresentacao tambem usam 'Discurso'"
+        given: "Modo Apresentacao aberto para um domingo com discursos"
+        when: "Cards de discursos sao exibidos"
+        then: "Labels usam 'Discurso'/'Speech'/'Discurso' conforme idioma da ala"
+        status: pending
+
+      - id: AC-F043-05
+        description: "Nenhum outro uso de 'speeches.speaker' quebrado"
+        given: "O valor da key 'speeches.speaker' foi alterado"
+        when: "Buscamos por t('speeches.speaker') no codebase"
+        then: "Todos os usos refletem corretamente o novo valor"
+        status: pending
+
+    edge_cases:
+      - id: EC-F043-01
+        case: "Testes existentes que verificam label 'speeches.speaker'"
+        expected: "Testes atualizados para refletir o novo valor ('Discurso')"
+        status: pending
+
+    files_impacted:
+      - path: "src/i18n/locales/pt-BR.json"
+        change: "Alterar 'speaker' de 'Orador' para 'Discurso' no namespace speeches"
+      - path: "src/i18n/locales/en.json"
+        change: "Alterar 'speaker' de 'Speaker' para 'Speech' no namespace speeches"
+      - path: "src/i18n/locales/es.json"
+        change: "Alterar 'speaker' de 'Orador' para 'Discurso' no namespace speeches"
+
+    dependencies: []
+    related_features: [F012, F016]
+    related_crs: [29, 69]
+    notes: >
+      A aba Discursos (speeches.tsx) nao usa t('speeches.speaker') para labels
+      de posicao. Ela usa t('speeches.speech1'), t('speeches.speech2'),
+      t('speeches.speech3') que ja mostram '1o Discurso'. Portanto, esta mudanca
+      e segura e nao afeta a aba Discursos.
+
+  # ===========================================================================
+  # F044 / CR-100: Read-only speaker field with last-minute swap
+  # ===========================================================================
+
+  - id: F044
+    name: "Read-only speaker field with edit icon for last-minute swap"
+    cr_id: 100
+    type: feature
+    priority: medium
+
+    description: >
+      Na aba Agenda, os campos de discursante (SpeakerField) atualmente sao
+      campos clicaveis que abrem o MemberSelectorModal para selecionar um membro.
+      O CR-100 solicita que esses campos sejam read-only por padrao, mostrando
+      o nome do discursante designado. Ao lado, um icone de edicao (lapis)
+      permite uma "Troca de Ultima Hora": ao clicar no lapis, o campo se torna
+      um TextInput manual onde o usuario pode digitar qualquer nome. Um icone X
+      permite reverter ao nome originalmente designado.
+      Este campo NÃO altera a designacao no banco (tabela speeches). Ele apenas
+      sobrescreve o speaker_name na tabela sunday_agendas para aquele domingo
+      especifico. O discursante designado original continua na tabela speeches.
+
+    user_request: >
+      "Campo de discursante read-only com icone de edicao para 'Troca de
+      Ultima Hora' - campo texto manual, icone X para reverter ao designado
+      original."
+
+    analysis: >
+      O SpeakerField atual e um wrapper de SelectorField que abre
+      MemberSelectorModal. O CR-100 pede um fluxo completamente diferente:
+      1. Estado normal (read-only): mostra nome do discursante designado + icone lapis.
+         Nao e clicavel como campo (nao abre modal).
+      2. Estado edicao (apos clicar lapis): campo vira TextInput editavel.
+         Mostra icone X para reverter ao nome original.
+      3. Reverter (clicar X): volta ao nome designado originalmente.
+
+      Campos afetados: SpeakerField nos 3 discursos (posicoes 1, 2, 3).
+
+      O dado "nome original" vem da tabela speeches (speech.speaker_name).
+      O dado "nome na agenda" vem da tabela sunday_agendas (via SpeakerField).
+      Atualmente, o AgendaForm nao armazena um override de speaker_name na
+      sunday_agendas. Os campos de speaker no AgendaForm leem diretamente de
+      speeches[position].speaker_name.
+
+      Para implementar "troca de ultima hora", precisamos de um campo na
+      sunday_agendas ou de um estado local no AgendaForm que armazene o override.
+      Opcao A: Adicionar campos speaker_1_override, speaker_2_override,
+      speaker_3_override na tabela sunday_agendas (migracao de DB).
+      Opcao B: Usar estado local no AgendaForm sem persistencia no DB (override
+      se perde ao recarregar). NAO RECOMENDADO.
+      Opcao C: Usar os campos ja existentes na sunday_agendas para armazenar o
+      override. Verificar se ha campos disponiveis.
+
+      Recomendacao: Opcao A - novos campos na tabela sunday_agendas para
+      persistir o override de nome do discursante.
+
+    acceptance_criteria:
+      - id: AC-F044-01
+        description: "Campo de discursante mostra nome designado como read-only"
+        given: "Discursante designado para posicao 1 com nome 'Joao Silva'"
+        when: "AgendaForm e aberto para aquele domingo"
+        then: "Campo mostra 'Joao Silva' como texto nao-editavel"
+        status: pending
+
+      - id: AC-F044-02
+        description: "Icone de edicao (lapis) visivel ao lado do nome"
+        given: "Campo de discursante com nome designado"
+        when: "AgendaForm exibe o campo"
+        then: "Icone de lapis (Unicode pencil) visivel a direita do nome"
+        status: pending
+
+      - id: AC-F044-03
+        description: "Clicar no lapis ativa modo de edicao com TextInput"
+        given: "Campo de discursante em modo read-only"
+        when: "Usuario clica no icone de lapis"
+        then: "Campo se torna TextInput editavel com o nome atual preenchido"
+        status: pending
+
+      - id: AC-F044-04
+        description: "Usuario pode digitar nome manual no TextInput"
+        given: "Campo de discursante em modo edicao"
+        when: "Usuario digita um nome diferente (ex: 'Maria Santos')"
+        then: "Nome digitado e salvo como override na agenda"
+        status: pending
+
+      - id: AC-F044-05
+        description: "Icone X visivel quando nome foi sobrescrito"
+        given: "Campo de discursante com nome diferente do original"
+        when: "AgendaForm exibe o campo"
+        then: "Icone X visivel para reverter ao nome original"
+        status: pending
+
+      - id: AC-F044-06
+        description: "Clicar X reverte ao nome originalmente designado"
+        given: "Campo de discursante com override manual"
+        when: "Usuario clica no icone X"
+        then: "Nome reverte ao speaker_name da tabela speeches e override e removido"
+        status: pending
+
+      - id: AC-F044-07
+        description: "Override e persistido no banco"
+        given: "Usuario digitou nome manual para troca de ultima hora"
+        when: "Auto-save dispara"
+        then: "O override e salvo em sunday_agendas (campos speaker_*_override)"
+        status: pending
+
+      - id: AC-F044-08
+        description: "Modo Apresentacao usa o override quando existir"
+        given: "Discursante com override de ultima hora"
+        when: "Modo Apresentacao e aberto"
+        then: "Mostra o nome do override, nao o nome original"
+        status: pending
+
+      - id: AC-F044-09
+        description: "Campo desabilitado para Observador"
+        given: "Usuario logado como Observador"
+        when: "AgendaForm exibe campos de discursante"
+        then: "Icone de lapis nao aparece, campo e somente leitura"
+        status: pending
+
+      - id: AC-F044-10
+        description: "Campo vazio quando nao ha discursante designado"
+        given: "Posicao de discurso sem designacao"
+        when: "AgendaForm exibe o campo"
+        then: "Campo mostra placeholder, sem icone de lapis (nao ha nome para sobrescrever)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F044-01
+        case: "Discursante designado apos override ja salvo"
+        expected: "Novo nome designado substitui o override (override e limpo)"
+        status: pending
+      - id: EC-F044-02
+        case: "Override com string vazia"
+        expected: "Tratado como reverter ao original (equivalente a clicar X)"
+        status: pending
+      - id: EC-F044-03
+        case: "Todas as 3 posicoes com override simultaneo"
+        expected: "Cada posicao tem override independente"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/AgendaForm.tsx"
+        change: "Reescrever SpeakerField para suportar modo read-only, lapis, TextInput e X. Ler override da sunday_agendas."
+      - path: "src/hooks/usePresentationMode.ts"
+        change: "Ao montar cards de discurso, usar override quando existir"
+      - path: "supabase/migrations/"
+        change: "Nova migracao para adicionar campos speaker_1_override, speaker_2_override, speaker_3_override em sunday_agendas"
+      - path: "src/types/database.ts"
+        change: "Adicionar campos speaker_*_override no tipo SundayAgenda"
+
+    dependencies: []
+    related_features: [F008, F012]
+    related_crs: [26]
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  - id: XC-01
+    concern: "Conflito de arquivos entre features"
+    details: >
+      F040: src/lib/whatsappUtils.ts, src/lib/whatsapp.ts
+      F041: src/app/(tabs)/settings/members.tsx, src/app/(tabs)/settings/topics.tsx
+      F042: src/components/AgendaForm.tsx, src/components/ActorSelector.tsx
+      F043: src/i18n/locales/*.json (3 arquivos)
+      F044: src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts, migracao DB, types
+      OVERLAP: F042 e F044 ambos alteram AgendaForm.tsx. Coordenar mudancas.
+      F043 e F044 ambos alteram usePresentationMode.ts. Coordenar mudancas.
+
+  - id: XC-02
+    concern: "Migracao de banco (apenas F044)"
+    details: >
+      Apenas F044 requer migracao de banco de dados para adicionar campos de
+      override na tabela sunday_agendas. Deve ser aplicada via Management API
+      (porta 5432 bloqueada no sandbox).
+
+  - id: XC-03
+    concern: "Testes existentes"
+    details: >
+      F043 afeta testes que verificam label 'speeches.speaker'
+      (phase04-agenda-presentation.test.ts). Devem ser atualizados.
+      F040 afeta testes de whatsappUtils (whatsapp-utils.test.ts,
+      phase03-whatsapp-invite.test.ts, cr003-qa.test.ts,
+      cr004-f006-uiux-fixes.test.ts). Devem ser atualizados.
+
+  - id: XC-04
+    concern: "Nenhuma dependencia nova"
+    details: >
+      Todas as features usam padroes e componentes existentes. package.json
+      inalterado. Icones via Unicode (DD-25).
+
+# =============================================================================
+# OPEN QUESTIONS (resolvidas durante analise)
+# =============================================================================
+
+open_questions: []
+  # Nenhuma open question pendente. Todas foram resolvidas:
+  # - F040: Template atual ja satisfaz requisitos. Melhoria: templates por idioma.
+  # - F041: Fix necessario apenas em settings screens.
+  # - F042: Toggle no array existente. ActorSelector precisa de multi-select mode.
+  # - F043: Alterar valor de i18n key 'speeches.speaker' e seguro (todos usos sao em Agenda).
+  # - F044: Opcao A (campos override na sunday_agendas) recomendada.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: A-1
+    assumption: >
+      O template padrao de WhatsApp atual ja satisfaz o CR-94. A melhoria sera
+      adicionar templates padrao por idioma (en, es) alem do pt-BR existente.
+    reason: >
+      O QA PRE confirmou que DEFAULT_TEMPLATE_PT_BR ja inclui {posicao},
+      {colecao}, {titulo} e {link}. O CR diz "trocar template padrao para
+      incluir posicao, tema e link" - esses ja estao incluidos.
+    impact_if_wrong: >
+      Se o usuario quiser um texto completamente diferente, precisara
+      fornecer o texto exato desejado.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Template atual ja satisfaz. Melhoria: templates i18n."
+
+  - id: A-2
+    assumption: >
+      O "botao fechar a direita" do CR-96 se refere ao botao fechar dos modais/
+      selectors, nao a um novo botao nas telas de settings.
+    reason: >
+      Telas de settings ja tem botao de voltar no header (DD-07/BR-01). Um botao
+      fechar no search nao faz sentido em telas fullscreen. Os modais ja tem
+      botao fechar que funciona como esperado.
+    impact_if_wrong: >
+      Se o usuario quiser botao fechar ao lado do search nas telas de settings,
+      precisaria especificar o comportamento (o que "fechar" faria - voltar?).
+    needs_confirmation: false
+    resolved: true
+    resolution: "Botao fechar se aplica aos modais, que ja implementam."
+
+  - id: A-3
+    assumption: >
+      Para F042, o ActorSelector precisa de um modo multi-select onde o modal
+      nao fecha apos selecao, e os atores selecionados sao indicados visualmente.
+    reason: >
+      O comportamento current e single-select (seleciona e fecha). Para multi-select,
+      o modal precisa permanecer aberto e indicar quais estao selecionados.
+    impact_if_wrong: >
+      Alternativa seria fechar o modal apos cada selecao e reabrir. UX inferior.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Multi-select mode com modal aberto e toggle."
+
+  - id: A-4
+    assumption: >
+      Para F043, alterar o valor da key 'speeches.speaker' diretamente e seguro
+      porque todos os usos sao em contexto de Agenda/Presentation.
+    reason: >
+      Busca no codebase revelou que t('speeches.speaker') e usado apenas em
+      AgendaForm.tsx (3 usos) e usePresentationMode.ts (3 usos). Nenhum uso em
+      contexto onde "Orador"/"Speaker" seria mais apropriado que "Discurso"/"Speech".
+    impact_if_wrong: >
+      Se houver uso oculto nao encontrado, o label estaria incorreto nesse local.
+      Revisao completa do codebase nao encontrou outros usos.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Seguro alterar diretamente."
+
+  - id: A-5
+    assumption: >
+      Para F044, novos campos na tabela sunday_agendas sao a melhor abordagem
+      para persistir overrides de nome de discursante.
+    reason: >
+      A tabela sunday_agendas ja armazena dados de agenda por domingo. Adicionar
+      campos speaker_1_override, speaker_2_override, speaker_3_override (nullable
+      string) e a extensao natural. Quando null, usa speech.speaker_name.
+    impact_if_wrong: >
+      Alternativa seria usar JSON field ou tabela separada. Campos simples sao
+      mais diretos e seguem o padrao existente da tabela.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Campos nullable na sunday_agendas."
+
+# =============================================================================
+# INCONSISTENCIES WITH SPEC_CONSOLIDATED
+# =============================================================================
+
+inconsistencies:
+  - id: INC-1
+    type: overlap
+    description: >
+      F040 (WhatsApp template update) e essencialmente uma "nao-mudanca" no
+      template existente. O QA PRE confirmou que o template ja inclui os
+      placeholders solicitados. A melhoria real e adicionar templates por idioma.
+    existing_spec: >
+      DD-08: "Placeholders validos: {nome}, {data}, {posicao}, {colecao},
+      {titulo}, {link}" - ja esta correto.
+      DD-24: "Template WhatsApp null no DB: mostrar template padrao" - padrao
+      e sempre pt-BR independente do idioma da ala.
+    new_request: >
+      CR-94: "Trocar template padrao para incluir posicao, tema e link" - ja
+      incluem. A melhoria e templates i18n.
+    resolution: >
+      Atualizar SPEC_CONSOLIDATED para refletir que o default template agora
+      varia por idioma da ala.
+
+  - id: INC-2
+    type: ambiguity
+    description: >
+      F044 (last-minute swap) cria um conceito novo no modelo de dados: override
+      de nome de discursante na agenda vs. designacao na tabela speeches. A regra
+      BR-05 (snapshot pattern) diz que "edicao de membro NAO altera discursos
+      existentes". F044 adiciona uma camada extra: o override na agenda tambem nao
+      altera a tabela speeches, apenas substitui o nome exibido na agenda/apresentacao.
+    existing_spec: >
+      BR-05: "Snapshot pattern: edicao/exclusao de membro, tema ou ator NAO
+      altera discursos/agendas existentes"
+      DD-05: "Discursos armazenam speaker_name como texto desnormalizado"
+    new_request: >
+      CR-100: "Campo texto manual para troca de ultima hora, icone X para
+      reverter ao designado original"
+    resolution: >
+      F044 e uma extensao do snapshot pattern, nao uma violacao. O override na
+      agenda e um snapshot temporario que pode ser revertido ao snapshot original
+      (speaker_name na tabela speeches). BR-05 continua valida.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-07: true   # Todas respostas incorporadas
+  GATE-08: true   # ZERO open questions pendentes
+  GATE-09: true   # Todas assumptions confirmadas/resolvidas
+  GATE-10: true   # SPEC_F040_F044.yaml salvo no disco
+  GATE-11: true   # SPEC_CONSOLIDATED.yaml sera atualizado a seguir
+  GATE-12: true   # Status e "complete"

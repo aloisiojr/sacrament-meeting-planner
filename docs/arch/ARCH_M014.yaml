@@ -1,0 +1,389 @@
+# =============================================================================
+# ARCH_M014.yaml
+# Architecture for Batch 7 Phase 2 - UX & Features
+# Features: F040, F041, F042, F043, F044
+# CRs: CR-94, CR-96, CR-97, CR-99, CR-100
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Implementar 5 melhorias de UX e features na agenda, templates e telas de settings"
+  principles:
+    - "Reutilizar componentes e padroes existentes (ActorSelector, SearchInput, i18n keys)"
+    - "Minimal change: alterar o minimo de arquivos necessario por feature"
+    - "Zero dependencias novas: nenhum pacote adicionado (DD-25)"
+    - "Snapshot pattern extendido: override de speaker nao altera tabela speeches (DD-05/DD-36)"
+    - "i18n: todos os textos/templates em pt-BR, en, es"
+
+diagram: |
+  F040: [whatsappUtils.ts] --DEFAULT_TEMPLATE_{PT_BR,EN,ES}--> [buildWhatsAppUrl(phone,code,template,vars,lang)]
+        [whatsapp.ts] re-exports novos templates
+
+  F041: [members.tsx / topics.tsx] -- SearchInput fora do ScrollView --> [fixo no topo]
+        [FlatList/ScrollView abaixo] -- scrollavel -->
+
+  F042: [AgendaForm] --multiSelect=true--> [ActorSelector]
+        onSelect: toggle add/remove no array recognized_names
+        ActorSelector: selectedNames[] prop, checkmark visual, modal nao fecha
+
+  F043: [i18n locales] -- speeches.speaker: "Discurso"/"Speech"/"Discurso" -->
+        [AgendaForm] + [usePresentationMode] usam t('speeches.speaker')
+
+  F044: [AgendaForm] --SpeakerField reescrito--> read-only + lapis + TextInput + X
+        [sunday_agendas] --speaker_1/2/3_override (nullable text)--> [migracao 014]
+        [usePresentationMode] -- usa override quando existir -->
+
+# =============================================================================
+# COMPONENTS (affected modules)
+# =============================================================================
+
+components:
+  - name: "SpeechModule (M003)"
+    responsibility: "Ciclo de vida de discursos e integracao WhatsApp"
+    dependencies: []
+    change_for_f040: >
+      whatsappUtils.ts: Adicionar DEFAULT_TEMPLATE_EN e DEFAULT_TEMPLATE_ES.
+      Alterar buildWhatsAppUrl para aceitar parametro 'language' e selecionar
+      template padrao do idioma da ala como fallback. whatsapp.ts: re-exportar
+      novos templates.
+
+  - name: "WardDataModule (M002)"
+    responsibility: "Dados mestres da ala incluindo membros e topics"
+    dependencies: []
+    change_for_f041: >
+      members.tsx: Extrair SearchInput do ScrollView e posicionar fixo acima
+      do conteudo scrollavel. topics.tsx: mesma mudanca de layout.
+
+  - name: "AgendaModule (M004)"
+    responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
+    dependencies: [M002]
+    change_for_f042: >
+      AgendaForm.tsx: Alterar handler do campo 'recognizing' para toggle
+      (add/remove do array). Nao fechar modal apos selecao. Passar
+      selectedNames e multiSelect props ao ActorSelector.
+    change_for_f043: >
+      Nenhuma mudanca de codigo - apenas i18n key speeches.speaker alterada.
+      AgendaForm e usePresentationMode usam t('speeches.speaker') que agora
+      retorna 'Discurso'/'Speech'/'Discurso'.
+    change_for_f044: >
+      AgendaForm.tsx: Reescrever SpeakerField para suportar modo read-only
+      com icone lapis, modo edicao com TextInput, e icone X para reverter.
+      Ler override de speaker_*_override da sunday_agendas.
+      usePresentationMode.ts: ao montar cards de discurso, usar override
+      quando existir (speaker_N_override ?? speech.speaker_name).
+
+  - name: "ActorSelector (componente de M002)"
+    responsibility: "Bottom-sheet para selecao/CRUD de atores"
+    dependencies: []
+    change_for_f042: >
+      Adicionar props opcionais: selectedNames (string[]) para indicar atores
+      ja selecionados, multiSelect (boolean) para nao fechar apos selecao.
+      Renderizar checkmark nos atores selecionados. Quando multiSelect=true,
+      handleSelect nao chama handleClose.
+
+  - name: "UIShell (M008)"
+    responsibility: "App shell, i18n, tema"
+    dependencies: []
+    change_for_f043: >
+      Alterar valor da key 'speeches.speaker' nos 3 arquivos de locale.
+      pt-BR: 'Orador' -> 'Discurso'. en: 'Speaker' -> 'Speech'.
+      es: 'Orador' -> 'Discurso'.
+
+  - name: "Database Schema"
+    responsibility: "PostgreSQL com RLS"
+    dependencies: []
+    change_for_f044: >
+      Nova migracao (014): ALTER TABLE sunday_agendas ADD COLUMN
+      speaker_1_override TEXT DEFAULT NULL, speaker_2_override TEXT
+      DEFAULT NULL, speaker_3_override TEXT DEFAULT NULL.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # --- F040: WhatsApp templates i18n ---
+  - name: "buildWhatsAppUrl_v2"
+    component: "whatsappUtils.ts"
+    methods:
+      - name: "buildWhatsAppUrl"
+        input: "(phone: string, countryCode: string, template: string, variables: WhatsAppVariables, language?: string)"
+        output: "string (wa.me URL)"
+        notes: >
+          Novo parametro opcional 'language' (default 'pt-BR'). Quando template
+          e vazio/null, seleciona DEFAULT_TEMPLATE_{language} como fallback.
+          Backward compatible: chamadas existentes sem language continuam usando pt-BR.
+
+  - name: "default_templates"
+    component: "whatsappUtils.ts"
+    methods:
+      - name: "DEFAULT_TEMPLATE_PT_BR"
+        input: "const"
+        output: "string (template existente)"
+      - name: "DEFAULT_TEMPLATE_EN"
+        input: "const"
+        output: "string (template em ingles)"
+      - name: "DEFAULT_TEMPLATE_ES"
+        input: "const"
+        output: "string (template em espanhol)"
+      - name: "getDefaultTemplate"
+        input: "(language: string)"
+        output: "string (template do idioma ou pt-BR como fallback)"
+
+  # --- F042: ActorSelector multi-select ---
+  - name: "ActorSelectorProps_v2"
+    component: "ActorSelector.tsx"
+    methods:
+      - name: "ActorSelectorProps"
+        input: >
+          { visible: boolean, roleFilter: ActorRoleFilter, onSelect: (actor) => void,
+            onClose: () => void, selectedNames?: string[], multiSelect?: boolean }
+        output: "JSX.Element"
+        notes: >
+          Novas props opcionais. selectedNames: array de nomes ja selecionados
+          para indicador visual. multiSelect: quando true, modal nao fecha
+          apos selecao e renderiza checkmark nos selecionados.
+
+  # --- F044: SpeakerField read-only + override ---
+  - name: "SpeakerField_v2"
+    component: "AgendaForm.tsx"
+    methods:
+      - name: "SpeakerField"
+        input: >
+          { label: string, speakerName: string, overrideName: string | null,
+            onEditOverride: (name: string | null) => void, disabled: boolean,
+            colors: ThemeColors }
+        output: "JSX.Element"
+        notes: >
+          Reescrito. speakerName e o nome original da tabela speeches.
+          overrideName e o override de ultima hora da sunday_agendas (null = sem override).
+          onEditOverride: callback para salvar/limpar override. disabled: observer.
+
+  - name: "SundayAgenda_v2"
+    component: "database.ts"
+    methods:
+      - name: "SundayAgenda interface"
+        input: "type update"
+        output: >
+          Adicionar 3 campos: speaker_1_override: string | null,
+          speaker_2_override: string | null, speaker_3_override: string | null
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities:
+    - name: "SundayAgenda (update)"
+      fields:
+        - { name: "speaker_1_override", type: "string | null", notes: "Override para troca de ultima hora do 1o discursante" }
+        - { name: "speaker_2_override", type: "string | null", notes: "Override para troca de ultima hora do 2o discursante" }
+        - { name: "speaker_3_override", type: "string | null", notes: "Override para troca de ultima hora do 3o discursante" }
+
+  migration:
+    file: "supabase/migrations/014_add_speaker_overrides.sql"
+    content: |
+      -- Migration 014: Add speaker override fields for last-minute swap (CR-100/F044)
+      ALTER TABLE sunday_agendas
+        ADD COLUMN speaker_1_override TEXT DEFAULT NULL,
+        ADD COLUMN speaker_2_override TEXT DEFAULT NULL,
+        ADD COLUMN speaker_3_override TEXT DEFAULT NULL;
+
+      -- Add comment for documentation
+      COMMENT ON COLUMN sunday_agendas.speaker_1_override IS 'Override name for 1st speaker (last-minute swap). NULL = use speeches.speaker_name';
+      COMMENT ON COLUMN sunday_agendas.speaker_2_override IS 'Override name for 2nd speaker (last-minute swap). NULL = use speeches.speaker_name';
+      COMMENT ON COLUMN sunday_agendas.speaker_3_override IS 'Override name for 3rd speaker (last-minute swap). NULL = use speeches.speaker_name';
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  f040: "Sem impacto. Templates sao constantes client-side."
+  f041: "Sem impacto. Layout-only change."
+  f042: "Sem impacto. Usa mesmo updateField que ja respeita RLS."
+  f043: "Sem impacto. i18n-only change."
+  f044: >
+    Os novos campos speaker_*_override sao TEXT nullable na tabela sunday_agendas.
+    A RLS existente de sunday_agendas (ward_id = auth.jwt().app_metadata.ward_id)
+    cobre automaticamente os novos campos. Observer nao pode editar (agenda:write=false).
+    Nenhuma nova policy necessaria.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  f040: "Nenhuma mudanca de logging. buildWhatsAppUrl e funcao pura."
+  f041: "Nenhuma mudanca de logging."
+  f042: "updateField('recognized_names', array) ja e logado via auto-save existente."
+  f043: "Nenhuma mudanca de logging."
+  f044: "updateField('speaker_N_override', name) sera logado via auto-save existente do AgendaForm."
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  file_overlap: >
+    F042 e F044 alteram AgendaForm.tsx. Implementar F042 primeiro (handler do
+    recognizing field) e depois F044 (SpeakerField rewrite). Ambos alteram
+    partes diferentes do componente.
+    F043 e F044 alteram usePresentationMode.ts. F043 e apenas uma mudanca
+    de i18n key (sem codigo). F044 altera a logica de buildPresentationCards.
+
+  implementation_order: >
+    Ordem recomendada: F043 (i18n key, zero risco) -> F040 (templates i18n,
+    isolado) -> F041 (layout fix, isolado) -> F042 (multi-select, altera
+    AgendaForm handler) -> F044 (speaker override, altera AgendaForm e
+    usePresentationMode, depende de migracao DB).
+
+  backward_compatibility: >
+    F040: buildWhatsAppUrl com novo parametro opcional 'language'. Chamadas
+    existentes sem language continuam funcionando (default pt-BR).
+    F042: ActorSelector com novas props opcionais. Usos existentes inalterados.
+    F044: Campos nullable com DEFAULT NULL. App funciona sem migracao (override
+    sera sempre null, exibindo nome original).
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-037
+    title: "Multi-select mode no ActorSelector via props opcionais"
+    context: >
+      Campo 'Reconhecendo a Presenca' precisa de selecao multipla, mas todos
+      os outros campos de ator (presidir, dirigir, pianista, regente) sao
+      single-select. ActorSelector precisa suportar ambos os modos.
+    decision: >
+      Adicionar props opcionais multiSelect (boolean) e selectedNames (string[])
+      ao ActorSelector. Quando multiSelect=true: (1) modal nao fecha apos selecao,
+      (2) checkmark nos atores selecionados, (3) handleAdd tambem nao fecha.
+      Props opcionais garantem backward compatibility.
+    consequences:
+      - "Usos existentes de ActorSelector nao precisam de mudanca"
+      - "AgendaForm passa multiSelect=true apenas para o campo 'recognizing'"
+      - "Toggle logic (add/remove) fica no AgendaForm, nao no ActorSelector"
+
+  - id: ADR-038
+    title: "Speaker override como campos nullable na sunday_agendas (nao JSON)"
+    context: >
+      F044 precisa persistir override de nome do discursante. Opcoes: (A) campos
+      individuais speaker_1/2/3_override na sunday_agendas, (B) JSON field com
+      overrides, (C) estado local sem persistencia.
+    decision: >
+      Opcao A: 3 campos TEXT nullable (speaker_1_override, speaker_2_override,
+      speaker_3_override). Quando null, exibe speech.speaker_name. Quando
+      preenchido, exibe o override. Migracao 014 adiciona os campos.
+    consequences:
+      - "Tipo simples e direto (TEXT nullable), sem parsing de JSON"
+      - "Segue padrao da tabela (campos individuais por posicao de discurso)"
+      - "Backward compatible: null = comportamento atual"
+      - "Override persiste entre sessoes (salvo no DB)"
+      - "RLS existente cobre automaticamente (mesma tabela)"
+
+# =============================================================================
+# FEATURE-BY-FEATURE IMPLEMENTATION DETAILS
+# =============================================================================
+
+implementation_details:
+
+  f040_whatsapp_templates_i18n:
+    files:
+      - path: "src/lib/whatsappUtils.ts"
+        changes:
+          - "Adicionar DEFAULT_TEMPLATE_EN (ingles) com 6 placeholders"
+          - "Adicionar DEFAULT_TEMPLATE_ES (espanhol) com 6 placeholders"
+          - "Adicionar funcao getDefaultTemplate(language: string) -> string"
+          - "Alterar buildWhatsAppUrl: novo param opcional 'language', usar getDefaultTemplate"
+      - path: "src/lib/whatsapp.ts"
+        changes:
+          - "Re-exportar DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES, getDefaultTemplate"
+    template_en: >
+      Hi! The Bishopric would like to invite you to give the {posicao} speech on
+      Sunday {data}! You will speak about a topic from {colecao} titled {titulo}
+      {link}. Can we confirm your speech?
+    template_es: >
+      Hola, como estas? El Obispado te quiere invitar a dar el {posicao} discurso
+      el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo {titulo}
+      {link}. Podemos confirmar tu discurso?
+
+  f041_search_fixed_top:
+    files:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        changes:
+          - "Mover SearchInput para fora do ScrollView/FlatList"
+          - "Container pai: flex:1 com SearchInput fixo no topo"
+          - "FlatList/ScrollView ocupa restante com flex:1"
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        changes:
+          - "Mesmo padrao: SearchInput fora do ScrollView"
+          - "Texto explicativo (F033) permanece dentro do ScrollView"
+
+  f042_multi_select_recognizing:
+    files:
+      - path: "src/components/ActorSelector.tsx"
+        changes:
+          - "Adicionar props opcionais: selectedNames?: string[], multiSelect?: boolean"
+          - "Quando multiSelect=true: handleSelect nao chama onClose"
+          - "Renderizar checkmark (U+2713) ao lado de atores em selectedNames"
+          - "handleAdd: quando multiSelect, nao fecha modal apos criar"
+      - path: "src/components/AgendaForm.tsx"
+        changes:
+          - "Handler do 'recognizing': toggle add/remove no array recognized_names"
+          - "Passar selectedNames={agenda.recognized_names} e multiSelect={true} ao ActorSelector"
+          - "Nao chamar setSelectorModal(null) no onSelect do 'recognizing'"
+
+  f043_speech_labels:
+    files:
+      - path: "src/i18n/locales/pt-BR.json"
+        changes:
+          - "speeches.speaker: 'Orador' -> 'Discurso'"
+      - path: "src/i18n/locales/en.json"
+        changes:
+          - "speeches.speaker: 'Speaker' -> 'Speech'"
+      - path: "src/i18n/locales/es.json"
+        changes:
+          - "speeches.speaker: 'Orador' -> 'Discurso'"
+
+  f044_speaker_override:
+    files:
+      - path: "supabase/migrations/014_add_speaker_overrides.sql"
+        changes:
+          - "ALTER TABLE sunday_agendas ADD COLUMN speaker_1/2/3_override TEXT DEFAULT NULL"
+      - path: "src/types/database.ts"
+        changes:
+          - "Adicionar speaker_1_override, speaker_2_override, speaker_3_override ao SundayAgenda"
+      - path: "src/components/AgendaForm.tsx"
+        changes:
+          - "Reescrever SpeakerField: modo read-only (nome + lapis), modo edicao (TextInput + X)"
+          - "Ler override de agenda.speaker_N_override"
+          - "onEditOverride: updateField('speaker_N_override', name | null)"
+          - "Icone lapis: U+270F (pencil), icone X: U+2716 (cross)"
+          - "Observer: sem icone de lapis (read-only)"
+          - "Sem discursante designado: placeholder, sem lapis"
+      - path: "src/hooks/usePresentationMode.ts"
+        changes:
+          - "buildPresentationCards: usar agenda.speaker_N_override ?? speech.speaker_name"
+          - "Afeta labels das 3 posicoes de discurso"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true   # Componentes tem responsabilidade unica
+  GATE-03: true   # Contratos definidos para cada integracao
+  GATE-04: true   # ADRs registrados para decisoes multi-componente (ADR-037, ADR-038)
+  GATE-05: true   # ARCH_M014.yaml salvo no disco
+  GATE-06: true   # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true   # ARCH_SUMMARY preenchido
+  GATE-08: true   # Maximo 10 componentes por modulo respeitado (6 componentes)

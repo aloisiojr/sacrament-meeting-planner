@@ -1,0 +1,511 @@
+# =============================================================================
+# QA_PLAN_batch7_phase2.yaml
+# PRE Validation Plan for Batch 7 Phase 2 - UX & Features
+# Features: F040, F041, F042, F043, F044
+# Created: 2026-02-18
+# =============================================================================
+
+meta:
+  batch: 7
+  phase: 2
+  type: feature_request
+  features:
+    - F040 (CR-94)
+    - F041 (CR-96)
+    - F042 (CR-97)
+    - F043 (CR-99)
+    - F044 (CR-100)
+  pre_validation_timestamp: "2026-02-18"
+  pre_validation_status: passed
+
+
+# #############################################################################
+# F040 / CR-94: WhatsApp template with speech position, topic, and link
+# #############################################################################
+
+f040:
+  cr_id: CR-94
+  title: "WhatsApp template with speech position, topic, and link"
+  type: feature_request
+  user_request: |
+    Trocar template padrao de convite WhatsApp para incluir posicao do discurso,
+    tema e link.
+  related_crs: [CR-14, CR-63]
+
+  baseline:
+    description: |
+      The current default WhatsApp template is defined in src/lib/whatsappUtils.ts
+      as DEFAULT_TEMPLATE_PT_BR. It already includes {posicao}, {colecao}, {titulo},
+      and {link} placeholders. The template text is:
+        "Ola, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso
+        no domingo dia {data}! Voce falara sobre um tema da {colecao} com o titulo {titulo}
+        {link}. Podemos confirmar o seu discurso?"
+      The whatsapp settings screen (src/app/(tabs)/settings/whatsapp.tsx) allows editing
+      the template with all 6 placeholders ({nome}, {data}, {posicao}, {colecao}, {titulo}, {link}).
+      The resolveTemplate function in whatsappUtils.ts correctly replaces all placeholders.
+    evidence:
+      - "src/lib/whatsappUtils.ts:8-9: DEFAULT_TEMPLATE_PT_BR already includes {posicao}, {colecao}, {titulo}, {link}"
+      - "src/app/(tabs)/settings/whatsapp.tsx:19-26: PLACEHOLDERS array lists all 6 placeholders"
+      - "Baseline tests pass: 57 test files, 2789 tests, all green"
+
+  pre_finding: |
+    The feature PARTIALLY EXISTS. The current template already includes placeholders for
+    position ({posicao}), topic collection ({colecao}), topic title ({titulo}), and link ({link}).
+    However, the user may want a DIFFERENT default template text or additional formatting.
+    The CR text says "trocar template padrao" (change default template) which means the user
+    wants a NEW default template, not just the existing one.
+    Marked as validated=true because the current template may not match what the user wants
+    exactly. The developer should confirm the exact template text with the user or update
+    DEFAULT_TEMPLATE_PT_BR to the desired format.
+
+  validated: true
+
+  validation_checks:
+    - id: VC-040-01
+      description: "DEFAULT_TEMPLATE_PT_BR includes speech position placeholder ({posicao})"
+      type: functional
+      how_to_verify: "Check src/lib/whatsappUtils.ts for DEFAULT_TEMPLATE_PT_BR constant"
+      expected_result: "Template text includes {posicao} placeholder"
+      priority: must_pass
+
+    - id: VC-040-02
+      description: "DEFAULT_TEMPLATE_PT_BR includes topic placeholder ({titulo})"
+      type: functional
+      how_to_verify: "Check src/lib/whatsappUtils.ts for DEFAULT_TEMPLATE_PT_BR constant"
+      expected_result: "Template text includes {titulo} placeholder"
+      priority: must_pass
+
+    - id: VC-040-03
+      description: "DEFAULT_TEMPLATE_PT_BR includes link placeholder ({link})"
+      type: functional
+      how_to_verify: "Check src/lib/whatsappUtils.ts for DEFAULT_TEMPLATE_PT_BR constant"
+      expected_result: "Template text includes {link} placeholder"
+      priority: must_pass
+
+    - id: VC-040-04
+      description: "resolveTemplate correctly replaces all placeholders"
+      type: functional
+      how_to_verify: "Check existing tests for resolveTemplate function. Run tests."
+      expected_result: "All placeholders resolved correctly in output message"
+      priority: must_pass
+
+    - id: VC-040-05
+      description: "WhatsApp settings screen lists all placeholders for user editing"
+      type: functional
+      how_to_verify: "Check src/app/(tabs)/settings/whatsapp.tsx PLACEHOLDERS array"
+      expected_result: "All 6 placeholders listed and clickable"
+      priority: should_pass
+
+    - id: VC-040-06
+      description: "Default template text matches the user's desired format"
+      type: behavioral
+      how_to_verify: "Compare DEFAULT_TEMPLATE_PT_BR with user's expected template wording"
+      expected_result: "Template clearly states speech position, topic title, and link"
+      priority: must_pass
+
+    - id: VC-040-07
+      description: "Existing WhatsApp tests still pass"
+      type: regression
+      how_to_verify: "Run npx vitest run and check all whatsapp-related test files"
+      expected_result: "All tests pass, zero regressions"
+      priority: must_pass
+
+
+# #############################################################################
+# F041 / CR-96: Search fields fixed at top, filling available space
+# #############################################################################
+
+f041:
+  cr_id: CR-96
+  title: "Search fields fixed at top filling available space with close button"
+  type: feature_request
+  user_request: |
+    Campos de busca (membros, temas, atores) devem ser fixos no topo e preencher
+    espaco disponivel, com botao fechar a direita.
+  related_crs: [CR-39, CR-84]
+
+  baseline:
+    description: |
+      Search fields currently exist in:
+      1. MemberSelectorModal (src/components/MemberSelectorModal.tsx) - Full screen modal,
+         search in header row with close button. Uses SearchInput. flex:1 on search.
+      2. TopicSelectorModal (src/components/TopicSelectorModal.tsx) - Full screen modal,
+         search in header row with close button. Uses SearchInput. flex:1 on search.
+      3. ActorSelector (src/components/ActorSelector.tsx) - Bottom sheet (2/3 screen),
+         search in searchRow with close button. Uses SearchInput. flex:1 on search.
+      4. HymnSelectorModal (inline in AgendaForm.tsx) - Bottom sheet (2/3 screen),
+         search in sheetSearchRow with close button. Uses SearchInput. flex:1 on search.
+      5. Members settings screen (src/app/(tabs)/settings/members.tsx) - Full page,
+         search in searchContainer div. NOT fixed at top - scrolls with content.
+      6. Topics settings screen (src/app/(tabs)/settings/topics.tsx) - Full page,
+         search input present. NOT fixed at top.
+
+      Modal-based selectors already have search fixed at top (in header before FlatList).
+      The settings screens (members, topics) have search that scrolls with content.
+    evidence:
+      - "MemberSelectorModal.tsx:63-70: SearchInput in header, already fixed above FlatList"
+      - "TopicSelectorModal.tsx:80-86: SearchInput in header, already fixed above FlatList"
+      - "ActorSelector.tsx:198-209: SearchInput in searchRow, fixed above FlatList"
+      - "members.tsx:553-559: SearchInput in searchContainer, part of scrollable content"
+      - "Baseline tests pass: 57 test files, 2789 tests, all green"
+
+  pre_finding: |
+    Feature PARTIALLY EXISTS. The modal-based selectors (MemberSelectorModal,
+    TopicSelectorModal, ActorSelector, HymnSelectorModal) already have the search
+    fixed at the top with a close button. However, the settings screens for members
+    and topics have search fields that scroll with content, not fixed at top.
+    The CR asks that ALL search fields be fixed at the top and fill available space
+    with a close button at the right side. Development needed for settings screens.
+
+  validated: true
+
+  validation_checks:
+    - id: VC-041-01
+      description: "Members settings screen has search fixed at top (not scrolling with content)"
+      type: functional
+      how_to_verify: "Check src/app/(tabs)/settings/members.tsx - SearchInput should be outside ScrollView/FlatList header"
+      expected_result: "SearchInput is in a fixed position above the scrollable list"
+      priority: must_pass
+
+    - id: VC-041-02
+      description: "Topics settings screen has search fixed at top"
+      type: functional
+      how_to_verify: "Check src/app/(tabs)/settings/topics.tsx - SearchInput should be outside ScrollView/FlatList header"
+      expected_result: "SearchInput is in a fixed position above the scrollable list"
+      priority: must_pass
+
+    - id: VC-041-03
+      description: "All search fields use flex:1 to fill available horizontal space"
+      type: functional
+      how_to_verify: "Check all SearchInput usages for flex:1 style"
+      expected_result: "SearchInput has flex:1 in all modals/screens"
+      priority: must_pass
+
+    - id: VC-041-04
+      description: "Close/fechar button present to the right of all search fields in selectors"
+      type: functional
+      how_to_verify: "Check all selector modals for close button next to search"
+      expected_result: "Close button visible at right side of search row"
+      priority: should_pass
+
+    - id: VC-041-05
+      description: "SearchInput X clear button still works (CR-84 regression)"
+      type: regression
+      how_to_verify: "Verify SearchInput component still renders clear X when value.length > 0"
+      expected_result: "Clear button appears and clears search on press"
+      priority: must_pass
+
+    - id: VC-041-06
+      description: "Existing search-related tests still pass"
+      type: regression
+      how_to_verify: "Run npx vitest run and verify all search tests pass"
+      expected_result: "All tests pass, zero regressions"
+      priority: must_pass
+
+
+# #############################################################################
+# F042 / CR-97: Multi-select for 'Reconhecendo a Presenca' field
+# #############################################################################
+
+f042:
+  cr_id: CR-97
+  title: "Multi-select for Reconhecendo a Presenca field"
+  type: feature_request
+  user_request: |
+    Campo 'Reconhecendo a Presenca' deve permitir selecao multipla de nomes.
+  related_crs: [CR-73]
+
+  baseline:
+    description: |
+      The 'Reconhecendo a Presenca' (Recognizing Presence) field in AgendaForm.tsx
+      currently:
+      1. Uses a SelectorField showing recognized_names?.join(', ')
+      2. Opens an ActorSelector with roleFilter='can_recognize'
+      3. When an actor is selected, stores ONLY a single name: updateField('recognized_names', [actor.name])
+      4. Database field recognized_names is typed as string[] | null (already supports arrays)
+      5. The UI displays multiple names joined by comma but can only select ONE at a time
+      6. Each new selection REPLACES the previous instead of APPENDING
+
+      The field type in database.ts is already string[] so the DB supports multi-select.
+      The issue is purely in the UI/logic: selecting a new actor replaces the entire array
+      instead of toggling the actor in/out of the array.
+    evidence:
+      - "AgendaForm.tsx:235: value={agenda.recognized_names?.join(', ') || ''} - displays as comma-separated"
+      - "AgendaForm.tsx:484: updateField('recognized_names', [actor.name]) - REPLACES with single-element array"
+      - "database.ts:177: recognized_names: string[] | null - DB already supports array"
+      - "usePresentationMode.ts:80-83: recognized_names displayed in presentation mode as join(', ')"
+      - "Baseline tests pass: 57 test files, 2789 tests, all green"
+
+  pre_finding: |
+    Feature DOES NOT EXIST as specified. The database already supports multiple names
+    (string[] type) and the display already shows comma-separated names, BUT the selection
+    logic only allows picking ONE actor at a time - each selection replaces the previous.
+    CR-97 requires multi-select behavior where the user can pick multiple actors and they
+    are all stored in the recognized_names array. Development needed to change the
+    ActorSelector to support multi-select mode, or create a separate multi-select component.
+
+  validated: true
+
+  validation_checks:
+    - id: VC-042-01
+      description: "User can select multiple actors for 'Reconhecendo a Presenca'"
+      type: functional
+      how_to_verify: "Check AgendaForm recognizing field handler - should append/toggle actors instead of replace"
+      expected_result: "Selecting actor adds to array; selecting again removes (toggle behavior)"
+      priority: must_pass
+
+    - id: VC-042-02
+      description: "Selected names display as comma-separated list"
+      type: functional
+      how_to_verify: "Check AgendaForm SelectorField value for recognizing field"
+      expected_result: "value shows all selected names joined by ', '"
+      priority: must_pass
+
+    - id: VC-042-03
+      description: "Previously selected actors are visually indicated in selector"
+      type: functional
+      how_to_verify: "Check ActorSelector or multi-select component for highlight/checkmark on selected items"
+      expected_result: "Already selected actors have visual indicator (checkmark, highlight, etc.)"
+      priority: should_pass
+
+    - id: VC-042-04
+      description: "User can deselect (remove) a previously selected actor"
+      type: functional
+      how_to_verify: "Check that tapping a selected actor removes it from the array"
+      expected_result: "Tapping selected actor removes from recognized_names array"
+      priority: must_pass
+
+    - id: VC-042-05
+      description: "recognized_names saved correctly to database as string array"
+      type: functional
+      how_to_verify: "Check updateField call stores the complete array"
+      expected_result: "Full array of names stored in recognized_names field"
+      priority: must_pass
+
+    - id: VC-042-06
+      description: "Presentation mode still shows recognized names correctly"
+      type: regression
+      how_to_verify: "Check usePresentationMode.ts still joins recognized_names correctly"
+      expected_result: "Presentation mode shows all names joined by ', '"
+      priority: must_pass
+
+    - id: VC-042-07
+      description: "Existing agenda tests still pass"
+      type: regression
+      how_to_verify: "Run npx vitest run and verify all agenda tests pass"
+      expected_result: "All tests pass, zero regressions"
+      priority: must_pass
+
+
+# #############################################################################
+# F043 / CR-99: Speech labels '1o Orador' -> '1o Discurso'
+# #############################################################################
+
+f043:
+  cr_id: CR-99
+  title: "Change speech labels from Orador to Discurso"
+  type: feature_request
+  user_request: |
+    Trocar labels dos discursos na edicao de agenda: '1o Orador' -> '1o Discurso'
+    (idem 2o e 3o).
+  related_crs: [CR-29, CR-69]
+
+  baseline:
+    description: |
+      Currently the speech labels in AgendaForm.tsx use the i18n key 'speeches.speaker':
+        - Line 367: label={`1\u00BA ${t('speeches.speaker')}`}  => "1o Orador" (pt-BR)
+        - Line 375: label={`2\u00BA ${t('speeches.speaker')}`}  => "2o Orador"
+        - Line 418: label={`3\u00BA ${t('speeches.speaker')}`}  => "3o Orador"
+
+      In i18n files:
+        - pt-BR.json: "speaker": "Orador"
+        - en.json: "speaker": "Speaker"
+        - es.json: "speaker": "Orador"
+
+      Also used in usePresentationMode.ts (lines 136-137, 158) for presentation cards:
+        - label: `1\u00BA ${t('speeches.speaker')}`
+
+      The CR wants:
+        - pt-BR: "1o Orador" -> "1o Discurso"
+        - en: "1st Speaker" -> "1st Speech"
+        - es: "1er Orador" -> "1er Discurso"
+    evidence:
+      - "AgendaForm.tsx:367: `1\\u00BA ${t('speeches.speaker')}` - currently 'Orador'"
+      - "AgendaForm.tsx:375: `2\\u00BA ${t('speeches.speaker')}` - currently 'Orador'"
+      - "AgendaForm.tsx:418: `3\\u00BA ${t('speeches.speaker')}` - currently 'Orador'"
+      - "pt-BR.json: 'speaker': 'Orador'"
+      - "en.json: 'speaker': 'Speaker'"
+      - "es.json: 'speaker': 'Orador'"
+      - "usePresentationMode.ts:136-137: Also uses speeches.speaker for presentation cards"
+      - "Baseline tests pass: 57 test files, 2789 tests, all green"
+
+  pre_finding: |
+    Feature DOES NOT EXIST. Currently labels show "1o Orador", "2o Orador", "3o Orador"
+    in pt-BR (and equivalent in en/es). The user wants "1o Discurso", "2o Discurso",
+    "3o Discurso". This requires changing either:
+    a) The i18n value for 'speeches.speaker' (but this key is also used elsewhere), or
+    b) Create a new i18n key like 'speeches.speechLabel' and use it in AgendaForm and
+       usePresentationMode instead.
+    Need to be careful not to break other usages of 'speeches.speaker' key.
+
+  validated: true
+
+  validation_checks:
+    - id: VC-043-01
+      description: "AgendaForm speech labels show 'Discurso' instead of 'Orador' in pt-BR"
+      type: functional
+      how_to_verify: "Check AgendaForm SpeakerField labels use updated i18n key"
+      expected_result: "Labels render as '1o Discurso', '2o Discurso', '3o Discurso'"
+      priority: must_pass
+
+    - id: VC-043-02
+      description: "English labels show 'Speech' instead of 'Speaker'"
+      type: functional
+      how_to_verify: "Check en.json for new/updated i18n key"
+      expected_result: "English labels render as '1st Speech', '2nd Speech', '3rd Speech'"
+      priority: must_pass
+
+    - id: VC-043-03
+      description: "Spanish labels show 'Discurso' instead of 'Orador'"
+      type: functional
+      how_to_verify: "Check es.json for new/updated i18n key"
+      expected_result: "Spanish labels render as '1er Discurso', '2do Discurso', '3er Discurso'"
+      priority: must_pass
+
+    - id: VC-043-04
+      description: "Presentation mode also uses updated labels"
+      type: functional
+      how_to_verify: "Check usePresentationMode.ts speech card labels"
+      expected_result: "Presentation cards show 'Discurso' instead of 'Orador'"
+      priority: must_pass
+
+    - id: VC-043-05
+      description: "Other usages of 'speeches.speaker' key are not broken"
+      type: regression
+      how_to_verify: "Search for all usages of t('speeches.speaker') or speeches.speaker in codebase"
+      expected_result: "If key was renamed, all references updated. If new key created, old key still works where needed."
+      priority: must_pass
+
+    - id: VC-043-06
+      description: "Existing tests still pass after label changes"
+      type: regression
+      how_to_verify: "Run npx vitest run and check all tests"
+      expected_result: "All tests pass, zero regressions"
+      priority: must_pass
+
+
+# #############################################################################
+# F044 / CR-100: Read-only speaker field with edit icon for last-minute swap
+# #############################################################################
+
+f044:
+  cr_id: CR-100
+  title: "Read-only speaker field with edit icon for last-minute swap"
+  type: feature_request
+  user_request: |
+    Campo de discursante read-only com icone de edicao para 'Troca de Ultima Hora' -
+    campo texto manual, icone X para reverter ao designado original.
+  related_crs: [CR-26]
+
+  baseline:
+    description: |
+      Currently the speaker fields in AgendaForm.tsx (SpeakerField component) are
+      clickable selector fields that open MemberSelectorModal. When clicked, user picks
+      a member from the ward member list. There is:
+      1. No concept of "read-only" speaker field - all speaker fields are either
+         fully clickable or fully disabled (observer mode)
+      2. No "edit icon" - the field is a Pressable that looks like a bordered text
+      3. No "last-minute swap" flow - changing a speaker completely replaces the
+         assignment with a new member
+      4. No way to manually type a speaker name (always selects from member list)
+      5. No "revert to original" functionality
+      6. No X icon to revert to original designee
+
+      The speech data model in database.ts has fields for speaker_name, speaker_phone,
+      member_id, and status. The status field could potentially track "swapped" state,
+      but no such status exists yet.
+    evidence:
+      - "AgendaForm.tsx:614-638: SpeakerField is a simple FieldRow + SelectorField, fully clickable"
+      - "AgendaForm.tsx:366-372: Speaker field 1 opens MemberSelectorModal on press"
+      - "No 'edit' icon, no 'revert' icon found in SpeakerField component"
+      - "No 'last-minute' or 'swap' references in the codebase"
+      - "Baseline tests pass: 57 test files, 2789 tests, all green"
+
+  pre_finding: |
+    Feature DOES NOT EXIST. Currently speaker fields in the agenda form are simple
+    clickable selectors that open a member picker modal. There is no concept of:
+    1. A read-only field that shows the designated speaker
+    2. An edit icon (pencil) to trigger a "last-minute swap"
+    3. A manual text input for typing a replacement name
+    4. An X icon to revert to the originally designated speaker
+    Full development needed: new SpeakerField component with read-only state, edit mode
+    with free-text input, original value tracking, and revert capability.
+
+  validated: true
+
+  validation_checks:
+    - id: VC-044-01
+      description: "Speaker field shows designated name as read-only (not clickable by default)"
+      type: functional
+      how_to_verify: "Check SpeakerField component renders name as non-editable text"
+      expected_result: "Speaker name displayed as read-only text, not as a pressable selector"
+      priority: must_pass
+
+    - id: VC-044-02
+      description: "Edit icon (pencil) visible on speaker field to trigger swap mode"
+      type: functional
+      how_to_verify: "Check SpeakerField for edit/pencil icon rendering"
+      expected_result: "Pencil icon visible when speaker is assigned"
+      priority: must_pass
+
+    - id: VC-044-03
+      description: "Clicking edit icon switches to manual text input mode"
+      type: functional
+      how_to_verify: "Check SpeakerField state management for edit mode toggle"
+      expected_result: "Clicking pencil icon shows TextInput for manual name entry"
+      priority: must_pass
+
+    - id: VC-044-04
+      description: "Manual text input allows typing a replacement speaker name"
+      type: functional
+      how_to_verify: "Check that TextInput in edit mode is editable and updates speaker_name"
+      expected_result: "User can type a name that overrides the designated speaker"
+      priority: must_pass
+
+    - id: VC-044-05
+      description: "X icon appears to revert to the originally designated speaker"
+      type: functional
+      how_to_verify: "Check SpeakerField for X/revert icon when in swap/edited state"
+      expected_result: "X icon visible when name has been manually changed; pressing it reverts to original"
+      priority: must_pass
+
+    - id: VC-044-06
+      description: "Reverting restores the original designated speaker name"
+      type: functional
+      how_to_verify: "Check revert handler restores original speaker_name from speech record"
+      expected_result: "After pressing X, speaker_name returns to the originally assigned member name"
+      priority: must_pass
+
+    - id: VC-044-07
+      description: "Existing speaker assignment flow still works (assign from member list)"
+      type: regression
+      how_to_verify: "Verify MemberSelectorModal is still used for initial assignment"
+      expected_result: "Initial speaker assignment via member picker unchanged"
+      priority: must_pass
+
+    - id: VC-044-08
+      description: "Existing agenda and speech tests still pass"
+      type: regression
+      how_to_verify: "Run npx vitest run and check all tests"
+      expected_result: "All tests pass, zero regressions"
+      priority: must_pass
+
+
+# #############################################################################
+# PASS CRITERIA
+# #############################################################################
+
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.

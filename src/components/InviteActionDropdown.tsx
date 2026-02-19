@@ -69,9 +69,9 @@ export function InviteActionDropdown({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <View style={[styles.content, { backgroundColor: colors.card }]}>
-          {/* Title: speaker name */}
+          {/* Title: i18n status change label */}
           <Text style={[styles.title, { color: colors.text }]}>
-            {speech?.speaker_name ?? ''}
+            {t('speeches.changeStatus')}
           </Text>
 
           {/* Option 1: View conversation (WhatsApp) */}

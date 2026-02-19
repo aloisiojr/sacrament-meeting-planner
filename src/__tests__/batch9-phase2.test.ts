@@ -371,21 +371,28 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   const getStatusChangeModal = () => readSourceFile('components/StatusChangeModal.tsx');
 
   // --- AC-F062-01: LED click on assigned_invited shows only confirmed and gave_up ---
+  // NOTE: Updated by CR-129 (F071) - ledAllowedStatuses is now a constant list
+  //       excluding not_assigned, no longer conditional on assigned_invited only.
   describe('AC-F062-01: LED click on assigned_invited filters to 2 options', () => {
     it('ledAllowedStatuses is set for assigned_invited', () => {
       const content = getSpeechSlot();
-      expect(content).toContain("status === 'assigned_invited'");
-      expect(content).toContain("'assigned_confirmed', 'gave_up'");
+      // F071 changed ledAllowedStatuses to a constant array
+      expect(content).toContain('const ledAllowedStatuses: SpeechStatus[]');
+      expect(content).toContain("'assigned_confirmed'");
+      expect(content).toContain("'gave_up'");
     });
 
-    it('ledAllowedStatuses contains exactly assigned_confirmed and gave_up', () => {
+    it('ledAllowedStatuses contains assigned_confirmed and gave_up', () => {
       const content = getSpeechSlot();
       const ledIdx = content.indexOf('const ledAllowedStatuses');
-      const ledEnd = content.indexOf(';', ledIdx);
+      const ledEnd = content.indexOf('];', ledIdx) + 2;
       const ledSection = content.substring(ledIdx, ledEnd);
       expect(ledSection).toContain("'assigned_confirmed'");
       expect(ledSection).toContain("'gave_up'");
-      expect(ledSection).not.toContain("'assigned_not_invited'");
+      // F071: also contains assigned_not_invited and assigned_invited
+      expect(ledSection).toContain("'assigned_not_invited'");
+      expect(ledSection).toContain("'assigned_invited'");
+      // but not not_assigned
       expect(ledSection).not.toContain("'not_assigned'");
     });
 
@@ -396,13 +403,16 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   });
 
   // --- AC-F062-02: LED click on assigned_not_invited shows all transitions ---
+  // NOTE: Updated by CR-129 (F071) - ledAllowedStatuses is now constant
   describe('AC-F062-02: LED click on assigned_not_invited shows all transitions', () => {
-    it('ledAllowedStatuses is undefined for non-assigned_invited status', () => {
+    it('ledAllowedStatuses is a constant array (not conditional)', () => {
       const content = getSpeechSlot();
       const ledIdx = content.indexOf('const ledAllowedStatuses');
-      const ledEnd = content.indexOf(';', ledIdx);
+      const ledEnd = content.indexOf('];', ledIdx) + 2;
       const ledSection = content.substring(ledIdx, ledEnd);
-      expect(ledSection).toContain(': undefined');
+      // F071: ledAllowedStatuses is now a constant, not conditional
+      expect(ledSection).toContain("'assigned_not_invited'");
+      expect(ledSection).toContain("'assigned_invited'");
     });
 
     it('assigned_not_invited has correct transitions in VALID_TRANSITIONS', () => {
@@ -439,10 +449,13 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   });
 
   // --- AC-F062-05: LED not interactive for not_assigned ---
+  // NOTE: Updated by CR-129 (F071) - disabled now includes terminal states
   describe('AC-F062-05: LED disabled for not_assigned', () => {
     it('LED disabled condition includes status not_assigned', () => {
       const content = getSpeechSlot();
-      expect(content).toContain("disabled={isObserver || status === 'not_assigned'}");
+      expect(content).toContain("disabled={isObserver || status === 'not_assigned'");
+      expect(content).toContain("status === 'assigned_confirmed'");
+      expect(content).toContain("status === 'gave_up'");
     });
   });
 
@@ -486,20 +499,20 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   });
 
   // --- EC-F062-01: Status gave_up - LED click ---
+  // NOTE: Updated by CR-129 (F071) - gave_up LED is now disabled
   describe('EC-F062-01: gave_up LED click shows not_assigned', () => {
     it('gave_up has only not_assigned as transition', () => {
       expect(getAvailableStatuses('gave_up')).toEqual(['not_assigned']);
     });
 
-    it('ledAllowedStatuses is undefined for gave_up (no filtering)', () => {
-      // status !== 'assigned_invited' => undefined
+    it('ledAllowedStatuses is a constant that includes gave_up', () => {
+      // F071: ledAllowedStatuses is now a constant array (not conditional)
       const content = getSpeechSlot();
       const ledIdx = content.indexOf('const ledAllowedStatuses');
-      const ledEnd = content.indexOf(';', ledIdx);
+      const ledEnd = content.indexOf('];', ledIdx) + 2;
       const ledSection = content.substring(ledIdx, ledEnd);
-      // Only assigned_invited triggers the filter
-      expect(ledSection).toContain("status === 'assigned_invited'");
-      // gave_up would fall to the else branch (undefined)
+      // gave_up is in the allowed list (but LED is disabled for this state)
+      expect(ledSection).toContain("'gave_up'");
     });
   });
 

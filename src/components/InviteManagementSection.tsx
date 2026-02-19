@@ -18,6 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
 import { QueryErrorView } from './QueryErrorView';
+import { StatusLED } from './StatusLED';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppUrl, openWhatsApp } from '../lib/whatsapp';
@@ -175,9 +176,18 @@ export function InviteManagementSection() {
               <Text style={[styles.speakerName, { color: colors.text }]} numberOfLines={1}>
                 {speech.speaker_name}
               </Text>
-              <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
-                {speech.position}{'\u00BA'}
-              </Text>
+              <View style={styles.speechInfoRow}>
+                <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
+                  {t('speeches.slot', { number: `${speech.position}\u00BA` })}
+                </Text>
+                <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
+                  {' - '}
+                </Text>
+                <StatusLED status={speech.status} size={10} />
+                <Text style={[styles.statusName, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {' '}{t(`speechStatus.${speech.status}`)}
+                </Text>
+              </View>
             </View>
             <Pressable
               style={[
@@ -242,6 +252,14 @@ const styles = StyleSheet.create({
   },
   speechNum: {
     fontSize: 12,
+  },
+  speechInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusName: {
+    fontSize: 12,
+    flex: 1,
   },
   actionButton: {
     paddingHorizontal: 12,

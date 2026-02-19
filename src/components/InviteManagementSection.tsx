@@ -22,7 +22,7 @@ import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
-import { buildWhatsAppUrl, openWhatsApp } from '../lib/whatsapp';
+import { buildWhatsAppUrl, buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
 import { getInviteItems } from '../lib/speechUtils';
 import type { Speech, SpeechStatus } from '../types/database';
 
@@ -107,24 +107,11 @@ export function InviteManagementSection() {
     async (speech: Speech) => {
       setDropdownSpeech(null);
       if (speech.speaker_phone) {
-        const url = buildWhatsAppUrl(
-          speech.speaker_phone,
-          '',
-          '',
-          {
-            speakerName: speech.speaker_name ?? '',
-            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-            topic: speech.topic_title ?? '',
-            position: `${speech.position}\u00BA`,
-            collection: speech.topic_collection ?? '',
-            link: speech.topic_link ?? '',
-          },
-          locale
-        );
+        const url = buildWhatsAppConversationUrl(speech.speaker_phone);
         await openWhatsApp(url);
       }
     },
-    [locale]
+    []
   );
 
   const handleDropdownStatusChange = useCallback(

@@ -6,13 +6,13 @@
 // --- Default Templates ---
 
 export const DEFAULT_TEMPLATE_PT_BR =
-  'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título {titulo} {link}. Podemos confirmar o seu discurso?';
+  'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
 
 export const DEFAULT_TEMPLATE_EN =
-  'Hi! The Bishopric would like to invite you to give the {posicao} speech on Sunday {data}! You will speak about a topic from {colecao} titled {titulo} {link}. Can we confirm your speech?';
+  'Hi! The Bishopric would like to invite you to give the {posicao} speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
 
 export const DEFAULT_TEMPLATE_ES =
-  'Hola, como estas? El Obispado te quiere invitar a dar el {posicao} discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo {titulo} {link}. Podemos confirmar tu discurso?';
+  'Hola, como estas? El Obispado te quiere invitar a dar el {posicao} discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
 
 /**
  * Get the default template for a given language.

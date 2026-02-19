@@ -18,8 +18,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
 import { QueryErrorView } from './QueryErrorView';
-import { getNextSundays, toISODateString, formatDate } from '../lib/dateUtils';
-import { getCurrentLanguage } from '../i18n';
+import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
+import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppUrl, openWhatsApp } from '../lib/whatsapp';
 import { getInviteItems } from '../lib/speechUtils';
 import type { Speech, SpeechStatus } from '../types/database';
@@ -63,9 +63,11 @@ export function InviteManagementSection() {
           '', // Will use default template for language
           {
             speakerName: speech.speaker_name ?? '',
-            date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
+            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
             topic: speech.topic_title ?? '',
             position: `${speech.position}\u00BA`,
+            collection: speech.topic_collection ?? '',
+            link: speech.topic_link ?? '',
           },
           locale
         );
@@ -95,9 +97,11 @@ export function InviteManagementSection() {
                   '',
                   {
                     speakerName: speech.speaker_name ?? '',
-                    date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
+                    date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
                     topic: speech.topic_title ?? '',
                     position: `${speech.position}\u00BA`,
+                    collection: speech.topic_collection ?? '',
+                    link: speech.topic_link ?? '',
                   },
                   locale
                 );

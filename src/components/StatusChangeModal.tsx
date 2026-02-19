@@ -29,6 +29,8 @@ export interface StatusChangeModalProps {
   onSelect: (status: SpeechStatus) => void;
   /** Called when the modal is closed without selection. */
   onClose: () => void;
+  /** Optional filter: only show these statuses (intersected with available transitions). */
+  allowedStatuses?: SpeechStatus[];
 }
 
 // --- Status Colors ---
@@ -48,11 +50,15 @@ export function StatusChangeModal({
   currentStatus,
   onSelect,
   onClose,
+  allowedStatuses,
 }: StatusChangeModalProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
   const availableStatuses = getAvailableStatuses(currentStatus);
+  const filtered = allowedStatuses
+    ? availableStatuses.filter(s => allowedStatuses.includes(s))
+    : availableStatuses;
 
   const getStatusLabel = useCallback(
     (status: SpeechStatus): string => {
@@ -87,7 +93,7 @@ export function StatusChangeModal({
           </View>
 
           <FlatList
-            data={availableStatuses}
+            data={filtered}
             keyExtractor={(item) => item}
             renderItem={({ item }) => (
               <Pressable

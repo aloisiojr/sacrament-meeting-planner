@@ -1,0 +1,553 @@
+# =============================================================================
+# PLAN_P017.yaml
+# Implementation Plan for Batch 9 Phase 1 - Bug Fixes & Quick UI
+# Features: F055, F056, F057, F058, F059
+# CRs: CR-112, CR-113, CR-117, CR-122, CR-125
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Fix 3 bugs e 2 UI tweaks: abrir conversa WhatsApp sem reenviar convite (F055),
+  trocar titulo do InviteActionDropdown de speaker name para 'Alterar status' i18n
+  (F056), corrigir bandeira +1 mostrando Canada ao inves de USA com highlight por
+  label (F057), trocar label '3o Discurso' para 'Ultimo Discurso' i18n em 4 locais
+  (F058), e corrigir duplicacao visual do campo de oracao no AgendaForm com nova
+  prop modalOnly no PrayerSelector (F059).
+
+strategy:
+  order: "Independent changes first (i18n, 1-line fix) -> Utils -> Components -> Tests"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F056 - Trocar titulo do InviteActionDropdown para i18n
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/components/InviteActionDropdown.tsx, trocar o titulo do modal de
+      speech?.speaker_name para t('speeches.changeStatus'). A chave i18n
+      speeches.changeStatus JA EXISTE nos 3 locales (pt-BR: "Alterar status",
+      en: "Change status", es: "Cambiar estado"). Mudanca de 1 linha:
+      Linha 73-74: trocar {speech?.speaker_name ?? ''} por
+      {t('speeches.changeStatus')}.
+    files:
+      - "src/components/InviteActionDropdown.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "Titulo do InviteActionDropdown usa t('speeches.changeStatus')"
+      - "speech?.speaker_name NAO e mais usado como titulo"
+      - "Titulo exibe 'Alterar status' em pt-BR, 'Change status' em en, 'Cambiar estado' em es"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que titulo do InviteActionDropdown mostra t('speeches.changeStatus')"
+      - type: unit
+        description: "Verificar que titulo NAO mostra speech.speaker_name"
+    covers:
+      acceptance_criteria: ["AC-F056-01", "AC-F056-02", "AC-F056-03"]
+      edge_cases: ["EC-F056-01"]
+    risks:
+      - risk: "Nenhum risco significativo - mudanca de 1 linha, chave i18n ja existe"
+        mitigation: "N/A"
+
+  # =========================================================================
+  # STEP-02: F055 - buildWhatsAppConversationUrl em whatsappUtils.ts
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/lib/whatsappUtils.ts, adicionar nova funcao exportada
+      buildWhatsAppConversationUrl(phone: string): string que:
+      (1) Limpa o telefone removendo espacos, hifens, parenteses
+      (mesma logica de buildWhatsAppUrl linhas 78-88).
+      (2) Remove o '+' inicial se existir.
+      (3) Retorna https://wa.me/{cleanPhone} SEM parametro ?text=.
+      A funcao e simples (~8 linhas) e segue ADR-042 (funcao separada
+      para responsabilidade clara: abrir conversa vs enviar mensagem).
+    files:
+      - "src/lib/whatsappUtils.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "Funcao buildWhatsAppConversationUrl exportada de whatsappUtils.ts"
+      - "Funcao limpa telefone: remove espacos, hifens, parenteses, + inicial"
+      - "Retorna URL no formato https://wa.me/{cleanPhone} sem ?text="
+      - "buildWhatsAppConversationUrl('+5511987654321') retorna 'https://wa.me/5511987654321'"
+      - "buildWhatsAppConversationUrl('55 11 98765-4321') retorna 'https://wa.me/5511987654321'"
+      - "buildWhatsAppUrl existente NAO foi alterada (zero regressao)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que buildWhatsAppConversationUrl retorna URL sem ?text="
+      - type: unit
+        description: "Verificar limpeza de caracteres especiais do telefone"
+      - type: unit
+        description: "Verificar que buildWhatsAppUrl continua funcionando normalmente"
+    covers:
+      acceptance_criteria: ["AC-F055-02"]
+      edge_cases: ["EC-F055-01"]
+    risks:
+      - risk: "Duplicacao de logica de limpeza de telefone com buildWhatsAppUrl"
+        mitigation: "Trivial (3 linhas), ADR-042 aceita este tradeoff para separacao de responsabilidade"
+
+  # =========================================================================
+  # STEP-03: F055 - Usar buildWhatsAppConversationUrl no handleDropdownWhatsApp
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/components/InviteManagementSection.tsx, alterar handleDropdownWhatsApp
+      (linhas 106-128) para usar buildWhatsAppConversationUrl ao inves de
+      buildWhatsAppUrl:
+      (1) Adicionar import de buildWhatsAppConversationUrl de '../lib/whatsappUtils'.
+          NOTA: o import atual (linha 25) e de '../lib/whatsapp' (que reexporta),
+          entao adicionar import direto de whatsappUtils OU verificar se whatsapp.ts
+          reexporta a nova funcao.
+      (2) Alterar handleDropdownWhatsApp: remover toda a construcao de URL com
+          buildWhatsAppUrl e variantes. Substituir por:
+          const url = buildWhatsAppConversationUrl(speech.speaker_phone);
+          await openWhatsApp(url);
+      (3) O handler fica muito mais simples (~5 linhas ao inves de ~20).
+      (4) handleNotInvitedAction (linhas 71-97) NAO e alterado - continua
+          enviando convite com mensagem (comportamento correto para primeiro envio).
+      (5) Verificar se 'Ver Conversa' no dropdown esta desabilitado quando
+          speaker_phone e null (ja tratado no InviteActionDropdown STEP-01
+          do batch anterior, confirmar que funciona).
+    files:
+      - "src/components/InviteManagementSection.tsx"
+      - "src/lib/whatsapp.ts"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "handleDropdownWhatsApp usa buildWhatsAppConversationUrl ao inves de buildWhatsAppUrl"
+      - "URL gerada para 'Ver Conversa' e wa.me/{phone} SEM ?text="
+      - "handleNotInvitedAction NAO foi alterado (ainda envia convite com mensagem)"
+      - "import de buildWhatsAppConversationUrl adicionado"
+      - "'Ver Conversa' desabilitado quando speaker_phone e null (ja existente)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que handleDropdownWhatsApp chama buildWhatsAppConversationUrl"
+      - type: unit
+        description: "Verificar que handleNotInvitedAction continua chamando buildWhatsAppUrl com mensagem"
+    covers:
+      acceptance_criteria: ["AC-F055-01", "AC-F055-03", "AC-F055-04"]
+      edge_cases: ["EC-F055-02"]
+    risks:
+      - risk: "Import path incorreto para buildWhatsAppConversationUrl"
+        mitigation: "Verificar se whatsapp.ts reexporta ou importar diretamente de whatsappUtils.ts"
+
+  # =========================================================================
+  # STEP-04: F058 - Adicionar i18n key speeches.lastSpeech + atualizar labels
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Adicionar nova key i18n e atualizar 4 locais que exibem label do 3o discurso:
+      (1) src/i18n/locales/pt-BR.json: adicionar "lastSpeech": "Ultimo Discurso"
+          dentro do bloco "speeches". Usar acento correto: U com acento agudo.
+      (2) src/i18n/locales/en.json: adicionar "lastSpeech": "Final Speech"
+          dentro do bloco "speeches".
+      (3) src/i18n/locales/es.json: adicionar "lastSpeech": "Ultimo Discurso"
+          dentro do bloco "speeches". Usar acento correto: U com acento agudo.
+      (4) src/components/SpeechSlot.tsx: alterar getPositionLabel() (linhas 51-54)
+          para retornar t('speeches.lastSpeech') quando position === 3.
+          Manter formato ordinal para position 1 e 2.
+      (5) src/components/AgendaForm.tsx: alterar label do SpeakerField para
+          posicao 3 (linha 378). Trocar `3\u00BA ${t('speeches.speaker')}`
+          por `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`.
+      (6) src/components/InviteManagementSection.tsx: alterar segunda linha
+          do invite row (linha 180). Quando speech.position === 3, usar
+          t('speeches.lastSpeech') ao inves de
+          t('speeches.slot', { number: '3\u00BA' }).
+      (7) src/hooks/usePresentationMode.ts: alterar label do 3o discurso
+          no buildPresentationCards (linha 162). Trocar
+          `3\u00BA ${t('speeches.speaker')}` por
+          `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+      - "src/components/SpeechSlot.tsx"
+      - "src/components/AgendaForm.tsx"
+      - "src/components/InviteManagementSection.tsx"
+      - "src/hooks/usePresentationMode.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02"]
+    done_when:
+      - "pt-BR.json contem speeches.lastSpeech = 'Último Discurso'"
+      - "en.json contem speeches.lastSpeech = 'Final Speech'"
+      - "es.json contem speeches.lastSpeech = 'Último Discurso'"
+      - "JSON valido em todos os 3 locales (sem erros de parse)"
+      - "getPositionLabel(3, t) retorna t('speeches.lastSpeech') (nao '3o Discurso')"
+      - "getPositionLabel(1, t) continua retornando '1o Discurso' (inalterado)"
+      - "getPositionLabel(2, t) continua retornando '2o Discurso' (inalterado)"
+      - "AgendaForm label do SpeakerField posicao 3 usa t('speeches.lastSpeech')"
+      - "InviteManagementSection segunda linha para position===3 usa t('speeches.lastSpeech')"
+      - "usePresentationMode label do 3o discurso usa t('speeches.lastSpeech')"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que t('speeches.lastSpeech') retorna valor correto em cada idioma"
+      - type: unit
+        description: "Verificar que getPositionLabel retorna 'lastSpeech' key para position 3"
+      - type: unit
+        description: "Verificar que getPositionLabel retorna ordinal para position 1 e 2"
+    covers:
+      acceptance_criteria: ["AC-F058-01", "AC-F058-02", "AC-F058-03", "AC-F058-04", "AC-F058-05", "AC-F058-06"]
+      edge_cases: ["EC-F058-01"]
+    risks:
+      - risk: "JSON invalido apos edicao manual dos locales"
+        mitigation: "Verificar com JSON.parse ou linter apos salvar"
+      - risk: "SpeechSlot docstring menciona '3o Discurso'"
+        mitigation: "Atualizar docstring no mesmo step"
+
+  # =========================================================================
+  # STEP-05: F057 - Reordenar USA antes de Canada + getCountryByLabel
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/lib/countryCodes.ts:
+      (1) Reordenar COUNTRY_CODES: mover a entrada de USA (linha 182:
+          { code: '+1', flag: USA flag, label: 'United States (+1)' })
+          para ANTES da entrada de Canada (linha 46:
+          { code: '+1', flag: Canada flag, label: 'Canada (+1)' }).
+          Posicionar USA logo apos Brunei (linha 40) e antes de Bulgaria
+          (linha 41), ou melhor: logo apos a posicao de 'United Arab Emirates'
+          na lista alfabetica. A forma mais simples e inserir USA logo
+          antes de Canada, quebrando a ordem alfabetica apenas neste caso.
+          Comentar: // USA before Canada: +1 defaults to US flag (ADR-043)
+      (2) Adicionar funcao exportada getCountryByLabel(label: string):
+          CountryCode | undefined que faz COUNTRY_CODES.find(c => c.label === label).
+          Labels sao unicos na lista.
+    files:
+      - "src/lib/countryCodes.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "USA (+1) aparece ANTES de Canada (+1) na lista COUNTRY_CODES"
+      - "Comentario explicativo sobre reordenacao presente"
+      - "getFlagForCode('+1') retorna bandeira dos EUA (primeiro match)"
+      - "getCountryByLabel exportada e funcional"
+      - "getCountryByLabel('United States (+1)') retorna entrada USA"
+      - "getCountryByLabel('Canada (+1)') retorna entrada Canada"
+      - "getCountryByLabel('inexistente') retorna undefined"
+      - "splitPhoneNumber NAO afetado (usa Sets, nao depende de ordem)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que getFlagForCode('+1') retorna bandeira dos EUA"
+      - type: unit
+        description: "Verificar que getCountryByLabel funciona para labels existentes"
+    covers:
+      acceptance_criteria: ["AC-F057-01", "AC-F057-04"]
+      edge_cases: ["EC-F057-01", "EC-F057-02"]
+    risks:
+      - risk: "Reordenacao quebra CODE_SETS_BY_LENGTH (Sets de splitPhoneNumber)"
+        mitigation: "Sets nao dependem de ordem de insercao. Apenas agrupam por tamanho do code."
+
+  # =========================================================================
+  # STEP-06: F057 - Highlight por label no dropdown de paises em members.tsx
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em src/app/(tabs)/settings/members.tsx, alterar MemberEditor para usar
+      label do pais ao inves de code para highlight no dropdown:
+      (1) Importar getCountryByLabel de '../../../lib/countryCodes' (adicionar
+          ao import existente na linha 31).
+      (2) Adicionar estado local countryLabel: useState<string>. Inicializar
+          com o label do pais correspondente ao member?.country_code ?? '+55'.
+          Usar: COUNTRY_CODES.find(c => c.code === (member?.country_code ?? '+55'))?.label ?? 'Brazil (+55)'.
+      (3) No FlatList do country picker (linha 144-164), alterar condicao de
+          highlight: trocar item.code === countryCode (linha 151) por
+          item.label === countryLabel. Isso garante que apenas 1 pais
+          fica highlighted para codigos duplicados (+1, +7, etc).
+      (4) No onPress do country item (linha 153-155): alem de
+          setCountryCode(item.code), tambem setCountryLabel(item.label).
+      (5) handleSave continua enviando apenas countryCode (nao o label).
+          Nao alterar interface do onSave.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: ["STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "Import de getCountryByLabel adicionado (ou COUNTRY_CODES.find usado inline)"
+      - "Estado countryLabel adicionado ao MemberEditor"
+      - "countryLabel inicializado com label do pais do member (ou Brazil default)"
+      - "Highlight no dropdown compara por item.label === countryLabel (nao por code)"
+      - "Ao selecionar pais, countryLabel e atualizado junto com countryCode"
+      - "handleSave continua enviando apenas country_code (nao label)"
+      - "Selecionar USA com +1 mostra apenas USA highlighted"
+      - "Selecionar Canada com +1 mostra apenas Canada highlighted"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que highlight no dropdown usa label ao inves de code"
+      - type: unit
+        description: "Verificar que selecionar Canada e USA funciona independentemente"
+    covers:
+      acceptance_criteria: ["AC-F057-02", "AC-F057-03"]
+      edge_cases: ["EC-F057-01"]
+    risks:
+      - risk: "Membros existentes com +1 abrem edicao com USA selecionado (era Canada)"
+        mitigation: "Aceito como tradeoff (ADR-043). Banco so armazena code, nao label. USA e default mais comum."
+
+  # =========================================================================
+  # STEP-07: F059 - Adicionar prop modalOnly ao PrayerSelector
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Em src/components/PrayerSelector.tsx:
+      (1) Adicionar prop modalOnly?: boolean (default false) na interface
+          PrayerSelectorProps (apos onClose na linha 43).
+      (2) Adicionar modalOnly ao destructuring do componente (linha 52,
+          com default false).
+      (3) Alterar o JSX: quando modalOnly e true, nao renderizar o
+          Pressable inline (linhas 93-115). O componente deve renderizar
+          apenas o Modal (linhas 117-202).
+          Implementacao: envolver o Pressable em {!modalOnly && (...)}.
+          Manter o fragment <> ... </> como wrapper.
+      (4) Comportamento: quando modalOnly=true e visible=true, o useEffect
+          (linhas 60-62) ainda abre o modal automaticamente. O botao
+          inline simplesmente nao e renderizado. Ao fechar o modal,
+          onClose e chamado normalmente.
+      (5) Quando modalOnly=false (default), comportamento inalterado.
+    files:
+      - "src/components/PrayerSelector.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05"]
+    done_when:
+      - "Prop modalOnly adicionada a PrayerSelectorProps (boolean, optional)"
+      - "Default false no destructuring"
+      - "Quando modalOnly=true, Pressable inline NAO e renderizado"
+      - "Quando modalOnly=true e visible=true, modal abre normalmente via useEffect"
+      - "Quando modalOnly=false, comportamento totalmente inalterado"
+      - "Selecao de membro funciona normalmente com modalOnly=true"
+      - "Nome customizado funciona normalmente com modalOnly=true"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que modalOnly=true nao renderiza o botao inline (Pressable)"
+      - type: unit
+        description: "Verificar que modalOnly=false (default) renderiza normalmente"
+    covers:
+      acceptance_criteria: ["AC-F059-04", "AC-F059-05", "AC-F059-06"]
+      edge_cases: []
+    risks:
+      - risk: "Componente sem Pressable fica sem elemento visivel quando modal fechado"
+        mitigation: "Isso e intencional: no AgendaForm, o SelectorField ja fornece o elemento de trigger"
+
+  # =========================================================================
+  # STEP-08: F059 - Passar modalOnly={true} no AgendaForm
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Em src/components/AgendaForm.tsx, adicionar modalOnly={true} ao
+      PrayerSelector renderizado condicionalmente pelo selectorModal
+      (linhas 480-507). O PrayerSelector ja e renderizado com
+      visible={true} (linha 482), e agora recebera tambem modalOnly={true}.
+      Isso suprime o botao inline duplicado que causava a duplicacao visual
+      do campo de oracao (bug CR-125).
+      Mudanca: na linha 481-482, adicionar prop modalOnly={true} ao JSX:
+      <PrayerSelector
+        visible={true}
+        modalOnly={true}
+        onClose={...}
+        ...
+      />
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "PrayerSelector no AgendaForm recebe modalOnly={true}"
+      - "Clicar no campo de oracao de encerramento nao duplica o campo"
+      - "Clicar no campo de oracao de abertura nao duplica o campo"
+      - "Modal de selecao abre uma unica vez (sem duplicacao de modais)"
+      - "Selecao de membro para oracao funciona normalmente"
+      - "Nome customizado para oracao funciona normalmente"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que PrayerSelector no AgendaForm tem modalOnly={true}"
+      - type: unit
+        description: "Verificar que nao ha duplicacao visual ao abrir seletor de oracao"
+    covers:
+      acceptance_criteria: ["AC-F059-01", "AC-F059-02", "AC-F059-03"]
+      edge_cases: ["EC-F059-01", "EC-F059-02"]
+    risks:
+      - risk: "Outros usos do PrayerSelector afetados"
+        mitigation: "modalOnly default e false; unico uso com modalOnly=true e no AgendaForm"
+
+  # =========================================================================
+  # STEP-09: Testes consolidados Batch 9 Phase 1 (F055-F059)
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Criar arquivo de testes src/__tests__/batch9-phase1.test.ts com testes
+      para todas as 5 features deste batch:
+      (1) F055: Verificar que buildWhatsAppConversationUrl retorna URL sem
+          ?text=. Verificar limpeza de telefone. Verificar que
+          handleDropdownWhatsApp usa buildWhatsAppConversationUrl.
+          Verificar que handleNotInvitedAction ainda usa buildWhatsAppUrl.
+      (2) F056: Verificar que titulo do InviteActionDropdown usa
+          t('speeches.changeStatus'). Verificar que NAO usa speaker_name.
+      (3) F057: Verificar que getFlagForCode('+1') retorna bandeira USA.
+          Verificar que getCountryByLabel funciona. Verificar que highlight
+          no dropdown de paises usa label.
+      (4) F058: Verificar que getPositionLabel retorna 'lastSpeech' para
+          position 3. Verificar que position 1 e 2 usam formato ordinal.
+          Verificar que t('speeches.lastSpeech') existe em 3 idiomas.
+      (5) F059: Verificar que PrayerSelector com modalOnly=true nao
+          renderiza botao inline. Verificar que modalOnly=false (default)
+          renderiza normalmente. Verificar que AgendaForm usa modalOnly=true.
+      Atualizar testes existentes que possam ser impactados pelas mudancas.
+    files:
+      - "src/__tests__/batch9-phase1.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch9-phase1.test.ts criado"
+      - "Testes cobrem F055 (buildWhatsAppConversationUrl + handleDropdownWhatsApp)"
+      - "Testes cobrem F056 (titulo do dropdown = changeStatus)"
+      - "Testes cobrem F057 (USA first + getCountryByLabel + highlight by label)"
+      - "Testes cobrem F058 (lastSpeech i18n + getPositionLabel)"
+      - "Testes cobrem F059 (modalOnly prop + AgendaForm usage)"
+      - "pnpm test roda sem falha em TODOS os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch9 phase1 (F055-F059)"
+    covers:
+      acceptance_criteria: ["AC-F055-01", "AC-F055-02", "AC-F055-03", "AC-F056-01", "AC-F057-01", "AC-F057-02", "AC-F058-01", "AC-F058-04", "AC-F058-06", "AC-F059-01", "AC-F059-06"]
+      edge_cases: ["EC-F055-01", "EC-F057-01", "EC-F057-02", "EC-F059-01"]
+    risks:
+      - risk: "Mocking de whatsappUtils para testes de handleDropdownWhatsApp"
+        mitigation: "Mock simples: jest.mock('../lib/whatsappUtils', () => ({ buildWhatsAppConversationUrl: jest.fn() }))"
+
+  # =========================================================================
+  # STEP-10: Documentacao do projeto (CODE_LEDGER, project-status)
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 9 Phase 1
+      (F055-F059) com arquivos impactados.
+      (2) .devteam/project-status.yaml - marcar phase 1 como completed,
+      atualizar current_agent para "completed".
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - adicionar PLAN_P017, atualizar
+      version (6) e changelog. Adicionar CRs 112/113/117/122/125 a
+      pending_with_plan.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch9 phase1"
+      - "project-status.yaml phase 1 marcada como completed"
+      - "PLAN_CONSOLIDATED atualizado com PLAN_P017 (version 6)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F055 ACs ---
+  - ac_id: AC-F055-01
+    how_to_verify: "Ver Conversa abre WhatsApp com URL wa.me/{phone} sem ?text= (buildWhatsAppConversationUrl)"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+  - ac_id: AC-F055-02
+    how_to_verify: "buildWhatsAppConversationUrl('+5511987654321') retorna 'https://wa.me/5511987654321'"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F055-03
+    how_to_verify: "handleNotInvitedAction continua usando buildWhatsAppUrl com mensagem de convite"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+  - ac_id: AC-F055-04
+    how_to_verify: "Opcao 'Ver Conversa' desabilitada quando speaker_phone e null (ja existente no InviteActionDropdown)"
+    covered_by_steps: ["STEP-03"]
+
+  # --- F056 ACs ---
+  - ac_id: AC-F056-01
+    how_to_verify: "Titulo do InviteActionDropdown exibe 'Alterar status' (pt-BR)"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F056-02
+    how_to_verify: "Titulo exibe 'Change status' (en)"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F056-03
+    how_to_verify: "Titulo exibe 'Cambiar estado' (es)"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+
+  # --- F057 ACs ---
+  - ac_id: AC-F057-01
+    how_to_verify: "getFlagForCode('+1') retorna bandeira dos EUA (USA antes de Canada na lista)"
+    covered_by_steps: ["STEP-05", "STEP-09"]
+  - ac_id: AC-F057-02
+    how_to_verify: "Highlight no dropdown de paises usa label (apenas USA highlighted para +1)"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F057-03
+    how_to_verify: "Selecionar Canada funciona e mostra apenas Canada highlighted"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F057-04
+    how_to_verify: "Codigos +7 (Kazakhstan/Russia) tambem funcionam com highlight por label"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  # --- F058 ACs ---
+  - ac_id: AC-F058-01
+    how_to_verify: "getPositionLabel(3, t) retorna t('speeches.lastSpeech') = 'ULTIMO DISCURSO' (uppercase pelo CSS)"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F058-02
+    how_to_verify: "getPositionLabel(3, t) em en retorna 'FINAL SPEECH'"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F058-03
+    how_to_verify: "getPositionLabel(3, t) em es retorna 'ULTIMO DISCURSO'"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F058-04
+    how_to_verify: "AgendaForm SpeakerField posicao 3 usa t('speeches.lastSpeech')"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F058-05
+    how_to_verify: "InviteManagementSection segunda linha para position===3 usa t('speeches.lastSpeech')"
+    covered_by_steps: ["STEP-04"]
+  - ac_id: AC-F058-06
+    how_to_verify: "getPositionLabel(1, t) e getPositionLabel(2, t) continuam usando formato ordinal"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+
+  # --- F059 ACs ---
+  - ac_id: AC-F059-01
+    how_to_verify: "Clicar em 'Oracao de encerramento' nao duplica o campo (modalOnly=true suprime Pressable)"
+    covered_by_steps: ["STEP-08", "STEP-09"]
+  - ac_id: AC-F059-02
+    how_to_verify: "Apenas UM modal de selecao e mostrado ao clicar no campo de oracao"
+    covered_by_steps: ["STEP-08"]
+  - ac_id: AC-F059-03
+    how_to_verify: "Oracao de abertura tambem nao duplica (mesma logica do selectorModal)"
+    covered_by_steps: ["STEP-08"]
+  - ac_id: AC-F059-04
+    how_to_verify: "Selecao de membro para oracao funciona com modalOnly=true"
+    covered_by_steps: ["STEP-07", "STEP-09"]
+  - ac_id: AC-F059-05
+    how_to_verify: "Nome customizado para oracao funciona com modalOnly=true"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F059-06
+    how_to_verify: "PrayerSelector com modalOnly=false (default) funciona normalmente (standalone use)"
+    covered_by_steps: ["STEP-07", "STEP-09"]

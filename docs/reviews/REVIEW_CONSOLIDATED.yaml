@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111
-# Reviewed: 2026-02-18
-# Version: 9
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125
+# Reviewed: 2026-02-19
+# Version: 10
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -3395,4 +3395,376 @@ batch8_phase2:
     full_suite_tests: 3061
     full_suite_passing: 3061
     full_suite_files: 60
+    regressions: 0
+
+# =============================================================================
+# BATCH 9, PHASE 1 REVIEW
+# CR-112 (F055), CR-113 (F056), CR-117 (F057), CR-122 (F058), CR-125 (F059)
+# Bug Fixes & Quick UI: WhatsApp conversation, dropdown title i18n, +1 flag,
+# last speech label, prayer duplication fix
+# =============================================================================
+
+batch9_phase1:
+  phase: "1 of 1"
+  phase_description: "Fix 3 bugs (WhatsApp reenvio, +1 bandeira, prayer duplication) e 2 UI tweaks (dropdown titulo i18n, label ultimo discurso)"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 9 Phase 1 implements 5 features (F055-F059) across 5 CRs cleanly and correctly.
+    All changes follow the complete chain SPEC -> ARCH -> PLAN -> CODE with no breaks.
+    F055 adds buildWhatsAppConversationUrl for opening chat without resending invite.
+    F056 changes dropdown title from speaker name to i18n key. F057 reorders USA before
+    Canada for +1 code and uses label-based highlight. F058 changes 3rd speech label to
+    "Ultimo Discurso" i18n in 4 locations. F059 adds modalOnly prop to PrayerSelector
+    fixing field duplication. All 3128 tests pass (67 new for this batch), no regressions.
+    Git is clean (only doc files pending, which are committed by Orchestrator).
+    No deploys required (all client-side changes). No P0/P1/P2 issues found.
+
+  chain_validation:
+    spec_vs_request:
+      status: aligned
+      notes: >
+        SPEC_F055_F059.yaml correctly captures all 5 user requests:
+        - CR-112: "Ver Conversa" opens chat without resending invite. SPEC correctly identifies
+          root cause in handleDropdownWhatsApp/buildWhatsAppUrl and proposes separate function.
+        - CR-113: Dropdown title uses i18n instead of speaker name. SPEC identifies existing key.
+        - CR-117: +1 flag shows Canada instead of USA. SPEC identifies ordering + highlight issue.
+        - CR-122: Label change from "3o Discurso" to "Ultimo Discurso". SPEC identifies 4 locations.
+        - CR-125: Prayer field duplication bug. SPEC correctly identifies dual-render root cause.
+        ACs are faithful to user intent. No scope creep.
+
+    arch_vs_spec:
+      status: aligned
+      notes: >
+        ARCH_M017.yaml maps all SPEC requirements to components. Components have clear
+        responsibilities. ADR-042 (separate function for conversation URL) and ADR-043
+        (country label as selection key) document non-trivial decisions. Contracts defined
+        for buildWhatsAppConversationUrl, getCountryByLabel, and modalOnly prop.
+        No data model changes needed (all client-side). Security impact: none.
+
+    plan_vs_arch:
+      status: aligned
+      notes: >
+        PLAN_P017.yaml decomposes architecture into 10 steps (STEP-01 through STEP-10).
+        Dependencies are correct: STEP-03 depends on STEP-02 (F055), STEP-06 depends on
+        STEP-05 (F057), STEP-08 depends on STEP-07 (F059). Steps follow architecture
+        component boundaries. All ACs mapped to steps with validation section.
+        Parallelizable steps correctly identified.
+
+    code_vs_plan:
+      status: aligned
+      notes: >
+        CODE_LEDGER.yaml records 10 commits (STEP-01 through STEP-08, plus STEP-TEST-FIX
+        and batch9 test commit) matching plan steps. Files changed match plan specification.
+        Each commit follows Conventional Commits format with CR reference.
+        Implementation matches plan requirements precisely:
+        - STEP-01: InviteActionDropdown title changed to t('speeches.changeStatus')
+        - STEP-02: buildWhatsAppConversationUrl added to whatsappUtils.ts + re-exported
+        - STEP-03: handleDropdownWhatsApp uses buildWhatsAppConversationUrl
+        - STEP-04: speeches.lastSpeech i18n key + 4 location updates
+        - STEP-05: USA reordered before Canada + getCountryByLabel function
+        - STEP-06: countryLabel state + label-based highlight in members.tsx
+        - STEP-07: modalOnly prop added to PrayerSelector
+        - STEP-08: modalOnly={true} passed in AgendaForm
+
+  commit_reviews:
+    - hash: cf1c8cf
+      message: "fix(invite): change InviteActionDropdown title to i18n changeStatus label (CR-113)"
+      files_changed: [src/components/InviteActionDropdown.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "Title correctly uses t('speeches.changeStatus') at line 74"
+          - "speaker_name no longer referenced in title section"
+          - "JSX comment updated from 'speaker name' to 'i18n status change label'"
+          - "i18n key speeches.changeStatus already existed in all 3 locales"
+        issues: []
+
+    - hash: 3160210
+      message: "feat(whatsapp): add buildWhatsAppConversationUrl for opening chat without message (CR-112)"
+      files_changed: [src/lib/whatsappUtils.ts, src/lib/whatsapp.ts]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "buildWhatsAppConversationUrl(phone) correctly cleans phone and returns https://wa.me/{cleanPhone}"
+          - "No ?text= parameter in output URL"
+          - "Re-exported in whatsapp.ts barrel for import compatibility"
+          - "Follows ADR-042: separate function for clear responsibility separation"
+          - "buildWhatsAppUrl function completely untouched (zero regression risk)"
+        issues: []
+
+    - hash: 6ff6d4c
+      message: "fix(invite): use buildWhatsAppConversationUrl for View Conversation action (CR-112)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "handleDropdownWhatsApp now uses buildWhatsAppConversationUrl at line 110"
+          - "Removed unused template/date/position/collection/link variables from handler"
+          - "handleNotInvitedAction at line 71-97 unchanged - still uses buildWhatsAppUrl with message"
+          - "Import of buildWhatsAppConversationUrl added at line 25"
+          - "Handler simplified from ~20 lines to ~5 lines"
+        issues: []
+
+    - hash: 0005ea6
+      message: "feat(i18n): add speeches.lastSpeech key and update 4 locations for position 3 (CR-122)"
+      files_changed: [src/i18n/locales/pt-BR.json, src/i18n/locales/en.json, src/i18n/locales/es.json, src/components/SpeechSlot.tsx, src/components/AgendaForm.tsx, src/components/InviteManagementSection.tsx, src/hooks/usePresentationMode.ts]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "i18n keys added correctly: pt-BR 'Ultimo Discurso', en 'Final Speech', es 'Ultimo Discurso'"
+          - "SpeechSlot getPositionLabel returns t('speeches.lastSpeech') for position === 3"
+          - "Positions 1 and 2 unchanged (ordinal format preserved)"
+          - "AgendaForm SpeakerField label at line 378 uses t('speeches.lastSpeech')"
+          - "InviteManagementSection at line 167 uses conditional for position 3"
+          - "usePresentationMode at line 162 uses t('speeches.lastSpeech')"
+          - "Docstring in SpeechSlot.tsx updated to mention 'Ultimo Discurso'"
+          - "All 3 locale JSONs remain valid (no parse errors)"
+        issues: []
+
+    - hash: 017b7a5
+      message: "fix(country): reorder USA before Canada for +1 default and add getCountryByLabel (CR-117)"
+      files_changed: [src/lib/countryCodes.ts]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "USA (+1) correctly placed before Canada (+1) at lines 47-48"
+          - "Comment '// USA before Canada: +1 defaults to US flag (ADR-043)' added"
+          - "getCountryByLabel function exported, uses .find() by label (unique values)"
+          - "getFlagForCode('+1') now returns US flag (first match)"
+          - "splitPhoneNumber unaffected (uses Sets, not order-dependent)"
+        issues: []
+
+    - hash: fe1bfba
+      message: "fix(members): highlight country by label instead of code to resolve +1 ambiguity (CR-117)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "countryLabel state added with initialization from member's country_code"
+          - "Highlight comparison changed from item.code === countryCode to item.label === countryLabel"
+          - "onPress updates both countryCode and countryLabel"
+          - "handleSave continues to save only countryCode (not label) to database"
+          - "Trade-off accepted per ADR-043: reopen edit shows USA for legacy +1 members"
+        issues: []
+
+    - hash: d3ec6a6
+      message: "feat(prayer): add modalOnly prop to PrayerSelector to suppress inline button (CR-125)"
+      files_changed: [src/components/PrayerSelector.tsx]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "modalOnly?: boolean added to PrayerSelectorProps at line 45"
+          - "Default value false at line 55 (backward compatible)"
+          - "Inline Pressable wrapped in {!modalOnly && (...)} at line 96"
+          - "Modal rendering unaffected by modalOnly"
+          - "useEffect for visible prop still works with modalOnly=true"
+        issues: []
+
+    - hash: abfda79
+      message: "fix(agenda): pass modalOnly={true} to PrayerSelector to fix field duplication (CR-125)"
+      files_changed: [src/components/AgendaForm.tsx]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "modalOnly={true} added at line 483 alongside visible={true}"
+          - "PrayerSelector now renders only modal in AgendaForm context (no duplicate inline button)"
+          - "Both opening_prayer and closing_prayer use same selectorModal pattern"
+          - "Existing SelectorField continues to serve as the trigger"
+          - "Member selection and custom name features unaffected"
+        issues: []
+
+    - hash: 8124f5f
+      message: "test(batch9): update existing tests to reflect F055, F056, F057 changes"
+      files_changed: [src/__tests__/batch6-f027-f031.test.ts, src/__tests__/batch7-f035-f039.test.ts, src/__tests__/batch8-phase1.test.ts, src/__tests__/batch8-phase2.test.ts]
+      step: STEP-TEST-FIX
+      review:
+        correctness: pass
+        notes:
+          - "Batch6 alphabetical order test updated to skip USA (ADR-043 reordering)"
+          - "Batch7 highlight test changed from code-based to label-based comparison"
+          - "Batch8-phase1 test updated for handleDropdownWhatsApp using buildWhatsAppConversationUrl"
+          - "Batch8-phase2 test updated for dropdown title using t('speeches.changeStatus')"
+          - "All existing test suites adapted correctly"
+        issues: []
+
+    - hash: "006ee85"
+      message: "test(batch9-phase1): add tests for F055, F056, F057, F058, F059"
+      files_changed: [src/__tests__/batch9-phase1.test.ts]
+      step: STEP-09
+      review:
+        correctness: pass
+        notes:
+          - "67 test cases covering all 5 features"
+          - "F055: 16 tests - URL building, phone cleaning, handler verification, error handling"
+          - "F056: 7 tests - title i18n, locale values, independence from speech object"
+          - "F057: 17 tests - flag order, label highlight, getCountryByLabel, splitPhoneNumber"
+          - "F058: 15 tests - position 3 label, locale values, 4 location updates, ordinal preserved"
+          - "F059: 12 tests - modalOnly prop, AgendaForm integration, member/custom selection, state management"
+          - "Cross-feature i18n consistency checks included"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  pending_deploys: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/phases/phase-001.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/CHANGE_REQUESTS.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M017.yaml"
+      - "docs/plans/PLAN_P017.yaml"
+      - "docs/qa/QA_PLAN_batch9_phase1.yaml"
+      - "docs/specs/SPEC_F055_F059.yaml"
+    notes: "All uncommitted files are documentation - committed by Orchestrator at end of phase"
+
+  ac_verification:
+    # F055
+    - ac_id: AC-F055-01
+      description: "Ver Conversa opens WhatsApp without invite text"
+      status: verified
+      evidence: "InviteManagementSection.tsx handleDropdownWhatsApp (line 106-115) calls buildWhatsAppConversationUrl which returns URL without ?text= parameter."
+
+    - ac_id: AC-F055-02
+      description: "Phone number correctly formatted in URL"
+      status: verified
+      evidence: "buildWhatsAppConversationUrl in whatsappUtils.ts (line 101-111) removes +, spaces, dashes, parentheses. Test confirms '+5511987654321' -> 'https://wa.me/5511987654321'."
+
+    - ac_id: AC-F055-03
+      description: "Initial invite button continues sending message"
+      status: verified
+      evidence: "handleNotInvitedAction (line 71-97) unchanged, still calls buildWhatsAppUrl with speakerName, date, topic, position, collection, link parameters."
+
+    - ac_id: AC-F055-04
+      description: "Ver Conversa disabled when no phone"
+      status: verified
+      evidence: "InviteActionDropdown.tsx line 85: disabled={!hasPhone} on View Conversation Pressable. Line 79: disabledOption style with opacity: 0.4."
+
+    # F056
+    - ac_id: AC-F056-01
+      description: "Title shows 'Alterar status' in pt-BR"
+      status: verified
+      evidence: "InviteActionDropdown.tsx line 74: t('speeches.changeStatus'). pt-BR.json: speeches.changeStatus = 'Alterar status'."
+
+    - ac_id: AC-F056-02
+      description: "Title shows 'Change status' in English"
+      status: verified
+      evidence: "en.json: speeches.changeStatus = 'Change status'."
+
+    - ac_id: AC-F056-03
+      description: "Title shows 'Cambiar estado' in Spanish"
+      status: verified
+      evidence: "es.json: speeches.changeStatus = 'Cambiar estado'."
+
+    # F057
+    - ac_id: AC-F057-01
+      description: "USA flag shown for +1 by default"
+      status: verified
+      evidence: "countryCodes.ts: USA entry at line 47 before Canada at line 48. getFlagForCode('+1') returns US flag (first .find match)."
+
+    - ac_id: AC-F057-02
+      description: "Only one country highlighted for +1"
+      status: verified
+      evidence: "members.tsx: highlight uses item.label === countryLabel (line 154). Labels are unique, so only one country highlighted."
+
+    - ac_id: AC-F057-03
+      description: "Selecting Canada works correctly"
+      status: verified
+      evidence: "members.tsx: onPress sets both setCountryCode(item.code) and setCountryLabel(item.label) at lines 157-158."
+
+    - ac_id: AC-F057-04
+      description: "Other duplicate codes not negatively affected"
+      status: verified
+      evidence: "Kazakhstan and Russia (+7) both exist in COUNTRY_CODES. Label-based highlight distinguishes them correctly."
+
+    # F058
+    - ac_id: AC-F058-01
+      description: "3rd speech label shows 'Ultimo Discurso' in Speeches tab"
+      status: verified
+      evidence: "SpeechSlot.tsx getPositionLabel (line 52-53): position === 3 returns t('speeches.lastSpeech'). pt-BR.json: 'Ultimo Discurso'. CSS textTransform: 'uppercase' (line 225)."
+
+    - ac_id: AC-F058-02
+      description: "Label translated in English"
+      status: verified
+      evidence: "en.json: speeches.lastSpeech = 'Final Speech'."
+
+    - ac_id: AC-F058-03
+      description: "Label translated in Spanish"
+      status: verified
+      evidence: "es.json: speeches.lastSpeech = 'Ultimo Discurso'."
+
+    - ac_id: AC-F058-04
+      description: "AgendaForm uses 'Ultimo Discurso' for position 3"
+      status: verified
+      evidence: "AgendaForm.tsx line 378: label uses t('speeches.lastSpeech') - t('speeches.speaker')."
+
+    - ac_id: AC-F058-05
+      description: "InviteManagement uses 'Ultimo Discurso' for position 3"
+      status: verified
+      evidence: "InviteManagementSection.tsx line 167: speech.position === 3 ? t('speeches.lastSpeech') : t('speeches.slot', ...)."
+
+    - ac_id: AC-F058-06
+      description: "1st and 2nd speech labels unchanged"
+      status: verified
+      evidence: "SpeechSlot.tsx getPositionLabel (line 56): non-3 positions use t('speeches.slot', { number: ordinal }). AgendaForm uses 1/2 ordinals."
+
+    # F059
+    - ac_id: AC-F059-01
+      description: "Clicking closing prayer does not duplicate field"
+      status: verified
+      evidence: "AgendaForm.tsx line 483: modalOnly={true} on PrayerSelector. PrayerSelector.tsx line 96: {!modalOnly && (...)} suppresses inline Pressable."
+
+    - ac_id: AC-F059-02
+      description: "Only one selection modal shown"
+      status: verified
+      evidence: "With modalOnly=true, PrayerSelector renders only the Modal (lines 122-207), not the inline Pressable (lines 97-120)."
+
+    - ac_id: AC-F059-03
+      description: "Opening prayer also does not duplicate"
+      status: verified
+      evidence: "Both opening_prayer and closing_prayer use same selectorModal pattern (type 'prayer'), both go through same PrayerSelector with modalOnly={true}."
+
+    - ac_id: AC-F059-04
+      description: "Member selection works with modalOnly"
+      status: verified
+      evidence: "handleSelectMember (line 69-78) unaffected by modalOnly. FlatList with member data renders inside Modal (lines 173-205)."
+
+    - ac_id: AC-F059-05
+      description: "Custom name works with modalOnly"
+      status: verified
+      evidence: "handleCustomName (line 80-88) unaffected by modalOnly. customNameButton renders inside Modal (lines 158-170)."
+
+    - ac_id: AC-F059-06
+      description: "PrayerSelector works normally without modalOnly (standalone)"
+      status: verified
+      evidence: "modalOnly defaults to false (line 55). When false, inline Pressable renders normally (line 96: {!modalOnly && (...)}). Backward compatible."
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 12
+    commits_reviewed: 10
+    new_tests: 67
+    new_tests_passing: 67
+    full_suite_tests: 3128
+    full_suite_passing: 3128
+    full_suite_files: 61
     regressions: 0

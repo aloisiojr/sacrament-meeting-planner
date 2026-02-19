@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-02-18"
-  total_features: 54
-  total_change_requests: 111
+  last_updated: "2026-02-19"
+  total_features: 59
+  total_change_requests: 116
   implemented_crs: 95
-  pending_crs: 16
+  pending_crs: 21
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -35,6 +35,7 @@ metadata:
     - docs/specs/SPEC_F040_F044.yaml
     - docs/specs/SPEC_F045_F049.yaml
     - docs/specs/SPEC_F050_F054.yaml
+    - docs/specs/SPEC_F055_F059.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -990,6 +991,93 @@ features:
       - "Unico arquivo afetado: SpeechSlot.tsx"
 
   # ---------------------------------------------------------------------------
+  # Batch 9 Phase 1 (F055-F059) - Bug Fixes & Quick UI
+  # ---------------------------------------------------------------------------
+
+  - id: F055
+    name: "View WhatsApp conversation without resending invite message"
+    status: pending
+    rfs: []
+    description: >
+      Na secao de gerenciamento de convites, "Ver Conversa" no InviteActionDropdown
+      chama buildWhatsAppUrl() com texto de convite, reenviando a mensagem. Fix:
+      abrir wa.me/{phone} sem ?text=, navegando diretamente para a conversa sem
+      mensagem pre-preenchida. Criar funcao buildWhatsAppConversationUrl(phone).
+    modified_by_crs: [112]
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    notes:
+      - "CR-112: Ver Conversa reenvia convite ao inves de abrir conversa"
+      - "handleDropdownWhatsApp deve usar URL sem ?text="
+      - "Nova funcao buildWhatsAppConversationUrl em whatsappUtils.ts"
+      - "Botao de primeiro envio (assigned_not_invited) nao afetado"
+
+  - id: F056
+    name: "Change InviteActionDropdown title to 'Alterar status' (i18n)"
+    status: pending
+    rfs: []
+    description: >
+      No InviteActionDropdown, o titulo exibe speaker_name. Trocar para
+      t('speeches.changeStatus'). Chaves i18n ja existem: pt-BR "Alterar status",
+      en "Change status", es "Cambiar estado".
+    modified_by_crs: [113]
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    notes:
+      - "CR-113: Titulo do dropdown mostra nome do discursante, deveria ser 'Alterar status'"
+      - "Chave i18n speeches.changeStatus ja existe nos 3 locales"
+      - "Unico arquivo afetado: InviteActionDropdown.tsx (linha 73-75)"
+
+  - id: F057
+    name: "Fix +1 country code showing Canada flag instead of USA"
+    status: pending
+    rfs: []
+    description: >
+      Canada (+1) e USA (+1) compartilham codigo. getFlagForCode() usa .find()
+      retornando Canada (primeiro na lista alfabetica). Fix: reordenar para USA
+      antes de Canada e ajustar highlight no dropdown de selecao para usar label
+      (unico) ao inves de code.
+    modified_by_crs: [117]
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    notes:
+      - "CR-117: +1 mostra bandeira do Canada ao inves de EUA"
+      - "getFlagForCode usa .find() que retorna primeiro match (Canada)"
+      - "Reordenar USA antes de Canada em COUNTRY_CODES"
+      - "Ajustar highlight no dropdown de members.tsx para comparar por label"
+
+  - id: F058
+    name: "Change third speech label from ordinal to 'Ultimo Discurso'"
+    status: pending
+    rfs: []
+    description: >
+      O label do 3o discurso usa formato ordinal generico ("3o Discurso").
+      Trocar para "Ultimo Discurso" (i18n). Afeta SpeechSlot, AgendaForm
+      e InviteManagementSection. Nova i18n key speeches.lastSpeech nos 3 locales.
+    modified_by_crs: [122]
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    notes:
+      - "CR-122: 3o Discurso deve ser 'Ultimo Discurso'"
+      - "getPositionLabel() sem caso especial para position === 3"
+      - "Nova i18n key speeches.lastSpeech em pt-BR, en, es"
+      - "Afeta SpeechSlot.tsx, AgendaForm.tsx, InviteManagementSection.tsx"
+
+  - id: F059
+    name: "Fix closing prayer field visual duplication in AgendaForm"
+    status: pending
+    rfs: []
+    description: >
+      Ao clicar no campo de oracao de encerramento na Agenda, ocorre duplicacao
+      visual do campo e do modal. AgendaForm renderiza PrayerSelector com
+      visible={true} que renderiza botao inline (duplicando SelectorField ja
+      existente) alem de abrir modal. Fix: adicionar prop modalOnly ao
+      PrayerSelector para suprimir botao inline quando usado como modal puro.
+    modified_by_crs: [125]
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    notes:
+      - "CR-125: Bug duplicacao visual no campo de oracao de encerramento"
+      - "PrayerSelector renderiza botao inline + modal, duplicando SelectorField do AgendaForm"
+      - "Nova prop modalOnly para PrayerSelector"
+      - "AgendaForm passa modalOnly={true} no uso condicional"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
   # ---------------------------------------------------------------------------
 
@@ -1148,7 +1236,7 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (16 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2)
+# PENDING CHANGE REQUESTS (21 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1)
 # =============================================================================
 
 pending_crs:
@@ -1441,6 +1529,106 @@ pending_crs:
       - "Layout nao quebra em telas estreitas"
     files_likely_impacted:
       - src/components/SpeechSlot.tsx
+
+  # --- Batch 9 Phase 1 (Bug Fixes & Quick UI) ---
+
+  - id: 112
+    type: bug
+    area: "InviteManagementSection (F009, F010)"
+    feature_id: F055
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    related_crs: [105, 106]
+    description: >
+      "Ver Conversa" no InviteActionDropdown chama buildWhatsAppUrl() com texto
+      de convite, reenviando mensagem. Deve abrir wa.me/{phone} sem ?text=.
+    acceptance_criteria:
+      - "Ver Conversa abre WhatsApp sem mensagem pre-preenchida"
+      - "URL gerada e wa.me/{phone} sem ?text="
+      - "Botao de envio inicial (not_invited) continua com mensagem"
+      - "Ver Conversa desabilitado quando sem telefone"
+    files_likely_impacted:
+      - src/components/InviteManagementSection.tsx
+      - src/lib/whatsappUtils.ts
+
+  - id: 113
+    type: ui
+    area: "InviteActionDropdown (F051)"
+    feature_id: F056
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    related_crs: [106]
+    description: >
+      Titulo do InviteActionDropdown mostra speaker_name. Trocar para
+      t('speeches.changeStatus'). Chave i18n ja existe nos 3 locales.
+    acceptance_criteria:
+      - "Titulo do dropdown exibe 'Alterar status' (pt-BR)"
+      - "Titulo do dropdown exibe 'Change status' (en)"
+      - "Titulo do dropdown exibe 'Cambiar estado' (es)"
+    files_likely_impacted:
+      - src/components/InviteActionDropdown.tsx
+
+  - id: 117
+    type: bug
+    area: "Country Codes (F003, F029)"
+    feature_id: F057
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    related_crs: [85, 92]
+    description: >
+      +1 mostra bandeira do Canada ao inves de EUA. getFlagForCode() usa
+      .find() que retorna Canada (primeiro na lista). Dropdown mostra ambos
+      como selecionados. Fix: reordenar USA antes de Canada e usar label
+      para highlight.
+    acceptance_criteria:
+      - "Bandeira dos EUA mostrada para +1 por padrao"
+      - "Lista de selecao mostra apenas um pais selecionado para +1"
+      - "Selecionar Canada funciona corretamente"
+      - "Outros codigos duplicados (+7) nao afetados"
+    files_likely_impacted:
+      - src/lib/countryCodes.ts
+      - src/app/(tabs)/settings/members.tsx
+
+  - id: 122
+    type: ui
+    area: "Speech Labels (F008, F012)"
+    feature_id: F058
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    related_crs: [99]
+    description: >
+      Label do 3o discurso usa formato ordinal generico. Trocar para
+      "Ultimo Discurso" (i18n). Afeta SpeechSlot, AgendaForm e
+      InviteManagementSection. Nova i18n key speeches.lastSpeech.
+    acceptance_criteria:
+      - "pt-BR: 'Ultimo Discurso' para posicao 3"
+      - "en: 'Final Speech' para posicao 3"
+      - "es: 'Ultimo Discurso' para posicao 3"
+      - "Labels do 1o e 2o discurso nao afetados"
+      - "Modo Apresentacao tambem usa novo label"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 125
+    type: bug
+    area: "Agenda Prayer (F012, F015)"
+    feature_id: F059
+    spec_file: "docs/specs/SPEC_F055_F059.yaml"
+    related_crs: [74, 98]
+    description: >
+      Clicar no campo de oracao de encerramento duplica campo e modal.
+      AgendaForm renderiza PrayerSelector com visible={true} que renderiza
+      botao inline (duplicando SelectorField) alem de abrir modal.
+    acceptance_criteria:
+      - "Clicar em oracao de encerramento nao duplica campo"
+      - "Apenas um modal de selecao aberto por vez"
+      - "Oracao de abertura tambem nao duplica"
+      - "Selecao de membro funciona corretamente"
+      - "Nome customizado funciona corretamente"
+    files_likely_impacted:
+      - src/components/PrayerSelector.tsx
+      - src/components/AgendaForm.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)

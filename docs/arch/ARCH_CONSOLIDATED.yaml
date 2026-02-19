@@ -6,10 +6,10 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-18"
-  last_updated_by: "batch-8-phase-2"
+  last_updated: "2026-02-19"
+  last_updated_by: "batch-9-phase-1"
   total_modules: 8
-  total_adrs: 32
+  total_adrs: 34
   total_crs_implemented: 82
   pending_arch: "none"
   source_documents:
@@ -23,6 +23,7 @@ metadata:
     - docs/arch/ARCH_M014.yaml
     - docs/arch/ARCH_M015.yaml
     - docs/arch/ARCH_M016.yaml
+    - docs/arch/ARCH_M017.yaml
 
 # =============================================================================
 # TECH STACK
@@ -198,7 +199,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -217,6 +218,7 @@ modules:
       CR-89 expand/collapse inline para ver temas de colecao (hook useCollectionTopics, accordion pattern).
       CR-90 Fix botao Delete no SwipeableCard (pointerEvents='box-none').
       CR-96/F041: SearchInput fixo no topo em members.tsx e topics.tsx (fora do ScrollView).
+      CR-117/F057: USA reordenado antes de Canada em countryCodes.ts. members.tsx usa label para highlight no dropdown.
 
   - id: M003
     name: SpeechModule
@@ -238,7 +240,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -250,6 +252,8 @@ modules:
       CR-101/F045: LEDs condicionados a isSpeechesType no SundayCard (ocultos para domingos sem discursos).
       CR-104+108/F048: Templates padrao com aspas ao redor de {titulo}; {colecao} e {link} passados em WhatsAppVariables.
       CR-106/F051: Transicao reversa assigned_invited -> assigned_not_invited adicionada a VALID_TRANSITIONS.
+      CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem. Usado em handleDropdownWhatsApp.
+      CR-122/F058: getPositionLabel() retorna t('speeches.lastSpeech') quando position===3.
 
   - id: M004
     name: AgendaModule
@@ -272,7 +276,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -285,6 +289,8 @@ modules:
       CR-100/F044: SpeakerField reescrito para read-only + lapis + TextInput + X. Override em speaker_*_override.
       CR-102/F046: exceptionLabel oculto para domingos com reason === 'speeches' na aba Agenda.
       Modo Apresentacao: read-only, accordion com 4 secoes (normal) ou 3 (especial).
+      CR-122/F058: Label do SpeakerField posicao 3 usa t('speeches.lastSpeech'). Presentation mode idem.
+      CR-125/F059: PrayerSelector recebe modalOnly={true} no AgendaForm para nao duplicar botao inline.
 
   - id: M005
     name: NotificationModule
@@ -392,7 +398,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -413,6 +419,9 @@ modules:
       CR-107/F052: InviteManagementSection segunda linha mostra '{N}o Discurso - <LED> <status name>'.
       CR-110/F053: Bishopric agora ve InviteManagementSection (permissao home:invite_mgmt adicionada).
       CR-111/F054: SpeechSlot gap 8->12 e removeButton fontSize 20->24.
+      CR-112/F055: handleDropdownWhatsApp usa buildWhatsAppConversationUrl (sem ?text=) ao inves de buildWhatsAppUrl.
+      CR-113/F056: InviteActionDropdown titulo usa t('speeches.changeStatus') ao inves de speaker_name.
+      CR-122/F058: InviteManagementSection segunda linha usa t('speeches.lastSpeech') para position===3.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -770,6 +779,24 @@ adrs:
       - "Separacao de responsabilidades clara"
       - "StatusChangeModal permanece inalterado"
       - "Padrao visual consistente via mesmas cores"
+
+  - id: ADR-042
+    title: "buildWhatsAppConversationUrl separada de buildWhatsAppUrl"
+    context: "F055 precisa abrir conversa WhatsApp sem mensagem. buildWhatsAppUrl sempre anexa ?text=."
+    decision: "Funcao separada buildWhatsAppConversationUrl(phone) em whatsappUtils.ts. Responsabilidade clara: abrir conversa vs enviar mensagem."
+    decided_in: "CR-112"
+    consequences:
+      - "Zero risco de regressao em envio de convite"
+      - "Duplica limpeza de telefone (trivial, 3 linhas)"
+
+  - id: ADR-043
+    title: "Country label como chave de selecao para resolver ambiguidade de +1"
+    context: "Canada e USA compartilham +1. getFlagForCode usa .find() retornando primeiro match."
+    decision: "Reordenar USA antes de Canada E usar label como chave de selecao no dropdown. Estado local countryLabel resolve ambiguidade na UI sem alterar schema."
+    decided_in: "CR-117"
+    consequences:
+      - "Resolve ambiguidade visual sem migracao de dados"
+      - "Se usuario selecionou Canada, reabrir edicao mostrara USA (tradeoff aceito)"
 
 # =============================================================================
 # DATABASE SCHEMA
@@ -1153,7 +1180,7 @@ file_structure:
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
-    "PrayerSelector.tsx": "Seletor de membro para oracoes"
+    "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline."
     "SundayCard.tsx": "Card expandivel por domingo"
     "SpeechSlot.tsx": "Slot de discurso (orador, topico, status)"
     "StatusLED.tsx": "LED 3D animado de status de discurso"
@@ -1169,7 +1196,7 @@ file_structure:
     "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos"
     "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
     "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary)"
-    "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051)"
+    "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus')."
 
   "src/lib/":
     "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
@@ -1177,7 +1204,7 @@ file_structure:
     "csvUtils.ts": "Parse/generate CSV com error codes i18n (ADR-026). splitPhoneNumber re-exportado de countryCodes.ts (CR-85)"
     "activityLog.ts": "Utility para logging de acoes (com userName)"
     "whatsapp.ts": "Construcao de URL WhatsApp. CR-94: re-exports templates i18n."
-    "whatsappUtils.ts": "Template placeholders e resolucao. CR-94: templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate()."
+    "whatsappUtils.ts": "Template placeholders e resolucao. CR-94: templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate(). CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem."
     "dateUtils.ts": "Formatacao de datas localizadas"
     "speechUtils.ts": "Utilitarios de discursos"
     "theme.ts": "Paleta de cores para dark/light"
@@ -1186,7 +1213,7 @@ file_structure:
     "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
     "offlineGuard.ts": "Guard para operacoes online-only"
     "notificationUtils.ts": "Utilitarios de notificacoes"
-    "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, splitPhoneNumber (CR-85, ADR-031)"
+    "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, getCountryByLabel (CR-117), splitPhoneNumber (CR-85, ADR-031, ADR-043)"
 
   "src/types/":
     "database.ts": "Tipos TypeScript para todas as tabelas do banco"
@@ -1408,6 +1435,14 @@ change_requests_history:
     adrs: [ADR-040, ADR-041]
     new_files:
       - "src/components/InviteActionDropdown.tsx"
+
+  batch_9_phase_1:
+    crs: "CR-112, CR-113, CR-117, CR-122, CR-125"
+    scope: "Bug fixes & Quick UI: WhatsApp conversation without resending (F055), dropdown title i18n (F056), +1 country code fix (F057), last speech label (F058), prayer field duplication fix (F059)"
+    doc: "ARCH_M017.yaml"
+    status: "pending implementation"
+    adrs: [ADR-042, ADR-043]
+    new_files: []
 
 # =============================================================================
 # OBSERVABILITY

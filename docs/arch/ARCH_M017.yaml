@@ -1,0 +1,242 @@
+# =============================================================================
+# ARCH_M017.yaml
+# Architecture for Batch 9 Phase 1 - Bug Fixes & Quick UI
+# Features: F055, F056, F057, F058, F059
+# CRs: CR-112, CR-113, CR-117, CR-122, CR-125
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Fix 3 bugs (WhatsApp reenvio, +1 bandeira, prayer duplication) e 2 UI tweaks (dropdown titulo i18n, label ultimo discurso)"
+  principles:
+    - "Minimo impacto: mudancas cirurgicas em componentes existentes"
+    - "Backward compatibility: novas props opcionais com defaults preservando comportamento atual"
+    - "Reutilizar keys i18n existentes sempre que possivel"
+    - "Zero migrations: todas as mudancas sao client-side (UI/logic)"
+
+diagram: |
+  F055: InviteManagementSection --[handleDropdownWhatsApp]--> whatsappUtils.buildWhatsAppConversationUrl(phone)
+  F056: InviteActionDropdown --[title]--> t('speeches.changeStatus') [existente]
+  F057: countryCodes.ts --[reorder]--> USA before Canada | members.tsx --[highlight]--> by label
+  F058: SpeechSlot/AgendaForm/InviteManagementSection --[position===3]--> t('speeches.lastSpeech') [nova key]
+  F059: PrayerSelector --[modalOnly prop]--> suprime botao inline | AgendaForm --[modalOnly={true}]-->
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F055: Ver Conversa sem reenviar convite ---
+  - name: "whatsappUtils"
+    responsibility: "Nova funcao buildWhatsAppConversationUrl(phone) que retorna URL wa.me/{cleanPhone} SEM parametro ?text="
+    dependencies: []
+
+  - name: "InviteManagementSection"
+    responsibility: "handleDropdownWhatsApp usa buildWhatsAppConversationUrl ao inves de buildWhatsAppUrl"
+    dependencies: ["whatsappUtils"]
+
+  # --- F056: Titulo do dropdown i18n ---
+  - name: "InviteActionDropdown"
+    responsibility: "Titulo do modal troca de speech?.speaker_name para t('speeches.changeStatus')"
+    dependencies: []
+
+  # --- F057: +1 mostra Canada ao inves de USA ---
+  - name: "countryCodes"
+    responsibility: "Reordenar COUNTRY_CODES: USA (+1) ANTES de Canada (+1). Adicionar funcao getCountryByLabel para lookup exato."
+    dependencies: []
+
+  - name: "members.tsx"
+    responsibility: "Armazenar label do pais selecionado no estado local. Highlight no dropdown compara por label (unico) ao inves de code (duplicado)."
+    dependencies: ["countryCodes"]
+
+  # --- F058: Label 'Ultimo Discurso' para posicao 3 ---
+  - name: "SpeechSlot"
+    responsibility: "getPositionLabel() retorna t('speeches.lastSpeech') quando position === 3"
+    dependencies: []
+
+  - name: "AgendaForm"
+    responsibility: "Label do SpeakerField posicao 3 usa t('speeches.lastSpeech') + t('speeches.speaker') ao inves de '3o Discurso'"
+    dependencies: []
+
+  - name: "InviteManagementSection (F058)"
+    responsibility: "Segunda linha do invite row usa t('speeches.lastSpeech') quando speech.position === 3"
+    dependencies: []
+
+  - name: "usePresentationMode"
+    responsibility: "Label do 3o discurso usa t('speeches.lastSpeech') + t('speeches.speaker') ao inves de '3o Discurso'"
+    dependencies: []
+
+  - name: "i18n locales"
+    responsibility: "Adicionar key speeches.lastSpeech em pt-BR, en, es"
+    dependencies: []
+
+  # --- F059: Fix duplicacao de campo de oracao ---
+  - name: "PrayerSelector"
+    responsibility: "Nova prop modalOnly: quando true, nao renderiza botao inline (Pressable), apenas o Modal"
+    dependencies: []
+
+  - name: "AgendaForm (F059)"
+    responsibility: "Passa modalOnly={true} ao PrayerSelector renderizado condicionalmente pelo selectorModal"
+    dependencies: ["PrayerSelector"]
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F055
+  - name: "buildWhatsAppConversationUrl"
+    component: "whatsappUtils"
+    methods:
+      - name: "buildWhatsAppConversationUrl"
+        input: "phone: string"
+        output: "string (https://wa.me/{cleanPhone} sem ?text=)"
+        notes: "Limpa phone removendo +, espacos, hifens. Retorna URL para abrir conversa existente."
+
+  # F057
+  - name: "getCountryByLabel"
+    component: "countryCodes"
+    methods:
+      - name: "getCountryByLabel"
+        input: "label: string"
+        output: "CountryCode | undefined"
+        notes: "Busca por label exato (ex: 'United States (+1)'). Labels sao unicos no COUNTRY_CODES."
+
+  # F058 - sem novo contrato, apenas mudanca de logica interna
+
+  # F059
+  - name: "PrayerSelector.modalOnly"
+    component: "PrayerSelector"
+    methods:
+      - name: "modalOnly prop"
+        input: "boolean (default false)"
+        output: "Quando true, componente nao renderiza o Pressable inline, apenas o Modal"
+        notes: "Backward compatible: default false preserva comportamento atual"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Todas as mudancas sao UI/logic no client. Nao altera RLS, Edge Functions ou autenticacao."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Nao adiciona novos logs ou metricas."
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F055
+  - path: "src/lib/whatsappUtils.ts"
+    feature: F055
+    change: "Adicionar funcao buildWhatsAppConversationUrl(phone) que retorna URL wa.me/{cleanPhone} sem ?text="
+
+  - path: "src/components/InviteManagementSection.tsx"
+    feature: F055
+    change: "handleDropdownWhatsApp importa e usa buildWhatsAppConversationUrl ao inves de buildWhatsAppUrl"
+
+  # F056
+  - path: "src/components/InviteActionDropdown.tsx"
+    feature: F056
+    change: "Trocar {speech?.speaker_name ?? ''} por {t('speeches.changeStatus')} no titulo (linha 73-74)"
+
+  # F057
+  - path: "src/lib/countryCodes.ts"
+    feature: F057
+    change: "Mover USA antes de Canada na lista. Adicionar funcao getCountryByLabel(label)."
+
+  - path: "src/app/(tabs)/settings/members.tsx"
+    feature: F057
+    change: "Estado countryLabel local para guardar label do pais selecionado. Highlight no dropdown compara por item.label === countryLabel. Ao salvar, continua salvando apenas o code."
+
+  # F058
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F058
+    change: "getPositionLabel retorna t('speeches.lastSpeech') quando position === 3"
+
+  - path: "src/components/AgendaForm.tsx"
+    feature: F058
+    change: "Label do SpeakerField posicao 3: t('speeches.lastSpeech') + ' ' + t('speeches.speaker') ao inves de '3o...'"
+
+  - path: "src/components/InviteManagementSection.tsx"
+    feature: F058
+    change: "Segunda linha: quando speech.position === 3, usar t('speeches.lastSpeech') ao inves de t('speeches.slot', { number: '3o' })"
+
+  - path: "src/hooks/usePresentationMode.ts"
+    feature: F058
+    change: "Label do 3o discurso: t('speeches.lastSpeech') + ' ' + t('speeches.speaker') ao inves de '3o...'"
+
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F058
+    change: "Adicionar speeches.lastSpeech = 'Ultimo Discurso'"
+
+  - path: "src/i18n/locales/en.json"
+    feature: F058
+    change: "Adicionar speeches.lastSpeech = 'Final Speech'"
+
+  - path: "src/i18n/locales/es.json"
+    feature: F058
+    change: "Adicionar speeches.lastSpeech = 'Ultimo Discurso'"
+
+  # F059
+  - path: "src/components/PrayerSelector.tsx"
+    feature: F059
+    change: "Adicionar prop modalOnly (boolean, default false). Quando true, nao renderiza o Pressable (linhas 93-115), apenas o Modal."
+
+  - path: "src/components/AgendaForm.tsx"
+    feature: F059
+    change: "Passar modalOnly={true} ao PrayerSelector renderizado condicionalmente pelo selectorModal"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-042
+    title: "buildWhatsAppConversationUrl separada de buildWhatsAppUrl"
+    context: "F055 precisa abrir conversa WhatsApp sem mensagem. buildWhatsAppUrl sempre anexa ?text=. Alternativas: (a) parametro opcional omitText em buildWhatsAppUrl, (b) funcao separada."
+    decision: "Funcao separada buildWhatsAppConversationUrl(phone) em whatsappUtils.ts. Motivo: responsabilidade clara -- abrir conversa vs enviar mensagem. buildWhatsAppUrl nao precisa de logica condicional."
+    consequences:
+      - "Pro: Separacao de responsabilidade clara, zero risco de regressao em envio de convite"
+      - "Con: Duplica logica de limpeza de telefone (trivial, 3 linhas)"
+
+  - id: ADR-043
+    title: "Country label como chave de selecao para resolver ambiguidade de +1"
+    context: "F057: Canada e USA compartilham +1. getFlagForCode usa .find() retornando primeiro match. Alternativas: (a) reordenar USA primeiro, (b) armazenar label no estado local, (c) armazenar label no banco."
+    decision: "Combinar (a) e (b): reordenar USA antes de Canada E usar label como chave de selecao no dropdown. Nao alterar schema do banco (country_code continua string '+1'). Estado local countryLabel resolve ambiguidade na UI."
+    consequences:
+      - "Pro: Resolve ambiguidade visual sem migracao de dados"
+      - "Pro: Membros existentes com +1 passam a mostrar bandeira USA (mais comum em contexto LDS)"
+      - "Con: Se usuario selecionou Canada, reabrir edicao mostrara USA (pois banco so tem '+1'). Aceito como tradeoff."
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M017.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (11 componentes mas sao de 5 features cross-module)

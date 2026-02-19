@@ -1,0 +1,595 @@
+# =============================================================================
+# QA_PLAN_batch9_phase1.yaml
+# PRE-validation QA Plan for Batch 9 Phase 1
+# CRs: CR-112, CR-113, CR-117, CR-122, CR-125
+# Generated: 2026-02-19
+# =============================================================================
+
+batch: 9
+phase: 1
+title: "Bug fixes & quick UI"
+type: feature_request
+status: validated
+generated_at: "2026-02-19"
+
+# #############################################################################
+# CR-112 / F055: Ver Conversa sem reenviar convite
+# #############################################################################
+
+cr_112:
+  cr_id: CR-112
+  feature_id: F055
+  title: "Ver Conversa should open WhatsApp conversation without resending invite message"
+  type: bugfix
+  user_request: |
+    Quando clico em 'Ver Conversa' no gerenciador de convites, é somente para
+    enviar ao WhatsApp na conversa com o discursante, nao pode mandar com o
+    convite de novo.
+
+  affected_files:
+    - src/components/InviteManagementSection.tsx
+    - src/lib/whatsappUtils.ts
+
+  root_cause: |
+    In InviteManagementSection.tsx:106-128, handleDropdownWhatsApp() calls
+    buildWhatsAppUrl() with all the invite template variables (speakerName, date,
+    topic, position, collection, link). This produces a wa.me URL with
+    ?text=<full invite message>. When the user clicks "Ver Conversa" from the
+    InviteActionDropdown, they expect to just open the WhatsApp conversation with
+    the speaker -- NOT resend the invite message.
+
+    The buildWhatsAppUrl() function (whatsappUtils.ts:70-95) always builds a URL
+    with the ?text= parameter containing the resolved template message.
+
+  evidence:
+    - path: src/components/InviteManagementSection.tsx
+      lines: "106-128"
+      observation: |
+        handleDropdownWhatsApp builds full invite URL with buildWhatsAppUrl(),
+        including speakerName, date, topic, position, collection, link variables.
+        This resends the invite message when user just wants to view conversation.
+    - path: src/components/InviteManagementSection.tsx
+      lines: "71-97"
+      observation: |
+        handleNotInvitedAction also calls buildWhatsAppUrl() -- this is CORRECT
+        because it's the initial invite action. The two handlers should behave
+        differently: initial invite sends message, "Ver Conversa" does not.
+    - path: src/lib/whatsappUtils.ts
+      lines: "70-95"
+      observation: |
+        buildWhatsAppUrl() always appends ?text=<message>. There is no option
+        to build a URL without the message text. A conversation-only URL would
+        be https://wa.me/{phone} without the ?text= parameter.
+    - path: src/components/InviteActionDropdown.tsx
+      lines: "78-93"
+      observation: |
+        The "View conversation" option calls onOpenWhatsApp(speech) which
+        delegates to handleDropdownWhatsApp in InviteManagementSection.
+
+  reproduction_steps:
+    - step: 1
+      action: "Open Home screen with invite management visible"
+    - step: 2
+      action: "Find a speech with status 'assigned_invited' (already invited)"
+    - step: 3
+      action: "Click the 3-dot button to open the dropdown"
+    - step: 4
+      action: "Click 'Ver Conversa'"
+    - step: 5
+      expected: "WhatsApp opens in the conversation with the speaker, no pre-filled message"
+      actual: "WhatsApp opens with the full invite message pre-filled again"
+
+  fix_approach: |
+    Modify handleDropdownWhatsApp in InviteManagementSection.tsx to build a
+    conversation-only WhatsApp URL (https://wa.me/{phone}) without the ?text=
+    parameter. This can be done by either:
+    (a) Building the URL manually without calling buildWhatsAppUrl, or
+    (b) Adding a new utility function buildWhatsAppConversationUrl(phone) that
+        returns just https://wa.me/{cleanPhone} without message text.
+
+  validation_checks:
+    must_pass:
+      - id: CR112-MP-01
+        description: "handleDropdownWhatsApp opens WhatsApp WITHOUT invite message"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          handleDropdownWhatsApp must NOT call buildWhatsAppUrl() with template
+          variables. It should either use a new conversation-only URL builder or
+          construct https://wa.me/{phone} directly without ?text= parameter.
+
+      - id: CR112-MP-02
+        description: "handleNotInvitedAction still sends invite message (unchanged)"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          handleNotInvitedAction (lines 71-97) must still call buildWhatsAppUrl()
+          with the full template variables. This function should NOT be changed.
+
+      - id: CR112-MP-03
+        description: "WhatsApp conversation URL has no text parameter"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          The URL used by handleDropdownWhatsApp must be in format
+          https://wa.me/{phone} without any ?text= query parameter.
+
+    should_pass:
+      - id: CR112-SP-01
+        description: "Phone number is properly cleaned for wa.me URL"
+        check_type: static
+        criteria: |
+          The phone number used in the conversation URL should have spaces,
+          dashes, parentheses removed and leading + stripped (same cleaning
+          as buildWhatsAppUrl does).
+
+# #############################################################################
+# CR-113 / F056: Titulo dialogo "Alterar status" i18n
+# #############################################################################
+
+cr_113:
+  cr_id: CR-113
+  feature_id: F056
+  title: "Dialog title should show 'Alterar status' instead of speaker name"
+  type: ui_change
+  user_request: |
+    Quando clica nos 3 pontinhos para trocar o status do convite, ao inves de
+    colocar o nome da pessoa como titulo do dialogo coloque (com suporte a i18n)
+    'Alterar status'.
+
+  affected_files:
+    - src/components/InviteActionDropdown.tsx
+    - src/i18n/locales/pt-BR.json
+    - src/i18n/locales/en.json
+    - src/i18n/locales/es.json
+
+  root_cause: |
+    In InviteActionDropdown.tsx:73-75, the title of the dropdown modal shows
+    {speech?.speaker_name ?? ''} directly. The user wants it to show a
+    localized "Alterar status" / "Change status" / "Cambiar estado" instead.
+
+  evidence:
+    - path: src/components/InviteActionDropdown.tsx
+      lines: "72-75"
+      observation: |
+        <Text style={[styles.title, { color: colors.text }]}>
+          {speech?.speaker_name ?? ''}
+        </Text>
+        This displays the speaker name as the dialog title.
+    - path: src/i18n/locales/pt-BR.json
+      line: 187
+      observation: |
+        Key "changeStatus": "Alterar status" already exists in pt-BR.
+    - path: src/i18n/locales/en.json
+      line: 187
+      observation: |
+        Key "changeStatus": "Change status" already exists in en.
+    - path: src/i18n/locales/es.json
+      line: 187
+      observation: |
+        Key "changeStatus": "Cambiar estado" already exists in es.
+
+  fix_approach: |
+    Replace {speech?.speaker_name ?? ''} with t('speeches.changeStatus') in
+    InviteActionDropdown.tsx. The i18n keys already exist in all 3 locales
+    so no new keys are needed. The component already imports useTranslation.
+
+  validation_checks:
+    must_pass:
+      - id: CR113-MP-01
+        description: "Dialog title uses i18n key instead of speaker name"
+        check_type: static
+        target: src/components/InviteActionDropdown.tsx
+        criteria: |
+          The title Text element must use t('speeches.changeStatus') or
+          equivalent i18n function call instead of speech?.speaker_name.
+
+      - id: CR113-MP-02
+        description: "i18n keys exist for all 3 locales"
+        check_type: static
+        target: src/i18n/locales/
+        criteria: |
+          The translation key used must exist in pt-BR.json, en.json, and es.json.
+          Currently speeches.changeStatus already exists with appropriate translations.
+
+    should_pass:
+      - id: CR113-SP-01
+        description: "Speaker name is not displayed anywhere in dialog title"
+        check_type: static
+        target: src/components/InviteActionDropdown.tsx
+        criteria: |
+          The styles.title Text element must not reference speech?.speaker_name.
+
+# #############################################################################
+# CR-117 / F057: +1 shows Canada flag instead of USA
+# #############################################################################
+
+cr_117:
+  cr_id: CR-117
+  feature_id: F057
+  title: "+1 country code shows Canada flag instead of USA flag"
+  type: bugfix
+  user_request: |
+    O telefone com +1 está com Canadá sendo mostrado. Quando eu clico na lista,
+    aparece tanto canada quanto EUA selecionados, mas mesmo que eu clique em EUA,
+    o ícone do canada continua sendo mostrado.
+
+  affected_files:
+    - src/lib/countryCodes.ts
+    - src/app/(tabs)/settings/members.tsx
+
+  root_cause: |
+    In countryCodes.ts, both Canada (line 46) and United States (line 182) have
+    code: '+1'. The getFlagForCode() function (line 196) uses
+    COUNTRY_CODES.find() which returns the FIRST match. Since the list is
+    alphabetical (Canada before United States), getFlagForCode('+1') always
+    returns the Canadian flag emoji.
+
+    Similarly, in members.tsx:151, the country code picker highlights items
+    where item.code === countryCode. Since both Canada and USA have code '+1',
+    both appear highlighted. When user selects USA, the stored code is still
+    '+1', so getFlagForCode('+1') returns Canada's flag again.
+
+    This is a fundamental issue with shared dial codes (+1 for US/CA,
+    +7 for Russia/Kazakhstan, +44 for UK dependencies, etc.)
+
+  evidence:
+    - path: src/lib/countryCodes.ts
+      lines: "46, 182"
+      observation: |
+        Line 46: { code: '+1', flag: '\u{1F1E8}\u{1F1E6}', label: 'Canada (+1)' }
+        Line 182: { code: '+1', flag: '\u{1F1FA}\u{1F1F8}', label: 'United States (+1)' }
+        Both entries share code '+1'.
+    - path: src/lib/countryCodes.ts
+      lines: "196-199"
+      observation: |
+        getFlagForCode uses .find() which returns FIRST match:
+        const entry = COUNTRY_CODES.find((c) => c.code === code);
+        For '+1', Canada (index ~20) comes before USA (index ~165).
+    - path: src/app/(tabs)/settings/members.tsx
+      line: 151
+      observation: |
+        item.code === countryCode highlights BOTH Canada and USA when code is '+1'.
+    - path: src/app/(tabs)/settings/members.tsx
+      lines: "95-96"
+      observation: |
+        getFlagForCode(countryCode) always returns Canada flag for '+1'.
+
+  reproduction_steps:
+    - step: 1
+      action: "Go to Settings > Members"
+    - step: 2
+      action: "Add or edit a member with +1 country code"
+    - step: 3
+      expected: "USA flag shown for +1"
+      actual: "Canada flag shown for +1"
+    - step: 4
+      action: "Click the country code selector"
+    - step: 5
+      expected: "Only USA highlighted if selected"
+      actual: "Both Canada and USA highlighted"
+    - step: 6
+      action: "Select USA from the list"
+    - step: 7
+      expected: "USA flag icon shown"
+      actual: "Canada flag icon still shown"
+
+  fix_approach: |
+    The root issue is that code alone ('+1') is ambiguous for shared dial codes.
+    Options:
+    (a) Use the label as the stored identifier instead of code (e.g. store
+        'United States (+1)' instead of '+1'). This changes the data model.
+    (b) Move United States before Canada in the COUNTRY_CODES array (quick fix
+        but doesn't solve the highlighting issue).
+    (c) Add a unique identifier (e.g., ISO country code like 'US', 'CA') to
+        each entry and use that for storage and matching instead of dial code.
+
+    Option (c) is the most robust. Add an `iso` field to CountryCode interface,
+    store the ISO code alongside the dial code, and use iso for matching in
+    getFlagForCode and the picker highlighting.
+
+    Alternatively, a simpler approach: change the stored value to use label
+    as key for uniqueness, but this impacts splitPhoneNumber and data migration.
+
+    Recommended: Move USA before Canada in the array (so .find returns USA first
+    for '+1'), and use item.label (already unique) as the keyExtractor and
+    matching key in the picker component.
+
+  validation_checks:
+    must_pass:
+      - id: CR117-MP-01
+        description: "+1 country code shows USA flag by default"
+        check_type: static
+        target: src/lib/countryCodes.ts
+        criteria: |
+          getFlagForCode('+1') must return USA flag emoji, not Canada flag.
+          This can be achieved by reordering entries or by adding a unique
+          identifier.
+
+      - id: CR117-MP-02
+        description: "Country picker does not highlight both CA and US simultaneously"
+        check_type: static
+        target: src/app/(tabs)/settings/members.tsx
+        criteria: |
+          The country code picker must be able to distinguish between
+          countries that share the same dial code. Only the actually selected
+          country should be highlighted.
+
+      - id: CR117-MP-03
+        description: "Selecting USA persists USA selection (not reverted to Canada)"
+        check_type: static
+        criteria: |
+          After selecting United States from the picker, the displayed flag
+          must be the USA flag, not Canada. The stored value must uniquely
+          identify USA vs Canada.
+
+    should_pass:
+      - id: CR117-SP-01
+        description: "Other shared codes (+7 RU/KZ, etc.) also work correctly"
+        check_type: static
+        target: src/lib/countryCodes.ts
+        criteria: |
+          The fix should handle all shared dial codes, not just +1.
+          Russia (+7) and Kazakhstan (+7) should also be distinguishable.
+
+      - id: CR117-SP-02
+        description: "splitPhoneNumber still works for +1 numbers"
+        check_type: static
+        target: src/lib/countryCodes.ts
+        criteria: |
+          splitPhoneNumber('+12025551234') should still correctly split
+          the country code as '+1' and phone as '2025551234'.
+
+# #############################################################################
+# CR-122 / F058: 3o Discurso -> Ultimo Discurso
+# #############################################################################
+
+cr_122:
+  cr_id: CR-122
+  feature_id: F058
+  title: "Change '3o Discurso' label to 'Ultimo Discurso' (Last Speech)"
+  type: ui_change
+  user_request: |
+    Trocar label, na agenda, de 3o Discurso para 'Ultimo Discurso'.
+
+  affected_files:
+    - src/components/SpeechSlot.tsx
+    - src/components/InviteManagementSection.tsx
+    - src/components/AgendaForm.tsx
+    - src/i18n/locales/pt-BR.json
+    - src/i18n/locales/en.json
+    - src/i18n/locales/es.json
+
+  root_cause: |
+    In SpeechSlot.tsx:51-53, getPositionLabel() always formats as ordinal + slot:
+    t('speeches.slot', { number: `${position}\u00BA` }), producing "3o Discurso".
+    There is no special case for the last speech position.
+
+    In AgendaForm.tsx:378, the 3rd speaker label is hardcoded as
+    `3\u00BA ${t('speeches.speaker')}` (= "3o Orador" / "3rd Speaker").
+
+    In InviteManagementSection.tsx:180, the slot label also uses the ordinal:
+    t('speeches.slot', { number: `${speech.position}\u00BA` }).
+
+  evidence:
+    - path: src/components/SpeechSlot.tsx
+      lines: "51-53"
+      observation: |
+        getPositionLabel always uses ordinal format:
+        return t('speeches.slot', { number: `${position}\u00BA` });
+        For position 3 this produces "3o Discurso".
+    - path: src/components/AgendaForm.tsx
+      line: 378
+      observation: |
+        label={`3\u00BA ${t('speeches.speaker')}`} produces "3o Orador".
+    - path: src/components/InviteManagementSection.tsx
+      line: 180
+      observation: |
+        Uses same ordinal format for all positions.
+    - path: src/i18n/locales/pt-BR.json
+      line: 220
+      observation: |
+        Key "sectionLastSpeech": "Ultimo Discurso" already exists (used as
+        section header in AgendaForm.tsx:375).
+
+  fix_approach: |
+    Add a new i18n key for "Last Speech" label (e.g., speeches.lastSlot) in all
+    3 locales. Modify getPositionLabel in SpeechSlot.tsx to return the "Last
+    Speech" label when position === 3 (the maximum). Also update
+    InviteManagementSection.tsx:180 and AgendaForm.tsx:378 to use "Ultimo" for
+    position 3.
+
+    New i18n keys needed:
+    - pt-BR: "lastSlot": "Ultimo Discurso"
+    - en: "lastSlot": "Last Speech"
+    - es: "lastSlot": "Ultimo Discurso"
+
+    Or reuse existing sectionLastSpeech key if semantically appropriate.
+
+  validation_checks:
+    must_pass:
+      - id: CR122-MP-01
+        description: "Position 3 label shows 'Ultimo Discurso' / 'Last Speech'"
+        check_type: static
+        target: src/components/SpeechSlot.tsx
+        criteria: |
+          getPositionLabel(3, t) must return "Ultimo Discurso" (pt-BR),
+          "Last Speech" (en), or "Ultimo Discurso" (es) instead of
+          "3o Discurso" / "3rd Speech".
+
+      - id: CR122-MP-02
+        description: "Positions 1 and 2 still use ordinal labels"
+        check_type: static
+        target: src/components/SpeechSlot.tsx
+        criteria: |
+          getPositionLabel(1, t) and getPositionLabel(2, t) must still return
+          "1o Discurso" and "2o Discurso" (or equivalent in other languages).
+
+      - id: CR122-MP-03
+        description: "AgendaForm 3rd speaker label uses 'Ultimo' instead of '3o'"
+        check_type: static
+        target: src/components/AgendaForm.tsx
+        criteria: |
+          The label for the 3rd speaker field (currently `3\u00BA ${t('speeches.speaker')}`)
+          must use the 'last' terminology instead of '3o'.
+
+      - id: CR122-MP-04
+        description: "InviteManagement also uses 'Ultimo' for position 3"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          Line 180 must display the "Ultimo Discurso" label for position 3
+          instead of "3o Discurso".
+
+      - id: CR122-MP-05
+        description: "i18n keys exist for all 3 locales"
+        check_type: static
+        target: src/i18n/locales/
+        criteria: |
+          A new or reused i18n key for "Last Speech" must exist in
+          pt-BR.json, en.json, and es.json.
+
+    should_pass:
+      - id: CR122-SP-01
+        description: "Presentation mode also uses 'Ultimo' for last speech"
+        check_type: static
+        target: src/hooks/usePresentationMode.ts
+        criteria: |
+          If the presentation mode displays speech position labels,
+          position 3 should also show "Ultimo Discurso" / "Last Speech".
+
+# #############################################################################
+# CR-125 / F059: Bug duplicacao oracao de encerramento
+# #############################################################################
+
+cr_125:
+  cr_id: CR-125
+  feature_id: F059
+  title: "Closing prayer field appears to duplicate when clicked"
+  type: bugfix
+  user_request: |
+    Tem um bug no campo Oracao de encerramento. Quando eu clico, ele parece que
+    duplica tanto o campo quando o numero de telas de search que aparecem.
+
+  affected_files:
+    - src/components/AgendaForm.tsx
+    - src/components/PrayerSelector.tsx
+
+  root_cause: |
+    In AgendaForm.tsx:424-436, the closing prayer field is rendered as a
+    SelectorField (Pressable). When clicked, it sets selectorModal to
+    { type: 'prayer', field: 'closing_prayer' }.
+
+    This triggers the conditional render at lines 480-507 which renders a
+    PrayerSelector component with visible={true}. However, PrayerSelector
+    (PrayerSelector.tsx) renders BOTH:
+    1. Its own selector Pressable button (lines 93-115) -- a visible UI element
+    2. A Modal (lines 117-202) that opens via useEffect when visible=true
+
+    So when clicking the closing prayer SelectorField in AgendaForm:
+    - The original SelectorField is still rendered (AgendaForm line 424-436)
+    - A NEW PrayerSelector button (PrayerSelector lines 93-115) is also rendered
+    - AND the PrayerSelector modal opens
+
+    This causes the visual "duplication" the user reports -- the PrayerSelector's
+    own button renders inline alongside the original SelectorField, and
+    the modal opens automatically, creating a jarring double-element + modal effect.
+
+    The same issue exists for opening_prayer (AgendaForm lines 231-243 + 480-507)
+    but may be less noticeable due to scroll position or layout.
+
+  evidence:
+    - path: src/components/AgendaForm.tsx
+      lines: "424-436"
+      observation: |
+        SelectorField for closing prayer renders and sets selectorModal on click.
+    - path: src/components/AgendaForm.tsx
+      lines: "480-507"
+      observation: |
+        When selectorModal.type === 'prayer', PrayerSelector is rendered with
+        visible={true}. This renders the PrayerSelector's own Pressable button
+        (which duplicates the original SelectorField visually) PLUS opens modal.
+    - path: src/components/PrayerSelector.tsx
+      lines: "91-203"
+      observation: |
+        PrayerSelector always renders its own selector Pressable (lines 93-115)
+        plus a Modal (lines 117-202). When used with visible={true} from
+        AgendaForm, both the inline selector AND the modal appear, causing
+        the visual duplication.
+    - path: src/components/PrayerSelector.tsx
+      lines: "60-62"
+      observation: |
+        useEffect(() => { if (visible) setModalVisible(true); }, [visible]);
+        This auto-opens the modal when visible prop is set, but doesn't
+        prevent rendering the inline selector button.
+
+  reproduction_steps:
+    - step: 1
+      action: "Open agenda for any Sunday"
+    - step: 2
+      action: "Scroll to 'Oracao de Encerramento' (Closing Prayer) field"
+    - step: 3
+      action: "Tap the closing prayer field"
+    - step: 4
+      expected: "A single search/selection modal opens"
+      actual: "The field appears duplicated and multiple search screens appear"
+
+  fix_approach: |
+    When PrayerSelector is used in "controlled modal" mode (visible + onClose
+    props provided from AgendaForm), it should NOT render its own inline
+    selector Pressable button. It should only render the Modal.
+
+    Option (a): In PrayerSelector, conditionally hide the inline selector when
+    the `visible` prop is provided (render only the Modal).
+
+    Option (b): In AgendaForm, don't render the SelectorField for prayers and
+    let PrayerSelector handle both the button and modal (but this changes the
+    visual consistency with other fields).
+
+    Option (a) is recommended: modify PrayerSelector to check if it's being
+    used in controlled mode and skip rendering the inline selector.
+
+  validation_checks:
+    must_pass:
+      - id: CR125-MP-01
+        description: "No visual duplication when closing prayer field is tapped"
+        check_type: static
+        target: src/components/PrayerSelector.tsx
+        criteria: |
+          When PrayerSelector is rendered with visible={true} (controlled mode
+          from AgendaForm), it must NOT render its own inline Pressable selector
+          button (lines 93-115). Only the Modal should be rendered.
+
+      - id: CR125-MP-02
+        description: "Only one search modal opens on tap"
+        check_type: static
+        target: src/components/AgendaForm.tsx
+        criteria: |
+          Tapping the closing prayer SelectorField must result in exactly one
+          search/selection modal appearing, not multiple.
+
+      - id: CR125-MP-03
+        description: "Opening prayer also fixed (same pattern)"
+        check_type: static
+        target: src/components/AgendaForm.tsx
+        criteria: |
+          The same fix must apply to opening_prayer (lines 231-243) since it
+          uses the identical pattern and likely has the same duplication issue.
+
+      - id: CR125-MP-04
+        description: "PrayerSelector standalone usage still works"
+        check_type: static
+        target: src/components/PrayerSelector.tsx
+        criteria: |
+          When PrayerSelector is used WITHOUT the visible prop (standalone mode),
+          it must still render its inline selector button and open the modal
+          on press as before. The fix must not break standalone usage.
+
+    should_pass:
+      - id: CR125-SP-01
+        description: "Modal closes properly and state resets"
+        check_type: static
+        target: src/components/PrayerSelector.tsx
+        criteria: |
+          When closing the modal via cancel or selection, search and customName
+          state should reset, and selectorModal in AgendaForm should be null.

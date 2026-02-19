@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-19"
-  last_updated_by: "batch-9-phase-3"
+  last_updated_by: "batch-10-phase-1"
   total_modules: 8
-  total_adrs: 39
+  total_adrs: 41
   total_crs_implemented: 85
   pending_arch: "none"
   source_documents:
@@ -26,6 +26,7 @@ metadata:
     - docs/arch/ARCH_M017.yaml
     - docs/arch/ARCH_M018.yaml
     - docs/arch/ARCH_M019.yaml
+    - docs/arch/ARCH_M020.yaml
 
 # =============================================================================
 # TECH STACK
@@ -201,7 +202,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118, 130]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -222,6 +223,7 @@ modules:
       CR-96/F041: SearchInput fixo no topo em members.tsx e topics.tsx (fora do ScrollView).
       CR-117/F057: USA reordenado antes de Canada em countryCodes.ts. members.tsx usa label para highlight no dropdown.
       CR-118/F065: SearchInput flex:1 defensivo. Settings screens (members, topics, history, timezone) com close button.
+      CR-130/F072: members.tsx usa getCountryByLabel para exibir bandeira correta para paises com mesmo dial code.
 
   - id: M003
     name: SpeechModule
@@ -243,7 +245,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 129]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -261,6 +263,9 @@ modules:
       CR-116/F062: StatusChangeModal recebe allowedStatuses prop. LED click em assigned_invited filtra para confirmed/gave_up.
       CR-119/F063: Layout reordenado [LED][Speaker][X]. topicField marginLeft 28px para alinhamento.
       CR-120/F066: Auto-scroll para card expandido em speeches.tsx com scrollToIndex(viewPosition:0, delay 300ms).
+      CR-126/F069: StatusLED redesenhado para circulo flat com novas cores (cinza, laranja, amarelo, verde, vinho). StatusChangeModal cores atualizadas.
+      CR-127/F070: useDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo. SundayTypeDropdown chama delete antes de type change.
+      CR-129/F071: LED click filtra todos os status exceto not_assigned. LED desabilitado para assigned_confirmed e gave_up.
 
   - id: M004
     name: AgendaModule
@@ -855,6 +860,25 @@ adrs:
       - "Zero risco de regressao em outros campos (presiding, conducting, hymns, prayers)"
       - "Controle total sobre layout vertical dos nomes"
 
+  - id: ADR-049
+    title: "Cores flat unicas no StatusLED ao inves de gradiente 3D por camada"
+    context: "F069 troca design 3D (3 camadas com cores distintas) por circulo flat. Opcoes: (a) manter 3 cores e usar a inner, (b) redesenhar com cor unica por status."
+    decision: "Cor unica por status, derivada da paleta Tailwind (orange-500, yellow-500, green-500, red-900). STATUS_COLORS simplificado para Record<SpeechStatus, string>."
+    decided_in: "CR-126"
+    consequences:
+      - "Implementacao simplificada (1 View ao inves de 3)"
+      - "Consistencia com STATUS_INDICATOR_COLORS (mesmas cores)"
+      - "Perde efeito visual 3D (decisao do usuario)"
+
+  - id: ADR-050
+    title: "Hook dedicado useDeleteSpeechesByDate ao inves de logica inline"
+    context: "F070 precisa deletar speeches ao mudar tipo. Opcoes: (a) supabase.delete inline, (b) hook dedicado, (c) logica no useSetSundayType."
+    decision: "Hook dedicado useDeleteSpeechesByDate em useSpeeches.ts. Separacao de responsabilidade: useSetSundayType cuida de sunday_exceptions, useDeleteSpeechesByDate cuida de speeches."
+    decided_in: "CR-127"
+    consequences:
+      - "Cada hook tem responsabilidade unica"
+      - "Nao e transacao atomica (mitigado pela ordem: delete primeiro, type change depois)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1218,7 +1242,7 @@ file_structure:
   "src/hooks/":
     "useMembers.ts": "CRUD membros via TanStack Query"
     "useTopics.ts": "CRUD topicos + toggle colecoes + useCollectionTopics (CR-89)"
-    "useSpeeches.ts": "CRUD discursos + status lifecycle"
+    "useSpeeches.ts": "CRUD discursos + status lifecycle. CR-127/F070: useDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo."
     "useAgenda.ts": "CRUD agenda + lazy creation"
     "useActors.ts": "CRUD atores (inline no AgendaForm)"
     "useSundayTypes.ts": "Auto-assign + override tipos de domingo"
@@ -1238,10 +1262,10 @@ file_structure:
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline."
-    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]."
-    "StatusLED.tsx": "LED 3D animado de status de discurso"
-    "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes."
+    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up."
+    "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
+    "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez)"
     "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix)"
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
@@ -1270,7 +1294,7 @@ file_structure:
     "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
     "offlineGuard.ts": "Guard para operacoes online-only"
     "notificationUtils.ts": "Utilitarios de notificacoes"
-    "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, getCountryByLabel (CR-117), splitPhoneNumber (CR-85, ADR-031, ADR-043)"
+    "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, getCountryByLabel (CR-117, CR-130/F072: usado para display correto de bandeira), splitPhoneNumber (CR-85, ADR-031, ADR-043)"
 
   "src/types/":
     "database.ts": "Tipos TypeScript para todas as tabelas do banco"
@@ -1515,6 +1539,14 @@ change_requests_history:
     doc: "ARCH_M019.yaml"
     status: "pending implementation"
     adrs: [ADR-046, ADR-047, ADR-048]
+    new_files: []
+
+  batch_10_phase_1:
+    crs: "CR-126, CR-127, CR-129, CR-130"
+    scope: "LED redesign flat circle + new colors (F069), delete speeches on sunday type change (F070), LED click filter all except not_assigned (F071), country code display fix for shared dial codes (F072)"
+    doc: "ARCH_M020.yaml"
+    status: "pending implementation"
+    adrs: [ADR-049, ADR-050]
     new_files: []
 
 # =============================================================================

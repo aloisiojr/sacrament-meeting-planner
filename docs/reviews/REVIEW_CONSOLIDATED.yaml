@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130
 # Reviewed: 2026-02-19
-# Version: 12
+# Version: 13
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml, specs/SPEC_F065_F068.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml, arch/ARCH_M019.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml, plans/PLAN_P019.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml, specs/SPEC_F065_F068.yaml, specs/SPEC_F069_F072.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml, arch/ARCH_M019.yaml, arch/ARCH_M020.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml, plans/PLAN_P019.yaml, plans/PLAN_P020.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -4509,4 +4509,401 @@ batch9_phase3:
     full_suite_tests: 3296
     full_suite_passing: 3296
     full_suite_files: 63
+    regressions: 0
+
+# =============================================================================
+# Batch 10, Phase 1: CR-126, CR-127, CR-129, CR-130
+# LED Redesign, Sunday Type Data Cleanup, Speech LED Status Options,
+# Country Code Display Fix
+# Features: F069, F070, F071, F072
+# =============================================================================
+
+batch10_phase1:
+  phase: "Batch 10 Phase 1"
+  phase_description: "LED flat circle redesign + new colors (F069/CR-126), delete speeches on type change (F070/CR-127), LED click filter excluding not_assigned (F071/CR-129), country code display fix for shared dial codes (F072/CR-130)"
+  verdict: approved
+  iteration: 1
+
+  verdict_summary: >
+    Batch 10 Phase 1 implements 4 features cleanly across 7 source files with
+    9 commits. All changes follow the SPEC -> ARCH -> PLAN -> CODE chain
+    faithfully. F069 simplifies StatusLED from 3-layer 3D effect to single flat
+    circle with correct new color scheme (gray, orange, yellow, green, dark wine).
+    F070 adds useDeleteSpeechesByDate hook and wires it through SundayCard to
+    speeches.tsx for proper data cleanup on type change. F071 changes
+    ledAllowedStatuses to constant array excluding not_assigned and disables LED
+    for terminal states. F072 fixes country flag display for shared dial codes
+    using getCountryByLabel. Tests: 84 new tests passing, full suite 3380/3380,
+    zero regressions. Repository clean (only doc files pending, expected).
+
+  chain_validation:
+    spec_vs_request: pass
+    arch_vs_spec: pass
+    plan_vs_arch: pass
+    code_vs_plan: pass
+    chain_intact: true
+
+    spec_vs_request_notes: >
+      SPEC_F069_F072.yaml accurately captures all 4 user requests: LED flat
+      redesign with specific colors (CR-126), speech data cleanup on type change
+      (CR-127), LED click showing all statuses except not_assigned (CR-129),
+      and country flag display fix for shared dial codes (CR-130). All acceptance
+      criteria are traceable to user requests.
+
+    arch_vs_spec_notes: >
+      ARCH_M020.yaml maps all SPEC requirements to components. F069: StatusLED.tsx
+      (simplify 3 layers to 1) + StatusChangeModal.tsx (update colors). F070:
+      useSpeeches.ts (new hook) + SundayCard.tsx (prop + callback) + speeches.tsx
+      (wiring). F071: SpeechSlot.tsx (constant filter + guard). F072: members.tsx
+      (use getCountryByLabel). ADR-049 and ADR-050 document design decisions.
+
+    plan_vs_arch_notes: >
+      PLAN_P020.yaml decomposes architecture into 9 steps with correct dependency
+      ordering. Steps 1-2 for F069, Steps 3/5/6 for F070, Step 7 for F071,
+      Step 4 for F072, Step 8 for tests, Step 9 for existing test updates.
+      All files match architecture specification.
+
+    code_vs_plan_notes: >
+      CODE_LEDGER commits map 1:1 to plan steps. 9 code commits match steps
+      STEP-01 through STEP-09. Files changed match plan specifications exactly.
+      No code outside the plan scope.
+
+  commit_reviews:
+    - hash: d6519da
+      message: "feat(status-led): redesign StatusLED to flat circle with new color scheme (CR-126)"
+      files_changed: [src/components/StatusLED.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "LEDColors interface removed, STATUS_COLORS simplified to Record<SpeechStatus, string>"
+          - "3 layers (outerRing, innerCircle, glowDot) replaced with single Animated.View"
+          - "Correct colors: #9CA3AF gray, #F97316 orange, #EAB308 yellow, #22C55E green, #7F1D1D dark wine"
+          - "Fading animation preserved for assigned_not_invited (withRepeat, opacity 0.3-1, 1000ms)"
+          - "Reduced motion accessibility preserved (cancelAnimation + opacity=1)"
+          - "StatusLEDProps API unchanged (backward compatible)"
+          - "styles.circle added, old styles removed"
+        issues: []
+
+    - hash: 516b606
+      message: "feat(status-modal): update STATUS_INDICATOR_COLORS to match new flat LED colors (CR-126)"
+      files_changed: [src/components/StatusChangeModal.tsx]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "STATUS_INDICATOR_COLORS updated with exact same hex codes as StatusLED"
+          - "InviteManagementSection and InviteActionDropdown inherit automatically via import"
+        issues: []
+
+    - hash: c7a278c
+      message: "feat(speeches): add useDeleteSpeechesByDate hook for sunday type cleanup (CR-127)"
+      files_changed: [src/hooks/useSpeeches.ts]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "New hook useDeleteSpeechesByDate exported correctly"
+          - "Uses supabase.from('speeches').delete().eq('ward_id', wardId!).eq('sunday_date', sundayDate)"
+          - "onSuccess invalidates speechKeys.all for cache consistency"
+          - "Activity log with 'speech_cleanup' action type and human-readable date"
+          - "Error propagated via throw (global MutationCache handles)"
+        issues: []
+
+    - hash: fd63a3e
+      message: "fix(members): use getCountryByLabel for flag display to fix shared dial code (CR-130)"
+      files_changed: [src/app/(tabs)/settings/members.tsx]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "getCountryByLabel imported from countryCodes.ts"
+          - "Flag display: getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)"
+          - "Fallback preserves backward compat when label not found"
+          - "Resolves US/Canada +1 ambiguity using unique label"
+        issues: []
+
+    - hash: e6b8dd2
+      message: "feat(sunday-card): add onDeleteSpeeches prop to SundayTypeDropdown for type change cleanup (CR-127)"
+      files_changed: [src/components/SundayCard.tsx]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "SundayTypeDropdownProps: date and onDeleteSpeeches added"
+          - "SundayCardProps: onDeleteSpeeches added"
+          - "Destructive confirm: onDeleteSpeeches called before onSelect/setOtherModalVisible"
+          - "No-assignments flow: onDeleteSpeeches called when currentType === SUNDAY_TYPE_SPEECHES"
+          - "Revert to speeches: onRevertToSpeeches called, NOT onDeleteSpeeches (correct)"
+          - "Cancel: does NOT call onDeleteSpeeches (correct)"
+          - "SundayCard passes date={date} and onDeleteSpeeches to SundayTypeDropdown"
+        issues: []
+
+    - hash: 5ef1ed5
+      message: "feat(speeches): wire handleDeleteSpeeches to SundayCard for type change cleanup (CR-127)"
+      files_changed: [src/app/(tabs)/speeches.tsx]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "useDeleteSpeechesByDate imported and instantiated"
+          - "handleDeleteSpeeches created with useCallback"
+          - "SundayCard receives onDeleteSpeeches={handleDeleteSpeeches}"
+          - "handleDeleteSpeeches included in renderItem dependency array"
+        issues: []
+
+    - hash: a101989
+      message: "feat(speech-slot): filter LED to exclude not_assigned and disable for terminal states (CR-129)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "ledAllowedStatuses changed from conditional to constant array of 4 statuses"
+          - "Correctly excludes not_assigned from allowed list"
+          - "handleStatusPress: guard added for assigned_confirmed and gave_up"
+          - "StatusLED disabled: assigned_confirmed and gave_up added alongside not_assigned"
+          - "Result: assigned_not_invited shows 1 option, assigned_invited shows 3, terminal states disabled"
+        issues: []
+
+    - hash: 118645f
+      message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+      files_changed: [src/__tests__/batch10-phase1.test.ts]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "84 tests covering all 4 features"
+          - "F069: 30 tests (flat circle, colors, animation, reduced motion, pressable, size, SundayCard LEDs, EC)"
+          - "F070: 27 tests (hook, cancel safety, no-assignments, revert, wiring, cache, log, other type)"
+          - "F071: 20 tests (filter, disabled states, terminal states, constant array)"
+          - "F072: 7 tests (getCountryByLabel, fallback, +7 codes, highlight, initialization)"
+          - "All tests use source-code analysis pattern consistent with project conventions"
+        issues: []
+
+    - hash: f797810
+      message: "fix(tests): update batch9 F062 tests for CR-129 changes to ledAllowedStatuses"
+      files_changed: [src/__tests__/batch9-phase2.test.ts]
+      step: STEP-09
+      review:
+        correctness: pass
+        notes:
+          - "5 F062 tests updated to reflect F071 changes"
+          - "Tests now verify constant ledAllowedStatuses instead of conditional pattern"
+          - "Correctly adds assertions for all 4 statuses in the constant array"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  pending_deploys: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/project-status.yaml"
+      - "docs/CHANGE_REQUESTS.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M020.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P020.yaml"
+      - "docs/qa/QA_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_batch10_phase1.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F069_F072.yaml"
+
+  ac_verification:
+    # F069
+    - ac_id: AC-F069-01
+      description: "LED is a flat circle without 3D effect"
+      status: verified
+      evidence: "StatusLED.tsx: no outerRing, innerCircle, glowDot. Single Animated.View with styles.circle, borderRadius: size/2."
+
+    - ac_id: AC-F069-02
+      description: "Gray color for not_assigned"
+      status: verified
+      evidence: "STATUS_COLORS.not_assigned = '#9CA3AF' (line 48)."
+
+    - ac_id: AC-F069-03
+      description: "Orange color for assigned_not_invited"
+      status: verified
+      evidence: "STATUS_COLORS.assigned_not_invited = '#F97316' (line 49)."
+
+    - ac_id: AC-F069-04
+      description: "Yellow color for assigned_invited"
+      status: verified
+      evidence: "STATUS_COLORS.assigned_invited = '#EAB308' (line 50)."
+
+    - ac_id: AC-F069-05
+      description: "Green color for assigned_confirmed"
+      status: verified
+      evidence: "STATUS_COLORS.assigned_confirmed = '#22C55E' (line 51)."
+
+    - ac_id: AC-F069-06
+      description: "Dark wine color for gave_up"
+      status: verified
+      evidence: "STATUS_COLORS.gave_up = '#7F1D1D' (line 52)."
+
+    - ac_id: AC-F069-07
+      description: "Fading animation for assigned_not_invited"
+      status: verified
+      evidence: "StatusLED.tsx lines 89-107: withRepeat + withSequence, opacity 0.3 to 1, duration 1000ms, infinite repeat."
+
+    - ac_id: AC-F069-08
+      description: "Reduced motion disables animation"
+      status: verified
+      evidence: "StatusLED.tsx lines 67-81: AccessibilityInfo.isReduceMotionEnabled check + reduceMotionChanged listener. cancelAnimation + fadeOpacity.value=1 on reduced motion."
+
+    - ac_id: AC-F069-09
+      description: "StatusChangeModal uses same new colors"
+      status: verified
+      evidence: "StatusChangeModal.tsx lines 38-44: STATUS_INDICATOR_COLORS with identical hex codes (#9CA3AF, #F97316, #EAB308, #22C55E, #7F1D1D)."
+
+    - ac_id: AC-F069-10
+      description: "LED pressable preserved"
+      status: verified
+      evidence: "StatusLED.tsx lines 136-148: Pressable wrapper with onPress when onPress && !disabled."
+
+    - ac_id: AC-F069-11
+      description: "Size prop preserved"
+      status: verified
+      evidence: "StatusLED.tsx line 59: size = 16 default. Lines 126-128: width: size, height: size, borderRadius: size/2."
+
+    - ac_id: AC-F069-12
+      description: "LEDs in SundayCard header use new colors"
+      status: verified
+      evidence: "SundayCard.tsx lines 360-371: StatusLED component used in header. Same component = same colors."
+
+    # F070
+    - ac_id: AC-F070-01
+      description: "Speeches deleted from DB after confirming type change"
+      status: verified
+      evidence: "useSpeeches.ts lines 323-348: useDeleteSpeechesByDate with supabase.delete().eq('ward_id').eq('sunday_date'). SundayCard.tsx line 128: onDeleteSpeeches?.(date) in destructive onPress."
+
+    - ac_id: AC-F070-02
+      description: "Cancel does NOT delete speeches"
+      status: verified
+      evidence: "SundayCard.tsx line 123: cancel button has style:'cancel' with no onPress (default dismiss). onDeleteSpeeches only in destructive handler (line 128)."
+
+    - ac_id: AC-F070-03
+      description: "No assignments: speeches still cleaned up"
+      status: verified
+      evidence: "SundayCard.tsx lines 141-143: after hasAssignments block, second check for currentType === SUNDAY_TYPE_SPEECHES calls onDeleteSpeeches?.(date)."
+
+    - ac_id: AC-F070-04
+      description: "Revert to speeches does NOT delete"
+      status: verified
+      evidence: "SundayCard.tsx lines 112-114: type === SUNDAY_TYPE_SPEECHES calls onRevertToSpeeches() and returns. No onDeleteSpeeches call in this path."
+
+    - ac_id: AC-F070-05
+      description: "Data does not reappear when reverting to speeches"
+      status: verified
+      evidence: "Delete removes all speech records. useLazyCreateSpeeches re-creates empty records when type reverts to speeches."
+
+    - ac_id: AC-F070-06
+      description: "Cache invalidated after delete"
+      status: verified
+      evidence: "useSpeeches.ts line 337: queryClient.invalidateQueries({ queryKey: speechKeys.all }) in onSuccess."
+
+    - ac_id: AC-F070-07
+      description: "Audit log records cleanup"
+      status: verified
+      evidence: "useSpeeches.ts lines 339-345: logAction with 'speech_cleanup' action type and human-readable date."
+
+    - ac_id: AC-F070-08
+      description: "Other type with confirmation works"
+      status: verified
+      evidence: "SundayCard.tsx lines 128-134: destructive handler calls onDeleteSpeeches, then checks type === 'other' to open custom reason modal."
+
+    # F071
+    - ac_id: AC-F071-01
+      description: "assigned_not_invited shows only assigned_invited"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 139-144: ledAllowedStatuses constant. VALID_TRANSITIONS[assigned_not_invited] = [assigned_invited, not_assigned]. Intersect with allowed (no not_assigned) = [assigned_invited]."
+
+    - ac_id: AC-F071-02
+      description: "assigned_invited shows 3 options"
+      status: verified
+      evidence: "VALID_TRANSITIONS[assigned_invited] = [assigned_confirmed, assigned_not_invited, gave_up, not_assigned]. Intersect with allowed = [assigned_confirmed, assigned_not_invited, gave_up]."
+
+    - ac_id: AC-F071-03
+      description: "assigned_confirmed LED disabled"
+      status: verified
+      evidence: "SpeechSlot.tsx line 101: handleStatusPress returns for assigned_confirmed. Line 157-158: disabled={... status === 'assigned_confirmed' ...}."
+
+    - ac_id: AC-F071-04
+      description: "gave_up LED disabled"
+      status: verified
+      evidence: "SpeechSlot.tsx line 101: handleStatusPress returns for gave_up. Line 158: disabled includes gave_up."
+
+    - ac_id: AC-F071-05
+      description: "not_assigned LED disabled (preserved)"
+      status: verified
+      evidence: "SpeechSlot.tsx line 100: handleStatusPress returns for not_assigned. Line 157: disabled includes not_assigned."
+
+    - ac_id: AC-F071-06
+      description: "StatusChangeModal without allowedStatuses not affected"
+      status: verified
+      evidence: "StatusChangeModal.tsx line 33: allowedStatuses?: SpeechStatus[] (optional). Lines 59-61: ternary filters only when provided."
+
+    - ac_id: AC-F071-07
+      description: "Observer LED disabled (preserved)"
+      status: verified
+      evidence: "SpeechSlot.tsx line 157: disabled={isObserver || ...}."
+
+    # F072
+    - ac_id: AC-F072-01
+      description: "Selecting Canada shows Canada flag"
+      status: verified
+      evidence: "members.tsx line 98: getCountryByLabel(countryLabel)?.flag resolves 'Canada (+1)' to Canada flag."
+
+    - ac_id: AC-F072-02
+      description: "Selecting Canada from another country shows Canada flag"
+      status: verified
+      evidence: "Same mechanism. setCountryLabel(item.label) stores 'Canada (+1)', getCountryByLabel resolves correctly."
+
+    - ac_id: AC-F072-03
+      description: "Selecting US still works"
+      status: verified
+      evidence: "getCountryByLabel('United States (+1)') returns US entry with US flag."
+
+    - ac_id: AC-F072-04
+      description: "Selecting Russia with +7 works"
+      status: verified
+      evidence: "getCountryByLabel('Russia (+7)') returns Russia entry. countryCodes.ts has both Russia and Kazakhstan with +7."
+
+    - ac_id: AC-F072-05
+      description: "Selecting Kazakhstan with +7 works"
+      status: verified
+      evidence: "getCountryByLabel('Kazakhstan (+7)') returns Kazakhstan entry with Kazakhstan flag."
+
+    - ac_id: AC-F072-06
+      description: "Highlight uses countryLabel (preserved)"
+      status: verified
+      evidence: "members.tsx: item.label === countryLabel comparison for highlight (unchanged from CR-117)."
+
+    - ac_id: AC-F072-07
+      description: "Unique code countries not affected"
+      status: verified
+      evidence: "getCountryByLabel fallback to getFlagForCode. For unique codes, both work correctly."
+
+    - ac_id: AC-F072-08
+      description: "Existing member with +1 defaults to US"
+      status: verified
+      evidence: "members.tsx lines 58-59: COUNTRY_CODES.find by code returns first match (US before Canada per ADR-043)."
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 8
+    commits_reviewed: 9
+    new_tests: 84
+    new_tests_passing: 84
+    full_suite_tests: 3380
+    full_suite_passing: 3380
+    full_suite_files: 64
     regressions: 0

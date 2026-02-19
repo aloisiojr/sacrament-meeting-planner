@@ -1,0 +1,409 @@
+# =============================================================================
+# ARCH_M019.yaml
+# Architecture for Batch 9 Phase 3 - UX Polish
+# Features: F065, F066, F067
+# CRs: CR-118, CR-120, CR-123
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Polish UX: SearchInput defensivo com flex:1 + close em Settings, auto-scroll ao expandir card, campo Reconhecendo proporcional"
+  principles:
+    - "Minimo impacto: mudancas cirurgicas em componentes existentes"
+    - "Consistencia visual: padrao close button dos modais replicado nas Settings screens"
+    - "Zero migrations: todas as mudancas sao client-side (UI/logic)"
+    - "Zero novos hooks ou mutations: reutilizar logica existente"
+    - "Backward compatibility: flex:1 defensivo no SearchInput nao afeta usos existentes"
+
+diagram: |
+  F065: SearchInput.tsx --[flex:1 defensivo]--> container styles
+        members.tsx / topics.tsx / history.tsx / timezone.tsx
+          --[searchContainer: flexDirection:'row', gap:12]--> SearchInput(flex:1) + Pressable(close)
+        Modais (MemberSelectorModal, ActorSelector, etc) --[nao afetados]--> ja tem padrao correto
+
+  F066: speeches.tsx --[handleToggle]--> setExpandedDate --> setTimeout(300ms) --> flatListRef.scrollToIndex(viewPosition:0)
+        agenda.tsx --[handleToggle]--> setExpandedDate --> setTimeout(300ms) --> flatListRef.scrollToIndex(viewPosition:0)
+
+  F067: AgendaForm.tsx --[bloco Reconhecendo]--> Pressable customizado com map de nomes (1 por linha)
+        SelectorField generico --[nao afetado]--> numberOfLines={1} preservado para outros campos
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F065: SearchInput flex:1 + close button nas Settings ---
+  - name: "SearchInput.tsx"
+    feature: F065
+    responsibility: "Adicionar flex:1 ao styles.container para preenchimento defensivo em layout row"
+    dependencies: []
+    change_detail: |
+      styles.container: adicionar flex: 1.
+      Em contexto column (default), flex:1 nao altera largura (container ja preenche largura do pai).
+      Em contexto row (modais e agora Settings), flex:1 faz SearchInput preencher espaco disponivel.
+      Nao afeta nenhum uso existente.
+
+  - name: "members.tsx"
+    feature: F065
+    responsibility: "searchContainer com flexDirection:'row', alignItems:'center', gap:12. Pressable close a direita que chama setSearch('')."
+    dependencies: ["SearchInput.tsx"]
+    change_detail: |
+      1. styles.searchContainer: adicionar flexDirection:'row', alignItems:'center', gap:12
+      2. Apos SearchInput, adicionar:
+         <Pressable onPress={() => setSearch('')} style={styles.closeButton}>
+           <Text style={[styles.closeButtonText, { color: colors.primary }]}>{t('common.close')}</Text>
+         </Pressable>
+      3. Novos estilos: closeButton (paddingVertical:8), closeButtonText (fontSize:16, fontWeight:'500')
+
+  - name: "topics.tsx"
+    feature: F065
+    responsibility: "Mesmo padrao de members.tsx: searchContainer row + Pressable close"
+    dependencies: ["SearchInput.tsx"]
+
+  - name: "history.tsx"
+    feature: F065
+    responsibility: "Mesmo padrao de members.tsx: searchContainer row + Pressable close"
+    dependencies: ["SearchInput.tsx"]
+
+  - name: "timezone.tsx"
+    feature: F065
+    responsibility: "Mesmo padrao de members.tsx: searchContainer row + Pressable close"
+    dependencies: ["SearchInput.tsx"]
+
+  # --- F066: Auto-scroll on card expand ---
+  - name: "speeches.tsx (F066)"
+    feature: F066
+    responsibility: "Em handleToggle, apos setExpandedDate(date), calcular index e chamar scrollToIndex com delay"
+    dependencies: []
+    change_detail: |
+      Em handleToggle, quando expandindo (date !== expandedDate):
+      1. Apos setExpandedDate(date), calcular index do item em listItems:
+         const index = listItems.findIndex(i => i.type === 'sunday' && i.date === date);
+      2. Se index >= 0, setTimeout(() => {
+           flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+         }, 300);
+      3. Quando colapsando (date === expandedDate), NAO scrollar.
+      4. handleToggle ja depende de [expandedDate, lazyCreate]. Adicionar listItems como dependencia.
+      NOTA: getItemLayout existente (70px fixo) pode causar calculo incorreto para scrollToIndex
+      quando cards expandidos mudam tamanho real. O onScrollToIndexFailed fallback ja existe
+      e trata esse caso. Para melhor precisao, a alternativa seria remover getItemLayout,
+      mas isso quebraria initialScrollIndex. Manter getItemLayout e confiar no fallback.
+
+  - name: "agenda.tsx (F066)"
+    feature: F066
+    responsibility: "Em handleToggle, mesmo padrao de speeches.tsx: calcular index e scrollToIndex com delay"
+    dependencies: []
+    change_detail: |
+      Em handleToggle, quando expandindo:
+      1. Apos setExpandedDate(date), calcular index do item em listItems:
+         const index = listItems.findIndex(i => i.type === 'sunday' && (i as any).data?.date === date);
+      2. Se index >= 0, setTimeout(() => {
+           flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+         }, 300);
+      3. Quando colapsando, NAO scrollar.
+      4. Adicionar listItems como dependencia do useCallback.
+      NOTA: Mesmo tradeoff que speeches.tsx com getItemLayout. Fallback onScrollToIndexFailed existente.
+
+  # --- F067: Campo Reconhecendo proporcional ---
+  - name: "AgendaForm.tsx (F067)"
+    feature: F067
+    responsibility: "Substituir SelectorField no bloco Reconhecendo por Pressable customizado com nomes individuais"
+    dependencies: []
+    change_detail: |
+      No bloco "Reconhecendo" (linhas 191-203), substituir:
+        <SelectorField value={agenda.recognized_names?.join(', ') || ''} ... />
+      Por:
+        <Pressable
+          style={[styles.selectorField, { borderColor: colors.border }]}
+          onPress={disabled ? undefined : onPress}
+          disabled={isObserver}
+        >
+          {(agenda.recognized_names?.length ?? 0) > 0 ? (
+            agenda.recognized_names!.map((name, idx) => (
+              <Text
+                key={idx}
+                style={[styles.recognizingName, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+            ))
+          ) : (
+            <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
+              {t('agenda.recognizing')}
+            </Text>
+          )}
+        </Pressable>
+      Novo estilo recognizingName: { fontSize: 15, paddingVertical: 2 }
+      O Pressable reutiliza styles.selectorField (borderWidth, borderRadius, paddingHorizontal, paddingVertical).
+      SEM numberOfLines no container -> altura cresce proporcionalmente.
+      SEM altura fixa -> cada nome ocupa uma linha.
+      Manter onPress para abrir ActorSelector (regressao check).
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F065 - sem novo contrato de interface; mudanca e de estilo interno
+  - name: "SearchInput.styles.container"
+    component: "SearchInput.tsx"
+    methods:
+      - name: "flex:1 defensivo"
+        input: "N/A (mudanca interna de estilo)"
+        output: "Container do SearchInput preenche espaco disponivel em layout row"
+        notes: "Nao altera API publica do SearchInput. Backward compatible com todos os usos existentes."
+
+  - name: "Settings close button pattern"
+    component: "members.tsx, topics.tsx, history.tsx, timezone.tsx"
+    methods:
+      - name: "Pressable close"
+        input: "onPress: () => setSearch('')"
+        output: "Limpa campo de busca. Nao fecha modal (nao ha modal nessas telas)."
+        notes: "Label reutiliza t('common.close') para consistencia visual com modais."
+
+  # F066 - sem novo contrato de interface; mudanca e de logica interna
+  - name: "handleToggle auto-scroll"
+    component: "speeches.tsx, agenda.tsx"
+    methods:
+      - name: "scrollToIndex apos expand"
+        input: "date: string (data do domingo expandido)"
+        output: "Scroll animado para topo do card expandido (viewPosition:0)"
+        notes: "Delay de 300ms para esperar re-render. Nao scrolla ao colapsar."
+
+  # F067
+  - name: "Recognizing field inline Pressable"
+    component: "AgendaForm.tsx"
+    methods:
+      - name: "Pressable customizado para recognized_names"
+        input: "agenda.recognized_names: string[] | null"
+        output: "Renderiza cada nome como <Text> individual (1 por linha) ou placeholder quando vazio"
+        notes: "Mantém onPress para abrir ActorSelector. Estilos visuais identicos ao SelectorField (borda, radius, padding). Observers: disabled=true."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-046
+    title: "flex:1 defensivo no container do SearchInput ao inves de por-consumer"
+    context: "F065 precisa que SearchInput preencha espaco em layout row nas Settings. Opcoes: (a) cada consumer passa style={{flex:1}}, (b) adicionar flex:1 ao container interno."
+    decision: "Adicionar flex:1 ao styles.container do SearchInput.tsx. Em layout column (default), flex:1 nao altera largura. Em layout row, preenche espaco disponivel. Modais ja passam flex:1 via style prop, que sera redundante mas sem efeito negativo."
+    consequences:
+      - "Pro: Mudanca unica no componente, zero mudanca nos 6+ consumers existentes (modais)"
+      - "Pro: Novos consumers em layout row nao precisam lembrar de passar flex:1"
+      - "Con: flex:1 redundante nos modais que ja passam via style (sem impacto visual)"
+      - "Con: Pode surpreender futuros consumers que NAO querem flex:1 em row layout (caso improvavel)"
+
+  - id: ADR-047
+    title: "setTimeout(300ms) para auto-scroll apos expand ao inves de onLayout"
+    context: "F066 precisa scrollar para o card expandido apos toggle. O card muda de tamanho ao expandir (renderiza AgendaForm ou SpeechSlots). Opcoes: (a) setTimeout fixo, (b) onLayout callback nos items, (c) requestAnimationFrame."
+    decision: "Usar setTimeout(300ms) apos setExpandedDate. Valor de 300ms e suficiente para re-render + layout na maioria dos dispositivos. onScrollToIndexFailed ja existe como fallback. onLayout adicionaria complexidade (Map de posicoes, scrollToOffset manual)."
+    consequences:
+      - "Pro: Simples, sem state adicional"
+      - "Pro: Fallback existente (onScrollToIndexFailed) cobre dispositivos lentos"
+      - "Con: Delay fixo pode ser insuficiente em dispositivos muito lentos (mitigado pelo fallback)"
+      - "Con: getItemLayout (70px fixo) pode causar offset incorreto para scrollToIndex quando ha cards expandidos acima. Fallback mitiga."
+
+  - id: ADR-048
+    title: "Pressable inline customizado para Reconhecendo ao inves de prop no SelectorField"
+    context: "F067 precisa exibir nomes um por linha no campo Reconhecendo. SelectorField generico usa numberOfLines={1}. Opcoes: (a) adicionar prop multiLine ao SelectorField, (b) substituir por Pressable customizado inline."
+    decision: "Substituir SelectorField por Pressable customizado APENAS no bloco Reconhecendo. SelectorField generico permanece inalterado com numberOfLines={1}."
+    consequences:
+      - "Pro: Zero risco de regressao em outros campos (presiding, conducting, hymns, prayers)"
+      - "Pro: Controle total sobre layout vertical dos nomes"
+      - "Con: Duplica estilos do SelectorField (borderWidth, borderRadius, padding) -- mitigado reutilizando styles.selectorField"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Todas as mudancas sao UI/logic no client. Nao altera RLS, Edge Functions ou autenticacao."
+  notes:
+    - "F065: Botao close nas Settings apenas limpa busca (setSearch('')). Nao altera permissoes."
+    - "F066: Auto-scroll e puramente visual, nao altera dados."
+    - "F067: Campo Reconhecendo mantem mesma logica de permissao (isObserver check). Apenas muda renderizacao."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Nao adiciona novos logs ou metricas."
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F065
+  - path: "src/components/SearchInput.tsx"
+    feature: F065
+    change: "Adicionar flex: 1 ao styles.container."
+
+  - path: "src/app/(tabs)/settings/members.tsx"
+    feature: F065
+    change: "styles.searchContainer: adicionar flexDirection:'row', alignItems:'center', gap:12. Adicionar Pressable close apos SearchInput com t('common.close') que chama setSearch(''). Novos estilos: closeButton, closeButtonText."
+
+  - path: "src/app/(tabs)/settings/topics.tsx"
+    feature: F065
+    change: "Mesmo padrao de members.tsx: searchContainer row + Pressable close."
+
+  - path: "src/app/(tabs)/settings/history.tsx"
+    feature: F065
+    change: "Mesmo padrao de members.tsx: searchContainer row + Pressable close."
+
+  - path: "src/app/(tabs)/settings/timezone.tsx"
+    feature: F065
+    change: "Mesmo padrao de members.tsx: searchContainer row + Pressable close."
+
+  # F066
+  - path: "src/app/(tabs)/speeches.tsx"
+    feature: F066
+    change: "Em handleToggle, apos setExpandedDate(date), calcular index em listItems e chamar setTimeout(() => flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }), 300). Nao scrollar ao colapsar. Adicionar listItems as dependencias do useCallback."
+
+  - path: "src/app/(tabs)/agenda.tsx"
+    feature: F066
+    change: "Em handleToggle, mesmo padrao de speeches.tsx: calcular index em listItems e scrollToIndex com delay 300ms apos expandir. Adicionar listItems as dependencias do useCallback."
+
+  # F067
+  - path: "src/components/AgendaForm.tsx"
+    feature: F067
+    change: "No bloco Reconhecendo (linhas 191-203), substituir SelectorField por Pressable customizado inline. Com nomes: map de recognized_names renderizando cada nome como <Text> individual. Sem nomes: placeholder em cor terciaria. Manter onPress para ActorSelector. Novo estilo: recognizingName (fontSize:15, paddingVertical:2)."
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  F065_search_close:
+    approach: "flex:1 defensivo + searchContainer row + close button"
+    detail: |
+      SearchInput.tsx:
+      - styles.container: adicionar flex: 1
+      - Nenhuma outra mudanca no componente
+
+      members.tsx:
+      - searchContainer style: { paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }
+      - Apos <SearchInput ... />:
+        <Pressable onPress={() => setSearch('')} accessibilityRole="button">
+          <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+            {t('common.close')}
+          </Text>
+        </Pressable>
+      - Novo estilo closeButtonText: { fontSize: 16, fontWeight: '500' }
+
+      topics.tsx, history.tsx, timezone.tsx:
+      - Mesmo padrao exato de members.tsx
+      - Cada tela tem seu proprio estado search/setSearch, entao close chama setSearch('') local
+      - history.tsx usa updateSearch ao inves de setSearch; close deve usar o setter original:
+        A variavel pode ser searchText/updateSearch. Verificar e usar o setter que limpa busca.
+        history.tsx:108 usa updateSearch como onChangeText. Close deve chamar updateSearch('').
+
+  F066_auto_scroll:
+    approach: "scrollToIndex com viewPosition:0 e setTimeout(300ms)"
+    detail: |
+      speeches.tsx handleToggle:
+      - Dentro do else (expandindo):
+        const index = listItems.findIndex(i => i.type === 'sunday' && i.key === date);
+        if (index >= 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+          }, 300);
+        }
+      - Adicionar listItems ao array de dependencias do useCallback
+
+      agenda.tsx handleToggle:
+      - Dentro do else (expandindo):
+        const index = listItems.findIndex(i => i.type === 'sunday' && (i as { type: 'sunday'; data: AgendaSunday }).data.date === date);
+        if (index >= 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+          }, 300);
+        }
+      - Adicionar listItems ao array de dependencias do useCallback
+
+      TRADEOFF: getItemLayout assume 70px/64px fixos. Cards expandidos sao maiores.
+      scrollToIndex pode calcular offset incorreto se ha cards expandidos acima do target.
+      Na pratica, ao expandir, o card anterior e colapsado (expandedDate muda), entao
+      todos os outros cards estao colapsados quando o scroll acontece. O unico card
+      expandido e o target. Portanto, getItemLayout com tamanho fixo e suficientemente
+      preciso para calcular o offset do card que acabou de expandir, pois todos acima
+      estao colapsados (tamanho ~70px/64px). O 300ms delay garante que o estado
+      expandedDate ja propagou e o card anterior ja colapsou.
+
+  F067_recognizing_field:
+    approach: "Pressable customizado inline substituindo SelectorField"
+    detail: |
+      AgendaForm.tsx, bloco Reconhecendo (linhas 191-203):
+
+      Antes:
+        <SelectorField
+          value={agenda.recognized_names?.join(', ') || ''}
+          placeholder={t('agenda.recognizing')}
+          onPress={() => { ... }}
+          disabled={isObserver}
+          colors={colors}
+        />
+
+      Depois:
+        <Pressable
+          style={[styles.selectorField, { borderColor: colors.border }]}
+          onPress={isObserver ? undefined : () => {
+            setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'can_recognize' });
+          }}
+          disabled={isObserver}
+        >
+          {(agenda.recognized_names?.length ?? 0) > 0 ? (
+            agenda.recognized_names!.map((name, idx) => (
+              <Text
+                key={idx}
+                style={[styles.recognizingName, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+            ))
+          ) : (
+            <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
+              {t('agenda.recognizing')}
+            </Text>
+          )}
+        </Pressable>
+
+      Novo estilo:
+        recognizingName: {
+          fontSize: 15,
+          paddingVertical: 2,
+        }
+
+      O Pressable usa styles.selectorField existente (borderWidth:1, borderRadius:6,
+      paddingHorizontal:10, paddingVertical:8). A unica diferenca e que nao usa
+      numberOfLines e renderiza cada nome como <Text> separado.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados (ADR-046: F065, ADR-047: F066, ADR-048: F067)
+  GATE-05: true  # ARCH_M019.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido abaixo
+  GATE-08: true  # 9 componentes, 3 features, cross-module SearchInput

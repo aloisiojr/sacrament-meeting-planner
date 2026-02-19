@@ -61,7 +61,14 @@ export function PrayerSelector({
   const [customName, setCustomName] = useState('');
 
   useEffect(() => {
-    if (visible) setModalVisible(true);
+    if (visible) {
+      if (selected?.memberId === null && selected?.name) {
+        setSearch(selected.name);
+        setCustomName(selected.name);
+      }
+      setModalVisible(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const { data: members } = useMembers(search);

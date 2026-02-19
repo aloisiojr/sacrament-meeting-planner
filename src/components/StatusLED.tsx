@@ -1,14 +1,14 @@
 /**
- * StatusLED: 3D-style LED indicator for speech status.
- * 5 states with gradient effect and fading animation.
+ * StatusLED: Flat circle LED indicator for speech status.
+ * 5 states with flat solid color and fading animation for assigned_not_invited.
  * Supports reduced motion accessibility preference.
  *
  * States:
- * - not_assigned: gray (off)
- * - assigned_not_invited: yellow with ~2s fading animation
- * - assigned_invited: yellow solid
- * - assigned_confirmed: green solid
- * - gave_up: red solid
+ * - not_assigned: gray (#9CA3AF)
+ * - assigned_not_invited: orange (#F97316) with ~2s fading animation
+ * - assigned_invited: yellow (#EAB308) solid
+ * - assigned_confirmed: green (#22C55E) solid
+ * - gave_up: dark wine (#7F1D1D) solid
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -44,38 +44,12 @@ export interface StatusLEDProps {
 
 // --- Color Map ---
 
-interface LEDColors {
-  outer: string;
-  inner: string;
-  glow: string;
-}
-
-const STATUS_COLORS: Record<SpeechStatus, LEDColors> = {
-  not_assigned: {
-    outer: '#6B7280',
-    inner: '#9CA3AF',
-    glow: 'transparent',
-  },
-  assigned_not_invited: {
-    outer: '#D97706',
-    inner: '#FBBF24',
-    glow: '#FDE68A',
-  },
-  assigned_invited: {
-    outer: '#D97706',
-    inner: '#FBBF24',
-    glow: '#FDE68A',
-  },
-  assigned_confirmed: {
-    outer: '#059669',
-    inner: '#34D399',
-    glow: '#A7F3D0',
-  },
-  gave_up: {
-    outer: '#DC2626',
-    inner: '#F87171',
-    glow: '#FECACA',
-  },
+const STATUS_COLORS: Record<SpeechStatus, string> = {
+  not_assigned: '#9CA3AF',
+  assigned_not_invited: '#F97316',
+  assigned_invited: '#EAB308',
+  assigned_confirmed: '#22C55E',
+  gave_up: '#7F1D1D',
 };
 
 // --- Component ---
@@ -132,12 +106,7 @@ export function StatusLED({
     };
   }, [status]);
 
-  const colors = STATUS_COLORS[status];
-  const halfSize = size / 2;
-  const innerSize = size * 0.65;
-  const glowSize = size * 0.4;
-
-  const animatedInnerStyle = useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeOpacity.value,
   }));
 
@@ -150,45 +119,18 @@ export function StatusLED({
   };
 
   const content = (
-    <View
+    <Animated.View
       style={[
-        styles.outerRing,
+        styles.circle,
         {
           width: size,
           height: size,
-          borderRadius: halfSize,
-          backgroundColor: colors.outer,
+          borderRadius: size / 2,
+          backgroundColor: STATUS_COLORS[status],
         },
+        animatedStyle,
       ]}
-    >
-      <Animated.View
-        style={[
-          styles.innerCircle,
-          {
-            width: innerSize,
-            height: innerSize,
-            borderRadius: innerSize / 2,
-            backgroundColor: colors.inner,
-          },
-          animatedInnerStyle,
-        ]}
-      >
-        {/* Highlight/glow for 3D effect */}
-        {status !== 'not_assigned' && (
-          <View
-            style={[
-              styles.glowDot,
-              {
-                width: glowSize,
-                height: glowSize,
-                borderRadius: glowSize / 2,
-                backgroundColor: colors.glow,
-              },
-            ]}
-          />
-        )}
-      </Animated.View>
-    </View>
+    />
   );
 
   if (onPress && !disabled) {
@@ -216,18 +158,5 @@ export function StatusLED({
 }
 
 const styles = StyleSheet.create({
-  outerRing: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  innerCircle: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  glowDot: {
-    position: 'absolute',
-    top: 1,
-    left: 1,
-    opacity: 0.6,
-  },
+  circle: {},
 });

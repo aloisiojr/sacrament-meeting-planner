@@ -55,6 +55,9 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
   const { t } = useTranslation();
   const [fullName, setFullName] = useState(member?.full_name ?? '');
   const [countryCode, setCountryCode] = useState(member?.country_code ?? '+55');
+  const [countryLabel, setCountryLabel] = useState(
+    () => COUNTRY_CODES.find((c) => c.code === (member?.country_code ?? '+55'))?.label ?? 'Brazil (+55)'
+  );
   const [phone, setPhone] = useState(member?.phone ?? '');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const nameRef = useRef<TextInput>(null);
@@ -148,10 +151,11 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
                 <Pressable
                   style={[
                     styles.countryItem,
-                    item.code === countryCode && { backgroundColor: colors.primaryContainer },
+                    item.label === countryLabel && { backgroundColor: colors.primaryContainer },
                   ]}
                   onPress={() => {
                     setCountryCode(item.code);
+                    setCountryLabel(item.label);
                     setShowCountryPicker(false);
                   }}
                 >

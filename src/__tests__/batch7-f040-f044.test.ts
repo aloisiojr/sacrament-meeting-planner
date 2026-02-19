@@ -389,10 +389,10 @@ describe('F042 (CR-97): Multi-select for Reconhecendo a Presenca field', () => {
     });
   });
 
-  describe('AC-F042-03: Nomes selecionados exibidos como lista separada por virgula', () => {
-    it('should display recognized_names joined by comma in AgendaForm', () => {
+  describe('AC-F042-03: Nomes selecionados exibidos individualmente (CR-123)', () => {
+    it('should display recognized_names via map with individual Text elements', () => {
       const content = getAgendaForm();
-      expect(content).toContain("recognized_names?.join(', ')");
+      expect(content).toContain("agenda.recognized_names!.map((name, idx)");
     });
   });
 

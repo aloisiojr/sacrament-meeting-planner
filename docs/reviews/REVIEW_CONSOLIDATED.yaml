@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133
 # Reviewed: 2026-02-19
-# Version: 13
+# Version: 14
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml, specs/SPEC_F065_F068.yaml, specs/SPEC_F069_F072.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml, arch/ARCH_M019.yaml, arch/ARCH_M020.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml, plans/PLAN_P019.yaml, plans/PLAN_P020.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml, specs/SPEC_F065_F068.yaml, specs/SPEC_F069_F072.yaml, specs/SPEC_F073.yaml, specs/SPEC_F074.yaml, specs/SPEC_F075.yaml, specs/SPEC_F076.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml, arch/ARCH_M019.yaml, arch/ARCH_M020.yaml, arch/ARCH_M021.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml, plans/PLAN_P019.yaml, plans/PLAN_P020.yaml, plans/PLAN_P021.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -4906,4 +4906,369 @@ batch10_phase1:
     full_suite_tests: 3380
     full_suite_passing: 3380
     full_suite_files: 64
+    regressions: 0
+
+# =============================================================================
+# Batch 10 Phase 2 REVIEW
+# CR-128 (F073): Topic X button positioning - outside dropdown field
+# CR-131 (F074): Hymn search field width - match other selector search widths
+# CR-132 (F075): Auto-scroll fix on card expand - remove getItemLayout
+# CR-133 (F076): Custom prayer name UX - hint text and pre-populate
+# Reviewed: 2026-02-19
+# =============================================================================
+
+batch10_phase2:
+  phase: "2 of 2"
+  phase_description: "Theme X button, hymn search width, auto-scroll, custom prayer name"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 10 Phase 2 implements 4 UI/UX improvements (F073-F076) across 8 files.
+    All 4 features follow the complete chain: SPEC -> ARCH (M021) -> PLAN (P021) -> CODE.
+    10 commits match PLAN_P021 steps 1-8 exactly. The topic X button (F073) is correctly
+    extracted from inside the topicField Pressable to a sibling in a topicRow container,
+    following the speaker row pattern. The hymn search style (F074) is simplified to
+    { flex: 1 } inheriting correct dimensions from SearchInput base. Auto-scroll (F075)
+    removes getItemLayout with fixed heights from both speeches.tsx and agenda.tsx,
+    increases timeout to 400ms, and removes initialScrollIndex in favor of existing
+    useEffect. Custom prayer UX (F076) adds a permanent hint text for discoverability
+    and pre-populates the search field when re-editing a custom name (memberId===null).
+    i18n keys added in 3 languages. 69 new tests, all passing. Full suite 3449/3449
+    tests, 0 regressions. No P0/P1/P2 issues found.
+
+  chain_validation:
+    spec_vs_request:
+      status: aligned
+      notes: >
+        All 4 SPECs (F073-F076) faithfully map the user request:
+        F073/CR-128: "Botao X de temas deve ficar fora do campo a direita (igual ao de discursante)"
+          -> SPEC correctly defines extracting X button outside topicField as sibling.
+        F074/CR-131: "Campo search do seletor de hinos muito estreito"
+          -> SPEC correctly identifies overrides in AgendaForm styles.searchInput and prescribes
+          removing them to inherit from SearchInput base.
+        F075/CR-132: "Ao expandir card da agenda, scroll para alinhar topo do card com topo da tela"
+          -> SPEC correctly identifies getItemLayout with fixed heights as root cause and
+          prescribes removal. Supersedes F066.
+        F076/CR-133: "Campos oracao devem permitir nome customizado"
+          -> SPEC correctly identifies 2 UX problems (discoverability and re-editing) and
+          prescribes hint text + pre-populate solution.
+        No SPEC goes beyond the user request. All ACs are faithful to user intent.
+
+    arch_vs_spec:
+      status: aligned
+      notes: >
+        ARCH_M021 correctly translates all 4 SPECs into architecture:
+        F073: Defines SpeechSlot.tsx component changes (topicRow container, sibling extraction,
+          style migration). Contract specifies topicRow style and topicField update.
+        F074: Defines AgendaForm.tsx style simplification. Contract specifies { flex: 1 }.
+        F075: Defines removal of getItemLayout from speeches.tsx and agenda.tsx, removal of
+          initialScrollIndex and ESTIMATED_ITEM_HEIGHT from agenda.tsx. ADR-051 (remove
+          getItemLayout) and ADR-052 (replace initialScrollIndex) justify design decisions.
+        F076: Defines PrayerSelector.tsx changes (hint text, useEffect pre-populate).
+          Contracts for hint render, pre-populate behavior, and i18n keys.
+        8 files_impacted correctly identified. Zero data model changes (all client-side).
+
+    plan_vs_arch:
+      status: aligned
+      notes: >
+        PLAN_P021 decomposes ARCH_M021 into 9 steps:
+        STEP-01 (F073) matches ARCH SpeechSlot.tsx component spec exactly.
+        STEP-02 (F074) matches ARCH AgendaForm.tsx style simplification.
+        STEP-03 (F075 speeches.tsx) and STEP-04 (F075 agenda.tsx) match ARCH changes.
+        STEP-05 (F076 hint) and STEP-06 (F076 pre-populate) match ARCH PrayerSelector changes.
+        STEP-07 (tests) covers all 21 ACs and 14 edge cases.
+        STEP-08 (legacy test updates) handles test regressions.
+        STEP-09 (documentation) handles CODE_LEDGER and project docs.
+        Step dependencies correct: STEP-06 depends on STEP-05, STEP-07 depends on STEP-01..06.
+        Validation section maps all ACs to steps.
+
+    code_vs_plan:
+      status: aligned
+      notes: >
+        CODE_LEDGER records 10 commits for PLAN_P021 steps 1-8:
+        71987d9 (STEP-01 / CR-128): SpeechSlot.tsx topicRow/X button restructure.
+        651fbf7 (STEP-02 / CR-131): AgendaForm.tsx searchInput simplified to { flex: 1 }.
+        ce73721 (STEP-03 / CR-132): speeches.tsx getItemLayout removed, 400ms timeout.
+        6984288 (STEP-04 / CR-132): agenda.tsx getItemLayout/initialScrollIndex removed, 400ms.
+        7399634 (STEP-05 / CR-133): PrayerSelector hint text + i18n keys.
+        8035a42 (STEP-06 / CR-133): PrayerSelector useEffect pre-populate.
+        ea24151 (STEP-07): 69 new tests for F073-F076.
+        0b2a117 (STEP-08): 5 legacy test files updated.
+        Plus 2 documentation commits (STEP-09).
+        All file changes match PLAN specification. No code beyond what PLAN defines.
+
+    chain_intact: true
+
+  commit_reviews:
+    - hash: 71987d9
+      message: "feat(speech-slot): move topic X button outside dropdown field as sibling (CR-128)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "topicField Pressable now wrapped in <View style={styles.topicRow}>"
+          - "clearTopic Pressable extracted from inside topicField, placed as sibling after </Pressable>"
+          - "Dropdown arrow (U+25BC) remains INSIDE topicField - correct"
+          - "X visibility condition: topicDisplay && canAssign - matches SPEC AC-073-05"
+          - "handleClearTopic correctly called via onPress - functionality preserved"
+          - "hitSlop={8} added for better touch target"
+          - "styles.topicRow: flexDirection row, alignItems center, gap 12, marginTop 6, marginLeft 28"
+          - "styles.topicField: flex:1 added, marginTop and marginLeft removed"
+          - "Pattern matches speaker row exactly (styles.row)"
+        issues: []
+
+    - hash: 651fbf7
+      message: "fix(agenda): simplify searchInput style to inherit from SearchInput base (CR-131)"
+      files_changed: [src/components/AgendaForm.tsx]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "styles.searchInput simplified from 7 properties to just { flex: 1 }"
+          - "Removed: borderWidth, borderRadius, paddingHorizontal, paddingVertical, fontSize, marginBottom"
+          - "SearchInput.tsx base provides height:40, borderRadius:8, paddingHorizontal:12 - correct inheritance"
+          - "Consistent with MemberSelectorModal, TopicSelectorModal, HymnSelector, PrayerSelector, ActorSelector patterns"
+        issues: []
+
+    - hash: ce73721
+      message: "fix(speeches): remove getItemLayout and increase scroll delay to 400ms (CR-132)"
+      files_changed: [src/app/(tabs)/speeches.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "getItemLayout callback completely removed (was returning fixed 70px heights)"
+          - "getItemLayout prop removed from FlatList"
+          - "setTimeout increased from 300ms to 400ms in handleToggle"
+          - "onScrollToIndexFailed fallback preserved - correct"
+          - "Initial scroll useEffect preserved (lines 145-157) - no change needed"
+          - "No references to getItemLayout remain in speeches.tsx (grep confirmed)"
+        issues: []
+
+    - hash: 6984288
+      message: "fix(agenda): remove getItemLayout, initialScrollIndex and increase scroll delay to 400ms (CR-132)"
+      files_changed: [src/app/(tabs)/agenda.tsx]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "ESTIMATED_ITEM_HEIGHT constant removed"
+          - "getItemLayout callback completely removed (was returning fixed 64px heights)"
+          - "getItemLayout prop removed from FlatList"
+          - "initialScrollIndex prop removed from FlatList (ADR-052)"
+          - "Existing useEffect (lines 112-119) handles initial scroll with scrollToIndex(animated:false)"
+          - "setTimeout increased from 300ms to 400ms in handleToggle"
+          - "onScrollToIndexFailed fallback preserved with scrollToOffset"
+          - "No references to getItemLayout, ESTIMATED_ITEM_HEIGHT, or initialScrollIndex remain"
+        issues: []
+
+    - hash: 7399634
+      message: "feat(prayer): add custom name hint text for discoverability in PrayerSelector (CR-133)"
+      files_changed: [src/components/PrayerSelector.tsx, src/i18n/locales/pt-BR.json, src/i18n/locales/en.json, src/i18n/locales/es.json]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "Hint <Text> added after modalHeader and before customNameButton conditional"
+          - "Uses t('agenda.customNameHint') for i18n"
+          - "Style: customNameHintText with fontSize:13, paddingHorizontal:16, paddingBottom:8"
+          - "Color: colors.textSecondary via inline style - subtle appearance"
+          - "Hint is ALWAYS visible (not conditional) - correct for discoverability"
+          - "pt-BR: 'Digite um nome para usar nome personalizado' - correct"
+          - "en: 'Type a name to use a custom name' - correct"
+          - "es: 'Escriba un nombre para usar un nombre personalizado' - correct"
+          - "Keys placed in 'agenda' section at same level as 'customName' - correct"
+        issues: []
+
+    - hash: 8035a42
+      message: "feat(prayer): pre-populate search field when re-editing custom prayer name (CR-133)"
+      files_changed: [src/components/PrayerSelector.tsx]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "useEffect(visible) updated: when visible=true and selected.memberId===null, sets search and customName to selected.name"
+          - "Dependency array remains [visible] only - eslint-disable-next-line react-hooks/exhaustive-deps added intentionally"
+          - "Pre-populate only for custom names (memberId===null), not for member selections"
+          - "customNameButton becomes visible immediately on re-edit (customName.trim().length > 0)"
+          - "setModalVisible(true) still called after pre-populate - correct order"
+        issues: []
+
+    - hash: ea24151
+      message: "test(batch10): add tests for Phase 2 features F073-F076 (CR-128, CR-131, CR-132, CR-133)"
+      files_changed: [src/__tests__/batch10-phase2.test.ts]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "69 new tests covering all 4 features"
+          - "F073: Tests verify X button is sibling (not inside topicField), topicRow styles, visibility conditions"
+          - "F074: Tests verify searchInput has only flex:1"
+          - "F075: Tests verify no getItemLayout, no ESTIMATED_ITEM_HEIGHT, no initialScrollIndex, 400ms timeout"
+          - "F076: Tests verify hint text presence, i18n keys in 3 languages, pre-populate logic"
+          - "Uses readSourceFile pattern consistent with project conventions"
+          - "All 69 tests passing"
+        issues: []
+
+    - hash: 0b2a117
+      message: "fix(tests): update legacy tests for Phase 2 changes (F073-F076)"
+      files_changed:
+        - src/__tests__/batch7-f035-f039.test.ts
+        - src/__tests__/batch9-phase2.test.ts
+        - src/__tests__/batch9-phase3.test.ts
+        - src/__tests__/batch10-phase1.test.ts
+        - src/__tests__/cr004-f006-uiux-fixes.test.ts
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "batch7: PrayerSelector useEffect test updated for new block-style visible check"
+          - "batch9-phase2: F060 tests updated - X button now sibling of topicField, marginLeft on topicRow"
+          - "batch9-phase3: F066 tests updated - 300ms -> 400ms, getItemLayout removed"
+          - "batch10-phase1: renderItem deps boundary updated from getItemLayout to speechesError"
+          - "cr004-f006: renderItem test boundary updated from getItemLayout to speechesError"
+          - "All 5 legacy test files correctly updated to reflect Phase 2 changes"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_minor: []
+
+  pending_deploys: []
+
+  deploy_check:
+    database: "No schema changes. All features are client-side UI/layout/i18n."
+    infrastructure: "No new env vars or services."
+    third_party: "No new integrations."
+    assets: "No new static assets."
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files: [".devteam/project-status.yaml"]
+    note: "project-status.yaml is a doc file committed by the Orchestrator."
+
+  ac_verification:
+    # F073
+    - ac_id: AC-073-01
+      description: "X button rendered outside topicField Pressable"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 201-233: topicRow View wraps topicField Pressable (closes at line 223) and clearTopic Pressable (lines 224-232) as siblings."
+
+    - ac_id: AC-073-02
+      description: "Layout uses row container"
+      status: verified
+      evidence: "styles.topicRow: flexDirection:'row', alignItems:'center', gap:12. topicField and X button are direct children."
+
+    - ac_id: AC-073-03
+      description: "Dropdown arrow stays inside topicField"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 218-221: U+25BC Text is inside topicField Pressable, before closing </Pressable> at line 223."
+
+    - ac_id: AC-073-04
+      description: "Clear topic functionality preserved"
+      status: verified
+      evidence: "SpeechSlot.tsx line 227: onPress={handleClearTopic} on the extracted Pressable."
+
+    - ac_id: AC-073-05
+      description: "X visible only when topicDisplay AND canAssign"
+      status: verified
+      evidence: "SpeechSlot.tsx line 224: {topicDisplay && canAssign && ( ... )} condition."
+
+    # F074
+    - ac_id: AC-074-01
+      description: "height:40 inherited from SearchInput base"
+      status: verified
+      evidence: "AgendaForm.tsx line 891-893: searchInput: { flex: 1 }. No height override. SearchInput.tsx base has height:40."
+
+    - ac_id: AC-074-02
+      description: "borderRadius:8 inherited from SearchInput base"
+      status: verified
+      evidence: "No borderRadius override in searchInput. SearchInput.tsx base has borderRadius:8."
+
+    - ac_id: AC-074-03
+      description: "paddingHorizontal:12 inherited from SearchInput base"
+      status: verified
+      evidence: "No paddingHorizontal override in searchInput. SearchInput.tsx base has paddingHorizontal:12."
+
+    - ac_id: AC-074-04
+      description: "Hymn search functionality preserved"
+      status: verified
+      evidence: "SearchInput component and onChangeText handler unchanged. Only style overrides removed."
+
+    # F075
+    - ac_id: AC-075-01
+      description: "Agenda: card expanded aligns to top"
+      status: verified
+      evidence: "agenda.tsx lines 132-140: scrollToIndex with viewPosition:0 and 400ms timeout. No getItemLayout (alturas reais)."
+
+    - ac_id: AC-075-02
+      description: "Speeches: card expanded aligns to top"
+      status: verified
+      evidence: "speeches.tsx lines 173-179: scrollToIndex with viewPosition:0 and 400ms timeout. No getItemLayout."
+
+    - ac_id: AC-075-03
+      description: "Scroll precise with variable heights"
+      status: verified
+      evidence: "getItemLayout removed from both files. FlatList measures real heights via onLayout. No fixed height assumptions."
+
+    - ac_id: AC-075-04
+      description: "Collapse does not auto-scroll"
+      status: verified
+      evidence: "speeches.tsx line 162-163: collapse branch sets expandedDate(null) without scrollToIndex. agenda.tsx line 123-124: same pattern."
+
+    - ac_id: AC-075-05
+      description: "Initial scroll to next sunday works"
+      status: verified
+      evidence: "speeches.tsx lines 145-157: useEffect scrollToIndex(animated:false). agenda.tsx lines 112-119: same pattern with useEffect."
+
+    # F076
+    - ac_id: AC-076-01
+      description: "Hint visible when PrayerSelector opens"
+      status: verified
+      evidence: "PrayerSelector.tsx lines 164-167: <Text style={customNameHintText}>{t('agenda.customNameHint')}</Text> - unconditional render."
+
+    - ac_id: AC-076-02
+      description: "Hint stays visible after typing"
+      status: verified
+      evidence: "Hint text has no conditional rendering. Always visible regardless of search/customName state."
+
+    - ac_id: AC-076-03
+      description: "Pre-populate on re-edit of custom name"
+      status: verified
+      evidence: "PrayerSelector.tsx lines 63-72: useEffect checks if selected.memberId===null, then setSearch(selected.name) and setCustomName(selected.name)."
+
+    - ac_id: AC-076-04
+      description: "customNameButton visible immediately on re-edit"
+      status: verified
+      evidence: "Pre-populate sets customName to selected.name. Line 170: customName.trim().length > 0 evaluates true, showing customNameButton."
+
+    - ac_id: AC-076-05
+      description: "Member list selection still works"
+      status: verified
+      evidence: "PrayerSelector.tsx lines 76-85: handleSelectMember unchanged. Sets memberId and name from member."
+
+    - ac_id: AC-076-06
+      description: "Custom name saved with memberId null"
+      status: verified
+      evidence: "PrayerSelector.tsx lines 87-95: handleCustomName calls onSelect({ memberId: null, name: trimmed })."
+
+    - ac_id: AC-076-07
+      description: "Hint translated in 3 languages"
+      status: verified
+      evidence: "en.json: 'Type a name to use a custom name'. pt-BR.json: 'Digite um nome para usar nome personalizado'. es.json: 'Escriba un nombre para usar un nombre personalizado'."
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 13
+    commits_reviewed: 10
+    new_tests: 69
+    new_tests_passing: 69
+    full_suite_tests: 3449
+    full_suite_passing: 3449
+    full_suite_files: 65
     regressions: 0

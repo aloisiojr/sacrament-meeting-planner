@@ -375,7 +375,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <SectionHeader title={t('agenda.sectionLastSpeech')} colors={colors} />
 
           <SpeakerField
-            label={`3\u00BA ${t('speeches.speaker')}`}
+            label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
             speakerName={getSpeech(3)?.speaker_name ?? ''}
             overrideName={agenda.speaker_3_override ?? null}
             onEditOverride={(name) => updateField('speaker_3_override', name)}

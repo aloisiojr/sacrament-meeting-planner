@@ -164,7 +164,7 @@ export function InviteManagementSection() {
               </Text>
               <View style={styles.speechInfoRow}>
                 <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
-                  {t('speeches.slot', { number: `${speech.position}\u00BA` })}
+                  {speech.position === 3 ? t('speeches.lastSpeech') : t('speeches.slot', { number: `${speech.position}\u00BA` })}
                 </Text>
                 <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
                   {' - '}

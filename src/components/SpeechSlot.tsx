@@ -1,7 +1,7 @@
 /**
  * SpeechSlot: Single speech position within a SundayCard.
  * Shows speaker field, topic field, status LED, and remove button.
- * Labels: "1o Discurso", "2o Discurso", "3o Discurso" (Unicode U+00BA).
+ * Labels: "1o Discurso", "2o Discurso", "Ultimo Discurso" (Unicode U+00BA for ordinals).
  *
  * Permissions:
  * - Bishopric: assign/unassign speaker, assign topic, change status
@@ -49,6 +49,9 @@ export interface SpeechSlotProps {
 // --- Position Labels ---
 
 function getPositionLabel(position: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (position === 3) {
+    return t('speeches.lastSpeech');
+  }
   // "1o Discurso" format using Unicode U+00BA (masculine ordinal)
   return t('speeches.slot', { number: `${position}\u00BA` });
 }

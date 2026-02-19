@@ -1,0 +1,391 @@
+# =============================================================================
+# QA_PLAN_batch9_phase3.yaml
+# PRE Validation Plan for Batch 9 Phase 3
+# CRs: CR-118, CR-120, CR-123, CR-124
+# Generated: 2026-02-19
+# =============================================================================
+
+batch: 9
+phase: 3
+type: feature_request
+status: validated
+timestamp: "2026-02-19"
+
+# #############################################################################
+# CR-118: Search field fixed size filling available space with close button
+# "Nas telas de Search (membros, temas, atores), campo de busca com tamanho
+#  fixo preenchendo todo espaco disponivel com botao fechar a direita"
+# #############################################################################
+
+cr_118:
+  cr_id: CR-118
+  title: "Search field fixed-width filling available space with close button at right"
+  feature_id: F065
+
+  current_behavior:
+    description: |
+      The SearchInput component (src/components/SearchInput.tsx) is a reusable
+      search field with a built-in clear (X) button. It is used in 5 modal contexts:
+      1. MemberSelectorModal (src/components/MemberSelectorModal.tsx:63-70)
+      2. TopicSelectorModal (src/components/TopicSelectorModal.tsx:80-86)
+      3. ActorSelector (src/components/ActorSelector.tsx:208-214)
+      4. HymnSelector (src/components/HymnSelector.tsx:103-109)
+      5. PrayerSelector (src/components/PrayerSelector.tsx:131-141)
+      6. AgendaForm HymnSelectorModal (src/components/AgendaForm.tsx:729-734)
+
+      In ALL these contexts, the SearchInput is already placed inside a
+      flexDirection:'row' container alongside a "Close" button. The SearchInput
+      already uses `style={{ flex: 1 }}` in all modal usages (searchInput style
+      has flex:1 in each modal's StyleSheet).
+
+      The SearchInput container (styles.container) has `position: 'relative'`
+      and `justifyContent: 'center'` but does NOT have `flex: 1`. This means
+      the SearchInput fills the available flex space via the `style` prop passed
+      by each consumer, not via its own internal styles.
+
+      The close button text is already at the right side of the search row in all
+      modals.
+
+    evidence:
+      - path: "src/components/SearchInput.tsx"
+        observation: "Container has no flex:1, but input receives flex via style prop"
+      - path: "src/components/MemberSelectorModal.tsx:128-130"
+        observation: "searchInput style has flex:1, height:40"
+      - path: "src/components/TopicSelectorModal.tsx:136-138"
+        observation: "searchInput style has flex:1, height:40"
+      - path: "src/components/ActorSelector.tsx:303-309"
+        observation: "searchInput style has flex:1, height:40"
+      - path: "src/components/HymnSelector.tsx:192-198"
+        observation: "searchInput style has flex:1, height:40"
+      - path: "src/components/PrayerSelector.tsx:244-250"
+        observation: "searchInput style has flex:1, height:40"
+
+  what_needs_to_change: |
+    The CR asks for a "fixed size" search field that fills ALL available space.
+    Currently the SearchInput itself has no explicit width/flex in its container.
+    The fix should ensure the SearchInput component's container has flex:1 so it
+    consistently fills available space regardless of how consumers pass styles.
+    This is mostly already working in the current codebase since all consumers
+    pass flex:1 via the style prop. The main improvement is to make this behavior
+    intrinsic to the SearchInput container itself (defensive), and ensure the
+    close button is always visible and positioned at the right.
+
+    Key changes expected:
+    1. SearchInput.tsx container style should include flex:1
+    2. Verify all search modal headers have the pattern: [SearchInput flex:1] + [Close button]
+    3. No functional change to the clear "X" button inside the SearchInput itself
+
+  validation_checks:
+    must_pass:
+      - id: MP-118-01
+        description: "SearchInput container style must include flex:1"
+        check: "src/components/SearchInput.tsx styles.container must have flex: 1"
+
+      - id: MP-118-02
+        description: "MemberSelectorModal search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/MemberSelectorModal.tsx header has flexDirection:'row', SearchInput with flex:1, Close button"
+
+      - id: MP-118-03
+        description: "TopicSelectorModal search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/TopicSelectorModal.tsx header has flexDirection:'row', SearchInput with flex:1, Close button"
+
+      - id: MP-118-04
+        description: "ActorSelector search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/ActorSelector.tsx searchRow has flexDirection:'row', SearchInput with flex:1, Close button"
+
+      - id: MP-118-05
+        description: "HymnSelector search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/HymnSelector.tsx modalHeader has flexDirection:'row', SearchInput with flex:1, Close button"
+
+      - id: MP-118-06
+        description: "PrayerSelector search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/PrayerSelector.tsx modalHeader has flexDirection:'row', SearchInput with flex:1, Close button"
+
+      - id: MP-118-07
+        description: "AgendaForm HymnSelectorModal search row has SearchInput with flex:1 and Close button at right"
+        check: "src/components/AgendaForm.tsx sheetSearchRow has flexDirection:'row', SearchInput with flex:1, Close button"
+
+    should_pass:
+      - id: SP-118-01
+        description: "SearchInput clear button (X) still appears when text is entered"
+        check: "SearchInput shows Pressable with clearButton when value.length > 0"
+
+      - id: SP-118-02
+        description: "All existing tests pass after change"
+        check: "npx vitest run passes all tests"
+
+# #############################################################################
+# CR-120: Auto-scroll to show expanded card entirely
+# "Ao expandir qualquer card, scroll automatico para mostrar card inteiro.
+#  Se card maior que tela, alinhar topo do card com topo da tela"
+# #############################################################################
+
+cr_120:
+  cr_id: CR-120
+  title: "Auto-scroll to show entire expanded card, align top if card larger than screen"
+  feature_id: F066
+
+  current_behavior:
+    description: |
+      Both Speeches tab (src/app/(tabs)/speeches.tsx) and Agenda tab
+      (src/app/(tabs)/agenda.tsx) use FlatList with expandable cards.
+      When a card is expanded:
+      - speeches.tsx: setExpandedDate(date) is called, but NO auto-scroll logic
+        exists after expansion.
+      - agenda.tsx: handleToggle sets expandedDate, calls lazyCreate.mutate(date),
+        but NO auto-scroll logic exists after expansion.
+
+      Neither tab scrolls to show the full expanded card content after toggling.
+      The user must manually scroll down to see the expanded form content.
+
+      The FlatList in both tabs has a ref (flatListRef) that supports scrollToIndex
+      and scrollToOffset, so auto-scroll is technically feasible.
+
+    evidence:
+      - path: "src/app/(tabs)/speeches.tsx:158-169"
+        observation: "handleToggle only sets expandedDate and calls lazyCreate, no scroll logic"
+      - path: "src/app/(tabs)/agenda.tsx:121-131"
+        observation: "handleToggle only sets expandedDate and calls lazyCreate, no scroll logic"
+      - path: "src/app/(tabs)/speeches.tsx:346"
+        observation: "FlatList has ref={flatListRef}"
+      - path: "src/app/(tabs)/agenda.tsx:206"
+        observation: "FlatList has ref={flatListRef}"
+
+  what_needs_to_change: |
+    After expanding a card, auto-scroll so the expanded card is fully visible.
+    If the expanded card is taller than the screen, align the top of the card
+    with the top of the visible area.
+
+    Key changes expected:
+    1. In handleToggle (both speeches.tsx and agenda.tsx), after setting expandedDate,
+       use scrollToIndex to scroll the expanded card into view
+    2. Use viewPosition: 0 (top-align) when the card might be taller than screen,
+       or viewOffset to ensure the card is visible
+    3. setTimeout may be needed to wait for the card to render before scrolling
+    4. The same behavior should apply consistently in both tabs
+
+  validation_checks:
+    must_pass:
+      - id: MP-120-01
+        description: "speeches.tsx handleToggle must call scrollToIndex or scrollToOffset after expansion"
+        check: "After setExpandedDate(date) in speeches.tsx, scroll logic targets the expanded card"
+
+      - id: MP-120-02
+        description: "agenda.tsx handleToggle must call scrollToIndex or scrollToOffset after expansion"
+        check: "After setExpandedDate(date) in agenda.tsx, scroll logic targets the expanded card"
+
+      - id: MP-120-03
+        description: "Auto-scroll uses viewPosition:0 to align card top with screen top"
+        check: "scrollToIndex call includes viewPosition: 0 (or equivalent top-alignment logic)"
+
+      - id: MP-120-04
+        description: "Auto-scroll only triggers on expand, not on collapse"
+        check: "Scroll logic is conditional on expanding (not collapsing)"
+
+    should_pass:
+      - id: SP-120-01
+        description: "setTimeout or requestAnimationFrame used to defer scroll after render"
+        check: "Scroll call is deferred to allow layout to complete"
+
+      - id: SP-120-02
+        description: "All existing tests pass after change"
+        check: "npx vitest run passes all tests"
+
+# #############################################################################
+# CR-123: Presence field proportional to number of selected actors, one per line
+# "Campo 'Reconhecendo a Presenca' com tamanho proporcional ao numero de
+#  atores selecionados, um ator por linha"
+# #############################################################################
+
+cr_123:
+  cr_id: CR-123
+  title: "Recognizing presence field proportional height with one actor per line"
+  feature_id: F067
+
+  current_behavior:
+    description: |
+      The "Reconhecendo a Presenca" field in AgendaForm (src/components/AgendaForm.tsx:191-202)
+      displays recognized_names as a comma-separated string in a single-line SelectorField:
+        value={agenda.recognized_names?.join(', ') || ''}
+
+      The SelectorField component (AgendaForm.tsx:540-569) is a Pressable with
+      fixed padding (paddingVertical:8, paddingHorizontal:10) and uses numberOfLines={1},
+      which truncates long text.
+
+      When many actors are selected, the display truncates the names because
+      numberOfLines={1} is set. The field does not grow vertically.
+
+      The data model stores recognized_names as string[] | null
+      (src/types/database.ts:177).
+
+    evidence:
+      - path: "src/components/AgendaForm.tsx:193"
+        observation: "Uses join(', ') to display all actors in one line"
+      - path: "src/components/AgendaForm.tsx:565"
+        observation: "SelectorField uses numberOfLines={1} which truncates"
+      - path: "src/types/database.ts:177"
+        observation: "recognized_names: string[] | null"
+      - path: "src/hooks/usePresentationMode.ts:80-83"
+        observation: "Presentation mode also joins with ', '"
+
+  what_needs_to_change: |
+    The recognizing field should:
+    1. Display each actor name on its own line (not comma-separated on one line)
+    2. Grow vertically proportional to the number of selected actors
+    3. Remove the numberOfLines={1} truncation for this specific field
+
+    Key changes expected:
+    1. In AgendaForm, the recognizing field should use a different display
+       component or a modified SelectorField that supports multi-line display
+    2. Instead of join(', '), use join('\n') or render each name individually
+    3. The field height should grow as more actors are added
+    4. The field should shrink back when actors are removed
+
+  validation_checks:
+    must_pass:
+      - id: MP-123-01
+        description: "Recognizing field displays actors on separate lines (not comma-separated)"
+        check: "AgendaForm recognizing field uses newline separator or renders names individually"
+
+      - id: MP-123-02
+        description: "Recognizing field does not use numberOfLines={1} truncation"
+        check: "The recognizing display component allows multi-line text"
+
+      - id: MP-123-03
+        description: "Field height grows proportionally with number of selected actors"
+        check: "No fixed height or maxHeight that would prevent growth"
+
+    should_pass:
+      - id: SP-123-01
+        description: "Empty state still shows placeholder text correctly"
+        check: "When no actors selected, placeholder is visible"
+
+      - id: SP-123-02
+        description: "Presentation mode recognized_names display is NOT affected (keeps comma format)"
+        check: "src/hooks/usePresentationMode.ts still uses join(', ')"
+
+      - id: SP-123-03
+        description: "All existing tests pass after change"
+        check: "npx vitest run passes all tests"
+
+# #############################################################################
+# CR-124: Prayer fields allow custom name without adding as member
+# "Campos 'Oracao de abertura' e 'Oracao de encerramento' devem permitir
+#  nome customizado alem da lista de membros, sem adicionar como membro"
+# #############################################################################
+
+cr_124:
+  cr_id: CR-124
+  title: "Prayer fields allow custom name beyond member list without adding as member"
+  feature_id: F068
+
+  current_behavior:
+    description: |
+      The PrayerSelector component (src/components/PrayerSelector.tsx) ALREADY
+      supports custom name entry. When the user types in the search field:
+      1. The text is synced to both `search` and `customName` states (line 134-136)
+      2. A "custom name" button appears below the search field (line 158-169)
+      3. Pressing the button calls handleCustomName which sets memberId: null (line 82-83)
+      4. The data model supports this: opening_prayer_member_id can be null while
+         opening_prayer_name has a value (src/types/database.ts:184-185)
+
+      In AgendaForm.tsx (lines 480-508), the prayer selector is opened with
+      modalOnly={true} and the selection handler correctly stores both name and
+      memberId (null for custom names).
+
+      This feature already appears to be fully implemented. The PrayerSelection
+      type (line 23-29) explicitly supports memberId: string | null.
+
+    evidence:
+      - path: "src/components/PrayerSelector.tsx:23-29"
+        observation: "PrayerSelection type has memberId: string | null"
+      - path: "src/components/PrayerSelector.tsx:80-88"
+        observation: "handleCustomName sets memberId: null, name: trimmed"
+      - path: "src/components/PrayerSelector.tsx:158-169"
+        observation: "Custom name button appears when text is typed"
+      - path: "src/components/AgendaForm.tsx:492-504"
+        observation: "Prayer selection handler stores memberId (null for custom) and name"
+      - path: "src/i18n/locales/pt-BR.json:226"
+        observation: "customName translation exists: 'nome personalizado'"
+      - path: "src/i18n/locales/en.json:226"
+        observation: "customName translation exists: 'custom name'"
+      - path: "src/i18n/locales/es.json:226"
+        observation: "customName translation exists: 'nombre personalizado'"
+
+  what_needs_to_change: |
+    This feature is ALREADY IMPLEMENTED. The PrayerSelector supports custom names
+    through its search-and-select UI. The "custom name" button appears when
+    text is entered, allowing the user to use a name that is not in the member list.
+    The selected name is stored with memberId: null, which does NOT add the person
+    as a member.
+
+    If the CR intends additional changes beyond what exists, possible improvements:
+    1. Make the custom name option more prominent/visible
+    2. Add a label or hint explaining this feature
+    3. Ensure the custom name button is above the member list (it already is)
+
+    No code changes may be needed if current behavior matches the requirement.
+
+  validation_checks:
+    must_pass:
+      - id: MP-124-01
+        description: "PrayerSelector has custom name functionality (memberId: null path)"
+        check: "PrayerSelector handleCustomName sets memberId to null"
+
+      - id: MP-124-02
+        description: "Custom name button appears when user types in prayer search"
+        check: "customName.trim().length > 0 shows the custom name button"
+
+      - id: MP-124-03
+        description: "Custom name does not create a new member record"
+        check: "No member creation mutation is called in handleCustomName"
+
+      - id: MP-124-04
+        description: "Both opening and closing prayer fields use PrayerSelector"
+        check: "AgendaForm opens PrayerSelector for both opening_prayer and closing_prayer fields"
+
+      - id: MP-124-05
+        description: "Custom name hint text exists in all 3 locales"
+        check: "agenda.customName key exists in en.json, pt-BR.json, es.json"
+
+    should_pass:
+      - id: SP-124-01
+        description: "Custom name selected shows in the prayer field correctly"
+        check: "After selecting custom name, the SelectorField shows the name"
+
+      - id: SP-124-02
+        description: "All existing tests pass"
+        check: "npx vitest run passes all tests"
+
+# =============================================================================
+# Overall Assessment
+# =============================================================================
+
+overall:
+  validated: true
+  summary: |
+    All 4 CRs for Batch 9 Phase 3 have been analyzed against the existing codebase:
+
+    - CR-118 (Search field size): SearchInput already uses flex:1 via consumer style props.
+      Minor improvement: add flex:1 to SearchInput container itself for consistency.
+      All 6 search modal contexts already have the correct layout pattern (SearchInput + Close button).
+
+    - CR-120 (Auto-scroll on card expand): Neither speeches.tsx nor agenda.tsx has
+      auto-scroll logic after expanding a card. FlatList refs exist and scrollToIndex
+      is available. Implementation is straightforward but requires careful timing
+      (setTimeout) and viewPosition handling.
+
+    - CR-123 (Presence field proportional): The recognizing field currently uses
+      SelectorField with numberOfLines={1} and comma-separated names. Needs to be
+      changed to display one actor per line with proportional height growth.
+
+    - CR-124 (Custom prayer name): Already fully implemented in PrayerSelector.
+      The component supports custom names with memberId: null. All i18n keys exist.
+      This CR may be a confirmation/documentation request rather than a code change.
+
+  risks:
+    - CR-120 auto-scroll may conflict with getItemLayout in FlatList (estimated heights
+      won't match expanded card heights)
+    - CR-123 changing the recognizing field display may require a new component variant
+      of SelectorField or a specialized component
+    - CR-124 may need no code changes at all, only QA verification

@@ -1,0 +1,624 @@
+# =============================================================================
+# SPEC_F065_F068.yaml
+# Specification for Batch 9 Phase 3 - UX Polish
+# Features: F065, F066, F067, F068
+# CRs: CR-118, CR-120, CR-123, CR-124
+# Created: 2026-02-19
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 9
+phase: 3
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+features:
+
+  # ===========================================================================
+  # F065 / CR-118: Defensive flex:1 on SearchInput + close button consistency
+  # ===========================================================================
+
+  - id: F065
+    name: "SearchInput with flex:1 and close button in search screens"
+    cr_id: 118
+    type: ux
+    priority: medium
+
+    description: >
+      Nas telas de Search (Settings: members.tsx, topics.tsx, history.tsx,
+      timezone.tsx) e nos modais de selecao (MemberSelectorModal,
+      TopicSelectorModal, ActorSelector, HymnSelector, PrayerSelector), o campo
+      de busca (SearchInput) deve preencher todo o espaco horizontal disponivel
+      com tamanho fixo e ter botao "Fechar" (close) a direita.
+      Os modais ja implementam esse padrao corretamente: searchInput com flex:1
+      dentro de um header/row com flexDirection:'row', e botao close a direita.
+      As telas de Settings (members, topics, history, timezone) NAO tem botao
+      close ao lado do SearchInput e o SearchInput esta dentro de um container
+      simples sem flexDirection:'row'.
+      O SearchInput.tsx ja tem container sem flex:1 (apenas position:'relative',
+      justifyContent:'center'). Os consumers que precisam de flex:1 ja aplicam
+      via style prop do SearchInput (ex: modais passam styles.searchInput com
+      flex:1). O componente SearchInput nao precisa de alteracao interna.
+      Fix: Nas telas de Settings, envolver SearchInput em um container
+      flexDirection:'row' com gap, e adicionar um Pressable "Fechar" a direita
+      que limpa o campo de busca (onChangeText('')). O SearchInput recebe flex:1
+      via style prop para preencher o espaco.
+
+    user_request: >
+      "Nas telas de Search (membros, temas, atores), campo de busca com tamanho
+      fixo preenchendo todo espaco disponivel com botao fechar a direita"
+
+    analysis: >
+      Baseline:
+      - SearchInput.tsx: container tem position:'relative', sem flex:1 defensivo.
+        Input tem styles fixos (height:40, borderWidth:1, etc). Clear button (X)
+        ja existe para limpar texto, posicionado absolutamente a direita.
+      - members.tsx:557-563: SearchInput dentro de searchContainer
+        (paddingHorizontal:16, paddingBottom:8). Sem flexDirection:'row'.
+        Sem botao close.
+      - topics.tsx:399-405: Mesmo padrao de members.tsx. Sem close.
+      - history.tsx:106-112: Mesmo padrao. Sem close.
+      - timezone.tsx:206-212: Mesmo padrao. Sem close.
+      - Modais (MemberSelectorModal, ActorSelector, PrayerSelector, etc):
+        JA tem flexDirection:'row' no header, SearchInput com flex:1 via style,
+        e Pressable close a direita. Padrao ja correto.
+      Fix proposto:
+      1. Adicionar flex:1 defensivo ao container do SearchInput.tsx
+         (styles.container). Isso garante que em qualquer contexto flexDirection:'row',
+         o SearchInput preenche o espaco. Nos contextos sem row, flex:1 nao tem
+         efeito visual (container preenche largura por default em column layout).
+      2. Nas 4 telas de Settings (members, topics, history, timezone):
+         trocar searchContainer para flexDirection:'row', alignItems:'center',
+         gap:12, e adicionar Pressable close a direita com t('common.close').
+      3. O botao close nas telas de Settings limpa o campo (setSearch(''))
+         pois nao ha modal para fechar.
+
+    root_cause: >
+      SearchInput.tsx container nao tem flex:1. Telas de Settings nao tem
+      flexDirection:'row' no searchContainer nem botao close.
+
+    acceptance_criteria:
+      - id: AC-F065-01
+        description: "SearchInput container tem flex:1 defensivo"
+        given: "SearchInput.tsx renderizado"
+        when: "O componente e usado em qualquer contexto"
+        then: "styles.container inclui flex:1, garantindo preenchimento em layout row"
+        status: pending
+
+      - id: AC-F065-02
+        description: "SearchInput preenche todo espaco disponivel em members.tsx"
+        given: "Tela de Settings > Membros"
+        when: "O campo de busca e renderizado"
+        then: "SearchInput ocupa todo espaco horizontal disponivel ate o botao close"
+        status: pending
+
+      - id: AC-F065-03
+        description: "Botao close visivel a direita do campo em members.tsx"
+        given: "Tela de Settings > Membros"
+        when: "Campo de busca renderizado"
+        then: "Botao 'Fechar' (t('common.close')) aparece a direita do SearchInput"
+        status: pending
+
+      - id: AC-F065-04
+        description: "Botao close limpa o texto de busca em members.tsx"
+        given: "Texto digitado no campo de busca de Membros"
+        when: "Usuario pressiona botao 'Fechar'"
+        then: "Campo de busca e limpo (search = '')"
+        status: pending
+
+      - id: AC-F065-05
+        description: "SearchInput preenche todo espaco disponivel em topics.tsx"
+        given: "Tela de Settings > Temas"
+        when: "O campo de busca e renderizado"
+        then: "SearchInput ocupa todo espaco horizontal ate o botao close"
+        status: pending
+
+      - id: AC-F065-06
+        description: "Botao close visivel a direita do campo em topics.tsx"
+        given: "Tela de Settings > Temas"
+        when: "Campo de busca renderizado"
+        then: "Botao 'Fechar' aparece a direita do SearchInput"
+        status: pending
+
+      - id: AC-F065-07
+        description: "SearchInput preenche todo espaco disponivel em history.tsx"
+        given: "Tela de Settings > Historico"
+        when: "O campo de busca e renderizado"
+        then: "SearchInput ocupa todo espaco horizontal ate o botao close"
+        status: pending
+
+      - id: AC-F065-08
+        description: "Botao close visivel a direita do campo em history.tsx"
+        given: "Tela de Settings > Historico"
+        when: "Campo de busca renderizado"
+        then: "Botao 'Fechar' aparece a direita do SearchInput"
+        status: pending
+
+      - id: AC-F065-09
+        description: "SearchInput preenche todo espaco disponivel em timezone.tsx"
+        given: "Tela de Settings > Fuso Horario"
+        when: "O campo de busca e renderizado"
+        then: "SearchInput ocupa todo espaco horizontal ate o botao close"
+        status: pending
+
+      - id: AC-F065-10
+        description: "Botao close visivel a direita do campo em timezone.tsx"
+        given: "Tela de Settings > Fuso Horario"
+        when: "Campo de busca renderizado"
+        then: "Botao 'Fechar' aparece a direita do SearchInput"
+        status: pending
+
+      - id: AC-F065-11
+        description: "Modais de selecao nao afetados (regressao check)"
+        given: "MemberSelectorModal, TopicSelectorModal, ActorSelector, HymnSelector, PrayerSelector"
+        when: "Modal e aberto"
+        then: "Layout permanece identico (SearchInput com flex:1 + close button ja existentes)"
+        status: pending
+
+      - id: AC-F065-12
+        description: "SearchInput na AgendaForm (inline search) nao afetado"
+        given: "AgendaForm com campo de busca inline"
+        when: "O campo e renderizado"
+        then: "Layout nao e alterado (AgendaForm search ja tem padrao proprio)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F065-01
+        case: "Campo de busca vazio e usuario pressiona close"
+        expected: "Nada acontece visualmente (search ja e '', setSearch('') e no-op)"
+        status: pending
+      - id: EC-F065-02
+        case: "Texto longo no campo de busca"
+        expected: "SearchInput com flex:1 nao expande alem do espaco disponivel; texto truncado normalmente"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SearchInput.tsx"
+        change: "Adicionar flex:1 ao styles.container"
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "searchContainer: flexDirection:'row', alignItems:'center', gap:12. Adicionar Pressable close com t('common.close') que chama setSearch('')."
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        change: "searchContainer: flexDirection:'row', alignItems:'center', gap:12. Adicionar Pressable close com t('common.close') que chama setSearch('')."
+      - path: "src/app/(tabs)/settings/history.tsx"
+        change: "searchContainer: flexDirection:'row', alignItems:'center', gap:12. Adicionar Pressable close com t('common.close') que chama setSearch('')."
+      - path: "src/app/(tabs)/settings/timezone.tsx"
+        change: "searchContainer: flexDirection:'row', alignItems:'center', gap:12. Adicionar Pressable close com t('common.close') que chama setSearch('')."
+
+    dependencies: []
+    related_features: [F041]
+    related_crs: [96]
+
+  # ===========================================================================
+  # F066 / CR-120: Auto-scroll on card expand
+  # ===========================================================================
+
+  - id: F066
+    name: "Auto-scroll to show expanded card after toggle"
+    cr_id: 120
+    type: ux
+    priority: high
+
+    description: >
+      Nas abas Discursos (speeches.tsx) e Agenda (agenda.tsx), ao expandir um
+      card (SundayCard ou AgendaSundayCard), nao ha scroll automatico para
+      mostrar o card expandido. Se o card expandido esta parcialmente fora da
+      tela, o usuario precisa scrollar manualmente para ve-lo.
+      O comportamento desejado e:
+      1. Ao expandir um card, scroll automatico para mostrar o card inteiro.
+      2. Se o card expandido e maior que a tela, alinhar o topo do card com o
+         topo da tela visivel.
+      Ambas as telas (speeches.tsx e agenda.tsx) usam FlatList com ref
+      (flatListRef). O FlatList tem scrollToIndex e scrollToOffset disponiveis.
+      A solucao mais robusta e usar scrollToIndex com viewPosition=0 (topo)
+      apos um pequeno delay (requestAnimationFrame ou setTimeout) para
+      garantir que o layout do card expandido ja foi calculado.
+      O delay e necessario porque o card expande (renderiza AgendaForm ou
+      SpeechSlots) e isso altera o layout. Sem delay, o scroll pode ir para
+      a posicao errada.
+
+    user_request: >
+      "Ao expandir qualquer card, scroll automatico para mostrar card inteiro.
+      Se card maior que tela, alinhar topo do card com topo da tela"
+
+    analysis: >
+      Baseline:
+      - speeches.tsx: FlatList com flatListRef.current. expandedDate state
+        controla qual card esta expandido. handleToggle (linhas 121-131) chama
+        setExpandedDate. Nao ha scrollToIndex apos expandir. getItemLayout
+        usa ESTIMATED_ITEM_HEIGHT (64), mas cards expandidos sao muito maiores.
+        scrollToIndex com getItemLayout pode nao funcionar bem com tamanhos
+        dinamicos.
+      - agenda.tsx: FlatList com flatListRef.current. expandedDate state.
+        handleToggle (linhas 121-131) chama setExpandedDate. getItemLayout
+        usa ESTIMATED_ITEM_HEIGHT (64). Mesmo problema de tamanhos dinamicos.
+      Abordagem recomendada:
+      1. Em handleToggle de ambas as telas, apos setExpandedDate(date),
+         usar setTimeout com ~300ms para esperar re-render e layout,
+         e entao chamar flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }).
+      2. viewPosition: 0 alinha o topo do item com o topo da lista visivel.
+         Isso satisfaz ambas as regras: se o card cabe na tela, ele fica
+         visivel do topo. Se e maior que a tela, o topo fica alinhado.
+      3. O getItemLayout existente assume tamanho fixo (64px). Para cards
+         expandidos, o tamanho real e muito maior. Optar por REMOVER
+         getItemLayout (que permite scrollToIndex funcionar com tamanhos
+         dinamicos via medida real) ou usar scrollToOffset calculado.
+         A opcao mais simples e usar scrollToIndex sem getItemLayout.
+         Sem getItemLayout, scrollToIndex so funciona se o item ja foi
+         renderizado. Para items proximos do viewport, isso funciona.
+         Para items distantes, onScrollToIndexFailed ja existe como handler.
+      4. Alternativa mais robusta: usar onLayout nos items para medir
+         posicoes reais e usar scrollToOffset. Mas adiciona complexidade.
+      Decisao: usar scrollToIndex com viewPosition:0 e setTimeout(300ms).
+      Remover getItemLayout das listas para evitar conflito com tamanhos
+      dinamicos. Manter onScrollToIndexFailed como fallback.
+      NOTA: Remover getItemLayout pode afetar a performance do initialScrollIndex.
+      Como alternativa, manter getItemLayout mas usar scrollToOffset manual
+      calculado via onLayout. DECISAO FINAL: Manter getItemLayout para
+      initialScrollIndex. Para auto-scroll apos expand, usar requestAnimationFrame
+      + scrollToIndex com viewPosition:0. Se falhar (via onScrollToIndexFailed),
+      o fallback existente trata.
+
+    root_cause: >
+      handleToggle em speeches.tsx e agenda.tsx nao chama nenhum metodo de
+      scroll apos expandir um card. O usuario precisa scrollar manualmente.
+
+    acceptance_criteria:
+      - id: AC-F066-01
+        description: "Auto-scroll apos expandir card na aba Discursos"
+        given: "Aba Discursos com cards colapsados"
+        when: "Usuario clica para expandir um card"
+        then: "Lista scrolla automaticamente para que o topo do card expandido fique alinhado com o topo da tela visivel"
+        status: pending
+
+      - id: AC-F066-02
+        description: "Auto-scroll apos expandir card na aba Agenda"
+        given: "Aba Agenda com cards colapsados"
+        when: "Usuario clica para expandir um card"
+        then: "Lista scrolla automaticamente para que o topo do card expandido fique alinhado com o topo da tela visivel"
+        status: pending
+
+      - id: AC-F066-03
+        description: "Card maior que tela tem topo alinhado"
+        given: "Card expandido com conteudo maior que a altura da tela"
+        when: "O scroll automatico e executado"
+        then: "O topo do card fica alinhado com o topo da tela (usuario pode scrollar para baixo para ver o resto)"
+        status: pending
+
+      - id: AC-F066-04
+        description: "Colapsar card NAO faz scroll"
+        given: "Card expandido visivel na tela"
+        when: "Usuario clica no header do card para colapsá-lo"
+        then: "Nenhum scroll automatico acontece (card colapsa no lugar)"
+        status: pending
+
+      - id: AC-F066-05
+        description: "Scroll animado suavemente"
+        given: "Card sendo expandido"
+        when: "Auto-scroll e executado"
+        then: "O scroll e animado (animated: true) para transicao suave"
+        status: pending
+
+      - id: AC-F066-06
+        description: "Auto-scroll funciona ao trocar de card expandido"
+        given: "Card A expandido"
+        when: "Usuario clica em Card B para expandir"
+        then: "Card A colapsa, Card B expande, e auto-scroll leva ao topo do Card B"
+        status: pending
+
+      - id: AC-F066-07
+        description: "Scroll inicial para proximo domingo nao afetado"
+        given: "App aberto pela primeira vez na aba Discursos ou Agenda"
+        when: "O scroll inicial para o proximo domingo e executado"
+        then: "Comportamento de initialScrollIndex permanece inalterado"
+        status: pending
+
+    edge_cases:
+      - id: EC-F066-01
+        case: "Expandir card ja visivel inteiramente na tela"
+        expected: "Auto-scroll acontece, alinhando topo do card. Mesmo que o card ja seja visivel, o scroll suave nao e disruptivo."
+        status: pending
+      - id: EC-F066-02
+        case: "Expandir ultimo card da lista"
+        expected: "Scroll leva ao card, limitado pelo contentSize da lista (nao scrolla alem do conteudo)"
+        status: pending
+      - id: EC-F066-03
+        case: "Expandir card enquanto lista esta scrollando (momentum)"
+        expected: "Auto-scroll interrompe momentum e leva ao card expandido"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/speeches.tsx"
+        change: "Em handleToggle, apos setExpandedDate(date), calcular indice do item e chamar setTimeout(() => flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }), 300). Nao scrollar ao colapsar (date === expandedDate)."
+      - path: "src/app/(tabs)/agenda.tsx"
+        change: "Em handleToggle, mesmo padrao de speeches.tsx: calcular indice e scrollToIndex com delay apos expandir."
+
+    dependencies: []
+    related_features: []
+    related_crs: []
+
+  # ===========================================================================
+  # F067 / CR-123: Recognizing field proportional to selected actors
+  # ===========================================================================
+
+  - id: F067
+    name: "Recognizing field proportional height with one actor per line"
+    cr_id: 123
+    type: ui
+    priority: medium
+
+    description: >
+      No AgendaForm.tsx, o campo "Reconhecendo a Presenca" (linha 191-203)
+      usa SelectorField com numberOfLines={1} e join(', ') para exibir os
+      nomes selecionados. Isso causa truncagem quando ha multiplos nomes.
+      O usuario quer que o campo tenha tamanho proporcional ao numero de
+      atores selecionados, exibindo um ator por linha.
+      Atualmente, SelectorField:540-569 renderiza um Pressable com Text
+      numberOfLines={1}. Para o campo "Reconhecendo", o valor e
+      agenda.recognized_names?.join(', ') || ''. Com 3+ nomes, o texto
+      e truncado na primeira linha.
+      Fix: Quando o campo "Reconhecendo" tem nomes selecionados, renderizar
+      cada nome em seu proprio <Text> (um por linha) ao inves de usar
+      SelectorField padrao. O container deve ter paddingVertical e crescer
+      verticalmente conforme o numero de nomes.
+      Se nenhum nome selecionado, exibir placeholder normal (como hoje).
+      Abordagem: Criar variante ou componente inline dentro de AgendaForm
+      que renderiza os recognized_names como lista vertical dentro do
+      Pressable (mantendo onPress para abrir ActorSelector). Remover
+      numberOfLines={1} e usar map de nomes com <Text> individual.
+
+    user_request: >
+      "Campo 'Reconhecendo a Presenca' com tamanho proporcional ao numero de
+      atores selecionados, um ator por linha"
+
+    analysis: >
+      Baseline:
+      - AgendaForm.tsx:191-203: FieldRow com SelectorField. O valor e
+        agenda.recognized_names?.join(', ') || ''. SelectorField:564 usa
+        numberOfLines={1}, truncando.
+      - SelectorField:540-569: componente generico com Text numberOfLines={1}.
+        Nao pode ser alterado genericamente (outros usos precisam de 1 linha).
+      Fix proposto:
+      1. NAO alterar SelectorField genericamente (quebraria outros usos).
+      2. No bloco de "Reconhecendo" (linhas 191-203), substituir SelectorField
+         por um Pressable customizado inline que:
+         a. Se recognized_names esta vazio: mostra placeholder (1 linha)
+         b. Se recognized_names tem items: renderiza cada nome como <Text>
+            separado, um por linha, dentro do Pressable.
+      3. O Pressable mantem onPress para abrir ActorSelector.
+      4. O estilo do Pressable usa os mesmos estilos de selectorField
+         (borderWidth, borderRadius, paddingHorizontal) mas SEM altura fixa
+         e SEM numberOfLines.
+      5. Cada nome usa fontSize:15 (mesmo de selectorText) e paddingVertical:2
+         para spacing entre linhas.
+
+    root_cause: >
+      SelectorField usa numberOfLines={1} e join(', ') para exibir nomes.
+      Com multiplos nomes, o texto e truncado em uma unica linha.
+
+    acceptance_criteria:
+      - id: AC-F067-01
+        description: "Um ator por linha quando ha nomes selecionados"
+        given: "Campo 'Reconhecendo a Presenca' com 3 nomes selecionados"
+        when: "O campo e renderizado"
+        then: "Cada nome aparece em sua propria linha dentro do campo (3 linhas visiveis)"
+        status: pending
+
+      - id: AC-F067-02
+        description: "Campo cresce verticalmente com numero de nomes"
+        given: "Campo 'Reconhecendo a Presenca' com 1 nome"
+        when: "Mais nomes sao adicionados (2, 3, 4...)"
+        then: "A altura do campo aumenta proporcionalmente (1 linha por nome)"
+        status: pending
+
+      - id: AC-F067-03
+        description: "Placeholder exibido quando nenhum nome selecionado"
+        given: "Campo 'Reconhecendo a Presenca' sem nomes selecionados"
+        when: "O campo e renderizado"
+        then: "Placeholder t('agenda.recognizing') e exibido em cor terciaria, 1 linha"
+        status: pending
+
+      - id: AC-F067-04
+        description: "onPress continua abrindo ActorSelector"
+        given: "Campo 'Reconhecendo a Presenca' renderizado"
+        when: "Usuario clica no campo"
+        then: "ActorSelector modal abre para selecao multipla (regressao check)"
+        status: pending
+
+      - id: AC-F067-05
+        description: "Observador nao pode clicar no campo"
+        given: "Usuario com role observer"
+        when: "Campo 'Reconhecendo a Presenca' renderizado"
+        then: "Campo nao responde ao clique (disabled, sem seta)"
+        status: pending
+
+      - id: AC-F067-06
+        description: "Estilo visual consistente com outros SelectorFields"
+        given: "Campo 'Reconhecendo a Presenca' com nomes"
+        when: "O campo e renderizado"
+        then: "Borda, borderRadius, paddingHorizontal sao identicos ao SelectorField padrao. Apenas a altura e dinamica."
+        status: pending
+
+      - id: AC-F067-07
+        description: "Outros usos de SelectorField nao afetados"
+        given: "Campos presiding, conducting, hymns, prayers usando SelectorField"
+        when: "Os campos sao renderizados"
+        then: "Todos continuam com numberOfLines={1} e altura fixa (regressao check)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F067-01
+        case: "Campo com 10+ nomes selecionados"
+        expected: "Campo cresce para 10+ linhas. Pode ficar grande mas reflete selecao real. Nao ha limite de linhas."
+        status: pending
+      - id: EC-F067-02
+        case: "Nome muito longo (> largura do campo)"
+        expected: "Nome e truncado na linha (sem numberOfLines, texto pode fazer wrap natural)"
+        status: pending
+      - id: EC-F067-03
+        case: "Nomes adicionados e removidos dinamicamente"
+        expected: "Campo encolhe/cresce conforme nomes sao removidos/adicionados via ActorSelector"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/AgendaForm.tsx"
+        change: "Substituir SelectorField no bloco 'Reconhecendo' (linhas 191-203) por Pressable customizado que renderiza cada recognized_name como <Text> individual (um por linha). Manter onPress para abrir ActorSelector. Usar mesmos estilos de selectorField sem numberOfLines."
+
+    dependencies: [F042]
+    related_features: [F042]
+    related_crs: [97]
+
+  # ===========================================================================
+  # F068 / CR-124: Custom name support in prayer fields (ALREADY IMPLEMENTED)
+  # ===========================================================================
+
+  - id: F068
+    name: "Custom name support in prayer selector fields"
+    cr_id: 124
+    type: feature
+    priority: low
+    status: already_implemented
+
+    description: >
+      Os campos 'Oracao de abertura' e 'Oracao de encerramento' devem permitir
+      nome customizado alem da lista de membros, sem adicionar como membro.
+      VERIFICACAO: PrayerSelector.tsx JA implementa essa funcionalidade:
+      - handleCustomName (linha 80-88): permite digitar nome livre
+      - PrayerSelection type (linha 24-29): memberId pode ser null (custom)
+      - customNameButton (linhas 158-170): botao visual para confirmar custom name
+      - O campo de busca e o campo de custom name sao sincronizados (linhas 134-137)
+      - Ao digitar texto que nao e um membro, aparece botao para usar como
+        nome customizado com label t('agenda.customName')
+      - O nome customizado e persistido com memberId: null
+      CONCLUSAO: CR-124 esta COMPLETAMENTE implementado. Nenhuma alteracao
+      de codigo necessaria.
+
+    user_request: >
+      "Campos 'Oracao de abertura' e 'Oracao de encerramento' devem permitir
+      nome customizado alem da lista de membros, sem adicionar como membro"
+
+    analysis: >
+      Baseline:
+      - PrayerSelector.tsx:24-29: PrayerSelection type com memberId: string|null
+        e name: string. memberId=null indica nome customizado.
+      - PrayerSelector.tsx:80-88: handleCustomName() - trim do customName,
+        chama onSelect com memberId:null, fecha modal, limpa state.
+      - PrayerSelector.tsx:134-137: search e customName sincronizados
+        (onChangeText seta ambos).
+      - PrayerSelector.tsx:158-170: Pressable customNameButton com
+        customName.trim() como texto e t('agenda.customName') como hint.
+        Visivel quando customName.trim().length > 0.
+      - AgendaForm.tsx: PrayerSelector usado para opening_prayer e
+        closing_prayer. O handler salva name no agenda.
+      VERIFICACAO COMPLETA: A funcionalidade esta implementada e funcional.
+      Nao ha gaps de UX ou visibilidade. O botao de custom name e visivel
+      e intuitivo. O usuario digita, ve o botao, e confirma.
+
+    root_cause: >
+      N/A - Feature ja implementada.
+
+    acceptance_criteria:
+      - id: AC-F068-01
+        description: "Nome customizado pode ser digitado no campo de oracao"
+        given: "PrayerSelector aberto para oracao de abertura ou encerramento"
+        when: "Usuario digita nome que nao esta na lista de membros"
+        then: "Botao com o nome digitado e hint 'Nome customizado' aparece acima da lista de membros"
+        status: already_implemented
+
+      - id: AC-F068-02
+        description: "Nome customizado persistido sem criar membro"
+        given: "Usuario digita nome customizado e pressiona o botao"
+        when: "A selecao e confirmada"
+        then: "PrayerSelection com memberId=null e name=nomeDigitado e salva. Nenhum novo membro e criado."
+        status: already_implemented
+
+      - id: AC-F068-03
+        description: "Nome customizado exibido no campo de oracao"
+        given: "Nome customizado selecionado para oracao"
+        when: "AgendaForm renderiza o campo"
+        then: "O nome customizado e exibido no SelectorField normalmente"
+        status: already_implemented
+
+    edge_cases: []
+
+    files_impacted: []
+
+    dependencies: []
+    related_features: [F039, F059]
+    related_crs: [74, 98, 125]
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: ASM-F065-01
+    description: >
+      O botao "Fechar" nas telas de Settings limpa o campo de busca
+      (setSearch('')) ao inves de navegar para tela anterior. Isso porque
+      nao ha modal para fechar nas telas de Settings; o SearchInput esta
+      inline na tela. O label reutiliza t('common.close') para consistencia
+      visual com os modais.
+    impact: "Baixo - comportamento intuitivo (limpar busca)"
+
+  - id: ASM-F065-02
+    description: >
+      O flex:1 defensivo no container do SearchInput.tsx nao afeta os usos
+      existentes em modais (que ja tem flex:1 via style prop) nem os usos
+      inline (onde column layout preenche largura automaticamente).
+    impact: "Nenhum - flex:1 em column layout nao altera largura"
+
+  - id: ASM-F066-01
+    description: >
+      O delay de 300ms antes do scrollToIndex e suficiente para o layout do
+      card expandido ser calculado. Em dispositivos lentos, pode nao ser
+      suficiente, mas o fallback onScrollToIndexFailed trata esse caso.
+    impact: "Baixo - fallback existente cobre o caso"
+
+  - id: ASM-F066-02
+    description: >
+      viewPosition:0 no scrollToIndex alinha o topo do item com o topo da
+      lista. Isso satisfaz ambas as regras do usuario: card menor que tela
+      fica visivel do topo, card maior que tela tem topo alinhado.
+    impact: "Nenhum - comportamento correto por definicao"
+
+  - id: ASM-F066-03
+    description: >
+      O auto-scroll nao acontece ao colapsar um card (apenas ao expandir).
+      Ao colapsar, o card encolhe no lugar e nao ha necessidade de scroll.
+    impact: "Nenhum - comportamento intuitivo"
+
+  - id: ASM-F067-01
+    description: >
+      O campo "Reconhecendo a Presenca" nao tem limite maximo de linhas.
+      Com muitos nomes (10+), o campo pode ficar grande. Isso e aceitavel
+      pois reflete a selecao real do usuario e e incomum ter muitos nomes.
+    impact: "Baixo - caso raro, visualmente correto"
+
+  - id: ASM-F067-02
+    description: >
+      A substituicao do SelectorField por Pressable customizado e feita
+      APENAS no bloco "Reconhecendo" do AgendaForm. Todos os outros usos
+      de SelectorField (presiding, conducting, hymns, prayers) nao sao
+      afetados.
+    impact: "Nenhum - alteracao localizada"
+
+  - id: ASM-F068-01
+    description: >
+      CR-124 esta completamente implementado. PrayerSelector ja suporta
+      nomes customizados com memberId:null. Nao ha alteracoes de codigo
+      necessarias para esta feature.
+    impact: "Nenhum - feature marcada como already_implemented"
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []

@@ -1,0 +1,463 @@
+# =============================================================================
+# PLAN_P019.yaml
+# Implementation Plan for Batch 9 Phase 3 - UX Polish
+# Features: F065, F066, F067 (F068 already implemented - no steps needed)
+# CRs: CR-118, CR-120, CR-123 (CR-124 already implemented)
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Polish de UX em 3 areas: adicionar flex:1 defensivo ao SearchInput e botao
+  "Fechar" nas 4 telas de Settings (F065), auto-scroll para mostrar card
+  expandido nas abas Discursos e Agenda (F066), e campo "Reconhecendo a
+  Presenca" com tamanho proporcional exibindo um ator por linha (F067).
+  F068 (nomes customizados em oracoes) ja esta implementado - nenhuma
+  alteracao necessaria.
+
+strategy:
+  order: "Happy path (F065 SearchInput + F066 auto-scroll + F067 recognizing) -> Edge cases -> Tests -> Documentation"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F065 - flex:1 defensivo no SearchInput.tsx
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/components/SearchInput.tsx, adicionar flex: 1 ao styles.container.
+      Em contexto column (default), flex:1 nao altera largura (container ja
+      preenche largura do pai). Em contexto row (modais e Settings), flex:1
+      faz SearchInput preencher espaco disponivel. Nao afeta nenhum uso
+      existente (ADR-046). Os modais que ja passam flex:1 via style prop
+      terao redundancia sem efeito negativo.
+    files:
+      - "src/components/SearchInput.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-03", "STEP-05", "STEP-06"]
+    done_when:
+      - "styles.container em SearchInput.tsx inclui flex: 1"
+      - "SearchInput continua funcionando em todos os modais (MemberSelectorModal, ActorSelector, HymnSelector, PrayerSelector, TopicSelectorModal)"
+      - "SearchInput continua funcionando na AgendaForm (inline search)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que SearchInput container tem flex:1"
+    covers:
+      acceptance_criteria: ["AC-F065-01", "AC-F065-11", "AC-F065-12"]
+      edge_cases: ["EC-F065-02"]
+    risks:
+      - risk: "flex:1 pode alterar layout em algum consumer inesperado"
+        mitigation: "Em column layout, flex:1 nao altera largura. Modais ja passam flex:1 via style (redundante). Baixo risco."
+
+  # =========================================================================
+  # STEP-02: F065 - Botao close + row layout nas 4 telas de Settings
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Nas 4 telas de Settings (members.tsx, topics.tsx, history.tsx, timezone.tsx):
+      (1) Alterar styles.searchContainer para incluir flexDirection:'row',
+          alignItems:'center', gap:12.
+      (2) Adicionar Pressable close apos SearchInput com t('common.close')
+          que chama o setter de busca com '' para limpar o campo.
+      (3) Adicionar novos estilos: closeButtonText (fontSize:16, fontWeight:'500').
+      (4) history.tsx usa updateSearch como setter; close deve chamar updateSearch('').
+          As outras 3 telas usam setSearch.
+      (5) SearchInput recebe flex:1 via styles.container interno (STEP-01),
+          nao precisa de style prop adicional.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+      - "src/app/(tabs)/settings/topics.tsx"
+      - "src/app/(tabs)/settings/history.tsx"
+      - "src/app/(tabs)/settings/timezone.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "members.tsx searchContainer tem flexDirection:'row', alignItems:'center', gap:12"
+      - "members.tsx tem Pressable close com t('common.close') que chama setSearch('')"
+      - "topics.tsx tem mesmo padrao (searchContainer row + close button)"
+      - "history.tsx tem mesmo padrao, close chama updateSearch('')"
+      - "timezone.tsx tem mesmo padrao (searchContainer row + close button)"
+      - "SearchInput preenche espaco disponivel ate o botao close em todas as 4 telas"
+      - "Botao close tem fontSize:16 e fontWeight:'500'"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que Pressable close e renderizado em members.tsx"
+      - type: unit
+        description: "Verificar que pressionar close limpa campo de busca em members.tsx"
+      - type: unit
+        description: "Verificar que Pressable close e renderizado em topics.tsx"
+      - type: unit
+        description: "Verificar que Pressable close e renderizado em history.tsx"
+      - type: unit
+        description: "Verificar que Pressable close e renderizado em timezone.tsx"
+    covers:
+      acceptance_criteria: ["AC-F065-02", "AC-F065-03", "AC-F065-04", "AC-F065-05", "AC-F065-06", "AC-F065-07", "AC-F065-08", "AC-F065-09", "AC-F065-10"]
+      edge_cases: ["EC-F065-01"]
+    risks:
+      - risk: "Alguma tela pode ter layout diferente no searchContainer que conflita com row"
+        mitigation: "Todas as 4 telas seguem mesmo padrao (paddingHorizontal:16, paddingBottom:8). Verificar cada uma."
+
+  # =========================================================================
+  # STEP-03: F066 - Auto-scroll apos expandir card em speeches.tsx
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/app/(tabs)/speeches.tsx, no handleToggle callback:
+      (1) Quando expandindo (date !== expandedDate), apos setExpandedDate(date):
+          - Calcular index: const index = listItems.findIndex(i => i.type === 'sunday' && i.key === date);
+          - Se index >= 0, chamar setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+            }, 300);
+      (2) Quando colapsando (date === expandedDate), NAO scrollar.
+      (3) Adicionar listItems ao array de dependencias do useCallback de handleToggle.
+      (4) Manter getItemLayout existente para initialScrollIndex.
+      (5) onScrollToIndexFailed ja existe como fallback.
+      ADR-047: setTimeout(300ms) escolhido por simplicidade. Fallback existente cobre
+      dispositivos lentos.
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-05", "STEP-06"]
+    done_when:
+      - "handleToggle chama scrollToIndex com viewPosition:0 apos expandir"
+      - "Delay de 300ms antes do scrollToIndex"
+      - "NAO scrolla ao colapsar (date === expandedDate)"
+      - "listItems adicionado as dependencias do useCallback"
+      - "getItemLayout mantido para initialScrollIndex"
+      - "onScrollToIndexFailed continua como fallback"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que scrollToIndex e chamado com viewPosition:0 ao expandir"
+      - type: unit
+        description: "Verificar que scrollToIndex NAO e chamado ao colapsar"
+    covers:
+      acceptance_criteria: ["AC-F066-01", "AC-F066-03", "AC-F066-04", "AC-F066-05", "AC-F066-06", "AC-F066-07"]
+      edge_cases: ["EC-F066-01", "EC-F066-02", "EC-F066-03"]
+    risks:
+      - risk: "getItemLayout com tamanho fixo pode causar offset incorreto"
+        mitigation: "Ao expandir, card anterior colapsa (todos acima ficam ~70px). Offset e suficientemente preciso. Fallback existente."
+
+  # =========================================================================
+  # STEP-04: F066 - Auto-scroll apos expandir card em agenda.tsx
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em src/app/(tabs)/agenda.tsx, no handleToggle callback:
+      (1) Quando expandindo (date !== expandedDate), apos setExpandedDate(date):
+          - Calcular index: const index = listItems.findIndex(i => i.type === 'sunday' && (i as { type: 'sunday'; data: AgendaSunday }).data.date === date);
+          - Se index >= 0, chamar setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+            }, 300);
+      (2) Quando colapsando, NAO scrollar.
+      (3) Adicionar listItems ao array de dependencias do useCallback de handleToggle.
+      (4) Manter getItemLayout e onScrollToIndexFailed.
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "handleToggle em agenda.tsx chama scrollToIndex com viewPosition:0 apos expandir"
+      - "Delay de 300ms antes do scrollToIndex"
+      - "NAO scrolla ao colapsar"
+      - "listItems adicionado as dependencias do useCallback"
+      - "getItemLayout mantido"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que scrollToIndex e chamado com viewPosition:0 ao expandir em agenda.tsx"
+      - type: unit
+        description: "Verificar que scrollToIndex NAO e chamado ao colapsar em agenda.tsx"
+    covers:
+      acceptance_criteria: ["AC-F066-02"]
+      edge_cases: []
+    risks:
+      - risk: "Cast de tipo (i as ...) pode causar erro em runtime se listItems mudar"
+        mitigation: "Check i.type === 'sunday' antes do cast garante seguranca de tipo"
+
+  # =========================================================================
+  # STEP-05: F067 - Campo Reconhecendo com Pressable customizado (1 nome/linha)
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/components/AgendaForm.tsx, no bloco "Reconhecendo a Presenca"
+      (linhas 191-203):
+      (1) Substituir SelectorField por Pressable customizado inline:
+          - Com nomes: map de recognized_names renderizando cada nome como
+            <Text key={idx} numberOfLines={1}> individual.
+          - Sem nomes: placeholder t('agenda.recognizing') em cor terciaria.
+      (2) Pressable reutiliza styles.selectorField existente (borderWidth,
+          borderRadius, paddingHorizontal, paddingVertical) com borderColor
+          dinâmico. SEM altura fixa, SEM numberOfLines no container.
+      (3) Manter onPress para abrir ActorSelector (isObserver check).
+      (4) Adicionar novo estilo recognizingName: { fontSize: 15, paddingVertical: 2 }.
+      (5) Verificar que outros SelectorFields (presiding, conducting, hymns,
+          prayers) nao sao afetados (ADR-048).
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-06"]
+    done_when:
+      - "SelectorField substituido por Pressable customizado no bloco Reconhecendo"
+      - "Cada recognized_name renderizado como <Text> individual (1 por linha)"
+      - "Placeholder exibido quando recognized_names vazio ou null"
+      - "Pressable onPress abre ActorSelector"
+      - "isObserver desabilita o campo (disabled=true, onPress=undefined)"
+      - "Estilo recognizingName com fontSize:15, paddingVertical:2"
+      - "Outros SelectorFields inalterados (presiding, conducting, hymns, prayers)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que nomes aparecem um por linha quando ha recognized_names"
+      - type: unit
+        description: "Verificar placeholder quando recognized_names vazio"
+      - type: unit
+        description: "Verificar que Pressable abre ActorSelector"
+      - type: unit
+        description: "Verificar que observer nao pode clicar no campo"
+    covers:
+      acceptance_criteria: ["AC-F067-01", "AC-F067-02", "AC-F067-03", "AC-F067-04", "AC-F067-05", "AC-F067-06", "AC-F067-07"]
+      edge_cases: ["EC-F067-01", "EC-F067-02", "EC-F067-03"]
+    risks:
+      - risk: "Pressable customizado pode nao ter mesmos estilos visuais que SelectorField"
+        mitigation: "Reutilizar styles.selectorField existente. Apenas adicionar recognizingName para cada Text."
+
+  # =========================================================================
+  # STEP-06: F065 - Verificar i18n key common.close existe nos 3 locales
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Verificar que a chave i18n 'common.close' ja existe nos 3 locales
+      (pt-BR.json, en.json, es.json). Os modais ja usam t('common.close'),
+      entao a chave deve existir. Se nao existir, adicionar:
+      - pt-BR: "Fechar"
+      - en: "Close"
+      - es: "Cerrar"
+      NOTA: Altamente provavel que ja exista. Este step e apenas verificacao.
+      Se ja existir, este step se resume a confirmar e seguir em frente.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-05"]
+    done_when:
+      - "common.close existe em pt-BR.json com valor 'Fechar' (ou similar)"
+      - "common.close existe em en.json com valor 'Close' (ou similar)"
+      - "common.close existe em es.json com valor 'Cerrar' (ou similar)"
+    tests:
+      - type: unit
+        description: "Verificar que common.close existe nos 3 idiomas"
+    covers:
+      acceptance_criteria: ["AC-F065-03", "AC-F065-06", "AC-F065-08", "AC-F065-10"]
+      edge_cases: []
+    risks:
+      - risk: "Chave pode nao existir"
+        mitigation: "Criar se necessario. Risco muito baixo - modais ja usam essa chave."
+
+  # =========================================================================
+  # STEP-07: Testes consolidados Batch 9 Phase 3 (F065, F066, F067)
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Criar arquivo de testes src/__tests__/batch9-phase3.test.ts com testes
+      para todas as 3 features deste batch:
+      (1) F065: Verificar que SearchInput container tem flex:1. Verificar
+          que Pressable close e renderizado nas 4 telas de Settings.
+          Verificar que pressionar close limpa campo de busca. Verificar
+          que campo de busca vazio + close e no-op. Verificar que modais
+          nao sao afetados (regressao check).
+      (2) F066: Verificar que scrollToIndex e chamado com viewPosition:0
+          ao expandir card em speeches.tsx e agenda.tsx. Verificar que
+          scrollToIndex NAO e chamado ao colapsar. Verificar que animated
+          e true. Verificar que delay e 300ms.
+      (3) F067: Verificar que cada recognized_name e renderizado como
+          <Text> individual. Verificar placeholder quando vazio.
+          Verificar que Pressable abre ActorSelector. Verificar que
+          observer nao pode clicar. Verificar que campo cresce com
+          numero de nomes.
+      (4) F068: Nenhum teste necessario (feature ja implementada).
+    files:
+      - "src/__tests__/batch9-phase3.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch9-phase3.test.ts criado"
+      - "Testes cobrem F065 (flex:1 + close button nas 4 telas)"
+      - "Testes cobrem F066 (auto-scroll speeches + agenda)"
+      - "Testes cobrem F067 (recognizing field proporcional)"
+      - "pnpm test roda sem falha em TODOS os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch9 phase3 (F065-F067)"
+    covers:
+      acceptance_criteria: ["AC-F065-01", "AC-F065-02", "AC-F065-03", "AC-F065-04", "AC-F065-05", "AC-F065-06", "AC-F065-07", "AC-F065-08", "AC-F065-09", "AC-F065-10", "AC-F065-11", "AC-F065-12", "AC-F066-01", "AC-F066-02", "AC-F066-03", "AC-F066-04", "AC-F066-05", "AC-F066-06", "AC-F066-07", "AC-F067-01", "AC-F067-02", "AC-F067-03", "AC-F067-04", "AC-F067-05", "AC-F067-06", "AC-F067-07"]
+      edge_cases: ["EC-F065-01", "EC-F065-02", "EC-F066-01", "EC-F066-02", "EC-F066-03", "EC-F067-01", "EC-F067-02", "EC-F067-03"]
+    risks:
+      - risk: "Mocking de FlatList.scrollToIndex para testes de F066"
+        mitigation: "jest.spyOn no flatListRef.current ou mock de FlatList"
+
+  # =========================================================================
+  # STEP-08: Atualizar testes existentes impactados
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Atualizar testes existentes que possam ser impactados pelas mudancas:
+      (1) Verificar src/__tests__/batch9-phase2.test.ts - testes de AgendaForm
+          podem precisar de ajuste por causa da substituicao do SelectorField
+          no bloco Reconhecendo (F067).
+      (2) Verificar outros testes que renderizam SearchInput, speeches.tsx,
+          agenda.tsx, ou AgendaForm.
+      (3) Ajustar snapshots ou assertions conforme necessario.
+    files:
+      - "src/__tests__/batch9-phase2.test.ts"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "Testes existentes atualizados para refletir mudancas de F065-F067"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Nenhum teste com falsa cobertura (assercoes corretas)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes podem nao estar mocking componentes corretamente apos mudancas"
+        mitigation: "Revisar cada teste e atualizar mocks quando necessario"
+
+  # =========================================================================
+  # STEP-09: Documentacao do projeto (CODE_LEDGER, project-status, PLAN_CONSOLIDATED)
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 9 Phase 3
+          (F065-F067) com arquivos impactados.
+      (2) .devteam/project-status.yaml - marcar phase 3 como completed,
+          atualizar current_agent para "completed".
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - PLAN_P019 ja adicionado,
+          marcar status como completed.
+      (4) docs/tests/TEST_CONSOLIDATED.yaml - adicionar testes de F065-F067.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch9 phase3"
+      - "project-status.yaml phase 3 marcada como completed"
+      - "PLAN_CONSOLIDATED PLAN_P019 status marcado como completed"
+      - "TEST_CONSOLIDATED atualizado com testes de F065-F067"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F065 ACs ---
+  - ac_id: AC-F065-01
+    how_to_verify: "SearchInput.tsx styles.container inclui flex:1"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-F065-02
+    how_to_verify: "SearchInput preenche espaco horizontal ate botao close em members.tsx"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F065-03
+    how_to_verify: "Botao 'Fechar' (t('common.close')) aparece a direita do SearchInput em members.tsx"
+    covered_by_steps: ["STEP-02", "STEP-06", "STEP-07"]
+  - ac_id: AC-F065-04
+    how_to_verify: "Pressionar 'Fechar' em members.tsx limpa campo de busca (search = '')"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F065-05
+    how_to_verify: "SearchInput preenche espaco em topics.tsx"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F065-06
+    how_to_verify: "Botao 'Fechar' aparece em topics.tsx"
+    covered_by_steps: ["STEP-02", "STEP-06", "STEP-07"]
+  - ac_id: AC-F065-07
+    how_to_verify: "SearchInput preenche espaco em history.tsx"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F065-08
+    how_to_verify: "Botao 'Fechar' aparece em history.tsx"
+    covered_by_steps: ["STEP-02", "STEP-06", "STEP-07"]
+  - ac_id: AC-F065-09
+    how_to_verify: "SearchInput preenche espaco em timezone.tsx"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F065-10
+    how_to_verify: "Botao 'Fechar' aparece em timezone.tsx"
+    covered_by_steps: ["STEP-02", "STEP-06", "STEP-07"]
+  - ac_id: AC-F065-11
+    how_to_verify: "Modais de selecao nao afetados (layout permanece identico)"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-F065-12
+    how_to_verify: "SearchInput na AgendaForm nao afetado"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  # --- F066 ACs ---
+  - ac_id: AC-F066-01
+    how_to_verify: "Auto-scroll com viewPosition:0 apos expandir card em speeches.tsx"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F066-02
+    how_to_verify: "Auto-scroll com viewPosition:0 apos expandir card em agenda.tsx"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+  - ac_id: AC-F066-03
+    how_to_verify: "Card maior que tela tem topo alinhado (viewPosition:0)"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F066-04
+    how_to_verify: "Colapsar card NAO faz scroll"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F066-05
+    how_to_verify: "Scroll animado (animated: true)"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F066-06
+    how_to_verify: "Trocar de card expandido faz auto-scroll para novo card"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F066-07
+    how_to_verify: "initialScrollIndex continua funcionando (getItemLayout preservado)"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  # --- F067 ACs ---
+  - ac_id: AC-F067-01
+    how_to_verify: "Cada recognized_name renderizado como <Text> individual (1 por linha)"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-02
+    how_to_verify: "Altura do campo cresce proporcionalmente ao numero de nomes"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-03
+    how_to_verify: "Placeholder t('agenda.recognizing') exibido quando sem nomes"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-04
+    how_to_verify: "Pressionar campo abre ActorSelector para selecao multipla"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-05
+    how_to_verify: "Observer nao pode clicar no campo (disabled, sem seta)"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-06
+    how_to_verify: "Estilo visual consistente (borda, borderRadius, padding identicos ao SelectorField)"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F067-07
+    how_to_verify: "Outros SelectorFields (presiding, conducting, hymns, prayers) inalterados"
+    covered_by_steps: ["STEP-05", "STEP-07"]

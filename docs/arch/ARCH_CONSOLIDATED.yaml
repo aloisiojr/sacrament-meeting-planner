@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-19"
-  last_updated_by: "batch-9-phase-2"
+  last_updated_by: "batch-9-phase-3"
   total_modules: 8
-  total_adrs: 36
-  total_crs_implemented: 82
+  total_adrs: 39
+  total_crs_implemented: 85
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -25,6 +25,7 @@ metadata:
     - docs/arch/ARCH_M016.yaml
     - docs/arch/ARCH_M017.yaml
     - docs/arch/ARCH_M018.yaml
+    - docs/arch/ARCH_M019.yaml
 
 # =============================================================================
 # TECH STACK
@@ -200,7 +201,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -220,6 +221,7 @@ modules:
       CR-90 Fix botao Delete no SwipeableCard (pointerEvents='box-none').
       CR-96/F041: SearchInput fixo no topo em members.tsx e topics.tsx (fora do ScrollView).
       CR-117/F057: USA reordenado antes de Canada em countryCodes.ts. members.tsx usa label para highlight no dropdown.
+      CR-118/F065: SearchInput flex:1 defensivo. Settings screens (members, topics, history, timezone) com close button.
 
   - id: M003
     name: SpeechModule
@@ -241,7 +243,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -258,6 +260,7 @@ modules:
       CR-114/F060: Botao X para remover atribuicao de tema. onClearTopic prop no SpeechSlot.
       CR-116/F062: StatusChangeModal recebe allowedStatuses prop. LED click em assigned_invited filtra para confirmed/gave_up.
       CR-119/F063: Layout reordenado [LED][Speaker][X]. topicField marginLeft 28px para alinhamento.
+      CR-120/F066: Auto-scroll para card expandido em speeches.tsx com scrollToIndex(viewPosition:0, delay 300ms).
 
   - id: M004
     name: AgendaModule
@@ -280,7 +283,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -296,6 +299,8 @@ modules:
       CR-122/F058: Label do SpeakerField posicao 3 usa t('speeches.lastSpeech'). Presentation mode idem.
       CR-125/F059: PrayerSelector recebe modalOnly={true} no AgendaForm para nao duplicar botao inline.
       CR-121/F064: SpeakerField mostra label "(Designacao de ultima hora)" quando hasOverride=true e !isEditing.
+      CR-120/F066: Auto-scroll para card expandido em agenda.tsx com scrollToIndex(viewPosition:0, delay 300ms).
+      CR-123/F067: Campo Reconhecendo com Pressable customizado mostrando nomes um por linha, altura proporcional.
 
   - id: M005
     name: NotificationModule
@@ -403,7 +408,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -823,6 +828,33 @@ adrs:
       - "Consistencia com padroes existentes do app"
       - "Estilo nativo varia entre iOS e Android (aceito)"
 
+  - id: ADR-046
+    title: "flex:1 defensivo no container do SearchInput ao inves de por-consumer"
+    context: "F065 precisa que SearchInput preencha espaco em layout row nas Settings. Opcoes: (a) cada consumer passa style={{flex:1}}, (b) adicionar flex:1 ao container interno."
+    decision: "Adicionar flex:1 ao styles.container do SearchInput.tsx. Em layout column, flex:1 nao altera largura. Em layout row, preenche espaco disponivel."
+    decided_in: "CR-118"
+    consequences:
+      - "Mudanca unica no componente, zero mudanca nos 6+ consumers existentes"
+      - "Novos consumers em layout row nao precisam lembrar de passar flex:1"
+
+  - id: ADR-047
+    title: "setTimeout(300ms) para auto-scroll apos expand ao inves de onLayout"
+    context: "F066 precisa scrollar para o card expandido apos toggle. Card muda de tamanho ao expandir. Opcoes: (a) setTimeout fixo, (b) onLayout callback, (c) requestAnimationFrame."
+    decision: "setTimeout(300ms) apos setExpandedDate. onScrollToIndexFailed existente como fallback."
+    decided_in: "CR-120"
+    consequences:
+      - "Simples, sem state adicional"
+      - "Fallback existente cobre dispositivos lentos"
+
+  - id: ADR-048
+    title: "Pressable inline customizado para Reconhecendo ao inves de prop no SelectorField"
+    context: "F067 precisa exibir nomes um por linha. SelectorField usa numberOfLines={1}. Opcoes: (a) prop multiLine no SelectorField, (b) Pressable customizado inline."
+    decision: "Pressable customizado APENAS no bloco Reconhecendo. SelectorField generico inalterado."
+    decided_in: "CR-123"
+    consequences:
+      - "Zero risco de regressao em outros campos (presiding, conducting, hymns, prayers)"
+      - "Controle total sobre layout vertical dos nomes"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1161,19 +1193,19 @@ file_structure:
     "(tabs)/":
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings)"
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt)"
-      "agenda.tsx": "Agenda tab (lista de domingos expandiveis)"
-      "speeches.tsx": "Speeches tab (scroll infinito)"
+      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066)"
+      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066)"
       "settings/":
         "_layout.tsx": "Settings stack navigator"
         "index.tsx": "Settings menu (links para sub-telas)"
-        "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86) + SearchInput fixo no topo (CR-96)"
-        "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96)"
+        "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
+        "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
-        "history.tsx": "Log de atividades com busca e paginacao"
+        "history.tsx": "Log de atividades com busca e paginacao + close button (CR-118/F065)"
         "whatsapp.tsx": "Editor de template WhatsApp com preview"
         "theme.tsx": "Toggle de tema (automatic/light/dark)"
         "about.tsx": "Info do app, creditos, disclaimer"
-        "timezone.tsx": "Seletor de timezone da ala"
+        "timezone.tsx": "Seletor de timezone da ala + close button (CR-118/F065)"
     "presentation.tsx": "Modo Apresentacao (modal, read-only)"
 
   "src/providers/":
@@ -1200,7 +1232,7 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
@@ -1213,7 +1245,7 @@ file_structure:
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez)"
     "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix)"
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
-    "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84)"
+    "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84). flex:1 defensivo no container (CR-118/F065)."
     "OfflineBanner.tsx": "Banner vermelho de offline"
     "ErrorBoundary.tsx": "Error boundary do React"
     "QueryErrorView.tsx": "View de erro para queries"
@@ -1475,6 +1507,14 @@ change_requests_history:
     doc: "ARCH_M018.yaml"
     status: "pending implementation"
     adrs: [ADR-044, ADR-045]
+    new_files: []
+
+  batch_9_phase_3:
+    crs: "CR-118, CR-120, CR-123"
+    scope: "UX Polish: SearchInput flex:1 + close button in Settings (F065), auto-scroll on card expand (F066), recognizing field proportional height (F067)"
+    doc: "ARCH_M019.yaml"
+    status: "pending implementation"
+    adrs: [ADR-046, ADR-047, ADR-048]
     new_files: []
 
 # =============================================================================

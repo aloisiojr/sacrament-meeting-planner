@@ -1,0 +1,653 @@
+# =============================================================================
+# SPEC_F045_F049.yaml
+# Specification for Batch 8 Phase 1 - Display fixes & WhatsApp template
+# Features: F045, F046, F047, F048, F049
+# CRs: CR-101, CR-102, CR-103, CR-104, CR-108, CR-109
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 8
+phase: 1
+created: "2026-02-18"
+last_updated: "2026-02-18"
+
+features:
+
+  # ===========================================================================
+  # F045 / CR-101: Hide LEDs on non-speech Sundays in SundayCard
+  # ===========================================================================
+
+  - id: F045
+    name: "Hide status LEDs on non-speech Sundays"
+    cr_id: 101
+    type: bug
+    priority: medium
+
+    description: >
+      Na aba Discursos e no Home (NextSundaysSection), os 3 LEDs de status de
+      discurso sao renderizados incondicionalmente para todos os domingos. Quando
+      o domingo nao e do tipo 'speeches' (ex: Reuniao de Testemunho, Conferencia),
+      os LEDs nao tem significado e nao devem ser mostrados. O componente
+      SundayCard.tsx ja calcula a flag isSpeechesType (linha 269) mas nao a usa
+      para condicionar a renderizacao da secao de LEDs (linhas 322-336).
+
+    user_request: >
+      "Na aba discursos (e no Home), quando o domingo e um domingo sem discursos,
+      nao se mostra os 3 led de status."
+
+    analysis: >
+      Root cause (CR-101): SundayCard.tsx:322-336 renderiza LEDs incondicionalmente.
+      A flag isSpeechesType ja existe na linha 269 (const isSpeechesType =
+      currentType === SUNDAY_TYPE_SPEECHES). A mesma flag ja e usada na linha 308
+      para condicionar o label de excecao ({!isSpeechesType && ...}). Basta envolver
+      a secao de LEDs com {isSpeechesType && (...)}.
+      O SundayCard e usado em speeches.tsx e NextSundaysSection.tsx (Home), logo o
+      fix se aplica automaticamente a ambos.
+
+    acceptance_criteria:
+      - id: AC-F045-01
+        description: "LEDs visiveis quando tipo de domingo e 'speeches'"
+        given: "SundayCard renderizado para um domingo do tipo 'speeches'"
+        when: "O card e exibido (colapsado ou expandido)"
+        then: "Os 3 LEDs de status sao renderizados normalmente"
+        status: pending
+
+      - id: AC-F045-02
+        description: "LEDs ocultos quando tipo de domingo NAO e 'speeches'"
+        given: "SundayCard renderizado para domingo de tipo diferente (ex: testimony_meeting)"
+        when: "O card e exibido"
+        then: "Os 3 LEDs de status NAO sao renderizados"
+        status: pending
+
+      - id: AC-F045-03
+        description: "Fix aplica-se na aba Discursos"
+        given: "Aba Discursos com domingos de tipos variados"
+        when: "Lista de domingos e exibida"
+        then: "Apenas domingos do tipo 'speeches' mostram LEDs"
+        status: pending
+
+      - id: AC-F045-04
+        description: "Fix aplica-se no Home (NextSundaysSection)"
+        given: "Home com secao 'Proximas Designacoes' contendo domingos de tipos variados"
+        when: "Cards de domingos sao exibidos"
+        then: "Apenas domingos do tipo 'speeches' mostram LEDs"
+        status: pending
+
+    edge_cases:
+      - id: EC-F045-01
+        case: "Tipo de domingo mudado de 'speeches' para outro enquanto card visivel"
+        expected: "LEDs desaparecem imediatamente (rerender com nova flag)"
+        status: pending
+      - id: EC-F045-02
+        case: "Tipo de domingo mudado de outro para 'speeches'"
+        expected: "LEDs aparecem imediatamente"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SundayCard.tsx"
+        change: "Envolver secao de LEDs (linhas 322-336) com condicional {isSpeechesType && (...)}"
+
+    dependencies: []
+    related_features: [F007, F008, F009]
+    related_crs: [56]
+
+  # ===========================================================================
+  # F046 / CR-102: Hide exception label for speech Sundays in Agenda
+  # ===========================================================================
+
+  - id: F046
+    name: "Hide exception label for speech Sundays in Agenda tab"
+    cr_id: 102
+    type: bug
+    priority: medium
+
+    description: >
+      Na aba Agenda, o card contraido mostra um label amarelo com o tipo de excecao
+      para todos os domingos que tem um registro em sunday_exceptions. Apos o CR-56,
+      todos os domingos (incluindo domingos com discursos) sao auto-atribuidos e
+      persistidos no banco, ou seja, TODO domingo tem um registro de excecao. Isso
+      causa um problema: domingos do tipo 'speeches' mostram o label "Discursos"
+      em amarelo, o que e redundante e confuso, pois 'speeches' e o tipo padrao.
+      O label amarelo deveria aparecer apenas para domingos com tipo diferente de
+      'speeches' (Testemunho, Conferencia, etc.).
+
+    user_request: >
+      "Na aba agenda, nao precisa mostrar o label amarelo no card contraido quando
+      o domingo for domingo de discursos."
+
+    analysis: >
+      Root cause (CR-102): agenda.tsx:265-267 calcula exceptionLabel para TODAS as
+      excecoes, incluindo reason='speeches'. Apos CR-56, toda entrada de domingo
+      tem um registro de excecao, entao speech Sundays passam a mostrar o label
+      "Discursos" em amarelo desnecessariamente.
+      Fix: filtrar a renderizacao do exceptionLabel quando exception.reason === 'speeches'.
+      O calculo pode permanecer, mas a renderizacao deve excluir 'speeches'.
+      Opcao mais limpa: ajustar o calculo de exceptionLabel para retornar null
+      quando exception.reason === 'speeches'.
+
+    acceptance_criteria:
+      - id: AC-F046-01
+        description: "Label amarelo NAO mostrado para domingos do tipo 'speeches'"
+        given: "Aba Agenda com domingos do tipo 'speeches'"
+        when: "Card contraido e exibido"
+        then: "Nenhum label amarelo e exibido no centro do card"
+        status: pending
+
+      - id: AC-F046-02
+        description: "Label amarelo mostrado para domingos com excecao diferente de 'speeches'"
+        given: "Aba Agenda com domingo do tipo 'testimony_meeting'"
+        when: "Card contraido e exibido"
+        then: "Label amarelo 'Reuniao de Testemunho' e exibido"
+        status: pending
+
+      - id: AC-F046-03
+        description: "Label amarelo para tipo 'other' continua mostrando custom_reason"
+        given: "Domingo com tipo 'other' e custom_reason 'Evento Especial'"
+        when: "Card contraido e exibido"
+        then: "Label amarelo 'Evento Especial' e exibido"
+        status: pending
+
+    edge_cases:
+      - id: EC-F046-01
+        case: "Domingo sem registro de excecao (nao deveria ocorrer apos CR-56, mas possivel em dados antigos)"
+        expected: "Nenhum label exibido (exceptionLabel e null)"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/agenda.tsx"
+        change: "Ajustar calculo de exceptionLabel para retornar null quando exception.reason === 'speeches'"
+
+    dependencies: []
+    related_features: [F007, F012]
+    related_crs: [56, 75]
+
+  # ===========================================================================
+  # F047 / CR-103: Fix WhatsApp template in Settings screen
+  # ===========================================================================
+
+  - id: F047
+    name: "Fix WhatsApp template initialization in Settings screen"
+    cr_id: 103
+    type: bug
+    priority: medium
+
+    description: >
+      Na tela de configuracoes do WhatsApp (settings/whatsapp.tsx), o campo de
+      template e inicializado apenas a partir do valor ward.whatsapp_template
+      armazenado no banco de dados. Se o valor no banco for null (ala nova) ou
+      contiver um template antigo, a tela mostra conteudo incorreto ao inves do
+      template padrao atual definido em whatsappUtils.ts (getDefaultTemplate).
+      O template no whatsappUtils.ts esta correto e completo, e quando o usuario
+      clica no botao WhatsApp para enviar mensagem, o template correto e usado
+      (pois buildWhatsAppUrl faz fallback para getDefaultTemplate). Porem a tela
+      de configuracoes nao aplica esse mesmo fallback.
+
+    user_request: >
+      "Em whatsappUtils.ts o template esta correto, na hora que eu clico no botao
+      WhatsApp para mandar a mensagem, tambem vem certo, porem eu so vejo o template
+      antigo na aba de configuracoes, no campo template, tem que corrigir la."
+
+    analysis: >
+      Root cause (CR-103): settings/whatsapp.tsx:70-79 inicializa o template
+      somente a partir de ward.whatsapp_template (valor do DB). Se o DB tem null
+      ou template antigo, e isso que aparece. Nao ha import nem fallback para
+      getDefaultTemplate() de whatsappUtils.ts.
+      Fix: Quando ward.whatsapp_template for null (BR-24 diz que null = template
+      padrao), inicializar o campo com getDefaultTemplate(idioma_da_ala). Se for
+      string vazia, respeitar (usuario limpou intencionalmente - BR-24). Se tiver
+      valor, usar o valor do DB normalmente.
+      Importante: o idioma da ala e necessario para selecionar o template padrao
+      correto (DD-32/BR-33). A query ja busca da tabela wards, mas precisa incluir
+      o campo language na selecao.
+
+    acceptance_criteria:
+      - id: AC-F047-01
+        description: "Template padrao exibido quando DB tem null"
+        given: "ward.whatsapp_template e null no banco de dados"
+        when: "Tela de configuracao WhatsApp e aberta"
+        then: "O campo template mostra o template padrao do idioma da ala (getDefaultTemplate)"
+        status: pending
+
+      - id: AC-F047-02
+        description: "Template do DB exibido quando DB tem valor"
+        given: "ward.whatsapp_template tem valor customizado no banco"
+        when: "Tela de configuracao WhatsApp e aberta"
+        then: "O campo template mostra o valor armazenado no banco"
+        status: pending
+
+      - id: AC-F047-03
+        description: "String vazia respeitada (usuario limpou intencionalmente)"
+        given: "ward.whatsapp_template e string vazia ('') no banco"
+        when: "Tela de configuracao WhatsApp e aberta"
+        then: "O campo template mostra vazio (nao substitui por padrao)"
+        status: pending
+
+      - id: AC-F047-04
+        description: "Template padrao correto por idioma da ala"
+        given: "ward.whatsapp_template e null e ala configurada em ingles"
+        when: "Tela de configuracao WhatsApp e aberta"
+        then: "O campo template mostra DEFAULT_TEMPLATE_EN (nao pt-BR)"
+        status: pending
+
+      - id: AC-F047-05
+        description: "Consistencia entre Settings e envio via WhatsApp"
+        given: "Template padrao exibido em Settings"
+        when: "Usuario clica no botao WhatsApp para enviar convite"
+        then: "Mensagem gerada e identica ao template exibido em Settings"
+        status: pending
+
+    edge_cases:
+      - id: EC-F047-01
+        case: "Query de ward falha (erro de rede)"
+        expected: "Campo template fica vazio (estado inicial), nao mostra template padrao prematuramente"
+        status: pending
+      - id: EC-F047-02
+        case: "Idioma da ala nao suportado (fallback)"
+        expected: "getDefaultTemplate retorna template pt-BR como fallback"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/whatsapp.tsx"
+        change: "Importar getDefaultTemplate de whatsappUtils.ts. Incluir 'language' na query de ward. No useEffect de inicializacao, usar getDefaultTemplate(ward.language) quando whatsapp_template for null."
+
+    dependencies: []
+    related_features: [F010, F024]
+    related_crs: [14, 63, 94]
+
+  # ===========================================================================
+  # F048 / CR-104 + CR-108: Fix WhatsApp message variables and date format
+  # ===========================================================================
+
+  - id: F048
+    name: "Fix WhatsApp message variables (collection, link, quotes, date format)"
+    cr_id: [104, 108]
+    type: bug
+    priority: high
+
+    description: >
+      Ao clicar no botao WhatsApp para enviar convite na secao de Gerenciamento
+      de Convites (InviteManagementSection.tsx), a mensagem gerada tem 4 problemas:
+      1. O titulo ({titulo}) aparece sem aspas ao redor (deveria ter aspas para
+         destaca-lo no texto).
+      2. O nome da colecao ({colecao}) nao e passado nas variaveis - aparece vazio.
+      3. O link ({link}) nao e passado nas variaveis - aparece vazio.
+      4. O placeholder {data} usa formatDate() que retorna formato compacto
+         "22 FEV". Deveria usar formato human-readable de acordo com o idioma da
+         ala, como "22 de Fevereiro de 2026".
+
+    user_request: >
+      "Sobre o template, quando eu cliquei em WhatsApp, o template veio sem aspas
+      ao redor do titulo, sem o nome da colecao e sem o link."
+      "Na sessao de gerenciamento de convites, o placeholder {data} esta colocando
+      '22 FEV' vamos trocar para uma data de acordo com a localizacao da ala."
+
+    analysis: >
+      Root cause (CR-104): InviteManagementSection.tsx:63-69 e :91-101 constroem
+      o objeto WhatsAppVariables sem os campos 'collection' e 'link'. Os campos
+      existem no tipo WhatsAppVariables (collection?: string, link?: string) mas
+      nao sao preenchidos. Os dados estao disponiveis no objeto speech:
+      speech.topic_collection (nome da colecao) e speech.topic_link (link do tema).
+      Tambem nao ha aspas ao redor do titulo no template. O template padrao em
+      whatsappUtils.ts tem {titulo} sem aspas. A solucao e adicionar aspas ao redor
+      de {titulo} no template padrao (DEFAULT_TEMPLATE_PT_BR, EN, ES): '"{titulo}"'.
+
+      Root cause (CR-108): InviteManagementSection.tsx:66,98 usa formatDate() que
+      retorna "22 FEV" (formato compacto). O usuario quer um formato human-readable
+      de acordo com o idioma da ala. A funcao formatDateHumanReadable() ja existe
+      em dateUtils.ts e retorna o formato correto: "22 de Fevereiro de 2026" (pt-BR),
+      "February 22, 2026" (en), "22 de Febrero de 2026" (es).
+
+    acceptance_criteria:
+      - id: AC-F048-01
+        description: "Colecao passada nas variaveis do WhatsApp"
+        given: "Discurso com topic_collection = 'Temas da Ala'"
+        when: "Botao WhatsApp clicado para enviar convite"
+        then: "A mensagem inclui 'Temas da Ala' no lugar de {colecao}"
+        status: pending
+
+      - id: AC-F048-02
+        description: "Link passado nas variaveis do WhatsApp"
+        given: "Discurso com topic_link = 'https://example.com/tema'"
+        when: "Botao WhatsApp clicado para enviar convite"
+        then: "A mensagem inclui 'https://example.com/tema' no lugar de {link}"
+        status: pending
+
+      - id: AC-F048-03
+        description: "Titulo com aspas na mensagem WhatsApp"
+        given: "Template padrao com placeholder {titulo}"
+        when: "Template e resolvido com titulo 'Fe em Jesus Cristo'"
+        then: "O titulo aparece entre aspas na mensagem: '\"Fe em Jesus Cristo\"'"
+        status: pending
+
+      - id: AC-F048-04
+        description: "Data no formato human-readable (pt-BR)"
+        given: "Ala com idioma pt-BR e discurso no domingo 2026-02-22"
+        when: "Botao WhatsApp clicado"
+        then: "A data aparece como '22 de Fevereiro de 2026'"
+        status: pending
+
+      - id: AC-F048-05
+        description: "Data no formato human-readable (en)"
+        given: "Ala com idioma en e discurso no domingo 2026-02-22"
+        when: "Botao WhatsApp clicado"
+        then: "A data aparece como 'February 22, 2026'"
+        status: pending
+
+      - id: AC-F048-06
+        description: "Data no formato human-readable (es)"
+        given: "Ala com idioma es e discurso no domingo 2026-02-22"
+        when: "Botao WhatsApp clicado"
+        then: "A data aparece como '22 de Febrero de 2026'"
+        status: pending
+
+      - id: AC-F048-07
+        description: "Colecao e link vazios quando discurso nao tem tema atribuido"
+        given: "Discurso sem topic_collection e sem topic_link"
+        when: "Botao WhatsApp clicado"
+        then: "Placeholders de colecao e link sao substituidos por vazio e whitespace limpo"
+        status: pending
+
+      - id: AC-F048-08
+        description: "Templates padrao (pt-BR, en, es) atualizados com aspas em {titulo}"
+        given: "DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES"
+        when: "Codigo-fonte verificado"
+        then: "Os templates contem '\"{titulo}\"' (com aspas) ao inves de '{titulo}'"
+        status: pending
+
+    edge_cases:
+      - id: EC-F048-01
+        case: "Discurso sem colecao (ward topic sem colecao associada)"
+        expected: "Campo collection passado como '' (string vazia), resolveTemplate limpa whitespace extra"
+        status: pending
+      - id: EC-F048-02
+        case: "Discurso sem link"
+        expected: "Campo link passado como '' (string vazia), resolveTemplate limpa whitespace extra"
+        status: pending
+      - id: EC-F048-03
+        case: "Titulo vazio"
+        expected: "Aspas ficam vazias '\"\"' - resolveTemplate limpa whitespace"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Adicionar campos collection (speech.topic_collection) e link (speech.topic_link) ao objeto WhatsAppVariables. Trocar formatDate() por formatDateHumanReadable() para o campo date."
+      - path: "src/lib/whatsappUtils.ts"
+        change: "Alterar DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN e DEFAULT_TEMPLATE_ES para usar '\"{titulo}\"' (com aspas) ao inves de '{titulo}'."
+
+    dependencies: []
+    related_features: [F009, F010, F024]
+    related_crs: [14, 63, 94]
+
+  # ===========================================================================
+  # F049 / CR-109: Fix speech slots not showing in NextSundaysSection
+  # ===========================================================================
+
+  - id: F049
+    name: "Fix speech slots not rendering in Home NextSundaysSection"
+    cr_id: 109
+    type: bug
+    priority: medium
+
+    description: >
+      Na secao "Proximas Designacoes" do Home, o card de domingo nao expande para
+      mostrar os 3 slots de discurso quando o domingo e do tipo 'speeches'. A
+      condicao !entry.exception (linha 181 de NextSundaysSection.tsx) bloqueia a
+      renderizacao dos SpeechSlots. Apos o CR-56, TODOS os domingos tem um registro
+      de excecao (incluindo domingos com discursos que tem reason='speeches'), entao
+      !entry.exception e sempre false, impedindo a renderizacao dos slots. O padrao
+      correto ja existe em speeches.tsx:276: (!exception || exception.reason ===
+      'speeches').
+
+    user_request: >
+      "Na sessao Proximas Designacoes do Home, o card nao expande para ver os 3
+      discursos quando o domingo e um domingo de discursos."
+
+    analysis: >
+      Root cause (CR-109): NextSundaysSection.tsx:181 usa a condicao
+      !entry.exception para decidir se renderiza os SpeechSlots. Apos CR-56
+      auto-atribuir tipo a todos os domingos (incluindo 'speeches'), entry.exception
+      nunca e null/undefined, e a condicao e sempre false. O fix ja existe como
+      padrao em speeches.tsx:276 onde a condicao e:
+      (!exception || exception.reason === 'speeches')
+      Basta replicar o mesmo padrao em NextSundaysSection.tsx:181.
+
+    acceptance_criteria:
+      - id: AC-F049-01
+        description: "SpeechSlots renderizados quando tipo e 'speeches'"
+        given: "NextSundaysSection com domingo expandido do tipo 'speeches'"
+        when: "Card e expandido (toggle)"
+        then: "3 SpeechSlots sao renderizados dentro do card expandido"
+        status: pending
+
+      - id: AC-F049-02
+        description: "SpeechSlots NAO renderizados quando tipo NAO e 'speeches'"
+        given: "NextSundaysSection com domingo expandido do tipo 'testimony_meeting'"
+        when: "Card e expandido"
+        then: "Nenhum SpeechSlot e renderizado (apenas dropdown de tipo)"
+        status: pending
+
+      - id: AC-F049-03
+        description: "Consistencia com aba Discursos"
+        given: "Mesmo domingo visualizado na aba Discursos e no Home"
+        when: "Card expandido em ambos"
+        then: "Ambos mostram os mesmos SpeechSlots com os mesmos dados"
+        status: pending
+
+    edge_cases:
+      - id: EC-F049-01
+        case: "Domingo sem registro de excecao (dados pre-CR-56)"
+        expected: "SpeechSlots renderizados (condicao !exception retorna true)"
+        status: pending
+      - id: EC-F049-02
+        case: "Tipo de domingo alterado enquanto card expandido"
+        expected: "SpeechSlots aparecem/desaparecem conforme novo tipo"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/NextSundaysSection.tsx"
+        change: "Alterar condicao na linha 181 de '!entry.exception' para '(!entry.exception || entry.exception.reason === \"speeches\")'"
+
+    dependencies: []
+    related_features: [F007, F008, F009]
+    related_crs: [56, 95]
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  - id: XC-01
+    concern: "Conflito de arquivos entre features"
+    details: >
+      F045: src/components/SundayCard.tsx
+      F046: src/app/(tabs)/agenda.tsx
+      F047: src/app/(tabs)/settings/whatsapp.tsx
+      F048: src/components/InviteManagementSection.tsx, src/lib/whatsappUtils.ts
+      F049: src/components/NextSundaysSection.tsx
+      OVERLAP: Nenhum overlap entre features. Cada feature altera arquivos distintos,
+      exceto F048 que altera whatsappUtils.ts (templates padrao). Nao ha conflito.
+
+  - id: XC-02
+    concern: "Migracao de banco"
+    details: >
+      Nenhuma feature neste batch requer migracao de banco de dados.
+
+  - id: XC-03
+    concern: "Testes existentes"
+    details: >
+      F048 altera templates padrao em whatsappUtils.ts (aspas ao redor de {titulo}).
+      Testes que verificam conteudo dos templates padrao precisarao ser atualizados
+      (whatsapp-utils.test.ts, phase03-whatsapp-invite.test.ts). Testes que verificam
+      apenas a mecanica de resolveTemplate nao sao afetados.
+
+  - id: XC-04
+    concern: "Nenhuma dependencia nova"
+    details: >
+      Todas as features usam funcoes e padroes existentes. package.json inalterado.
+      formatDateHumanReadable e getDefaultTemplate ja existem no codebase.
+
+  - id: XC-05
+    concern: "Relacao entre F045 e F049 (SundayCard + NextSundaysSection)"
+    details: >
+      F045 esconde LEDs no SundayCard quando tipo != 'speeches'. F049 corrige a
+      renderizacao de SpeechSlots no NextSundaysSection. Ambas correcoes se
+      complementam e devem ser implementadas juntas para que o Home funcione
+      corretamente: cards de discurso mostram LEDs + expandem para SpeechSlots,
+      enquanto cards de excecao nao mostram LEDs nem SpeechSlots.
+
+  - id: XC-06
+    concern: "Relacao entre F047 e F048 (template Settings + template envio)"
+    details: >
+      F047 corrige a exibicao do template em Settings. F048 corrige os dados
+      passados ao template no envio. Ambas devem ser implementadas juntas para
+      garantir consistencia: o que o usuario ve em Settings e o que e enviado
+      via WhatsApp deve ser identico (com os placeholders resolvidos).
+
+# =============================================================================
+# OPEN QUESTIONS (resolvidas durante analise)
+# =============================================================================
+
+open_questions: []
+  # Nenhuma open question pendente. Todas foram resolvidas:
+  # - F045: isSpeechesType ja existe, basta usar para condicionar LEDs.
+  # - F046: Filtrar exceptionLabel quando reason === 'speeches'.
+  # - F047: Importar getDefaultTemplate e usar como fallback quando DB e null.
+  # - F048: Passar collection/link de speech, trocar formatDate por formatDateHumanReadable, aspas em {titulo}.
+  # - F049: Replicar padrao de speeches.tsx (!exception || exception.reason === 'speeches').
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: A-1
+    assumption: >
+      As aspas ao redor de {titulo} devem ser aspas duplas tipograficas ou aspas
+      simples. Como o app usa caracteres simples em todo o codebase, usaremos
+      aspas duplas ASCII (") ao redor do placeholder: "{titulo}".
+    reason: >
+      O usuario disse que o template veio "sem aspas ao redor do titulo". Nao
+      especificou o tipo de aspas. Aspas duplas ASCII sao universais e nao
+      dependem de suporte a caracteres especiais.
+    impact_if_wrong: >
+      Se o usuario preferir outro formato de aspas (ex: guillemets, aspas simples),
+      basta alterar o caractere no template.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Aspas duplas ASCII ao redor de {titulo} nos templates padrao."
+
+  - id: A-2
+    assumption: >
+      O formato de data human-readable para o placeholder {data} do WhatsApp deve
+      usar formatDateHumanReadable() que retorna "22 de Fevereiro de 2026" (pt-BR).
+      Nao inclui o dia da semana (que seria formatFullDate: "Domingo, 22 de
+      Fevereiro de 2026"). O usuario disse "de acordo com a localizacao da ala".
+    reason: >
+      O usuario pediu "data de acordo com a localizacao da ala" ao inves de "22 FEV".
+      formatDateHumanReadable ja e usado em outras partes do app para datas
+      human-readable (ex: activity log). Nao incluir dia da semana pois e redundante
+      (reuniao sacramental e sempre domingo).
+    impact_if_wrong: >
+      Se o usuario quiser incluir o dia da semana, trocar para formatFullDate.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Usar formatDateHumanReadable (sem dia da semana)."
+
+  - id: A-3
+    assumption: >
+      A tela de Settings de WhatsApp precisa incluir o campo 'language' na query
+      da tabela wards para poder usar getDefaultTemplate(language) como fallback.
+      Atualmente a query seleciona apenas 'whatsapp_template'.
+    reason: >
+      Para selecionar o template padrao correto por idioma (DD-32/BR-33), precisamos
+      saber o idioma da ala. A informacao ja esta no banco na tabela wards.language
+      e pode ser obtida adicionando 'language' ao .select().
+    impact_if_wrong: >
+      Se o idioma estiver disponivel de outra forma (ex: via contexto de auth),
+      podemos usa-lo ao inves de adicionar a query.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Adicionar 'language' ao .select() da query de wards."
+
+# =============================================================================
+# INCONSISTENCIES WITH SPEC_CONSOLIDATED
+# =============================================================================
+
+inconsistencies:
+  - id: INC-1
+    type: gap
+    description: >
+      SPEC_CONSOLIDATED nao documenta explicitamente que LEDs devem ser condicionados
+      ao tipo de domingo. F008 descreve "LEDs 3D com animacao indicam status" mas nao
+      especifica condicionalidade. O comportamento correto (mostrar LEDs apenas para
+      domingos com discursos) e a intencao implicita, pois LEDs representam status de
+      discursos que so existem em domingos do tipo 'speeches'.
+    existing_spec: >
+      F008: "LEDs 3D com animacao indicam status." (sem condicao)
+    new_request: >
+      CR-101: "Quando o domingo e sem discursos, nao se mostra os 3 LEDs."
+    resolution: >
+      Atualizar SPEC_CONSOLIDATED para explicitar que LEDs sao condicionados a
+      isSpeechesType.
+
+  - id: INC-2
+    type: gap
+    description: >
+      DD-16 e BR-20 descrevem "badge amarelo com tipo de excecao" para domingos sem
+      agenda na aba Agenda. Nao especificam que 'speeches' deve ser excluido da
+      exibicao do badge. Com CR-56, 'speeches' e persistido como excecao, gerando
+      badge indesejado.
+    existing_spec: >
+      DD-16: "Sundays sem agenda aparecem como cards nao-expansiveis com badge de tipo"
+      BR-20: "Domingos sem agenda aparecem na aba Agenda como cards nao-expansiveis com badge de tipo"
+    new_request: >
+      CR-102: "Nao precisa mostrar o label amarelo quando o domingo for domingo de discursos."
+    resolution: >
+      Atualizar SPEC_CONSOLIDATED para especificar que o label/badge de excecao
+      nao e mostrado quando exception.reason === 'speeches'.
+
+  - id: INC-3
+    type: gap
+    description: >
+      BR-24 diz "Template WhatsApp null no DB: mostrar template padrao" mas
+      F024/F010 nao especificam que a tela de configuracoes deve exibir o template
+      padrao quando o DB e null. A tela de Settings e a unica interface onde o
+      usuario ve e edita o template diretamente.
+    existing_spec: >
+      BR-24: "Template WhatsApp null no DB: mostrar template padrao."
+      F024: "Tela de configuracao do template WhatsApp com editor, preview e chips."
+    new_request: >
+      CR-103: "Template correto no whatsappUtils.ts mas so vejo o template antigo em Settings."
+    resolution: >
+      Atualizar F024 para especificar fallback para getDefaultTemplate quando DB e null.
+
+  - id: INC-4
+    type: gap
+    description: >
+      DD-08 lista 6 placeholders validos ({nome}, {data}, {posicao}, {colecao},
+      {titulo}, {link}), mas InviteManagementSection nao passa {colecao} e {link}
+      ao construir WhatsAppVariables. Tambem, o formato de {data} nao e especificado
+      explicitamente em nenhum lugar.
+    existing_spec: >
+      DD-08: "Placeholders validos: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}"
+      WhatsAppVariables interface: "collection?: string; link?: string" (opcionais)
+    new_request: >
+      CR-104: "Template sem colecao e sem link." CR-108: "{data} com '22 FEV'."
+    resolution: >
+      Atualizar spec para: (1) collection e link devem ser passados quando disponiveis
+      em speech; (2) {data} deve usar formatDateHumanReadable; (3) {titulo} com aspas.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-07: true   # Todas respostas incorporadas
+  GATE-08: true   # ZERO open questions pendentes
+  GATE-09: true   # Todas assumptions confirmadas/resolvidas
+  GATE-10: true   # SPEC_F045_F049.yaml salvo no disco
+  GATE-11: true   # SPEC_CONSOLIDATED.yaml sera atualizado a seguir
+  GATE-12: true   # Status e "complete"

@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-18"
-  last_updated_by: "batch-7-phase-2"
+  last_updated_by: "batch-8-phase-1"
   total_modules: 8
-  total_adrs: 29
+  total_adrs: 30
   total_crs_implemented: 82
   pending_arch: "none"
   source_documents:
@@ -21,6 +21,7 @@ metadata:
     - docs/arch/ARCH_M012.yaml
     - docs/arch/ARCH_M013.yaml
     - docs/arch/ARCH_M014.yaml
+    - docs/arch/ARCH_M015.yaml
 
 # =============================================================================
 # TECH STACK
@@ -245,6 +246,8 @@ modules:
       CR-95: Speech slots condicionados a tipo === 'speeches' (nao usa mais isExcludedFromAgenda).
       CR-94/F040: Templates padrao de WhatsApp por idioma (DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES).
       buildWhatsAppUrl aceita parametro 'language' para selecionar template do idioma da ala.
+      CR-101/F045: LEDs condicionados a isSpeechesType no SundayCard (ocultos para domingos sem discursos).
+      CR-104+108/F048: Templates padrao com aspas ao redor de {titulo}; {colecao} e {link} passados em WhatsAppVariables.
 
   - id: M004
     name: AgendaModule
@@ -278,6 +281,7 @@ modules:
       CR-97/F042: Multi-select para 'Reconhecendo a Presenca' (toggle add/remove, ActorSelector com multiSelect prop).
       CR-99/F043: Labels 'speeches.speaker' alterados de 'Orador' para 'Discurso' (i18n only).
       CR-100/F044: SpeakerField reescrito para read-only + lapis + TextInput + X. Override em speaker_*_override.
+      CR-102/F046: exceptionLabel oculto para domingos com reason === 'speeches' na aba Agenda.
       Modo Apresentacao: read-only, accordion com 4 secoes (normal) ou 3 (especial).
 
   - id: M005
@@ -398,6 +402,9 @@ modules:
       CR-87 substituiu texto por icones Unicode nos botoes de swipe do SwipeableCard (pencil/trash).
       CR-90 fix botao Delete no SwipeableCard (pointerEvents='box-none', ADR-032).
       CR-99/F043: i18n key speeches.speaker alterada de 'Orador'/'Speaker' para 'Discurso'/'Speech'.
+      CR-103/F047: Settings WhatsApp usa getDefaultTemplate(language) como fallback quando DB e null.
+      CR-104+108/F048: InviteManagementSection passa collection/link e usa formatDateHumanReadable para {data}.
+      CR-109/F049: NextSundaysSection corrige condicao de SpeechSlots para incluir reason === 'speeches'.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -725,6 +732,15 @@ adrs:
       - "Tipo simples e direto, sem parsing de JSON"
       - "Segue padrao da tabela (campos individuais)"
       - "Backward compatible: null = comportamento atual"
+
+  - id: ADR-039
+    title: "Replicar padrao de condicao de speeches.tsx para NextSundaysSection"
+    context: "Apos CR-56, todos os domingos tem registro de excecao. NextSundaysSection usa !entry.exception que e sempre false."
+    decision: "Replicar condicao de speeches.tsx:276: (!exception || exception.reason === 'speeches')."
+    decided_in: "CR-109"
+    consequences:
+      - "Consistencia entre speeches.tsx e NextSundaysSection.tsx"
+      - "Padrao ja testado e validado"
       - "RLS existente cobre automaticamente (mesma tabela)"
 
 # =============================================================================
@@ -1346,6 +1362,14 @@ change_requests_history:
     adrs: [ADR-037, ADR-038]
     new_files:
       - "supabase/migrations/014_add_speaker_overrides.sql"
+
+  batch_8_phase_1:
+    crs: "CR-101, CR-102, CR-103, CR-104, CR-108, CR-109"
+    scope: "Display fixes & WhatsApp: LED visibility (F045), agenda label filter (F046), WhatsApp template settings fallback (F047), WhatsApp message variables + date format + quotes (F048), speech slots in Home (F049)"
+    doc: "ARCH_M015.yaml"
+    status: "pending implementation"
+    adrs: [ADR-039]
+    new_files: []
 
 # =============================================================================
 # OBSERVABILITY

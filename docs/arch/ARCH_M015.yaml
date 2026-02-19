@@ -1,0 +1,335 @@
+# =============================================================================
+# ARCH_M015.yaml
+# Architecture for Batch 8 Phase 1 - Display fixes & WhatsApp template
+# Features: F045, F046, F047, F048, F049
+# CRs: CR-101, CR-102, CR-103, CR-104, CR-108, CR-109
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Corrigir 5 bugs de exibicao e dados em componentes existentes (LEDs, labels, template WhatsApp, variaveis WhatsApp, speech slots)"
+  principles:
+    - "Bug fixes localizados: cada feature altera 1-2 arquivos sem overlap entre features"
+    - "Reutilizar funcoes existentes (isSpeechesType, getDefaultTemplate, formatDateHumanReadable)"
+    - "Zero dependencias novas: nenhum pacote adicionado"
+    - "Zero migracoes de banco: nenhuma alteracao de schema"
+    - "Consistencia de padroes: replicar padroes ja validados em outras partes do codigo"
+
+diagram: |
+  F045: [SundayCard.tsx] --isSpeechesType flag (linha 269)--> {isSpeechesType && <LEDs>}
+        Afeta: speeches.tsx + NextSundaysSection.tsx (via SundayCard compartilhado)
+
+  F046: [agenda.tsx] --exception.reason--> exceptionLabel = (reason !== 'speeches') ? label : null
+
+  F047: [settings/whatsapp.tsx] --ward query + getDefaultTemplate()--> template fallback
+        [whatsappUtils.ts] <--import getDefaultTemplate--
+
+  F048: [InviteManagementSection.tsx] --speech.topic_collection, speech.topic_link--> WhatsAppVariables
+        [InviteManagementSection.tsx] --formatDateHumanReadable()--> {data} placeholder
+        [whatsappUtils.ts] --aspas ao redor de {titulo}--> '"{titulo}"' nos 3 templates
+
+  F049: [NextSundaysSection.tsx] --condicao corrigida--> (!entry.exception || entry.exception.reason === 'speeches')
+        Padrao replicado de speeches.tsx:276
+
+# =============================================================================
+# COMPONENTS (affected modules)
+# =============================================================================
+
+components:
+  - name: "SpeechModule (M003)"
+    responsibility: "Ciclo de vida de discursos e integracao WhatsApp"
+    dependencies: []
+    change_for_f045: >
+      SundayCard.tsx: Envolver a secao de LEDs (linhas 322-336) com condicional
+      {isSpeechesType && (...)}. A flag isSpeechesType ja existe na linha 269.
+      O SundayCard e compartilhado entre speeches.tsx e NextSundaysSection.tsx,
+      logo o fix se aplica automaticamente a ambas as telas.
+    change_for_f048: >
+      whatsappUtils.ts: Alterar os 3 templates padrao (DEFAULT_TEMPLATE_PT_BR,
+      DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES) para usar '"{titulo}"' (com aspas
+      duplas ASCII ao redor) ao inves de '{titulo}'.
+
+  - name: "AgendaModule (M004)"
+    responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
+    dependencies: [M002]
+    change_for_f046: >
+      agenda.tsx: Ajustar calculo de exceptionLabel (linha 265-267) para retornar
+      null quando exception.reason === 'speeches'. O label amarelo so deve ser
+      exibido para excecoes que nao sao do tipo padrao.
+
+  - name: "UIShell (M008)"
+    responsibility: "App shell, Home tab com secoes role-aware"
+    dependencies: [M003]
+    change_for_f047: >
+      settings/whatsapp.tsx: Importar getDefaultTemplate de whatsappUtils.ts.
+      Adicionar 'language' ao .select() da query de wards. No useEffect de
+      inicializacao, usar getDefaultTemplate(ward.language) quando
+      ward.whatsapp_template for null (e ward ja estiver carregado).
+      String vazia respeitada (usuario limpou intencionalmente).
+    change_for_f048: >
+      InviteManagementSection.tsx: Adicionar campos collection
+      (speech.topic_collection ?? '') e link (speech.topic_link ?? '')
+      ao objeto WhatsAppVariables em ambos os pontos de construcao
+      (linhas ~64-69 e ~96-101). Importar formatDateHumanReadable de
+      dateUtils.ts e substituir formatDate() por formatDateHumanReadable()
+      para o campo date.
+    change_for_f049: >
+      NextSundaysSection.tsx: Alterar condicao na linha 181 de
+      '!entry.exception' para '(!entry.exception || entry.exception.reason === "speeches")'.
+      Este padrao ja e validado em speeches.tsx:276.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # --- F045: SundayCard LED conditional rendering ---
+  - name: "SundayCard_LED_conditional"
+    component: "SundayCard.tsx"
+    methods:
+      - name: "render (LED section)"
+        input: "isSpeechesType: boolean (existing flag, line 269)"
+        output: "JSX: LEDs rendered only when isSpeechesType === true"
+        notes: >
+          Nenhum novo prop ou interface. Apenas envolver JSX existente com
+          condicional. O calculo de speechStatuses continua existindo mas os
+          LEDs so sao renderizados quando relevantes.
+
+  # --- F046: agenda exceptionLabel filter ---
+  - name: "agenda_exceptionLabel_filter"
+    component: "agenda.tsx"
+    methods:
+      - name: "exceptionLabel computation"
+        input: "exception: SundayException | null"
+        output: "string | null (null when exception.reason === 'speeches')"
+        notes: >
+          Mudanca no calculo, nao na renderizacao. A renderizacao condicional
+          {exceptionLabel && (...)} ja existe (linha 292). Basta garantir que
+          exceptionLabel retorna null para 'speeches'.
+
+  # --- F047: WhatsApp template fallback in Settings ---
+  - name: "whatsapp_settings_template_init"
+    component: "settings/whatsapp.tsx"
+    methods:
+      - name: "useEffect initialization"
+        input: "ward: { whatsapp_template: string | null, language: string }"
+        output: "template state initialized correctly"
+        notes: >
+          Logica: if ward exists and !initialized: (1) if whatsapp_template
+          is null -> setTemplate(getDefaultTemplate(ward.language)),
+          (2) if whatsapp_template is '' -> setTemplate(''),
+          (3) if whatsapp_template has value -> setTemplate(whatsapp_template).
+          Requires adding 'language' to ward query .select('whatsapp_template, language').
+
+  # --- F048: WhatsApp variables (collection, link, date format, quotes) ---
+  - name: "whatsapp_variables_complete"
+    component: "InviteManagementSection.tsx"
+    methods:
+      - name: "WhatsAppVariables construction"
+        input: "speech: Speech (with topic_collection, topic_link, sunday_date)"
+        output: "WhatsAppVariables with collection, link, and human-readable date"
+        notes: >
+          Adicionar: collection: speech.topic_collection ?? '',
+          link: speech.topic_link ?? ''. Trocar formatDate() por
+          formatDateHumanReadable(speech.sunday_date, locale). Ambos os pontos
+          de construcao (handleNotInvitedAction e handleInvitedAction).
+
+  - name: "whatsapp_templates_quotes"
+    component: "whatsappUtils.ts"
+    methods:
+      - name: "DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES"
+        input: "const (update)"
+        output: "string com '{titulo}' alterado para '\"{titulo}\"'"
+        notes: >
+          Aspas duplas ASCII ao redor do placeholder {titulo} nos 3 templates.
+          resolveTemplate() substitui {titulo} pelo valor, mantendo as aspas.
+
+  # --- F049: NextSundaysSection speech slots condition ---
+  - name: "NextSundaysSection_slots_condition"
+    component: "NextSundaysSection.tsx"
+    methods:
+      - name: "SpeechSlots render condition"
+        input: "entry.exception: SundayException | null"
+        output: "boolean: true when no exception OR exception.reason === 'speeches'"
+        notes: >
+          Condicao atual: !entry.exception (sempre false apos CR-56).
+          Nova condicao: (!entry.exception || entry.exception.reason === 'speeches').
+          Padrao identico ao usado em speeches.tsx:276.
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: >
+    Nenhuma alteracao de schema. Nenhuma migracao de banco. Todas as features
+    usam tabelas e campos existentes. F047 apenas adiciona 'language' ao
+    .select() de uma query ja existente (wards table).
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  f045: "Sem impacto. Condicional de renderizacao client-side."
+  f046: "Sem impacto. Filtro de label client-side."
+  f047: >
+    Sem impacto. A query de wards ja esta protegida por RLS (ward_id).
+    Adicionar 'language' ao SELECT nao altera permissoes. getDefaultTemplate
+    e funcao pura client-side.
+  f048: >
+    Sem impacto. collection e link sao dados ja presentes no objeto speech
+    (carregado via query protegida por RLS). formatDateHumanReadable e funcao
+    pura. Aspas no template sao constantes.
+  f049: "Sem impacto. Condicional de renderizacao client-side."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  f045: "Nenhuma mudanca de logging."
+  f046: "Nenhuma mudanca de logging."
+  f047: "Nenhuma mudanca de logging. Auto-save existente ja loga mudancas de template."
+  f048: "Nenhuma mudanca de logging. WhatsApp URL e construida client-side."
+  f049: "Nenhuma mudanca de logging."
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  file_overlap: >
+    Nenhum overlap de arquivos entre features. Cada feature altera arquivo(s)
+    distintos:
+    F045: src/components/SundayCard.tsx
+    F046: src/app/(tabs)/agenda.tsx
+    F047: src/app/(tabs)/settings/whatsapp.tsx
+    F048: src/components/InviteManagementSection.tsx + src/lib/whatsappUtils.ts
+    F049: src/components/NextSundaysSection.tsx
+    A unica dependencia logica e que F048 altera templates em whatsappUtils.ts
+    (aspas em {titulo}) que F047 tambem importa, mas nao ha conflito.
+
+  implementation_order: >
+    Ordem sugerida (sem dependencias fortes, todas podem ser paralelas):
+    F045 (1 linha de condicional) -> F046 (1 filtro) -> F049 (1 condicao) ->
+    F047 (import + query + useEffect) -> F048 (2 pontos de WhatsAppVariables
+    + 3 templates + import de formatDateHumanReadable).
+
+  backward_compatibility: >
+    F045: LEDs continuam existindo para domingos com discursos. Sem regressao.
+    F046: Labels para excecoes nao-speeches continuam funcionando normalmente.
+    F047: Fallback para getDefaultTemplate apenas quando DB e null. Se DB tem
+    valor, comportamento identico ao atual.
+    F048: collection e link sao opcionais em WhatsAppVariables (? mark). Chamadas
+    existentes sem esses campos continuam funcionando via resolveTemplate que
+    ja trata campos vazios. formatDateHumanReadable retorna formato mais legivel
+    (melhoria, nao breaking change).
+    F049: Condicao expandida e superset da original. Dados pre-CR-56 (sem excecao)
+    continuam funcionando normalmente.
+
+  test_impact: >
+    F048 altera os 3 templates padrao em whatsappUtils.ts (adiciona aspas ao
+    redor de {titulo}). Testes que verificam conteudo exato dos templates
+    padrao precisarao ser atualizados:
+    - src/__tests__/whatsapp-utils.test.ts
+    - src/__tests__/batch7-f040-f044.test.ts (se testar conteudo de templates)
+    Testes que verificam apenas mecanica de resolveTemplate nao sao afetados.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-039
+    title: "Replicar padrao de condicao de speeches.tsx para NextSundaysSection (F049)"
+    context: >
+      Apos CR-56, todos os domingos tem registro de excecao (incluindo
+      reason='speeches'). NextSundaysSection usa !entry.exception que e sempre
+      false, bloqueando SpeechSlots. speeches.tsx ja tem o padrao correto:
+      (!exception || exception.reason === 'speeches').
+    decision: >
+      Replicar identicamente a condicao de speeches.tsx:276 em
+      NextSundaysSection.tsx:181 ao inves de inventar nova logica.
+    consequences:
+      - "Consistencia entre as duas telas que renderizam SpeechSlots"
+      - "Padrao ja testado e validado em speeches.tsx"
+      - "Facil de auditar: mesma logica em ambos os lugares"
+
+# =============================================================================
+# FEATURE-BY-FEATURE IMPLEMENTATION DETAILS
+# =============================================================================
+
+implementation_details:
+
+  f045_hide_leds_non_speech:
+    files:
+      - path: "src/components/SundayCard.tsx"
+        changes:
+          - "Envolver linhas 322-336 (secao de LEDs) com {isSpeechesType && (...)}"
+          - "A flag isSpeechesType ja existe na linha 269"
+          - "Nenhum import novo necessario"
+
+  f046_hide_exception_label_speeches:
+    files:
+      - path: "src/app/(tabs)/agenda.tsx"
+        changes:
+          - "Alterar linhas 265-267: adicionar filtro para excluir reason === 'speeches'"
+          - "De: exceptionLabel = exception ? t(`sundayExceptions.${exception.reason}`) : null"
+          - "Para: exceptionLabel = (exception && exception.reason !== 'speeches') ? t(`sundayExceptions.${exception.reason}`, exception.reason) : null"
+
+  f047_whatsapp_template_settings:
+    files:
+      - path: "src/app/(tabs)/settings/whatsapp.tsx"
+        changes:
+          - "Adicionar import: import { getDefaultTemplate } from '../../../lib/whatsappUtils'"
+          - "Alterar query .select('whatsapp_template') para .select('whatsapp_template, language')"
+          - "Alterar useEffect (linhas 74-79) para tratar 3 casos:"
+          - "  1. whatsapp_template === null -> setTemplate(getDefaultTemplate(ward.language ?? 'pt-BR'))"
+          - "  2. whatsapp_template === '' -> setTemplate('')"
+          - "  3. whatsapp_template has value -> setTemplate(ward.whatsapp_template)"
+          - "Condicao de guarda: if (ward && !initialized)"
+
+  f048_whatsapp_variables:
+    files:
+      - path: "src/components/InviteManagementSection.tsx"
+        changes:
+          - "Adicionar import: import { formatDateHumanReadable } from '../lib/dateUtils'"
+          - "Em handleNotInvitedAction (linhas ~64-69): adicionar collection e link ao WhatsAppVariables"
+          - "  collection: speech.topic_collection ?? ''"
+          - "  link: speech.topic_link ?? ''"
+          - "  date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage) (substituir formatDate)"
+          - "Em handleInvitedAction (linhas ~96-101): mesmas 3 mudancas"
+          - "Remover import de formatDate se nao mais usado (verificar uso em getInviteItems)"
+      - path: "src/lib/whatsappUtils.ts"
+        changes:
+          - "DEFAULT_TEMPLATE_PT_BR: '{titulo}' -> '\"{titulo}\"'"
+          - "DEFAULT_TEMPLATE_EN: '{titulo}' -> '\"{titulo}\"'"
+          - "DEFAULT_TEMPLATE_ES: '{titulo}' -> '\"{titulo}\"'"
+
+  f049_speech_slots_home:
+    files:
+      - path: "src/components/NextSundaysSection.tsx"
+        changes:
+          - "Alterar linha 181 de '!entry.exception' para '(!entry.exception || entry.exception.reason === \"speeches\")'"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true   # Componentes tem responsabilidade unica (3 modulos afetados, cada um com responsabilidade clara)
+  GATE-03: true   # Contratos definidos para cada integracao (6 contratos)
+  GATE-04: true   # ADR registrado para decisao que afeta multiplos componentes (ADR-039)
+  GATE-05: true   # ARCH_M015.yaml salvo no disco
+  GATE-06: true   # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true   # ARCH_SUMMARY preenchido
+  GATE-08: true   # Maximo 10 componentes por modulo respeitado (3 componentes)

@@ -1,0 +1,635 @@
+# =============================================================================
+# QA_PLAN_batch8_phase1.yaml
+# PRE-validation QA Plan for Batch 8 Phase 1
+# CRs: CR-101, CR-102, CR-103, CR-104, CR-108, CR-109
+# Generated: 2026-02-18
+# =============================================================================
+
+batch: 8
+phase: 1
+title: "Display fixes & WhatsApp template"
+type: feature_request
+status: validated
+generated_at: "2026-02-18"
+
+# #############################################################################
+# CR-101: Hide 3 LED status on non-speech Sundays (Speeches tab + Home)
+# #############################################################################
+
+cr_101:
+  cr_id: CR-101
+  title: "Hide 3 LED status indicators when Sunday has no speeches"
+  type: bugfix
+  user_request: |
+    Na aba discursos (e no Home), quando o domingo eh um domingo sem discursos,
+    nao se mostra os 3 led de status
+
+  affected_files:
+    - src/components/SundayCard.tsx
+    - src/components/NextSundaysSection.tsx
+
+  root_cause: |
+    In SundayCard.tsx:322-336, the 3 StatusLED indicators are rendered unconditionally
+    via speechStatuses.map(). They always show regardless of whether the Sunday is a
+    speech Sunday or not. The component already has `isSpeechesType` (line 269) that
+    checks if currentType === SUNDAY_TYPE_SPEECHES, but this flag is not used to
+    conditionally render the LEDs section.
+
+  evidence:
+    - path: src/components/SundayCard.tsx
+      lines: "269, 322-336"
+      observation: |
+        Line 269: const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES;
+        Lines 322-336: LEDs rendered unconditionally inside styles.leds View.
+        The isSpeechesType flag exists but is NOT used to gate LED rendering.
+    - path: src/components/NextSundaysSection.tsx
+      lines: "167-196"
+      observation: |
+        Uses SundayCard component. SpeechSlot children are gated by
+        `!entry.exception` (line 181), but LED visibility is delegated to SundayCard.
+
+  fix_approach: |
+    In SundayCard.tsx, wrap the LEDs View (lines 322-336) with a condition:
+    only render when isSpeechesType is true.
+
+  validation_checks:
+    must_pass:
+      - id: CR101-MP-01
+        description: "SundayCard only renders LEDs when isSpeechesType is true"
+        check_type: static
+        target: src/components/SundayCard.tsx
+        criteria: |
+          The LEDs section (3 StatusLED components) must be wrapped in a conditional
+          that checks isSpeechesType === true. When Sunday is not speeches type,
+          no StatusLED should render in the header.
+
+      - id: CR101-MP-02
+        description: "Non-speech Sundays show no LEDs in Speeches tab"
+        check_type: static
+        target: src/components/SundayCard.tsx
+        criteria: |
+          When exception.reason !== 'speeches' (e.g., testimony_meeting,
+          general_conference), the LEDs View should not be rendered.
+
+      - id: CR101-MP-03
+        description: "Speech Sundays still show 3 LEDs"
+        check_type: static
+        target: src/components/SundayCard.tsx
+        criteria: |
+          When isSpeechesType is true, the 3 StatusLED components must still render
+          exactly as before (positions 1, 2, 3).
+
+    should_pass:
+      - id: CR101-SP-01
+        description: "Home tab NextSundaysSection inherits LED fix from SundayCard"
+        check_type: static
+        target: src/components/NextSundaysSection.tsx
+        criteria: |
+          Since NextSundaysSection uses SundayCard, the fix should automatically
+          propagate. No additional changes needed in NextSundaysSection.
+
+# #############################################################################
+# CR-102: Hide yellow label on contracted card for speech Sundays (Agenda tab)
+# #############################################################################
+
+cr_102:
+  cr_id: CR-102
+  title: "Hide yellow exception label on contracted agenda card for speech Sundays"
+  type: bugfix
+  user_request: |
+    Na aba agenda, nao precisa mostrar o label amarelo no card contraido quando
+    o domingo for domingo de discursos
+
+  affected_files:
+    - src/app/(tabs)/agenda.tsx
+
+  root_cause: |
+    In agenda.tsx:265-267, the exceptionLabel is computed for ALL exceptions:
+      const exceptionLabel = exception
+        ? t(`sundayExceptions.${exception.reason}`, exception.reason)
+        : null;
+    This means even when exception.reason === 'speeches', a yellow label
+    "Discursos" is shown. Since ALL sundays now have entries in sunday_exceptions
+    table (per CR-56 auto-assignment), every speech Sunday also gets a label.
+
+  evidence:
+    - path: src/app/(tabs)/agenda.tsx
+      lines: "265-299"
+      observation: |
+        Line 265-267: exceptionLabel computed for all non-null exceptions.
+        Lines 292-299: Yellow label rendered when exceptionLabel is truthy.
+        No check for exception.reason === 'speeches' to suppress label.
+    - path: src/hooks/useSundayTypes.ts
+      lines: "29"
+      observation: |
+        SUNDAY_TYPE_SPEECHES = 'speeches' - this is the default type stored
+        for all sundays after auto-assignment.
+
+  fix_approach: |
+    In agenda.tsx AgendaSundayCard, suppress the yellow label when
+    exception.reason === 'speeches'. Only show the label for non-speech
+    exception types (testimony_meeting, general_conference, etc.).
+
+  validation_checks:
+    must_pass:
+      - id: CR102-MP-01
+        description: "Agenda card does not show yellow label for speech Sundays"
+        check_type: static
+        target: src/app/(tabs)/agenda.tsx
+        criteria: |
+          The exceptionLabel should be null/empty when exception.reason === 'speeches'.
+          Either filter in the exceptionLabel computation or in the rendering condition.
+
+      - id: CR102-MP-02
+        description: "Non-speech exception Sundays still show yellow label"
+        check_type: static
+        target: src/app/(tabs)/agenda.tsx
+        criteria: |
+          When exception.reason is 'testimony_meeting', 'general_conference',
+          'stake_conference', etc., the yellow label must still render.
+
+    should_pass:
+      - id: CR102-SP-01
+        description: "SundayCard in Speeches tab already handles this correctly"
+        check_type: static
+        target: src/components/SundayCard.tsx
+        criteria: |
+          SundayCard.tsx already uses isSpeechesType (line 269) and only shows
+          exceptionText when !isSpeechesType (line 308). This is correct behavior
+          in the Speeches tab. The fix is only needed in agenda.tsx's AgendaSundayCard.
+
+# #############################################################################
+# CR-103: WhatsApp template shows old version in settings
+# #############################################################################
+
+cr_103:
+  cr_id: CR-103
+  title: "WhatsApp settings page shows old template instead of current default"
+  type: bugfix
+  user_request: |
+    Em whatsappUtils.ts o template esta correto, na hora que eu clico no botao
+    WhatsApp para mandar a mensagem, tambem vem certo, porem eu so vejo o template
+    antigo na aba de configuracoes, no campo template, tem que corrigir la.
+
+  affected_files:
+    - src/app/(tabs)/settings/whatsapp.tsx
+    - src/lib/whatsappUtils.ts
+
+  root_cause: |
+    In whatsapp.tsx:74-79, the template is initialized from ward.whatsapp_template
+    (DB value). If the ward has never saved a custom template, or if the DB still
+    has an old default template stored, the settings page will show that old value.
+    The page does NOT fall back to getDefaultTemplate() from whatsappUtils.ts when
+    the DB value is null/empty, nor does it compare with the current default to
+    detect stale templates.
+
+    Line 75: if (ward?.whatsapp_template && !initialized)
+    This only sets from DB. If DB has an old template, it shows old template.
+    If DB has null/empty, template stays as empty string '' (line 70).
+
+  evidence:
+    - path: src/app/(tabs)/settings/whatsapp.tsx
+      lines: "70-79"
+      observation: |
+        Line 70: const [template, setTemplate] = useState('');
+        Lines 74-79: Only initializes from ward.whatsapp_template.
+        No import of getDefaultTemplate from whatsappUtils.ts.
+        No fallback to current default template when DB value is empty/null.
+    - path: src/lib/whatsappUtils.ts
+      lines: "8-31"
+      observation: |
+        DEFAULT_TEMPLATE_PT_BR (line 8-9), DEFAULT_TEMPLATE_EN (line 11-12),
+        DEFAULT_TEMPLATE_ES (line 14-15) contain the current correct templates.
+        getDefaultTemplate(language) on lines 21-31 returns the right template.
+    - path: src/lib/whatsappUtils.ts
+      lines: "90"
+      observation: |
+        buildWhatsAppUrl line 90: const messageTemplate = template || getDefaultTemplate(language);
+        This correctly falls back to default when template is empty. So the
+        WhatsApp button works correctly, but the settings display does not.
+
+  fix_approach: |
+    In whatsapp.tsx, import getDefaultTemplate from whatsappUtils.ts.
+    When initializing the template state, fall back to getDefaultTemplate(language)
+    when ward.whatsapp_template is null/empty. Also need to get the current
+    language (from getCurrentLanguage() or i18n).
+
+  validation_checks:
+    must_pass:
+      - id: CR103-MP-01
+        description: "Settings page imports getDefaultTemplate from whatsappUtils"
+        check_type: static
+        target: src/app/(tabs)/settings/whatsapp.tsx
+        criteria: |
+          The file must import getDefaultTemplate from whatsappUtils.ts (or whatsapp.ts
+          which re-exports it).
+
+      - id: CR103-MP-02
+        description: "Settings page falls back to default template when DB is empty"
+        check_type: static
+        target: src/app/(tabs)/settings/whatsapp.tsx
+        criteria: |
+          When ward.whatsapp_template is null or empty, the template state must be
+          initialized with getDefaultTemplate(language) using the current ward language.
+
+      - id: CR103-MP-03
+        description: "Settings page shows current default, not empty string"
+        check_type: static
+        target: src/app/(tabs)/settings/whatsapp.tsx
+        criteria: |
+          The initial state of template should never be '' when there is a valid
+          default template available. Either initialize in useState or in useEffect.
+
+    should_pass:
+      - id: CR103-SP-01
+        description: "Preview section reflects the correct template"
+        check_type: static
+        target: src/app/(tabs)/settings/whatsapp.tsx
+        criteria: |
+          The preview (line 114) uses resolveTemplate(template) which should
+          now show the correct default template content in preview.
+
+# #############################################################################
+# CR-104: WhatsApp template missing quotes, collection name, link
+# #############################################################################
+
+cr_104:
+  cr_id: CR-104
+  title: "WhatsApp message missing quotes around title, collection name, and link"
+  type: bugfix
+  user_request: |
+    Ainda sobre o template, quando eu cliquei em WhatsApp, o template veio sem
+    aspas ao redor do titulo, sem o nome da colecao e sem o link.
+
+  affected_files:
+    - src/components/InviteManagementSection.tsx
+    - src/lib/whatsappUtils.ts
+
+  root_cause: |
+    In InviteManagementSection.tsx:57-78, when building WhatsApp URL variables
+    (lines 63-69), the variables object does NOT include `collection` or `link`:
+      {
+        speakerName: speech.speaker_name ?? '',
+        date: formatDate(speech.sunday_date, locale),
+        topic: speech.topic_title ?? '',
+        position: `${speech.position}\u00BA`,
+      }
+    The `collection` and `link` fields are missing from the WhatsAppVariables
+    object. These are optional fields in the interface (line 40-41 of whatsappUtils.ts),
+    so resolveTemplate replaces {colecao} with '' and {link} with '' (lines 54, 56).
+
+    Additionally, the template in whatsappUtils.ts has {titulo} without quotes:
+    "com o titulo {titulo} {link}" should have quotes around the title to match
+    user expectation: "com o titulo \"{titulo}\" {link}".
+
+    The Speech type likely has topic_collection and topic_link fields that should
+    be passed through.
+
+  evidence:
+    - path: src/components/InviteManagementSection.tsx
+      lines: "63-69"
+      observation: |
+        WhatsApp variables only include speakerName, date, topic, position.
+        Missing: collection (from speech.topic_collection) and
+        link (from speech.topic_link).
+    - path: src/components/InviteManagementSection.tsx
+      lines: "91-101"
+      observation: |
+        Same issue in handleInvitedAction (the Alert dialog WhatsApp option).
+        Variables object also missing collection and link.
+    - path: src/lib/whatsappUtils.ts
+      lines: "35-42"
+      observation: |
+        WhatsAppVariables interface has collection?: string and link?: string
+        as optional fields. They default to '' when not provided.
+    - path: src/lib/whatsappUtils.ts
+      lines: "8-9"
+      observation: |
+        DEFAULT_TEMPLATE_PT_BR has {titulo} without quotes:
+        "com o titulo {titulo} {link}" - user expects quotes around title.
+
+  fix_approach: |
+    1. In InviteManagementSection.tsx, add collection and link to WhatsApp variables:
+       collection: speech.topic_collection ?? '',
+       link: speech.topic_link ?? '',
+       Do this in BOTH handleNotInvitedAction and handleInvitedAction.
+    2. In whatsappUtils.ts, add quotes around {titulo} in all 3 default templates:
+       change {titulo} to "{titulo}" (using escaped quotes or Unicode quotes).
+    3. Verify Speech type has topic_collection and topic_link fields.
+
+  validation_checks:
+    must_pass:
+      - id: CR104-MP-01
+        description: "InviteManagementSection passes collection to WhatsApp variables"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          Both handleNotInvitedAction and handleInvitedAction must include
+          `collection: speech.topic_collection` in the WhatsAppVariables object
+          passed to buildWhatsAppUrl.
+
+      - id: CR104-MP-02
+        description: "InviteManagementSection passes link to WhatsApp variables"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          Both handleNotInvitedAction and handleInvitedAction must include
+          `link: speech.topic_link` in the WhatsAppVariables object.
+
+      - id: CR104-MP-03
+        description: "Default templates have quotes around {titulo}"
+        check_type: static
+        target: src/lib/whatsappUtils.ts
+        criteria: |
+          DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, and DEFAULT_TEMPLATE_ES
+          must wrap {titulo} in quotes (e.g., \"{titulo}\" or similar).
+
+    should_pass:
+      - id: CR104-SP-01
+        description: "Speech type has topic_collection and topic_link fields"
+        check_type: static
+        target: src/types/database.ts
+        criteria: |
+          The Speech type/interface must have topic_collection and topic_link
+          fields (string | null) available for use.
+
+# #############################################################################
+# CR-108: Invite management {data} placeholder locale-aware format
+# #############################################################################
+
+cr_108:
+  cr_id: CR-108
+  title: "Invite management date placeholder uses locale-aware formatting"
+  type: bugfix
+  user_request: |
+    Na sessao de gerenciamento de convites, o placeholder {data} esta colocando
+    "22 FEV" vamos trocar para uma data de acordo com a localizacao da ala.
+
+  affected_files:
+    - src/components/InviteManagementSection.tsx
+    - src/lib/dateUtils.ts
+
+  root_cause: |
+    In InviteManagementSection.tsx:66, the date variable is formatted using:
+      date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
+    The formatDate function (dateUtils.ts:94-107) returns compact format like
+    "22 FEV" for pt-BR. The user wants a more locale-aware format that matches
+    the ward's location (e.g., "22 de Fevereiro" or full date format).
+
+    The existing formatDateHumanReadable (dateUtils.ts:192-206) provides a longer
+    format: "22 de Fevereiro de 2026" for pt-BR, "February 22, 2026" for en,
+    "22 de Febrero de 2026" for es.
+
+  evidence:
+    - path: src/components/InviteManagementSection.tsx
+      lines: "66, 98"
+      observation: |
+        Line 66: date: formatDate(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es')
+        Line 98: same formatDate call in handleInvitedAction.
+        formatDate returns compact "22 FEV" format.
+    - path: src/lib/dateUtils.ts
+      lines: "94-107"
+      observation: |
+        formatDate returns "${day} ${month}" for pt-BR (e.g., "22 FEV").
+    - path: src/lib/dateUtils.ts
+      lines: "192-206"
+      observation: |
+        formatDateHumanReadable returns "22 de Fevereiro de 2026" for pt-BR,
+        which is more locale-appropriate.
+
+  fix_approach: |
+    In InviteManagementSection.tsx, replace formatDate with formatDateHumanReadable
+    for the {data} placeholder in WhatsApp messages. Import formatDateHumanReadable
+    from dateUtils. Apply in both handleNotInvitedAction and handleInvitedAction.
+
+  validation_checks:
+    must_pass:
+      - id: CR108-MP-01
+        description: "WhatsApp date uses locale-aware human-readable format"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          The date variable passed to buildWhatsAppUrl must use
+          formatDateHumanReadable instead of formatDate, producing output like
+          "22 de Fevereiro de 2026" (pt-BR) instead of "22 FEV".
+
+      - id: CR108-MP-02
+        description: "Both WhatsApp actions use updated date format"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          Both handleNotInvitedAction (line ~66) and handleInvitedAction (line ~98)
+          must use the updated date formatting function.
+
+    should_pass:
+      - id: CR108-SP-01
+        description: "formatDateHumanReadable is imported from dateUtils"
+        check_type: static
+        target: src/components/InviteManagementSection.tsx
+        criteria: |
+          The import statement includes formatDateHumanReadable from dateUtils.
+
+# #############################################################################
+# CR-109: Home next assignments card expand for speech Sundays
+# #############################################################################
+
+cr_109:
+  cr_id: CR-109
+  title: "Next Assignments card does not expand to show 3 speeches on speech Sundays"
+  type: bugfix
+  user_request: |
+    Na sessao Proximas Designacoes do Home, o card nao expande para ver os 3
+    discursos quando o domingo eh um domingo de discursos.
+
+  affected_files:
+    - src/components/NextAssignmentsSection.tsx
+
+  root_cause: |
+    In NextAssignmentsSection.tsx:159-173, the SpeechSlot children are rendered
+    inside the expanded SundayCard. However, SundayCard.tsx:340-350 only renders
+    `children` when `expanded` is true, and the SpeechSlots are rendered in
+    NextAssignmentsSection when `expanded` is true (line 159).
+
+    The issue may be in findNextPendingSunday logic or in how the SundayCard
+    handles the expand/collapse. Looking at NextAssignmentsSection:85-90:
+      const handleToggle = useCallback(() => {
+        if (!expanded && pendingEntry) {
+          lazyCreate.mutate(pendingEntry.date);
+        }
+        setExpanded((prev) => !prev);
+      }, [expanded, lazyCreate, pendingEntry]);
+
+    The SundayCard's onToggle is set to handleToggle, but looking at SundayCard.tsx
+    line 298-303, the header Pressable calls onToggle. This should work.
+
+    However, looking more carefully at NextAssignmentsSection.tsx:159:
+      {expanded &&
+        [1, 2, 3].map((pos) => { ... })}
+    This renders SpeechSlots as children of SundayCard. But in SundayCard.tsx:348,
+    `{children}` is rendered inside the expandedContent view, which is gated by
+    `expanded` prop (line 340). So there's a double gate - both the parent
+    NextAssignmentsSection checks expanded AND SundayCard checks expanded.
+
+    The real issue: SundayCard doesn't render children when the Sunday is NOT
+    a speech type. Looking at SundayCard.tsx:340-350:
+      {expanded && (
+        <View style={styles.expandedContent}>
+          <SundayTypeDropdown ... />
+          {children}
+        </View>
+      )}
+    Children ARE rendered for all types when expanded. But NextAssignmentsSection
+    does NOT filter by speech type before rendering slots (lines 159-173 have no
+    isSpeechesType check).
+
+    Actually, looking at it again - the findNextPendingSunday function may be
+    returning a non-speech Sunday. If the pending entry is a non-speech Sunday,
+    the card would expand but show SpeechSlots inappropriately.
+
+    Wait - the user says "o card nao expande". This means clicking the card
+    header does nothing. Let me look at what could prevent expansion.
+
+    Looking at the SundayCard usage in NextAssignmentsSection:149-158:
+      <SundayCard
+        date={pendingEntry.date}
+        speeches={pendingEntry.speeches}
+        exception={pendingEntry.exception}
+        expanded={expanded}
+        onToggle={handleToggle}
+        ...
+      >
+    This looks correct. The expanded state and onToggle are properly connected.
+
+    BUT - the issue could be that SpeechSlots are inside the SundayCard children,
+    and if the SundayCard's expandedContent is not rendering them due to some
+    condition. Looking at SundayCard more carefully - the expanded content
+    section at line 340 shows dropdown + children. This should work.
+
+    Actually, rethinking this: the user says the card doesn't expand to show
+    the 3 speeches. Perhaps the issue is in NextSundaysSection (Home's "next 3"
+    section), not NextAssignmentsSection. Looking at NextSundaysSection.tsx:180-195:
+      {expandedDate === entry.date &&
+        !entry.exception &&
+        [1, 2, 3].map((pos) => { ... })}
+
+    Line 181: `!entry.exception` - this is the problem! Since ALL sundays now
+    have entries in sunday_exceptions table (after CR-56 auto-assignment), every
+    Sunday has an exception entry, even speech Sundays (with reason='speeches').
+    So `!entry.exception` is ALWAYS false, and SpeechSlots NEVER render.
+
+    The fix in speeches.tsx is correct (line 276):
+      (!exception || exception.reason === 'speeches')
+    But NextSundaysSection.tsx line 181 uses the old `!entry.exception` check.
+
+  evidence:
+    - path: src/components/NextSundaysSection.tsx
+      lines: "180-195"
+      observation: |
+        Line 181: !entry.exception - gates SpeechSlot rendering.
+        Since all sundays now have exception entries after auto-assignment (CR-56),
+        entry.exception is ALWAYS truthy, so SpeechSlots NEVER render.
+        This is the root cause.
+    - path: src/app/(tabs)/speeches.tsx
+      lines: "275-276"
+      observation: |
+        Speeches tab correctly uses:
+          (!exception || exception.reason === 'speeches')
+        This is the correct pattern that NextSundaysSection should follow.
+    - path: src/components/NextAssignmentsSection.tsx
+      lines: "159-173"
+      observation: |
+        NextAssignmentsSection has NO condition on exception - it renders
+        SpeechSlots unconditionally when expanded. However, the findNextPendingSunday
+        logic may also need to account for speech-type filtering.
+
+  fix_approach: |
+    In NextSundaysSection.tsx line 181, change the condition from:
+      !entry.exception
+    to:
+      (!entry.exception || entry.exception.reason === 'speeches')
+    This matches the pattern already used in speeches.tsx line 276.
+
+    Also verify NextAssignmentsSection.tsx handles this correctly (it currently
+    has no exception check, so it would render SpeechSlots even for non-speech
+    Sundays, which may need separate fixing).
+
+  validation_checks:
+    must_pass:
+      - id: CR109-MP-01
+        description: "NextSundaysSection renders SpeechSlots for speech Sundays"
+        check_type: static
+        target: src/components/NextSundaysSection.tsx
+        criteria: |
+          The condition gating SpeechSlot rendering must be changed from
+          `!entry.exception` to `(!entry.exception || entry.exception.reason === 'speeches')`
+          to allow speech Sundays with auto-assigned exception entries.
+
+      - id: CR109-MP-02
+        description: "Non-speech Sundays do not show SpeechSlots in NextSundaysSection"
+        check_type: static
+        target: src/components/NextSundaysSection.tsx
+        criteria: |
+          When entry.exception.reason !== 'speeches' (e.g., testimony_meeting),
+          SpeechSlots must NOT render.
+
+      - id: CR109-MP-03
+        description: "Speeches tab condition remains correct"
+        check_type: static
+        target: src/app/(tabs)/speeches.tsx
+        criteria: |
+          The existing condition at line 276:
+            (!exception || exception.reason === 'speeches')
+          must remain unchanged and still work correctly.
+
+    should_pass:
+      - id: CR109-SP-01
+        description: "NextAssignmentsSection speech slot rendering is appropriate"
+        check_type: static
+        target: src/components/NextAssignmentsSection.tsx
+        criteria: |
+          Verify that NextAssignmentsSection also properly handles the
+          exception check (currently renders SpeechSlots unconditionally).
+
+# #############################################################################
+# Summary
+# #############################################################################
+
+summary:
+  total_crs: 6
+  validated: true
+  all_crs_have_root_cause: true
+  all_crs_have_affected_files: true
+  all_crs_testable: true
+
+  must_pass_total: 14
+  should_pass_total: 6
+
+  risk_areas:
+    - area: "SundayCard LED rendering"
+      crs: [CR-101]
+      risk: "Low - simple conditional wrap"
+    - area: "Agenda yellow label"
+      crs: [CR-102]
+      risk: "Low - filter exception reason"
+    - area: "WhatsApp template initialization"
+      crs: [CR-103]
+      risk: "Medium - must handle null DB values and language detection"
+    - area: "WhatsApp variable passing"
+      crs: [CR-104]
+      risk: "Low - add missing fields to variables object"
+    - area: "Date formatting in invite management"
+      crs: [CR-108]
+      risk: "Low - swap formatDate for formatDateHumanReadable"
+    - area: "Home card expansion"
+      crs: [CR-109]
+      risk: "Low - change exception check condition"
+
+  notes: |
+    CR-109 root cause is the same pattern as a previous fix in speeches.tsx:
+    the auto-assignment from CR-56 means all sundays have exception entries,
+    so !entry.exception is always false. The fix pattern already exists in
+    speeches.tsx and just needs to be replicated in NextSundaysSection.tsx.
+
+    CR-103 and CR-104 are related WhatsApp issues. CR-103 is about the settings
+    display, CR-104 is about the actual message content. They affect different
+    files but should be tested together.

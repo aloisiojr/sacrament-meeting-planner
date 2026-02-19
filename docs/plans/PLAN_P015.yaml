@@ -1,0 +1,405 @@
+# =============================================================================
+# PLAN_P015.yaml
+# Implementation Plan for Batch 8 Phase 1 - Display fixes & WhatsApp template
+# Features: F045, F046, F047, F048, F049
+# CRs: CR-101, CR-102, CR-103, CR-104, CR-108, CR-109
+# Created: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Corrigir 5 bugs de exibicao e dados em componentes existentes: esconder LEDs
+  de status em domingos nao-discursos (F045), esconder label amarelo de excecao
+  para domingos de discursos na Agenda (F046), corrigir inicializacao do template
+  WhatsApp na tela de Settings (F047), corrigir variaveis do WhatsApp (colecao,
+  link, aspas no titulo, formato de data) (F048), e corrigir renderizacao de
+  SpeechSlots no Home (F049).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F045 - Condicionar LEDs ao tipo 'speeches' no SundayCard
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em SundayCard.tsx, envolver a secao de LEDs (linhas 322-336) com a
+      condicional {isSpeechesType && (...)}. A flag isSpeechesType ja existe
+      na linha 269 (const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES)
+      e ja e usada na linha 308 para condicionar o label de excecao. Basta
+      replicar o mesmo padrao para a secao de LEDs. O SundayCard e compartilhado
+      entre speeches.tsx e NextSundaysSection.tsx (Home), logo o fix se aplica
+      automaticamente a ambas as telas.
+    files:
+      - "src/components/SundayCard.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "Secao de LEDs (3 LEDs de status) envolvida com {isSpeechesType && (...)}"
+      - "LEDs renderizados quando currentType === 'speeches'"
+      - "LEDs NAO renderizados quando currentType !== 'speeches' (ex: testimony_meeting)"
+      - "Fix aplica-se na aba Discursos (speeches.tsx usa SundayCard)"
+      - "Fix aplica-se no Home (NextSundaysSection.tsx usa SundayCard)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que SundayCard renderiza LEDs quando tipo e 'speeches'"
+      - type: unit
+        description: "Verificar que SundayCard NAO renderiza LEDs quando tipo e 'testimony_meeting'"
+    covers:
+      acceptance_criteria: ["AC-F045-01", "AC-F045-02", "AC-F045-03", "AC-F045-04"]
+      edge_cases: ["EC-F045-01", "EC-F045-02"]
+    risks:
+      - risk: "Calculo de speechStatuses executa desnecessariamente para domingos nao-speeches"
+        mitigation: "Impacto desprezivel em performance; calculo e O(1) e ja existia antes"
+
+  # =========================================================================
+  # STEP-02: F046 - Filtrar label amarelo para domingos de discursos na Agenda
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em agenda.tsx, ajustar o calculo de exceptionLabel (linhas 265-267) para
+      retornar null quando exception.reason === 'speeches'. Apos CR-56, todos
+      os domingos (incluindo domingos com discursos) tem registro de excecao,
+      causando exibicao redundante do label "Discursos" em amarelo. A
+      renderizacao condicional {exceptionLabel && (...)} ja existe (linha 292),
+      entao basta garantir que exceptionLabel e null para 'speeches'. Alterar
+      de: exceptionLabel = exception ? t(...) : null
+      para: exceptionLabel = (exception && exception.reason !== 'speeches') ? t(...) : null
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "exceptionLabel retorna null quando exception.reason === 'speeches'"
+      - "exceptionLabel retorna label traduzido para excecoes como 'testimony_meeting', 'stake_conference', etc."
+      - "exceptionLabel retorna custom_reason para excecoes do tipo 'other'"
+      - "Label amarelo NAO aparece para domingos do tipo padrao (speeches)"
+      - "Label amarelo aparece normalmente para domingos com excecao diferente"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que exceptionLabel e null quando reason === 'speeches'"
+      - type: unit
+        description: "Verificar que exceptionLabel retorna label traduzido para 'testimony_meeting'"
+    covers:
+      acceptance_criteria: ["AC-F046-01", "AC-F046-02", "AC-F046-03"]
+      edge_cases: ["EC-F046-01"]
+    risks:
+      - risk: "Existe outro lugar no codigo que depende de exceptionLabel para 'speeches'"
+        mitigation: "exceptionLabel e calculado localmente dentro do renderItem da Agenda, sem export"
+
+  # =========================================================================
+  # STEP-03: F049 - Corrigir condicao de SpeechSlots no NextSundaysSection
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em NextSundaysSection.tsx, alterar a condicao na linha 181 de
+      '!entry.exception' para '(!entry.exception || entry.exception.reason
+      === "speeches")'. Este padrao ja e validado em speeches.tsx:276. Apos
+      CR-56, entry.exception nunca e null/undefined (incluindo domingos com
+      reason='speeches'), fazendo com que !entry.exception seja sempre false
+      e bloqueando a renderizacao dos SpeechSlots na secao "Proximas
+      Designacoes" do Home.
+    files:
+      - "src/components/NextSundaysSection.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "Condicao alterada para (!entry.exception || entry.exception.reason === 'speeches')"
+      - "SpeechSlots renderizados quando tipo e 'speeches' (card expandido)"
+      - "SpeechSlots NAO renderizados quando tipo e diferente (ex: testimony_meeting)"
+      - "Cards de domingo expandem normalmente no Home"
+      - "Consistencia com aba Discursos (mesmo padrao de condicao)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que SpeechSlots sao renderizados quando exception.reason === 'speeches'"
+      - type: unit
+        description: "Verificar que SpeechSlots NAO sao renderizados quando exception.reason !== 'speeches'"
+    covers:
+      acceptance_criteria: ["AC-F049-01", "AC-F049-02", "AC-F049-03"]
+      edge_cases: ["EC-F049-01", "EC-F049-02"]
+    risks:
+      - risk: "entry.exception nao tem campo reason (tipo incompleto)"
+        mitigation: "SundayException type ja inclui reason (validado por TypeScript strict)"
+
+  # =========================================================================
+  # STEP-04: F048 - Aspas no titulo dos templates padrao WhatsApp
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em whatsappUtils.ts, alterar os 3 templates padrao para adicionar aspas
+      duplas ASCII ao redor do placeholder {titulo}:
+      DEFAULT_TEMPLATE_PT_BR: '{titulo}' -> '"{titulo}"'
+      DEFAULT_TEMPLATE_EN: '{titulo}' -> '"{titulo}"'
+      DEFAULT_TEMPLATE_ES: '{titulo}' -> '"{titulo}"'
+      A funcao resolveTemplate() substituira {titulo} pelo valor, mantendo as
+      aspas ao redor. Atualizar testes existentes que verificam conteudo exato
+      dos templates padrao (whatsapp-utils.test.ts, batch7-f040-f044.test.ts).
+    files:
+      - "src/lib/whatsappUtils.ts"
+      - "src/__tests__/whatsapp-utils.test.ts"
+      - "src/__tests__/batch7-f040-f044.test.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "DEFAULT_TEMPLATE_PT_BR contem '\"{titulo}\"' (com aspas duplas)"
+      - "DEFAULT_TEMPLATE_EN contem '\"{titulo}\"' (com aspas duplas)"
+      - "DEFAULT_TEMPLATE_ES contem '\"{titulo}\"' (com aspas duplas)"
+      - "Testes atualizados para esperar aspas ao redor de {titulo}"
+      - "resolveTemplate funciona normalmente com aspas (nao interfere na substituicao)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que templates padrao contem aspas ao redor de {titulo}"
+      - type: unit
+        description: "Verificar que resolveTemplate resolve {titulo} mantendo aspas"
+    covers:
+      acceptance_criteria: ["AC-F048-03", "AC-F048-08"]
+      edge_cases: ["EC-F048-03"]
+    risks:
+      - risk: "Testes existentes que verificam conteudo exato de templates falham"
+        mitigation: "Atualizar testes no mesmo step para refletir aspas ao redor de {titulo}"
+
+  # =========================================================================
+  # STEP-05: F047 - Corrigir inicializacao do template WhatsApp em Settings
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em settings/whatsapp.tsx: (1) Importar getDefaultTemplate de
+      whatsappUtils.ts. (2) Alterar a query .select('whatsapp_template') para
+      .select('whatsapp_template, language') para obter o idioma da ala.
+      (3) Alterar o useEffect de inicializacao (linhas 74-79) para tratar 3
+      casos: (a) whatsapp_template === null -> setTemplate(getDefaultTemplate(
+      ward.language ?? 'pt-BR')), (b) whatsapp_template === '' -> setTemplate('')
+      (respeitando que usuario limpou), (c) whatsapp_template tem valor ->
+      setTemplate(ward.whatsapp_template) (comportamento atual preservado).
+      Condicao de guarda: if (ward && !initialized).
+    files:
+      - "src/app/(tabs)/settings/whatsapp.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "getDefaultTemplate importado de whatsappUtils.ts"
+      - "Query de wards inclui campo 'language' no .select()"
+      - "Template padrao (getDefaultTemplate) exibido quando DB e null"
+      - "String vazia respeitada quando DB e '' (usuario limpou)"
+      - "Valor do DB exibido quando tem valor customizado"
+      - "Template padrao correto por idioma da ala (pt-BR, en, es)"
+      - "Sem crash quando ward query falha (loading state antes de ward carregar)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que template padrao e exibido quando DB retorna null"
+      - type: unit
+        description: "Verificar que template customizado do DB e preservado"
+      - type: unit
+        description: "Verificar que string vazia e respeitada"
+    covers:
+      acceptance_criteria: ["AC-F047-01", "AC-F047-02", "AC-F047-03", "AC-F047-04", "AC-F047-05"]
+      edge_cases: ["EC-F047-01", "EC-F047-02"]
+    risks:
+      - risk: "useEffect dispara antes de ward carregar, causando template padrao prematuro"
+        mitigation: "Condicao de guarda 'if (ward && !initialized)' impede execucao sem dados"
+
+  # =========================================================================
+  # STEP-06: F048 - Corrigir variaveis do WhatsApp (colecao, link, data)
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em InviteManagementSection.tsx: (1) Importar formatDateHumanReadable
+      de dateUtils.ts. (2) Em handleNotInvitedAction (linhas ~64-69) e
+      handleInvitedAction (linhas ~96-101), adicionar ao objeto WhatsAppVariables:
+      collection: speech.topic_collection ?? '' e
+      link: speech.topic_link ?? ''. (3) Trocar formatDate() por
+      formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage)
+      para o campo date em ambos os pontos. (4) Remover import de formatDate
+      se nao mais usado. A funcao formatDateHumanReadable ja existe em
+      dateUtils.ts e retorna o formato correto por idioma.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: ["STEP-05"]
+    done_when:
+      - "collection: speech.topic_collection ?? '' adicionado em ambos os pontos de WhatsAppVariables"
+      - "link: speech.topic_link ?? '' adicionado em ambos os pontos de WhatsAppVariables"
+      - "formatDateHumanReadable usado para campo date (substituindo formatDate)"
+      - "Data formatada como '22 de Fevereiro de 2026' (pt-BR)"
+      - "Data formatada como 'February 22, 2026' (en)"
+      - "Data formatada como '22 de Febrero de 2026' (es)"
+      - "Discurso sem colecao/link: campos passados como '' (string vazia)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que WhatsAppVariables inclui collection e link"
+      - type: unit
+        description: "Verificar que date usa formato human-readable por idioma"
+    covers:
+      acceptance_criteria: ["AC-F048-01", "AC-F048-02", "AC-F048-04", "AC-F048-05", "AC-F048-06", "AC-F048-07"]
+      edge_cases: ["EC-F048-01", "EC-F048-02"]
+    risks:
+      - risk: "speech.topic_collection ou speech.topic_link nao existem no tipo Speech"
+        mitigation: "Verificar tipo Speech em database.ts; se campos nao existem, sao null e ?? '' resolve"
+
+  # =========================================================================
+  # STEP-07: Testes consolidados de todas as features (F045-F049)
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Criar arquivo de testes batch8-phase1.test.ts com testes para:
+      (1) F045: SundayCard condiciona LEDs a isSpeechesType (render com
+      tipo speeches vs testimony_meeting),
+      (2) F046: exceptionLabel retorna null para speeches e label para outros,
+      (3) F047: inicializacao do template WhatsApp com null/vazio/valor do DB,
+      (4) F048: WhatsAppVariables com collection, link, data human-readable,
+      aspas em titulo via templates padrao,
+      (5) F049: condicao de SpeechSlots no NextSundaysSection com exception
+      speeches vs nao-speeches.
+      Atualizar testes existentes se necessario.
+    files:
+      - "src/__tests__/batch8-phase1.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch8-phase1.test.ts criado"
+      - "Testes cobrem F045 (LEDs condicionais)"
+      - "Testes cobrem F046 (exceptionLabel filtrado)"
+      - "Testes cobrem F047 (template settings fallback)"
+      - "Testes cobrem F048 (variaveis WhatsApp completas)"
+      - "Testes cobrem F049 (SpeechSlots condicao corrigida)"
+      - "pnpm test roda sem falha em TODOS os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch8 phase1 (F045-F049)"
+    covers:
+      acceptance_criteria: ["AC-F045-01", "AC-F045-02", "AC-F046-01", "AC-F046-02", "AC-F047-01", "AC-F047-02", "AC-F048-01", "AC-F048-04", "AC-F049-01", "AC-F049-02"]
+      edge_cases: ["EC-F045-01", "EC-F046-01", "EC-F047-01", "EC-F048-01", "EC-F049-01"]
+    risks:
+      - risk: "Testes existentes de whatsapp falham com mudancas de templates"
+        mitigation: "Templates ja atualizados no STEP-04; testes existentes corrigidos la"
+
+  # =========================================================================
+  # STEP-08: Documentacao do projeto (CODE_LEDGER, project-status)
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Atualizar docs/code/CODE_LEDGER.yaml com os commits de Batch 8 Phase 1
+      (F045-F049). Atualizar .devteam/project-status.yaml marcando phase 1
+      como completed. Atualizar docs/plans/PLAN_CONSOLIDATED.yaml adicionando
+      PLAN_P015 e atualizando version e changelog.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch8 phase1"
+      - "project-status.yaml phase 1 marcada como completed"
+      - "PLAN_CONSOLIDATED atualizado com PLAN_P015 (version incrementada)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F045 ACs ---
+  - ac_id: AC-F045-01
+    how_to_verify: "SundayCard com tipo 'speeches' renderiza secao de LEDs (3 LEDs visiveis)"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-F045-02
+    how_to_verify: "SundayCard com tipo 'testimony_meeting' NAO renderiza LEDs"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-F045-03
+    how_to_verify: "Aba Discursos (speeches.tsx) usa SundayCard que agora condiciona LEDs"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F045-04
+    how_to_verify: "Home (NextSundaysSection) usa SundayCard que agora condiciona LEDs"
+    covered_by_steps: ["STEP-01"]
+
+  # --- F046 ACs ---
+  - ac_id: AC-F046-01
+    how_to_verify: "exceptionLabel e null quando exception.reason === 'speeches' (sem label amarelo)"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F046-02
+    how_to_verify: "exceptionLabel retorna label traduzido para 'testimony_meeting'"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-F046-03
+    how_to_verify: "exceptionLabel retorna custom_reason para tipo 'other'"
+    covered_by_steps: ["STEP-02"]
+
+  # --- F047 ACs ---
+  - ac_id: AC-F047-01
+    how_to_verify: "Template padrao (getDefaultTemplate) exibido quando DB retorna null"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F047-02
+    how_to_verify: "Template customizado do DB exibido quando tem valor"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-F047-03
+    how_to_verify: "String vazia respeitada quando DB e '' (nao substituida por padrao)"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F047-04
+    how_to_verify: "getDefaultTemplate(ward.language) retorna template correto por idioma"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F047-05
+    how_to_verify: "Template em Settings identico ao usado no envio via WhatsApp"
+    covered_by_steps: ["STEP-05"]
+
+  # --- F048 ACs ---
+  - ac_id: AC-F048-01
+    how_to_verify: "WhatsAppVariables inclui collection: speech.topic_collection ?? ''"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-F048-02
+    how_to_verify: "WhatsAppVariables inclui link: speech.topic_link ?? ''"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F048-03
+    how_to_verify: "Templates padrao contem '\"{titulo}\"' (com aspas duplas ASCII)"
+    covered_by_steps: ["STEP-04"]
+  - ac_id: AC-F048-04
+    how_to_verify: "Data formatada como '22 de Fevereiro de 2026' (pt-BR) via formatDateHumanReadable"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-F048-05
+    how_to_verify: "Data formatada como 'February 22, 2026' (en)"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F048-06
+    how_to_verify: "Data formatada como '22 de Febrero de 2026' (es)"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F048-07
+    how_to_verify: "Discurso sem colecao/link: campos passados como '' e whitespace limpo"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F048-08
+    how_to_verify: "Codigo-fonte dos 3 templates padrao contem '\"{titulo}\"'"
+    covered_by_steps: ["STEP-04"]
+
+  # --- F049 ACs ---
+  - ac_id: AC-F049-01
+    how_to_verify: "SpeechSlots renderizados quando entry.exception.reason === 'speeches'"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F049-02
+    how_to_verify: "SpeechSlots NAO renderizados quando entry.exception.reason === 'testimony_meeting'"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-F049-03
+    how_to_verify: "Comportamento identico entre aba Discursos e Home (mesmo padrao de condicao)"
+    covered_by_steps: ["STEP-03"]

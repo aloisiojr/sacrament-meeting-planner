@@ -187,8 +187,15 @@ function AgendaTabContent() {
     (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
       const offset = info.averageItemLength * info.index;
       flatListRef.current?.scrollToOffset({ offset, animated: false });
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: Math.min(info.index, listItems.length - 1),
+          animated: false,
+          viewPosition: 0.5,
+        });
+      }, 100);
     },
-    []
+    [listItems.length]
   );
 
   if (exceptionsError) {

@@ -99,8 +99,8 @@ describe('PHASE-03: Status lifecycle exhaustive tests', () => {
       expect(getAvailableStatuses('assigned_not_invited')).toHaveLength(2);
     });
 
-    it('assigned_invited has 3 transitions', () => {
-      expect(getAvailableStatuses('assigned_invited')).toHaveLength(3);
+    it('assigned_invited has 4 transitions', () => {
+      expect(getAvailableStatuses('assigned_invited')).toHaveLength(4);
     });
 
     it('assigned_confirmed has 1 transition', () => {

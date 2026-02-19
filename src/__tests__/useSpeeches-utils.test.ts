@@ -69,8 +69,9 @@ describe('VALID_TRANSITIONS', () => {
     expect(VALID_TRANSITIONS.assigned_not_invited).toContain('not_assigned');
   });
 
-  it('assigned_invited can transition to confirmed, gave_up, or not_assigned', () => {
+  it('assigned_invited can transition to confirmed, not_invited, gave_up, or not_assigned', () => {
     expect(VALID_TRANSITIONS.assigned_invited).toContain('assigned_confirmed');
+    expect(VALID_TRANSITIONS.assigned_invited).toContain('assigned_not_invited');
     expect(VALID_TRANSITIONS.assigned_invited).toContain('gave_up');
     expect(VALID_TRANSITIONS.assigned_invited).toContain('not_assigned');
   });

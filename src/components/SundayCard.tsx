@@ -49,6 +49,8 @@ export interface SundayCardProps {
   onTypeChange?: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   /** Called when the sunday type is reverted to "speeches" (remove exception). */
   onRemoveException?: (date: string) => void;
+  /** Called to delete speeches when changing sunday type away from speeches. */
+  onDeleteSpeeches?: (date: string) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
   /** Children to render when expanded (speech slots, etc.). */
@@ -89,9 +91,11 @@ interface SundayTypeDropdownProps {
   onRevertToSpeeches: () => void;
   disabled?: boolean;
   speeches: Speech[];
+  date: string;
+  onDeleteSpeeches?: (date: string) => void;
 }
 
-function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches }: SundayTypeDropdownProps) {
+function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches }: SundayTypeDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -121,6 +125,7 @@ function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disable
             text: t('common.confirm'),
             style: 'destructive',
             onPress: () => {
+              onDeleteSpeeches?.(date);
               if (type === 'other') {
                 setCustomReason('');
                 setOtherModalVisible(true);
@@ -132,6 +137,9 @@ function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disable
         ]
       );
       return;
+    }
+    if (currentType === SUNDAY_TYPE_SPEECHES) {
+      onDeleteSpeeches?.(date);
     }
     if (type === 'other') {
       setCustomReason('');
@@ -282,6 +290,7 @@ export const SundayCard = React.memo(function SundayCard({
   onStatusPress,
   onTypeChange,
   onRemoveException,
+  onDeleteSpeeches,
   typeDisabled = false,
   children,
 }: SundayCardProps) {
@@ -373,6 +382,8 @@ export const SundayCard = React.memo(function SundayCard({
             onRevertToSpeeches={handleRemoveException}
             disabled={typeDisabled}
             speeches={speeches}
+            date={date}
+            onDeleteSpeeches={onDeleteSpeeches}
           />
           {children}
         </View>

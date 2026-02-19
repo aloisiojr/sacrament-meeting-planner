@@ -12,6 +12,7 @@ import {
   Pressable,
   Modal,
   FlatList,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -87,9 +88,10 @@ interface SundayTypeDropdownProps {
   onSelect: (type: SundayExceptionReason, customReason?: string) => void;
   onRevertToSpeeches: () => void;
   disabled?: boolean;
+  speeches: Speech[];
 }
 
-function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled }: SundayTypeDropdownProps) {
+function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches }: SundayTypeDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -105,6 +107,30 @@ function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disable
     setModalVisible(false);
     if (type === SUNDAY_TYPE_SPEECHES) {
       onRevertToSpeeches();
+      return;
+    }
+    // Confirm when changing FROM speeches WITH assignments
+    const hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title);
+    if (currentType === SUNDAY_TYPE_SPEECHES && hasAssignments) {
+      Alert.alert(
+        t('sundayExceptions.changeConfirmTitle'),
+        t('sundayExceptions.changeConfirmMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.confirm'),
+            style: 'destructive',
+            onPress: () => {
+              if (type === 'other') {
+                setCustomReason('');
+                setOtherModalVisible(true);
+              } else {
+                onSelect(type as SundayExceptionReason);
+              }
+            },
+          },
+        ]
+      );
       return;
     }
     if (type === 'other') {
@@ -346,6 +372,7 @@ export const SundayCard = React.memo(function SundayCard({
             onSelect={handleTypeChange}
             onRevertToSpeeches={handleRemoveException}
             disabled={typeDisabled}
+            speeches={speeches}
           />
           {children}
         </View>

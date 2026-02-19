@@ -1,0 +1,564 @@
+# =============================================================================
+# SPEC_F055_F059.yaml
+# Specification for Batch 9 Phase 1 - Bug Fixes & Quick UI
+# Features: F055, F056, F057, F058, F059
+# CRs: CR-112, CR-113, CR-117, CR-122, CR-125
+# Created: 2026-02-19
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 9
+phase: 1
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+features:
+
+  # ===========================================================================
+  # F055 / CR-112: Ver Conversa without resending invite
+  # ===========================================================================
+
+  - id: F055
+    name: "View WhatsApp conversation without resending invite message"
+    cr_id: 112
+    type: bug
+    priority: high
+
+    description: >
+      Na secao de gerenciamento de convites, ao clicar em "Ver Conversa" no
+      InviteActionDropdown, o handler handleDropdownWhatsApp chama buildWhatsAppUrl()
+      passando texto de convite completo (com template, variaveis de nome, data, tema,
+      etc.), gerando uma URL wa.me/{phone}?text=... Isso causa reenvio do convite
+      toda vez que o usuario quer apenas abrir a conversa existente com o discursante.
+      "Ver Conversa" deve abrir wa.me/{phone} SEM parametro ?text=, navegando
+      diretamente para a conversa do WhatsApp com aquele numero.
+
+    user_request: >
+      "Quando clico em 'Ver Conversa' no gerenciador de convites, e somente para
+      enviar ao WhatsApp na conversa com o discursante, nao pode mandar com o
+      convite de novo"
+
+    analysis: >
+      Baseline: InviteManagementSection.tsx:106-128 define handleDropdownWhatsApp()
+      que chama buildWhatsAppUrl() com todas as variaveis de template (speakerName,
+      date, topic, position, collection, link). Isso gera URL
+      https://wa.me/{phone}?text={encoded_message}. A funcao buildWhatsAppUrl em
+      whatsappUtils.ts:70-95 sempre anexa ?text= com mensagem resolvida.
+      Fix: handleDropdownWhatsApp deve construir URL simples https://wa.me/{phone}
+      sem ?text=, usando a mesma logica de limpeza de numero (remover +, espacos,
+      hifens) mas sem chamar buildWhatsAppUrl(). Alternativamente, criar uma nova
+      funcao buildWhatsAppConversationUrl(phone) em whatsappUtils.ts que retorna
+      apenas https://wa.me/{cleanPhone}.
+
+    root_cause: >
+      handleDropdownWhatsApp em InviteManagementSection.tsx:106-128 reutiliza
+      buildWhatsAppUrl() que sempre anexa ?text= com mensagem de convite.
+      Nao existe funcao separada para abrir conversa sem mensagem.
+
+    acceptance_criteria:
+      - id: AC-F055-01
+        description: "Ver Conversa abre WhatsApp sem texto de convite"
+        given: "Usuario clica em 'Ver Conversa' no InviteActionDropdown"
+        when: "O speech tem speaker_phone preenchido"
+        then: "WhatsApp abre na conversa com o numero do discursante SEM mensagem pre-preenchida (URL wa.me/{phone} sem ?text=)"
+        status: pending
+
+      - id: AC-F055-02
+        description: "Numero de telefone corretamente formatado na URL"
+        given: "speaker_phone contem numero com formato +5511987654321"
+        when: "Ver Conversa e clicado"
+        then: "URL gerada e https://wa.me/5511987654321 (sem +, sem espacos, sem hifens)"
+        status: pending
+
+      - id: AC-F055-03
+        description: "Botao de enviar convite inicial continua enviando mensagem"
+        given: "Speech com status assigned_not_invited"
+        when: "Botao de WhatsApp (icone) e pressionado na secao de convites"
+        then: "WhatsApp abre COM mensagem de convite pre-preenchida (comportamento inalterado)"
+        status: pending
+
+      - id: AC-F055-04
+        description: "Ver Conversa desabilitado quando nao tem telefone"
+        given: "Speech sem speaker_phone"
+        when: "InviteActionDropdown e exibido"
+        then: "Opcao 'Ver Conversa' aparece desabilitada (opacity reduzida, nao clicavel)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F055-01
+        case: "Numero de telefone com espacos ou hifens"
+        expected: "Caracteres especiais removidos antes de montar URL wa.me"
+        status: pending
+      - id: EC-F055-02
+        case: "WhatsApp nao instalado"
+        expected: "Alert de erro exibido (comportamento existente de openWhatsApp)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Alterar handleDropdownWhatsApp para construir URL wa.me/{phone} sem ?text="
+      - path: "src/lib/whatsappUtils.ts"
+        change: "Adicionar funcao buildWhatsAppConversationUrl(phone) que retorna URL sem mensagem"
+
+    dependencies: []
+    related_features: [F010, F051]
+    related_crs: [105, 106]
+
+  # ===========================================================================
+  # F056 / CR-113: Dialog title "Alterar status" with i18n
+  # ===========================================================================
+
+  - id: F056
+    name: "Change InviteActionDropdown title from speaker name to 'Alterar status' (i18n)"
+    cr_id: 113
+    type: ui
+    priority: medium
+
+    description: >
+      No InviteActionDropdown, o titulo do dialogo exibe o nome do discursante
+      (speech?.speaker_name). O usuario quer que o titulo seja "Alterar status"
+      (traduzido via i18n) ao inves do nome da pessoa. A chave i18n
+      speeches.changeStatus JA EXISTE nos 3 locales:
+      pt-BR: "Alterar status", en: "Change status", es: "Cambiar estado".
+
+    user_request: >
+      "Quando clica nos 3 pontinhos para trocar o status do convite, ao inves de
+      colocar o nome da pessoa como titulo do dialogo coloque (com suporte a i18n)
+      'Alterar status'"
+
+    analysis: >
+      Baseline: InviteActionDropdown.tsx:73-75 renderiza o titulo como:
+      <Text style={[styles.title, { color: colors.text }]}>
+        {speech?.speaker_name ?? ''}
+      </Text>
+      A chave i18n speeches.changeStatus ja existe em todos os 3 locales e ja e
+      usada no accessibilityLabel do botao de tres pontinhos (InviteManagementSection.tsx:205).
+      Fix: substituir {speech?.speaker_name ?? ''} por {t('speeches.changeStatus')}.
+      Nao precisa criar novas chaves i18n.
+
+    root_cause: >
+      InviteActionDropdown.tsx:73-75 usa speech?.speaker_name como titulo do modal.
+      Deveria usar t('speeches.changeStatus') que ja existe nos 3 locales.
+
+    acceptance_criteria:
+      - id: AC-F056-01
+        description: "Titulo do dropdown mostra texto traduzido 'Alterar status'"
+        given: "InviteActionDropdown e exibido (tres pontinhos clicado)"
+        when: "O idioma do app e pt-BR"
+        then: "O titulo do dialogo exibe 'Alterar status'"
+        status: pending
+
+      - id: AC-F056-02
+        description: "Titulo traduzido corretamente em ingles"
+        given: "InviteActionDropdown e exibido"
+        when: "O idioma do app e en"
+        then: "O titulo do dialogo exibe 'Change status'"
+        status: pending
+
+      - id: AC-F056-03
+        description: "Titulo traduzido corretamente em espanhol"
+        given: "InviteActionDropdown e exibido"
+        when: "O idioma do app e es"
+        then: "O titulo do dialogo exibe 'Cambiar estado'"
+        status: pending
+
+    edge_cases:
+      - id: EC-F056-01
+        case: "Speech null quando dropdown visivel"
+        expected: "Titulo mostra texto i18n independente de speech ser null (t('speeches.changeStatus') nao depende de speech)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteActionDropdown.tsx"
+        change: "Trocar {speech?.speaker_name ?? ''} por {t('speeches.changeStatus')} no titulo (linha 73-75)"
+
+    dependencies: []
+    related_features: [F051]
+    related_crs: [106]
+
+  # ===========================================================================
+  # F057 / CR-117: +1 country code shows Canada instead of USA
+  # ===========================================================================
+
+  - id: F057
+    name: "Fix +1 country code showing Canada flag instead of USA"
+    cr_id: 117
+    type: bug
+    priority: high
+
+    description: >
+      Na lista de codigos de pais (countryCodes.ts), Canada (linha 46) e USA
+      (linha 182) compartilham o codigo +1. A funcao getFlagForCode() usa
+      Array.find() que retorna o PRIMEIRO match - Canada aparece antes de USA
+      na lista alfabetica, entao +1 sempre mostra bandeira do Canada. Alem disso,
+      na lista de selecao, ambos Canada e USA aparecem como selecionados quando
+      o codigo e +1. Mesmo ao selecionar USA, o icone do Canada continua sendo
+      mostrado porque getFlagForCode('+1') sempre retorna Canada.
+      Fix: priorizar USA para +1 (mais comum em contexto LDS) reordenando a lista
+      ou adicionando logica de preferencia no getFlagForCode. A abordagem mais
+      simples e mover USA antes de Canada na lista, ou criar uma tabela de
+      prioridade para codigos duplicados.
+
+    user_request: >
+      "O telefone com +1 esta com Canada sendo mostrado. Quando eu clico na lista,
+      aparece tanto canada quanto EUA selecionados, mas mesmo que eu clique em EUA,
+      o icone do canada continua sendo mostrado"
+
+    analysis: >
+      Baseline: countryCodes.ts define COUNTRY_CODES como array ordenado
+      alfabeticamente (apos Brazil). Canada (+1) esta na linha 46, USA (+1) na
+      linha 182. getFlagForCode() na linha 196-199 usa .find() que retorna primeiro
+      match, sempre Canada.
+      Dois problemas:
+      1. getFlagForCode('+1') retorna bandeira do Canada (primeiro find match).
+      2. Na lista de selecao (members.tsx), ambos Canada e USA ficam highlighted
+         pois a comparacao e por code === selectedCode (+1 === +1).
+      Fix proposto:
+      (a) Reordenar COUNTRY_CODES para USA antes de Canada (mudanca simples).
+      (b) Na lista de selecao em members.tsx, comparar por label (unico) ao inves
+          de code para highlight. Ou armazenar country label junto com code.
+      Abordagem mais robusta: armazenar no membro/member o label do pais (ex:
+      "United States (+1)") ao inves de apenas o code, mas isso requer migracao de
+      dados. Abordagem mais simples e pragmatica: reordenar para USA primeiro
+      (atende 99% dos casos LDS) e no seletor usar label para highlight.
+
+    root_cause: >
+      countryCodes.ts: Canada (+1, linha 46) aparece antes de USA (+1, linha 182)
+      na lista. getFlagForCode() usa .find() que retorna primeiro match. Na lista
+      de selecao, comparacao por code causa ambos paises highlighted.
+
+    acceptance_criteria:
+      - id: AC-F057-01
+        description: "Bandeira dos EUA mostrada para codigo +1 por padrao"
+        given: "Membro cadastrado com codigo de pais +1"
+        when: "A tela de membros exibe o membro"
+        then: "Bandeira dos EUA (emoji flag US) e mostrada ao lado do numero"
+        status: pending
+
+      - id: AC-F057-02
+        description: "Lista de selecao mostra apenas um pais selecionado para +1"
+        given: "Usuario abre dropdown de codigo de pais com +1 selecionado"
+        when: "A lista de paises e exibida"
+        then: "Apenas USA aparece como selecionado (highlighted), Canada nao fica highlighted"
+        status: pending
+
+      - id: AC-F057-03
+        description: "Selecionar Canada funciona corretamente"
+        given: "Usuario seleciona Canada na lista de codigos de pais"
+        when: "O membro e salvo e a tela exibe o membro"
+        then: "Bandeira do Canada e mostrada ao lado do numero (distinguivel de USA)"
+        status: pending
+
+      - id: AC-F057-04
+        description: "Outros codigos duplicados nao afetados negativamente"
+        given: "Codigos +7 (Kazakhstan e Russia) tambem sao duplicados"
+        when: "Usuario seleciona Russia ou Kazakhstan"
+        then: "Bandeira correta e mostrada e apenas o pais selecionado fica highlighted"
+        status: pending
+
+    edge_cases:
+      - id: EC-F057-01
+        case: "Membros existentes com +1 (dados legados)"
+        expected: "Membros existentes com +1 passam a mostrar bandeira dos EUA (padrao); usuario pode reselecionar Canada se necessario"
+        status: pending
+      - id: EC-F057-02
+        case: "splitPhoneNumber com numero +1..."
+        expected: "splitPhoneNumber continua funcionando corretamente (usa Sets, nao afetado por ordem)"
+        status: pending
+
+    files_impacted:
+      - path: "src/lib/countryCodes.ts"
+        change: "Reordenar COUNTRY_CODES: mover USA antes de Canada na secao alfabetica. Alterar getFlagForCode para suportar preferencia de pais por label quando armazenado."
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "Alterar selecao e highlight no dropdown de pais para usar label (unico) ao inves de code, permitindo distinguir Canada de USA"
+
+    dependencies: []
+    related_features: [F003, F029]
+    related_crs: [85, 92]
+
+  # ===========================================================================
+  # F058 / CR-122: Change "3o Discurso" to "Ultimo Discurso" label
+  # ===========================================================================
+
+  - id: F058
+    name: "Change third speech label from ordinal to 'Ultimo Discurso' (i18n)"
+    cr_id: 122
+    type: ui
+    priority: medium
+
+    description: >
+      Na agenda, aba Discursos e secao de gerenciamento de convites, o label do
+      3o discurso usa formato ordinal generico ("3o Discurso") via getPositionLabel()
+      que gera t('speeches.slot', { number: '3\u00BA' }). O usuario quer que a
+      posicao 3 seja exibida como "Ultimo Discurso" ao inves de "3o Discurso".
+      Isso afeta: (1) SpeechSlot.tsx - getPositionLabel(), (2) AgendaForm.tsx -
+      label do SpeakerField e SectionHeader (ja usa i18n key agenda.sectionLastSpeech),
+      (3) InviteManagementSection.tsx - segunda linha do invite row.
+      As i18n keys agenda.sectionLastSpeech ja existem:
+      pt-BR: "Ultimo Discurso", en: "Final Speech", es: "Ultimo Discurso".
+      Porem o label inline do slot ("3o Discurso") precisa de tratamento especial.
+
+    user_request: >
+      "Trocar label, na agenda, de 3o Discurso para 'Ultimo Discurso'"
+
+    analysis: >
+      Baseline: getPositionLabel() em SpeechSlot.tsx:51-54 sempre retorna formato
+      ordinal: t('speeches.slot', { number: '3\u00BA' }) -> "3o Discurso".
+      Nao existe caso especial para posicao 3.
+      Locais afetados:
+      1. SpeechSlot.tsx:51-54 getPositionLabel() - usado na aba Discursos.
+      2. AgendaForm.tsx:377-378 label do SpeakerField para posicao 3 - usa
+         '3\u00BA ${t("speeches.speaker")}' hardcoded, nao usa getPositionLabel.
+      3. InviteManagementSection.tsx:180 - usa t('speeches.slot', { number: '3\u00BA' }).
+      4. AgendaForm.tsx:375 SectionHeader ja usa t('agenda.sectionLastSpeech')
+         corretamente ("Ultimo Discurso").
+      Fix: Adicionar nova i18n key speeches.lastSpeech = "Ultimo Discurso" (pt-BR),
+      "Final Speech" (en), "Ultimo Discurso" (es). Alterar getPositionLabel() para
+      retornar essa key quando position === 3. Atualizar AgendaForm label do
+      SpeakerField e InviteManagementSection para usar a mesma logica.
+
+    root_cause: >
+      getPositionLabel() em SpeechSlot.tsx:51-54 sempre usa formato ordinal
+      generico sem caso especial para posicao 3 (ultimo discurso). AgendaForm.tsx
+      e InviteManagementSection.tsx tambem usam formato ordinal hardcoded para
+      posicao 3.
+
+    acceptance_criteria:
+      - id: AC-F058-01
+        description: "Label do 3o discurso mostra 'Ultimo Discurso' na aba Discursos"
+        given: "Card de domingo expandido na aba Discursos"
+        when: "O idioma e pt-BR"
+        then: "O label do terceiro slot mostra 'ULTIMO DISCURSO' (uppercase, como os outros labels)"
+        status: pending
+
+      - id: AC-F058-02
+        description: "Label traduzido em ingles"
+        given: "Card de domingo expandido na aba Discursos"
+        when: "O idioma e en"
+        then: "O label do terceiro slot mostra 'FINAL SPEECH'"
+        status: pending
+
+      - id: AC-F058-03
+        description: "Label traduzido em espanhol"
+        given: "Card de domingo expandido na aba Discursos"
+        when: "O idioma e es"
+        then: "O label do terceiro slot mostra 'ULTIMO DISCURSO'"
+        status: pending
+
+      - id: AC-F058-04
+        description: "Label do 3o discursante na Agenda usa 'Ultimo Discurso'"
+        given: "Formulario de agenda para reuniao normal"
+        when: "O campo do 3o discursante e exibido"
+        then: "O label do campo mostra 'Ultimo Discurso' (pt-BR) / 'Final Speech' (en) / 'Ultimo Discurso' (es) ao inves de '3o Discurso'"
+        status: pending
+
+      - id: AC-F058-05
+        description: "Invite management usa 'Ultimo Discurso' para posicao 3"
+        given: "Invite row para speech na posicao 3"
+        when: "A segunda linha do invite row e exibida"
+        then: "Mostra 'Ultimo Discurso' ao inves de '3o Discurso'"
+        status: pending
+
+      - id: AC-F058-06
+        description: "Labels do 1o e 2o discurso nao afetados"
+        given: "Cards de domingo na aba Discursos e Agenda"
+        when: "Slots de posicao 1 e 2 sao exibidos"
+        then: "Labels continuam usando formato ordinal: '1o Discurso', '2o Discurso'"
+        status: pending
+
+    edge_cases:
+      - id: EC-F058-01
+        case: "Modo Apresentacao"
+        expected: "Modo Apresentacao tambem deve mostrar 'Ultimo Discurso' para posicao 3 (verificar usePresentationMode.ts)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Alterar getPositionLabel() para retornar i18n key especial quando position === 3"
+      - path: "src/components/AgendaForm.tsx"
+        change: "Alterar label do SpeakerField de posicao 3 para usar 'Ultimo Discurso' i18n"
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Usar mesma logica de label para posicao 3 na segunda linha do invite row"
+      - path: "src/i18n/locales/pt-BR.json"
+        change: "Adicionar key speeches.lastSpeech = 'Ultimo Discurso'"
+      - path: "src/i18n/locales/en.json"
+        change: "Adicionar key speeches.lastSpeech = 'Final Speech'"
+      - path: "src/i18n/locales/es.json"
+        change: "Adicionar key speeches.lastSpeech = 'Ultimo Discurso'"
+
+    dependencies: []
+    related_features: [F008, F012, F043]
+    related_crs: [99]
+
+  # ===========================================================================
+  # F059 / CR-125: Fix closing prayer field duplication bug
+  # ===========================================================================
+
+  - id: F059
+    name: "Fix closing prayer field visual duplication in AgendaForm"
+    cr_id: 125
+    type: bug
+    priority: critical
+
+    description: >
+      Na aba Agenda, ao clicar no campo "Oracao de encerramento", ocorre duplicacao
+      visual: tanto o campo inline do PrayerSelector quanto a tela modal de busca
+      aparecem duplicados. O campo parece se multiplicar na tela.
+      Root cause: AgendaForm.tsx renderiza PrayerSelector com visible={true} quando
+      selectorModal?.type === 'prayer'. O PrayerSelector renderiza DOIS elementos:
+      (1) Um botao inline (Pressable) que e sempre renderizado como parte do fluxo
+      normal do formulario - este botao se torna redundante/duplicado quando o
+      PrayerSelector e renderizado condicionalmente pelo selectorModal.
+      (2) Um Modal que abre via useEffect quando visible=true.
+      A duplicacao ocorre porque:
+      - AgendaForm ja renderiza um SelectorField para opening_prayer e closing_prayer
+        (linhas 231-243 e 424-436) que sao botoes de toque que abrem o selectorModal.
+      - Quando selectorModal.type === 'prayer', AgendaForm renderiza PrayerSelector
+        (linhas 480-507) com visible={true}, que renderiza OUTRO botao inline
+        (PrayerSelector:93-115) ALEM de abrir o modal.
+      Fix: No contexto de AgendaForm, o PrayerSelector deve funcionar SOMENTE como
+      modal (sem renderizar o botao inline). Opcoes:
+      (a) Adicionar prop modalOnly ao PrayerSelector que suprime o botao inline.
+      (b) Alterar AgendaForm para nao renderizar PrayerSelector no fluxo do
+          formulario, usando-o apenas como modal separado.
+
+    user_request: >
+      "Tem um bug no campo Oracao de encerramento. Quando eu clico, ele parece que
+      duplica tanto o campo quando o numero de telas de search que aparecem."
+
+    analysis: >
+      Baseline: AgendaForm.tsx usa padrao de SelectorField + modal condicional para
+      todos os tipos de campo (actor, hymn, prayer). Para prayer (linhas 480-507),
+      renderiza PrayerSelector com visible={true}. PrayerSelector.tsx sempre renderiza
+      um botao inline (<Pressable> linhas 93-115) + Modal (linhas 117-203). O useEffect
+      (linhas 60-62) auto-abre o modal quando visible=true.
+      O resultado e: AgendaForm tem SelectorField para closing_prayer (linhas 424-436)
+      + PrayerSelector renderizado condicionalmente (linhas 480-507) que adiciona OUTRO
+      botao inline ao DOM + abre modal. Isso causa a duplicacao visual do campo e
+      potencialmente do modal.
+      Fix recomendado: Adicionar prop modalOnly ao PrayerSelector. Quando modalOnly=true,
+      o componente nao renderiza o botao inline (Pressable), apenas o Modal. O AgendaForm
+      ja tem seu proprio SelectorField para trigger; o PrayerSelector so precisa fornecer
+      o modal.
+
+    root_cause: >
+      AgendaForm.tsx renderiza PrayerSelector condicionalmente com visible={true}
+      (linhas 480-507). PrayerSelector.tsx sempre renderiza um botao inline
+      (linhas 93-115) ALEM do Modal. Isso cria duplicacao visual porque AgendaForm
+      ja tem seu proprio SelectorField para o campo de oracao.
+
+    acceptance_criteria:
+      - id: AC-F059-01
+        description: "Clicar em 'Oracao de encerramento' nao duplica o campo"
+        given: "Formulario de agenda com campo 'Oracao de encerramento' visivel"
+        when: "Usuario clica no campo de oracao de encerramento"
+        then: "Apenas um campo de oracao de encerramento e visivel na tela e o modal de selecao abre normalmente"
+        status: pending
+
+      - id: AC-F059-02
+        description: "Modal de selecao de oracao abre uma unica vez"
+        given: "Usuario clica no campo de oracao de encerramento"
+        when: "O modal de selecao e exibido"
+        then: "Apenas UM modal de selecao e mostrado (sem duplicacao de modais)"
+        status: pending
+
+      - id: AC-F059-03
+        description: "Oracao de abertura tambem nao duplica"
+        given: "Formulario de agenda com campo 'Oracao de abertura' visivel"
+        when: "Usuario clica no campo de oracao de abertura"
+        then: "Apenas um campo e um modal sao exibidos (sem duplicacao)"
+        status: pending
+
+      - id: AC-F059-04
+        description: "Selecao de membro para oracao funciona corretamente"
+        given: "Modal de selecao de oracao aberto"
+        when: "Usuario seleciona um membro da lista"
+        then: "O nome do membro e preenchido no campo de oracao e o modal fecha"
+        status: pending
+
+      - id: AC-F059-05
+        description: "Nome customizado para oracao funciona corretamente"
+        given: "Modal de selecao de oracao aberto"
+        when: "Usuario digita um nome customizado e confirma"
+        then: "O nome customizado e preenchido no campo de oracao e o modal fecha"
+        status: pending
+
+      - id: AC-F059-06
+        description: "PrayerSelector funciona normalmente fora do AgendaForm"
+        given: "PrayerSelector usado sem prop modalOnly (uso standalone)"
+        when: "Componente e renderizado"
+        then: "Botao inline e modal funcionam normalmente como antes"
+        status: pending
+
+    edge_cases:
+      - id: EC-F059-01
+        case: "Abrir e fechar modal de oracao rapidamente"
+        expected: "Nenhuma duplicacao ou estado residual; campo volta ao estado normal"
+        status: pending
+      - id: EC-F059-02
+        case: "Trocar entre oracao de abertura e encerramento sem fechar modal"
+        expected: "Modal reflete o campo correto (abertura ou encerramento) sem duplicacao"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/PrayerSelector.tsx"
+        change: "Adicionar prop modalOnly que quando true suprime renderizacao do botao inline (Pressable), renderizando apenas o Modal"
+      - path: "src/components/AgendaForm.tsx"
+        change: "Passar modalOnly={true} ao PrayerSelector renderizado condicionalmente pelo selectorModal"
+
+    dependencies: []
+    related_features: [F012, F015]
+    related_crs: [74, 98]
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: ASM-F055-01
+    description: >
+      A funcao openWhatsApp() existente em whatsapp.ts pode receber URL sem
+      parametro ?text= e funcionar corretamente (Linking.canOpenURL e openURL
+      suportam URLs wa.me sem query string).
+    impact: "Baixo - wa.me/{phone} e formato oficial documentado do WhatsApp"
+
+  - id: ASM-F057-01
+    description: >
+      Reordenar USA antes de Canada na lista COUNTRY_CODES e suficiente para
+      resolver o caso mais comum. Usuarios que precisam de Canada podem
+      reselecionar na lista. Nao e necessario armazenar o label do pais no banco.
+    impact: "Medio - membros existentes com +1 passam a mostrar bandeira dos EUA"
+
+  - id: ASM-F057-02
+    description: >
+      O highlight de pais selecionado na lista de codigos (members.tsx) pode ser
+      ajustado para comparar por label ao inves de code, sem impacto em outros
+      fluxos. O valor armazenado no banco (member.country_code) continua sendo
+      apenas o code ('+1'), nao o label.
+    impact: "Baixo - mudanca apenas visual no dropdown de selecao"
+
+  - id: ASM-F058-01
+    description: >
+      A mudanca de label afeta apenas a UI. O campo position no banco de dados
+      continua sendo numerico (1, 2, 3). Nenhuma migracao de dados necessaria.
+    impact: "Nenhum - mudanca puramente visual"
+
+  - id: ASM-F059-01
+    description: >
+      Adicionar prop modalOnly ao PrayerSelector nao quebra usos existentes
+      do componente, pois o default sera false (comportamento atual preservado).
+    impact: "Nenhum - prop opcional com default false"
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []

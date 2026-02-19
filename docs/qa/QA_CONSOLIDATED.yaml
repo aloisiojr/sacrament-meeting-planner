@@ -4,8 +4,9 @@
 # CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98,
 # CR-94, CR-96, CR-97, CR-99, CR-100 (PRE),
 # CR-101, CR-102, CR-103, CR-104, CR-108, CR-109 (PRE+POST),
-# CR-105, CR-106, CR-107, CR-110, CR-111 (PRE+POST)
-# Updated: 2026-02-18
+# CR-105, CR-106, CR-107, CR-110, CR-111 (PRE+POST),
+# CR-112, CR-113, CR-117, CR-122, CR-125 (PRE+POST)
+# Updated: 2026-02-19
 # =============================================================================
 
 # #############################################################################
@@ -3911,3 +3912,406 @@ cr_111:
       All 2 must_pass and 2 should_pass checks passed. Row gap increased from
       8 to 12, X fontSize increased from 20 to 24. Touch target and layout
       remain functional.
+
+# #############################################################################
+# CR-112: Ver Conversa without resending invite (F055)
+# #############################################################################
+
+cr_112:
+  cr_id: CR-112
+  title: "Ver Conversa should open WhatsApp conversation without resending invite message"
+  type: bugfix
+  spec: specs/SPEC_F055_F059.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Root cause confirmed: handleDropdownWhatsApp calls buildWhatsAppUrl()
+      with full template variables, generating wa.me URL with ?text= message.
+      Should open conversation-only URL without message text.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: 3160210
+        message: "feat(whatsapp): add buildWhatsAppConversationUrl for opening chat without message (CR-112)"
+      - hash: 6ff6d4c
+        message: "fix(invite): use buildWhatsAppConversationUrl for View Conversation action (CR-112)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 67
+    tester_tests_total: 67
+    tester_suite_passed: 3128
+    tester_suite_total: 3128
+
+    must_pass_results:
+      - id: CR112-MP-01
+        description: "handleDropdownWhatsApp opens WhatsApp WITHOUT invite message"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:106-115 handleDropdownWhatsApp now calls
+          buildWhatsAppConversationUrl(speech.speaker_phone) instead of
+          buildWhatsAppUrl() with template variables.
+
+      - id: CR112-MP-02
+        description: "handleNotInvitedAction still sends invite message (unchanged)"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:71-97 handleNotInvitedAction still calls
+          buildWhatsAppUrl() with full template variables (speakerName, date,
+          topic, position, collection, link). Unchanged from baseline.
+
+      - id: CR112-MP-03
+        description: "WhatsApp conversation URL has no text parameter"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:101-111 buildWhatsAppConversationUrl returns
+          `https://wa.me/${cleanPhone}` without any ?text= query parameter.
+
+    should_pass_results:
+      - id: CR112-SP-01
+        description: "Phone number is properly cleaned for wa.me URL"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:103-108 buildWhatsAppConversationUrl cleans phone:
+          removes spaces/dashes/parentheses via regex, strips leading +.
+          Same cleaning logic as buildWhatsAppUrl.
+
+    summary: |
+      All 3 must_pass and 1 should_pass checks passed. New function
+      buildWhatsAppConversationUrl added to whatsappUtils.ts. handleDropdownWhatsApp
+      now opens conversation without pre-filled message. Initial invite flow unchanged.
+
+# #############################################################################
+# CR-113: Dialog title "Alterar status" i18n (F056)
+# #############################################################################
+
+cr_113:
+  cr_id: CR-113
+  title: "Change InviteActionDropdown title from speaker name to i18n changeStatus"
+  type: ui_change
+  spec: specs/SPEC_F055_F059.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Root cause confirmed: InviteActionDropdown.tsx:73-75 showed speaker name
+      as title. i18n keys speeches.changeStatus already exist in all 3 locales.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: cf1c8cf
+        message: "fix(invite): change InviteActionDropdown title to i18n changeStatus label (CR-113)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 67
+    tester_tests_total: 67
+    tester_suite_passed: 3128
+    tester_suite_total: 3128
+
+    must_pass_results:
+      - id: CR113-MP-01
+        description: "Dialog title uses i18n key instead of speaker name"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:73-75 now shows {t('speeches.changeStatus')}
+          instead of {speech?.speaker_name ?? ''}.
+
+      - id: CR113-MP-02
+        description: "i18n keys exist for all 3 locales"
+        status: PASSED
+        evidence: |
+          pt-BR.json:187 "changeStatus": "Alterar status"
+          en.json:187 "changeStatus": "Change status"
+          es.json:187 "changeStatus": "Cambiar estado"
+
+    should_pass_results:
+      - id: CR113-SP-01
+        description: "Speaker name is not displayed anywhere in dialog title"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx title Text element has no reference to
+          speech?.speaker_name. Only {t('speeches.changeStatus')} is used.
+
+    summary: |
+      All 2 must_pass and 1 should_pass checks passed. Title changed from
+      speaker name to i18n changeStatus key. No new i18n keys needed.
+
+# #############################################################################
+# CR-117: +1 country code shows Canada instead of USA (F057)
+# #############################################################################
+
+cr_117:
+  cr_id: CR-117
+  title: "Fix +1 country code showing Canada flag instead of USA flag"
+  type: bugfix
+  spec: specs/SPEC_F055_F059.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Root cause confirmed: Canada (+1) listed before USA (+1) in alphabetical
+      order. getFlagForCode uses .find() returning first match. Picker highlights
+      both countries sharing code.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: 017b7a5
+        message: "fix(country): reorder USA before Canada for +1 default and add getCountryByLabel (CR-117)"
+      - hash: fe1bfba
+        message: "fix(members): highlight country by label instead of code to resolve +1 ambiguity (CR-117)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 67
+    tester_tests_total: 67
+    tester_suite_passed: 3128
+    tester_suite_total: 3128
+
+    must_pass_results:
+      - id: CR117-MP-01
+        description: "+1 country code shows USA flag by default"
+        status: PASSED
+        evidence: |
+          countryCodes.ts:47 USA is now listed BEFORE Canada (line 48).
+          getFlagForCode('+1') uses .find() and returns USA flag first.
+          Comment on line 46: "USA before Canada: +1 defaults to US flag (ADR-043)".
+
+      - id: CR117-MP-02
+        description: "Country picker does not highlight both CA and US simultaneously"
+        status: PASSED
+        evidence: |
+          members.tsx:154 now uses item.label === countryLabel for highlighting
+          instead of item.code === countryCode. Since labels are unique
+          ("United States (+1)" vs "Canada (+1)"), only selected country highlights.
+
+      - id: CR117-MP-03
+        description: "Selecting USA persists USA selection (not reverted to Canada)"
+        status: PASSED
+        evidence: |
+          members.tsx:157-158 setCountryCode(item.code) + setCountryLabel(item.label)
+          stores both code and label. countryLabel state (line 58) initialized from
+          COUNTRY_CODES.find() which now returns USA first for +1. Flag display
+          (line 98) uses getFlagForCode(countryCode) which returns USA flag.
+
+    should_pass_results:
+      - id: CR117-SP-01
+        description: "Other shared codes (+7 RU/KZ, etc.) also work correctly"
+        status: PASSED
+        evidence: |
+          countryCodes.ts:100 Kazakhstan (+7) listed before Russia (+7, line 151).
+          Same label-based highlighting in picker applies. Labels are unique
+          ("Kazakhstan (+7)" vs "Russia (+7)").
+
+      - id: CR117-SP-02
+        description: "splitPhoneNumber still works for +1 numbers"
+        status: PASSED
+        evidence: |
+          splitPhoneNumber uses CODE_SETS_BY_LENGTH built from Sets (deduplicates).
+          Reordering does not affect Set membership. splitPhoneNumber('+12025551234')
+          correctly returns { countryCode: '+1', phone: '2025551234' }.
+
+    summary: |
+      All 3 must_pass and 2 should_pass checks passed. USA reordered before
+      Canada in COUNTRY_CODES. New getCountryByLabel helper added. Picker
+      highlights by unique label instead of ambiguous code. splitPhoneNumber
+      unaffected.
+
+# #############################################################################
+# CR-122: 3o Discurso -> Ultimo Discurso (F058)
+# #############################################################################
+
+cr_122:
+  cr_id: CR-122
+  title: "Change third speech label from ordinal to 'Ultimo Discurso' (Last Speech)"
+  type: ui_change
+  spec: specs/SPEC_F055_F059.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Root cause confirmed: getPositionLabel() always uses ordinal format.
+      No special case for position 3. Affects SpeechSlot, AgendaForm,
+      InviteManagementSection.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: 0005ea6
+        message: "feat(i18n): add speeches.lastSpeech key and update 4 locations for position 3 (CR-122)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 67
+    tester_tests_total: 67
+    tester_suite_passed: 3128
+    tester_suite_total: 3128
+
+    must_pass_results:
+      - id: CR122-MP-01
+        description: "Position 3 label shows 'Ultimo Discurso' / 'Last Speech'"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:51-57 getPositionLabel now has special case:
+          if (position === 3) return t('speeches.lastSpeech');
+          Falls through to ordinal format for other positions.
+
+      - id: CR122-MP-02
+        description: "Positions 1 and 2 still use ordinal labels"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:56 for positions != 3, returns
+          t('speeches.slot', { number: `${position}\u00BA` }).
+          Produces "1o Discurso", "2o Discurso" as before.
+
+      - id: CR122-MP-03
+        description: "AgendaForm 3rd speaker label uses 'Ultimo' instead of '3o'"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:378 now uses
+          `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`
+          instead of `3\u00BA ${t('speeches.speaker')}`.
+
+      - id: CR122-MP-04
+        description: "InviteManagement also uses 'Ultimo' for position 3"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:167 uses conditional:
+          speech.position === 3
+            ? t('speeches.lastSpeech')
+            : t('speeches.slot', { number: `${speech.position}\u00BA` })
+
+      - id: CR122-MP-05
+        description: "i18n keys exist for all 3 locales"
+        status: PASSED
+        evidence: |
+          pt-BR.json:193 "lastSpeech": "Ultimo Discurso"
+          en.json:193 "lastSpeech": "Final Speech"
+          es.json:193 "lastSpeech": "Ultimo Discurso"
+
+    should_pass_results:
+      - id: CR122-SP-01
+        description: "Presentation mode also uses 'Ultimo' for last speech"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts:162 already uses
+          t('speeches.lastSpeech') - ${t('speeches.speaker')} for position 3.
+
+    summary: |
+      All 5 must_pass and 1 should_pass checks passed. New i18n key
+      speeches.lastSpeech added to all 3 locales. Updated in 4 locations:
+      SpeechSlot, AgendaForm, InviteManagementSection, usePresentationMode.
+
+# #############################################################################
+# CR-125: Bug duplicacao oracao de encerramento (F059)
+# #############################################################################
+
+cr_125:
+  cr_id: CR-125
+  title: "Fix closing prayer field visual duplication in AgendaForm"
+  type: bugfix
+  spec: specs/SPEC_F055_F059.yaml
+  qa_plan: qa/QA_PLAN_batch9_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Root cause confirmed: PrayerSelector renders inline Pressable button
+      alongside Modal when used in controlled mode from AgendaForm. This causes
+      visual duplication of the prayer field.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: d3ec6a6
+        message: "feat(prayer): add modalOnly prop to PrayerSelector to suppress inline button (CR-125)"
+      - hash: abfda79
+        message: "fix(agenda): pass modalOnly={true} to PrayerSelector to fix field duplication (CR-125)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 67
+    tester_tests_total: 67
+    tester_suite_passed: 3128
+    tester_suite_total: 3128
+
+    must_pass_results:
+      - id: CR125-MP-01
+        description: "No visual duplication when closing prayer field is tapped"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:96 wraps inline Pressable with {!modalOnly && (...)}.
+          When modalOnly={true}, the inline selector button is not rendered.
+          Only the Modal (lines 122-207) renders.
+
+      - id: CR125-MP-02
+        description: "Only one search modal opens on tap"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:483 passes modalOnly={true} to PrayerSelector.
+          Only PrayerSelector's Modal renders (no duplicate inline button).
+          The original SelectorField (lines 424-436) remains as the trigger.
+
+      - id: CR125-MP-03
+        description: "Opening prayer also fixed (same pattern)"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:480-507 renders a single PrayerSelector for both
+          opening_prayer and closing_prayer via selectorModal.field. Both
+          use modalOnly={true} via the same render block.
+
+      - id: CR125-MP-04
+        description: "PrayerSelector standalone usage still works"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:55 defaults modalOnly = false. Without the prop,
+          the inline Pressable button renders normally at lines 97-120.
+          Standalone usage is preserved.
+
+    should_pass_results:
+      - id: CR125-SP-01
+        description: "Modal closes properly and state resets"
+        status: PASSED
+        evidence: |
+          PrayerSelector.tsx:126 onRequestClose calls setModalVisible(false)
+          and onClose?(). Lines 144-148 cancel button resets search and
+          customName state. AgendaForm.tsx:484 onClose sets
+          setSelectorModal(null).
+
+    summary: |
+      All 4 must_pass and 1 should_pass checks passed. New modalOnly prop
+      added to PrayerSelector. AgendaForm passes modalOnly={true} to suppress
+      inline button. Standalone PrayerSelector usage preserved.

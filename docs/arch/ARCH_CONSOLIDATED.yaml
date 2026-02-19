@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-18"
-  last_updated_by: "batch-8-phase-1"
+  last_updated_by: "batch-8-phase-2"
   total_modules: 8
-  total_adrs: 30
+  total_adrs: 32
   total_crs_implemented: 82
   pending_arch: "none"
   source_documents:
@@ -22,6 +22,7 @@ metadata:
     - docs/arch/ARCH_M013.yaml
     - docs/arch/ARCH_M014.yaml
     - docs/arch/ARCH_M015.yaml
+    - docs/arch/ARCH_M016.yaml
 
 # =============================================================================
 # TECH STACK
@@ -220,7 +221,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024]
+    spec_features: [F008, F010, F024, F051]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -237,7 +238,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -248,6 +249,7 @@ modules:
       buildWhatsAppUrl aceita parametro 'language' para selecionar template do idioma da ala.
       CR-101/F045: LEDs condicionados a isSpeechesType no SundayCard (ocultos para domingos sem discursos).
       CR-104+108/F048: Templates padrao com aspas ao redor de {titulo}; {colecao} e {link} passados em WhatsAppVariables.
+      CR-106/F051: Transicao reversa assigned_invited -> assigned_not_invited adicionada a VALID_TRANSITIONS.
 
   - id: M004
     name: AgendaModule
@@ -356,7 +358,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -378,6 +380,7 @@ modules:
       - src/components/NextSundaysSection.tsx
       - src/components/NextAssignmentsSection.tsx
       - src/components/InviteManagementSection.tsx
+      - src/components/InviteActionDropdown.tsx
       - src/components/SwipeableCard.tsx
       - src/components/QueryErrorView.tsx
     hooks:
@@ -389,10 +392,10 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
-      Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary).
+      Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
       Presentation Mode button aparece no Home aos domingos.
       CR-82 adicionou GestureHandlerRootView wrapper no root layout.
       Tema: system detection + manual toggle (automatic/light/dark).
@@ -405,6 +408,11 @@ modules:
       CR-103/F047: Settings WhatsApp usa getDefaultTemplate(language) como fallback quando DB e null.
       CR-104+108/F048: InviteManagementSection passa collection/link e usa formatDateHumanReadable para {data}.
       CR-109/F049: NextSundaysSection corrige condicao de SpeechSlots para incluir reason === 'speeches'.
+      CR-105/F050: InviteManagementSection botoes de acao trocam texto por icones (WhatsApp SVG + U+22EE tres pontinhos).
+      CR-106/F051: InviteManagementSection troca Alert por InviteActionDropdown customizado com 5 opcoes.
+      CR-107/F052: InviteManagementSection segunda linha mostra '{N}o Discurso - <LED> <status name>'.
+      CR-110/F053: Bishopric agora ve InviteManagementSection (permissao home:invite_mgmt adicionada).
+      CR-111/F054: SpeechSlot gap 8->12 e removeButton fontSize 20->24.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -743,6 +751,26 @@ adrs:
       - "Padrao ja testado e validado"
       - "RLS existente cobre automaticamente (mesma tabela)"
 
+  - id: ADR-040
+    title: "SVG inline para icone WhatsApp ao inves de Unicode ou icon library"
+    context: "F050 precisa de icone reconhecivel do WhatsApp. Nao existe glifo Unicode padrao. App segue DD-25 (sem icon library)."
+    decision: "Usar SVG inline minimo do logo WhatsApp via react-native-svg (dependencia transitiva do Expo). Zero instalacao."
+    decided_in: "CR-105"
+    consequences:
+      - "Icone reconhecivel e profissional"
+      - "Zero dependencias novas (react-native-svg ja presente)"
+      - "Consiste com DD-25 (sem icon library)"
+
+  - id: ADR-041
+    title: "InviteActionDropdown como componente separado do StatusChangeModal"
+    context: "F051 precisa de dropdown customizado. StatusChangeModal tem padrao similar mas opcoes diferentes (inclui 'Ver conversa')."
+    decision: "Criar novo componente InviteActionDropdown.tsx com padrao visual do StatusChangeModal mas logica propria. Importar STATUS_INDICATOR_COLORS para consistencia."
+    decided_in: "CR-106"
+    consequences:
+      - "Separacao de responsabilidades clara"
+      - "StatusChangeModal permanece inalterado"
+      - "Padrao visual consistente via mesmas cores"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -959,7 +987,7 @@ roles:
       - "sunday_type:write"
       - "settings:access, settings:language, settings:whatsapp, settings:timezone, settings:users"
       - "invite:manage, invitation:create"
-      - "home:next_assignments"
+      - "home:next_assignments, home:invite_mgmt"
       - "agenda:read, agenda:write, agenda:assign_speaker"
       - "presentation:start"
       - "push:receive"
@@ -1141,6 +1169,7 @@ file_structure:
     "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos"
     "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
     "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary)"
+    "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051)"
 
   "src/lib/":
     "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
@@ -1370,6 +1399,15 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-039]
     new_files: []
+
+  batch_8_phase_2:
+    crs: "CR-105, CR-106, CR-107, CR-110, CR-111"
+    scope: "Invite Management UX: icon buttons (F050), custom dropdown (F051), enhanced second line (F052), bishopric visibility (F053), SpeechSlot spacing (F054)"
+    doc: "ARCH_M016.yaml"
+    status: "pending implementation"
+    adrs: [ADR-040, ADR-041]
+    new_files:
+      - "src/components/InviteActionDropdown.tsx"
 
 # =============================================================================
 # OBSERVABILITY

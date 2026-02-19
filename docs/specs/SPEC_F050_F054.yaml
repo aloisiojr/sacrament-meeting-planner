@@ -1,0 +1,733 @@
+# =============================================================================
+# SPEC_F050_F054.yaml
+# Specification for Batch 8 Phase 2 - Invite Management UX
+# Features: F050, F051, F052, F053, F054
+# CRs: CR-105, CR-106, CR-107, CR-110, CR-111
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 8
+phase: 2
+created: "2026-02-18"
+last_updated: "2026-02-18"
+
+features:
+
+  # ===========================================================================
+  # F050 / CR-105: Replace text buttons with icons in invite management
+  # ===========================================================================
+
+  - id: F050
+    name: "Replace WhatsApp text button with icon and status button with three-dots"
+    cr_id: 105
+    type: ui
+    priority: medium
+
+    description: >
+      Na secao de gerenciamento de convites (InviteManagementSection.tsx), os botoes
+      de acao sao texto puro: "WhatsApp" (para status assigned_not_invited) e
+      "Alterar status" (para status assigned_invited). O usuario quer substituir:
+      (1) O botao "WhatsApp" por um icone do WhatsApp reconhecivel.
+      (2) O botao "Alterar status" por um icone de tres pontinhos (ellipsis vertical).
+      O app nao usa biblioteca de icones (DD-25); usa caracteres Unicode para icones.
+      O icone do WhatsApp pode ser representado com um SVG inline ou com um componente
+      customizado simples (telefone em circulo), pois nao existe glifo Unicode padrao
+      para WhatsApp. Alternativamente, pode-se usar o emoji de telefone com seta
+      (Unicode) para representar a acao de contato via WhatsApp, ou um SVG minimalista
+      do logo WhatsApp. O icone de tres pontinhos pode usar Unicode U+22EE (vertical
+      ellipsis).
+
+    user_request: >
+      "Na sessao de gerenciamento de convites, trocar botao texto WhatsApp pelo
+      icone do WhatsApp e icone de status por tres pontinhos"
+
+    analysis: >
+      Baseline: InviteManagementSection.tsx:196-205 renderiza botoes como Pressable
+      com Text. Para assigned_not_invited mostra 'WhatsApp' literal, para
+      assigned_invited mostra t('speeches.changeStatus'). Ambos sao texto com
+      fontSize 13 e fontWeight 600. O app segue DD-25 (Unicode icons, sem icon
+      library). Porem nao existe glifo Unicode padrao para WhatsApp. Opcoes:
+      (a) Usar SVG inline simples do logo WhatsApp (Path dentro de Svg do
+      react-native-svg, que ja e dependencia transitiva do Expo).
+      (b) Usar emoji de telefone (U+1F4F1 ou U+1F4DE).
+      Para tres pontinhos: usar U+22EE (vertical ellipsis) ou U+2026 (horizontal
+      ellipsis). O vertical (U+22EE) e mais intuitivo para "menu de opcoes".
+
+    acceptance_criteria:
+      - id: AC-F050-01
+        description: "Botao de assigned_not_invited mostra icone de WhatsApp ao inves de texto"
+        given: "Invite row para speech com status assigned_not_invited"
+        when: "A secao de gerenciamento de convites e exibida"
+        then: "O botao de acao mostra icone do WhatsApp (SVG ou Unicode) ao inves do texto 'WhatsApp'"
+        status: pending
+
+      - id: AC-F050-02
+        description: "Botao de assigned_invited mostra tres pontinhos ao inves de texto"
+        given: "Invite row para speech com status assigned_invited"
+        when: "A secao de gerenciamento de convites e exibida"
+        then: "O botao de acao mostra icone de tres pontinhos (Unicode U+22EE ou similar) ao inves de t('speeches.changeStatus')"
+        status: pending
+
+      - id: AC-F050-03
+        description: "Comportamento onPress do botao WhatsApp inalterado"
+        given: "Botao de WhatsApp (icone) pressionado"
+        when: "Speech tem status assigned_not_invited"
+        then: "handleNotInvitedAction e chamado (abre WhatsApp + muda status para invited)"
+        status: pending
+
+      - id: AC-F050-04
+        description: "Comportamento onPress do botao tres pontinhos inalterado"
+        given: "Botao de tres pontinhos pressionado"
+        when: "Speech tem status assigned_invited"
+        then: "handleInvitedAction e chamado (abre dropdown de opcoes de status)"
+        status: pending
+
+      - id: AC-F050-05
+        description: "Botoes tem accessibilityLabel descritivo"
+        given: "Ambos os botoes de icone renderizados"
+        when: "Screen reader le os botoes"
+        then: "WhatsApp icon button tem accessibilityLabel 'WhatsApp' e tres pontinhos tem accessibilityLabel t('speeches.changeStatus')"
+        status: pending
+
+    edge_cases:
+      - id: EC-F050-01
+        case: "Icone de WhatsApp em dark mode"
+        expected: "Icone visivel e reconhecivel em ambos os temas (usar cor primaria ou branco sobre fundo primario)"
+        status: pending
+      - id: EC-F050-02
+        case: "Icone de tres pontinhos em diferentes tamanhos de tela"
+        expected: "Icone centralizado no botao, tamanho adequado para toque (min 44px touch target via hitSlop/padding)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Substituir texto dos botoes de acao por icones: SVG/Unicode WhatsApp e Unicode tres pontinhos (U+22EE)"
+
+    dependencies: []
+    related_features: [F009, F010]
+    related_crs: []
+
+  # ===========================================================================
+  # F051 / CR-106: Replace Alert with custom dropdown for status actions
+  # ===========================================================================
+
+  - id: F051
+    name: "Replace Alert with custom dropdown for invite status actions"
+    cr_id: 106
+    type: ux
+    priority: high
+
+    description: >
+      Na secao de gerenciamento de convites, o handler handleInvitedAction (linha 84-136)
+      usa Alert.alert() nativo para mostrar opcoes de status. O usuario quer substituir
+      o Alert nativo por um dropdown/modal personalizado (similar ao StatusChangeModal
+      existente) com as seguintes opcoes:
+      1. Ver conversa (icone WhatsApp) - abre WhatsApp com o discursante
+      2. Designado/Confirmado (LED verde) - muda status para assigned_confirmed
+      3. Designado/Nao-Convidado (LED amarelo piscante) - muda status para assigned_not_invited
+      4. Desistiu (LED vermelho) - muda status para gave_up
+      5. Cancelar (X ou icone de fechar) - fecha o dropdown
+      Nota: A opcao "Designado/Nao-Convidado" e NOVA - nao existia no Alert atual.
+      Permite reverter um convite para o estado anterior (nao convidado).
+      Cada opcao deve ter um indicador visual (LED colorido) ao lado do texto,
+      seguindo o padrao do StatusChangeModal existente.
+
+    user_request: >
+      "Na sessao de convites, trocar Alert por dropdown personalizado com
+      Ver conversa, Designado/Confirmado, Designado/Nao-Convidado, Desistiu, Cancelar"
+
+    analysis: >
+      Baseline: handleInvitedAction em InviteManagementSection.tsx:84-136 usa
+      Alert.alert() com 4 opcoes: WhatsApp (abre WhatsApp), Designado/Confirmado,
+      Desistiu, Cancelar. O usuario quer:
+      (a) Substituir Alert nativo por dropdown/modal customizado.
+      (b) Renomear opcao "WhatsApp" para "Ver conversa" (com icone WhatsApp).
+      (c) Adicionar nova opcao "Designado/Nao-Convidado" (muda status para
+          assigned_not_invited, revertendo o convite).
+      (d) Adicionar indicadores visuais (LEDs coloridos) como no StatusChangeModal.
+      O StatusChangeModal.tsx ja implementa um padrao similar (Modal com opcoes de
+      status + LED indicator). Podemos criar um novo componente InviteActionDropdown
+      ou reutilizar/estender o StatusChangeModal. A abordagem mais limpa e criar um
+      componente especifico InviteActionDropdown pois as opcoes sao diferentes
+      (inclui "Ver conversa" que nao e um status, e tem "Cancelar" que fecha).
+
+    acceptance_criteria:
+      - id: AC-F051-01
+        description: "Alert.alert nao e mais usado para status de speeches convidados"
+        given: "InviteManagementSection.tsx"
+        when: "handleInvitedAction e chamado"
+        then: "Alert.alert NAO e chamado. Em vez disso, um modal/dropdown customizado e exibido"
+        status: pending
+
+      - id: AC-F051-02
+        description: "Dropdown tem opcao 'Ver conversa' com icone WhatsApp"
+        given: "Dropdown customizado aberto para speech com status assigned_invited"
+        when: "Opcoes sao renderizadas"
+        then: "Primeira opcao e 'Ver conversa' (traduzido) com icone de WhatsApp. Ao clicar, abre WhatsApp com numero do discursante"
+        status: pending
+
+      - id: AC-F051-03
+        description: "Dropdown tem opcao 'Designado/Confirmado' com LED verde"
+        given: "Dropdown customizado aberto"
+        when: "Opcoes sao renderizadas"
+        then: "Opcao 'Designado/Confirmado' com indicador verde. Ao clicar, muda status para assigned_confirmed"
+        status: pending
+
+      - id: AC-F051-04
+        description: "Dropdown tem opcao 'Designado/Nao-Convidado' com LED amarelo"
+        given: "Dropdown customizado aberto"
+        when: "Opcoes sao renderizadas"
+        then: "Opcao 'Designado/Nao-Convidado' com indicador amarelo. Ao clicar, muda status para assigned_not_invited (reverte convite)"
+        status: pending
+
+      - id: AC-F051-05
+        description: "Dropdown tem opcao 'Desistiu' com LED vermelho"
+        given: "Dropdown customizado aberto"
+        when: "Opcoes sao renderizadas"
+        then: "Opcao 'Desistiu' com indicador vermelho. Ao clicar, muda status para gave_up"
+        status: pending
+
+      - id: AC-F051-06
+        description: "Dropdown tem opcao 'Cancelar' que fecha sem alterar status"
+        given: "Dropdown customizado aberto"
+        when: "Opcao 'Cancelar' e clicada (ou tap fora do dropdown)"
+        then: "Dropdown fecha sem alterar o status do speech"
+        status: pending
+
+      - id: AC-F051-07
+        description: "Dropdown e um componente customizado (nao Alert nativo)"
+        given: "Dropdown de opcoes para speech convidado"
+        when: "Componente e renderizado"
+        then: "Usa React Native Modal ou View overlay com estilos customizados (borderRadius, backgroundColor, etc)"
+        status: pending
+
+      - id: AC-F051-08
+        description: "Dropdown mostra nome do discursante como titulo/contexto"
+        given: "Dropdown aberto para speech com speaker_name = 'Joao Silva'"
+        when: "Dropdown e exibido"
+        then: "O nome 'Joao Silva' e exibido como titulo ou subtitulo do dropdown para contexto"
+        status: pending
+
+    edge_cases:
+      - id: EC-F051-01
+        case: "Speech sem speaker_phone (nao deveria ocorrer para invited, mas defensivo)"
+        expected: "Opcao 'Ver conversa' desabilitada ou oculta quando speaker_phone e null"
+        status: pending
+      - id: EC-F051-02
+        case: "Tap fora do dropdown (overlay)"
+        expected: "Dropdown fecha (mesmo comportamento de 'Cancelar')"
+        status: pending
+      - id: EC-F051-03
+        case: "Dark mode"
+        expected: "Dropdown respeita cores do tema (colors.card, colors.text, etc)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Substituir Alert.alert em handleInvitedAction por abertura de modal customizado. Adicionar state para controlar visibilidade. Adicionar nova opcao assigned_not_invited."
+      - path: "src/components/InviteActionDropdown.tsx"
+        change: "NOVO componente. Modal customizado com opcoes: Ver conversa, Designado/Confirmado, Designado/Nao-Convidado, Desistiu, Cancelar. Indicadores visuais (LED colorido) por opcao."
+
+    dependencies: [F050]
+    related_features: [F009, F010]
+    related_crs: []
+    notes:
+      - "Nova i18n key necessaria: speeches.viewConversation ou home.viewConversation para 'Ver conversa'"
+      - "Reutilizar STATUS_INDICATOR_COLORS de StatusChangeModal para consistencia"
+      - "O dropdown F051 sera ativado pelo botao tres pontinhos criado em F050"
+
+  # ===========================================================================
+  # F052 / CR-107: Show speech position + LED + status name in invite second line
+  # ===========================================================================
+
+  - id: F052
+    name: "Show speech number with LED and status name in invite card second line"
+    cr_id: 107
+    type: ui
+    priority: medium
+
+    description: >
+      Na secao de gerenciamento de convites, cada invite row mostra duas linhas:
+      Linha 1: nome do discursante (speaker_name)
+      Linha 2: apenas o numero da posicao ("1o", "2o", "3o")
+      O usuario quer que a segunda linha mostre o formato completo:
+      "1o Discurso - <LED> <nome do status>"
+      Exemplo: "1o Discurso - [LED verde] Designado/Confirmado"
+      Isso requer: importar StatusLED, usar a i18n key speeches.slot para label
+      completo, e adicionar o status name traduzido via speechStatus.* keys.
+
+    user_request: >
+      "Na sessao de convites, segunda linha: '1o Discurso - <led> <nome do status>'"
+
+    analysis: >
+      Baseline: InviteManagementSection.tsx:178-180 renderiza speechNum que mostra
+      apenas '{position}o' (ex: "1o"). Nao importa StatusLED nem mostra status name.
+      Para implementar o formato "1o Discurso - <LED> <nome do status>":
+      1. Importar StatusLED de ./StatusLED
+      2. Usar t('speeches.slot', { number: `${position}o` }) para "1o Discurso"
+      3. Adicionar separador " - "
+      4. Renderizar StatusLED com status do speech (tamanho 10 ou 12, inline)
+      5. Renderizar t(`speechStatus.${speech.status}`) para nome do status
+      Layout da segunda linha: flexDirection: 'row', alignItems: 'center'
+      com texto + separador + LED + espaco + status name.
+
+    acceptance_criteria:
+      - id: AC-F052-01
+        description: "Segunda linha mostra label completo do slot (ex: '1o Discurso')"
+        given: "Invite row para speech na posicao 1"
+        when: "Row e renderizado"
+        then: "Segunda linha começa com '1o Discurso' (via t('speeches.slot', { number: '1o' }))"
+        status: pending
+
+      - id: AC-F052-02
+        description: "Segunda linha inclui StatusLED inline"
+        given: "Invite row para speech com status assigned_not_invited"
+        when: "Row e renderizado"
+        then: "StatusLED e renderizado inline na segunda linha, mostrando cor amarela piscante"
+        status: pending
+
+      - id: AC-F052-03
+        description: "Segunda linha inclui nome do status traduzido"
+        given: "Invite row para speech com status assigned_invited, idioma pt-BR"
+        when: "Row e renderizado"
+        then: "Texto 'Designado/Convidado' aparece apos o LED"
+        status: pending
+
+      - id: AC-F052-04
+        description: "Formato completo: 'No Discurso - LED StatusName'"
+        given: "Invite row para speech posicao 2, status assigned_not_invited, pt-BR"
+        when: "Row e renderizado"
+        then: "Segunda linha exibe: '2o Discurso - [LED amarelo] Designado/Nao convidado'"
+        status: pending
+
+      - id: AC-F052-05
+        description: "LED tem tamanho adequado para inline text"
+        given: "StatusLED renderizado na segunda linha"
+        when: "Componente e exibido"
+        then: "LED tem tamanho 10-12px (menor que o 16px padrao dos SpeechSlots) para caber inline"
+        status: pending
+
+    edge_cases:
+      - id: EC-F052-01
+        case: "Texto longo de status em tela estreita"
+        expected: "Texto truncado com numberOfLines={1} ou flex para acomodar"
+        status: pending
+      - id: EC-F052-02
+        case: "Status assigned_not_invited com LED animado (fading)"
+        expected: "LED piscante funciona corretamente inline na segunda linha"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/InviteManagementSection.tsx"
+        change: "Alterar segunda linha do invite row: importar StatusLED, usar t('speeches.slot') para label completo, adicionar separador + LED + status name. Layout row com alignItems center."
+
+    dependencies: []
+    related_features: [F008, F009]
+    related_crs: []
+
+  # ===========================================================================
+  # F053 / CR-110: Show invite management section for bishopric
+  # ===========================================================================
+
+  - id: F053
+    name: "Show invite management section for bishopric role"
+    cr_id: 110
+    type: feature
+    priority: medium
+
+    description: >
+      A secao de gerenciamento de convites (InviteManagementSection) e visivel
+      apenas para secretarios. A guard de permissao na linha 139 verifica
+      hasPermission('home:invite_mgmt'), e no permissions.ts apenas o role
+      'secretary' possui essa permissao. O bishopric tem 'invite:manage' (linha 31)
+      mas NAO 'home:invite_mgmt'. O usuario quer que o bispado tambem veja a secao
+      de gerenciamento de convites. Isso requer adicionar 'home:invite_mgmt' ao
+      Set de permissoes do bishopric em permissions.ts.
+
+    user_request: >
+      "Na sessao de convites, mostrar para o bispado tambem"
+
+    analysis: >
+      Baseline: permissions.ts:16-40 define permissoes do bishopric. O Set NAO
+      inclui 'home:invite_mgmt' (que esta apenas em secretary, linha 56).
+      InviteManagementSection.tsx:139 faz guard com hasPermission('home:invite_mgmt').
+      Fix: Adicionar 'home:invite_mgmt' ao Set do bishopric em permissions.ts.
+      Isso e suficiente - nao precisa alterar InviteManagementSection.tsx pois a
+      guard ja usa hasPermission que consulta PERMISSIONS_MAP.
+      IMPORTANTE: Deve-se atualizar tambem o SPEC_CONSOLIDATED que atualmente diz
+      home_invite_mgmt: bispado=false, secretario=true. Deve mudar para
+      bispado=true, secretario=true.
+
+    acceptance_criteria:
+      - id: AC-F053-01
+        description: "Bishopric tem permissao 'home:invite_mgmt'"
+        given: "permissions.ts com role bishopric"
+        when: "hasPermission('bishopric', 'home:invite_mgmt') e chamado"
+        then: "Retorna true"
+        status: pending
+
+      - id: AC-F053-02
+        description: "InviteManagementSection visivel para bishopric"
+        given: "Usuario logado com role bishopric na Home"
+        when: "Home e renderizada com speeches pendentes de convite"
+        then: "Secao 'Gerenciamento de Convites' e exibida"
+        status: pending
+
+      - id: AC-F053-03
+        description: "InviteManagementSection continua visivel para secretary"
+        given: "Usuario logado com role secretary na Home"
+        when: "Home e renderizada"
+        then: "Secao 'Gerenciamento de Convites' continua visivel (regressao check)"
+        status: pending
+
+      - id: AC-F053-04
+        description: "Observer NAO ve InviteManagementSection"
+        given: "Usuario logado com role observer na Home"
+        when: "Home e renderizada"
+        then: "Secao 'Gerenciamento de Convites' NAO e exibida"
+        status: pending
+
+      - id: AC-F053-05
+        description: "Bispado ve InviteManagementSection E NextAssignmentsSection"
+        given: "Usuario logado com role bishopric na Home"
+        when: "Home e renderizada"
+        then: "Ambas secoes sao visiveis: 'Proximas Designacoes' e 'Gerenciamento de Convites'"
+        status: pending
+
+    edge_cases:
+      - id: EC-F053-01
+        case: "Bispado ve secao de convites E secao de proximas designacoes ao mesmo tempo"
+        expected: "Ambas secoes coexistem na Home sem conflito de layout. NextAssignmentsSection e controlada por 'home:next_assignments' e InviteManagementSection por 'home:invite_mgmt'"
+        status: pending
+
+    files_impacted:
+      - path: "src/lib/permissions.ts"
+        change: "Adicionar 'home:invite_mgmt' ao Set de permissoes do bishopric (entre 'home:next_assignments' e 'agenda:read')"
+
+    dependencies: []
+    related_features: [F009, F023]
+    related_crs: []
+    notes:
+      - "SPEC_CONSOLIDATED deve atualizar permissao home_invite_mgmt: bispado de false para true"
+      - "Nao altera InviteManagementSection.tsx - a guard existente ja funciona via hasPermission"
+
+  # ===========================================================================
+  # F054 / CR-111: Increase spacing and X icon size in expanded invite card
+  # ===========================================================================
+
+  - id: F054
+    name: "Increase spacing between LED and X button, increase X icon size"
+    cr_id: 111
+    type: ux
+    priority: low
+
+    description: >
+      No card de convites expandido (SpeechSlot.tsx), o espaco entre o LED de
+      status e o botao X (remover designacao) e 8px (gap na row, linha 229).
+      O icone X tem fontSize 20 e paddingHorizontal 4 (linhas 248-252).
+      O usuario quer: (1) aumentar o espaco entre LED e X, (2) aumentar o tamanho
+      do icone X para melhorar a visualizacao e facilitar o toque.
+
+    user_request: >
+      "No card de convites expandido, aumentar espaco entre LED e X e
+      aumentar icone do X"
+
+    analysis: >
+      Baseline: SpeechSlot.tsx
+      - row gap: 8 (linha 229) entre speaker field, LED e X button
+      - removeButton fontSize: 20, fontWeight: 300, paddingHorizontal: 4 (linhas 248-252)
+      - X character: Unicode U+00D7 (multiplication sign, linha 173)
+      - hitSlop: 8 (linha 168)
+      Fix:
+      (1) Aumentar gap da row de 8 para 12 ou 16. Alternativamente, adicionar
+          marginLeft ao removeButton para espacar apenas entre LED e X.
+      (2) Aumentar fontSize do X de 20 para 24 ou 26.
+      Nota: aumentar o gap afeta TODOS os elementos da row (speaker field, LED, X).
+      Se quiser aumentar apenas o espaco entre LED e X, e melhor usar marginLeft
+      no removeButton ao inves de aumentar o gap. Porem, como o gap de 8 e
+      relativamente pequeno e o usuario reclama do espaco, aumentar para 12 pode
+      ser uma melhoria geral. A abordagem mais precisa e adicionar marginLeft
+      ao removeButton.
+
+    acceptance_criteria:
+      - id: AC-F054-01
+        description: "Espaco entre LED e X maior que atual (8px)"
+        given: "SpeechSlot expandido com speaker designado (X visivel)"
+        when: "Row com LED e X e renderizada"
+        then: "O espaco entre o StatusLED e o botao X e visivelmente maior (ex: 12-16px via gap ou marginLeft)"
+        status: pending
+
+      - id: AC-F054-02
+        description: "Icone X maior que atual (fontSize 20)"
+        given: "SpeechSlot expandido com speaker designado"
+        when: "Botao X e renderizado"
+        then: "O icone X tem fontSize 24 ou maior, visivelmente maior que antes"
+        status: pending
+
+      - id: AC-F054-03
+        description: "Touch target adequado apos mudancas"
+        given: "Botao X com novo tamanho"
+        when: "Usuario tenta tocar no X"
+        then: "hitSlop continua adequado (8 ou mais) para garantir touch target minimo"
+        status: pending
+
+      - id: AC-F054-04
+        description: "Layout da row nao quebra com espaco maior"
+        given: "SpeechSlot com speaker name longo + LED + X"
+        when: "Row e renderizada em diferentes larguras de tela"
+        then: "Todos os elementos permanecem alinhados em uma unica linha sem overflow"
+        status: pending
+
+    edge_cases:
+      - id: EC-F054-01
+        case: "Speaker name muito longo com espaco aumentado"
+        expected: "Speaker field usa flex:1 e trunca o nome com ellipsis. LED e X permanecem visiveis"
+        status: pending
+      - id: EC-F054-02
+        case: "X nao visivel (observer role ou sem speaker)"
+        expected: "Sem impacto - X so renderiza quando hasSpeaker && canUnassign"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Aumentar gap da row (ou marginLeft no removeButton) e fontSize do removeButton"
+
+    dependencies: []
+    related_features: [F008]
+    related_crs: []
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  - id: XC-01
+    concern: "Overlap de arquivos entre features"
+    details: >
+      F050: src/components/InviteManagementSection.tsx (botoes de acao)
+      F051: src/components/InviteManagementSection.tsx (handler + novo componente)
+      F052: src/components/InviteManagementSection.tsx (segunda linha)
+      F053: src/lib/permissions.ts (permissao bishopric)
+      F054: src/components/SpeechSlot.tsx (estilo row)
+      OVERLAP: F050, F051 e F052 TODOS alteram InviteManagementSection.tsx em
+      partes diferentes do componente. F050 altera os botoes de acao (linhas 182-205),
+      F051 altera handleInvitedAction (linhas 84-136) e adiciona state/modal,
+      F052 altera a segunda linha do invite row (linhas 178-180). Nao ha conflito
+      direto mas devem ser implementadas na mesma sessao de codigo para evitar
+      merge conflicts. F053 e F054 alteram arquivos distintos.
+
+  - id: XC-02
+    concern: "Dependencia entre F050 e F051"
+    details: >
+      F050 cria o botao de tres pontinhos. F051 substitui o Alert.alert pelo
+      dropdown customizado. O botao de tres pontinhos (F050) deve chamar o
+      dropdown (F051) ao inves do handleInvitedAction atual. Logicamente, F050
+      e F051 formam uma unidade: o botao e a acao que ele dispara. Devem ser
+      implementados juntos. O botao de tres pontinhos abre o dropdown, e o
+      dropdown contém as opcoes de status + "Ver conversa".
+
+  - id: XC-03
+    concern: "Novas i18n keys"
+    details: >
+      F051 requer nova key para "Ver conversa" (pt-BR), "View conversation" (en),
+      "Ver conversacion" (es). Sugestao: home.viewConversation ou
+      speeches.viewConversation.
+      F051 tambem pode reusar speechStatus.assigned_not_invited para a nova opcao
+      de reverter status.
+
+  - id: XC-04
+    concern: "Novo componente InviteActionDropdown"
+    details: >
+      F051 cria um novo componente InviteActionDropdown.tsx (ou similar).
+      Deve seguir o padrao visual do StatusChangeModal.tsx existente (Modal
+      transparente com overlay, card com borderRadius 12, opcoes com
+      indicador colorido). Pode importar STATUS_INDICATOR_COLORS de
+      StatusChangeModal ou definir localmente.
+
+  - id: XC-05
+    concern: "Impacto de F053 na Home do bispado"
+    details: >
+      Atualmente o bispado ve apenas NextAssignmentsSection na Home (controlada
+      por 'home:next_assignments'). Ao adicionar 'home:invite_mgmt', o bispado
+      passara a ver AMBAS as secoes na mesma Home. Verificar que o layout
+      comporta ambas sem problemas de scroll ou performance.
+
+  - id: XC-06
+    concern: "Nenhuma migracao de banco necessaria"
+    details: >
+      Todas as features neste batch sao puramente frontend. Nenhuma alteracao
+      de schema, migracao ou Edge Function necessaria.
+
+  - id: XC-07
+    concern: "Nenhuma nova dependencia de pacote"
+    details: >
+      Todas as features usam funcoes e componentes existentes no codebase.
+      Se um SVG simples do WhatsApp for usado em F050, react-native-svg ja e
+      dependencia transitiva do Expo e nao precisa ser instalado separadamente.
+      Caso se opte por Unicode/emoji, nenhuma dependencia adicional.
+
+# =============================================================================
+# OPEN QUESTIONS (resolvidas durante analise - todas as decisoes tomadas
+# pela analise do codebase existente e pedido do usuario)
+# =============================================================================
+
+open_questions: []
+  # Todas resolvidas durante analise com base no codebase e contexto:
+  # - F050: Unicode vs SVG para WhatsApp -> Decisao: SVG inline simples do logo
+  #   ou emoji de telefone, seguindo DD-25 (sem icon library). Tres pontinhos:
+  #   Unicode U+22EE.
+  # - F051: Novo componente vs reutilizar StatusChangeModal -> Decisao: Novo
+  #   componente InviteActionDropdown, pois opcoes sao diferentes (inclui
+  #   "Ver conversa" que nao e status).
+  # - F052: Tamanho do LED inline -> Decisao: 10-12px para caber na segunda linha.
+  # - F053: Apenas adicionar permissao ao bishopric -> Confirmado pela analise.
+  # - F054: Gap vs marginLeft -> Decisao do arquiteto, ambas abordagens validas.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: A-1
+    assumption: >
+      O icone do WhatsApp sera representado como SVG inline simples (Path dentro
+      de Svg do react-native-svg, dependencia transitiva do Expo) ou como um
+      emoji/Unicode reconhecivel (ex: U+1F4DE telefone). O app nao instala
+      biblioteca de icones (DD-25).
+    reason: >
+      Nao existe glifo Unicode padrao para o logo do WhatsApp. O caractere mais
+      proximo seria um emoji de telefone, que pode nao ser intuitivo. SVG inline
+      e a opcao mais reconhecivel.
+    impact_if_wrong: >
+      Se o usuario preferir outro estilo de icone, basta trocar o SVG/Unicode.
+      Se quiser usar biblioteca de icones, seria uma mudanca de arquitetura.
+    needs_confirmation: false
+    resolved: true
+    resolution: "SVG inline ou emoji de telefone para WhatsApp icon, conforme decisao do arquiteto."
+
+  - id: A-2
+    assumption: >
+      O icone de tres pontinhos sera Unicode U+22EE (vertical ellipsis), que e
+      o icone padrao de "menu de opcoes" em interfaces mobile. Alternativa
+      seria U+2026 (horizontal ellipsis) ou U+2807 (braille dots).
+    reason: >
+      O usuario disse "tres pontinhos". Vertical ellipsis e o padrao mais
+      reconhecido em UIs mobile para indicar "mais opcoes".
+    impact_if_wrong: >
+      Trocar caractere Unicode e trivial.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Unicode U+22EE (vertical ellipsis) para botao de tres pontinhos."
+
+  - id: A-3
+    assumption: >
+      A nova opcao "Ver conversa" no dropdown F051 tem a mesma funcionalidade
+      que a opcao "WhatsApp" atual no Alert: abre WhatsApp com numero do
+      discursante usando buildWhatsAppUrl/openWhatsApp. A unica diferenca e o
+      label renomeado de "WhatsApp" para "Ver conversa".
+    reason: >
+      O usuario listou as opcoes do dropdown e a primeira e "Ver conversa". No
+      Alert atual, a opcao equivalente e "WhatsApp" que abre a conversa no app.
+    impact_if_wrong: >
+      Se "Ver conversa" devesse ter comportamento diferente (ex: abrir historico
+      de mensagens), precisaria de implementacao adicional.
+    needs_confirmation: false
+    resolved: true
+    resolution: "'Ver conversa' abre WhatsApp com buildWhatsAppUrl (mesma funcionalidade do 'WhatsApp' atual)."
+
+  - id: A-4
+    assumption: >
+      Ao adicionar 'home:invite_mgmt' para bishopric (F053), o bispado vera AMBAS
+      as secoes na Home: NextAssignmentsSection (proximas designacoes) E
+      InviteManagementSection (gerenciamento de convites). O layout atual da Home
+      comporta ambas secoes sem conflito.
+    reason: >
+      O bispado ja tem 'home:next_assignments' e recebera 'home:invite_mgmt'.
+      As secoes sao independentes e renderizadas em sequencia na Home.
+    impact_if_wrong: >
+      Se houver problemas de layout ou se o usuario quiser que o bispado veja
+      apenas uma das secoes, seria necessario ajustar a logica de visibilidade.
+    needs_confirmation: false
+    resolved: true
+    resolution: "Bispado vera ambas as secoes. Layout atual da Home suporta."
+
+  - id: A-5
+    assumption: >
+      "Card de convites expandido" no CR-111 refere-se ao SpeechSlot dentro do
+      SundayCard expandido (aba Discursos e Home), NAO ao invite row da secao
+      InviteManagementSection. A evidencia esta no QA baseline que aponta
+      SpeechSlot.tsx com gap: 8, removeButton fontSize: 20, e caracter U+00D7.
+    reason: >
+      O QA pre-validation identificou SpeechSlot.tsx como arquivo afetado e
+      descreveu o baseline com precisao (linhas 229, 248-252, 173).
+    impact_if_wrong: >
+      Se o usuario quisesse alterar a secao InviteManagementSection, o arquivo
+      seria diferente. Mas o QA baseline confirma SpeechSlot.tsx.
+    needs_confirmation: false
+    resolved: true
+    resolution: "CR-111 afeta SpeechSlot.tsx (card de domingo expandido), nao InviteManagementSection."
+
+# =============================================================================
+# INCONSISTENCIES WITH SPEC_CONSOLIDATED
+# =============================================================================
+
+inconsistencies:
+  - id: INC-1
+    type: gap
+    description: >
+      SPEC_CONSOLIDATED define home_invite_mgmt como permissao exclusiva do secretario
+      (bispado: false). CR-110/F053 altera isso para incluir bispado. A tabela de
+      permissoes no SPEC_CONSOLIDATED precisa ser atualizada.
+    existing_spec: >
+      permissions.home_invite_mgmt: bispado=false, secretario=true, observador=false
+    new_request: >
+      CR-110: "mostrar para o bispado tambem"
+    resolution: >
+      Atualizar SPEC_CONSOLIDATED para home_invite_mgmt: bispado=true, secretario=true.
+
+  - id: INC-2
+    type: gap
+    description: >
+      O SPEC_CONSOLIDATED descreve InviteManagementSection como "Secretary-only section"
+      no comentario do componente (linha 1-3 do arquivo). Apos F053, sera visivel para
+      bispado tambem. O comentario do componente deve ser atualizado.
+    existing_spec: >
+      InviteManagementSection docstring: "Secretary-only section showing speeches..."
+    new_request: >
+      CR-110: mostrar para bispado tambem
+    resolution: >
+      Atualizar docstring para "Secretary and Bishopric section..."
+
+  - id: INC-3
+    type: gap
+    description: >
+      O ciclo de status definido em F008 e "Nao-designado -> Designado/Nao-Convidado ->
+      Convidado -> Confirmado | Desistiu". A nova opcao "Designado/Nao-Convidado" no
+      dropdown de F051 permite uma transicao reversa: assigned_invited -> assigned_not_invited.
+      Este "revert" nao esta documentado no ciclo de status atual.
+    existing_spec: >
+      F008: "Ciclo de status: Nao-designado -> Designado/Nao-Convidado -> Convidado ->
+      Confirmado | Desistiu"
+    new_request: >
+      CR-106: opcao "Designado/Nao-Convidado" no dropdown permite reverter de
+      assigned_invited para assigned_not_invited
+    resolution: >
+      Documentar transicao reversa. O ciclo permite: assigned_invited ->
+      assigned_not_invited (revert via dropdown do convite), alem das transicoes
+      originais. A funcao getAvailableStatuses em useSpeeches.ts pode ja suportar
+      essa transicao, mas precisa ser verificado.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-07: true   # Todas respostas incorporadas (segunda invocacao)
+  GATE-08: true   # ZERO open questions pendentes
+  GATE-09: true   # Todas assumptions resolvidas
+  GATE-10: true   # SPEC_F050_F054.yaml salvo no disco
+  GATE-11: true   # SPEC_CONSOLIDATED.yaml sera atualizado a seguir
+  GATE-12: true   # Status e "complete"

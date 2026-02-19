@@ -1,0 +1,474 @@
+# =============================================================================
+# ARCH_M016.yaml
+# Architecture for Batch 8 Phase 2 - Invite Management UX
+# Features: F050, F051, F052, F053, F054
+# CRs: CR-105, CR-106, CR-107, CR-110, CR-111
+# Created: 2026-02-18
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Melhorar UX da secao de gerenciamento de convites com icones, dropdown customizado, info detalhada, visibilidade expandida e ajuste de espaco"
+  principles:
+    - "Reutilizar padroes visuais existentes (StatusChangeModal, StatusLED, STATUS_INDICATOR_COLORS)"
+    - "Consistencia de icones: Unicode para tres pontinhos (U+22EE), SVG inline para WhatsApp (DD-25: sem icon library)"
+    - "Zero dependencias novas: react-native-svg ja e dependencia transitiva do Expo"
+    - "Zero migracoes de banco: todas as features sao puramente frontend"
+    - "Backward compatible: novas props opcionais, novas permissoes aditivas"
+
+diagram: |
+  F050: [InviteManagementSection.tsx] --botoes de acao-->
+        assigned_not_invited: [WhatsAppIcon (SVG inline)] --onPress--> handleNotInvitedAction
+        assigned_invited: [Unicode U+22EE (tres pontinhos)] --onPress--> abre InviteActionDropdown
+
+  F051: [InviteManagementSection.tsx] --state dropdownSpeech-->
+        [InviteActionDropdown.tsx] (NOVO componente)
+        Opcoes:
+          1. Ver conversa (WhatsAppIcon) --> openWhatsApp
+          2. Designado/Confirmado (LED verde) --> changeStatus(assigned_confirmed)
+          3. Designado/Nao-Convidado (LED amarelo) --> changeStatus(assigned_not_invited) [NOVO]
+          4. Desistiu (LED vermelho) --> changeStatus(gave_up)
+          5. Cancelar (fechar) --> onClose
+
+  F052: [InviteManagementSection.tsx] --segunda linha-->
+        "{position}o Discurso - <StatusLED size=10> {statusName}"
+        Importa: StatusLED, t('speeches.slot'), t('speechStatus.*')
+
+  F053: [permissions.ts] --bishopric Set--> adiciona 'home:invite_mgmt'
+        [InviteManagementSection.tsx] --guard inalterada--> hasPermission('home:invite_mgmt')
+
+  F054: [SpeechSlot.tsx] --row gap: 8-->12, removeButton fontSize: 20-->24-->
+        Mais espaco entre LED e X, X maior
+
+# =============================================================================
+# COMPONENTS (affected modules)
+# =============================================================================
+
+components:
+  - name: "UIShell (M008)"
+    responsibility: "App shell, Home tab com secoes role-aware, permissoes"
+    dependencies: [M003]
+    change_for_f050: >
+      InviteManagementSection.tsx: Substituir texto dos botoes de acao por icones.
+      Para assigned_not_invited: renderizar WhatsAppIcon (componente SVG inline
+      novo dentro do mesmo arquivo, ou componente separado minimo). Para
+      assigned_invited: renderizar Unicode U+22EE (vertical ellipsis).
+      accessibilityLabel preservado para screen readers. hitSlop/padding adequado
+      para touch target minimo 44px.
+    change_for_f051: >
+      InviteManagementSection.tsx: Remover Alert.alert de handleInvitedAction.
+      Adicionar state useState<Speech | null>(null) para dropdownSpeech.
+      handleInvitedAction agora seta dropdownSpeech ao inves de Alert.
+      Renderizar InviteActionDropdown com visible={!!dropdownSpeech}.
+      Criar novo componente InviteActionDropdown.tsx seguindo padrao visual
+      do StatusChangeModal (Modal transparente, overlay, card com borderRadius 12).
+      5 opcoes: Ver conversa (WhatsAppIcon + texto), Designado/Confirmado (LED verde),
+      Designado/Nao-Convidado (LED amarelo, NOVA opcao), Desistiu (LED vermelho),
+      Cancelar (fechar).
+    change_for_f052: >
+      InviteManagementSection.tsx: Alterar segunda linha do invite row. Importar
+      StatusLED. Usar t('speeches.slot', { number: `${position}o` }) para label
+      completo. Adicionar separador " - " + StatusLED inline (size=10) + espaco +
+      t(`speechStatus.${speech.status}`) para nome do status traduzido.
+      Layout: flexDirection 'row', alignItems 'center'.
+    change_for_f053: >
+      permissions.ts: Adicionar 'home:invite_mgmt' ao Set de permissoes do
+      bishopric (entre 'home:next_assignments' e 'agenda:read', linha 32-33).
+      Atualizar docstring de InviteManagementSection de "Secretary-only" para
+      "Secretary and Bishopric".
+
+  - name: "SpeechModule (M003)"
+    responsibility: "Ciclo de vida de discursos"
+    dependencies: []
+    change_for_f051: >
+      useSpeeches.ts: Adicionar 'assigned_not_invited' ao array de transicoes
+      validas a partir de 'assigned_invited' em VALID_TRANSITIONS. Atualmente
+      assigned_invited tem ['assigned_confirmed', 'gave_up', 'not_assigned'].
+      Deve ser alterado para ['assigned_confirmed', 'assigned_not_invited',
+      'gave_up', 'not_assigned']. NOTA: esta transicao reversa (invited ->
+      not_invited) e explicita no SPEC F051 (AC-F051-04). O getAvailableStatuses
+      retornara este novo status como opcao disponivel no StatusChangeModal tambem,
+      o que e consistente (se alguem abrir StatusChangeModal para assigned_invited
+      via SpeechSlot, tambem vera a opcao de reverter).
+
+  - name: "SpeechSlot (componente de M003)"
+    responsibility: "Slot de discurso (orador, topico, status, remocao)"
+    dependencies: []
+    change_for_f054: >
+      SpeechSlot.tsx: Aumentar gap da row de 8 para 12 (melhoria geral de
+      espacamento entre speaker field, LED e X). Aumentar fontSize do
+      removeButton de 20 para 24. Manter hitSlop em 8 (ja adequado com
+      o fontSize maior).
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # --- F050: Icon buttons in InviteManagementSection ---
+  - name: "WhatsAppIcon_inline"
+    component: "InviteManagementSection.tsx (ou componente separado)"
+    methods:
+      - name: "WhatsAppIcon"
+        input: "{ size?: number, color?: string }"
+        output: "JSX.Element (Svg > Path)"
+        notes: >
+          Componente funcional minimo que renderiza SVG inline do logo WhatsApp.
+          Usa react-native-svg (Svg, Path) que e dependencia transitiva do Expo.
+          size padrao 18, color padrao 'white' ou cores do tema. Pode ser
+          definido inline no InviteManagementSection.tsx ou em arquivo separado
+          src/components/WhatsAppIcon.tsx. Preferencia: inline no mesmo arquivo
+          para manter simplicidade (e apenas um icone).
+
+  - name: "InviteActionButtons"
+    component: "InviteManagementSection.tsx"
+    methods:
+      - name: "render (action button area)"
+        input: "isNotInvited: boolean"
+        output: >
+          JSX: Se isNotInvited, renderiza Pressable com WhatsAppIcon (SVG).
+          Se !isNotInvited, renderiza Pressable com Text '\u22EE' (vertical ellipsis).
+          Ambos preservam accessibilityLabel. Estilo: minWidth 44 para touch target.
+
+  # --- F051: InviteActionDropdown ---
+  - name: "InviteActionDropdown"
+    component: "src/components/InviteActionDropdown.tsx"
+    methods:
+      - name: "InviteActionDropdownProps"
+        input: >
+          { visible: boolean, speech: Speech | null, onOpenWhatsApp: (speech: Speech) => void,
+            onChangeStatus: (speechId: string, status: SpeechStatus) => void,
+            onClose: () => void }
+        output: "JSX.Element (Modal)"
+        notes: >
+          Componente novo. Modal transparente com overlay (tap fora fecha).
+          Card central com borderRadius 12, backgroundColor colors.card.
+          Titulo: speech.speaker_name. 5 opcoes com indicador colorido
+          (bolinha 12px, mesma que StatusChangeModal). Opcao "Ver conversa"
+          usa WhatsAppIcon ao inves de bolinha. Cores do tema via useTheme().
+          i18n via useTranslation().
+
+  - name: "InviteActionDropdown_integration"
+    component: "InviteManagementSection.tsx"
+    methods:
+      - name: "handleInvitedAction (refactored)"
+        input: "speech: Speech"
+        output: "void (sets dropdownSpeech state)"
+        notes: >
+          Alert.alert removido. Agora apenas seta setDropdownSpeech(speech).
+          O InviteActionDropdown recebe callbacks para cada acao.
+
+  # --- F052: Enhanced second line ---
+  - name: "InviteRow_secondLine"
+    component: "InviteManagementSection.tsx"
+    methods:
+      - name: "render (speech info row)"
+        input: "speech: Speech"
+        output: >
+          JSX: View flexDirection='row' alignItems='center' com:
+          Text: t('speeches.slot', { number: `${position}o` })
+          Text: ' - '
+          StatusLED: status={speech.status} size={10}
+          Text: ' ' + t(`speechStatus.${speech.status}`)
+          numberOfLines={1} para truncamento.
+        notes: >
+          Importar StatusLED de ./StatusLED. LED inline com tamanho 10px
+          (menor que 16px padrao) para caber no texto.
+
+  # --- F053: Bishopric permission ---
+  - name: "permissions_bishopric_invite"
+    component: "src/lib/permissions.ts"
+    methods:
+      - name: "PERMISSIONS_MAP.bishopric"
+        input: "Set update"
+        output: "Set inclui 'home:invite_mgmt'"
+        notes: >
+          Uma unica linha adicionada ao Set. InviteManagementSection.tsx NAO
+          precisa de alteracao pois ja usa hasPermission('home:invite_mgmt').
+
+  # --- F054: SpeechSlot spacing ---
+  - name: "SpeechSlot_spacing"
+    component: "src/components/SpeechSlot.tsx"
+    methods:
+      - name: "styles.row"
+        input: "gap: 8 -> 12"
+        output: "Mais espaco entre elementos da row"
+      - name: "styles.removeButton"
+        input: "fontSize: 20 -> 24"
+        output: "X maior e mais visivel"
+        notes: >
+          hitSlop permanece 8. O fontSize 24 ja proporciona touch target
+          adequado. Nenhum outro estilo alterado.
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: >
+    Nenhuma alteracao de schema. Nenhuma migracao de banco. Todas as features
+    sao puramente frontend. F051 adiciona uma transicao de status (assigned_invited
+    -> assigned_not_invited) que e apenas uma mudanca de logica client-side no
+    mapa VALID_TRANSITIONS. O changeStatus mutation ja aceita qualquer SpeechStatus
+    e o backend (Supabase) aceita qualquer valor do enum.
+
+  migration_note: >
+    F051 adiciona transicao reversa assigned_invited -> assigned_not_invited.
+    Esta transicao e suportada pelo backend sem alteracao: o campo status na
+    tabela speeches aceita qualquer valor valido do enum SpeechStatus, e as
+    policies RLS permitem UPDATE para bishopric e secretary. O VALID_TRANSITIONS
+    e apenas uma validacao client-side.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  f050: "Sem impacto. Mudanca puramente visual (texto -> icone). Mesmos handlers preservados."
+  f051: >
+    A nova transicao reversa (assigned_invited -> assigned_not_invited) e
+    controlada pelo mesmo changeStatus mutation que ja valida permissoes
+    (speech:change_status). O VALID_TRANSITIONS passa a incluir esta transicao,
+    e o StatusChangeModal do SpeechSlot tambem a oferecera (consistencia).
+    Backend aceita a transicao sem alteracao (campo status e TEXT/enum, RLS
+    ja permite UPDATE para bishopric e secretary).
+  f052: "Sem impacto. Dados ja disponiveis no objeto speech (status, position). StatusLED e read-only inline."
+  f053: >
+    Adicionar 'home:invite_mgmt' ao bishopric expande acesso. O bispado ja
+    tem permissoes de escrita em speeches (speech:assign, speech:change_status),
+    portanto ver e interagir com a secao de convites e consistente com suas
+    permissoes existentes. Nenhuma nova RLS policy necessaria.
+  f054: "Sem impacto. Mudanca puramente de estilo CSS."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  f050: "Nenhuma mudanca de logging."
+  f051: >
+    Nenhuma mudanca de logging. As acoes do dropdown (changeStatus, openWhatsApp)
+    usam os mesmos handlers que o Alert.alert anterior, que ja nao logam.
+  f052: "Nenhuma mudanca de logging."
+  f053: "Nenhuma mudanca de logging."
+  f054: "Nenhuma mudanca de logging."
+
+# =============================================================================
+# CROSS-CUTTING CONCERNS
+# =============================================================================
+
+cross_cutting:
+  file_overlap: >
+    F050, F051 e F052 TODOS alteram InviteManagementSection.tsx. Porem em
+    partes distintas:
+    - F050: area do botao de acao (linhas 182-205, Pressable com texto)
+    - F051: handleInvitedAction (linhas 84-136) + novo state + render do dropdown
+    - F052: segunda linha do invite row (linhas 178-180, speechNum)
+    Devem ser implementados na mesma sessao de codigo para evitar conflitos.
+    F053 altera permissions.ts (arquivo isolado).
+    F054 altera SpeechSlot.tsx (arquivo isolado).
+
+  new_files:
+    - path: "src/components/InviteActionDropdown.tsx"
+      reason: "F051 - Modal/dropdown customizado para acoes de convite"
+      pattern: "Segue padrao visual do StatusChangeModal.tsx (Modal + overlay + card)"
+
+  new_i18n_keys:
+    - key: "home.viewConversation"
+      pt_BR: "Ver conversa"
+      en: "View conversation"
+      es: "Ver conversacion"
+      reason: "F051 - Label da opcao de abrir WhatsApp no dropdown"
+
+  implementation_order: >
+    Ordem recomendada (dependencias logicas):
+    1. F053 (permissions.ts, 1 linha, isolado, zero risco)
+    2. F054 (SpeechSlot.tsx, 2 linhas de estilo, isolado)
+    3. F052 (InviteManagementSection segunda linha, import StatusLED, i18n)
+    4. F050 (InviteManagementSection botoes icone, SVG/Unicode)
+    5. F051 (InviteManagementSection dropdown + novo componente + useSpeeches)
+    F050 antes de F051 porque F050 cria o botao tres pontinhos que F051 conecta
+    ao dropdown.
+
+  backward_compatibility: >
+    F050: Mesmos handlers onPress preservados. Apenas visual muda (texto -> icone).
+    F051: Alert nativo removido em favor de dropdown customizado. Mesma funcionalidade
+    com UX melhorada + opcao extra (assigned_not_invited revert). A mudanca em
+    VALID_TRANSITIONS tambem afeta StatusChangeModal (que mostrara a opcao extra
+    para assigned_invited). Isso e desejavel: consistencia entre os dois pontos
+    de interacao.
+    F052: Informacao adicional na segunda linha. Nao remove nenhum dado existente.
+    F053: Permissao aditiva (mais acesso). Nao remove nenhuma permissao existente.
+    F054: Melhoria visual de espacamento. Nao altera funcionalidade.
+
+  test_impact: >
+    F051 altera VALID_TRANSITIONS em useSpeeches.ts. Testes existentes que
+    verificam contagem de transicoes para assigned_invited (atualmente 3:
+    assigned_confirmed, gave_up, not_assigned) precisarao ser atualizados
+    para 4 (adicionar assigned_not_invited):
+    - src/__tests__/phase03-speech-lifecycle.test.ts (linha 102-103: expect 3 -> 4)
+    - src/__tests__/useSpeeches-utils.test.ts (linha 113-114: verificar includes)
+    F053 pode impactar testes que verificam permissoes do bishopric.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-040
+    title: "SVG inline para icone WhatsApp ao inves de Unicode ou icon library"
+    context: >
+      F050 precisa de icone reconhecivel do WhatsApp. O app segue DD-25 (sem
+      icon library). Nao existe glifo Unicode padrao para WhatsApp. Opcoes:
+      (A) SVG inline via react-native-svg (dependencia transitiva do Expo).
+      (B) Emoji de telefone (U+1F4DE) que nao e intuitivo para WhatsApp.
+      (C) Instalar icon library (viola DD-25).
+    decision: >
+      Usar SVG inline minimo do logo WhatsApp via react-native-svg (Svg + Path).
+      Componente WhatsAppIcon definido inline no InviteManagementSection.tsx ou
+      como componente separado (src/components/WhatsAppIcon.tsx). react-native-svg
+      ja esta disponivel como dependencia transitiva do Expo, portanto zero
+      instalacao necessaria.
+    consequences:
+      - "Icone reconhecivel e profissional"
+      - "Zero dependencias novas (react-native-svg ja presente)"
+      - "Consiste com DD-25 (sem icon library)"
+      - "SVG path pode ser ajustado facilmente para tamanho e cor"
+
+  - id: ADR-041
+    title: "InviteActionDropdown como componente separado (nao reutiliza StatusChangeModal)"
+    context: >
+      F051 precisa de dropdown customizado para acoes de convite. StatusChangeModal
+      ja implementa padrao similar (Modal + overlay + opcoes com LED). Porem as
+      opcoes sao diferentes: InviteActionDropdown inclui "Ver conversa" (que nao
+      e um status) e tem conjunto fixo de opcoes (nao depende de getAvailableStatuses).
+    decision: >
+      Criar novo componente InviteActionDropdown.tsx seguindo o PADRAO VISUAL
+      do StatusChangeModal (mesmos estilos: overlay, borderRadius 12, indicator
+      circles 12px) mas com logica propria. Importar STATUS_INDICATOR_COLORS
+      do StatusChangeModal para consistencia de cores. Componente recebe speech,
+      callbacks e controle de visibilidade.
+    consequences:
+      - "Separacao de responsabilidades clara"
+      - "StatusChangeModal permanece inalterado"
+      - "Padrao visual consistente via mesmos estilos e cores"
+      - "Novo componente e arquivo separado: facil de testar isoladamente"
+
+# =============================================================================
+# FEATURE-BY-FEATURE IMPLEMENTATION DETAILS
+# =============================================================================
+
+implementation_details:
+
+  f050_icon_buttons:
+    files:
+      - path: "src/components/InviteManagementSection.tsx"
+        changes:
+          - "Adicionar import de Svg, Path de react-native-svg (verificar se ja disponivel)"
+          - "Criar componente inline WhatsAppIcon({ size, color }) que renderiza SVG do logo"
+          - "Substituir conteudo do Pressable de acao:"
+          - "  isNotInvited: <WhatsAppIcon size={18} color={colors.onPrimary} />"
+          - "  !isNotInvited: <Text style={{ fontSize: 18 }}>{'\u22EE'}</Text> (vertical ellipsis)"
+          - "Adicionar accessibilityLabel='WhatsApp' ao botao isNotInvited"
+          - "Adicionar accessibilityLabel={t('speeches.changeStatus')} ao botao !isNotInvited"
+          - "Ajustar estilo do actionButton: minWidth 36, justifyContent 'center', alignItems 'center'"
+          - "Remover paddingHorizontal do actionButton e usar padding uniforme para icone"
+
+  f051_invite_action_dropdown:
+    files:
+      - path: "src/components/InviteActionDropdown.tsx"
+        changes:
+          - "NOVO ARQUIVO"
+          - "Import: React, Modal, View, Text, Pressable, StyleSheet de react-native"
+          - "Import: useTranslation de react-i18next"
+          - "Import: useTheme de ../contexts/ThemeContext"
+          - "Import: STATUS_INDICATOR_COLORS de ./StatusChangeModal"
+          - "Import: type Speech, SpeechStatus de ../types/database"
+          - "Import: WhatsAppIcon inline (ou de InviteManagementSection, ou redefinir aqui)"
+          - "Props: { visible, speech, onOpenWhatsApp, onChangeStatus, onClose }"
+          - "Titulo: speech?.speaker_name"
+          - "5 opcoes renderizadas como lista fixa (nao FlatList, sao apenas 5):"
+          - "  1. { icon: WhatsAppIcon, label: t('home.viewConversation'), action: onOpenWhatsApp }"
+          - "  2. { color: STATUS_INDICATOR_COLORS.assigned_confirmed, label: t('speechStatus.assigned_confirmed'), action: changeStatus('assigned_confirmed') }"
+          - "  3. { color: STATUS_INDICATOR_COLORS.assigned_not_invited, label: t('speechStatus.assigned_not_invited'), action: changeStatus('assigned_not_invited') }"
+          - "  4. { color: STATUS_INDICATOR_COLORS.gave_up, label: t('speechStatus.gave_up'), action: changeStatus('gave_up') }"
+          - "  5. { label: t('common.cancel'), action: onClose }"
+          - "Opcao 'Ver conversa' desabilitada quando speech?.speaker_phone e null"
+          - "Estilo: mesmos valores do StatusChangeModal (overlay, content, optionRow, indicator)"
+
+      - path: "src/components/InviteManagementSection.tsx"
+        changes:
+          - "Adicionar import de InviteActionDropdown"
+          - "Adicionar state: const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null)"
+          - "Refatorar handleInvitedAction: remover Alert.alert, usar setDropdownSpeech(speech)"
+          - "Adicionar handleDropdownWhatsApp callback (abre WhatsApp, mesma logica do Alert anterior)"
+          - "Adicionar handleDropdownStatusChange callback (chama changeStatus.mutate + fecha dropdown)"
+          - "Renderizar <InviteActionDropdown visible={!!dropdownSpeech} speech={dropdownSpeech} ... /> antes do </View> final"
+
+      - path: "src/hooks/useSpeeches.ts"
+        changes:
+          - "Alterar VALID_TRANSITIONS.assigned_invited de ['assigned_confirmed', 'gave_up', 'not_assigned'] para ['assigned_confirmed', 'assigned_not_invited', 'gave_up', 'not_assigned']"
+          - "Isto adiciona a transicao reversa assigned_invited -> assigned_not_invited"
+
+      - path: "src/i18n/locales/pt-BR.json"
+        changes:
+          - "Adicionar key home.viewConversation: 'Ver conversa'"
+      - path: "src/i18n/locales/en.json"
+        changes:
+          - "Adicionar key home.viewConversation: 'View conversation'"
+      - path: "src/i18n/locales/es.json"
+        changes:
+          - "Adicionar key home.viewConversation: 'Ver conversacion'"
+
+  f052_enhanced_second_line:
+    files:
+      - path: "src/components/InviteManagementSection.tsx"
+        changes:
+          - "Adicionar import: import { StatusLED } from './StatusLED'"
+          - "Substituir a segunda linha do invite row (atualmente speechNum com apenas '{position}o'):"
+          - "  De: <Text style={speechNum}>{speech.position}{'\u00BA'}</Text>"
+          - "  Para: <View style={styles.speechInfoRow}>"
+          - "    <Text style={speechNumStyle}>{t('speeches.slot', { number: `${speech.position}\u00BA` })}</Text>"
+          - "    <Text style={separatorStyle}> - </Text>"
+          - "    <StatusLED status={speech.status} size={10} />"
+          - "    <Text style={statusNameStyle}> {t(`speechStatus.${speech.status}`)}</Text>"
+          - "  </View>"
+          - "Adicionar styles: speechInfoRow (flexDirection 'row', alignItems 'center')"
+          - "  statusName (fontSize 12, flex ou numberOfLines 1)"
+
+  f053_bishopric_permission:
+    files:
+      - path: "src/lib/permissions.ts"
+        changes:
+          - "Adicionar 'home:invite_mgmt' ao Set do bishopric (entre 'home:next_assignments' e 'agenda:read', linha 32-33)"
+      - path: "src/components/InviteManagementSection.tsx"
+        changes:
+          - "Atualizar docstring: 'Secretary-only' -> 'Secretary and Bishopric'"
+          - "Atualizar comentario na guard (linha 138): '// Only visible for Secretary' -> '// Only visible for Secretary and Bishopric'"
+
+  f054_speech_slot_spacing:
+    files:
+      - path: "src/components/SpeechSlot.tsx"
+        changes:
+          - "styles.row: gap: 8 -> 12"
+          - "styles.removeButton: fontSize: 20 -> 24"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true   # Componentes tem responsabilidade unica (3 componentes afetados: M008, M003, SpeechSlot)
+  GATE-03: true   # Contratos definidos para cada integracao (7 contratos)
+  GATE-04: true   # ADRs registrados para decisoes que afetam multiplos componentes (ADR-040, ADR-041)
+  GATE-05: true   # ARCH_M016.yaml salvo no disco
+  GATE-06: true   # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true   # ARCH_SUMMARY preenchido
+  GATE-08: true   # Maximo 10 componentes por modulo respeitado (3 componentes)

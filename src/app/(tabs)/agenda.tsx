@@ -136,7 +136,7 @@ function AgendaTabContent() {
               animated: true,
               viewPosition: 0,
             });
-          }, 300);
+          }, 400);
         }
       }
     },
@@ -183,17 +183,6 @@ function AgendaTabContent() {
     [expandedDate, nextSunday, locale, handleToggle, colors]
   );
 
-  const ESTIMATED_ITEM_HEIGHT = 64;
-
-  const getItemLayout = useCallback(
-    (_data: unknown, index: number) => ({
-      length: ESTIMATED_ITEM_HEIGHT,
-      offset: ESTIMATED_ITEM_HEIGHT * index,
-      index,
-    }),
-    []
-  );
-
   const onScrollToIndexFailed = useCallback(
     (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
       const offset = info.averageItemLength * info.index;
@@ -220,7 +209,6 @@ function AgendaTabContent() {
         data={listItems}
         keyExtractor={getItemKey}
         renderItem={renderItem}
-        initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
         onEndReached={hasMoreFuture ? loadMoreFuture : undefined}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
@@ -237,7 +225,6 @@ function AgendaTabContent() {
         }
         onScrollToIndexFailed={onScrollToIndexFailed}
         contentContainerStyle={styles.listContent}
-        getItemLayout={getItemLayout}
       />
     </SafeAreaView>
   );

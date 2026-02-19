@@ -60,6 +60,7 @@ export function SearchInput({ value, onChangeText, style, ...rest }: SearchInput
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     position: 'relative',
     justifyContent: 'center',
   },

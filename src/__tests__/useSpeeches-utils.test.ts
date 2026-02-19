@@ -76,12 +76,20 @@ describe('VALID_TRANSITIONS', () => {
     expect(VALID_TRANSITIONS.assigned_invited).toContain('not_assigned');
   });
 
-  it('assigned_confirmed can only transition to not_assigned', () => {
-    expect(VALID_TRANSITIONS.assigned_confirmed).toEqual(['not_assigned']);
+  it('assigned_confirmed can transition to all other assigned statuses and not_assigned', () => {
+    expect(VALID_TRANSITIONS.assigned_confirmed).toContain('assigned_not_invited');
+    expect(VALID_TRANSITIONS.assigned_confirmed).toContain('assigned_invited');
+    expect(VALID_TRANSITIONS.assigned_confirmed).toContain('gave_up');
+    expect(VALID_TRANSITIONS.assigned_confirmed).toContain('not_assigned');
+    expect(VALID_TRANSITIONS.assigned_confirmed).toHaveLength(4);
   });
 
-  it('gave_up can only transition to not_assigned', () => {
-    expect(VALID_TRANSITIONS.gave_up).toEqual(['not_assigned']);
+  it('gave_up can transition to all other assigned statuses and not_assigned', () => {
+    expect(VALID_TRANSITIONS.gave_up).toContain('assigned_not_invited');
+    expect(VALID_TRANSITIONS.gave_up).toContain('assigned_invited');
+    expect(VALID_TRANSITIONS.gave_up).toContain('assigned_confirmed');
+    expect(VALID_TRANSITIONS.gave_up).toContain('not_assigned');
+    expect(VALID_TRANSITIONS.gave_up).toHaveLength(4);
   });
 });
 
@@ -96,8 +104,9 @@ describe('isValidTransition', () => {
   it('returns false for invalid transitions', () => {
     expect(isValidTransition('not_assigned', 'assigned_confirmed')).toBe(false);
     expect(isValidTransition('not_assigned', 'gave_up')).toBe(false);
-    expect(isValidTransition('assigned_confirmed', 'assigned_invited')).toBe(false);
-    expect(isValidTransition('gave_up', 'assigned_confirmed')).toBe(false);
+    // F077: assigned_confirmed and gave_up can now transition to any other assigned status
+    expect(isValidTransition('assigned_confirmed', 'assigned_invited')).toBe(true);
+    expect(isValidTransition('gave_up', 'assigned_confirmed')).toBe(true);
   });
 
   it('allows removal (back to not_assigned) from any assigned state', () => {

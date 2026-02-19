@@ -95,20 +95,20 @@ describe('PHASE-03: Status lifecycle exhaustive tests', () => {
       expect(getAvailableStatuses('not_assigned')).toHaveLength(1);
     });
 
-    it('assigned_not_invited has 2 transitions', () => {
-      expect(getAvailableStatuses('assigned_not_invited')).toHaveLength(2);
+    it('assigned_not_invited has 4 transitions', () => {
+      expect(getAvailableStatuses('assigned_not_invited')).toHaveLength(4);
     });
 
     it('assigned_invited has 4 transitions', () => {
       expect(getAvailableStatuses('assigned_invited')).toHaveLength(4);
     });
 
-    it('assigned_confirmed has 1 transition', () => {
-      expect(getAvailableStatuses('assigned_confirmed')).toHaveLength(1);
+    it('assigned_confirmed has 4 transitions', () => {
+      expect(getAvailableStatuses('assigned_confirmed')).toHaveLength(4);
     });
 
-    it('gave_up has 1 transition', () => {
-      expect(getAvailableStatuses('gave_up')).toHaveLength(1);
+    it('gave_up has 4 transitions', () => {
+      expect(getAvailableStatuses('gave_up')).toHaveLength(4);
     });
   });
 });

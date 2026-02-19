@@ -557,46 +557,47 @@ describe('F071 (CR-129): LED click shows all except not_assigned', () => {
     });
   });
 
-  // --- AC-F071-03: assigned_confirmed LED disabled ---
-  describe('AC-F071-03: LED disabled for assigned_confirmed', () => {
-    it('handleStatusPress returns early for assigned_confirmed', () => {
+  // --- AC-F071-03: assigned_confirmed LED now enabled (F077 override) ---
+  // NOTE: F077 (CR-134) removed the assigned_confirmed block from handleStatusPress and disabled prop.
+  describe('AC-F071-03: LED enabled for assigned_confirmed (updated by F077)', () => {
+    it('handleStatusPress does NOT return early for assigned_confirmed', () => {
       const content = getSpeechSlot();
-      expect(content).toContain("status === 'assigned_confirmed'");
       const handlePress = content.substring(
         content.indexOf('handleStatusPress'),
         content.indexOf('setStatusModalVisible(true)')
       );
-      expect(handlePress).toContain("status === 'assigned_confirmed'");
+      expect(handlePress).not.toContain("status === 'assigned_confirmed'");
     });
 
-    it('StatusLED disabled includes assigned_confirmed', () => {
+    it('StatusLED disabled does NOT include assigned_confirmed', () => {
       const content = getSpeechSlot();
       const disabledSection = content.substring(
         content.indexOf('disabled={isObserver'),
         content.indexOf('}', content.indexOf('disabled={isObserver') + 20) + 1
       );
-      expect(disabledSection).toContain("'assigned_confirmed'");
+      expect(disabledSection).not.toContain("'assigned_confirmed'");
     });
   });
 
-  // --- AC-F071-04: gave_up LED disabled ---
-  describe('AC-F071-04: LED disabled for gave_up', () => {
-    it('handleStatusPress returns early for gave_up', () => {
+  // --- AC-F071-04: gave_up LED now enabled (F077 override) ---
+  // NOTE: F077 (CR-134) removed the gave_up block from handleStatusPress and disabled prop.
+  describe('AC-F071-04: LED enabled for gave_up (updated by F077)', () => {
+    it('handleStatusPress does NOT return early for gave_up', () => {
       const content = getSpeechSlot();
       const handlePress = content.substring(
         content.indexOf('handleStatusPress'),
         content.indexOf('setStatusModalVisible(true)')
       );
-      expect(handlePress).toContain("status === 'gave_up'");
+      expect(handlePress).not.toContain("status === 'gave_up'");
     });
 
-    it('StatusLED disabled includes gave_up', () => {
+    it('StatusLED disabled does NOT include gave_up', () => {
       const content = getSpeechSlot();
       const disabledSection = content.substring(
         content.indexOf('disabled={isObserver'),
         content.indexOf('}', content.indexOf('disabled={isObserver') + 20) + 1
       );
-      expect(disabledSection).toContain("'gave_up'");
+      expect(disabledSection).not.toContain("'gave_up'");
     });
   });
 

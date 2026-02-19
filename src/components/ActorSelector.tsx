@@ -159,8 +159,13 @@ export function ActorSelector({
             />
           ) : (
             <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+              {multiSelect && (
+                <Text style={[styles.checkbox, { color: colors.text }]}>
+                  {isSelected ? '\u2611' : '\u2610'}
+                </Text>
+              )}
               <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
-                {isSelected ? '\u2713 ' : ''}{item.name}
+                {item.name}
               </Text>
             </Pressable>
           )}
@@ -362,9 +367,15 @@ const styles = StyleSheet.create({
   },
   actorNameArea: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   actorName: {
     fontSize: 16,
+  },
+  checkbox: {
+    fontSize: 20,
+    marginRight: 8,
   },
   actorActions: {
     flexDirection: 'row',

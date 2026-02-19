@@ -890,12 +890,6 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 15,
-    marginBottom: 8,
   },
   speakerEditRow: {
     flexDirection: 'row',

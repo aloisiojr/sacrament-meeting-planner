@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-109
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111
 # Reviewed: 2026-02-18
-# Version: 8
+# Version: 9
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -2941,4 +2941,458 @@ batch8_phase1:
     full_suite_tests: 2983
     full_suite_passing: 2983
     full_suite_files: 59
+    regressions: 0
+
+# =============================================================================
+# Batch 8, Phase 2 REVIEW
+# CR-105 (F050): Replace WhatsApp text button with icon and status button with three-dots
+# CR-106 (F051): Replace Alert with custom dropdown for invite status actions
+# CR-107 (F052): Show speech position + LED + status name in invite second line
+# CR-110 (F053): Show invite management section for bishopric
+# CR-111 (F054): Increase spacing between LED and X, increase X icon size
+# =============================================================================
+
+batch8_phase2:
+  phase: "2 of 2"
+  phase_description: "Invite management UX improvements: icon buttons, custom dropdown, enhanced status line, bishopric access, spacing adjustments"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 8 Phase 2 implements 5 features (F050-F054) across 5 CRs (CR-105, CR-106,
+    CR-107, CR-110, CR-111). All changes are purely frontend. The implementation
+    faithfully follows the SPEC -> ARCH -> PLAN chain with no breaks. 9 commits map
+    directly to the 9 plan steps. Key changes: (1) InviteManagementSection buttons
+    replaced with WhatsApp SVG icon and Unicode vertical ellipsis (CR-105), (2) Alert.alert
+    replaced with custom InviteActionDropdown modal with 5 options including new reverse
+    transition assigned_invited -> assigned_not_invited (CR-106), (3) second line of
+    invite row enhanced with full slot label + StatusLED inline + status name (CR-107),
+    (4) bishopric granted 'home:invite_mgmt' permission (CR-110), (5) SpeechSlot row
+    gap increased from 8 to 12 and X fontSize from 20 to 24 (CR-111). 78 new tests
+    added, all passing. Full suite: 3061/3061 (60 files), zero regressions. Repository
+    is clean with no uncommitted code files.
+
+  chain_validation:
+    spec_vs_request:
+      status: aligned
+      notes: >
+        SPEC_F050_F054.yaml accurately captures all 5 user requests from the batch.
+        CR-105: user asked to replace text buttons with WhatsApp icon and three-dots -> F050
+        covers exactly this with SVG WhatsApp icon and Unicode U+22EE.
+        CR-106: user asked to replace Alert with dropdown having 5 specific options -> F051
+        covers all 5 options including the new "Designado/Nao-Convidado" reverse transition.
+        CR-107: user asked for second line format "1o Discurso - <led> <nome do status>" -> F052
+        covers this format exactly.
+        CR-110: user asked to show invite section for bishopric -> F053 adds the permission.
+        CR-111: user asked to increase spacing and X size in expanded card -> F054 covers gap
+        and fontSize changes.
+        No over-engineering: each feature is tightly scoped to the request.
+
+    arch_vs_spec:
+      status: aligned
+      notes: >
+        ARCH_M016.yaml correctly maps all SPEC acceptance criteria to component changes.
+        3 components affected: UIShell (M008) for InviteManagementSection changes (F050/F051/F052),
+        SpeechModule (M003) for VALID_TRANSITIONS update (F051), and SpeechSlot component
+        for spacing (F054). Contracts defined for WhatsAppIcon, InviteActionDropdown,
+        InviteRow second line, permissions, and SpeechSlot spacing. ADR-040 (SVG inline for
+        WhatsApp icon) and ADR-041 (separate InviteActionDropdown component) are well-reasoned
+        architectural decisions consistent with DD-25 (no icon library).
+
+    plan_vs_arch:
+      status: aligned
+      notes: >
+        PLAN_P016.yaml decomposes the architecture into 10 steps following recommended
+        implementation order from ARCH. Steps 1-2 (F053, F054) are independent, isolated
+        changes. Steps 3-4 (F052, F050) modify InviteManagementSection incrementally.
+        Steps 5-8 (F051 parts) handle the more complex dropdown feature: export colors,
+        add i18n keys, create component, integrate. Step 9 consolidates tests. Step 10
+        updates documentation. Dependencies are correctly declared: STEP-07 depends on
+        STEP-05/06, STEP-08 depends on STEP-04/07.
+
+    code_vs_plan:
+      status: aligned
+      notes: >
+        CODE_LEDGER tracks 9 code commits (STEP-01 through STEP-09) plus documentation
+        (STEP-10). Each commit maps 1:1 to a plan step with matching hash, files, and
+        AC coverage. Commit order follows the plan exactly:
+        STEP-01 (9ee783e): permissions.ts + docstring update -> F053
+        STEP-02 (c5d8288): SpeechSlot gap/fontSize -> F054
+        STEP-03 (83fadef): InviteManagement second line -> F052
+        STEP-04 (96944bc): WhatsApp SVG + three dots icons -> F050
+        STEP-05 (152b3b4): Export colors + VALID_TRANSITIONS -> F051 prep
+        STEP-06 (94b1a24): i18n keys in 3 locales -> F051 prep
+        STEP-07 (ec883c5): InviteActionDropdown component -> F051
+        STEP-08 (c28bc63): Integration, remove Alert -> F051
+        STEP-09 (ef42ed7): Tests (78 new) -> all features
+        No files modified outside the plan specification.
+
+  commit_reviews:
+    - hash: 9ee783e
+      message: "feat(permissions): add home:invite_mgmt to bishopric role (CR-110)"
+      files_changed: [src/lib/permissions.ts, src/components/InviteManagementSection.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "'home:invite_mgmt' added at line 33 of bishopric Set, between 'home:next_assignments' and 'agenda:read'"
+          - "Docstring updated to 'Secretary and Bishopric section' (line 2-3)"
+          - "Guard comment updated to 'Only visible for Secretary and Bishopric' (line 138)"
+          - "hasPermission('bishopric', 'home:invite_mgmt') returns true (verified by test)"
+          - "hasPermission('observer', 'home:invite_mgmt') remains false"
+          - "Minimal change: 1 line in permissions.ts, 2 lines in InviteManagementSection.tsx"
+        issues: []
+
+    - hash: c5d8288
+      message: "feat(speech-slot): increase row gap to 12 and X fontSize to 24 (CR-111)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "styles.row.gap changed from 8 to 12 (line 229)"
+          - "styles.removeButton.fontSize changed from 20 to 24 (line 249)"
+          - "hitSlop remains 8 - adequate touch target with fontSize 24"
+          - "field has flex:1 ensuring speaker name truncates without overflow"
+          - "2 style value changes only, no logic changes"
+        issues: []
+
+    - hash: 83fadef
+      message: "feat(invite): show speech slot label, StatusLED, and status name in second line (CR-107)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "StatusLED imported from './StatusLED'"
+          - "Second line replaced: was simple Text with '{position}o', now View with speechInfoRow style"
+          - "Uses t('speeches.slot', { number: ... }) for full label (e.g., '1o Discurso')"
+          - "Separator ' - ' between label and LED"
+          - "StatusLED rendered inline with size={10} (smaller than 16px default)"
+          - "Status name via t('speechStatus.${speech.status}') with numberOfLines={1}"
+          - "statusName style has flex:1 for truncation on narrow screens"
+          - "speechInfoRow style: flexDirection 'row', alignItems 'center'"
+        issues: []
+
+    - hash: 96944bc
+      message: "feat(invite): replace text buttons with WhatsApp SVG icon and Unicode three-dots (CR-105)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "Svg and Path imported from react-native-svg (Expo transitive dependency)"
+          - "WhatsAppIcon component defined inline with size and color props"
+          - "SVG path is standard WhatsApp logo path data"
+          - "isNotInvited button renders <WhatsAppIcon size={18} color={colors.onPrimary} />"
+          - "!isNotInvited button renders Unicode U+22EE (vertical ellipsis) with actionIcon style"
+          - "accessibilityLabel set correctly: 'WhatsApp' and t('speeches.changeStatus')"
+          - "actionButton style: fixed 36x36 with centered content, borderRadius 6"
+          - "onPress handlers unchanged: handleNotInvitedAction and handleInvitedAction"
+          - "Alert import removed from react-native (no longer needed)"
+        issues: []
+
+    - hash: 152b3b4
+      message: "feat(speeches): export STATUS_INDICATOR_COLORS and add assigned_invited -> assigned_not_invited transition (CR-106)"
+      files_changed: [src/components/StatusChangeModal.tsx, src/hooks/useSpeeches.ts, src/__tests__/useSpeeches-utils.test.ts, src/__tests__/phase03-speech-lifecycle.test.ts]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "STATUS_INDICATOR_COLORS exported with 'export const' (was just 'const')"
+          - "VALID_TRANSITIONS.assigned_invited now includes 'assigned_not_invited' (4 transitions total)"
+          - "isValidTransition('assigned_invited', 'assigned_not_invited') returns true"
+          - "getAvailableStatuses('assigned_invited') now includes 'assigned_not_invited'"
+          - "Existing tests updated: transition count assertions adjusted from 3 to 4"
+          - "StatusChangeModal in SpeechSlot will also show assigned_not_invited option - this is intentional and consistent (ARCH ADR)"
+          - "Backend accepts the reverse transition (status field is enum, RLS allows UPDATE)"
+        issues: []
+
+    - hash: 94b1a24
+      message: "feat(i18n): add home.viewConversation key in 3 locales (CR-106)"
+      files_changed: [src/i18n/locales/pt-BR.json, src/i18n/locales/en.json, src/i18n/locales/es.json]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "pt-BR.json: home.viewConversation = 'Ver conversa'"
+          - "en.json: home.viewConversation = 'View conversation'"
+          - "es.json: home.viewConversation = 'Ver conversacion' (with correct accent mark)"
+          - "All 3 JSON files remain valid"
+          - "No existing keys modified"
+        issues: []
+
+    - hash: ec883c5
+      message: "feat(components): create InviteActionDropdown with 5 options for invite status management (CR-106)"
+      files_changed: [src/components/InviteActionDropdown.tsx]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "New file: InviteActionDropdown.tsx (229 lines)"
+          - "Follows StatusChangeModal visual pattern: Modal transparent, overlay, card borderRadius 12"
+          - "Props: visible, speech, onOpenWhatsApp, onChangeStatus, onClose"
+          - "Title: speech?.speaker_name displayed at top"
+          - "5 options rendered as fixed list:"
+          - "  1. View conversation (WhatsAppIcon 12px, disabled when no phone)"
+          - "  2. Assigned/Confirmed (green indicator from STATUS_INDICATOR_COLORS)"
+          - "  3. Assigned/Not invited (yellow indicator, reverse transition)"
+          - "  4. Gave up (red indicator)"
+          - "  5. Cancel (separator + close button)"
+          - "Uses useTheme for dark mode support"
+          - "Uses useTranslation for i18n"
+          - "Overlay Pressable onPress={onClose} for tap-outside-to-close"
+          - "Disabled option has opacity 0.4 and disabled={true}"
+          - "Styles match StatusChangeModal values (overlay, content, indicator sizes)"
+        issues: []
+
+    - hash: c28bc63
+      message: "feat(invite): integrate InviteActionDropdown replacing Alert.alert for status actions (CR-106)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "InviteActionDropdown imported"
+          - "dropdownSpeech state added: useState<Speech | null>(null)"
+          - "handleInvitedAction simplified: just setDropdownSpeech(speech)"
+          - "Alert.alert completely removed from the component"
+          - "Alert removed from react-native import"
+          - "handleDropdownWhatsApp: closes dropdown then opens WhatsApp (null-then-open pattern)"
+          - "handleDropdownStatusChange: closes dropdown then mutates status"
+          - "InviteActionDropdown rendered at end of section with visible/speech/callbacks"
+          - "onClose: () => setDropdownSpeech(null)"
+        issues: []
+
+    - hash: ef42ed7
+      message: "test(batch8-phase2): add tests for F050, F051, F052, F053, F054"
+      files_changed: [src/__tests__/batch8-phase2.test.ts, src/__tests__/permissions.test.ts]
+      step: STEP-09
+      review:
+        correctness: pass
+        notes:
+          - "78 new tests in batch8-phase2.test.ts covering all 5 features"
+          - "F050 tests: SVG import, WhatsAppIcon component, icon rendering, accessibilityLabel, touch target"
+          - "F051 tests: Alert removed, dropdown options, i18n keys, VALID_TRANSITIONS, integration, overlay close"
+          - "F052 tests: slot label, StatusLED inline, status name, separator, numberOfLines"
+          - "F053 tests: bishopric permission, secretary retention, observer exclusion, docstring"
+          - "F054 tests: gap 12, fontSize 24, hitSlop 8, flex:1 for truncation"
+          - "Cross-cutting tests: VALID_TRANSITIONS count, STATUS_INDICATOR_COLORS export"
+          - "permissions.test.ts updated: bishopric now has 24 permissions (was 23)"
+          - "All 78 new tests passing"
+          - "Full suite: 3061/3061 (60 files), zero regressions"
+        issues: []
+
+  pending_deploys: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_nice_to_have: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files: []
+
+  ac_verification:
+    # F050 ACs (CR-105)
+    - ac_id: AC-F050-01
+      description: "WhatsApp icon button for assigned_not_invited"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx renders <WhatsAppIcon size={18} color={colors.onPrimary} />
+        for isNotInvited condition. SVG inline component using react-native-svg Svg+Path.
+        No text 'WhatsApp' in button content.
+
+    - ac_id: AC-F050-02
+      description: "Three dots button for assigned_invited"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx renders Unicode U+22EE (vertical ellipsis) via
+        <Text style={styles.actionIcon}>{'\u22EE'}</Text> for !isNotInvited condition.
+
+    - ac_id: AC-F050-03
+      description: "WhatsApp button onPress unchanged"
+      status: verified
+      evidence: >
+        onPress={() => handleNotInvitedAction(speech)} preserved for isNotInvited.
+        handleNotInvitedAction logic unchanged: buildWhatsAppUrl + openWhatsApp + changeStatus.
+
+    - ac_id: AC-F050-04
+      description: "Three dots button opens dropdown"
+      status: verified
+      evidence: >
+        onPress={() => handleInvitedAction(speech)} preserved for !isNotInvited.
+        handleInvitedAction now calls setDropdownSpeech(speech) which opens InviteActionDropdown.
+
+    - ac_id: AC-F050-05
+      description: "Both buttons have accessibilityLabel"
+      status: verified
+      evidence: >
+        accessibilityLabel={isNotInvited ? 'WhatsApp' : t('speeches.changeStatus')} on the
+        Pressable component at line 205.
+
+    # F051 ACs (CR-106)
+    - ac_id: AC-F051-01
+      description: "Alert.alert not used for invited status"
+      status: verified
+      evidence: >
+        Alert is not imported in InviteManagementSection.tsx. handleInvitedAction simply
+        calls setDropdownSpeech(speech). No Alert.alert anywhere in the file.
+
+    - ac_id: AC-F051-02
+      description: "Dropdown has 'View conversation' with WhatsApp icon"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx Option 1 renders WhatsAppIcon + t('home.viewConversation').
+        i18n keys present in all 3 locales (pt-BR: 'Ver conversa', en: 'View conversation',
+        es: 'Ver conversacion'). onPress calls onOpenWhatsApp(speech).
+
+    - ac_id: AC-F051-03
+      description: "Dropdown has 'Assigned/Confirmed' with green indicator"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx Option 2 renders indicator with
+        STATUS_INDICATOR_COLORS.assigned_confirmed (#34D399 green) and
+        t('speechStatus.assigned_confirmed'). onPress calls onChangeStatus with 'assigned_confirmed'.
+
+    - ac_id: AC-F051-04
+      description: "Dropdown has 'Assigned/Not invited' with yellow indicator"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx Option 3 renders indicator with
+        STATUS_INDICATOR_COLORS.assigned_not_invited (#FBBF24 yellow) and
+        t('speechStatus.assigned_not_invited'). onPress calls onChangeStatus with
+        'assigned_not_invited'. VALID_TRANSITIONS.assigned_invited includes
+        'assigned_not_invited' (reverse transition enabled).
+
+    - ac_id: AC-F051-05
+      description: "Dropdown has 'Gave up' with red indicator"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx Option 4 renders indicator with
+        STATUS_INDICATOR_COLORS.gave_up (#F87171 red) and t('speechStatus.gave_up').
+        onPress calls onChangeStatus with 'gave_up'.
+
+    - ac_id: AC-F051-06
+      description: "Dropdown has 'Cancel' that closes without action"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx Option 5 renders t('common.cancel') with onPress={onClose}.
+        Close button separated by divider (borderTopWidth: hairlineWidth).
+
+    - ac_id: AC-F051-07
+      description: "Dropdown is custom Modal (not Alert)"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx uses Modal from react-native with transparent prop,
+        overlay with rgba(0,0,0,0.5), card with borderRadius 12, maxWidth 320.
+
+    - ac_id: AC-F051-08
+      description: "Dropdown shows speaker name as title"
+      status: verified
+      evidence: >
+        InviteActionDropdown.tsx line 74: speech?.speaker_name displayed in title Text
+        with fontSize 17, fontWeight 600.
+
+    # F052 ACs (CR-107)
+    - ac_id: AC-F052-01
+      description: "Second line shows full slot label"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx line 180: t('speeches.slot', { number: `${speech.position}\u00BA` })
+        produces "1o Discurso", "2o Discurso", "3o Discurso".
+
+    - ac_id: AC-F052-02
+      description: "StatusLED rendered inline"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx line 185: <StatusLED status={speech.status} size={10} />
+        rendered inside speechInfoRow View with flexDirection 'row', alignItems 'center'.
+
+    - ac_id: AC-F052-03
+      description: "Status name translated after LED"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx line 187: t(`speechStatus.${speech.status}`) renders
+        translated status name (e.g., 'Designado/Convidado' for assigned_invited).
+
+    - ac_id: AC-F052-04
+      description: "Full format: 'No Discurso - LED StatusName'"
+      status: verified
+      evidence: >
+        Lines 178-189: View speechInfoRow contains: slot label Text + separator ' - ' Text +
+        StatusLED inline + status name Text. Layout: flexDirection row, alignItems center.
+
+    - ac_id: AC-F052-05
+      description: "LED has size 10px"
+      status: verified
+      evidence: "StatusLED size={10} at line 185, smaller than the 16px default in SpeechSlot."
+
+    # F053 ACs (CR-110)
+    - ac_id: AC-F053-01
+      description: "Bishopric has home:invite_mgmt permission"
+      status: verified
+      evidence: >
+        permissions.ts line 33: 'home:invite_mgmt' in bishopric Set.
+        hasPermission('bishopric', 'home:invite_mgmt') returns true (unit test verified).
+
+    - ac_id: AC-F053-02
+      description: "InviteManagementSection visible for bishopric"
+      status: verified
+      evidence: >
+        InviteManagementSection.tsx line 139: guard uses hasPermission('home:invite_mgmt').
+        Since bishopric now has this permission, guard passes for bishopric role.
+
+    - ac_id: AC-F053-03
+      description: "Secretary still sees InviteManagementSection"
+      status: verified
+      evidence: "hasPermission('secretary', 'home:invite_mgmt') still returns true (unit test verified)."
+
+    - ac_id: AC-F053-04
+      description: "Observer does NOT see InviteManagementSection"
+      status: verified
+      evidence: "hasPermission('observer', 'home:invite_mgmt') returns false (unit test verified)."
+
+    - ac_id: AC-F053-05
+      description: "Bishopric sees both sections"
+      status: verified
+      evidence: >
+        Bishopric has both 'home:next_assignments' and 'home:invite_mgmt' permissions.
+        Both sections render independently based on their respective guards.
+
+    # F054 ACs (CR-111)
+    - ac_id: AC-F054-01
+      description: "Gap between LED and X is 12 (was 8)"
+      status: verified
+      evidence: "SpeechSlot.tsx line 229: styles.row gap: 12."
+
+    - ac_id: AC-F054-02
+      description: "X icon fontSize is 24 (was 20)"
+      status: verified
+      evidence: "SpeechSlot.tsx line 249: styles.removeButton fontSize: 24."
+
+    - ac_id: AC-F054-03
+      description: "Touch target adequate"
+      status: verified
+      evidence: "SpeechSlot.tsx line 168: hitSlop={8} on remove button Pressable. Combined with fontSize 24, touch area is adequate."
+
+    - ac_id: AC-F054-04
+      description: "Layout does not break with larger gap"
+      status: verified
+      evidence: >
+        SpeechSlot.tsx field style has flex:1 (line 232), speaker Text has numberOfLines={1}
+        (line 145). Speaker name truncates with ellipsis while LED and X maintain fixed size.
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 13
+    commits_reviewed: 9
+    new_tests: 78
+    new_tests_passing: 78
+    full_suite_tests: 3061
+    full_suite_passing: 3061
+    full_suite_files: 60
     regressions: 0

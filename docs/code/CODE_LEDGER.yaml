@@ -7,16 +7,17 @@
 # CR-105, CR-106, CR-107, CR-110, CR-111,
 # CR-112, CR-113, CR-117, CR-122, CR-125,
 # CR-114, CR-115, CR-116, CR-119, CR-121,
-# CR-118, CR-120, CR-123
+# CR-118, CR-120, CR-123,
+# CR-126, CR-127, CR-129, CR-130
 # Generated: 2026-02-19
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123]
-  plan_ref: plans/PLAN_P019.yaml
-  arch_ref: arch/ARCH_M019.yaml
-  spec_ref: specs/SPEC_F065_F068.yaml
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130]
+  plan_ref: plans/PLAN_P020.yaml
+  arch_ref: arch/ARCH_M020.yaml
+  spec_ref: specs/SPEC_F069_F072.yaml
 
 commits:
 
@@ -1504,4 +1505,151 @@ batch9_phase3_test_results:
   full_suite_tests: 3296
   full_suite_passing: 3296
   full_suite_files: 63
+  regressions: 0
+
+  # --- Batch 10, Phase 1: CR-126, CR-127, CR-129, CR-130 ---
+
+  - step: STEP-01
+    cr: CR-126
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-01
+    hash: d6519da
+    message: "feat(status-led): redesign StatusLED to flat circle with new color scheme (CR-126)"
+    files_changed:
+      - src/components/StatusLED.tsx
+    changes:
+      - id: CHG-217
+        description: "Removed 3D effect (outerRing, innerCircle, glowDot) and LEDColors interface"
+      - id: CHG-218
+        description: "Replaced with flat circle using single Animated.View and Record<SpeechStatus, string>"
+      - id: CHG-219
+        description: "New colors: gray #9CA3AF, orange #F97316, yellow #EAB308, green #22C55E, dark wine #7F1D1D"
+    acs_covered: [AC-F069-01, AC-F069-02, AC-F069-03, AC-F069-04, AC-F069-05, AC-F069-06, AC-F069-07, AC-F069-08, AC-F069-10, AC-F069-11]
+
+  - step: STEP-02
+    cr: CR-126
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-02
+    hash: 516b606
+    message: "feat(status-modal): update STATUS_INDICATOR_COLORS to match new flat LED colors (CR-126)"
+    files_changed:
+      - src/components/StatusChangeModal.tsx
+    changes:
+      - id: CHG-220
+        description: "Updated STATUS_INDICATOR_COLORS: assigned_not_invited #F97316, assigned_invited #EAB308, assigned_confirmed #22C55E, gave_up #7F1D1D"
+    acs_covered: [AC-F069-09]
+
+  - step: STEP-03
+    cr: CR-127
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-03
+    hash: c7a278c
+    message: "feat(speeches): add useDeleteSpeechesByDate hook for sunday type cleanup (CR-127)"
+    files_changed:
+      - src/hooks/useSpeeches.ts
+    changes:
+      - id: CHG-221
+        description: "Added useDeleteSpeechesByDate hook that deletes speeches by ward_id + sunday_date"
+      - id: CHG-222
+        description: "Added cache invalidation (speechKeys.all) and logAction for speech_cleanup"
+    acs_covered: [AC-F070-01, AC-F070-06, AC-F070-07]
+
+  - step: STEP-04
+    cr: CR-130
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-04
+    hash: fd63a3e
+    message: "fix(members): use getCountryByLabel for flag display to fix shared dial code (CR-130)"
+    files_changed:
+      - src/app/(tabs)/settings/members.tsx
+    changes:
+      - id: CHG-223
+        description: "Added import of getCountryByLabel from countryCodes.ts"
+      - id: CHG-224
+        description: "Changed flag display from getFlagForCode(countryCode) to getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)"
+    acs_covered: [AC-F072-01, AC-F072-02, AC-F072-03, AC-F072-04, AC-F072-05]
+
+  - step: STEP-05
+    cr: CR-127
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-05
+    hash: e6b8dd2
+    message: "feat(sunday-card): add onDeleteSpeeches prop to SundayTypeDropdown for type change cleanup (CR-127)"
+    files_changed:
+      - src/components/SundayCard.tsx
+    changes:
+      - id: CHG-225
+        description: "Added date and onDeleteSpeeches props to SundayTypeDropdownProps interface"
+      - id: CHG-226
+        description: "Added onDeleteSpeeches to SundayCardProps interface"
+      - id: CHG-227
+        description: "Call onDeleteSpeeches in destructive confirm and in no-assignments flow when changing from speeches"
+    acs_covered: [AC-F070-02, AC-F070-03, AC-F070-04, AC-F070-05, AC-F070-08]
+
+  - step: STEP-06
+    cr: CR-127
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-06
+    hash: 5ef1ed5
+    message: "feat(speeches): wire handleDeleteSpeeches to SundayCard for type change cleanup (CR-127)"
+    files_changed:
+      - src/app/(tabs)/speeches.tsx
+    changes:
+      - id: CHG-228
+        description: "Imported useDeleteSpeechesByDate from useSpeeches"
+      - id: CHG-229
+        description: "Created deleteSpeechesByDate instance and handleDeleteSpeeches callback"
+      - id: CHG-230
+        description: "Passed onDeleteSpeeches={handleDeleteSpeeches} to SundayCard"
+      - id: CHG-231
+        description: "Added handleDeleteSpeeches to renderItem dependency array"
+    acs_covered: [AC-F070-05]
+
+  - step: STEP-07
+    cr: CR-129
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-07
+    hash: a101989
+    message: "feat(speech-slot): filter LED to exclude not_assigned and disable for terminal states (CR-129)"
+    files_changed:
+      - src/components/SpeechSlot.tsx
+    changes:
+      - id: CHG-232
+        description: "Changed ledAllowedStatuses from conditional (assigned_invited only) to constant array of 4 statuses"
+      - id: CHG-233
+        description: "Added assigned_confirmed and gave_up to handleStatusPress early return"
+      - id: CHG-234
+        description: "Added assigned_confirmed and gave_up to StatusLED disabled condition"
+    acs_covered: [AC-F071-01, AC-F071-02, AC-F071-03, AC-F071-04, AC-F071-05, AC-F071-06, AC-F071-07]
+
+  - step: STEP-08
+    cr: [CR-126, CR-127, CR-129, CR-130]
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-08
+    hash: 118645f
+    message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+    files_changed:
+      - src/__tests__/batch10-phase1.test.ts
+    tests_added: 84
+    acs_covered: [AC-F069-01, AC-F069-12, AC-F070-01, AC-F070-08, AC-F071-01, AC-F071-07, AC-F072-01, AC-F072-08]
+    ecs_covered: [EC-F069-01, EC-F069-03, EC-F070-01, EC-F070-04, EC-F071-01, EC-F071-02, EC-F072-01, EC-F072-02]
+
+  - step: STEP-09
+    cr: CR-129
+    plan_ref: plans/PLAN_P020.yaml
+    plan_step: STEP-09
+    hash: f797810
+    message: "fix(tests): update batch9 F062 tests for CR-129 changes to ledAllowedStatuses"
+    files_changed:
+      - src/__tests__/batch9-phase2.test.ts
+    changes:
+      - id: CHG-235
+        description: "Updated 5 F062 tests to reflect F071 changes: constant ledAllowedStatuses, disabled terminal states"
+
+batch10_phase1_test_results:
+  new_tests: 84
+  new_tests_passing: 84
+  full_suite_tests: 3380
+  full_suite_passing: 3380
+  full_suite_files: 64
   regressions: 0

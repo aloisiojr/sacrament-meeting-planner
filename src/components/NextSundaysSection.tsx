@@ -178,7 +178,7 @@ export function NextSundaysSection() {
           typeDisabled={!canWriteSundayType}
         >
           {expandedDate === entry.date &&
-            !entry.exception &&
+            (!entry.exception || entry.exception.reason === 'speeches') &&
             [1, 2, 3].map((pos) => {
               const speech = entry.speeches.find((s) => s.position === pos) ?? null;
               return (

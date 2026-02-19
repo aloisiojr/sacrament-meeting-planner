@@ -126,7 +126,7 @@ export function ActorSelector({
     (actor: MeetingActor) => {
       Alert.alert(
         t('common.delete'),
-        t('members.deleteConfirm'),
+        t('actors.deleteConfirm'),
         [
           { text: t('common.cancel'), style: 'cancel' },
           {

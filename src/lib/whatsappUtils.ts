@@ -93,3 +93,19 @@ export function buildWhatsAppUrl(
 
   return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 }
+
+/**
+ * Build a WhatsApp URL to open an existing conversation (no pre-filled message).
+ * @param phone - Full phone number (with country code, e.g., "+5511987654321")
+ */
+export function buildWhatsAppConversationUrl(phone: string): string {
+  // Clean phone number: remove spaces, dashes, parentheses
+  let cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+
+  // Remove leading + for wa.me format
+  if (cleanPhone.startsWith('+')) {
+    cleanPhone = cleanPhone.substring(1);
+  }
+
+  return `https://wa.me/${cleanPhone}`;
+}

@@ -28,7 +28,7 @@ import { SearchInput } from '../../../components/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { generateCsv, parseCsv, splitPhoneNumber, type CsvErrorCode } from '../../../lib/csvUtils';
-import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes';
+import { COUNTRY_CODES, getFlagForCode, getCountryByLabel, type CountryCode } from '../../../lib/countryCodes';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -95,7 +95,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           onPress={() => setShowCountryPicker(true)}
           accessibilityLabel={t('members.countryCode')}
         >
-          <Text style={styles.flagText}>{getFlagForCode(countryCode)}</Text>
+          <Text style={styles.flagText}>{getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)}</Text>
           <Text style={[styles.codeText, { color: colors.text }]}>{countryCode}</Text>
         </Pressable>
         <TextInput

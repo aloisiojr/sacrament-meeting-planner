@@ -97,7 +97,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   }, [speech, canAssign, onOpenTopicSelector]);
 
   const handleStatusPress = useCallback(() => {
-    if (!canChangeStatus || !speech || status === 'not_assigned') return;
+    if (!canChangeStatus || !speech || status === 'not_assigned' ||
+        status === 'assigned_confirmed' || status === 'gave_up') return;
     setStatusModalVisible(true);
   }, [canChangeStatus, speech, status]);
 
@@ -134,10 +135,13 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       : speech.topic_title
     : null;
 
-  // When LED is clicked on assigned_invited, show only confirmed/gave_up options
-  const ledAllowedStatuses = status === 'assigned_invited'
-    ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
-    : undefined;
+  // LED allowed statuses: all except not_assigned
+  const ledAllowedStatuses: SpeechStatus[] = [
+    'assigned_not_invited',
+    'assigned_invited',
+    'assigned_confirmed',
+    'gave_up',
+  ];
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
@@ -150,7 +154,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           status={status}
           size={16}
           onPress={handleStatusPress}
-          disabled={isObserver || status === 'not_assigned'}
+          disabled={isObserver || status === 'not_assigned' ||
+                    status === 'assigned_confirmed' || status === 'gave_up'}
         />
 
         {/* Speaker field */}

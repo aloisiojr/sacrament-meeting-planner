@@ -11,7 +11,6 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
@@ -20,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
 import { QueryErrorView } from './QueryErrorView';
 import { StatusLED } from './StatusLED';
+import { InviteActionDropdown } from './InviteActionDropdown';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppUrl, openWhatsApp } from '../lib/whatsapp';
@@ -51,6 +51,7 @@ export function InviteManagementSection() {
   const { hasPermission } = useAuth();
   const locale = getCurrentLanguage();
   const changeStatus = useChangeStatus();
+  const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
 
   const nextSundays = useMemo(() => {
     const today = new Date();
@@ -97,56 +98,41 @@ export function InviteManagementSection() {
 
   const handleInvitedAction = useCallback(
     (speech: Speech) => {
-      Alert.alert(
-        t('speeches.changeStatus'),
-        speech.speaker_name ?? '',
-        [
-          {
-            text: 'WhatsApp',
-            onPress: async () => {
-              if (speech.speaker_phone) {
-                const url = buildWhatsAppUrl(
-                  speech.speaker_phone,
-                  '',
-                  '',
-                  {
-                    speakerName: speech.speaker_name ?? '',
-                    date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-                    topic: speech.topic_title ?? '',
-                    position: `${speech.position}\u00BA`,
-                    collection: speech.topic_collection ?? '',
-                    link: speech.topic_link ?? '',
-                  },
-                  locale
-                );
-                await openWhatsApp(url);
-              }
-            },
-          },
-          {
-            text: t('speechStatus.assigned_confirmed'),
-            onPress: () => {
-              changeStatus.mutate({
-                speechId: speech.id,
-                status: 'assigned_confirmed',
-              });
-            },
-          },
-          {
-            text: t('speechStatus.gave_up'),
-            style: 'destructive',
-            onPress: () => {
-              changeStatus.mutate({
-                speechId: speech.id,
-                status: 'gave_up',
-              });
-            },
-          },
-          { text: t('common.cancel'), style: 'cancel' },
-        ]
-      );
+      setDropdownSpeech(speech);
     },
-    [t, changeStatus, locale]
+    []
+  );
+
+  const handleDropdownWhatsApp = useCallback(
+    async (speech: Speech) => {
+      setDropdownSpeech(null);
+      if (speech.speaker_phone) {
+        const url = buildWhatsAppUrl(
+          speech.speaker_phone,
+          '',
+          '',
+          {
+            speakerName: speech.speaker_name ?? '',
+            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+            topic: speech.topic_title ?? '',
+            position: `${speech.position}\u00BA`,
+            collection: speech.topic_collection ?? '',
+            link: speech.topic_link ?? '',
+          },
+          locale
+        );
+        await openWhatsApp(url);
+      }
+    },
+    [locale]
+  );
+
+  const handleDropdownStatusChange = useCallback(
+    (speechId: string, status: SpeechStatus) => {
+      setDropdownSpeech(null);
+      changeStatus.mutate({ speechId, status });
+    },
+    [changeStatus]
   );
 
   // Only visible for Secretary and Bishopric
@@ -234,6 +220,14 @@ export function InviteManagementSection() {
           </View>
         );
       })}
+
+      <InviteActionDropdown
+        visible={!!dropdownSpeech}
+        speech={dropdownSpeech}
+        onOpenWhatsApp={handleDropdownWhatsApp}
+        onChangeStatus={handleDropdownStatusChange}
+        onClose={() => setDropdownSpeech(null)}
+      />
     </View>
   );
 }

@@ -163,9 +163,22 @@ function SpeechesTabContent() {
         setExpandedDate(date);
         // Lazy-create speeches on first expand
         lazyCreate.mutate(date);
+        // Auto-scroll to expanded card (ADR-047)
+        const index = listItems.findIndex(
+          (i) => i.type === 'sunday' && i.key === date
+        );
+        if (index >= 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0,
+            });
+          }, 300);
+        }
       }
     },
-    [expandedDate, lazyCreate]
+    [expandedDate, lazyCreate, listItems]
   );
 
   // Speaker assignment

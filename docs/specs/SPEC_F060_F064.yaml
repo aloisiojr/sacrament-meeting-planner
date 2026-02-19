@@ -1,0 +1,687 @@
+# =============================================================================
+# SPEC_F060_F064.yaml
+# Specification for Batch 9 Phase 2 - Speech Cards & Agenda
+# Features: F060, F061, F062, F063, F064
+# CRs: CR-114, CR-115, CR-116, CR-119, CR-121
+# Created: 2026-02-19
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 9
+phase: 2
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+features:
+
+  # ===========================================================================
+  # F060 / CR-114: Add X button to remove topic assignment
+  # ===========================================================================
+
+  - id: F060
+    name: "Add X button next to topic field to remove assigned topic"
+    cr_id: 114
+    type: ux
+    priority: high
+
+    description: >
+      No SpeechSlot.tsx, o campo de tema (topic field, linhas 183-204) mostra o
+      tema atribuido no formato "Collection : Title" mas NAO possui botao X para
+      remover o tema. O unico modo de mudar o tema e selecionar outro via
+      TopicSelectorModal. O campo de discursante (speaker row, linhas 167-179)
+      JA possui botao X (handleRemove) para remover a designacao. A mesma
+      funcionalidade deve ser adicionada ao campo de tema: um botao X que limpa
+      topic_title, topic_link e topic_collection para null.
+
+    user_request: >
+      "Adicionar X ao lado do campo de temas para poder remover o tema selecionado"
+
+    analysis: >
+      Baseline: SpeechSlot.tsx renderiza topic field (Pressable, linhas 183-204)
+      com topic display e dropdown arrow. Nao ha botao X nem callback para limpar
+      o tema. O componente ja recebe onAssignTopic mas nao tem onClearTopic.
+      O padrao de remocao ja existe para o speaker (handleRemove, linhas 110-120)
+      usando Alert.alert para confirmacao.
+      Fix: Adicionar prop onClearTopic ao SpeechSlotProps. Adicionar botao X
+      ao lado do campo de tema, visivel apenas quando topicDisplay tem valor e
+      usuario tem permissao canAssign. Ao pressionar X, limpar topic_title,
+      topic_link, topic_collection via mutation. Os componentes pai
+      (NextSundaysSection, speeches.tsx) precisam wiring do novo callback.
+      Nao e necessario dialogo de confirmacao pois o tema pode ser facilmente
+      re-atribuido (diferente do speaker que tem ciclo de convites).
+
+    root_cause: >
+      SpeechSlot.tsx:183-204 renderiza campo de tema sem botao X. Nao existe
+      callback onClearTopic no componente. O padrao de remocao existe para
+      speaker mas nao foi replicado para topic.
+
+    acceptance_criteria:
+      - id: AC-F060-01
+        description: "Botao X aparece ao lado do campo de tema quando tema esta atribuido"
+        given: "SpeechSlot com speech.topic_title preenchido"
+        when: "O slot e renderizado"
+        then: "Um botao X (Unicode U+00D7) aparece a direita do campo de tema, entre o campo e o dropdown arrow"
+        status: pending
+
+      - id: AC-F060-02
+        description: "Pressionar X limpa a atribuicao de tema"
+        given: "Botao X visivel no campo de tema"
+        when: "Usuario pressiona o botao X"
+        then: "topic_title, topic_link e topic_collection sao setados para null via mutation. O campo volta a mostrar placeholder 'Selecionar Tema'"
+        status: pending
+
+      - id: AC-F060-03
+        description: "Botao X visivel apenas para quem pode atribuir (canAssign)"
+        given: "SpeechSlot com tema atribuido"
+        when: "Usuario e observador ou secretario (canAssign=false)"
+        then: "Botao X NAO e renderizado no campo de tema"
+        status: pending
+
+      - id: AC-F060-04
+        description: "Botao X nao visivel quando nao ha tema atribuido"
+        given: "SpeechSlot sem tema atribuido (topic_title e null)"
+        when: "O slot e renderizado"
+        then: "Botao X NAO e renderizado (apenas placeholder e mostrado)"
+        status: pending
+
+      - id: AC-F060-05
+        description: "Fluxo de atribuicao de tema via modal continua funcionando"
+        given: "Campo de tema visivel"
+        when: "Usuario clica no campo de tema (nao no X)"
+        then: "TopicSelectorModal abre normalmente e selecionar um tema atribui corretamente"
+        status: pending
+
+      - id: AC-F060-06
+        description: "Nao requer dialogo de confirmacao para remover tema"
+        given: "Botao X pressionado"
+        when: "O handler e executado"
+        then: "Tema e removido diretamente sem Alert.alert (tema pode ser facilmente re-atribuido)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F060-01
+        case: "Remover tema enquanto speech nao tem speaker"
+        expected: "Funciona normalmente; tema removido independente do estado do speaker"
+        status: pending
+      - id: EC-F060-02
+        case: "Remover tema de speech com status 'assigned_confirmed'"
+        expected: "Tema removido normalmente; status do speech nao e alterado (tema e speaker sao independentes)"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Adicionar prop onClearTopic. Adicionar botao X no campo de tema, visivel quando topicDisplay && canAssign. Handler chama onClearTopic(speechId)."
+      - path: "src/app/(tabs)/speeches.tsx"
+        change: "Wiring de onClearTopic no SpeechSlot: chamar mutation para setar topic_title, topic_link, topic_collection para null"
+      - path: "src/components/NextSundaysSection.tsx"
+        change: "Wiring de onClearTopic (mesmo padrao de speeches.tsx)"
+
+    dependencies: []
+    related_features: [F005, F008]
+    related_crs: []
+
+  # ===========================================================================
+  # F061 / CR-115: Confirmation dialog on sunday type change
+  # ===========================================================================
+
+  - id: F061
+    name: "Show confirmation dialog when changing sunday type if speakers/topics are assigned"
+    cr_id: 115
+    type: ux
+    priority: high
+
+    description: >
+      No SundayCard.tsx, o SundayTypeDropdown (linhas 85-243) permite mudar o
+      tipo de domingo sem confirmacao. Se o domingo atual e do tipo 'speeches'
+      e ja tem discursantes ou temas atribuidos, mudar para outro tipo
+      efetivamente "esconde" essas atribuicoes (os dados permanecem no banco mas
+      nao sao exibidos). O usuario deve ser avisado antes de prosseguir.
+      SundayCard ja recebe speeches: Speech[] como prop, entao os dados estao
+      disponiveis. O SundayTypeDropdown interno precisa receber essa informacao
+      (via prop ou callback) para verificar se ha atribuicoes antes de prosseguir.
+
+    user_request: >
+      "Ao selecionar opcao diferente de 'Domingo com Discursos' com discursantes/temas
+      existentes, abrir dialogo de confirmacao antes de apagar"
+
+    analysis: >
+      Baseline: SundayTypeDropdown.handleSelect (linha 104-116) chama
+      onSelect/onRevertToSpeeches diretamente sem verificacao. SundayCard
+      recebe speeches[] como prop mas nao passa para SundayTypeDropdown.
+      Fix proposto:
+      1. Passar speeches ao SundayTypeDropdown (ou passar callback hasAssignments).
+      2. Em handleSelect, antes de prosseguir com tipo diferente de speeches,
+         verificar se algum speech tem speaker_name ou topic_title preenchido.
+      3. Se sim, exibir Alert.alert com mensagem de aviso e opcoes Confirmar/Cancelar.
+      4. Se nao, prosseguir diretamente (sem confirmacao).
+      5. Ao reverter PARA speeches, nao exibir confirmacao (nada esta sendo perdido).
+      O dialogo deve ser i18n: novas keys sundayExceptions.changeConfirmTitle e
+      sundayExceptions.changeConfirmMessage.
+
+    root_cause: >
+      SundayTypeDropdown.handleSelect (linha 104-116) nao verifica existencia
+      de atribuicoes antes de mudar o tipo. Nao ha logica de confirmacao.
+
+    acceptance_criteria:
+      - id: AC-F061-01
+        description: "Confirmacao exibida ao mudar DE 'speeches' COM atribuicoes"
+        given: "Domingo do tipo 'speeches' com pelo menos um speech com speaker_name ou topic_title preenchido"
+        when: "Usuario seleciona outro tipo no dropdown (ex: testimony_meeting)"
+        then: "Alert.alert de confirmacao e exibido antes de efetuar a mudanca"
+        status: pending
+
+      - id: AC-F061-02
+        description: "Nenhuma confirmacao quando nao ha atribuicoes"
+        given: "Domingo do tipo 'speeches' sem nenhum speech com speaker_name ou topic_title"
+        when: "Usuario seleciona outro tipo no dropdown"
+        then: "Mudanca de tipo e efetuada diretamente sem confirmacao"
+        status: pending
+
+      - id: AC-F061-03
+        description: "Cancelar na confirmacao mantem tipo atual"
+        given: "Dialogo de confirmacao exibido"
+        when: "Usuario pressiona 'Cancelar'"
+        then: "Tipo de domingo permanece 'speeches', dropdown nao muda"
+        status: pending
+
+      - id: AC-F061-04
+        description: "Confirmar na confirmacao efetua a mudanca"
+        given: "Dialogo de confirmacao exibido"
+        when: "Usuario pressiona 'Confirmar'"
+        then: "Tipo de domingo e alterado para o tipo selecionado via onSelect/onRevertToSpeeches"
+        status: pending
+
+      - id: AC-F061-05
+        description: "Nenhuma confirmacao ao reverter PARA speeches"
+        given: "Domingo de qualquer tipo diferente de 'speeches'"
+        when: "Usuario seleciona 'Domingo com Discursos'"
+        then: "Mudanca para 'speeches' e efetuada diretamente sem confirmacao"
+        status: pending
+
+      - id: AC-F061-06
+        description: "SundayTypeDropdown tem acesso aos dados de speeches"
+        given: "SundayCard renderiza SundayTypeDropdown"
+        when: "O dropdown precisa verificar atribuicoes"
+        then: "SundayTypeDropdown recebe speeches[] como prop ou callback hasAssignments"
+        status: pending
+
+      - id: AC-F061-07
+        description: "Textos do dialogo traduzidos em 3 idiomas"
+        given: "Dialogo de confirmacao exibido"
+        when: "O idioma do app e pt-BR, en ou es"
+        then: "Titulo e mensagem do dialogo estao traduzidos corretamente"
+        status: pending
+
+    edge_cases:
+      - id: EC-F061-01
+        case: "Mudar tipo quando speeches tem apenas topic (sem speaker)"
+        expected: "Confirmacao exibida (topic_title preenchido e suficiente para acionar)"
+        status: pending
+      - id: EC-F061-02
+        case: "Mudar tipo de 'speeches' para 'other' (com campo de texto)"
+        expected: "Confirmacao exibida ANTES do modal de texto customizado. Se cancelar, nenhum modal e aberto."
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SundayCard.tsx"
+        change: "Passar speeches[] ao SundayTypeDropdown. Adicionar logica de confirmacao em handleSelect quando currentType === SUNDAY_TYPE_SPEECHES e ha atribuicoes."
+      - path: "src/i18n/locales/pt-BR.json"
+        change: "Adicionar keys sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+      - path: "src/i18n/locales/en.json"
+        change: "Adicionar keys sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+      - path: "src/i18n/locales/es.json"
+        change: "Adicionar keys sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+
+    dependencies: []
+    related_features: [F007, F008]
+    related_crs: [6, 7, 56, 95]
+
+  # ===========================================================================
+  # F062 / CR-116: LED click shows confirmed and gave_up options
+  # ===========================================================================
+
+  - id: F062
+    name: "Clicking LED shows 'confirmed' and 'gave up' options directly"
+    cr_id: 116
+    type: feature
+    priority: medium
+
+    description: >
+      Atualmente, clicar no StatusLED no SpeechSlot abre o StatusChangeModal
+      que mostra TODOS os status de transicao validos (conforme VALID_TRANSITIONS
+      em useSpeeches.ts). O usuario quer que o LED mostre apenas as opcoes
+      mais comuns: "Confirmado" e "Desistiu". Isso simplifica a UX pois apos
+      enviar convite (status assigned_invited), as acoes mais frequentes sao
+      marcar como confirmado ou desistiu.
+      A proposta e: quando o LED e clicado no SpeechSlot e o status e
+      assigned_invited, filtrar as opcoes para mostrar APENAS assigned_confirmed
+      e gave_up. Para outros status (assigned_not_invited), o LED mostra todas
+      as opcoes normais. O StatusChangeModal pode receber uma nova prop
+      'filteredStatuses' opcional para limitar quais opcoes exibir, OU o
+      SpeechSlot pode pre-filtrar antes de passar para o modal.
+      O acesso ao modal COMPLETO (com todas as transicoes) permanece disponivel
+      pois o StatusChangeModal tambem e usado pelo InviteActionDropdown e outros
+      contextos onde todas as transicoes sao necessarias.
+
+    user_request: >
+      "Ao clicar no LED de status do convite, mostrar tambem as opcoes
+      'confirmado' e 'desistiu'"
+
+    analysis: >
+      Baseline: SpeechSlot.tsx:96-99 handleStatusPress abre StatusChangeModal.
+      StatusChangeModal.tsx:55 mostra getAvailableStatuses(currentStatus) que
+      retorna TODAS as transicoes validas de VALID_TRANSITIONS.
+      Para assigned_invited, transicoes validas sao: assigned_confirmed,
+      assigned_not_invited, gave_up, not_assigned. O usuario quer apenas
+      assigned_confirmed e gave_up.
+      Para assigned_not_invited, transicoes sao: assigned_invited, not_assigned.
+      Nenhuma das "opcoes pedidas" (confirmed/gave_up) e valida neste estado,
+      entao o comportamento original deve ser mantido.
+      Abordagem recomendada: Adicionar prop opcional 'allowedStatuses' ao
+      StatusChangeModal. No SpeechSlot, quando status === 'assigned_invited',
+      passar allowedStatuses=['assigned_confirmed', 'gave_up']. Para outros
+      status, nao passar a prop (comportamento original). StatusChangeModal
+      usa allowedStatuses para filtrar: se passado, mostra interseccao de
+      allowedStatuses com getAvailableStatuses(currentStatus). Se nao passado,
+      mostra todos os disponeis.
+
+    root_cause: >
+      StatusChangeModal sempre mostra todas as transicoes validas de
+      VALID_TRANSITIONS sem possibilidade de filtrar para um subconjunto.
+
+    acceptance_criteria:
+      - id: AC-F062-01
+        description: "LED click no status assigned_invited mostra apenas 'Confirmado' e 'Desistiu'"
+        given: "SpeechSlot com speech no status assigned_invited"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal mostra apenas 2 opcoes: assigned_confirmed ('Confirmado') e gave_up ('Desistiu')"
+        status: pending
+
+      - id: AC-F062-02
+        description: "LED click no status assigned_not_invited mostra todas as transicoes"
+        given: "SpeechSlot com speech no status assigned_not_invited"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal mostra todas as transicoes disponiveis: assigned_invited, not_assigned"
+        status: pending
+
+      - id: AC-F062-03
+        description: "LED click no status assigned_confirmed mostra transicao normal"
+        given: "SpeechSlot com speech no status assigned_confirmed"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal mostra a transicao disponivel: not_assigned"
+        status: pending
+
+      - id: AC-F062-04
+        description: "Labels traduzidos em 3 idiomas"
+        given: "StatusChangeModal aberto via LED click"
+        when: "O idioma do app e pt-BR, en ou es"
+        then: "Labels 'Confirmado'/'Desistiu' traduzidos usando i18n keys existentes speechStatus.assigned_confirmed e speechStatus.gave_up"
+        status: pending
+
+      - id: AC-F062-05
+        description: "LED permanece nao-interativo para not_assigned"
+        given: "SpeechSlot com speech no status not_assigned"
+        when: "Usuario tenta clicar no LED"
+        then: "LED nao responde (disabled={isObserver || status === 'not_assigned'})"
+        status: pending
+
+      - id: AC-F062-06
+        description: "StatusChangeModal sem prop de filtro continua funcionando normalmente"
+        given: "StatusChangeModal usado em outro contexto (InviteActionDropdown)"
+        when: "Modal e aberto sem prop allowedStatuses"
+        then: "Todas as transicoes validas sao exibidas (comportamento original preservado)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F062-01
+        case: "Status gave_up - LED click"
+        expected: "Modal mostra transicao para not_assigned (unica opcao, nao filtra)"
+        status: pending
+      - id: EC-F062-02
+        case: "Selecionar 'Confirmado' no modal filtrado"
+        expected: "Status muda para assigned_confirmed, LED muda para cor verde"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/StatusChangeModal.tsx"
+        change: "Adicionar prop opcional 'allowedStatuses?: SpeechStatus[]'. Quando passado, filtrar availableStatuses para interseccao com allowedStatuses."
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Quando status === 'assigned_invited', passar allowedStatuses={['assigned_confirmed', 'gave_up']} ao StatusChangeModal."
+
+    dependencies: []
+    related_features: [F008, F051]
+    related_crs: [106]
+
+  # ===========================================================================
+  # F063 / CR-119: Redesign speech cards layout (LED left, X right)
+  # ===========================================================================
+
+  - id: F063
+    name: "Redesign speech assignment cards (LED left, X right, same component)"
+    cr_id: 119
+    type: ui
+    priority: high
+
+    description: >
+      No SpeechSlot.tsx, a row do speaker (linhas 134-180) tem a seguinte ordem:
+      [Speaker Field (flex:1)] [StatusLED] [Remove X]
+      O usuario quer a ordem: [StatusLED] [Speaker Field (flex:1)] [Remove X]
+      Adicionalmente, o request menciona "mesmo componente" significando que
+      todas as 3 posicoes (1o, 2o, Ultimo Discurso) devem usar o mesmo
+      SpeechSlot com layout identico. Atualmente ja usam o mesmo componente,
+      entao o foco e apenas reordenar os elementos visuais na row.
+      Tambem do pedido original: "secretario/observador nao ve X" - isso ja e
+      implementado via canUnassign (secretario nao tem speech:unassign, observador
+      tambem nao). E "inicio do campo tema/discursante alinhados" - com LED
+      a esquerda, ambos os campos (speaker e topic) devem ter o mesmo alinhamento
+      esquerdo. O campo de tema (topic field) fica abaixo da speaker row, entao
+      precisa de marginLeft/paddingLeft equivalente ao espaco ocupado pelo LED
+      para alinhar visualmente.
+
+    user_request: >
+      "Redesign dos cards de designacao de discursos (mesmo componente para aba
+      discursos e home): LED a esquerda do nome, X a direita (so com selecao),
+      inicio do campo tema/discursante alinhados, secretario/observador nao ve X"
+
+    analysis: >
+      Baseline: SpeechSlot.tsx:134-180 renderiza na ordem:
+      1. Pressable (speaker field, flex:1)
+      2. StatusLED (size 16)
+      3. Pressable (X remove button, condicional)
+      Fix: Reordenar JSX para:
+      1. StatusLED (size 16)
+      2. Pressable (speaker field, flex:1)
+      3. Pressable (X remove button, condicional)
+      Para alinhar topic field com speaker field: adicionar marginLeft ao
+      topicField igual ao tamanho do LED (16) + gap (12) = 28px. Ou usar
+      paddingLeft no container do topic. Isso garante que o inicio do texto
+      do tema fica alinhado com o inicio do texto do speaker.
+      Verificar: canUnassign ja e false para secretary e observer (speech:unassign
+      nao esta nos Sets de permissions.ts). O botao X so aparece quando
+      hasSpeaker && canUnassign.
+
+    root_cause: >
+      SpeechSlot.tsx:134-180 renderiza LED entre speaker field e X button.
+      Precisa reordenar para LED primeiro.
+
+    acceptance_criteria:
+      - id: AC-F063-01
+        description: "LED posicionado a ESQUERDA da row (primeiro elemento)"
+        given: "SpeechSlot renderizado"
+        when: "A row do speaker e exibida"
+        then: "StatusLED e o primeiro elemento da row, seguido pelo speaker field, seguido pelo X"
+        status: pending
+
+      - id: AC-F063-02
+        description: "X button permanece a DIREITA da row (ultimo elemento)"
+        given: "SpeechSlot com speaker atribuido e canUnassign=true"
+        when: "A row do speaker e exibida"
+        then: "Botao X e o ultimo elemento da row"
+        status: pending
+
+      - id: AC-F063-03
+        description: "Speaker field continua com flex:1"
+        given: "SpeechSlot renderizado"
+        when: "A row do speaker e exibida"
+        then: "Speaker field ocupa todo o espaco restante entre LED e X (flex:1)"
+        status: pending
+
+      - id: AC-F063-04
+        description: "Campo de tema alinhado com campo de speaker"
+        given: "SpeechSlot com speaker e tema atribuidos"
+        when: "Ambos os campos sao exibidos"
+        then: "O inicio do texto do campo de tema esta alinhado verticalmente com o inicio do texto do campo de speaker (topic field tem marginLeft de 28px ou equivalente para compensar LED+gap)"
+        status: pending
+
+      - id: AC-F063-05
+        description: "Todas as 3 posicoes usam o mesmo componente e layout"
+        given: "Card de domingo expandido na aba Discursos"
+        when: "3 slots de discurso sao exibidos"
+        then: "Todos usam SpeechSlot com layout identico [LED][Field][X]"
+        status: pending
+
+      - id: AC-F063-06
+        description: "LED continua funcional (pressable para status change)"
+        given: "SpeechSlot com speaker atribuido"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal abre normalmente (regressao check)"
+        status: pending
+
+      - id: AC-F063-07
+        description: "Secretary e Observer nao veem botao X"
+        given: "Usuario com role secretary ou observer"
+        when: "SpeechSlot e renderizado com speaker atribuido"
+        then: "Botao X NAO e renderizado (canUnassign=false)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F063-01
+        case: "SpeechSlot sem speaker atribuido"
+        expected: "LED aparece (status not_assigned, cor cinza), botao X nao aparece, field mostra placeholder"
+        status: pending
+      - id: EC-F063-02
+        case: "Tela estreita (dispositivo pequeno)"
+        expected: "Layout nao quebra, field com flex:1 encolhe adequadamente"
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Reordenar JSX na styles.row: LED primeiro, speaker field segundo, X terceiro. Adicionar marginLeft ao topicField (28px = LED 16 + gap 12) para alinhar com speaker field."
+
+    dependencies: []
+    related_features: [F008, F054]
+    related_crs: [100, 111]
+
+  # ===========================================================================
+  # F064 / CR-121: "(Last-minute assignment)" label in agenda
+  # ===========================================================================
+
+  - id: F064
+    name: "Show '(Last-minute assignment)' label when making assignment in agenda"
+    cr_id: 121
+    type: feature
+    priority: medium
+
+    description: >
+      Na aba Agenda, o SpeakerField (AgendaForm.tsx:572-657) permite override de
+      nome via mecanismo de "Troca de Ultima Hora" (CR-100/F044). Quando o usuario
+      edita o nome diretamente na agenda (overrideName diferente de speakerName),
+      nao ha indicacao visual de que aquela e uma designacao de ultima hora.
+      O usuario quer que um label "(Designacao de ultima hora)" apareca ao lado
+      ou abaixo do campo quando um override esta ativo.
+      O label deve:
+      1. Aparecer quando hasOverride=true (overrideName !== null && overrideName !== speakerName)
+      2. Desaparecer quando override e limpo (handleRevert)
+      3. Ser traduzido em 3 idiomas via i18n
+      4. Ter estilo visual sutil (fonte menor, cor secundaria, italico)
+
+    user_request: >
+      "Ao fazer designacao de ultima hora na agenda, adicionar '(Designacao de
+      ultima hora)' apos o label do discurso"
+
+    analysis: >
+      Baseline: SpeakerField em AgendaForm.tsx:572-657. A variavel hasOverride
+      (linha 591) ja existe e indica quando ha override ativo. Atualmente e usada
+      apenas para mostrar/esconder o botao X de reverter (linha 648).
+      Fix: Adicionar um <Text> abaixo do speakerReadRow (ou ao lado do label)
+      que renderiza "(Designacao de ultima hora)" quando hasOverride=true.
+      O texto deve usar i18n key agenda.lastMinuteAssignment.
+      Novas i18n keys:
+      - pt-BR: "(Designacao de ultima hora)"
+      - en: "(Last-minute assignment)"
+      - es: "(Designacion de ultima hora)"
+      Estilo: fontSize 11-12, fontStyle 'italic', color colors.textTertiary.
+      O label deve ser exibido apos o label principal do campo (ex: abaixo de
+      "Ultimo Discurso - Discurso") para indicar visualmente que aquele nome
+      foi inserido manualmente na agenda.
+
+    root_cause: >
+      SpeakerField em AgendaForm.tsx nao tem indicacao visual de que o nome
+      exibido e um override (designacao de ultima hora) vs nome designado
+      normalmente. A variavel hasOverride existe mas nao e usada para exibir
+      label informativo.
+
+    acceptance_criteria:
+      - id: AC-F064-01
+        description: "Label exibido quando override esta ativo"
+        given: "SpeakerField com overrideName definido e diferente de speakerName"
+        when: "O campo e renderizado em modo read-only"
+        then: "Label '(Designacao de ultima hora)' e exibido abaixo do campo"
+        status: pending
+
+      - id: AC-F064-02
+        description: "Label NAO exibido quando nao ha override"
+        given: "SpeakerField com overrideName null (fluxo normal)"
+        when: "O campo e renderizado"
+        then: "Nenhum label de ultima hora e exibido"
+        status: pending
+
+      - id: AC-F064-03
+        description: "Label desaparece ao reverter override"
+        given: "SpeakerField com override ativo e label visivel"
+        when: "Usuario clica no X para reverter ao nome original (handleRevert)"
+        then: "Label desaparece imediatamente"
+        status: pending
+
+      - id: AC-F064-04
+        description: "Label traduzido em 3 idiomas"
+        given: "SpeakerField com override ativo"
+        when: "O idioma do app e pt-BR"
+        then: "Label exibe '(Designacao de ultima hora)'"
+        status: pending
+
+      - id: AC-F064-05
+        description: "Label traduzido em ingles"
+        given: "SpeakerField com override ativo"
+        when: "O idioma do app e en"
+        then: "Label exibe '(Last-minute assignment)'"
+        status: pending
+
+      - id: AC-F064-06
+        description: "Label traduzido em espanhol"
+        given: "SpeakerField com override ativo"
+        when: "O idioma do app e es"
+        then: "Label exibe '(Designacion de ultima hora)'"
+        status: pending
+
+      - id: AC-F064-07
+        description: "Label com estilo visual sutil e nao-intrusivo"
+        given: "Label de ultima hora visivel"
+        when: "O campo e renderizado"
+        then: "Label tem fontSize 11-12, fontStyle italic, cor textTertiary/textSecondary"
+        status: pending
+
+      - id: AC-F064-08
+        description: "Label NAO aparece durante modo de edicao"
+        given: "SpeakerField em modo de edicao (isEditing=true)"
+        when: "O campo esta como TextInput"
+        then: "Label de ultima hora NAO e exibido (apenas no modo read-only com override ativo)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F064-01
+        case: "Override com mesmo nome do speaker (editValue.trim() === speakerName)"
+        expected: "Override e limpo (handleSave define null), label NAO aparece"
+        status: pending
+      - id: EC-F064-02
+        case: "Override com nome vazio"
+        expected: "Override e limpo (handleSave define null para trimmed vazio), label NAO aparece"
+        status: pending
+      - id: EC-F064-03
+        case: "Modo Apresentacao com override ativo"
+        expected: "Modo Apresentacao mostra o nome do override. Label de ultima hora NAO e necessario no Modo Apresentacao (apenas na edicao de agenda)."
+        status: pending
+
+    files_impacted:
+      - path: "src/components/AgendaForm.tsx"
+        change: "No SpeakerField, adicionar <Text> com label i18n quando hasOverride=true e nao esta em modo edicao"
+      - path: "src/i18n/locales/pt-BR.json"
+        change: "Adicionar key agenda.lastMinuteAssignment = '(Designacao de ultima hora)'"
+      - path: "src/i18n/locales/en.json"
+        change: "Adicionar key agenda.lastMinuteAssignment = '(Last-minute assignment)'"
+      - path: "src/i18n/locales/es.json"
+        change: "Adicionar key agenda.lastMinuteAssignment = '(Designacion de ultima hora)'"
+
+    dependencies: [F044]
+    related_features: [F012, F044]
+    related_crs: [100]
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: ASM-F060-01
+    description: >
+      Nao e necessario dialogo de confirmacao para remover tema (diferente do
+      speaker que tem ciclo de convites). Tema pode ser facilmente re-atribuido
+      selecionando outro no TopicSelectorModal.
+    impact: "Baixo - se UX indesejada, pode-se adicionar confirmacao futuramente"
+
+  - id: ASM-F060-02
+    description: >
+      O callback onClearTopic reutiliza a mutation existente de updateSpeech
+      para setar topic_title, topic_link, topic_collection para null (mesma
+      mutation usada por onAssignTopic, apenas com valores null).
+    impact: "Nenhum - padrao ja existente para updates de speech"
+
+  - id: ASM-F061-01
+    description: >
+      O dialogo de confirmacao usa Alert.alert nativo (padrao consistente com
+      outros dialogos do app: delete member, import CSV, remove speech assignment).
+      Nao e necessario modal customizado.
+    impact: "Nenhum - padrao consistente com o app"
+
+  - id: ASM-F061-02
+    description: >
+      A confirmacao verifica apenas speaker_name e topic_title. Nao verifica
+      status do speech (not_assigned com campos null e tratado como sem atribuicao).
+    impact: "Nenhum - logica simples e correta"
+
+  - id: ASM-F062-01
+    description: >
+      O filtro de opcoes no LED click aplica-se APENAS ao status assigned_invited.
+      Para todos os outros status, o comportamento do StatusChangeModal permanece
+      inalterado (todas as transicoes validas sao mostradas).
+    impact: "Baixo - simplifica a UX do caso mais comum sem remover funcionalidade"
+
+  - id: ASM-F062-02
+    description: >
+      A prop allowedStatuses do StatusChangeModal e opcional. Quando nao
+      passada, o modal funciona exatamente como antes (backward compatible).
+    impact: "Nenhum - prop opcional com backward compatibility"
+
+  - id: ASM-F063-01
+    description: >
+      O alinhamento do campo de tema com o campo de speaker e feito via
+      marginLeft fixo (28px = LED 16px + gap 12px). Se futuramente o tamanho
+      do LED ou gap mudar, o marginLeft precisa ser ajustado manualmente.
+    impact: "Baixo - valores sao definidos no mesmo arquivo (SpeechSlot.tsx)"
+
+  - id: ASM-F064-01
+    description: >
+      O label de ultima hora aparece apenas na edicao de agenda
+      (SpeakerField dentro do AgendaForm), nao no Modo Apresentacao.
+      O Modo Apresentacao ja mostra o override name, e o contexto de
+      "ultima hora" e relevante apenas durante edicao.
+    impact: "Nenhum - Modo Apresentacao e para visualizacao publica"
+
+  - id: ASM-F064-02
+    description: >
+      A i18n key usa o namespace 'agenda' (agenda.lastMinuteAssignment) pois o
+      conceito de designacao de ultima hora e especifico da aba Agenda.
+    impact: "Nenhum - organizacao de i18n keys"
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []

@@ -1,0 +1,337 @@
+# =============================================================================
+# ARCH_M018.yaml
+# Architecture for Batch 9 Phase 2 - Speech Cards & Agenda
+# Features: F060, F061, F062, F063, F064
+# CRs: CR-114, CR-115, CR-116, CR-119, CR-121
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Melhorar UX dos cards de discurso (remover tema, confirmacao ao mudar tipo, LED filtrado, reorder layout) e label de ultima hora na agenda"
+  principles:
+    - "Minimo impacto: mudancas cirurgicas em componentes existentes"
+    - "Backward compatibility: novas props opcionais com defaults preservando comportamento atual"
+    - "Reutilizar mutations e hooks existentes (zero novos hooks)"
+    - "Zero migrations: todas as mudancas sao client-side (UI/logic)"
+    - "Consistencia visual: novos botoes X seguem padrao existente (Unicode U+00D7)"
+
+diagram: |
+  F060: SpeechSlot --[onClearTopic prop]--> speeches.tsx / NextSundaysSection (wiring mutation topic=null)
+  F061: SundayCard --[speeches[] prop]--> SundayTypeDropdown --[Alert.alert]--> confirm/cancel
+  F062: SpeechSlot --[allowedStatuses prop]--> StatusChangeModal (filter when assigned_invited)
+  F063: SpeechSlot --[JSX reorder]--> [LED] [Field] [X] + topicField marginLeft 28px
+  F064: AgendaForm.SpeakerField --[hasOverride]--> <Text> i18n label "(Designacao de ultima hora)"
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F060: Botao X para remover tema ---
+  - name: "SpeechSlot"
+    responsibility: "Adicionar prop onClearTopic e botao X no campo de tema (visivel quando topicDisplay && canAssign)"
+    dependencies: []
+
+  - name: "speeches.tsx"
+    responsibility: "Wiring de onClearTopic: chamar assignTopic.mutate com topicTitle=null, topicLink=null, topicCollection=null"
+    dependencies: ["SpeechSlot"]
+
+  - name: "NextSundaysSection"
+    responsibility: "Wiring de onClearTopic (mesmo padrao de speeches.tsx)"
+    dependencies: ["SpeechSlot"]
+
+  # --- F061: Confirmacao ao mudar tipo de domingo ---
+  - name: "SundayCard.SundayTypeDropdown"
+    responsibility: "Receber prop speeches[]. Em handleSelect, verificar se currentType===speeches e ha atribuicoes antes de mudar. Alert.alert com i18n."
+    dependencies: []
+
+  - name: "SundayCard"
+    responsibility: "Passar speeches[] ao SundayTypeDropdown interno"
+    dependencies: ["SundayCard.SundayTypeDropdown"]
+
+  - name: "i18n locales (F061)"
+    responsibility: "Adicionar keys sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage em pt-BR, en, es"
+    dependencies: []
+
+  # --- F062: LED click mostra apenas confirmed/gave_up ---
+  - name: "StatusChangeModal"
+    responsibility: "Adicionar prop opcional allowedStatuses?: SpeechStatus[]. Quando passado, filtrar availableStatuses para interseccao com allowedStatuses."
+    dependencies: []
+
+  - name: "SpeechSlot (F062)"
+    responsibility: "Quando status === 'assigned_invited', passar allowedStatuses={['assigned_confirmed', 'gave_up']} ao StatusChangeModal"
+    dependencies: ["StatusChangeModal"]
+
+  # --- F063: Reorder layout [LED][Field][X] ---
+  - name: "SpeechSlot (F063)"
+    responsibility: "Reordenar JSX na styles.row: LED primeiro, speaker field segundo, X terceiro. Adicionar marginLeft 28px ao topicField."
+    dependencies: []
+
+  # --- F064: Label de ultima hora na agenda ---
+  - name: "AgendaForm.SpeakerField"
+    responsibility: "Adicionar <Text> com label i18n quando hasOverride=true e nao esta em modo edicao"
+    dependencies: []
+
+  - name: "i18n locales (F064)"
+    responsibility: "Adicionar key agenda.lastMinuteAssignment em pt-BR, en, es"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F060
+  - name: "SpeechSlot.onClearTopic"
+    component: "SpeechSlot"
+    methods:
+      - name: "onClearTopic"
+        input: "speechId: string"
+        output: "void (callback prop, chamado quando usuario pressiona X no campo de tema)"
+        notes: "Nova prop opcional. Quando chamado, o pai deve setar topic_title, topic_link, topic_collection para null via mutation existente."
+
+  # F061
+  - name: "SundayTypeDropdown.speeches"
+    component: "SundayCard.SundayTypeDropdown"
+    methods:
+      - name: "speeches prop"
+        input: "Speech[]"
+        output: "Usado internamente para verificar se ha atribuicoes (speaker_name || topic_title) antes de mudar tipo"
+        notes: "Prop obrigatoria no SundayTypeDropdown. Verificacao ocorre apenas quando currentType === SUNDAY_TYPE_SPEECHES."
+
+  # F062
+  - name: "StatusChangeModal.allowedStatuses"
+    component: "StatusChangeModal"
+    methods:
+      - name: "allowedStatuses prop"
+        input: "SpeechStatus[] | undefined (optional)"
+        output: "Quando passado, modal mostra interseccao de allowedStatuses com getAvailableStatuses(currentStatus). Quando undefined, mostra todos."
+        notes: "Backward compatible: prop opcional com default undefined."
+
+  # F063 - sem novo contrato, apenas mudanca de layout JSX
+
+  # F064 - sem novo contrato, apenas mudanca de renderizacao interna
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Todas as mudancas sao UI/logic no client. Nao altera RLS, Edge Functions ou autenticacao."
+  notes:
+    - "F060: Botao X usa mesma permissao canAssign (speech:assign) -- apenas bishopric"
+    - "F061: Confirmacao e apenas UX, nao altera permissoes de mudanca de tipo"
+    - "F062: Filtro de opcoes no LED e apenas UX, nao altera VALID_TRANSITIONS no servidor"
+    - "F063: Reorder visual, nao altera permissoes (canUnassign continua controlando X)"
+    - "F064: Label informativo read-only, sem impacto de seguranca"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Nao adiciona novos logs ou metricas."
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F060
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F060
+    change: "Adicionar prop onClearTopic ao SpeechSlotProps. Adicionar handler handleClearTopic. Adicionar botao X (Unicode U+00D7) no campo de tema entre o texto e o dropdown arrow, visivel quando topicDisplay && canAssign. Sem confirmacao (tema facilmente re-atribuivel)."
+
+  - path: "src/app/(tabs)/speeches.tsx"
+    feature: F060
+    change: "Wiring de onClearTopic no SpeechSlot: chamar assignTopic.mutate com topicTitle=null, topicLink=null, topicCollection=null para o speechId."
+
+  - path: "src/components/NextSundaysSection.tsx"
+    feature: F060
+    change: "Wiring de onClearTopic (mesmo padrao de speeches.tsx): chamar assignTopic.mutate com valores null."
+
+  # F061
+  - path: "src/components/SundayCard.tsx"
+    feature: F061
+    change: "SundayTypeDropdown: adicionar prop speeches: Speech[]. Em handleSelect, quando currentType === SUNDAY_TYPE_SPEECHES e speeches tem atribuicoes (some(s => s.speaker_name || s.topic_title)), exibir Alert.alert de confirmacao antes de prosseguir. Se tipo selecionado === 'other', a confirmacao vem ANTES do modal de texto. SundayCard: passar speeches prop ao SundayTypeDropdown."
+
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F061
+    change: "Adicionar sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+
+  - path: "src/i18n/locales/en.json"
+    feature: F061
+    change: "Adicionar sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+
+  - path: "src/i18n/locales/es.json"
+    feature: F061
+    change: "Adicionar sundayExceptions.changeConfirmTitle e sundayExceptions.changeConfirmMessage"
+
+  # F062
+  - path: "src/components/StatusChangeModal.tsx"
+    feature: F062
+    change: "Adicionar prop opcional allowedStatuses?: SpeechStatus[] a StatusChangeModalProps. Alterar logica: const filtered = allowedStatuses ? availableStatuses.filter(s => allowedStatuses.includes(s)) : availableStatuses. Usar filtered no FlatList."
+
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F062
+    change: "Quando status === 'assigned_invited', passar allowedStatuses={['assigned_confirmed', 'gave_up']} ao StatusChangeModal. Para outros status, nao passar prop (comportamento original)."
+
+  # F063
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F063
+    change: "Reordenar JSX na styles.row: 1) StatusLED, 2) Pressable (speaker field, flex:1), 3) Pressable (X remove button). Adicionar marginLeft: 28 ao styles.topicField (28 = LED 16 + gap 12) para alinhar inicio do texto do tema com inicio do texto do speaker."
+
+  # F064
+  - path: "src/components/AgendaForm.tsx"
+    feature: F064
+    change: "No SpeakerField, adicionar <Text> abaixo do speakerReadRow quando hasOverride=true e !isEditing. Estilo: fontSize 11, fontStyle 'italic', color colors.textTertiary. Texto: t('agenda.lastMinuteAssignment')."
+
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F064
+    change: "Adicionar agenda.lastMinuteAssignment = '(Designacao de ultima hora)'"
+
+  - path: "src/i18n/locales/en.json"
+    feature: F064
+    change: "Adicionar agenda.lastMinuteAssignment = '(Last-minute assignment)'"
+
+  - path: "src/i18n/locales/es.json"
+    feature: F064
+    change: "Adicionar agenda.lastMinuteAssignment = '(Designacion de ultima hora)'"
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  F060_clear_topic:
+    approach: "Reutilizar mutation existente assignTopic com valores null"
+    detail: |
+      SpeechSlot.tsx:
+      - Adicionar onClearTopic?: (speechId: string) => void ao SpeechSlotProps
+      - Adicionar handler handleClearTopic = useCallback(() => { if (!speech) return; onClearTopic?.(speech.id); }, [speech, onClearTopic])
+      - No campo de tema (Pressable lines 183-204), entre topicText e fieldArrow, renderizar botao X:
+        {topicDisplay && canAssign && (
+          <Pressable hitSlop={8} onPress={handleClearTopic} accessibilityLabel={t('common.remove')}>
+            <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
+          </Pressable>
+        )}
+
+      speeches.tsx e NextSundaysSection.tsx:
+      - Adicionar handler handleClearTopic = useCallback((speechId: string) => {
+          assignTopic.mutate({ speechId, topicTitle: null, topicLink: null, topicCollection: null });
+        }, [assignTopic])
+      - Passar onClearTopic={handleClearTopic} ao SpeechSlot
+
+  F061_type_change_confirm:
+    approach: "Logica de confirmacao no SundayTypeDropdown"
+    detail: |
+      SundayTypeDropdown:
+      - Adicionar prop speeches: Speech[]
+      - hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title)
+      - Em handleSelect, ANTES de processar, verificar:
+        if (currentType === SUNDAY_TYPE_SPEECHES && hasAssignments && type !== SUNDAY_TYPE_SPEECHES) {
+          setModalVisible(false); // fechar dropdown
+          Alert.alert(
+            t('sundayExceptions.changeConfirmTitle'),
+            t('sundayExceptions.changeConfirmMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('common.confirm'), style: 'destructive', onPress: () => { /* proceed */ } }
+            ]
+          );
+          return;
+        }
+      - Para 'other', a confirmacao vem antes do otherModal
+
+  F062_led_filter:
+    approach: "Prop opcional allowedStatuses no StatusChangeModal"
+    detail: |
+      StatusChangeModal.tsx:
+      - Adicionar allowedStatuses?: SpeechStatus[] a StatusChangeModalProps
+      - const filtered = allowedStatuses
+          ? availableStatuses.filter(s => allowedStatuses.includes(s))
+          : availableStatuses;
+      - FlatList data={filtered}
+
+      SpeechSlot.tsx:
+      - const ledAllowedStatuses = status === 'assigned_invited'
+          ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
+          : undefined;
+      - <StatusChangeModal ... allowedStatuses={ledAllowedStatuses} />
+
+  F063_layout_reorder:
+    approach: "Reordenar JSX e ajustar marginLeft do topicField"
+    detail: |
+      SpeechSlot.tsx styles.row children order:
+      Antes: [Speaker Field] [StatusLED] [Remove X]
+      Depois: [StatusLED] [Speaker Field] [Remove X]
+
+      JSX dentro de <View style={styles.row}>:
+      1. <StatusLED ... />
+      2. <Pressable style={[styles.field, ...]} ... > (speaker field, flex:1)
+      3. {hasSpeaker && canUnassign && <Pressable ...> (X button)}
+
+      styles.topicField: adicionar marginLeft: 28 (LED 16px + gap 12px = 28px)
+      Isso alinha o inicio do texto do tema com o inicio do texto do speaker.
+
+  F064_last_minute_label:
+    approach: "Renderizacao condicional de Text no SpeakerField"
+    detail: |
+      AgendaForm.tsx SpeakerField:
+      - Apos o bloco condicional isEditing ? (...) : (<View style={styles.speakerReadRow}>...),
+        adicionar DENTRO do FieldRow, apos o ternario:
+        {hasOverride && !isEditing && (
+          <Text style={[styles.lastMinuteLabel, { color: colors.textTertiary }]}>
+            {t('agenda.lastMinuteAssignment')}
+          </Text>
+        )}
+      - Novo estilo lastMinuteLabel: { fontSize: 11, fontStyle: 'italic', marginTop: 2 }
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-044
+    title: "Reutilizar mutation assignTopic com valores null para clear topic"
+    context: "F060 precisa limpar atribuicao de tema. Opcoes: (a) criar mutation separada clearTopic, (b) reutilizar assignTopic passando null."
+    decision: "Reutilizar assignTopic.mutate com topicTitle=null, topicLink=null, topicCollection=null. A mutation existente de assignTopic ja faz update parcial no speech -- os campos nullable aceitam null naturalmente."
+    consequences:
+      - "Pro: Zero codigo novo no hook useSpeeches (reutiliza mutation existente)"
+      - "Pro: Consistencia -- mesmo pathway para assign e clear"
+      - "Con: Semanticamente 'assign null' pode confundir, mas o padrao e claro no contexto"
+
+  - id: ADR-045
+    title: "Confirmacao de mudanca de tipo com Alert.alert nativo"
+    context: "F061 precisa de dialogo de confirmacao. Opcoes: (a) Alert.alert nativo, (b) modal customizado, (c) inline warning."
+    decision: "Usar Alert.alert nativo. Padrao consistente com: delete member (members.tsx), import CSV (members.tsx), remove speech assignment (SpeechSlot.tsx)."
+    consequences:
+      - "Pro: Consistencia com padroes existentes do app"
+      - "Pro: Simples, sem componente adicional"
+      - "Con: Estilo nativo varia entre iOS e Android (aceito)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes cross-component (ADR-044: F060, ADR-045: F061)
+  GATE-05: true  # ARCH_M018.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado abaixo
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # 12 componentes mas de 5 features cross-module (SpeechSlot aparece em F060+F062+F063)

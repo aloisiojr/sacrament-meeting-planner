@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-19"
-  total_features: 59
-  total_change_requests: 116
+  total_features: 64
+  total_change_requests: 121
   implemented_crs: 95
-  pending_crs: 21
+  pending_crs: 26
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -36,6 +36,7 @@ metadata:
     - docs/specs/SPEC_F045_F049.yaml
     - docs/specs/SPEC_F050_F054.yaml
     - docs/specs/SPEC_F055_F059.yaml
+    - docs/specs/SPEC_F060_F064.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1078,6 +1079,100 @@ features:
       - "AgendaForm passa modalOnly={true} no uso condicional"
 
   # ---------------------------------------------------------------------------
+  # Batch 9 Phase 2 (F060-F064) - Speech Cards & Agenda
+  # ---------------------------------------------------------------------------
+
+  - id: F060
+    name: "Add X button next to topic field to remove assigned topic"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar botao X ao lado do campo de tema no SpeechSlot para remover
+      a atribuicao de tema. Ao pressionar X, topic_title, topic_link e
+      topic_collection sao setados para null. Botao visivel apenas quando
+      tema esta atribuido e usuario tem permissao canAssign (bishopric).
+      Sem dialogo de confirmacao (tema facilmente re-atribuivel).
+    modified_by_crs: [114]
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    notes:
+      - "CR-114: Botao X no campo de temas para remover tema"
+      - "Padrao similar ao botao X de remover speaker (ja existente)"
+      - "Nova prop onClearTopic no SpeechSlot"
+      - "Sem confirmacao (diferente de speaker que tem ciclo de convites)"
+
+  - id: F061
+    name: "Confirmation dialog when changing sunday type with assignments"
+    status: pending
+    rfs: []
+    description: >
+      Ao mudar tipo de domingo DE 'speeches' quando ha discursantes ou temas
+      atribuidos, exibir Alert.alert de confirmacao antes de efetuar a mudanca.
+      Se nao ha atribuicoes, mudanca direta sem confirmacao. Reverter PARA
+      speeches tambem nao requer confirmacao. SundayTypeDropdown recebe
+      speeches[] para verificar atribuicoes.
+    modified_by_crs: [115]
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    notes:
+      - "CR-115: Confirmacao ao mudar tipo de domingo com atribuicoes"
+      - "SundayTypeDropdown precisa acessar speeches[] do SundayCard"
+      - "Novas i18n keys sundayExceptions.changeConfirmTitle/Message"
+      - "Usa Alert.alert nativo (padrao consistente com app)"
+
+  - id: F062
+    name: "LED click shows only confirmed and gave_up for invited status"
+    status: pending
+    rfs: []
+    description: >
+      Ao clicar no StatusLED no SpeechSlot quando status e assigned_invited,
+      filtrar opcoes do StatusChangeModal para mostrar apenas assigned_confirmed
+      e gave_up (as 2 acoes mais comuns apos convite). Para outros status,
+      todas as transicoes validas sao mostradas normalmente. Nova prop opcional
+      allowedStatuses no StatusChangeModal.
+    modified_by_crs: [116]
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    notes:
+      - "CR-116: LED click mostra apenas 'confirmado' e 'desistiu'"
+      - "Nova prop allowedStatuses no StatusChangeModal"
+      - "Filtro aplica-se APENAS a assigned_invited"
+      - "Outros contextos de uso do modal nao afetados"
+
+  - id: F063
+    name: "Redesign speech cards layout (LED left, X right)"
+    status: pending
+    rfs: []
+    description: >
+      Reordenar layout da row do speaker no SpeechSlot: LED a esquerda,
+      speaker field no meio (flex:1), X button a direita. Anterior:
+      [Speaker][LED][X]. Novo: [LED][Speaker][X]. Campo de tema alinhado
+      com campo de speaker via marginLeft (28px = LED 16 + gap 12).
+      Todas as 3 posicoes usam o mesmo componente SpeechSlot.
+    modified_by_crs: [119]
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    notes:
+      - "CR-119: LED a esquerda, X a direita, campo de tema alinhado"
+      - "Reordenacao de JSX na styles.row do SpeechSlot"
+      - "marginLeft no topicField para alinhamento visual"
+      - "Secretary/Observer ja nao veem X (canUnassign=false)"
+
+  - id: F064
+    name: "Show '(Last-minute assignment)' label in agenda override"
+    status: pending
+    rfs: []
+    description: >
+      No SpeakerField do AgendaForm, quando override esta ativo
+      (overrideName !== null && overrideName !== speakerName), exibir label
+      "(Designacao de ultima hora)" abaixo do campo. Label i18n em 3 idiomas
+      com estilo sutil (fontSize 11-12, italic, cor terciaria). Label
+      desaparece ao reverter override ou em modo de edicao.
+    modified_by_crs: [121]
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    notes:
+      - "CR-121: Label de designacao de ultima hora na agenda"
+      - "Usa variavel hasOverride ja existente no SpeakerField"
+      - "Nova i18n key agenda.lastMinuteAssignment em 3 idiomas"
+      - "Nao aparece no Modo Apresentacao (apenas edicao de agenda)"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
   # ---------------------------------------------------------------------------
 
@@ -1236,7 +1331,7 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (21 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1)
+# PENDING CHANGE REQUESTS (26 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1 + Batch 9 Phase 2)
 # =============================================================================
 
 pending_crs:
@@ -1629,6 +1724,110 @@ pending_crs:
     files_likely_impacted:
       - src/components/PrayerSelector.tsx
       - src/components/AgendaForm.tsx
+
+  # --- Batch 9 Phase 2 (Speech Cards & Agenda) ---
+
+  - id: 114
+    type: ux
+    area: "SpeechSlot (F008)"
+    feature_id: F060
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    related_crs: []
+    description: >
+      Adicionar botao X ao lado do campo de temas no SpeechSlot para remover
+      tema atribuido. Sem confirmacao (tema facilmente re-atribuivel).
+    acceptance_criteria:
+      - "X visivel quando tema atribuido e canAssign=true"
+      - "X nao visivel quando sem tema ou sem permissao"
+      - "Pressionar X limpa topic_title, topic_link, topic_collection"
+      - "Fluxo de atribuicao via TopicSelectorModal inalterado"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+      - src/app/(tabs)/speeches.tsx
+      - src/components/NextSundaysSection.tsx
+
+  - id: 115
+    type: ux
+    area: "SundayCard (F007, F008)"
+    feature_id: F061
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    related_crs: [6, 7, 56, 95]
+    description: >
+      Confirmacao ao mudar tipo de domingo DE 'speeches' quando ha
+      discursantes ou temas atribuidos. Sem confirmacao quando sem
+      atribuicoes ou ao reverter PARA speeches.
+    acceptance_criteria:
+      - "Alert.alert exibido quando speeches tem speaker_name ou topic_title"
+      - "Sem confirmacao quando sem atribuicoes"
+      - "Cancelar preserva tipo atual"
+      - "Confirmar efetua mudanca"
+      - "Reverter para speeches nao pede confirmacao"
+      - "Textos i18n em 3 idiomas"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 116
+    type: feature
+    area: "StatusChangeModal (F008)"
+    feature_id: F062
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    related_crs: [106]
+    description: >
+      LED click no SpeechSlot com status assigned_invited mostra apenas
+      opcoes 'Confirmado' e 'Desistiu'. Para outros status, todas as
+      transicoes validas sao mostradas.
+    acceptance_criteria:
+      - "assigned_invited: apenas assigned_confirmed e gave_up"
+      - "Outros status: todas as transicoes validas"
+      - "StatusChangeModal sem prop de filtro funciona normalmente"
+      - "LED nao-interativo para not_assigned preservado"
+    files_likely_impacted:
+      - src/components/StatusChangeModal.tsx
+      - src/components/SpeechSlot.tsx
+
+  - id: 119
+    type: ui
+    area: "SpeechSlot (F008)"
+    feature_id: F063
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    related_crs: [100, 111]
+    description: >
+      Reordenar layout do SpeechSlot: [LED][Speaker][X] ao inves de
+      [Speaker][LED][X]. Campo de tema alinhado com speaker via marginLeft.
+    acceptance_criteria:
+      - "LED primeiro na row (esquerda)"
+      - "Speaker field segundo (flex:1, centro)"
+      - "X button terceiro (direita, condicional)"
+      - "Campo de tema alinhado com speaker (marginLeft 28px)"
+      - "Secretary/Observer nao veem X"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 121
+    type: feature
+    area: "Agenda (F012, F044)"
+    feature_id: F064
+    spec_file: "docs/specs/SPEC_F060_F064.yaml"
+    related_crs: [100]
+    description: >
+      Label "(Designacao de ultima hora)" no SpeakerField da agenda quando
+      override esta ativo (overrideName !== speakerName). Estilo sutil
+      (italic, fontSize 11-12, cor terciaria). Traduzido em 3 idiomas.
+    acceptance_criteria:
+      - "Label visivel quando hasOverride=true"
+      - "Label nao visivel quando sem override"
+      - "Label desaparece ao reverter override"
+      - "Label em 3 idiomas (pt-BR, en, es)"
+      - "Estilo sutil (italic, cor terciaria)"
+      - "Nao aparece durante modo de edicao"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)

@@ -1,16 +1,16 @@
 # =============================================================================
 # REVIEW_CONSOLIDATED.yaml
-# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125
+# Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121
 # Reviewed: 2026-02-19
-# Version: 10
+# Version: 11
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125]
-  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml]
-  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml]
-  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121]
+  spec_ref: [specs/SPEC_F001.yaml, specs/SPEC_F026.yaml, specs/SPEC_F027_F031.yaml, specs/SPEC_F032_F034.yaml, specs/SPEC_F035_F039.yaml, specs/SPEC_F040_F044.yaml, specs/SPEC_F045_F049.yaml, specs/SPEC_F050_F054.yaml, specs/SPEC_F055_F059.yaml, specs/SPEC_F060_F064.yaml]
+  arch_ref: [arch/ARCH_M001.yaml, arch/ARCH_M010.yaml, arch/ARCH_M011.yaml, arch/ARCH_M012.yaml, arch/ARCH_M013.yaml, arch/ARCH_M014.yaml, arch/ARCH_M015.yaml, arch/ARCH_M016.yaml, arch/ARCH_M017.yaml, arch/ARCH_M018.yaml]
+  plan_ref: [plans/PLAN_P001.yaml, plans/PLAN_P010.yaml, plans/PLAN_P011.yaml, plans/PLAN_P012.yaml, plans/PLAN_P013.yaml, plans/PLAN_P014.yaml, plans/PLAN_P015.yaml, plans/PLAN_P016.yaml, plans/PLAN_P017.yaml, plans/PLAN_P018.yaml]
   code_ledger_ref: code/CODE_LEDGER.yaml
 
 # =============================================================================
@@ -3767,4 +3767,397 @@ batch9_phase1:
     full_suite_tests: 3128
     full_suite_passing: 3128
     full_suite_files: 61
+    regressions: 0
+
+# =============================================================================
+# BATCH 9, PHASE 2 REVIEW (CR-114, CR-115, CR-116, CR-119, CR-121)
+# F060: Add X button to remove topic assignment
+# F061: Confirmation dialog on sunday type change
+# F062: LED click shows confirmed and gave_up options
+# F063: Redesign speech cards layout (LED left, X right)
+# F064: "(Last-minute assignment)" label in agenda
+# =============================================================================
+
+batch9_phase2:
+  phase: "2 of 3"
+  phase_description: "Speech cards redesign, topic removal, type change confirmation, LED filtering, last-minute label"
+  verdict: approved
+
+  verdict_summary: >
+    Batch 9 Phase 2 implements 5 features across 8 commits following the exact plan
+    (PLAN_P018 STEP-01 through STEP-08). All chain validations pass: SPEC -> ARCH ->
+    PLAN -> CODE are aligned. The implementation is clean, minimal, and uses existing
+    patterns (assignTopic mutation reuse, Alert.alert for confirmations, optional props
+    for backward compatibility). No P0, P1, or P2 issues found. All 3216 tests pass
+    (62 test files, 88 new tests for Phase 2, zero regressions). Git is clean -- only
+    documentation files are uncommitted (expected, as docs are committed by Orchestrator).
+
+  chain_validation:
+    spec_to_arch:
+      status: aligned
+      notes: >
+        ARCH_M018.yaml correctly decomposes all 5 features from SPEC_F060_F064.yaml into
+        12 components. SpeechSlot changes for F060/F062/F063 are correctly consolidated
+        (single component, multiple changes). Contracts defined for new inter-component
+        interfaces (onClearTopic callback, SundayTypeDropdown.speeches prop,
+        StatusChangeModal.allowedStatuses prop). ADRs document key decisions (reuse
+        assignTopic mutation with null, Alert.alert for confirmation). Zero data model
+        changes (all client-side).
+
+    arch_to_plan:
+      status: aligned
+      notes: >
+        PLAN_P018.yaml breaks 5 features into 11 steps with correct dependency ordering.
+        F063 (layout reorder) is STEP-01 as foundation before F060 adds more elements.
+        F062 steps are parallelizable with F061 (independent components). F064 depends
+        on STEP-07 (i18n keys). Each step specifies files, done_when criteria, and test
+        coverage mapped to acceptance criteria.
+
+    plan_to_code:
+      status: aligned
+      notes: >
+        CODE_LEDGER records 8 implementation commits (STEP-01 through STEP-08) plus
+        test commits. Each commit matches its plan step exactly: hash ec285bd for STEP-01
+        (layout reorder), 5500894 for STEP-02 (onClearTopic prop), 6d80369 for STEP-03
+        (wiring), 429915d for STEP-04 (allowedStatuses), 97e8725 for STEP-05 (LED filter),
+        c95e1d3 for STEP-06 (confirmation), 8ec4f3a for STEP-07 (i18n), 162c74b for
+        STEP-08 (lastMinuteLabel). Files changed match plan specification.
+
+    code_to_runtime:
+      status: aligned
+      notes: >
+        Source code reviewed against implementation notes. SpeechSlot.tsx: row order is
+        [StatusLED][Pressable field][Pressable X] (lines 148-193), topicField has marginLeft:28
+        (line 287), onClearTopic prop exists (line 48), handleClearTopic handler (lines 125-128),
+        topic X button conditional on topicDisplay && canAssign (line 212), ledAllowedStatuses
+        filters for assigned_invited (lines 138-140), allowedStatuses passed to StatusChangeModal
+        (line 234). StatusChangeModal.tsx: allowedStatuses optional prop (line 33), filtering
+        logic (lines 59-61), FlatList uses filtered (line 96). SundayCard.tsx: speeches prop
+        in SundayTypeDropdownProps (line 91), hasAssignments check (line 113), Alert.alert
+        with cancel/destructive (lines 115-134), speeches passed from SundayCard (line 375).
+        AgendaForm.tsx: lastMinuteLabel rendered when hasOverride && !isEditing (lines 656-660),
+        style fontSize:11 italic marginTop:2 (lines 916-920). i18n: all 6 new keys present
+        in pt-BR, en, es.
+
+  commit_reviews:
+    - hash: ec285bd
+      message: "feat(speech-slot): reorder layout to [LED][Field][X] and align topic field (CR-119)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-01
+      review:
+        correctness: pass
+        notes:
+          - "StatusLED moved to first position inside styles.row (line 149)"
+          - "Speaker Pressable field remains flex:1 (line 158)"
+          - "Remove X button remains last (lines 181-192)"
+          - "marginLeft: 28 added to topicField (line 287), correctly aligns with LED (16) + gap (12)"
+          - "No changes to canUnassign logic -- secretary/observer X visibility preserved"
+        issues: []
+
+    - hash: "5500894"
+      message: "feat(speech-slot): add onClearTopic prop and X button to topic field (CR-114)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-02
+      review:
+        correctness: pass
+        notes:
+          - "onClearTopic optional prop added to SpeechSlotProps (line 48)"
+          - "handleClearTopic callback uses useCallback with correct deps (lines 125-128)"
+          - "X button rendered between topicText and fieldArrow, conditional on topicDisplay && canAssign (lines 212-220)"
+          - "Uses U+00D7 character consistent with speaker remove button"
+          - "No confirmation dialog -- direct removal as specified in SPEC"
+        issues: []
+
+    - hash: 6d80369
+      message: "feat(speeches): wire onClearTopic in speeches.tsx and NextSundaysSection (CR-114)"
+      files_changed: [src/app/(tabs)/speeches.tsx, src/components/NextSundaysSection.tsx]
+      step: STEP-03
+      review:
+        correctness: pass
+        notes:
+          - "speeches.tsx: handleClearTopic (line 216) calls assignTopic.mutate with null values"
+          - "speeches.tsx: onClearTopic={handleClearTopic} passed to SpeechSlot (line 299)"
+          - "NextSundaysSection.tsx: same pattern -- handleClearTopic (line 128) with null mutation"
+          - "NextSundaysSection.tsx: onClearTopic={handleClearTopic} passed to SpeechSlot (line 203)"
+          - "Reuses existing assignTopic mutation (ADR-044) -- zero new hooks"
+        issues: []
+
+    - hash: 429915d
+      message: "feat(status-modal): add optional allowedStatuses prop for filtering transitions (CR-116)"
+      files_changed: [src/components/StatusChangeModal.tsx]
+      step: STEP-04
+      review:
+        correctness: pass
+        notes:
+          - "allowedStatuses optional prop (SpeechStatus[]) in StatusChangeModalProps (line 33)"
+          - "Filtering logic: ternary with includes-based filter (lines 59-61)"
+          - "FlatList data={filtered} instead of data={availableStatuses} (line 96)"
+          - "Fully backward compatible -- undefined allowedStatuses = all statuses shown"
+        issues: []
+
+    - hash: 97e8725
+      message: "feat(speech-slot): filter LED click to confirmed/gave_up for assigned_invited (CR-116)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      step: STEP-05
+      review:
+        correctness: pass
+        notes:
+          - "ledAllowedStatuses conditionally set for assigned_invited (lines 138-140)"
+          - "Only assigned_confirmed and gave_up in filter array"
+          - "undefined for all other statuses (original behavior preserved)"
+          - "Passed to StatusChangeModal via allowedStatuses prop (line 234)"
+        issues: []
+
+    - hash: c95e1d3
+      message: "feat(sunday-card): add confirmation dialog when changing type with assignments (CR-115)"
+      files_changed: [src/components/SundayCard.tsx]
+      step: STEP-06
+      review:
+        correctness: pass
+        notes:
+          - "speeches: Speech[] added to SundayTypeDropdownProps (line 91)"
+          - "hasAssignments uses speeches.some with !!s.speaker_name || !!s.topic_title (line 113)"
+          - "Alert.alert shown only when currentType === SUNDAY_TYPE_SPEECHES && hasAssignments (line 114)"
+          - "Early return for SUNDAY_TYPE_SPEECHES (revert) without Alert (lines 108-111)"
+          - "Confirm onPress handles 'other' type correctly (opens otherModal, lines 124-129)"
+          - "SundayCard passes speeches={speeches} to SundayTypeDropdown (line 375)"
+        issues: []
+
+    - hash: 8ec4f3a
+      message: "feat(i18n): add changeConfirmTitle/Message and lastMinuteAssignment keys in 3 locales (CR-115, CR-121)"
+      files_changed: [src/i18n/locales/pt-BR.json, src/i18n/locales/en.json, src/i18n/locales/es.json]
+      step: STEP-07
+      review:
+        correctness: pass
+        notes:
+          - "pt-BR: changeConfirmTitle='Alterar tipo de domingo', changeConfirmMessage correct, lastMinuteAssignment correct"
+          - "en: changeConfirmTitle='Change sunday type', changeConfirmMessage correct, lastMinuteAssignment='(Last-minute assignment)'"
+          - "es: changeConfirmTitle='Cambiar tipo de domingo', changeConfirmMessage correct with accented question mark"
+          - "All 3 JSON files valid (parsed successfully in tests)"
+        issues: []
+
+    - hash: 162c74b
+      message: "feat(agenda): show last-minute assignment label on speaker override (CR-121)"
+      files_changed: [src/components/AgendaForm.tsx]
+      step: STEP-08
+      review:
+        correctness: pass
+        notes:
+          - "useTranslation imported in SpeakerField sub-component"
+          - "Label rendered when hasOverride && !isEditing (lines 656-660)"
+          - "Uses t('agenda.lastMinuteAssignment') for i18n"
+          - "lastMinuteLabel style: fontSize 11, fontStyle italic, marginTop 2 (lines 916-920)"
+          - "Color uses colors.textTertiary for subtle visual"
+          - "Label NOT shown during editing mode (!isEditing guard)"
+        issues: []
+
+  issues:
+    p0_critical: []
+    p1_major: []
+    p2_nice_to_have: []
+
+  pending_deploys: []
+
+  repository_status:
+    clean: true
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/project-status.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/arch/ARCH_M018.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P018.yaml"
+      - "docs/qa/QA_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_batch9_phase2.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F060_F064.yaml"
+    notes: "Only doc files uncommitted. Docs are committed by the Orchestrator."
+
+  ac_verification:
+    # F060
+    - ac_id: AC-F060-01
+      description: "X button appears next to topic field when topic is assigned"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 212-220: topicDisplay && canAssign conditional renders Pressable with U+00D7."
+
+    - ac_id: AC-F060-02
+      description: "Pressing X clears topic assignment"
+      status: verified
+      evidence: "handleClearTopic (lines 125-128) calls onClearTopic(speech.id). speeches.tsx (line 218) and NextSundaysSection (line 130) call assignTopic.mutate with topicTitle/topicLink/topicCollection=null."
+
+    - ac_id: AC-F060-03
+      description: "X button visible only for canAssign users"
+      status: verified
+      evidence: "Condition: topicDisplay && canAssign (line 212). canAssign = hasPermission('speech:assign') (line 80)."
+
+    - ac_id: AC-F060-04
+      description: "X button not visible when no topic assigned"
+      status: verified
+      evidence: "topicDisplay is null when speech?.topic_title is falsy (lines 131-135). Condition topicDisplay && canAssign is false."
+
+    - ac_id: AC-F060-05
+      description: "Topic modal still opens when clicking topic field"
+      status: verified
+      evidence: "Topic Pressable onPress={handleTopicPress} (line 198). handleTopicPress calls onOpenTopicSelector (lines 94-97)."
+
+    - ac_id: AC-F060-06
+      description: "No confirmation dialog for topic removal"
+      status: verified
+      evidence: "handleClearTopic (lines 125-128) directly calls onClearTopic without Alert.alert."
+
+    # F061
+    - ac_id: AC-F061-01
+      description: "Confirmation when changing FROM speeches WITH assignments"
+      status: verified
+      evidence: "SundayCard.tsx lines 113-134: hasAssignments check + Alert.alert with cancel/destructive buttons."
+
+    - ac_id: AC-F061-02
+      description: "No confirmation when no assignments"
+      status: verified
+      evidence: "Condition: currentType === SUNDAY_TYPE_SPEECHES && hasAssignments (line 114). If hasAssignments is false, falls through to direct onSelect."
+
+    - ac_id: AC-F061-03
+      description: "Cancel keeps current type"
+      status: verified
+      evidence: "Alert button with style:'cancel' (line 119) does nothing, leaving type unchanged."
+
+    - ac_id: AC-F061-04
+      description: "Confirm executes the change"
+      status: verified
+      evidence: "Alert button with style:'destructive' onPress calls onSelect(type) or opens otherModal (lines 121-131)."
+
+    - ac_id: AC-F061-05
+      description: "No confirmation when reverting TO speeches"
+      status: verified
+      evidence: "handleSelect (lines 108-111): if type === SUNDAY_TYPE_SPEECHES, calls onRevertToSpeeches() and returns immediately, before any Alert logic."
+
+    - ac_id: AC-F061-06
+      description: "SundayTypeDropdown has access to speeches data"
+      status: verified
+      evidence: "SundayTypeDropdownProps includes speeches: Speech[] (line 91). SundayCard passes speeches={speeches} (line 375)."
+
+    - ac_id: AC-F061-07
+      description: "Dialog texts translated in 3 languages"
+      status: verified
+      evidence: "pt-BR: 'Alterar tipo de domingo', en: 'Change sunday type', es: 'Cambiar tipo de domingo'. Messages present in all 3 locales."
+
+    # F062
+    - ac_id: AC-F062-01
+      description: "LED click on assigned_invited shows only confirmed and gave_up"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 138-140: ledAllowedStatuses = ['assigned_confirmed', 'gave_up'] when status === 'assigned_invited'."
+
+    - ac_id: AC-F062-02
+      description: "LED click on assigned_not_invited shows all transitions"
+      status: verified
+      evidence: "ledAllowedStatuses is undefined for non-assigned_invited (line 140). StatusChangeModal shows all available when allowedStatuses is undefined."
+
+    - ac_id: AC-F062-03
+      description: "LED click on assigned_confirmed shows not_assigned"
+      status: verified
+      evidence: "ledAllowedStatuses undefined for assigned_confirmed. getAvailableStatuses('assigned_confirmed') returns ['not_assigned']."
+
+    - ac_id: AC-F062-04
+      description: "Labels translated using existing i18n keys"
+      status: verified
+      evidence: "StatusChangeModal uses t('speechStatus.${status}') (line 65). speechStatus keys exist in all 3 locales."
+
+    - ac_id: AC-F062-05
+      description: "LED not interactive for not_assigned"
+      status: verified
+      evidence: "SpeechSlot.tsx line 153: disabled={isObserver || status === 'not_assigned'}."
+
+    - ac_id: AC-F062-06
+      description: "StatusChangeModal without allowedStatuses works normally"
+      status: verified
+      evidence: "allowedStatuses is optional (line 33). Filtering ternary returns availableStatuses when undefined (lines 59-61)."
+
+    # F063
+    - ac_id: AC-F063-01
+      description: "LED positioned as first element in row"
+      status: verified
+      evidence: "SpeechSlot.tsx line 149: StatusLED is first child inside styles.row View (line 147)."
+
+    - ac_id: AC-F063-02
+      description: "X button is last element in row"
+      status: verified
+      evidence: "SpeechSlot.tsx lines 181-192: Remove button Pressable is last child in styles.row."
+
+    - ac_id: AC-F063-03
+      description: "Speaker field has flex:1"
+      status: verified
+      evidence: "styles.field has flex: 1 (line 258). Applied to speaker Pressable (line 158)."
+
+    - ac_id: AC-F063-04
+      description: "Topic field aligned with speaker field"
+      status: verified
+      evidence: "styles.topicField has marginLeft: 28 (line 287). 28 = LED size 16 + row gap 12."
+
+    - ac_id: AC-F063-05
+      description: "All 3 positions use the same SpeechSlot component"
+      status: verified
+      evidence: "speeches.tsx maps [1, 2, 3].map(pos => <SpeechSlot position={pos} .../>). Single export const SpeechSlot."
+
+    - ac_id: AC-F063-06
+      description: "LED continues to be functional"
+      status: verified
+      evidence: "StatusLED has onPress={handleStatusPress} (line 152). handleStatusPress opens StatusChangeModal (lines 99-102)."
+
+    - ac_id: AC-F063-07
+      description: "Secretary and Observer do not see X button"
+      status: verified
+      evidence: "X button conditional: hasSpeaker && canUnassign (line 181). canUnassign = hasPermission('speech:unassign') (line 81)."
+
+    # F064
+    - ac_id: AC-F064-01
+      description: "Label shown when override is active"
+      status: verified
+      evidence: "AgendaForm.tsx lines 656-660: {hasOverride && !isEditing && <Text>...lastMinuteAssignment</Text>}."
+
+    - ac_id: AC-F064-02
+      description: "Label NOT shown when no override"
+      status: verified
+      evidence: "hasOverride = overrideName !== null && overrideName !== speakerName (line 592). False when overrideName is null."
+
+    - ac_id: AC-F064-03
+      description: "Label disappears when override is reverted"
+      status: verified
+      evidence: "handleRevert calls onEditOverride(null). When overrideName becomes null, hasOverride becomes false."
+
+    - ac_id: AC-F064-04
+      description: "Label translated in pt-BR"
+      status: verified
+      evidence: "pt-BR.json: agenda.lastMinuteAssignment = '(Designacao de ultima hora)' (with accents)."
+
+    - ac_id: AC-F064-05
+      description: "Label translated in English"
+      status: verified
+      evidence: "en.json: agenda.lastMinuteAssignment = '(Last-minute assignment)'."
+
+    - ac_id: AC-F064-06
+      description: "Label translated in Spanish"
+      status: verified
+      evidence: "es.json: agenda.lastMinuteAssignment = '(Designacion de ultima hora)' (with accents)."
+
+    - ac_id: AC-F064-07
+      description: "Label with subtle visual style"
+      status: verified
+      evidence: "lastMinuteLabel: fontSize 11, fontStyle 'italic', marginTop 2 (lines 916-920). Color: colors.textTertiary."
+
+    - ac_id: AC-F064-08
+      description: "Label NOT shown during editing mode"
+      status: verified
+      evidence: "Condition includes !isEditing (line 656). When isEditing=true, label is not rendered."
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    files_reviewed: 8
+    commits_reviewed: 8
+    new_tests: 88
+    new_tests_passing: 88
+    full_suite_tests: 3216
+    full_suite_passing: 3216
+    full_suite_files: 62
     regressions: 0

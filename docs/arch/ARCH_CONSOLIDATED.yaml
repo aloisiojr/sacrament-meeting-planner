@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-19"
-  last_updated_by: "batch-10-phase-1"
+  last_updated_by: "batch-10-phase-2"
   total_modules: 8
-  total_adrs: 41
-  total_crs_implemented: 85
+  total_adrs: 43
+  total_crs_implemented: 89
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -27,6 +27,7 @@ metadata:
     - docs/arch/ARCH_M018.yaml
     - docs/arch/ARCH_M019.yaml
     - docs/arch/ARCH_M020.yaml
+    - docs/arch/ARCH_M021.yaml
 
 # =============================================================================
 # TECH STACK
@@ -245,7 +246,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 129]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -263,9 +264,11 @@ modules:
       CR-116/F062: StatusChangeModal recebe allowedStatuses prop. LED click em assigned_invited filtra para confirmed/gave_up.
       CR-119/F063: Layout reordenado [LED][Speaker][X]. topicField marginLeft 28px para alinhamento.
       CR-120/F066: Auto-scroll para card expandido em speeches.tsx com scrollToIndex(viewPosition:0, delay 300ms).
+      CR-132/F075: speeches.tsx remove getItemLayout (alturas fixas). Delay 300->400ms para scroll mais preciso.
       CR-126/F069: StatusLED redesenhado para circulo flat com novas cores (cinza, laranja, amarelo, verde, vinho). StatusChangeModal cores atualizadas.
       CR-127/F070: useDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo. SundayTypeDropdown chama delete antes de type change.
       CR-129/F071: LED click filtra todos os status exceto not_assigned. LED desabilitado para assigned_confirmed e gave_up.
+      CR-128/F073: Topic X button extraido do campo para sibling em topicRow container (padrao identico ao speaker row).
 
   - id: M004
     name: AgendaModule
@@ -288,7 +291,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -306,6 +309,9 @@ modules:
       CR-121/F064: SpeakerField mostra label "(Designacao de ultima hora)" quando hasOverride=true e !isEditing.
       CR-120/F066: Auto-scroll para card expandido em agenda.tsx com scrollToIndex(viewPosition:0, delay 300ms).
       CR-123/F067: Campo Reconhecendo com Pressable customizado mostrando nomes um por linha, altura proporcional.
+      CR-131/F074: AgendaForm styles.searchInput simplificado para {flex:1}, herda estilos do SearchInput base.
+      CR-132/F075: agenda.tsx remove getItemLayout, ESTIMATED_ITEM_HEIGHT, initialScrollIndex. Usa useEffect para initial scroll. Delay 300->400ms.
+      CR-133/F076: PrayerSelector hint text para discoverability + pre-populate no re-edit de nomes customizados.
 
   - id: M005
     name: NotificationModule
@@ -879,6 +885,24 @@ adrs:
       - "Cada hook tem responsabilidade unica"
       - "Nao e transacao atomica (mitigado pela ordem: delete primeiro, type change depois)"
 
+  - id: ADR-051
+    title: "Remover getItemLayout ao inves de calcular alturas reais manualmente"
+    context: "F075 precisa corrigir auto-scroll impreciso. getItemLayout retorna alturas fixas (70px speeches, 64px agenda) que nao correspondem as alturas reais."
+    decision: "Remover getItemLayout de ambas as abas. FlatList mede alturas reais via onLayout de cada item. scrollToIndex calcula offset correto."
+    decided_in: "CR-132"
+    consequences:
+      - "scrollToIndex posiciona com precisao independente de alturas variadas"
+      - "Perda de performance negligivel para listas de ~100 itens"
+
+  - id: ADR-052
+    title: "Substituir initialScrollIndex por useEffect em agenda.tsx"
+    context: "initialScrollIndex depende de getItemLayout para funcionar. Com getItemLayout removido (ADR-051), initialScrollIndex nao funciona."
+    decision: "Remover initialScrollIndex e usar useEffect existente com scrollToIndex(animated:false). Padrao ja usado em speeches.tsx."
+    decided_in: "CR-132"
+    consequences:
+      - "Padrao consistente entre speeches.tsx e agenda.tsx"
+      - "Pequeno flash visual no primeiro render (aceito: mesmo tradeoff de speeches.tsx)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1217,8 +1241,8 @@ file_structure:
     "(tabs)/":
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings)"
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt)"
-      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066)"
-      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066)"
+      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso."
+      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
         "index.tsx": "Settings menu (links para sub-telas)"
@@ -1256,14 +1280,14 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
-    "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline."
+    "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
     "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez)"
@@ -1547,6 +1571,14 @@ change_requests_history:
     doc: "ARCH_M020.yaml"
     status: "pending implementation"
     adrs: [ADR-049, ADR-050]
+    new_files: []
+
+  batch_10_phase_2:
+    crs: "CR-128, CR-131, CR-132, CR-133"
+    scope: "Topic X button positioning (F073), hymn search width consistency (F074), auto-scroll fix on card expand (F075), custom prayer name UX improvements (F076)"
+    doc: "ARCH_M021.yaml"
+    status: "pending implementation"
+    adrs: [ADR-051, ADR-052]
     new_files: []
 
 # =============================================================================

@@ -1,0 +1,528 @@
+# =============================================================================
+# PLAN_P021.yaml
+# Implementation Plan for Batch 10 Phase 2 - Topic X Button Positioning,
+#   Hymn Search Width, Auto-scroll Fix, Custom Prayer Name UX
+# Features: F073, F074, F075, F076
+# CRs: CR-128, CR-131, CR-132, CR-133
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  4 mudancas de UI/UX: reposicionar botao X do tema para fora do campo dropdown
+  no SpeechSlot (F073), normalizar largura do campo de busca de hinos no
+  AgendaForm (F074), corrigir auto-scroll impreciso ao expandir cards removendo
+  getItemLayout com alturas fixas (F075), e melhorar discoverability e re-edicao
+  de nomes customizados nas oracoes do PrayerSelector (F076).
+
+strategy:
+  order: "Happy path (F073 topic X -> F074 hymn search -> F075 auto-scroll -> F076 prayer UX) -> Edge cases -> Tests -> Documentation"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F073 - Topic X button fora do campo (SpeechSlot)
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/components/SpeechSlot.tsx:
+      (1) Envolver o topicField Pressable (linhas 201-231) em um novo
+          <View style={styles.topicRow}>.
+      (2) Extrair o clearTopic Pressable (linhas 217-225) de DENTRO do topicField
+          e colocar como sibling DEPOIS do topicField, dentro do topicRow.
+      (3) Mover marginTop:6 e marginLeft:28 de styles.topicField para novo
+          styles.topicRow.
+      (4) Adicionar flex:1 ao styles.topicField para ocupar espaco disponivel.
+      (5) Novo estilo topicRow:
+            topicRow: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: 6,
+              marginLeft: 28,
+            }
+      (6) Seta dropdown (U+25BC) permanece DENTRO do topicField.
+      (7) Resultado:
+            <View style={styles.topicRow}>
+              <Pressable style={[styles.topicField, ...]}>
+                <Text>{topic}</Text>
+                {canAssign && <Text>{arrow}</Text>}
+              </Pressable>
+              {topicDisplay && canAssign && (
+                <Pressable hitSlop={8} onPress={handleClearTopic}>
+                  <Text style={[styles.removeButton, { color: colors.error }]}>{X}</Text>
+                </Pressable>
+              )}
+            </View>
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-05"]
+    done_when:
+      - "topicField envolvido por View com style topicRow"
+      - "clearTopic Pressable e sibling do topicField (fora do campo)"
+      - "Seta dropdown (U+25BC) continua dentro do topicField"
+      - "styles.topicField tem flex:1, sem marginTop e sem marginLeft"
+      - "styles.topicRow tem flexDirection:'row', alignItems:'center', gap:12, marginTop:6, marginLeft:28"
+      - "X visivel apenas quando topicDisplay existe E canAssign e true"
+      - "Funcionalidade de clear topic preservada (handleClearTopic chamado)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que clearTopic Pressable e renderizado fora do topicField"
+      - type: unit
+        description: "Verificar que X visivel apenas com topicDisplay e canAssign"
+      - type: unit
+        description: "Verificar que handleClearTopic e chamado ao pressionar X"
+    covers:
+      acceptance_criteria: ["AC-073-01", "AC-073-02", "AC-073-03", "AC-073-04", "AC-073-05"]
+      edge_cases: ["EC-073-01", "EC-073-02", "EC-073-03"]
+    risks:
+      - risk: "Nesting de Pressable (X dentro de View pode conflitar com topicField)"
+        mitigation: "X e sibling do topicField, nao aninhado. Mesmo padrao do speaker row que ja funciona."
+
+  # =========================================================================
+  # STEP-02: F074 - Normalizar largura do search de hinos (AgendaForm)
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/components/AgendaForm.tsx:
+      (1) Simplificar styles.searchInput (linhas 891-899) de:
+            { flex: 1, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10,
+              paddingVertical: 8, fontSize: 15, marginBottom: 8 }
+          Para:
+            { flex: 1 }
+      (2) Remover todos os overrides: borderWidth, borderRadius, paddingHorizontal,
+          paddingVertical, fontSize, marginBottom.
+      (3) O SearchInput.tsx base ja define: height:40, borderWidth:1, borderRadius:8,
+          paddingHorizontal:12, fontSize:15. Esses valores serao herdados.
+      (4) marginBottom:8 removido - sheetSearchRow pai ja tem gap/padding suficiente.
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-05"]
+    done_when:
+      - "styles.searchInput contem apenas { flex: 1 }"
+      - "borderWidth, borderRadius, paddingHorizontal, paddingVertical, fontSize, marginBottom removidos"
+      - "Campo de busca de hinos tem height:40 (herdado de SearchInput base)"
+      - "Campo de busca de hinos tem borderRadius:8 (herdado de SearchInput base)"
+      - "Campo de busca de hinos tem paddingHorizontal:12 (herdado de SearchInput base)"
+      - "Funcionalidade de busca de hinos preservada"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que styles.searchInput contem apenas flex:1"
+      - type: unit
+        description: "Verificar que busca de hinos filtra corretamente"
+    covers:
+      acceptance_criteria: ["AC-074-01", "AC-074-02", "AC-074-03", "AC-074-04"]
+      edge_cases: ["EC-074-01", "EC-074-02"]
+    risks:
+      - risk: "Remocao de marginBottom:8 pode afetar spacing visual"
+        mitigation: "sheetSearchRow pai ja tem paddingBottom ou gap. Verificar visualmente."
+
+  # =========================================================================
+  # STEP-03: F075 - Auto-scroll fix em speeches.tsx
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/app/(tabs)/speeches.tsx:
+      (1) REMOVER callback getItemLayout (linhas 348-355):
+            const getItemLayout = useCallback(
+              (_data: unknown, index: number) => ({
+                length: 70, offset: 70 * index, index,
+              }), []
+            );
+      (2) REMOVER prop getItemLayout={getItemLayout} do FlatList (linha 375).
+      (3) Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 179):
+            }, 300); -> }, 400);
+      (4) Manter onScrollToIndexFailed fallback (linhas 378-386) - continua
+          necessario sem getItemLayout.
+      (5) Manter initial scroll useEffect (linhas 145-157) - sem mudanca.
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-05"]
+    done_when:
+      - "getItemLayout callback removido de speeches.tsx"
+      - "Prop getItemLayout removida do FlatList"
+      - "setTimeout no handleToggle e 400ms (nao 300ms)"
+      - "onScrollToIndexFailed fallback preservado"
+      - "Initial scroll via useEffect preservado (sem mudanca)"
+      - "Auto-scroll posiciona card expandido corretamente no topo"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que getItemLayout nao esta presente no FlatList"
+      - type: unit
+        description: "Verificar que setTimeout usa 400ms"
+    covers:
+      acceptance_criteria: ["AC-075-02", "AC-075-03", "AC-075-04", "AC-075-05"]
+      edge_cases: ["EC-075-01", "EC-075-02", "EC-075-03", "EC-075-04", "EC-075-05"]
+    risks:
+      - risk: "scrollToIndex pode falhar para itens nao renderizados"
+        mitigation: "onScrollToIndexFailed mantido como fallback. Para listas de ~100 itens, risco baixo."
+
+  # =========================================================================
+  # STEP-04: F075 - Auto-scroll fix em agenda.tsx
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em src/app/(tabs)/agenda.tsx:
+      (1) REMOVER constante ESTIMATED_ITEM_HEIGHT = 64 (linha 186).
+      (2) REMOVER callback getItemLayout (linhas 188-195):
+            const getItemLayout = useCallback(
+              (_data: unknown, index: number) => ({
+                length: ESTIMATED_ITEM_HEIGHT, offset: ESTIMATED_ITEM_HEIGHT * index, index,
+              }), []
+            );
+      (3) REMOVER prop getItemLayout={getItemLayout} do FlatList (linha 240).
+      (4) REMOVER prop initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
+          do FlatList (linha 223).
+      (5) O useEffect existente (linhas 112-119) ja faz scrollToIndex com
+          animated:false para initial scroll. Este substitui initialScrollIndex.
+          Nenhuma mudanca necessaria no useEffect.
+      (6) Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 139):
+            }, 300); -> }, 400);
+      (7) Manter onScrollToIndexFailed fallback (linhas 197-203).
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-03"]
+    done_when:
+      - "ESTIMATED_ITEM_HEIGHT constante removida"
+      - "getItemLayout callback removido de agenda.tsx"
+      - "Prop getItemLayout removida do FlatList"
+      - "Prop initialScrollIndex removida do FlatList"
+      - "useEffect para initial scroll preservado (linhas 112-119)"
+      - "setTimeout no handleToggle e 400ms (nao 300ms)"
+      - "onScrollToIndexFailed fallback preservado"
+      - "Auto-scroll posiciona card expandido corretamente no topo"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que getItemLayout e initialScrollIndex nao estao no FlatList"
+      - type: unit
+        description: "Verificar que useEffect para initial scroll esta presente"
+      - type: unit
+        description: "Verificar que setTimeout usa 400ms"
+    covers:
+      acceptance_criteria: ["AC-075-01", "AC-075-03", "AC-075-04", "AC-075-05"]
+      edge_cases: ["EC-075-01", "EC-075-02", "EC-075-03", "EC-075-04", "EC-075-05"]
+    risks:
+      - risk: "Remover initialScrollIndex pode causar flash visual no primeiro render"
+        mitigation: "Aceito: mesmo tradeoff de speeches.tsx. useEffect com animated:false minimiza flash (ADR-052)."
+
+  # =========================================================================
+  # STEP-05: F076 - Hint de discoverability no PrayerSelector
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/components/PrayerSelector.tsx:
+      (1) Adicionar <Text> com hint de discoverability APOS o modalHeader
+          (linha 155) e ANTES do customNameButton condicional (linha 158):
+            <Text style={[styles.customNameHintText, { color: colors.textSecondary }]}>
+              {t('agenda.customNameHint')}
+            </Text>
+      (2) Novo estilo customNameHintText:
+            customNameHintText: {
+              fontSize: 13,
+              paddingHorizontal: 16,
+              paddingBottom: 8,
+            }
+      (3) Hint visivel SEMPRE (campo vazio ou com texto) para discoverability.
+      (4) Adicionar i18n keys em 3 idiomas:
+          pt-BR.json: "customNameHint": "Digite um nome para usar nome personalizado"
+          en.json: "customNameHint": "Type a name to use a custom name"
+          es.json: "customNameHint": "Escriba un nombre para usar un nombre personalizado"
+          Todas na secao "agenda" (mesmo nivel de "customName").
+    files:
+      - "src/components/PrayerSelector.tsx"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "Hint text renderizado entre modalHeader e customNameButton"
+      - "Hint visivel com campo vazio e com texto digitado"
+      - "Estilo fontSize:13, color:textSecondary, paddingHorizontal:16, paddingBottom:8"
+      - "Key 'agenda.customNameHint' presente em pt-BR.json, en.json, es.json"
+      - "Traducoes corretas nos 3 idiomas"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que hint text e renderizado no PrayerSelector"
+      - type: unit
+        description: "Verificar que hint permanece visivel apos digitar texto"
+    covers:
+      acceptance_criteria: ["AC-076-01", "AC-076-02", "AC-076-07"]
+      edge_cases: []
+    risks:
+      - risk: "Hint pode parecer redundante para usuarios que ja conhecem a funcionalidade"
+        mitigation: "Texto sutil (fontSize:13, cor secundaria). Nao interfere no fluxo principal."
+
+  # =========================================================================
+  # STEP-06: F076 - Pre-populate no re-edit de nome customizado
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em src/components/PrayerSelector.tsx:
+      (1) Modificar useEffect existente (linhas 63-65) que observa 'visible':
+          De:
+            useEffect(() => {
+              if (visible) setModalVisible(true);
+            }, [visible]);
+          Para:
+            useEffect(() => {
+              if (visible) {
+                if (selected?.memberId === null && selected?.name) {
+                  setSearch(selected.name);
+                  setCustomName(selected.name);
+                }
+                setModalVisible(true);
+              }
+            }, [visible]);
+      (2) NAO adicionar 'selected' ao array de dependencias do useEffect.
+          O useEffect deve reagir APENAS a mudancas em 'visible'. Adicionar
+          'selected' causaria re-execucao indesejada.
+      (3) Quando modal abre com nome customizado existente (memberId===null):
+          - Campo de busca pre-populado com o nome
+          - customName pre-populado -> customNameButton visivel imediatamente
+          - Lista de membros filtra pelo nome (pode nao encontrar, esperado)
+      (4) Quando selected e um membro (memberId !== null), campo abre vazio.
+    files:
+      - "src/components/PrayerSelector.tsx"
+    dependencies: ["STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "useEffect pre-popula search e customName quando selected.memberId === null"
+      - "Array de dependencias do useEffect contem apenas [visible]"
+      - "Campo de busca abre pre-populado com nome customizado atual"
+      - "customNameButton visivel imediatamente ao re-editar"
+      - "Campo abre vazio quando selected e um membro (memberId !== null)"
+      - "Selecao de membro da lista continua funcionando"
+      - "Nome customizado salvo com memberId null"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar pre-populate quando selected.memberId === null"
+      - type: unit
+        description: "Verificar campo vazio quando selected e membro (memberId !== null)"
+      - type: unit
+        description: "Verificar que selecao de membro continua funcionando"
+    covers:
+      acceptance_criteria: ["AC-076-03", "AC-076-04", "AC-076-05", "AC-076-06"]
+      edge_cases: ["EC-076-01", "EC-076-02", "EC-076-03", "EC-076-04"]
+    risks:
+      - risk: "ESLint pode reclamar de missing dependency 'selected' no useEffect"
+        mitigation: "Adicionar // eslint-disable-next-line react-hooks/exhaustive-deps no useEffect. Intencional: useEffect so deve reagir a 'visible'."
+
+  # =========================================================================
+  # STEP-07: Testes consolidados Batch 10 Phase 2 (F073-F076)
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Criar arquivo de testes src/__tests__/batch10-phase2.test.ts com testes
+      para todas as 4 features deste batch:
+      (1) F073 SpeechSlot topic X:
+          - Verificar que clearTopic Pressable e sibling do topicField (fora do campo)
+          - Verificar que seta dropdown (U+25BC) continua dentro do topicField
+          - Verificar que X visivel apenas quando topicDisplay E canAssign
+          - Verificar que X nao visivel quando sem tema (EC-073-01)
+          - Verificar que X nao visivel quando canAssign=false (EC-073-02)
+          - Verificar que handleClearTopic e chamado ao pressionar X
+      (2) F074 AgendaForm hymn search:
+          - Verificar que styles.searchInput contem apenas flex:1
+          - Verificar que busca de hinos funciona corretamente
+      (3) F075 speeches.tsx auto-scroll:
+          - Verificar que getItemLayout nao esta definido
+          - Verificar que FlatList nao recebe prop getItemLayout
+          - Verificar que setTimeout usa 400ms
+      (4) F075 agenda.tsx auto-scroll:
+          - Verificar que ESTIMATED_ITEM_HEIGHT nao esta definido
+          - Verificar que getItemLayout nao esta definido
+          - Verificar que FlatList nao recebe getItemLayout nem initialScrollIndex
+          - Verificar que useEffect para initial scroll esta presente
+          - Verificar que setTimeout usa 400ms
+      (5) F076 PrayerSelector hint:
+          - Verificar que hint text e renderizado
+          - Verificar que hint permanece visivel apos digitar
+          - Verificar traducao em 3 idiomas (via i18n keys)
+      (6) F076 PrayerSelector pre-populate:
+          - Verificar pre-populate quando selected.memberId === null
+          - Verificar campo vazio quando selected e membro
+          - Verificar selecao de membro continua funcionando
+          - Verificar nome customizado com espacos e trimado (EC-076-01)
+    files:
+      - "src/__tests__/batch10-phase2.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch10-phase2.test.ts criado"
+      - "Testes cobrem F073 (topic X button positioning)"
+      - "Testes cobrem F074 (hymn search width)"
+      - "Testes cobrem F075 (auto-scroll fix em speeches e agenda)"
+      - "Testes cobrem F076 (prayer hint + pre-populate)"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch10 phase2 (F073-F076)"
+    covers:
+      acceptance_criteria: ["AC-073-01", "AC-073-02", "AC-073-03", "AC-073-04", "AC-073-05", "AC-074-01", "AC-074-02", "AC-074-03", "AC-074-04", "AC-075-01", "AC-075-02", "AC-075-03", "AC-075-04", "AC-075-05", "AC-076-01", "AC-076-02", "AC-076-03", "AC-076-04", "AC-076-05", "AC-076-06", "AC-076-07"]
+      edge_cases: ["EC-073-01", "EC-073-02", "EC-073-03", "EC-074-01", "EC-074-02", "EC-075-01", "EC-075-02", "EC-075-03", "EC-075-04", "EC-075-05", "EC-076-01", "EC-076-02", "EC-076-03", "EC-076-04"]
+    risks:
+      - risk: "Mocking de FlatList para verificar props removidas"
+        mitigation: "Seguir padrao de mocking existente nos testes batch10-phase1.test.ts"
+
+  # =========================================================================
+  # STEP-08: Atualizar testes existentes impactados
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Verificar e atualizar testes existentes impactados pelas mudancas:
+      (1) Verificar testes que usam SpeechSlot (topicField layout pode ter assertions).
+      (2) Verificar testes de AgendaForm (searchInput style).
+      (3) Verificar testes de speeches.tsx e agenda.tsx (getItemLayout).
+      (4) Verificar testes de PrayerSelector (modal behavior).
+      (5) Ajustar snapshots ou assertions conforme necessario.
+      (6) Se nenhum teste existente e impactado, step completa sem mudancas.
+    files:
+      - "src/__tests__/batch9-phase2.test.ts"
+      - "src/__tests__/batch9-phase3.test.ts"
+      - "src/__tests__/batch10-phase1.test.ts"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "Testes existentes verificados para impacto"
+      - "Assertions desatualizadas corrigidas (se houver)"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Nenhum teste com falsa cobertura"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes de SpeechSlot podem verificar estrutura do topicField"
+        mitigation: "Atualizar assertions para refletir nova estrutura com topicRow"
+
+  # =========================================================================
+  # STEP-09: Documentacao do projeto
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 10 Phase 2
+          (F073-F076) com arquivos impactados.
+      (2) .devteam/project-status.yaml - atualizar fase/batch atual.
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - adicionar PLAN_P021, marcar
+          como completed apos implementacao.
+      (4) docs/tests/TEST_CONSOLIDATED.yaml - adicionar testes de F073-F076.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch10 phase2"
+      - "project-status.yaml atualizado"
+      - "PLAN_CONSOLIDATED tem PLAN_P021 com status completed"
+      - "TEST_CONSOLIDATED atualizado com testes de F073-F076"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F073 ACs ---
+  - ac_id: AC-073-01
+    how_to_verify: "clearTopic Pressable renderizado fora do topicField, como sibling no topicRow"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-073-02
+    how_to_verify: "topicRow usa flexDirection:'row' com topicField e X button como filhos diretos"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-073-03
+    how_to_verify: "Seta unicode (U+25BC) continua dentro do topicField Pressable"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-073-04
+    how_to_verify: "handleClearTopic chamado com speechId ao pressionar X (fora do campo)"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+  - ac_id: AC-073-05
+    how_to_verify: "X visivel apenas quando topicDisplay existe E canAssign === true"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  # --- F074 ACs ---
+  - ac_id: AC-074-01
+    how_to_verify: "Campo de busca de hinos tem height:40 herdado de SearchInput base"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-074-02
+    how_to_verify: "Campo de busca de hinos tem borderRadius:8 herdado de SearchInput base"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-074-03
+    how_to_verify: "Campo de busca de hinos tem paddingHorizontal:12 herdado de SearchInput base"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+  - ac_id: AC-074-04
+    how_to_verify: "Filtragem por numero ou titulo de hino funciona normalmente"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  # --- F075 ACs ---
+  - ac_id: AC-075-01
+    how_to_verify: "Agenda: topo do card expandido alinhado com topo da area visivel apos ~400ms"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+  - ac_id: AC-075-02
+    how_to_verify: "Discursos: topo do card expandido alinhado com topo da area visivel apos ~400ms"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+  - ac_id: AC-075-03
+    how_to_verify: "Scroll preciso com cards de alturas variadas (year separators e cards expandidos)"
+    covered_by_steps: ["STEP-03", "STEP-04", "STEP-07"]
+  - ac_id: AC-075-04
+    how_to_verify: "Colapsar card NAO faz auto-scroll (apenas expand trigger)"
+    covered_by_steps: ["STEP-03", "STEP-04", "STEP-07"]
+  - ac_id: AC-075-05
+    how_to_verify: "Initial scroll ao proximo domingo funciona em ambas as abas (animated:false)"
+    covered_by_steps: ["STEP-03", "STEP-04", "STEP-07"]
+
+  # --- F076 ACs ---
+  - ac_id: AC-076-01
+    how_to_verify: "Hint text visivel ao abrir PrayerSelector com campo vazio"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-076-02
+    how_to_verify: "Hint permanece visivel apos digitar texto no campo de busca"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-076-03
+    how_to_verify: "Campo de busca pre-populado com nome customizado ao re-editar (memberId===null)"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-076-04
+    how_to_verify: "customNameButton visivel imediatamente ao abrir modal com nome customizado"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-076-05
+    how_to_verify: "Selecao de membro da lista continua preenchendo prayer_member_id e prayer_name"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-076-06
+    how_to_verify: "Nome customizado salvo com memberId=null e name=texto trimado"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-076-07
+    how_to_verify: "Hint traduzido corretamente em pt-BR, en, es"
+    covered_by_steps: ["STEP-05", "STEP-07"]

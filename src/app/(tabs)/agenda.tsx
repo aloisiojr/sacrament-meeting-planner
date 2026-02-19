@@ -113,7 +113,7 @@ function AgendaTabContent() {
     if (!hasScrolled.current && initialIndex > 0 && listItems.length > 0) {
       hasScrolled.current = true;
       setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+        flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false, viewPosition: 0.5 });
       }, 100);
     }
   }, [initialIndex, listItems.length]);

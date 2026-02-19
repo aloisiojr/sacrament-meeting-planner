@@ -224,13 +224,13 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
   // CR-73: Recognizing uses ActorSelector
   // ---------------------------------------------------------------
   describe('CR-73: Recognizing field uses ActorSelector', () => {
-    it('Recognizing field should use SelectorField (not DebouncedTextInput)', () => {
+    it('Recognizing field should use Pressable with individual Text per name (CR-123)', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
       // Find the recognizing section
-      const recognizingIdx = source.indexOf("t('agenda.recognizing')");
-      const nextFieldIdx = source.indexOf("t('agenda.announcements')", recognizingIdx);
+      const recognizingIdx = source.indexOf("label={t('agenda.recognizing')}");
+      const nextFieldIdx = source.indexOf("<FieldRow", recognizingIdx + 1);
       const section = source.slice(recognizingIdx, nextFieldIdx);
-      expect(section).toContain('SelectorField');
+      expect(section).toContain('<Pressable');
       expect(section).not.toContain('DebouncedTextInput');
     });
 
@@ -251,17 +251,17 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain("field: 'recognizing', roleFilter: 'can_recognize'");
     });
 
-    it('recognizing field should display recognized_names joined by comma', () => {
+    it('recognizing field should display recognized_names via map (one per line, CR-123)', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      expect(source).toContain("agenda.recognized_names?.join(', ')");
+      expect(source).toContain("agenda.recognized_names!.map((name, idx)");
     });
 
-    it('recognizing SelectorField should be disabled for observer', () => {
+    it('recognizing Pressable should be disabled for observer', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      // All actor selector fields check isObserver before opening modal
+      // The recognizing Pressable checks isObserver before opening modal
       const recognizingIdx = source.indexOf("field: 'recognizing'");
       const nearbySection = source.slice(Math.max(0, recognizingIdx - 200), recognizingIdx);
-      expect(nearbySection).toContain('!isObserver');
+      expect(nearbySection).toContain('isObserver');
     });
 
     it('should render ActorSelector component when selectorModal type is actor', () => {

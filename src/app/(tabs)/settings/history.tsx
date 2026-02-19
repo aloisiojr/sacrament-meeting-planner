@@ -109,6 +109,11 @@ export default function ActivityLogScreen() {
           onChangeText={updateSearch}
           placeholder={t('common.search')}
         />
+        <Pressable onPress={() => updateSearch('')} accessibilityRole="button">
+          <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+            {t('common.close')}
+          </Text>
+        </Pressable>
       </View>
 
       {isLoading && (
@@ -180,8 +185,15 @@ const styles = StyleSheet.create({
     width: 50,
   },
   searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   centered: {
     padding: 40,

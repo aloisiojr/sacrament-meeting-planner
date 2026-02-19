@@ -402,6 +402,11 @@ export default function TopicsScreen() {
             onChangeText={setSearch}
             placeholder={t('common.search')}
           />
+          <Pressable onPress={() => setSearch('')} accessibilityRole="button">
+            <Text style={[styles.closeButtonText, { color: colors.primary }]}>
+              {t('common.close')}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Scrollable content: topics list and collections */}
@@ -538,8 +543,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   editor: {
     paddingHorizontal: 16,

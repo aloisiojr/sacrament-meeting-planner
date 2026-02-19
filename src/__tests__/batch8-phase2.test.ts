@@ -181,26 +181,33 @@ describe('F051 (CR-106): Replace Alert with custom dropdown', () => {
   });
 
   describe('AC-F051-03: Dropdown has "Assigned/Confirmed" option with green indicator', () => {
-    it('should render assigned_confirmed option', () => {
+    it('should render assigned_confirmed option (via dynamic template)', () => {
       const content = getDropdown();
-      expect(content).toContain("t('speechStatus.assigned_confirmed')");
+      // F077: options are now rendered dynamically via statusOptions.map
+      // The template literal `speechStatus.${statusOption}` covers all statuses
+      expect(content).toContain('speechStatus.');
+      // ALL_ASSIGNED_STATUSES array contains assigned_confirmed
+      expect(content).toContain("'assigned_confirmed'");
     });
 
-    it('should use STATUS_INDICATOR_COLORS.assigned_confirmed', () => {
+    it('should use STATUS_INDICATOR_COLORS for status indicators', () => {
       const content = getDropdown();
-      expect(content).toContain('STATUS_INDICATOR_COLORS.assigned_confirmed');
+      // F077: uses STATUS_INDICATOR_COLORS[statusOption] instead of direct property access
+      expect(content).toContain('STATUS_INDICATOR_COLORS[statusOption]');
     });
   });
 
   describe('AC-F051-04: Dropdown has "Assigned/Not invited" reverse transition', () => {
-    it('should render assigned_not_invited option', () => {
+    it('should render assigned_not_invited option (via dynamic template)', () => {
       const content = getDropdown();
-      expect(content).toContain("t('speechStatus.assigned_not_invited')");
+      // F077: ALL_ASSIGNED_STATUSES array contains assigned_not_invited
+      expect(content).toContain("'assigned_not_invited'");
     });
 
-    it('should use STATUS_INDICATOR_COLORS.assigned_not_invited', () => {
+    it('should use STATUS_INDICATOR_COLORS for all status indicators', () => {
       const content = getDropdown();
-      expect(content).toContain('STATUS_INDICATOR_COLORS.assigned_not_invited');
+      // F077: uses STATUS_INDICATOR_COLORS[statusOption] for all dynamic options
+      expect(content).toContain('STATUS_INDICATOR_COLORS[statusOption]');
     });
 
     it('assigned_invited -> assigned_not_invited is valid transition', () => {
@@ -214,14 +221,16 @@ describe('F051 (CR-106): Replace Alert with custom dropdown', () => {
   });
 
   describe('AC-F051-05: Dropdown has "Gave up" option with red indicator', () => {
-    it('should render gave_up option', () => {
+    it('should render gave_up option (via dynamic template)', () => {
       const content = getDropdown();
-      expect(content).toContain("t('speechStatus.gave_up')");
+      // F077: ALL_ASSIGNED_STATUSES array contains gave_up
+      expect(content).toContain("'gave_up'");
     });
 
-    it('should use STATUS_INDICATOR_COLORS.gave_up', () => {
+    it('should use STATUS_INDICATOR_COLORS for gave_up indicator', () => {
       const content = getDropdown();
-      expect(content).toContain('STATUS_INDICATOR_COLORS.gave_up');
+      // F077: uses STATUS_INDICATOR_COLORS[statusOption] dynamically
+      expect(content).toContain('STATUS_INDICATOR_COLORS[statusOption]');
     });
   });
 

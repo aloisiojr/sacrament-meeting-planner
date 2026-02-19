@@ -407,10 +407,11 @@ describe('F042 (CR-97): Multi-select for Reconhecendo a Presenca field', () => {
       expect(content).toContain("selectedNames?.includes(item.name)");
     });
 
-    it('should render checkmark (U+2713) for selected actors', () => {
+    it('should render checkbox (U+2611/U+2610) for selected/unselected actors', () => {
       const content = getActorSelector();
-      // Source code contains the escape sequence \\u2713 in string literal
-      expect(content).toContain('\\u2713');
+      // F080: Replaced U+2713 text prefix with checkbox unicode characters
+      expect(content).toContain('\\u2611');
+      expect(content).toContain('\\u2610');
     });
   });
 

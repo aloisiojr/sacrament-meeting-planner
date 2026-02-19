@@ -505,20 +505,21 @@ describe('F076 (CR-133): Custom prayer name hint text', () => {
   });
 
   // --- AC-076-07: Translations in 3 locales ---
+  // NOTE: F078 (CR-135) changed the hint text
   describe('AC-076-07: Hint translated in 3 locales', () => {
     it('pt-BR has agenda.customNameHint key', () => {
       const locale = readLocale('pt-BR') as { agenda: Record<string, string> };
-      expect(locale.agenda.customNameHint).toBe('Digite um nome para usar nome personalizado');
+      expect(locale.agenda.customNameHint).toBe('Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado');
     });
 
     it('en has agenda.customNameHint key', () => {
       const locale = readLocale('en') as { agenda: Record<string, string> };
-      expect(locale.agenda.customNameHint).toBe('Type a name to use a custom name');
+      expect(locale.agenda.customNameHint).toBe("To choose a non-member, type the person's name and add as a custom name");
     });
 
     it('es has agenda.customNameHint key', () => {
       const locale = readLocale('es') as { agenda: Record<string, string> };
-      expect(locale.agenda.customNameHint).toBe('Escriba un nombre para usar un nombre personalizado');
+      expect(locale.agenda.customNameHint).toBe('Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado');
     });
   });
 

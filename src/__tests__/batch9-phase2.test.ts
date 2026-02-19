@@ -419,15 +419,18 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
     it('assigned_not_invited has correct transitions in VALID_TRANSITIONS', () => {
       expect(getAvailableStatuses('assigned_not_invited')).toContain('assigned_invited');
       expect(getAvailableStatuses('assigned_not_invited')).toContain('not_assigned');
-      expect(getAvailableStatuses('assigned_not_invited')).toHaveLength(2);
+      // F077: assigned_not_invited now has 4 transitions (full mesh)
+      expect(getAvailableStatuses('assigned_not_invited')).toHaveLength(4);
     });
   });
 
-  // --- AC-F062-03: LED click on assigned_confirmed shows not_assigned ---
+  // --- AC-F062-03: LED click on assigned_confirmed shows all except current and not_assigned ---
+  // NOTE: F077 (CR-134) expanded transitions - assigned_confirmed now has 4 transitions
   describe('AC-F062-03: LED click on assigned_confirmed shows not_assigned', () => {
-    it('assigned_confirmed has correct transition', () => {
+    it('assigned_confirmed has correct transitions (updated by F077)', () => {
       expect(getAvailableStatuses('assigned_confirmed')).toContain('not_assigned');
-      expect(getAvailableStatuses('assigned_confirmed')).toHaveLength(1);
+      // F077: assigned_confirmed now has 4 transitions (full mesh)
+      expect(getAvailableStatuses('assigned_confirmed')).toHaveLength(4);
     });
   });
 
@@ -450,13 +453,14 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   });
 
   // --- AC-F062-05: LED not interactive for not_assigned ---
-  // NOTE: Updated by CR-129 (F071) - disabled now includes terminal states
+  // NOTE: F077 (CR-134) removed assigned_confirmed and gave_up from disabled
   describe('AC-F062-05: LED disabled for not_assigned', () => {
     it('LED disabled condition includes status not_assigned', () => {
       const content = getSpeechSlot();
-      expect(content).toContain("disabled={isObserver || status === 'not_assigned'");
-      expect(content).toContain("status === 'assigned_confirmed'");
-      expect(content).toContain("status === 'gave_up'");
+      expect(content).toContain("disabled={isObserver || status === 'not_assigned'}");
+      // F077: assigned_confirmed and gave_up no longer in disabled condition
+      expect(content).not.toContain("status === 'assigned_confirmed'");
+      expect(content).not.toContain("status === 'gave_up'");
     });
   });
 
@@ -500,10 +504,15 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
   });
 
   // --- EC-F062-01: Status gave_up - LED click ---
-  // NOTE: Updated by CR-129 (F071) - gave_up LED is now disabled
-  describe('EC-F062-01: gave_up LED click shows not_assigned', () => {
-    it('gave_up has only not_assigned as transition', () => {
-      expect(getAvailableStatuses('gave_up')).toEqual(['not_assigned']);
+  // NOTE: F077 (CR-134) expanded transitions - gave_up now has 4 transitions
+  describe('EC-F062-01: gave_up LED click shows transitions', () => {
+    it('gave_up has 4 transitions (updated by F077)', () => {
+      const available = getAvailableStatuses('gave_up');
+      expect(available).toContain('not_assigned');
+      expect(available).toContain('assigned_not_invited');
+      expect(available).toContain('assigned_invited');
+      expect(available).toContain('assigned_confirmed');
+      expect(available).toHaveLength(4);
     });
 
     it('ledAllowedStatuses is a constant that includes gave_up', () => {

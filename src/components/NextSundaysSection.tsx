@@ -125,6 +125,18 @@ export function NextSundaysSection() {
     [removeAssignment]
   );
 
+  const handleClearTopic = useCallback(
+    (speechId: string) => {
+      assignTopic.mutate({
+        speechId,
+        topicTitle: null,
+        topicLink: null,
+        topicCollection: null,
+      });
+    },
+    [assignTopic]
+  );
+
   const handleTypeChange = useCallback(
     (date: string, type: SundayExceptionReason, customReason?: string) => {
       setSundayType.mutate({ date, reason: type, custom_reason: customReason });
@@ -188,6 +200,7 @@ export function NextSundaysSection() {
                   position={pos}
                   onChangeStatus={handleChangeStatus}
                   onRemoveAssignment={handleRemoveAssignment}
+                  onClearTopic={handleClearTopic}
                   onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
                   onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
                 />

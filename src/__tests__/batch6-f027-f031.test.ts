@@ -473,7 +473,8 @@ describe('F029 (CR-85): Complete International Country Codes List', () => {
 
     it('remaining entries (after Brazil) should be in alphabetical order by country name', () => {
       // Extract country names from labels (everything before the parenthesized code)
-      const remaining = COUNTRY_CODES.slice(1);
+      // Skip the USA entry placed before Canada (ADR-043: +1 defaults to US flag)
+      const remaining = COUNTRY_CODES.slice(1).filter(c => c.label !== 'United States (+1)');
       const names = remaining.map(c => {
         const match = c.label.match(/^(.+?)\s*\(\+/);
         return match ? match[1].trim() : c.label;

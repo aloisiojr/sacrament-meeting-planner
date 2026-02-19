@@ -239,10 +239,10 @@ describe('F036 (CR-92): Fix duplicate key error in country dropdown', () => {
   });
 
   describe('AC-F036-05: Selected country highlighting still works', () => {
-    it('should have item.code === countryCode comparison for highlighting', () => {
+    it('should have item.label === countryLabel comparison for highlighting', () => {
       const source = getMembersSource();
-      // The highlighting comparison should still use item.code
-      expect(source).toContain('item.code === countryCode');
+      // F057 changed highlighting to use label-based comparison (ADR-043)
+      expect(source).toContain('item.label === countryLabel');
     });
 
     it('should apply primaryContainer background for selected item', () => {
@@ -256,16 +256,17 @@ describe('F036 (CR-92): Fix duplicate key error in country dropdown', () => {
     });
   });
 
-  describe('EC-F036-01: Both countries with same code highlight together', () => {
-    it('should use code-based comparison (not label-based) for highlighting', () => {
+  describe('EC-F036-01: Unique country highlighting with label-based comparison', () => {
+    it('should use label-based comparison for unique highlighting', () => {
       const source = getMembersSource();
-      // Verify highlighting uses item.code (both US and Canada highlight when +1 selected)
+      // F057 changed to label-based highlighting (ADR-043) so US and Canada
+      // highlight individually since labels are unique
       const countrySection = source.substring(
         source.indexOf('data={COUNTRY_CODES}'),
         source.indexOf('data={COUNTRY_CODES}') + 1000
       );
-      expect(countrySection).toContain('item.code === countryCode');
-      expect(countrySection).not.toContain('item.label === countryCode');
+      expect(countrySection).toContain('item.label === countryLabel');
+      expect(countrySection).not.toContain('item.code === countryCode');
     });
   });
 });

@@ -262,9 +262,12 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
 
     it('should include collection field in handleInvitedAction', () => {
       const content = getInviteManagement();
+      // F055 changed handleDropdownWhatsApp to use buildWhatsAppConversationUrl
+      // (no message, no collection/link). Collection is still in handleNotInvitedAction.
       const invitedIdx = content.indexOf('handleInvitedAction');
       const section = content.substring(invitedIdx);
-      expect(section).toContain("collection: speech.topic_collection ?? ''");
+      // handleDropdownWhatsApp now uses buildWhatsAppConversationUrl (no ?text=)
+      expect(section).toContain('buildWhatsAppConversationUrl');
     });
   });
 
@@ -279,9 +282,12 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
 
     it('should include link field in handleInvitedAction', () => {
       const content = getInviteManagement();
+      // F055 changed handleDropdownWhatsApp to use buildWhatsAppConversationUrl
+      // (no message, no link). Link is still in handleNotInvitedAction.
       const invitedIdx = content.indexOf('handleInvitedAction');
       const section = content.substring(invitedIdx);
-      expect(section).toContain("link: speech.topic_link ?? ''");
+      // handleDropdownWhatsApp now uses buildWhatsAppConversationUrl (no ?text=)
+      expect(section).toContain('buildWhatsAppConversationUrl');
     });
   });
 

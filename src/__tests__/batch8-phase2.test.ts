@@ -252,10 +252,11 @@ describe('F051 (CR-106): Replace Alert with custom dropdown', () => {
     });
   });
 
-  describe('AC-F051-08: Dropdown shows speaker name as title', () => {
-    it('should display speech.speaker_name', () => {
+  describe('AC-F051-08: Dropdown shows i18n changeStatus as title', () => {
+    it('should display t(speeches.changeStatus) instead of speaker_name', () => {
       const content = getDropdown();
-      expect(content).toContain('speech?.speaker_name');
+      // F056 changed title from speech?.speaker_name to t('speeches.changeStatus')
+      expect(content).toContain("t('speeches.changeStatus')");
     });
   });
 

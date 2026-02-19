@@ -134,6 +134,11 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       : speech.topic_title
     : null;
 
+  // When LED is clicked on assigned_invited, show only confirmed/gave_up options
+  const ledAllowedStatuses = status === 'assigned_invited'
+    ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
+    : undefined;
+
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
       {/* Slot label */}
@@ -226,6 +231,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
         currentStatus={status}
         onSelect={handleStatusSelect}
         onClose={() => setStatusModalVisible(false)}
+        allowedStatuses={ledAllowedStatuses}
       />
     </View>
   );

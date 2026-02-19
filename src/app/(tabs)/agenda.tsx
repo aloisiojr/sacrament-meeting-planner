@@ -262,7 +262,7 @@ function AgendaSundayCard({
   const monthAbbr = getMonthAbbr(monthNum, locale);
   const dayStr = zeroPadDay(dayNum);
 
-  const exceptionLabel = exception
+  const exceptionLabel = (exception && exception.reason !== 'speeches')
     ? t(`sundayExceptions.${exception.reason}`, exception.reason)
     : null;
 

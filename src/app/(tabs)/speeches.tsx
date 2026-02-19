@@ -212,6 +212,19 @@ function SpeechesTabContent() {
     [removeAssignment]
   );
 
+  // Clear topic assignment
+  const handleClearTopic = useCallback(
+    (speechId: string) => {
+      assignTopic.mutate({
+        speechId,
+        topicTitle: null,
+        topicLink: null,
+        topicCollection: null,
+      });
+    },
+    [assignTopic]
+  );
+
   // Sunday type change
   const handleTypeChange = useCallback(
     (date: string, type: SundayExceptionReason, customReason?: string) => {
@@ -283,6 +296,7 @@ function SpeechesTabContent() {
                   position={pos}
                   onChangeStatus={handleChangeStatus}
                   onRemoveAssignment={handleRemoveAssignment}
+                  onClearTopic={handleClearTopic}
                   onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
                   onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
                 />
@@ -302,6 +316,7 @@ function SpeechesTabContent() {
       canWriteSundayType,
       handleChangeStatus,
       handleRemoveAssignment,
+      handleClearTopic,
     ]
   );
 

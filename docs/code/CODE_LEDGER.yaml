@@ -1,16 +1,18 @@
 # =============================================================================
 # CODE_LEDGER.yaml
 # Tracks commits made for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
-# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98
+# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98,
+# CR-94, CR-96, CR-97, CR-99, CR-100,
+# CR-101, CR-102, CR-103, CR-104, CR-108, CR-109
 # Generated: 2026-02-18
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98]
-  plan_ref: plans/PLAN_P013.yaml
-  arch_ref: arch/ARCH_M013.yaml
-  spec_ref: specs/SPEC_F035_F039.yaml
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109]
+  plan_ref: plans/PLAN_P015.yaml
+  arch_ref: arch/ARCH_M015.yaml
+  spec_ref: specs/SPEC_F045_F049.yaml
 
 commits:
 
@@ -751,4 +753,130 @@ batch7_phase2_test_results:
   full_suite_tests: 2800
   full_suite_passing: 2800
   full_suite_files: 57
+  regressions: 0
+
+  # --- Batch 8, Phase 1: CR-101, CR-102, CR-103, CR-104, CR-108, CR-109 ---
+
+  - step: STEP-01
+    cr: CR-101
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-01
+    hash: 63a72ea
+    message: "fix(sunday-card): conditionally render LEDs only for speeches type (CR-101)"
+    files_changed:
+      - src/components/SundayCard.tsx
+    changes:
+      - id: CHG-109
+        description: "Wrapped LED section (StatusLED map) with {isSpeechesType && (...)} conditional"
+    acs_covered: [AC-F045-01, AC-F045-02, AC-F045-03, AC-F045-04]
+    ecs_covered: [EC-F045-01, EC-F045-02]
+
+  - step: STEP-02
+    cr: CR-102
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-02
+    hash: 81c4181
+    message: "fix(agenda): hide exception label for speeches type sundays (CR-102)"
+    files_changed:
+      - src/app/(tabs)/agenda.tsx
+    changes:
+      - id: CHG-110
+        description: "Changed exceptionLabel computation to return null when exception.reason === 'speeches'"
+    acs_covered: [AC-F046-01, AC-F046-02, AC-F046-03]
+    ecs_covered: [EC-F046-01]
+
+  - step: STEP-03
+    cr: CR-109
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-03
+    hash: 781eb7d
+    message: "fix(home): fix SpeechSlots condition to render for speeches type sundays (CR-109)"
+    files_changed:
+      - src/components/NextSundaysSection.tsx
+    changes:
+      - id: CHG-111
+        description: "Changed condition from !entry.exception to (!entry.exception || entry.exception.reason === 'speeches')"
+    acs_covered: [AC-F049-01, AC-F049-02, AC-F049-03]
+    ecs_covered: [EC-F049-01, EC-F049-02]
+
+  - step: STEP-04
+    cr: CR-104
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-04
+    hash: 0ccc825
+    message: "fix(whatsapp): add quotes around {titulo} placeholder in default templates (CR-104)"
+    files_changed:
+      - src/lib/whatsappUtils.ts
+    changes:
+      - id: CHG-112
+        description: "Changed {titulo} to \"{titulo}\" in DEFAULT_TEMPLATE_PT_BR"
+      - id: CHG-113
+        description: "Changed {titulo} to \"{titulo}\" in DEFAULT_TEMPLATE_EN"
+      - id: CHG-114
+        description: "Changed {titulo} to \"{titulo}\" in DEFAULT_TEMPLATE_ES"
+    acs_covered: [AC-F048-03, AC-F048-08]
+    ecs_covered: [EC-F048-03]
+
+  - step: STEP-05
+    cr: CR-103
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-05
+    hash: 6ac1c9d
+    message: "fix(settings): initialize WhatsApp template with language-aware default fallback (CR-103)"
+    files_changed:
+      - src/app/(tabs)/settings/whatsapp.tsx
+    changes:
+      - id: CHG-115
+        description: "Added import of getDefaultTemplate from whatsappUtils.ts"
+      - id: CHG-116
+        description: "Changed query .select('whatsapp_template') to .select('whatsapp_template, language')"
+      - id: CHG-117
+        description: "Updated useEffect to handle 3 cases: null -> getDefaultTemplate(ward.language), '' -> '', value -> value"
+    acs_covered: [AC-F047-01, AC-F047-02, AC-F047-03, AC-F047-04, AC-F047-05]
+    ecs_covered: [EC-F047-01, EC-F047-02]
+
+  - step: STEP-06
+    cr: [CR-104, CR-108]
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-06
+    hash: 8e2cc8f
+    message: "fix(invite): add collection/link vars and human-readable date to WhatsApp message (CR-104, CR-108)"
+    files_changed:
+      - src/components/InviteManagementSection.tsx
+    changes:
+      - id: CHG-118
+        description: "Added import of formatDateHumanReadable from dateUtils.ts and SupportedLanguage from i18n"
+      - id: CHG-119
+        description: "Added collection: speech.topic_collection ?? '' to WhatsAppVariables in handleNotInvitedAction"
+      - id: CHG-120
+        description: "Added link: speech.topic_link ?? '' to WhatsAppVariables in handleNotInvitedAction"
+      - id: CHG-121
+        description: "Replaced formatDate with formatDateHumanReadable for date field in handleNotInvitedAction"
+      - id: CHG-122
+        description: "Added collection: speech.topic_collection ?? '' to WhatsAppVariables in handleInvitedAction"
+      - id: CHG-123
+        description: "Added link: speech.topic_link ?? '' to WhatsAppVariables in handleInvitedAction"
+      - id: CHG-124
+        description: "Replaced formatDate with formatDateHumanReadable for date field in handleInvitedAction"
+    acs_covered: [AC-F048-01, AC-F048-02, AC-F048-04, AC-F048-05, AC-F048-06, AC-F048-07]
+    ecs_covered: [EC-F048-01, EC-F048-02]
+
+  - step: STEP-07
+    cr: [CR-101, CR-102, CR-103, CR-104, CR-108, CR-109]
+    plan_ref: plans/PLAN_P015.yaml
+    plan_step: STEP-07
+    hash: 054fe33
+    message: "test(batch8-phase1): add tests for F045, F046, F047, F048, F049"
+    files_changed:
+      - src/__tests__/batch8-phase1.test.ts
+    tests_added: 60
+    acs_covered: [AC-F045-01, AC-F045-02, AC-F046-01, AC-F046-02, AC-F047-01, AC-F047-02, AC-F048-01, AC-F048-04, AC-F049-01, AC-F049-02]
+    ecs_covered: [EC-F045-01, EC-F046-01, EC-F047-01, EC-F048-01, EC-F049-01]
+
+batch8_phase1_test_results:
+  new_tests: 60
+  new_tests_passing: 60
+  full_suite_tests: 2983
+  full_suite_passing: 2983
+  full_suite_files: 59
   regressions: 0

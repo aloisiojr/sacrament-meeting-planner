@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   field: {
     flex: 1,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   removeButton: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '300',
     paddingHorizontal: 4,
   },

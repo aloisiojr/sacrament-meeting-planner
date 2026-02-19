@@ -1,0 +1,137 @@
+# =============================================================================
+# SPEC_F073.yaml
+# Feature F073 / CR-128: Topic X button positioning - outside dropdown field
+# Batch: 10, Phase: 2
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 10
+phase: 2
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F073
+  name: "Topic X button positioning - outside dropdown field"
+  cr_id: 128
+  type: ui
+  priority: medium
+
+  user_request: >
+    "Botao X para apagar tema esta dentro do dropdown, deveria estar fora do
+    campo a direita (igual ao X de discursante)"
+
+  description: >
+    No SpeechSlot.tsx, o botao X para limpar tema esta renderizado DENTRO do
+    Pressable topicField (linhas 201-231). O topicField tem borderWidth:1,
+    borderRadius:6, e contem: texto do tema, botao X (clearTopic), e seta
+    dropdown (U+25BC). Isso faz o X aparecer dentro da borda do campo.
+    O usuario quer que o X fique FORA do campo, a direita, seguindo o mesmo
+    padrao do botao X do campo de discursante (speaker). O speaker row (linhas
+    151-198) usa styles.row (flexDirection:'row', alignItems:'center', gap:12)
+    com o field Pressable e o remove button Pressable como siblings.
+
+  current_behavior: >
+    SpeechSlot.tsx linhas 200-231: O Pressable topicField contem dentro de si:
+    1. Text com topicDisplay ou placeholder (topicText style, flex:1)
+    2. Pressable clearTopic com Text X (removeButton style) - DENTRO do campo
+    3. Text seta U+25BC (fieldArrow style)
+    O X aparece entre o texto e a seta, dentro da borda do campo.
+
+  expected_behavior: >
+    O topicField deve ser envolvido por um container row (flexDirection:'row',
+    alignItems:'center', gap:12) identico ao styles.row do speaker. O botao X
+    deve ser extraido do topicField e colocado como sibling a direita.
+    A seta dropdown permanece dentro do topicField.
+    A marginTop:6 e marginLeft:28 do topicField vao para o novo container row.
+    O topicField recebe flex:1 para ocupar espaco disponivel.
+
+  files_impacted:
+    - path: src/components/SpeechSlot.tsx
+      changes:
+        - "Envolver topicField em View com styles.topicRow (novo estilo)"
+        - "Extrair clearTopic Pressable de dentro do topicField"
+        - "Colocar clearTopic como sibling do topicField no topicRow"
+        - "Mover marginTop:6 e marginLeft:28 de topicField para topicRow"
+        - "Adicionar flex:1 ao topicField"
+        - "Adicionar style topicRow: flexDirection:'row', alignItems:'center', gap:12"
+
+  acceptance_criteria:
+    - id: AC-073-01
+      description: "Botao X do topic renderizado fora do topicField Pressable"
+      given: "Um SpeechSlot com tema atribuido e usuario com permissao canAssign"
+      when: "O componente e renderizado"
+      then: "O botao X aparece fora da borda do campo, a direita, como sibling do topicField"
+
+    - id: AC-073-02
+      description: "Layout do topic usa row container com field e X como siblings"
+      given: "Um SpeechSlot com tema atribuido"
+      when: "O componente e renderizado"
+      then: "O topic row usa flexDirection:'row' com topicField e X button como filhos diretos"
+
+    - id: AC-073-03
+      description: "Seta dropdown permanece dentro do topicField"
+      given: "Um SpeechSlot com permissao canAssign"
+      when: "O componente e renderizado"
+      then: "A seta unicode (U+25BC) continua dentro do topicField Pressable"
+
+    - id: AC-073-04
+      description: "Funcionalidade de clear topic preservada"
+      given: "Um SpeechSlot com tema atribuido"
+      when: "O usuario pressiona o botao X (agora fora do campo)"
+      then: "onClearTopic e chamado com o speechId corretamente"
+
+    - id: AC-073-05
+      description: "X visivel apenas quando ha tema e usuario tem permissao"
+      given: "Diferentes estados de tema e permissao"
+      when: "O componente e renderizado"
+      then: "X visivel apenas quando topicDisplay existe E canAssign e true"
+
+  edge_cases:
+    - id: EC-073-01
+      case: "Sem tema atribuido"
+      expected: "X nao renderizado, apenas topicField com placeholder e seta"
+
+    - id: EC-073-02
+      case: "Usuario observer ou secretary (canAssign=false)"
+      expected: "X nao renderizado mesmo com tema atribuido"
+
+    - id: EC-073-03
+      case: "Tema com nome longo"
+      expected: "Texto truncado com numberOfLines=1, X e seta nao cortados"
+
+  implementation_notes: >
+    Padrao de referencia exato - speaker row no mesmo arquivo:
+    ```
+    <View style={styles.row}>        // flexDirection:'row', alignItems:'center', gap:12
+      <StatusLED ... />
+      <Pressable style={[styles.field, ...]}>  // flex:1, borderWidth:1
+        <Text ...>{speaker_name}</Text>
+        <Text>{arrow}</Text>
+      </Pressable>
+      {hasSpeaker && canUnassign && (
+        <Pressable onPress={handleRemove}>
+          <Text style={styles.removeButton}>{X}</Text>
+        </Pressable>
+      )}
+    </View>
+    ```
+    Replicar esse padrao para o topic row:
+    ```
+    <View style={styles.topicRow}>   // flexDirection:'row', alignItems:'center', gap:12, marginTop:6, marginLeft:28
+      <Pressable style={[styles.topicField, ...]}>  // flex:1
+        <Text>{topic}</Text>
+        <Text>{arrow}</Text>
+      </Pressable>
+      {topicDisplay && canAssign && (
+        <Pressable onPress={handleClearTopic}>
+          <Text style={styles.removeButton}>{X}</Text>
+        </Pressable>
+      )}
+    </View>
+    ```
+    Remover marginTop e marginLeft do styles.topicField e adicionar ao novo
+    styles.topicRow. Adicionar flex:1 ao topicField.

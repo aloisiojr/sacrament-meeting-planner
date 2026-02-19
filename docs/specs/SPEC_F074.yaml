@@ -1,0 +1,119 @@
+# =============================================================================
+# SPEC_F074.yaml
+# Feature F074 / CR-131: Hymn search field width consistency
+# Batch: 10, Phase: 2
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 10
+phase: 2
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F074
+  name: "Hymn search field width - match other selector search widths"
+  cr_id: 131
+  type: ui
+  priority: low
+
+  user_request: >
+    "Campo de search do seletor de hinos muito estreito comparado com search
+    de temas e membros. Aumentar para ficar igual"
+
+  description: >
+    O campo de search no HymnSelectorModal (bottom sheet) dentro do
+    AgendaForm.tsx usa estilo inconsistente com os outros seletores.
+    O SearchInput component base (SearchInput.tsx) ja define height:40,
+    borderRadius:8, paddingHorizontal:12. Porem, o AgendaForm passa um
+    style override (styles.searchInput, linha 742/891) que sobrescreve esses
+    valores para borderRadius:6, paddingHorizontal:10, paddingVertical:8,
+    sem height explicito. Isso resulta em um campo visualmente menor.
+    Todos os outros seletores que usam SearchInput (MemberSelectorModal,
+    TopicSelectorModal, HymnSelector standalone, PrayerSelector,
+    ActorSelector) passam styles.searchInput que APENAS define flex:1 e
+    height:40, deixando os demais valores do SearchInput base intocados.
+    O fix e remover os overrides incorretos do styles.searchInput no
+    AgendaForm.tsx e alinhar com o padrao dos outros seletores.
+
+  current_behavior: >
+    AgendaForm.tsx styles.searchInput (linha 891-898):
+      flex: 1,
+      borderWidth: 1,        // desnecessario - SearchInput base ja tem
+      borderRadius: 6,       // ERRADO - deveria ser 8 (SearchInput base)
+      paddingHorizontal: 10, // ERRADO - deveria ser 12 (SearchInput base)
+      paddingVertical: 8,    // ERRADO - deveria usar height:40 (SearchInput base)
+      fontSize: 15,          // desnecessario - SearchInput base ja tem
+      marginBottom: 8,       // ESPECIFICO do layout do bottom sheet - MANTER
+
+  expected_behavior: >
+    AgendaForm.tsx styles.searchInput deve conter APENAS:
+      flex: 1,
+    O marginBottom:8 sera movido para o sheetSearchRow ou removido se
+    desnecessario (sheetSearchRow ja tem paddingBottom:10). Todos os demais
+    valores serao herdados do SearchInput base (height:40, borderRadius:8,
+    paddingHorizontal:12, fontSize:15).
+
+  files_impacted:
+    - path: src/components/AgendaForm.tsx
+      changes:
+        - "Simplificar styles.searchInput para apenas { flex: 1 }"
+        - "Remover borderWidth, borderRadius, paddingHorizontal, paddingVertical, fontSize, marginBottom"
+
+  reference_comparison: >
+    SearchInput.tsx base styles.input:
+      height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12,
+      paddingRight: 36, fontSize: 15
+    MemberSelectorModal.tsx styles.searchInput: flex: 1, height: 40
+    TopicSelectorModal.tsx styles.searchInput: flex: 1, height: 40
+    HymnSelector.tsx styles.searchInput: flex: 1, height: 40
+    PrayerSelector.tsx styles.searchInput: flex: 1, height: 40
+    ActorSelector.tsx styles.searchInput: flex: 1, height: 40
+    AgendaForm.tsx styles.searchInput (ATUAL - INCORRETO):
+      flex: 1, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10,
+      paddingVertical: 8, fontSize: 15, marginBottom: 8
+
+  acceptance_criteria:
+    - id: AC-074-01
+      description: "searchInput no AgendaForm herda height:40 do SearchInput base"
+      given: "O seletor de hinos na agenda e aberto"
+      when: "O campo de busca e renderizado"
+      then: "O campo tem height:40 (herdado de SearchInput.tsx)"
+
+    - id: AC-074-02
+      description: "searchInput no AgendaForm herda borderRadius:8 do SearchInput base"
+      given: "O seletor de hinos na agenda e aberto"
+      when: "O campo de busca e renderizado"
+      then: "O campo tem borderRadius:8 (herdado de SearchInput.tsx)"
+
+    - id: AC-074-03
+      description: "searchInput no AgendaForm herda paddingHorizontal:12 do SearchInput base"
+      given: "O seletor de hinos na agenda e aberto"
+      when: "O campo de busca e renderizado"
+      then: "O campo tem paddingHorizontal:12 (herdado de SearchInput.tsx)"
+
+    - id: AC-074-04
+      description: "Funcionalidade de busca de hinos preservada"
+      given: "O seletor de hinos e aberto"
+      when: "O usuario digita no campo de busca"
+      then: "A filtragem por numero ou titulo funciona normalmente"
+
+  edge_cases:
+    - id: EC-074-01
+      case: "Campo de busca vazio"
+      expected: "Todos os hinos listados, campo com placeholder visivel"
+
+    - id: EC-074-02
+      case: "Campo com texto longo"
+      expected: "Texto nao transborda o campo (truncado horizontalmente)"
+
+  implementation_notes: >
+    Alteracao minima: simplificar styles.searchInput para { flex: 1 }.
+    O SearchInput.tsx ja aplica todos os estilos corretos internamente.
+    Os overrides no AgendaForm estavam sobrescrevendo esses valores corretos
+    com valores menores. Ao remover os overrides, o campo herdara
+    automaticamente os estilos do SearchInput base, ficando consistente
+    com todos os outros seletores do app.

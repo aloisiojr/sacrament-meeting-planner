@@ -1,0 +1,167 @@
+# =============================================================================
+# SPEC_F075.yaml
+# Feature F075 / CR-132: Auto-scroll fix on card expand
+# Batch: 10, Phase: 2
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 10
+phase: 2
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F075
+  name: "Auto-scroll fix on card expand - remove getItemLayout for accurate positioning"
+  cr_id: 132
+  type: ux
+  priority: medium
+  supersedes: F066
+
+  user_request: >
+    "Ao expandir card da agenda, scroll automatico para alinhar topo do card
+    com topo da tela"
+
+  description: >
+    O auto-scroll ao expandir cards ja esta implementado (ADR-047) em
+    speeches.tsx e agenda.tsx. Ambos usam scrollToIndex com viewPosition:0
+    e setTimeout(300ms). Porem, o posicionamento e impreciso porque
+    getItemLayout retorna altura fixa que nao corresponde a altura real dos
+    cards. Em speeches.tsx, getItemLayout retorna 70px para TODOS os itens
+    (linhas 348-355). Em agenda.tsx, getItemLayout retorna 64px
+    (ESTIMATED_ITEM_HEIGHT, linhas 186-195). Quando ha cards expandidos
+    (muito maiores que 70/64px) ou year separators (menores), o
+    scrollToIndex calcula offset baseado nessas alturas fixas, resultando
+    em scroll para posicao errada.
+    O fix e remover getItemLayout de ambas as abas. Sem getItemLayout, o
+    React Native FlatList mede alturas reais via onLayout de cada item.
+    scrollToIndex com viewPosition:0 entao calcula offset correto.
+
+  current_behavior: >
+    speeches.tsx:
+      - getItemLayout retorna { length: 70, offset: 70 * index } (linha 348-355)
+      - scrollToIndex({ index, animated: true, viewPosition: 0 }) no handleToggle
+      - initialScrollIndex: NÃO usa (usa useEffect com scrollToIndex e animated:false)
+      - onScrollToIndexFailed: fallback com setTimeout(200ms)
+    agenda.tsx:
+      - getItemLayout retorna { length: 64, offset: 64 * index } (linhas 186-195)
+      - scrollToIndex({ index, animated: true, viewPosition: 0 }) no handleToggle
+      - initialScrollIndex={initialIndex > 0 ? initialIndex : undefined} (linha 223)
+      - onScrollToIndexFailed: fallback com scrollToOffset (linhas 197-203)
+
+  expected_behavior: >
+    speeches.tsx:
+      - REMOVER getItemLayout callback (linhas 348-355)
+      - REMOVER prop getItemLayout do FlatList (linha 375)
+      - Manter scrollToIndex no handleToggle (funciona sem getItemLayout)
+      - Manter onScrollToIndexFailed fallback
+      - Aumentar delay de 300ms para 400ms para dar mais tempo ao layout
+    agenda.tsx:
+      - REMOVER getItemLayout callback (linhas 188-195)
+      - REMOVER ESTIMATED_ITEM_HEIGHT constante (linha 186)
+      - REMOVER prop getItemLayout do FlatList (linha 240)
+      - REMOVER prop initialScrollIndex do FlatList (linha 223)
+      - ADICIONAR useEffect com scrollToIndex (animated:false) identico ao
+        padrao de speeches.tsx (linhas 145-157) para substituir initialScrollIndex
+      - Manter onScrollToIndexFailed fallback
+      - Aumentar delay de 300ms para 400ms para dar mais tempo ao layout
+
+  files_impacted:
+    - path: src/app/(tabs)/speeches.tsx
+      changes:
+        - "Remover getItemLayout callback (linhas 348-355)"
+        - "Remover prop getItemLayout do FlatList (linha 375)"
+        - "Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 179)"
+
+    - path: src/app/(tabs)/agenda.tsx
+      changes:
+        - "Remover ESTIMATED_ITEM_HEIGHT constante (linha 186)"
+        - "Remover getItemLayout callback (linhas 188-195)"
+        - "Remover prop getItemLayout do FlatList (linha 240)"
+        - "Remover prop initialScrollIndex do FlatList (linha 223)"
+        - "Adicionar useEffect + scrollToIndex para initial scroll (substituindo initialScrollIndex)"
+        - "Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 139)"
+
+  acceptance_criteria:
+    - id: AC-075-01
+      description: "Agenda: card expandido tem topo alinhado com topo da area visivel"
+      given: "A aba Agenda com multiplos domingos listados"
+      when: "O usuario expande um card de domingo"
+      then: "Apos ~400ms, o scroll posiciona o topo do card expandido no topo da area visivel"
+
+    - id: AC-075-02
+      description: "Discursos: card expandido tem topo alinhado com topo da area visivel"
+      given: "A aba Discursos com multiplos domingos listados"
+      when: "O usuario expande um card de domingo"
+      then: "Apos ~400ms, o scroll posiciona o topo do card expandido no topo da area visivel"
+
+    - id: AC-075-03
+      description: "Scroll preciso com cards de alturas variadas"
+      given: "Lista com year separators e cards de alturas diferentes"
+      when: "O usuario expande um card apos varias scroll positions"
+      then: "O posicionamento e preciso independente das alturas dos itens acima"
+
+    - id: AC-075-04
+      description: "Colapsar card nao faz auto-scroll"
+      given: "Um card expandido"
+      when: "O usuario colapsa o card"
+      then: "Nenhum scroll automatico ocorre (apenas expand trigger scroll)"
+
+    - id: AC-075-05
+      description: "Initial scroll ao proximo domingo funciona em ambas as abas"
+      given: "O usuario abre a aba Discursos ou Agenda"
+      when: "A lista carrega pela primeira vez"
+      then: "O scroll posiciona no proximo domingo sem animacao"
+
+  edge_cases:
+    - id: EC-075-01
+      case: "Primeiro card da lista expandido"
+      expected: "Scroll para o topo da lista (posicao 0)"
+
+    - id: EC-075-02
+      case: "Ultimo card da lista expandido"
+      expected: "Scroll para mostrar o card, topo alinhado se possivel"
+
+    - id: EC-075-03
+      case: "Card ja visivel no topo da tela"
+      expected: "Scroll minimo ou nenhum (ja esta posicionado)"
+
+    - id: EC-075-04
+      case: "scrollToIndex falha (onScrollToIndexFailed)"
+      expected: "Fallback gracioso com scrollToOffset, sem crash"
+
+    - id: EC-075-05
+      case: "Lista com apenas 1 item"
+      expected: "Sem scroll, card ja visivel"
+
+  design_decisions:
+    - id: DD-F075-01
+      decision: "Remover getItemLayout ao inves de calcular alturas reais manualmente"
+      reason: >
+        getItemLayout com alturas fixas e a causa raiz do problema. Sem
+        getItemLayout, FlatList mede alturas reais automaticamente via onLayout
+        de cada item. scrollToIndex funciona com alturas reais medidas. A
+        alternativa (calcular alturas manualmente via onLayout e usar
+        scrollToOffset) seria mais complexa e fragil. Para listas de ~100 items
+        (24 meses de domingos), a perda de performance e negligivel.
+
+    - id: DD-F075-02
+      decision: "Substituir initialScrollIndex por useEffect em agenda.tsx"
+      reason: >
+        initialScrollIndex depende de getItemLayout para funcionar (precisa saber
+        offsets de todos os itens para scroll instantaneo). Sem getItemLayout,
+        initialScrollIndex nao funciona. A alternativa e usar useEffect +
+        scrollToIndex com animated:false, que e o padrao ja usado em speeches.tsx.
+
+  implementation_notes: >
+    IMPORTANTE sobre F066: Esta feature (F075) SUPERSEDE F066 (CR-120). F066
+    especificava "Auto-scroll to show expanded card after toggle" e tem status
+    'pending' no SPEC_CONSOLIDATED. Na realidade, o auto-scroll JA FOI
+    implementado durante F066 (o codigo ja existe em speeches.tsx linhas 168-180
+    e agenda.tsx linhas 128-143). O que ficou 'pending' foi marcar como
+    implementado. F075 corrige o bug no auto-scroll ja implementado (alturas
+    fixas em getItemLayout). Apos F075, F066 deve ser atualizado para
+    status='superseded_by: F075'.

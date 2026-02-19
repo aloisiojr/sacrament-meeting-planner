@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-19"
-  total_features: 72
-  total_change_requests: 130
+  total_features: 76
+  total_change_requests: 133
   implemented_crs: 96
-  pending_crs: 34
+  pending_crs: 37
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -39,6 +39,10 @@ metadata:
     - docs/specs/SPEC_F060_F064.yaml
     - docs/specs/SPEC_F065_F068.yaml
     - docs/specs/SPEC_F069_F072.yaml
+    - docs/specs/SPEC_F073.yaml
+    - docs/specs/SPEC_F074.yaml
+    - docs/specs/SPEC_F075.yaml
+    - docs/specs/SPEC_F076.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1200,7 +1204,7 @@ features:
 
   - id: F066
     name: "Auto-scroll to show expanded card after toggle"
-    status: pending
+    status: superseded_by_F075
     rfs: []
     description: >
       Ao expandir card nas abas Discursos e Agenda, scroll automatico para
@@ -1327,6 +1331,83 @@ features:
       - "Regressao de CR-117: display usa code ao inves de label"
       - "getCountryByLabel ja existe em countryCodes.ts"
       - "Inicializacao com +1 mostra US por padrao (aceitavel)"
+
+  # ---------------------------------------------------------------------------
+  # Batch 10 Phase 2 (F073-F076) - Topic X Button, Hymn Search, Auto-Scroll Fix, Custom Prayer UX
+  # ---------------------------------------------------------------------------
+
+  - id: F073
+    name: "Topic X button positioning - outside dropdown field"
+    status: pending
+    rfs: []
+    description: >
+      Botao X para limpar tema no SpeechSlot esta dentro do Pressable topicField
+      (dentro da borda). Deve ser extraido e posicionado como sibling fora do
+      campo, a direita, seguindo o padrao do botao X do campo de discursante.
+    modified_by_crs: [128]
+    spec_file: "docs/specs/SPEC_F073.yaml"
+    notes:
+      - "CR-128: X do topic dentro do campo, deveria estar fora como X do speaker"
+      - "Criar topicRow (flexDirection:'row', gap:12) envolvendo topicField + X"
+      - "Mover marginTop:6 e marginLeft:28 de topicField para topicRow"
+      - "Adicionar flex:1 ao topicField"
+      - "Padrao identico ao speaker row (styles.row)"
+
+  - id: F074
+    name: "Hymn search field width - match other selector search widths"
+    status: pending
+    rfs: []
+    description: >
+      Campo de search do HymnSelectorModal (bottom sheet) no AgendaForm tem
+      estilo inconsistente (borderRadius:6, paddingHorizontal:10, sem height)
+      vs outros seletores (height:40, borderRadius:8, paddingHorizontal:12).
+      Simplificar styles.searchInput para { flex: 1 } e herdar estilos do
+      SearchInput base.
+    modified_by_crs: [131]
+    spec_file: "docs/specs/SPEC_F074.yaml"
+    notes:
+      - "CR-131: Campo de search do hymn selector muito estreito"
+      - "Remover overrides incorretos no styles.searchInput do AgendaForm"
+      - "SearchInput.tsx base ja define estilos corretos (height:40, borderRadius:8)"
+      - "Alteracao minima: simplificar para { flex: 1 }"
+
+  - id: F075
+    name: "Auto-scroll fix on card expand - remove getItemLayout"
+    status: pending
+    rfs: []
+    supersedes: F066
+    description: >
+      Auto-scroll ao expandir cards ja implementado (ADR-047) mas impreciso
+      porque getItemLayout retorna alturas fixas (70px speeches, 64px agenda)
+      que nao correspondem a alturas reais dos cards. Remover getItemLayout
+      de ambas as abas para que FlatList meca alturas reais. Substituir
+      initialScrollIndex por useEffect em agenda.tsx.
+    modified_by_crs: [132]
+    spec_file: "docs/specs/SPEC_F075.yaml"
+    notes:
+      - "CR-132: Auto-scroll impreciso ao expandir cards"
+      - "Supersede F066 (CR-120) que especificou o auto-scroll"
+      - "Remover getItemLayout de speeches.tsx e agenda.tsx"
+      - "Substituir initialScrollIndex por useEffect em agenda.tsx"
+      - "Aumentar delay de 300ms para 400ms"
+
+  - id: F076
+    name: "Custom prayer name fields - improve discoverability and re-editing"
+    status: pending
+    rfs: []
+    description: >
+      Funcionalidade de nomes customizados para oracoes ja implementada
+      (F068/CR-124) mas com UX ruim: (1) sem indicacao visual de que nomes
+      customizados sao permitidos ao abrir o modal, (2) ao re-editar um nome
+      customizado, campo de busca abre vazio sem mostrar o nome atual.
+      Adicionar hint text fixo e pre-popular campo ao re-editar.
+    modified_by_crs: [133]
+    spec_file: "docs/specs/SPEC_F076.yaml"
+    notes:
+      - "CR-133: UX de nome customizado para oracoes ruim"
+      - "Adicionar hint text descritivo abaixo do campo de busca"
+      - "Pre-popular search/customName quando re-editando (memberId===null)"
+      - "Adicionar i18n key agenda.customNameHint em 3 idiomas"
 
   # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
@@ -1487,7 +1568,7 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (26 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1 + Batch 9 Phase 2)
+# PENDING CHANGE REQUESTS (30 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1 + Batch 9 Phase 2 + Batch 10 Phase 1 + Batch 10 Phase 2)
 # =============================================================================
 
 pending_crs:
@@ -2065,6 +2146,86 @@ pending_crs:
       - "Inicializacao com +1 mostra US por padrao (aceitavel)"
     files_likely_impacted:
       - src/app/(tabs)/settings/members.tsx
+
+  # --- Batch 10 Phase 2 (Topic X Button, Hymn Search, Auto-Scroll Fix, Custom Prayer UX) ---
+
+  - id: 128
+    type: ui
+    area: "SpeechSlot (F008, F060)"
+    feature_id: F073
+    spec_file: "docs/specs/SPEC_F073.yaml"
+    related_crs: [114]
+    description: >
+      Botao X para limpar tema no SpeechSlot esta dentro do topicField Pressable
+      (dentro da borda). Deve ser extraido e posicionado como sibling fora do
+      campo, a direita, seguindo padrao do X do speaker.
+    acceptance_criteria:
+      - "X do topic renderizado fora do topicField como sibling"
+      - "topicRow com flexDirection:'row', gap:12 envolve topicField + X"
+      - "Seta dropdown permanece dentro do topicField"
+      - "Funcionalidade de clear topic preservada"
+      - "X visivel apenas com tema + canAssign"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 131
+    type: ui
+    area: "AgendaForm HymnSelectorModal (F014)"
+    feature_id: F074
+    spec_file: "docs/specs/SPEC_F074.yaml"
+    related_crs: [118]
+    description: >
+      Campo de search do HymnSelectorModal no AgendaForm tem estilo
+      inconsistente com outros seletores. Simplificar styles.searchInput
+      para herdar estilos corretos do SearchInput base.
+    acceptance_criteria:
+      - "Campo de busca tem height:40 (herdado do SearchInput base)"
+      - "Campo de busca tem borderRadius:8 (herdado do SearchInput base)"
+      - "Campo de busca tem paddingHorizontal:12 (herdado do SearchInput base)"
+      - "Funcionalidade de busca de hinos preservada"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+
+  - id: 132
+    type: ux
+    area: "Speeches/Agenda tabs (F066)"
+    feature_id: F075
+    spec_file: "docs/specs/SPEC_F075.yaml"
+    related_crs: [120]
+    description: >
+      Auto-scroll ao expandir cards impreciso porque getItemLayout retorna
+      alturas fixas. Remover getItemLayout de ambas as abas. Substituir
+      initialScrollIndex por useEffect em agenda.tsx.
+    acceptance_criteria:
+      - "Card expandido alinhado com topo da area visivel"
+      - "Scroll preciso com cards de alturas variadas"
+      - "Colapsar card nao faz auto-scroll"
+      - "Initial scroll ao proximo domingo funciona em ambas as abas"
+    files_likely_impacted:
+      - src/app/(tabs)/speeches.tsx
+      - src/app/(tabs)/agenda.tsx
+
+  - id: 133
+    type: ux
+    area: "PrayerSelector (F015, F068)"
+    feature_id: F076
+    spec_file: "docs/specs/SPEC_F076.yaml"
+    related_crs: [74, 98, 124]
+    description: >
+      Funcionalidade de nomes customizados para oracoes ja implementada
+      mas com UX ruim: sem indicacao visual upfront e re-editing nao
+      pre-popula campo. Adicionar hint text e pre-populate.
+    acceptance_criteria:
+      - "Hint de discoverability visivel ao abrir PrayerSelector"
+      - "Pre-populate do campo quando re-editando nome customizado"
+      - "customNameButton visivel imediatamente ao re-editar"
+      - "Selecao de membro da lista continua funcionando"
+      - "Hint traduzido em 3 idiomas"
+    files_likely_impacted:
+      - src/components/PrayerSelector.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -3040,3 +3201,23 @@ cr_history:
       - "docs/specs/SPEC_F045_F049.yaml (CR-101, 102, 103, 104, 108, 109 - Fase 1: Display Fixes & WhatsApp Template)"
       - "docs/specs/SPEC_F050_F054.yaml (CR-105, 106, 107, 110, 111 - Fase 2: Invite Management UX)"
     summary: "Fase 1 (pendente): Hide LEDs on non-speech Sundays, hide speech exception label in Agenda, fix WhatsApp template in Settings, fix WhatsApp message variables (collection, link, quotes, date format), fix speech slots in Home NextSundaysSection. Fase 2 (pendente): WhatsApp icon button, custom status dropdown, status line in invite row, bishopric access to invite section, LED-X spacing."
+
+  batch_9:
+    range: "CR-112 a CR-125"
+    status: "14 pendentes"
+    files:
+      - "docs/specs/SPEC_F055_F059.yaml (CR-112, 113, 117, 122, 125 - Fase 1: Bug Fixes & Quick UI)"
+      - "docs/specs/SPEC_F060_F064.yaml (CR-114, 115, 116, 119, 121 - Fase 2: Speech Cards & Agenda)"
+      - "docs/specs/SPEC_F065_F068.yaml (CR-118, 120, 123, 124 - Fase 3: UX Polish)"
+    summary: "Fase 1: WhatsApp view conversation fix, dropdown title fix, country code display fix, last speech label, prayer selector duplicate fix. Fase 2: Topic clear button, confirmation on type change, LED status filter, speech slot reorder, last-minute label. Fase 3: Search field width, auto-scroll on expand, recognizing per-line, custom prayer names."
+
+  batch_10:
+    range: "CR-126 a CR-133"
+    status: "4 pendentes fase 1 (126, 127, 129, 130), 4 pendentes fase 2 (128, 131, 132, 133)"
+    files:
+      - "docs/specs/SPEC_F069_F072.yaml (CR-126, 127, 129, 130 - Fase 1: LED Redesign, Data Cleanup, Status Options, Country Code Fix)"
+      - "docs/specs/SPEC_F073.yaml (CR-128 - Fase 2: Topic X Button)"
+      - "docs/specs/SPEC_F074.yaml (CR-131 - Fase 2: Hymn Search Width)"
+      - "docs/specs/SPEC_F075.yaml (CR-132 - Fase 2: Auto-Scroll Fix)"
+      - "docs/specs/SPEC_F076.yaml (CR-133 - Fase 2: Custom Prayer UX)"
+    summary: "Fase 1 (pendente): LED flat redesign, delete speeches on type change, LED click all status options, country code display fix. Fase 2 (pendente): Topic X button outside field, hymn search field width consistency, auto-scroll fix (remove getItemLayout), custom prayer name UX (discoverability + re-editing)."

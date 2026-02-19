@@ -1,0 +1,414 @@
+# =============================================================================
+# QA_PLAN_batch10_phase2.yaml
+# QA Plan for Batch 10 Phase 2: CR-128, CR-131, CR-132, CR-133
+# Created: 2026-02-19
+# =============================================================================
+
+type: qa_plan
+id: QA-batch10-phase2
+created_at: "2026-02-19"
+request_type: feature_request
+
+features:
+  - cr: CR-128
+    id: F073
+    type: feature_request
+    description: "Theme X button positioning: move the X (clear) button outside the dropdown field to the right, matching the speaker X button pattern"
+
+  - cr: CR-131
+    id: F074
+    type: feature_request
+    description: "Hymn search field width: increase hymn selector search input width to match theme and member search widths"
+
+  - cr: CR-132
+    id: F075
+    type: feature_request
+    description: "Auto-scroll on card expand: when expanding a card in the agenda/speeches list, auto-scroll to align the card top with the screen top"
+
+  - cr: CR-133
+    id: F076
+    type: feature_request
+    description: "Custom prayer name fields: allow typing a custom name in opening/closing prayer fields without adding as a member; name stays only in that field"
+
+user_requests:
+  cr_128: |
+    Botao X para apagar tema esta dentro do dropdown, deveria estar fora do campo
+    a direita (igual ao X de discursante)
+  cr_131: |
+    Campo de search do seletor de hinos muito estreito comparado com search de temas
+    e membros. Aumentar para ficar igual
+  cr_132: |
+    Ao expandir card da agenda, scroll automatico para alinhar topo do card com topo da tela
+  cr_133: |
+    Campos 'Oracao de abertura' e 'Oracao de encerramento' devem permitir nome customizado
+    sem adicionar como membro, nome fica so naquele campo
+
+# ===========================================================================
+# BASELINE: Current state before development
+# ===========================================================================
+
+baseline:
+  cr_128:
+    description: |
+      In SpeechSlot.tsx, the topic field (lines 200-231) renders the X (clear) button
+      INSIDE the topicField Pressable. The X button is rendered as a child of the Pressable
+      that has styles.topicField (which includes borderWidth:1, borderRadius:6). This means
+      the X button appears inside the bordered dropdown field, between the text and the
+      dropdown arrow.
+
+      In contrast, the speaker field (lines 162-197) renders the X (remove) button OUTSIDE
+      the field Pressable. The speaker row is a flexDirection:'row' container with gap:12,
+      and the remove button is a separate Pressable after the field Pressable, positioned
+      independently to the right of the field.
+
+      The user wants the topic X button to follow the same pattern as the speaker X button:
+      outside the field border, to the right.
+    evidence:
+      - "SpeechSlot.tsx lines 200-231: topicField Pressable contains clearTopic button (X) AND arrow INSIDE the same bordered container"
+      - "SpeechSlot.tsx lines 162-197: speaker field has X button (handleRemove) OUTSIDE the field Pressable, as a sibling element"
+      - "SpeechSlot.tsx styles.topicField: borderWidth:1, borderRadius:6 - the X is visually inside this border"
+      - "SpeechSlot.tsx styles.row: speaker row uses flexDirection:'row' with gap:12, X button is separate sibling"
+      - "Pattern difference: speaker X is at line 186-197 (outside field), topic X is at line 217-225 (inside field)"
+
+  cr_131:
+    description: |
+      The HymnSelector component uses two different search contexts:
+      1. The standalone HymnSelector (used in Speeches tab) has its own modal with
+         SearchInput in modalHeader (line 103). The searchInput style at line 191
+         uses flex:1, height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12.
+      2. The AgendaForm's inline HymnSelectorModal (lines 707-779) uses SearchInput
+         in sheetSearchRow (line 741). The searchInput style at line 891 uses flex:1,
+         borderWidth:1, borderRadius:6, paddingHorizontal:10, paddingVertical:8,
+         marginBottom:8 - but NO explicit height.
+
+      Comparing with TopicSelectorModal and MemberSelectorModal:
+      - TopicSelectorModal searchInput (line 136): flex:1, height:40, borderWidth:1,
+        borderRadius:8, paddingHorizontal:12, fontSize:15
+      - MemberSelectorModal searchInput (line 128): flex:1, height:40, borderWidth:1,
+        borderRadius:8, paddingHorizontal:12, fontSize:15
+
+      The AgendaForm's HymnSelectorModal searchInput lacks explicit height:40 and
+      uses borderRadius:6 instead of 8, and paddingHorizontal:10 instead of 12.
+      However, the standalone HymnSelector modal search matches the pattern.
+
+      The real issue is likely the inline hymn selector (HymnSelector component used
+      in the Speeches tab) vs the bottom-sheet hymn selector used in Agenda tab. Both
+      use SearchInput which has its own styles (height:40, flex:1 on container). The
+      SearchInput component itself is consistent but the AgendaForm's searchInput style
+      override may cause visual difference.
+
+      The user perception of "narrow" likely refers to the HymnSelector's inline
+      selector button (lines 71-93) which has a fixed layout, compared to the TopicSelector
+      and MemberSelector which are full-screen modals with search at top.
+    evidence:
+      - "HymnSelector.tsx line 103: SearchInput in modal with style={styles.searchInput}"
+      - "HymnSelector.tsx line 191: searchInput style: flex:1, height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15"
+      - "TopicSelectorModal.tsx line 136: searchInput: flex:1, height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15"
+      - "MemberSelectorModal.tsx line 128: searchInput: flex:1, height:40, borderWidth:1, borderRadius:8, paddingHorizontal:12, fontSize:15"
+      - "AgendaForm.tsx line 891: searchInput: flex:1, borderWidth:1, borderRadius:6, paddingHorizontal:10, paddingVertical:8, marginBottom:8 -- DIFFERENT from others"
+      - "AgendaForm HymnSelectorModal (line 707-779): uses bottom-sheet style, not full-screen modal like Topic/Member selectors"
+      - "SearchInput.tsx container style: flex:1 - inherits width from parent"
+
+  cr_132:
+    description: |
+      Auto-scroll on card expand is ALREADY IMPLEMENTED in both tabs:
+
+      1. Speeches tab (speeches.tsx lines 168-180): handleToggle already includes
+         auto-scroll with scrollToIndex({index, animated:true, viewPosition:0}).
+         viewPosition:0 means "align top of item to top of visible area".
+         Delay: 300ms after expanding.
+
+      2. Agenda tab (agenda.tsx lines 128-139): handleToggle also includes
+         auto-scroll with scrollToIndex({index, animated:true, viewPosition:0}).
+         Same delay: 300ms.
+
+      Both implementations use the same ADR-047 pattern. The auto-scroll IS present
+      and uses viewPosition:0 which should align the card top with the viewport top.
+
+      If the user still reports this as an issue, the problem might be:
+      - The getItemLayout returns fixed height (70 for speeches, 64 for agenda) which
+        is inaccurate for expanded cards, causing scrollToIndex to miscalculate
+      - The 300ms delay might not be enough for the layout to update
+      - The scroll might be happening before the card finishes expanding
+
+      This is an existing feature that may need refinement rather than a new feature.
+    evidence:
+      - "speeches.tsx lines 168-180: handleToggle auto-scrolls to expanded card with viewPosition:0"
+      - "agenda.tsx lines 128-139: handleToggle auto-scrolls to expanded card with viewPosition:0"
+      - "speeches.tsx line 350: getItemLayout returns fixed height 70 (collapsed card only)"
+      - "agenda.tsx line 189: getItemLayout returns fixed ESTIMATED_ITEM_HEIGHT=64"
+      - "Both use setTimeout(300ms) which may not wait for LayoutAnimation to complete"
+      - "ADR-047 already defines this pattern (referenced in comments)"
+
+  cr_133:
+    description: |
+      Custom prayer names are ALREADY IMPLEMENTED via the PrayerSelector component.
+
+      PrayerSelector.tsx (lines 1-292) already supports both member selection AND
+      custom name input:
+      - Line 61: customName state for custom text input
+      - Lines 80-88: handleCustomName creates a PrayerSelection with memberId:null
+        and name=trimmed custom text
+      - Lines 158-169: Custom name option button appears when user types text,
+        showing the typed name with a "custom name" hint label
+      - Lines 24-29: PrayerSelection type allows memberId:null for custom names
+
+      In AgendaForm.tsx (lines 492-520), the PrayerSelector is used for both
+      opening_prayer and closing_prayer fields. The handlePrayerSelect correctly
+      saves the selection using prayer_name and prayer_member_id fields.
+      When a custom name is selected, memberId is null, so prayer_member_id=null
+      and prayer_name=custom text.
+
+      The database schema supports this: opening_prayer_member_id (nullable) and
+      opening_prayer_name (nullable) are separate fields, so a name can exist
+      without a member_id.
+
+      This feature appears to be ALREADY WORKING. The user may not be aware of the
+      existing functionality, or there may be a subtle UX issue where the custom
+      name option is not visible enough.
+    evidence:
+      - "PrayerSelector.tsx lines 24-29: PrayerSelection interface has memberId:string|null for custom names"
+      - "PrayerSelector.tsx line 61: customName state tracks custom text"
+      - "PrayerSelector.tsx lines 80-88: handleCustomName creates selection with memberId:null"
+      - "PrayerSelector.tsx lines 158-169: UI shows custom name button when text is typed"
+      - "AgendaForm.tsx lines 492-520: Prayer selector saves name+memberId, memberId=null for custom"
+      - "database.ts lines 184-185: opening_prayer_member_id and opening_prayer_name are nullable"
+      - "database.ts lines 204-205: closing_prayer_member_id and closing_prayer_name are nullable"
+      - "i18n locales: agenda.customName translations exist in pt-BR, en, es"
+
+# ===========================================================================
+# VALIDATION CHECKS
+# ===========================================================================
+
+validation_checks:
+
+  # --- CR-128: Theme X Button Positioning ---
+
+  - id: VC-128-01
+    cr: CR-128
+    description: "Topic X (clear) button is rendered OUTSIDE the topicField border, as a sibling element"
+    type: functional
+    how_to_verify: |
+      Read SpeechSlot.tsx. Verify that the topic clear button (X) is rendered
+      OUTSIDE the topicField Pressable, as a separate sibling element in the
+      topic row layout. It should follow the same pattern as the speaker remove
+      button (line 186-197): the X button should be a separate Pressable after
+      the topic field Pressable, not inside it.
+    expected_result: "Topic X button is outside the bordered field, to the right (same pattern as speaker X)"
+    priority: must_pass
+
+  - id: VC-128-02
+    cr: CR-128
+    description: "Topic field row uses flexDirection:'row' layout with X button as sibling"
+    type: functional
+    how_to_verify: |
+      Read SpeechSlot.tsx styles. Verify that the topic field row container uses
+      flexDirection:'row' and the X button is a separate Pressable child of this
+      row container, not a child of the topicField Pressable.
+    expected_result: "Topic row uses row layout with field and X button as siblings"
+    priority: must_pass
+
+  - id: VC-128-03
+    cr: CR-128
+    description: "Topic dropdown arrow remains inside the topic field"
+    type: regression
+    how_to_verify: |
+      Verify the dropdown arrow (unicode down triangle) is still rendered inside
+      the topicField Pressable, after the topic text.
+    expected_result: "Arrow is inside the field, X is outside"
+    priority: should_pass
+
+  - id: VC-128-04
+    cr: CR-128
+    description: "Topic clear functionality still works (calls onClearTopic)"
+    type: regression
+    how_to_verify: |
+      Verify the X button still calls handleClearTopic when pressed.
+    expected_result: "onClearTopic is called when X is pressed"
+    priority: must_pass
+
+  - id: VC-128-05
+    cr: CR-128
+    description: "X button only shown when topic is assigned and user can assign"
+    type: behavioral
+    how_to_verify: |
+      Verify the X button is conditionally rendered: only when topicDisplay exists
+      AND canAssign is true (same conditions as before).
+    expected_result: "X button hidden when no topic or user lacks permission"
+    priority: must_pass
+
+  # --- CR-131: Hymn Search Field Width ---
+
+  - id: VC-131-01
+    cr: CR-131
+    description: "HymnSelector modal search input width matches TopicSelectorModal and MemberSelectorModal"
+    type: functional
+    how_to_verify: |
+      Read HymnSelector.tsx. Compare the modal search layout with TopicSelectorModal
+      and MemberSelectorModal. All three should use the same SearchInput with
+      flex:1 in a row container that matches the pattern:
+      - header/modalHeader with flexDirection:'row', paddingHorizontal:16, gap:12
+      - SearchInput with style that includes flex:1, height:40
+      Verify the HymnSelector modal search matches this pattern.
+    expected_result: "HymnSelector modal search width equals Topic/Member selector search width"
+    priority: must_pass
+
+  - id: VC-131-02
+    cr: CR-131
+    description: "AgendaForm HymnSelectorModal search input width matches other selectors"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx HymnSelectorModal. Verify the sheetSearchRow and
+      searchInput styles match the pattern used by other selectors. The searchInput
+      should have consistent height, borderRadius, and paddingHorizontal values.
+    expected_result: "AgendaForm hymn search has consistent dimensions with other selectors"
+    priority: must_pass
+
+  - id: VC-131-03
+    cr: CR-131
+    description: "SearchInput styling is uniform across all selector modals"
+    type: functional
+    how_to_verify: |
+      Compare searchInput styles across HymnSelector, TopicSelectorModal,
+      MemberSelectorModal, and AgendaForm HymnSelectorModal. Verify they all
+      use the same height, borderRadius, paddingHorizontal, and fontSize values.
+    expected_result: "All search inputs use identical styling parameters"
+    priority: should_pass
+
+  - id: VC-131-04
+    cr: CR-131
+    description: "Hymn search functionality still works correctly"
+    type: regression
+    how_to_verify: |
+      Verify that the search filtering (by number prefix or title) still works
+      correctly after width changes.
+    expected_result: "Search filtering unaffected by layout changes"
+    priority: must_pass
+
+  # --- CR-132: Auto-scroll on Card Expand ---
+
+  - id: VC-132-01
+    cr: CR-132
+    description: "Agenda tab auto-scrolls to align card top with screen top when expanding"
+    type: functional
+    how_to_verify: |
+      Read agenda.tsx handleToggle. Verify scrollToIndex is called with
+      viewPosition:0 (top alignment). If the previous implementation had issues,
+      verify the fix (e.g., using scrollToOffset instead, or measuring actual
+      card position, or using a longer delay).
+    expected_result: "Expanded card top aligns with screen top after scroll"
+    priority: must_pass
+
+  - id: VC-132-02
+    cr: CR-132
+    description: "Speeches tab auto-scrolls to align card top with screen top when expanding"
+    type: functional
+    how_to_verify: |
+      Read speeches.tsx handleToggle. Same verification as VC-132-01.
+    expected_result: "Expanded card top aligns with screen top after scroll"
+    priority: must_pass
+
+  - id: VC-132-03
+    cr: CR-132
+    description: "Auto-scroll handles variable card heights correctly"
+    type: behavioral
+    how_to_verify: |
+      Verify the scroll implementation accounts for variable card heights
+      (expanded cards are much taller than collapsed). The getItemLayout with
+      fixed height may need to be removed or adjusted, or scrollToOffset/
+      scrollToItem used instead of scrollToIndex.
+    expected_result: "Scroll accurately positions the expanded card at screen top regardless of preceding card heights"
+    priority: must_pass
+
+  - id: VC-132-04
+    cr: CR-132
+    description: "Collapsing a card does not trigger auto-scroll"
+    type: behavioral
+    how_to_verify: |
+      Read handleToggle. Verify that auto-scroll only happens when EXPANDING
+      (setting expandedDate to a new value), not when COLLAPSING (setting to null).
+    expected_result: "Auto-scroll only triggered on expand, not collapse"
+    priority: should_pass
+
+  # --- CR-133: Custom Prayer Name Fields ---
+
+  - id: VC-133-01
+    cr: CR-133
+    description: "PrayerSelector allows entering a custom name without adding as member"
+    type: functional
+    how_to_verify: |
+      Read PrayerSelector.tsx. Verify:
+      1. Custom name input field/button exists
+      2. Selecting custom name creates PrayerSelection with memberId:null
+      3. The name is saved to the prayer field but no member is created
+    expected_result: "Custom name can be entered and saved without creating a member"
+    priority: must_pass
+
+  - id: VC-133-02
+    cr: CR-133
+    description: "Custom prayer name is saved correctly to the database"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx prayer handling. Verify that when a custom name is
+      selected (memberId:null), the prayer_name field gets the custom name
+      and prayer_member_id gets null.
+    expected_result: "Custom name saves to prayer_name with null prayer_member_id"
+    priority: must_pass
+
+  - id: VC-133-03
+    cr: CR-133
+    description: "Custom name option is visible and discoverable in the UI"
+    type: functional
+    how_to_verify: |
+      Read PrayerSelector.tsx UI rendering. Verify the custom name button/option
+      is clearly visible when the user types text in the search field. The button
+      should show the typed name with a "custom name" hint.
+    expected_result: "Custom name option clearly visible with hint text when user types"
+    priority: must_pass
+
+  - id: VC-133-04
+    cr: CR-133
+    description: "Selecting a member from the list still works correctly"
+    type: regression
+    how_to_verify: |
+      Verify that member selection from the list still creates PrayerSelection
+      with the correct memberId and name.
+    expected_result: "Member selection unaffected by custom name feature"
+    priority: must_pass
+
+  - id: VC-133-05
+    cr: CR-133
+    description: "Custom name does not appear in member list or member management"
+    type: behavioral
+    how_to_verify: |
+      Verify that entering a custom prayer name does NOT add the name to the
+      members table or member list. The name should only be stored in the
+      sunday_agenda prayer fields.
+    expected_result: "Custom prayer names never added to members table"
+    priority: must_pass
+
+  # --- Cross-cutting ---
+
+  - id: VC-CROSS-01
+    description: "All existing tests still pass"
+    type: regression
+    how_to_verify: |
+      Run npx vitest run and verify all tests pass.
+    expected_result: "All 3296+ tests pass (plus any new tests)"
+    priority: must_pass
+
+# ===========================================================================
+# PASS CRITERIA
+# ===========================================================================
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.
+
+  must_pass checks:
+  - VC-128-01, VC-128-02, VC-128-04, VC-128-05 (Theme X button positioning)
+  - VC-131-01, VC-131-02, VC-131-04 (Hymn search width)
+  - VC-132-01, VC-132-02, VC-132-03 (Auto-scroll on card expand)
+  - VC-133-01, VC-133-02, VC-133-03, VC-133-04, VC-133-05 (Custom prayer name)
+  - VC-CROSS-01 (all tests pass)

@@ -1,0 +1,519 @@
+# =============================================================================
+# ARCH_M021.yaml
+# Architecture for Batch 10 Phase 2 - Theme X Button, Hymn Search Width,
+#   Auto-scroll Fix, Custom Prayer Name UX
+# Features: F073, F074, F075, F076
+# CRs: CR-128, CR-131, CR-132, CR-133
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Fix Topic X button positioning (outside field), normalize hymn search width, fix auto-scroll accuracy on card expand, improve custom prayer name discoverability and re-editing"
+  principles:
+    - "Consistencia: Topic X button segue mesmo padrao do Speaker X button (siblings em row container)"
+    - "Heranca de estilos: HymnSelectorModal herda estilos do SearchInput base ao inves de sobrescrever"
+    - "Precisao: Remover getItemLayout com alturas fixas para permitir FlatList medir alturas reais"
+    - "Discoverability: Hint text permanente indica funcionalidade de nome customizado"
+    - "Zero migrations: Todas as mudancas sao client-side (UI/layout/i18n)"
+
+diagram: |
+  F073: SpeechSlot.tsx --[reestruturar]--> topicField envolvido por topicRow container
+        topicRow: View (flexDirection:'row', gap:12) com [topicField, X_button] como siblings
+        Padrao identico ao speaker row existente (styles.row)
+
+  F074: AgendaForm.tsx --[simplificar]--> styles.searchInput = { flex: 1 }
+        Herda: SearchInput.tsx base styles.input (height:40, borderRadius:8, paddingHorizontal:12)
+        Resultado: Campo de busca de hinos com mesma dimensao que todos os outros seletores
+
+  F075: speeches.tsx --[remover]--> getItemLayout callback + prop
+        agenda.tsx --[remover]--> getItemLayout + ESTIMATED_ITEM_HEIGHT + initialScrollIndex
+        agenda.tsx --[adicionar]--> useEffect + scrollToIndex (padrao speeches.tsx)
+        Ambos: setTimeout 300ms -> 400ms para dar mais tempo ao layout
+
+  F076: PrayerSelector.tsx --[adicionar]--> hint text + pre-populate no re-edit
+        i18n/{pt-BR,en,es}.json --[adicionar]--> key 'agenda.customNameHint'
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F073: Topic X button positioning ---
+  - name: "SpeechSlot.tsx"
+    feature: F073
+    responsibility: "Reestruturar topicField: extrair X button para fora do campo, criar topicRow container"
+    dependencies: []
+    change_detail: |
+      1. Envolver topicField Pressable (linhas 201-231) em novo <View style={styles.topicRow}>
+      2. Extrair clearTopic Pressable (linhas 218-225) de DENTRO do topicField
+         e colocar como sibling DEPOIS do topicField, dentro do topicRow
+      3. Mover marginTop:6 e marginLeft:28 de styles.topicField para novo styles.topicRow
+      4. Adicionar flex:1 ao styles.topicField para que ocupe espaco disponivel
+      5. Novo estilo topicRow: { flexDirection:'row', alignItems:'center', gap:12, marginTop:6, marginLeft:28 }
+      6. Seta dropdown (U+25BC) permanece DENTRO do topicField
+
+      Antes:
+        <Pressable style={[styles.topicField, ...]}>
+          <Text>{topic}</Text>
+          {topicDisplay && canAssign && <Pressable onPress={handleClearTopic}><Text>X</Text></Pressable>}
+          {canAssign && <Text>arrow</Text>}
+        </Pressable>
+
+      Depois:
+        <View style={styles.topicRow}>
+          <Pressable style={[styles.topicField, ...]}>
+            <Text>{topic}</Text>
+            {canAssign && <Text>arrow</Text>}
+          </Pressable>
+          {topicDisplay && canAssign && (
+            <Pressable hitSlop={8} onPress={handleClearTopic}>
+              <Text style={[styles.removeButton, { color: colors.error }]}>{X}</Text>
+            </Pressable>
+          )}
+        </View>
+
+  # --- F074: Hymn search field width ---
+  - name: "AgendaForm.tsx"
+    feature: F074
+    responsibility: "Simplificar styles.searchInput para herdar estilos corretos do SearchInput base"
+    dependencies: []
+    change_detail: |
+      1. Alterar styles.searchInput (linhas 891-899) de:
+           { flex: 1, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10,
+             paddingVertical: 8, fontSize: 15, marginBottom: 8 }
+         Para:
+           { flex: 1 }
+      2. O SearchInput.tsx base ja define: height:40, borderWidth:1, borderRadius:8,
+         paddingHorizontal:12, fontSize:15. Esses valores serao herdados automaticamente.
+      3. marginBottom:8 removido - o sheetSearchRow pai ja tem gap/padding suficiente.
+
+  # --- F075: Auto-scroll fix ---
+  - name: "speeches.tsx"
+    feature: F075
+    responsibility: "Remover getItemLayout para permitir FlatList medir alturas reais. Aumentar timeout."
+    dependencies: []
+    change_detail: |
+      1. REMOVER callback getItemLayout (linhas 348-355):
+           const getItemLayout = useCallback(
+             (_data: unknown, index: number) => ({
+               length: 70, offset: 70 * index, index,
+             }), []
+           );
+      2. REMOVER prop getItemLayout={getItemLayout} do FlatList (linha 375)
+      3. Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 179):
+           setTimeout(() => { ... }, 400);
+      4. Manter onScrollToIndexFailed fallback (linhas 378-386) - continua necessario
+
+  - name: "agenda.tsx"
+    feature: F075
+    responsibility: "Remover getItemLayout e initialScrollIndex. Substituir por useEffect+scrollToIndex. Aumentar timeout."
+    dependencies: []
+    change_detail: |
+      1. REMOVER constante ESTIMATED_ITEM_HEIGHT (linha 186)
+      2. REMOVER callback getItemLayout (linhas 188-195):
+           const getItemLayout = useCallback(
+             (_data: unknown, index: number) => ({
+               length: ESTIMATED_ITEM_HEIGHT, offset: ESTIMATED_ITEM_HEIGHT * index, index,
+             }), []
+           );
+      3. REMOVER prop getItemLayout={getItemLayout} do FlatList (linha 240)
+      4. REMOVER prop initialScrollIndex={initialIndex > 0 ? initialIndex : undefined} do FlatList (linha 223)
+      5. O useEffect existente (linhas 112-119) ja faz scroll via scrollToIndex com animated:false.
+         Este useEffect ja substitui initialScrollIndex. Apenas manter como esta.
+      6. Aumentar setTimeout de 300ms para 400ms no handleToggle (linha 139):
+           setTimeout(() => { ... }, 400);
+      7. Manter onScrollToIndexFailed (linhas 197-203) - continua necessario
+
+  # --- F076: Custom prayer name UX ---
+  - name: "PrayerSelector.tsx"
+    feature: F076
+    responsibility: "Adicionar hint de discoverability e pre-populate no re-edit de nomes customizados"
+    dependencies: []
+    change_detail: |
+      MUDANCA 1 - HINT TEXT:
+      1. Adicionar <Text> com estilo sutil DEPOIS do modalHeader (linha 155) e ANTES do
+         customNameButton condicional (linha 158):
+           <Text style={[styles.customNameHintText, { color: colors.textSecondary }]}>
+             {t('agenda.customNameHint')}
+           </Text>
+      2. Novo estilo customNameHintText:
+           { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 }
+      3. Hint visivel SEMPRE (campo vazio ou com texto) para discoverability
+
+      MUDANCA 2 - PRE-POPULATE:
+      1. Modificar useEffect existente (linhas 63-65) que observa 'visible':
+         De:
+           useEffect(() => {
+             if (visible) setModalVisible(true);
+           }, [visible]);
+         Para:
+           useEffect(() => {
+             if (visible) {
+               if (selected?.memberId === null && selected?.name) {
+                 setSearch(selected.name);
+                 setCustomName(selected.name);
+               }
+               setModalVisible(true);
+             }
+           }, [visible]);
+      2. Quando modal abre com nome customizado existente (memberId===null):
+         - Campo de busca pre-populado com o nome
+         - customName pre-populado -> customNameButton visivel imediatamente
+         - Lista de membros filtra pelo nome (pode nao encontrar, esperado)
+
+  # --- F076: i18n ---
+  - name: "pt-BR.json"
+    feature: F076
+    responsibility: "Adicionar key agenda.customNameHint em portugues"
+    dependencies: []
+    change_detail: |
+      Adicionar na secao "agenda":
+        "customNameHint": "Digite um nome para usar nome personalizado"
+
+  - name: "en.json"
+    feature: F076
+    responsibility: "Adicionar key agenda.customNameHint em ingles"
+    dependencies: []
+    change_detail: |
+      Adicionar na secao "agenda":
+        "customNameHint": "Type a name to use a custom name"
+
+  - name: "es.json"
+    feature: F076
+    responsibility: "Adicionar key agenda.customNameHint em espanhol"
+    dependencies: []
+    change_detail: |
+      Adicionar na secao "agenda":
+        "customNameHint": "Escriba un nombre para usar un nombre personalizado"
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F073 - Topic row layout
+  - name: "SpeechSlot topicRow layout"
+    component: "SpeechSlot.tsx"
+    methods:
+      - name: "topicRow render"
+        input: "speech, canAssign, topicDisplay"
+        output: "View container (row) com topicField Pressable + X button Pressable como siblings"
+        notes: "Mesmo padrao do speaker row (styles.row). X visivel apenas quando topicDisplay existe E canAssign e true."
+      - name: "styles.topicRow"
+        input: "N/A"
+        output: "{ flexDirection:'row', alignItems:'center', gap:12, marginTop:6, marginLeft:28 }"
+        notes: "marginTop e marginLeft movidos de styles.topicField para topicRow"
+      - name: "styles.topicField (atualizado)"
+        input: "N/A"
+        output: "flex:1 adicionado. marginTop e marginLeft removidos."
+        notes: "flex:1 faz o campo ocupar espaco disponivel no row"
+
+  # F074 - SearchInput override simplificado
+  - name: "AgendaForm searchInput style"
+    component: "AgendaForm.tsx"
+    methods:
+      - name: "styles.searchInput"
+        input: "N/A"
+        output: "{ flex: 1 }"
+        notes: "Todos os outros estilos herdados de SearchInput.tsx base (height:40, borderRadius:8, etc)"
+
+  # F075 - Auto-scroll sem getItemLayout
+  - name: "speeches.tsx FlatList scroll"
+    component: "speeches.tsx"
+    methods:
+      - name: "FlatList (sem getItemLayout)"
+        input: "listItems data"
+        output: "FlatList mede alturas reais via onLayout interno. scrollToIndex calcula offset correto."
+        notes: "getItemLayout removido. onScrollToIndexFailed mantido como fallback."
+      - name: "handleToggle scroll"
+        input: "date: string"
+        output: "setTimeout(400ms) -> scrollToIndex({ index, animated:true, viewPosition:0 })"
+        notes: "Delay aumentado de 300ms para 400ms para dar mais tempo ao layout apos expand"
+
+  - name: "agenda.tsx FlatList scroll"
+    component: "agenda.tsx"
+    methods:
+      - name: "FlatList (sem getItemLayout, sem initialScrollIndex)"
+        input: "listItems data"
+        output: "FlatList mede alturas reais. useEffect faz initial scroll. scrollToIndex funciona com alturas medidas."
+        notes: "getItemLayout, ESTIMATED_ITEM_HEIGHT, initialScrollIndex removidos. useEffect existente substitui initialScrollIndex."
+      - name: "handleToggle scroll"
+        input: "date: string"
+        output: "setTimeout(400ms) -> scrollToIndex({ index, animated:true, viewPosition:0 })"
+        notes: "Delay aumentado de 300ms para 400ms"
+
+  # F076 - Prayer hint + pre-populate
+  - name: "PrayerSelector hint"
+    component: "PrayerSelector.tsx"
+    methods:
+      - name: "customNameHintText render"
+        input: "t('agenda.customNameHint')"
+        output: "Text element renderizado entre modalHeader e customNameButton"
+        notes: "Sempre visivel (nao depende de estado do campo)"
+      - name: "useEffect pre-populate"
+        input: "visible: boolean, selected: PrayerSelection | null"
+        output: "Se visible=true E selected.memberId===null: setSearch(name), setCustomName(name)"
+        notes: "Pre-popula campo apenas para nomes customizados (memberId===null)"
+
+  - name: "i18n agenda.customNameHint"
+    component: "i18n locales"
+    methods:
+      - name: "agenda.customNameHint"
+        input: "N/A"
+        output: "pt-BR: 'Digite um nome para usar nome personalizado', en: 'Type a name to use a custom name', es: 'Escriba un nombre para usar un nombre personalizado'"
+        notes: "Nova key. Nao substitui nenhuma existente."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+  notes:
+    - "F073: Mudanca puramente de layout (JSX/styles). Nenhuma mudanca de dados."
+    - "F074: Mudanca puramente de estilos CSS. Nenhuma mudanca de dados."
+    - "F075: Remocao de getItemLayout. Nenhuma mudanca de dados."
+    - "F076: Adicao de i18n keys. Nenhuma mudanca de schema de banco."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Todas as features sao mudancas de UI/layout/i18n."
+  notes:
+    - "F073: Reestruturacao de layout. Mesmas permissoes (canAssign) controlam visibilidade do X."
+    - "F074: Mudanca de estilos CSS. Nenhum impacto."
+    - "F075: Remocao de getItemLayout nao afeta dados ou permissoes."
+    - "F076: Hint text e pre-populate nao expoe dados adicionais. selected ja e prop do componente."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Nenhuma feature adiciona ou modifica logs ou metricas."
+  notes:
+    - "Todas as 4 features sao mudancas de UI/UX sem novos eventos de log."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-051
+    title: "Remover getItemLayout ao inves de calcular alturas reais manualmente"
+    context: "F075 precisa corrigir auto-scroll impreciso. getItemLayout retorna alturas fixas (70px speeches, 64px agenda) que nao correspondem as alturas reais dos cards expandidos ou year separators. Opcoes: (a) remover getItemLayout e deixar FlatList medir, (b) calcular alturas manualmente via onLayout, (c) usar scrollToOffset com offsets calculados."
+    decision: "Remover getItemLayout de ambas as abas. Sem getItemLayout, FlatList mede alturas reais automaticamente via onLayout de cada item. scrollToIndex calcula offset correto com alturas medidas."
+    consequences:
+      - "Pro: scrollToIndex posiciona com precisao independente de alturas variadas"
+      - "Pro: Zero calculo manual de alturas"
+      - "Pro: Funciona automaticamente quando cards expandem/colapsam"
+      - "Con: FlatList precisa medir itens antes de scroll (pode atrasar primeiro render)"
+      - "Con: scrollToIndex pode falhar para itens nao renderizados (onScrollToIndexFailed como fallback)"
+      - "Tradeoff aceito: para listas de ~100 itens (24 meses de domingos), perda de performance e negligivel"
+
+  - id: ADR-052
+    title: "Substituir initialScrollIndex por useEffect em agenda.tsx"
+    context: "initialScrollIndex depende de getItemLayout para funcionar (precisa saber offsets de todos os itens). Com getItemLayout removido (ADR-051), initialScrollIndex nao funciona corretamente. Opcoes: (a) manter initialScrollIndex sem getItemLayout (risco de crash), (b) useEffect + scrollToIndex."
+    decision: "Remover initialScrollIndex e usar o useEffect existente (linhas 112-119) que ja faz scrollToIndex com animated:false. Este padrao ja e usado em speeches.tsx (linhas 145-157)."
+    consequences:
+      - "Pro: Padrao consistente entre speeches.tsx e agenda.tsx"
+      - "Pro: useEffect ja existe e funciona corretamente"
+      - "Pro: scrollToIndex com animated:false e visualmente equivalente a initialScrollIndex"
+      - "Con: Pequeno flash visual no primeiro render (items aparecem no topo antes do scroll). Aceito: mesmo tradeoff de speeches.tsx."
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F073
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F073
+    change: "Envolver topicField em View topicRow. Extrair clearTopic para fora do topicField como sibling. Mover marginTop/marginLeft de topicField para topicRow. Adicionar flex:1 ao topicField. Novo style topicRow."
+
+  # F074
+  - path: "src/components/AgendaForm.tsx"
+    feature: F074
+    change: "Simplificar styles.searchInput para { flex: 1 }. Remover borderWidth, borderRadius, paddingHorizontal, paddingVertical, fontSize, marginBottom."
+
+  # F075
+  - path: "src/app/(tabs)/speeches.tsx"
+    feature: F075
+    change: "Remover getItemLayout callback e prop do FlatList. Aumentar setTimeout de 300ms para 400ms no handleToggle."
+
+  - path: "src/app/(tabs)/agenda.tsx"
+    feature: F075
+    change: "Remover ESTIMATED_ITEM_HEIGHT, getItemLayout callback e prop, initialScrollIndex prop. Manter useEffect existente para initial scroll. Aumentar setTimeout de 300ms para 400ms no handleToggle."
+
+  # F076
+  - path: "src/components/PrayerSelector.tsx"
+    feature: F076
+    change: "Adicionar hint Text entre modalHeader e customNameButton. Modificar useEffect(visible) para pre-populate search/customName quando selected.memberId===null. Novo style customNameHintText."
+
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F076
+    change: "Adicionar key 'agenda.customNameHint': 'Digite um nome para usar nome personalizado'"
+
+  - path: "src/i18n/locales/en.json"
+    feature: F076
+    change: "Adicionar key 'agenda.customNameHint': 'Type a name to use a custom name'"
+
+  - path: "src/i18n/locales/es.json"
+    feature: F076
+    change: "Adicionar key 'agenda.customNameHint': 'Escriba un nombre para usar un nombre personalizado'"
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  F073_topic_x_button:
+    approach: "Reestruturar JSX do topicField para replicar padrao do speaker row"
+    detail: |
+      SpeechSlot.tsx:
+      1. Linhas 200-231 (topicField bloco):
+         Envolver em <View style={styles.topicRow}> ... </View>
+      2. Extrair clearTopic Pressable (linhas 218-225) de dentro do topicField
+         e mover para DEPOIS do </Pressable> do topicField, dentro do topicRow
+      3. styles.topicField: remover marginTop:6 e marginLeft:28, adicionar flex:1
+      4. Novo styles.topicRow:
+           topicRow: {
+             flexDirection: 'row',
+             alignItems: 'center',
+             gap: 12,
+             marginTop: 6,
+             marginLeft: 28,
+           }
+      5. Resultado final:
+           <View style={styles.topicRow}>
+             <Pressable style={[styles.topicField, { borderColor:..., backgroundColor:... }]}
+                        onPress={handleTopicPress} disabled={!canAssign || !speech}>
+               <Text style={[styles.topicText, ...]} numberOfLines={1}>
+                 {topicDisplay ?? t('speeches.selectTopic')}
+               </Text>
+               {canAssign && <Text style={[styles.fieldArrow, ...]}>arrow</Text>}
+             </Pressable>
+             {topicDisplay && canAssign && (
+               <Pressable hitSlop={8} onPress={handleClearTopic}
+                          accessibilityLabel={t('common.delete')}>
+                 <Text style={[styles.removeButton, { color: colors.error }]}>{X}</Text>
+               </Pressable>
+             )}
+           </View>
+
+  F074_hymn_search_width:
+    approach: "Remover style overrides, herdar do SearchInput base"
+    detail: |
+      AgendaForm.tsx:
+      1. Substituir styles.searchInput (linhas 891-899):
+         De:
+           searchInput: {
+             flex: 1,
+             borderWidth: 1,
+             borderRadius: 6,
+             paddingHorizontal: 10,
+             paddingVertical: 8,
+             fontSize: 15,
+             marginBottom: 8,
+           },
+         Para:
+           searchInput: {
+             flex: 1,
+           },
+      2. Nenhuma outra mudanca necessaria. O SearchInput.tsx aplica seus estilos
+         base internamente via styles.input (height:40, borderRadius:8, etc).
+         O style prop do AgendaForm e aplicado APOS o base (via array spread),
+         entao os overrides eram sobrescrevendo os valores corretos.
+
+  F075_auto_scroll_fix:
+    approach: "Remover getItemLayout para medir alturas reais + aumentar delay"
+    detail: |
+      speeches.tsx:
+      1. DELETAR o bloco getItemLayout (linhas 348-355):
+           const getItemLayout = useCallback(
+             (_data: unknown, index: number) => ({
+               length: 70, offset: 70 * index, index,
+             }), []
+           );
+      2. REMOVER prop getItemLayout={getItemLayout} da FlatList (linha 375)
+      3. Alterar 300 para 400 na linha 179:
+           }, 300); -> }, 400);
+
+      agenda.tsx:
+      1. DELETAR constante ESTIMATED_ITEM_HEIGHT = 64 (linha 186)
+      2. DELETAR o bloco getItemLayout (linhas 188-195):
+           const getItemLayout = useCallback(
+             (_data: unknown, index: number) => ({
+               length: ESTIMATED_ITEM_HEIGHT, offset: ESTIMATED_ITEM_HEIGHT * index, index,
+             }), []
+           );
+      3. REMOVER prop getItemLayout={getItemLayout} da FlatList (linha 240)
+      4. REMOVER prop initialScrollIndex={initialIndex > 0 ? initialIndex : undefined}
+         da FlatList (linha 223)
+      5. MANTER useEffect existente (linhas 112-119) para initial scroll - ja funciona
+      6. Alterar 300 para 400 na linha 139:
+           }, 300); -> }, 400);
+
+  F076_custom_prayer_name:
+    approach: "Hint text permanente + pre-populate via useEffect"
+    detail: |
+      PrayerSelector.tsx:
+      MUDANCA 1 (hint):
+      1. Apos o fechamento do <View style={styles.modalHeader}> (linha 155),
+         adicionar:
+           <Text style={[styles.customNameHintText, { color: colors.textSecondary }]}>
+             {t('agenda.customNameHint')}
+           </Text>
+      2. Novo style:
+           customNameHintText: {
+             fontSize: 13,
+             paddingHorizontal: 16,
+             paddingBottom: 8,
+           }
+
+      MUDANCA 2 (pre-populate):
+      1. Modificar useEffect (linhas 63-65):
+         De:
+           useEffect(() => {
+             if (visible) setModalVisible(true);
+           }, [visible]);
+         Para:
+           useEffect(() => {
+             if (visible) {
+               if (selected?.memberId === null && selected?.name) {
+                 setSearch(selected.name);
+                 setCustomName(selected.name);
+               }
+               setModalVisible(true);
+             }
+           }, [visible]);
+      NOTA: Nao adicionar 'selected' ao array de dependencias do useEffect.
+      O useEffect deve reagir APENAS a mudancas em 'visible'. Adicionar 'selected'
+      causaria re-execucao indesejada quando o usuario seleciona um membro.
+
+      i18n:
+      1. pt-BR.json: "customNameHint": "Digite um nome para usar nome personalizado"
+      2. en.json: "customNameHint": "Type a name to use a custom name"
+      3. es.json: "customNameHint": "Escriba un nombre para usar un nombre personalizado"
+      Todas na secao "agenda" (mesmo nivel de "customName")
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao (8 contratos)
+  GATE-04: true  # ADRs registrados (ADR-051: remover getItemLayout, ADR-052: substituir initialScrollIndex)
+  GATE-05: true  # ARCH_M021.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # 9 componentes, 4 features

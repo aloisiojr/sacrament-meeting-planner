@@ -1,0 +1,173 @@
+# =============================================================================
+# SPEC_F076.yaml
+# Feature F076 / CR-133: Custom prayer name UX improvements
+# Batch: 10, Phase: 2
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 10
+phase: 2
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F076
+  name: "Custom prayer name fields - improve discoverability and re-editing"
+  cr_id: 133
+  type: ux
+  priority: medium
+  related_features: [F015, F068]
+
+  user_request: >
+    "Campos 'Oracao de abertura' e 'Oracao de encerramento' devem permitir
+    nome customizado sem adicionar como membro, nome fica so naquele campo"
+    Feedback adicional:
+    "Nao da pra saber que voce pode colocar um nome personalizado quando voce
+    entra na tela de search, tem que ter algum jeito de ficar claro. E mesmo
+    quando eu ja adicionei um nome personalizado, quando eu clico de novo, ele
+    nem mostra o modal... ele vai direto para procurar um nome, tem que ficar
+    mais claro como usar isso."
+
+  description: >
+    A funcionalidade de nomes customizados para oracoes JA ESTA IMPLEMENTADA
+    (F068/CR-124, DD-15, BR-19). O PrayerSelector.tsx tem handleCustomName
+    (linhas 80-88), customNameButton (linhas 158-169), e logica de
+    memberId:null. O AgendaForm.tsx salva corretamente com prayer_member_id=null.
+    O problema reportado e de UX com 2 aspectos:
+
+    PROBLEMA 1 - DISCOVERABILITY: Quando o usuario abre o PrayerSelector modal,
+    ve apenas um campo de busca e uma lista de membros. O botao de nome
+    customizado (customNameButton) so aparece DEPOIS que o usuario digita texto.
+    Nao ha nenhuma indicacao visual upfront de que nomes customizados sao
+    permitidos. O usuario pode nem saber que a opcao existe.
+
+    PROBLEMA 2 - RE-EDITING: Quando um nome customizado ja esta definido
+    (memberId=null, name="Visitante"), clicar no campo abre o PrayerSelector
+    modal que mostra campo de busca vazio e lista de membros. O nome customizado
+    atual nao e mostrado em nenhum lugar do modal. O usuario nao tem como saber
+    que ja tinha um nome customizado nem como edita-lo facilmente. O campo de
+    busca deveria pre-popular com o nome customizado atual para facilitar edicao.
+
+  current_behavior: >
+    PrayerSelector.tsx:
+    1. Modal abre com campo de busca vazio e lista completa de membros
+    2. customNameButton so aparece quando customName.trim().length > 0
+       (linhas 158-169), ou seja, apenas apos o usuario digitar algo
+    3. Quando modal abre, customName e resetado para '' (state inicial)
+    4. Nao ha indicacao visual de que nomes customizados sao permitidos
+    5. Quando ja existe um nome customizado, o modal abre sem pre-popular
+
+  expected_behavior: >
+    PrayerSelector.tsx - DUAS melhorias:
+
+    1. HINT DE DISCOVERABILITY: Adicionar texto descritivo abaixo do campo de
+       busca, ANTES do customNameButton e da lista de membros. Texto:
+       t('agenda.customNameHint') - algo como "Digite um nome para usar nome
+       personalizado" (traduzido em 3 idiomas). Estilo sutil (fontSize:13,
+       color: textSecondary, paddingHorizontal:16, paddingBottom:8).
+       O hint e visivel SEMPRE (campo vazio ou com texto).
+
+    2. PRE-POPULATE NO RE-EDIT: Quando o modal abre E o selected atual tem
+       memberId===null (nome customizado), pre-popular o campo de busca (search)
+       e o customName com selected.name. Isso permite ao usuario ver e editar
+       o nome customizado atual imediatamente. Implementacao: no useEffect que
+       observa visible, se selected?.memberId === null, setar search e
+       customName para selected.name.
+
+  files_impacted:
+    - path: src/components/PrayerSelector.tsx
+      changes:
+        - "Adicionar hint text fixo abaixo do campo de busca"
+        - "Pre-popular search/customName quando selected e customizado (memberId===null)"
+        - "Adicionar i18n key 'agenda.customNameHint'"
+
+    - path: src/i18n/locales/pt-BR.json
+      changes:
+        - "Adicionar key 'agenda.customNameHint': 'Digite um nome para usar nome personalizado'"
+
+    - path: src/i18n/locales/en.json
+      changes:
+        - "Adicionar key 'agenda.customNameHint': 'Type a name to use a custom name'"
+
+    - path: src/i18n/locales/es.json
+      changes:
+        - "Adicionar key 'agenda.customNameHint': 'Escriba un nombre para usar un nombre personalizado'"
+
+  acceptance_criteria:
+    - id: AC-076-01
+      description: "Hint de discoverability visivel ao abrir PrayerSelector"
+      given: "O modal do PrayerSelector e aberto (campo vazio)"
+      when: "O modal renderiza"
+      then: "Um texto descritivo abaixo do campo de busca indica que nomes customizados sao permitidos"
+
+    - id: AC-076-02
+      description: "Hint permanece visivel apos digitar texto"
+      given: "O modal do PrayerSelector esta aberto"
+      when: "O usuario digita texto no campo de busca"
+      then: "O hint continua visivel; o customNameButton aparece acima da lista"
+
+    - id: AC-076-03
+      description: "Pre-populate do campo quando re-editando nome customizado"
+      given: "Um campo de oracao com nome customizado ja definido (memberId===null)"
+      when: "O usuario clica no campo para re-editar"
+      then: "O campo de busca abre pre-populado com o nome customizado atual"
+
+    - id: AC-076-04
+      description: "customNameButton visivel imediatamente ao re-editar"
+      given: "Um campo de oracao com nome customizado ja definido"
+      when: "O modal abre com campo pre-populado"
+      then: "O customNameButton aparece imediatamente (pois customName.trim().length > 0)"
+
+    - id: AC-076-05
+      description: "Selecao de membro da lista continua funcionando"
+      given: "O modal do PrayerSelector com membros listados"
+      when: "O usuario seleciona um membro da lista"
+      then: "prayer_member_id e prayer_name sao preenchidos corretamente"
+
+    - id: AC-076-06
+      description: "Nome customizado salvo com memberId null"
+      given: "O usuario digita um nome e clica no customNameButton"
+      when: "A selecao e processada pelo AgendaForm"
+      then: "prayer_member_id=null e prayer_name=texto digitado (trimmed)"
+
+    - id: AC-076-07
+      description: "Hint traduzido em 3 idiomas"
+      given: "O app em qualquer idioma suportado (pt-BR, en, es)"
+      when: "O PrayerSelector modal e aberto"
+      then: "O hint aparece no idioma correto"
+
+  edge_cases:
+    - id: EC-076-01
+      case: "Nome customizado com espacos nas extremidades"
+      expected: "Nome e trimado antes de salvar (handleCustomName ja faz trim)"
+
+    - id: EC-076-02
+      case: "Nome customizado vazio (so espacos)"
+      expected: "customNameButton nao aparece (customName.trim().length === 0)"
+
+    - id: EC-076-03
+      case: "Trocar de nome customizado para membro da lista"
+      given: "Campo com nome customizado pre-populado"
+      when: "Usuario limpa campo, busca membro, e seleciona da lista"
+      then: "memberId preenchido com id do membro, name com full_name"
+
+    - id: EC-076-04
+      case: "Abrir modal quando selected e um membro (nao customizado)"
+      expected: "Campo de busca abre vazio (pre-populate so para memberId===null)"
+
+  implementation_notes: >
+    Mudanca 1 (hint): Adicionar <Text> com estilo sutil entre modalHeader e
+    customNameButton. Texto usando t('agenda.customNameHint'). Estilo:
+    fontSize:13, color:colors.textSecondary, paddingHorizontal:16,
+    paddingBottom:8. Posicionar DEPOIS do modalHeader e ANTES do bloco
+    condicional do customNameButton.
+
+    Mudanca 2 (pre-populate): No useEffect que observa 'visible', adicionar
+    condicao: se visible===true E selected?.memberId===null E selected?.name,
+    setar setSearch(selected.name) e setCustomName(selected.name). O campo de
+    busca abrira pre-populado, o customNameButton aparecera imediatamente, e a
+    lista de membros filtrara pelo nome (pode nao encontrar, o que e esperado
+    pois e nome customizado).

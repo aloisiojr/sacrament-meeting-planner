@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-18"
-  total_features: 48
-  total_change_requests: 106
+  total_features: 54
+  total_change_requests: 111
   implemented_crs: 95
-  pending_crs: 11
+  pending_crs: 16
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -34,6 +34,7 @@ metadata:
     - docs/specs/SPEC_F035_F039.yaml
     - docs/specs/SPEC_F040_F044.yaml
     - docs/specs/SPEC_F045_F049.yaml
+    - docs/specs/SPEC_F050_F054.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -185,7 +186,7 @@ permissions:
 
   home_invite_mgmt:
     description: "Ver secao 'Gerenciamento de convites' na Home"
-    bispado: false
+    bispado: true
     secretario: true
     observador: false
 
@@ -900,6 +901,95 @@ features:
       - "Replicar condicao (!exception || exception.reason === 'speeches')"
 
   # ---------------------------------------------------------------------------
+  # Batch 8 Phase 2 (F050-F054) - Invite Management UX
+  # ---------------------------------------------------------------------------
+
+  - id: F050
+    name: "Replace WhatsApp text button with icon and status button with three-dots"
+    status: pending
+    rfs: []
+    description: >
+      Na secao de gerenciamento de convites (InviteManagementSection), substituir
+      botao texto "WhatsApp" por icone do WhatsApp (SVG inline ou Unicode) e
+      botao "Alterar status" por icone de tres pontinhos (Unicode U+22EE vertical
+      ellipsis). Sem biblioteca de icones (DD-25).
+    modified_by_crs: [105]
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    notes:
+      - "CR-105: Substituir texto por icones nos botoes de acao do invite row"
+      - "WhatsApp: SVG inline ou emoji. Tres pontinhos: U+22EE"
+      - "Manter accessibilityLabel com texto descritivo"
+      - "Unico arquivo afetado: InviteManagementSection.tsx"
+
+  - id: F051
+    name: "Replace Alert with custom dropdown for invite status actions"
+    status: pending
+    rfs: []
+    description: >
+      Na secao de gerenciamento de convites, substituir Alert.alert nativo por
+      dropdown/modal customizado com opcoes: Ver conversa (icone WhatsApp),
+      Designado/Confirmado (LED verde), Designado/Nao-Convidado (LED amarelo),
+      Desistiu (LED vermelho), Cancelar. Nova opcao "Designado/Nao-Convidado"
+      permite reverter convite. Segue padrao visual do StatusChangeModal.
+    modified_by_crs: [106]
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    notes:
+      - "CR-106: Dropdown customizado para opcoes de status de convite"
+      - "Novo componente InviteActionDropdown.tsx"
+      - "Nova opcao: assigned_not_invited (reverter convite)"
+      - "Nova i18n key: speeches.viewConversation ('Ver conversa')"
+      - "Ativado pelo botao tres pontinhos de F050"
+
+  - id: F052
+    name: "Show speech number with LED and status name in invite card second line"
+    status: pending
+    rfs: []
+    description: >
+      Na secao de gerenciamento de convites, alterar a segunda linha de cada
+      invite row de apenas "1o" para o formato completo:
+      "1o Discurso - <StatusLED> <nome do status traduzido>".
+      Importar StatusLED, usar t('speeches.slot') e t('speechStatus.*').
+    modified_by_crs: [107]
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    notes:
+      - "CR-107: Formato completo na segunda linha do invite row"
+      - "Importar StatusLED com tamanho 10-12px (inline)"
+      - "Layout: flexDirection row com alignItems center"
+      - "Unico arquivo afetado: InviteManagementSection.tsx"
+
+  - id: F053
+    name: "Show invite management section for bishopric role"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar permissao 'home:invite_mgmt' ao role bishopric em permissions.ts.
+      Atualmente apenas secretary tem essa permissao. Bispado passara a ver a
+      secao de Gerenciamento de Convites na Home, alem da secao de Proximas
+      Designacoes que ja possui.
+    modified_by_crs: [110]
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    notes:
+      - "CR-110: Bispado tambem ve secao de gerenciamento de convites"
+      - "Unico arquivo afetado: permissions.ts (adicionar 'home:invite_mgmt' ao bishopric Set)"
+      - "InviteManagementSection.tsx nao precisa alterar (guard ja usa hasPermission)"
+
+  - id: F054
+    name: "Increase spacing between LED and X button, increase X icon size"
+    status: pending
+    rfs: []
+    description: >
+      No SpeechSlot.tsx (card de domingo expandido), aumentar espaco entre
+      StatusLED e botao X (remover designacao) de gap 8 para 12-16px, e
+      aumentar fontSize do icone X de 20 para 24-26px.
+    modified_by_crs: [111]
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    notes:
+      - "CR-111: Mais espaco entre LED e X, icone X maior"
+      - "gap da row e/ou marginLeft no removeButton"
+      - "fontSize do X de 20 para 24+"
+      - "Unico arquivo afetado: SpeechSlot.tsx"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
   # ---------------------------------------------------------------------------
 
@@ -1058,7 +1148,7 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (11 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1)
+# PENDING CHANGE REQUESTS (16 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2)
 # =============================================================================
 
 pending_crs:
@@ -1262,6 +1352,95 @@ pending_crs:
       - "Consistencia com aba Discursos"
     files_likely_impacted:
       - src/components/NextSundaysSection.tsx
+
+  # --- Batch 8 Phase 2 (Invite Management UX) ---
+
+  - id: 105
+    type: ui
+    area: "InviteManagementSection (F009)"
+    feature_id: F050
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    related_crs: []
+    description: >
+      Substituir botao texto "WhatsApp" por icone do WhatsApp e botao
+      "Alterar status" por icone de tres pontinhos na secao de convites.
+    acceptance_criteria:
+      - "Botao not-invited mostra icone WhatsApp (SVG ou Unicode)"
+      - "Botao invited mostra tres pontinhos (U+22EE)"
+      - "Comportamento onPress inalterado"
+      - "accessibilityLabel descritivo nos botoes"
+    files_likely_impacted:
+      - src/components/InviteManagementSection.tsx
+
+  - id: 106
+    type: ux
+    area: "InviteManagementSection (F009)"
+    feature_id: F051
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    related_crs: [105]
+    description: >
+      Substituir Alert.alert por dropdown customizado com opcoes:
+      Ver conversa, Designado/Confirmado, Designado/Nao-Convidado,
+      Desistiu, Cancelar. Cada opcao com indicador visual (LED).
+    acceptance_criteria:
+      - "Alert.alert NAO usado para status de invited"
+      - "Dropdown com 5 opcoes (Ver conversa, Confirmado, Nao-Convidado, Desistiu, Cancelar)"
+      - "Nova opcao assigned_not_invited (reverter convite)"
+      - "Indicadores visuais (LED colorido) por opcao"
+      - "Tap fora fecha dropdown"
+    files_likely_impacted:
+      - src/components/InviteManagementSection.tsx
+      - src/components/InviteActionDropdown.tsx
+
+  - id: 107
+    type: ui
+    area: "InviteManagementSection (F009)"
+    feature_id: F052
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    related_crs: []
+    description: >
+      Alterar segunda linha do invite row de "1o" para
+      "1o Discurso - <LED> <nome do status>".
+    acceptance_criteria:
+      - "Segunda linha mostra '1o Discurso' completo"
+      - "StatusLED inline na segunda linha (10-12px)"
+      - "Nome do status traduzido apos o LED"
+      - "Layout horizontal alinhado"
+    files_likely_impacted:
+      - src/components/InviteManagementSection.tsx
+
+  - id: 110
+    type: feature
+    area: "Permissions (F023)"
+    feature_id: F053
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    related_crs: []
+    description: >
+      Adicionar permissao 'home:invite_mgmt' ao role bishopric para que
+      bispado tambem veja a secao de gerenciamento de convites na Home.
+    acceptance_criteria:
+      - "bishopric tem 'home:invite_mgmt' em PERMISSIONS_MAP"
+      - "InviteManagementSection visivel para bishopric"
+      - "Observer continua sem acesso"
+    files_likely_impacted:
+      - src/lib/permissions.ts
+
+  - id: 111
+    type: ux
+    area: "SpeechSlot (F008)"
+    feature_id: F054
+    spec_file: "docs/specs/SPEC_F050_F054.yaml"
+    related_crs: []
+    description: >
+      Aumentar espaco entre LED e botao X e aumentar tamanho do icone X
+      no SpeechSlot expandido.
+    acceptance_criteria:
+      - "Gap ou margin entre LED e X maior que 8px"
+      - "fontSize do X maior que 20"
+      - "hitSlop adequado mantido"
+      - "Layout nao quebra em telas estreitas"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -1682,6 +1861,60 @@ design_decisions:
       slots aparecem tanto para domingos sem excecao (dados antigos) quanto
       para domingos com tipo 'speeches' explicitamente persistido (CR-56).
 
+  - id: DD-44
+    title: "Icones em botoes de acao do InviteManagementSection"
+    decided_in: CR-105
+    decision: >
+      Botoes de acao na secao de gerenciamento de convites usam icones ao inves
+      de texto: icone do WhatsApp (SVG inline ou emoji) para assigned_not_invited,
+      icone de tres pontinhos (Unicode U+22EE vertical ellipsis) para assigned_invited.
+      Segue principio DD-25 de nao usar biblioteca de icones.
+
+  - id: DD-45
+    title: "Dropdown customizado para opcoes de status de convite"
+    decided_in: CR-106
+    decision: >
+      A interacao de mudanca de status para speeches convidados usa dropdown/modal
+      customizado (InviteActionDropdown) ao inves de Alert.alert nativo. Opcoes:
+      Ver conversa (abre WhatsApp), Designado/Confirmado, Designado/Nao-Convidado
+      (nova - reverte convite), Desistiu, Cancelar. Cada opcao tem indicador
+      visual (LED colorido) seguindo padrao do StatusChangeModal.
+
+  - id: DD-46
+    title: "Transicao reversa de status: assigned_invited -> assigned_not_invited"
+    decided_in: CR-106
+    decision: >
+      O dropdown de opcoes de convite permite reverter o status de assigned_invited
+      para assigned_not_invited via opcao "Designado/Nao-Convidado". Isso estende
+      o ciclo de status original com uma transicao reversa para correcao de erros
+      ou re-convite.
+
+  - id: DD-47
+    title: "Segunda linha do invite row com formato completo"
+    decided_in: CR-107
+    decision: >
+      Cada invite row na secao de gerenciamento de convites mostra na segunda
+      linha o formato: "No Discurso - <StatusLED> <nome do status traduzido>".
+      StatusLED inline com tamanho 10-12px. Usa t('speeches.slot') para label
+      e t('speechStatus.*') para nome do status.
+
+  - id: DD-48
+    title: "Bispado ve secao de gerenciamento de convites na Home"
+    decided_in: CR-110
+    decision: >
+      A permissao 'home:invite_mgmt' e concedida ao role bishopric (alem de
+      secretary). Bispado passa a ver AMBAS as secoes na Home: NextAssignmentsSection
+      (controlada por 'home:next_assignments') e InviteManagementSection (controlada
+      por 'home:invite_mgmt'). Observer continua sem acesso.
+
+  - id: DD-49
+    title: "Espaco e tamanho aumentados entre LED e X no SpeechSlot"
+    decided_in: CR-111
+    decision: >
+      No SpeechSlot.tsx, o espaco entre StatusLED e botao X (remover designacao)
+      e aumentado de 8px para 12-16px, e o fontSize do icone X e aumentado de
+      20 para 24-26px para melhorar visualizacao e toque.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -1888,6 +2121,37 @@ business_rules:
     rule: "Condicao para renderizar SpeechSlots: (!exception || exception.reason === 'speeches')"
     origin: CR-109
     notes: "Padrao consistente em speeches.tsx e NextSundaysSection.tsx. Nao usar !exception sozinho."
+
+  - id: BR-45
+    rule: "Botoes de acao na secao de convites usam icones (nao texto)"
+    origin: CR-105
+    notes: "WhatsApp: SVG/emoji. Tres pontinhos: U+22EE. Sem icon library (DD-25)."
+
+  - id: BR-46
+    rule: "Opcoes de status de convite via dropdown customizado (nao Alert nativo)"
+    origin: CR-106
+    notes: "InviteActionDropdown com Ver conversa, Confirmado, Nao-Convidado, Desistiu, Cancelar."
+
+  - id: BR-47
+    rule: "Status pode reverter de assigned_invited para assigned_not_invited via dropdown"
+    origin: CR-106
+    notes: "Transicao reversa para correcao de erros ou re-convite."
+
+  - id: BR-48
+    rule: "Segunda linha do invite row mostra formato completo: 'No Discurso - LED StatusName'"
+    origin: CR-107
+    notes: "StatusLED inline 10-12px. Usa t('speeches.slot') + t('speechStatus.*')."
+
+  - id: BR-49
+    rule: "Secao de gerenciamento de convites visivel para bispado E secretario"
+    origin: CR-110
+    supersedes: "Secao visivel apenas para secretario (comportamento anterior)"
+    notes: "Permissao 'home:invite_mgmt' adicionada ao bishopric."
+
+  - id: BR-50
+    rule: "Espaco entre LED e X no SpeechSlot >= 12px, fontSize do X >= 24"
+    origin: CR-111
+    notes: "Melhoria de UX para visualizacao e toque."
 
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
@@ -2146,8 +2410,9 @@ cr_history:
     summary: "Fase 1 (implementada): RLS policy fix, duplicate key fix, deep link protocol, speech fields visibility, prayer fields clickable. Fase 2 (pendente): WhatsApp template i18n, search fields layout, multi-select recognizing, agenda speech labels, last-minute speaker swap."
 
   batch_8:
-    range: "CR-101 a CR-109"
-    status: "6 pendentes (101, 102, 103, 104, 108, 109)"
+    range: "CR-101 a CR-111"
+    status: "11 pendentes (101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111)"
     files:
       - "docs/specs/SPEC_F045_F049.yaml (CR-101, 102, 103, 104, 108, 109 - Fase 1: Display Fixes & WhatsApp Template)"
-    summary: "Fase 1 (pendente): Hide LEDs on non-speech Sundays, hide speech exception label in Agenda, fix WhatsApp template in Settings, fix WhatsApp message variables (collection, link, quotes, date format), fix speech slots in Home NextSundaysSection."
+      - "docs/specs/SPEC_F050_F054.yaml (CR-105, 106, 107, 110, 111 - Fase 2: Invite Management UX)"
+    summary: "Fase 1 (pendente): Hide LEDs on non-speech Sundays, hide speech exception label in Agenda, fix WhatsApp template in Settings, fix WhatsApp message variables (collection, link, quotes, date format), fix speech slots in Home NextSundaysSection. Fase 2 (pendente): WhatsApp icon button, custom status dropdown, status line in invite row, bishopric access to invite section, LED-X spacing."

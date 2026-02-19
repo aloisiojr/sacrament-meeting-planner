@@ -1,0 +1,572 @@
+# =============================================================================
+# PLAN_P016.yaml
+# Implementation Plan for Batch 8 Phase 2 - Invite Management UX
+# Features: F050, F051, F052, F053, F054
+# CRs: CR-105, CR-106, CR-107, CR-110, CR-111
+# Created: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Melhorar UX da secao de gerenciamento de convites com 5 mudancas: substituir
+  botoes de texto por icones (WhatsApp SVG + tres pontinhos Unicode) (F050),
+  substituir Alert.alert nativo por dropdown customizado com opcoes de status
+  incluindo nova transicao reversa assigned_invited -> assigned_not_invited (F051),
+  exibir informacao completa na segunda linha do invite row (posicao + LED + nome
+  do status) (F052), liberar secao de convites para o bispado (F053), e aumentar
+  espaco entre LED e X e tamanho do X no SpeechSlot (F054).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F053 - Adicionar permissao 'home:invite_mgmt' ao bishopric
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/lib/permissions.ts, adicionar 'home:invite_mgmt' ao Set de
+      permissoes do bishopric (entre 'home:next_assignments' na linha 32 e
+      'agenda:read' na linha 33). Esta e a unica alteracao necessaria pois
+      InviteManagementSection.tsx ja usa hasPermission('home:invite_mgmt')
+      como guard (linha 139) e nao precisa de mudanca. Atualizar tambem o
+      comentario docstring de InviteManagementSection de "Secretary-only"
+      para "Secretary and Bishopric" (linha 2) e o comentario da guard
+      (linha 138) de "// Only visible for Secretary" para
+      "// Only visible for Secretary and Bishopric".
+    files:
+      - "src/lib/permissions.ts"
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "bishopric Set em permissions.ts inclui 'home:invite_mgmt'"
+      - "hasPermission('bishopric', 'home:invite_mgmt') retorna true"
+      - "hasPermission('secretary', 'home:invite_mgmt') continua retornando true"
+      - "hasPermission('observer', 'home:invite_mgmt') continua retornando false"
+      - "Docstring de InviteManagementSection atualizado para 'Secretary and Bishopric'"
+      - "Comentario da guard atualizado"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que bishopric tem permissao 'home:invite_mgmt'"
+      - type: unit
+        description: "Verificar que observer NAO tem permissao 'home:invite_mgmt'"
+    covers:
+      acceptance_criteria: ["AC-F053-01", "AC-F053-02", "AC-F053-03", "AC-F053-04", "AC-F053-05"]
+      edge_cases: ["EC-F053-01"]
+    risks:
+      - risk: "Testes existentes de permissoes do bishopric esperam contagem exata"
+        mitigation: "Testes existentes usam .has() e nao verificam tamanho do Set"
+
+  # =========================================================================
+  # STEP-02: F054 - Aumentar espaco e tamanho do X no SpeechSlot
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/components/SpeechSlot.tsx, alterar 2 valores de estilo:
+      (1) styles.row: gap de 8 para 12 (linha 229) - melhora espacamento
+      geral entre speaker field, LED e botao X.
+      (2) styles.removeButton: fontSize de 20 para 24 (linha 249) - torna
+      o X maior e mais visivel. hitSlop permanece em 8 (ja adequado com
+      fontSize 24). Nenhuma outra mudanca necessaria.
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "styles.row.gap e 12 (era 8)"
+      - "styles.removeButton.fontSize e 24 (era 20)"
+      - "hitSlop permanece 8"
+      - "Layout da row nao quebra em telas estreitas (flex:1 no field garante truncamento)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que gap da row e 12 e fontSize do removeButton e 24"
+    covers:
+      acceptance_criteria: ["AC-F054-01", "AC-F054-02", "AC-F054-03", "AC-F054-04"]
+      edge_cases: ["EC-F054-01", "EC-F054-02"]
+    risks:
+      - risk: "Gap maior empurra X para fora da tela com nomes longos"
+        mitigation: "field tem flex:1 e trunca com numberOfLines={1}, LED e X tem tamanho fixo"
+
+  # =========================================================================
+  # STEP-03: F052 - Exibir info completa na segunda linha do invite row
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/components/InviteManagementSection.tsx, alterar a segunda linha
+      do invite row (linhas 178-180). Atualmente mostra apenas
+      '{position}o' (ex: "1o"). Deve mostrar o formato completo:
+      "{position}o Discurso - <LED> <nome do status>".
+      Mudancas:
+      (1) Importar StatusLED de ./StatusLED.
+      (2) Substituir o Text simples por um View com flexDirection 'row' e
+      alignItems 'center' contendo:
+        - Text com t('speeches.slot', { number: `${speech.position}\u00BA` })
+        - Text com ' - '
+        - StatusLED com status={speech.status} e size={10} (inline, menor que 16)
+        - Text com ' ' + t(`speechStatus.${speech.status}`)
+      (3) Adicionar styles: speechInfoRow ({ flexDirection: 'row',
+      alignItems: 'center' }), statusName ({ fontSize: 12 }).
+      (4) numberOfLines={1} no container ou ultimo Text para truncamento.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02"]
+    done_when:
+      - "StatusLED importado de ./StatusLED"
+      - "Segunda linha mostra '{position}o Discurso' (via t('speeches.slot'))"
+      - "Separador ' - ' visivel entre label e LED"
+      - "StatusLED renderizado inline com size 10"
+      - "Nome do status traduzido (t('speechStatus.{status}')) visivel apos LED"
+      - "Layout: flexDirection row, alignItems center"
+      - "Texto trunca em telas estreitas (numberOfLines ou flex)"
+      - "LED piscante (assigned_not_invited) funciona inline"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que segunda linha contem label completo do slot"
+      - type: unit
+        description: "Verificar que StatusLED e renderizado inline com size 10"
+      - type: unit
+        description: "Verificar que nome do status traduzido aparece apos o LED"
+    covers:
+      acceptance_criteria: ["AC-F052-01", "AC-F052-02", "AC-F052-03", "AC-F052-04", "AC-F052-05"]
+      edge_cases: ["EC-F052-01", "EC-F052-02"]
+    risks:
+      - risk: "StatusLED com animacao piscante causa re-render excessivo na lista"
+        mitigation: "StatusLED ja usa Animated.Value internamente, sem re-render do pai"
+
+  # =========================================================================
+  # STEP-04: F050 - Substituir texto dos botoes por icones
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em src/components/InviteManagementSection.tsx, substituir o conteudo
+      textual dos botoes de acao no invite row (linhas 182-205):
+      (1) Importar Svg e Path de react-native-svg (dependencia transitiva do Expo).
+      (2) Criar componente inline WhatsAppIcon({ size, color }) que renderiza
+      SVG minimalista do logo WhatsApp usando Svg e Path. Tamanho padrao 18,
+      cor padrao 'white'. Definir dentro do mesmo arquivo (um unico icone nao
+      justifica arquivo separado).
+      (3) Para isNotInvited: substituir <Text>WhatsApp</Text> por
+      <WhatsAppIcon size={18} color={colors.onPrimary} />.
+      (4) Para !isNotInvited: substituir <Text>{t('speeches.changeStatus')}</Text>
+      por <Text style={{ fontSize: 18 }}>{'\u22EE'}</Text> (vertical ellipsis).
+      (5) Adicionar accessibilityLabel='WhatsApp' ao botao isNotInvited.
+      (6) Adicionar accessibilityLabel={t('speeches.changeStatus')} ao botao
+      !isNotInvited.
+      (7) Ajustar styles.actionButton: remover paddingHorizontal, usar
+      width/height fixos (ex: 36x36) com justifyContent 'center' e
+      alignItems 'center' para centralizar os icones. Ajustar borderRadius
+      para circular ou manter retangular conforme alinhamento visual.
+      (8) Remover styles.actionText se nao mais utilizado.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "Import de Svg, Path de react-native-svg adicionado"
+      - "Componente WhatsAppIcon definido inline com props size e color"
+      - "Botao isNotInvited renderiza WhatsAppIcon ao inves de texto 'WhatsApp'"
+      - "Botao !isNotInvited renderiza Unicode U+22EE ao inves de t('speeches.changeStatus')"
+      - "accessibilityLabel='WhatsApp' no botao isNotInvited"
+      - "accessibilityLabel={t('speeches.changeStatus')} no botao !isNotInvited"
+      - "Botoes tem tamanho adequado para toque (min 36px via dimensao fixa ou padding)"
+      - "Icones visiveis em dark mode e light mode"
+      - "Comportamento onPress inalterado (mesmos handlers)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que botao isNotInvited renderiza WhatsAppIcon (SVG)"
+      - type: unit
+        description: "Verificar que botao !isNotInvited renderiza Unicode U+22EE"
+      - type: unit
+        description: "Verificar que accessibilityLabel esta presente em ambos os botoes"
+    covers:
+      acceptance_criteria: ["AC-F050-01", "AC-F050-02", "AC-F050-03", "AC-F050-04", "AC-F050-05"]
+      edge_cases: ["EC-F050-01", "EC-F050-02"]
+    risks:
+      - risk: "react-native-svg nao disponivel no bundle"
+        mitigation: "E dependencia transitiva do Expo SDK 54, ja esta no node_modules"
+      - risk: "SVG path do WhatsApp incorreto (icone irreconhecivel)"
+        mitigation: "Usar path padrao amplamente disponivel do logo WhatsApp"
+
+  # =========================================================================
+  # STEP-05: F051 - Exportar STATUS_INDICATOR_COLORS e adicionar transicao
+  # reversa no VALID_TRANSITIONS
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Preparacao para F051:
+      (1) Em src/components/StatusChangeModal.tsx, exportar
+      STATUS_INDICATOR_COLORS (atualmente const, linha 36). Mudar para
+      'export const STATUS_INDICATOR_COLORS'. Isso permite que o novo
+      componente InviteActionDropdown importe as mesmas cores para
+      consistencia visual.
+      (2) Em src/hooks/useSpeeches.ts, adicionar 'assigned_not_invited' ao
+      array VALID_TRANSITIONS.assigned_invited (linha 62). O array atual e
+      ['assigned_confirmed', 'gave_up', 'not_assigned']. Deve ser alterado
+      para ['assigned_confirmed', 'assigned_not_invited', 'gave_up',
+      'not_assigned']. Isso habilita a transicao reversa (invited -> not_invited)
+      que sera usada no dropdown de F051.
+      (3) Atualizar testes existentes em
+      src/__tests__/useSpeeches-utils.test.ts (linha 72-75): adicionar
+      expect que assigned_invited toContain 'assigned_not_invited'.
+      (4) Atualizar testes em src/__tests__/phase03-speech-lifecycle.test.ts
+      se necessario (testes usam VALID_TRANSITIONS diretamente, verificacao
+      automatica de todas as transicoes).
+    files:
+      - "src/components/StatusChangeModal.tsx"
+      - "src/hooks/useSpeeches.ts"
+      - "src/__tests__/useSpeeches-utils.test.ts"
+      - "src/__tests__/phase03-speech-lifecycle.test.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "STATUS_INDICATOR_COLORS exportado de StatusChangeModal.tsx"
+      - "VALID_TRANSITIONS.assigned_invited inclui 'assigned_not_invited'"
+      - "isValidTransition('assigned_invited', 'assigned_not_invited') retorna true"
+      - "getAvailableStatuses('assigned_invited') inclui 'assigned_not_invited'"
+      - "Testes em useSpeeches-utils.test.ts atualizados e passando"
+      - "Testes em phase03-speech-lifecycle.test.ts passando (verificacao automatica)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que assigned_invited -> assigned_not_invited e transicao valida"
+      - type: unit
+        description: "Verificar que getAvailableStatuses('assigned_invited') inclui assigned_not_invited"
+    covers:
+      acceptance_criteria: ["AC-F051-04"]
+      edge_cases: []
+    risks:
+      - risk: "StatusChangeModal em SpeechSlot tambem mostra opcao assigned_not_invited para assigned_invited"
+        mitigation: "Isso e desejavel - consistencia entre os dois pontos de interacao (ARCH_M016)"
+      - risk: "Testes de contagem de transicoes falham (3 -> 4)"
+        mitigation: "Atualizar testes no mesmo step"
+
+  # =========================================================================
+  # STEP-06: F051 - Adicionar i18n keys para 'Ver conversa'
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Adicionar nova key de internacionalizacao para o label "Ver conversa"
+      do dropdown de F051. A key sera 'home.viewConversation'.
+      (1) src/i18n/locales/pt-BR.json: adicionar "viewConversation":
+      "Ver conversa" dentro do bloco "home".
+      (2) src/i18n/locales/en.json: adicionar "viewConversation":
+      "View conversation" dentro do bloco "home".
+      (3) src/i18n/locales/es.json: adicionar "viewConversation":
+      "Ver conversacion" dentro do bloco "home".
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "pt-BR.json contem home.viewConversation = 'Ver conversa'"
+      - "en.json contem home.viewConversation = 'View conversation'"
+      - "es.json contem home.viewConversation = 'Ver conversacion'"
+      - "Nenhuma key existente alterada ou removida"
+      - "JSON valido (sem erros de parse)"
+    tests:
+      - type: unit
+        description: "Verificar que t('home.viewConversation') retorna valor correto em cada idioma"
+    covers:
+      acceptance_criteria: ["AC-F051-02"]
+      edge_cases: []
+    risks:
+      - risk: "JSON invalido apos edicao manual"
+        mitigation: "Verificar com JSON.parse ou linter apos salvar"
+
+  # =========================================================================
+  # STEP-07: F051 - Criar componente InviteActionDropdown
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Criar novo componente src/components/InviteActionDropdown.tsx seguindo
+      o padrao visual do StatusChangeModal.tsx. O componente e um Modal
+      transparente com overlay (tap fora fecha) e card central com
+      borderRadius 12. Titulo: nome do discursante (speech.speaker_name).
+      5 opcoes renderizadas como lista fixa:
+      1. Ver conversa (WhatsAppIcon + t('home.viewConversation')) -> onOpenWhatsApp
+      2. Designado/Confirmado (LED verde + t('speechStatus.assigned_confirmed')) -> changeStatus
+      3. Designado/Nao-Convidado (LED amarelo + t('speechStatus.assigned_not_invited')) -> changeStatus
+      4. Desistiu (LED vermelho + t('speechStatus.gave_up')) -> changeStatus
+      5. Cancelar (t('common.cancel')) -> onClose
+      Props: { visible, speech, onOpenWhatsApp, onChangeStatus, onClose }.
+      Importar STATUS_INDICATOR_COLORS de StatusChangeModal (exportado no STEP-05).
+      Opcao 'Ver conversa' desabilitada quando speech?.speaker_phone e null.
+      Usar mesmos estilos de overlay, content, optionRow, indicator do
+      StatusChangeModal para consistencia visual.
+      Importar WhatsAppIcon (ou redefinir inline) para a opcao 'Ver conversa'.
+    files:
+      - "src/components/InviteActionDropdown.tsx"
+    dependencies: ["STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Arquivo InviteActionDropdown.tsx criado em src/components/"
+      - "Modal com overlay transparente (tap fora fecha)"
+      - "Card com borderRadius 12, backgroundColor colors.card"
+      - "Titulo: speech.speaker_name exibido"
+      - "5 opcoes renderizadas com indicador visual (LED/icon + texto)"
+      - "Opcao 'Ver conversa' usa WhatsAppIcon + label traduzido"
+      - "Opcao 'Ver conversa' desabilitada quando speaker_phone e null"
+      - "Opcoes de status usam STATUS_INDICATOR_COLORS importado"
+      - "Opcao 'Cancelar' fecha o modal"
+      - "Cores do tema via useTheme()"
+      - "Labels traduzidos via useTranslation()"
+      - "Dark mode e light mode funcionam corretamente"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que InviteActionDropdown renderiza 5 opcoes"
+      - type: unit
+        description: "Verificar que opcao 'Ver conversa' e desabilitada sem speaker_phone"
+      - type: unit
+        description: "Verificar que tap fora fecha o dropdown (overlay onPress -> onClose)"
+      - type: unit
+        description: "Verificar que cada opcao chama callback correto"
+    covers:
+      acceptance_criteria: ["AC-F051-02", "AC-F051-03", "AC-F051-05", "AC-F051-06", "AC-F051-07", "AC-F051-08"]
+      edge_cases: ["EC-F051-01", "EC-F051-02", "EC-F051-03"]
+    risks:
+      - risk: "Estilos do dropdown divergem do StatusChangeModal"
+        mitigation: "Copiar valores de estilo diretamente do StatusChangeModal (overlay, content, indicator)"
+
+  # =========================================================================
+  # STEP-08: F051 - Integrar InviteActionDropdown na InviteManagementSection
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Em src/components/InviteManagementSection.tsx, integrar o
+      InviteActionDropdown criado no STEP-07:
+      (1) Importar InviteActionDropdown.
+      (2) Adicionar state: const [dropdownSpeech, setDropdownSpeech] =
+      useState<Speech | null>(null).
+      (3) Refatorar handleInvitedAction: remover Alert.alert() completo.
+      Substituir por setDropdownSpeech(speech). O handler agora apenas
+      seta o state e o InviteActionDropdown e renderizado condicionalmente.
+      (4) Remover import de Alert de react-native (se nao mais usado em
+      nenhum outro lugar deste arquivo).
+      (5) Criar callbacks: handleDropdownWhatsApp (mesma logica do Alert
+      anterior: buildWhatsAppUrl + openWhatsApp + fechar dropdown),
+      handleDropdownStatusChange (changeStatus.mutate + fechar dropdown).
+      (6) Renderizar <InviteActionDropdown visible={!!dropdownSpeech}
+      speech={dropdownSpeech} onOpenWhatsApp={handleDropdownWhatsApp}
+      onChangeStatus={handleDropdownStatusChange}
+      onClose={() => setDropdownSpeech(null)} /> antes do </View> final.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: ["STEP-04", "STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "InviteActionDropdown importado"
+      - "State dropdownSpeech adicionado (useState<Speech | null>)"
+      - "handleInvitedAction nao usa mais Alert.alert"
+      - "handleInvitedAction seta dropdownSpeech ao inves de Alert"
+      - "Import de Alert removido de react-native (se nao mais usado)"
+      - "handleDropdownWhatsApp callback criado (abre WhatsApp + fecha dropdown)"
+      - "handleDropdownStatusChange callback criado (muda status + fecha dropdown)"
+      - "InviteActionDropdown renderizado condicionalmente (visible={!!dropdownSpeech})"
+      - "Botao de tres pontinhos (STEP-04) agora abre o dropdown"
+      - "Todas as 5 opcoes do dropdown funcionam corretamente"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que Alert.alert nao e mais chamado em handleInvitedAction"
+      - type: unit
+        description: "Verificar que InviteActionDropdown e renderizado quando dropdownSpeech e setado"
+      - type: unit
+        description: "Verificar que dropdown fecha (setDropdownSpeech(null)) apos acao"
+    covers:
+      acceptance_criteria: ["AC-F051-01", "AC-F051-04"]
+      edge_cases: []
+    risks:
+      - risk: "Alert ainda e usado em outro lugar do arquivo"
+        mitigation: "Verificar todos os usos de Alert antes de remover o import"
+
+  # =========================================================================
+  # STEP-09: Testes consolidados Batch 8 Phase 2 (F050-F054)
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Criar arquivo de testes src/__tests__/batch8-phase2.test.ts com testes
+      para todas as 5 features deste batch:
+      (1) F050: Verificar que botoes de acao usam icones (WhatsAppIcon e
+      Unicode U+22EE) ao inves de texto. Verificar accessibilityLabel.
+      (2) F051: Verificar que InviteActionDropdown renderiza com 5 opcoes.
+      Verificar que Alert.alert nao e usado. Verificar transicao reversa
+      assigned_invited -> assigned_not_invited.
+      (3) F052: Verificar que segunda linha contem label completo
+      ("{position}o Discurso - LED StatusName"). Verificar StatusLED inline.
+      (4) F053: Verificar que bishopric tem 'home:invite_mgmt'. Verificar
+      que observer NAO tem.
+      (5) F054: Verificar que gap da row e 12 e fontSize do removeButton
+      e 24 no SpeechSlot.
+      Atualizar testes existentes que possam ser impactados pelas mudancas.
+    files:
+      - "src/__tests__/batch8-phase2.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch8-phase2.test.ts criado"
+      - "Testes cobrem F050 (icones de botoes + accessibility)"
+      - "Testes cobrem F051 (dropdown + transicao reversa + sem Alert)"
+      - "Testes cobrem F052 (segunda linha completa + LED inline)"
+      - "Testes cobrem F053 (permissao bishopric)"
+      - "Testes cobrem F054 (gap + fontSize do SpeechSlot)"
+      - "pnpm test roda sem falha em TODOS os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch8 phase2 (F050-F054)"
+    covers:
+      acceptance_criteria: ["AC-F050-01", "AC-F050-02", "AC-F050-05", "AC-F051-01", "AC-F051-07", "AC-F052-01", "AC-F052-02", "AC-F052-03", "AC-F053-01", "AC-F053-04", "AC-F054-01", "AC-F054-02"]
+      edge_cases: ["EC-F050-01", "EC-F051-01", "EC-F052-01", "EC-F053-01", "EC-F054-01"]
+    risks:
+      - risk: "Mocking de react-native-svg para testes do WhatsAppIcon"
+        mitigation: "Mock simples: jest.mock('react-native-svg', () => ({ Svg: 'Svg', Path: 'Path' }))"
+
+  # =========================================================================
+  # STEP-10: Documentacao do projeto (CODE_LEDGER, project-status)
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 8 Phase 2
+      (F050-F054) com arquivos impactados.
+      (2) .devteam/project-status.yaml - marcar phase 2 como completed,
+      atualizar current_agent para "completed".
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - adicionar PLAN_P016, atualizar
+      version (5) e changelog. Mover CRs 105/106/107/110/111 de
+      pending_with_plan (se existirem) para historico.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch8 phase2"
+      - "project-status.yaml phase 2 marcada como completed"
+      - "PLAN_CONSOLIDATED atualizado com PLAN_P016 (version 5)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F050 ACs ---
+  - ac_id: AC-F050-01
+    how_to_verify: "Botao isNotInvited renderiza WhatsAppIcon (SVG ou componente) ao inves de texto 'WhatsApp'"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F050-02
+    how_to_verify: "Botao !isNotInvited renderiza Unicode U+22EE (vertical ellipsis) ao inves de t('speeches.changeStatus')"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+  - ac_id: AC-F050-03
+    how_to_verify: "onPress do botao WhatsApp (icone) chama handleNotInvitedAction (mesma funcionalidade)"
+    covered_by_steps: ["STEP-04"]
+  - ac_id: AC-F050-04
+    how_to_verify: "onPress do botao tres pontinhos chama handleInvitedAction (agora seta dropdownSpeech)"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F050-05
+    how_to_verify: "Ambos botoes tem accessibilityLabel descritivo (WhatsApp / changeStatus)"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+
+  # --- F051 ACs ---
+  - ac_id: AC-F051-01
+    how_to_verify: "Alert.alert NAO e chamado em handleInvitedAction (removido, substituido por dropdown)"
+    covered_by_steps: ["STEP-08", "STEP-09"]
+  - ac_id: AC-F051-02
+    how_to_verify: "Dropdown tem opcao 'Ver conversa' com WhatsAppIcon e label traduzido"
+    covered_by_steps: ["STEP-06", "STEP-07", "STEP-09"]
+  - ac_id: AC-F051-03
+    how_to_verify: "Dropdown tem opcao 'Designado/Confirmado' com indicator verde"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F051-04
+    how_to_verify: "Dropdown tem opcao 'Designado/Nao-Convidado' com indicator amarelo. Transicao valida em VALID_TRANSITIONS"
+    covered_by_steps: ["STEP-05", "STEP-07", "STEP-08"]
+  - ac_id: AC-F051-05
+    how_to_verify: "Dropdown tem opcao 'Desistiu' com indicator vermelho"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F051-06
+    how_to_verify: "Dropdown tem opcao 'Cancelar' que fecha sem alterar status"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F051-07
+    how_to_verify: "Dropdown e Modal customizado (nao Alert nativo)"
+    covered_by_steps: ["STEP-07", "STEP-09"]
+  - ac_id: AC-F051-08
+    how_to_verify: "Dropdown mostra speech.speaker_name como titulo"
+    covered_by_steps: ["STEP-07"]
+
+  # --- F052 ACs ---
+  - ac_id: AC-F052-01
+    how_to_verify: "Segunda linha usa t('speeches.slot') para label completo (ex: '1o Discurso')"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+  - ac_id: AC-F052-02
+    how_to_verify: "StatusLED renderizado inline com size 10 na segunda linha"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+  - ac_id: AC-F052-03
+    how_to_verify: "Nome do status traduzido (t('speechStatus.*')) visivel apos LED"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+  - ac_id: AC-F052-04
+    how_to_verify: "Formato completo: 'No Discurso - LED StatusName' exibido"
+    covered_by_steps: ["STEP-03"]
+  - ac_id: AC-F052-05
+    how_to_verify: "LED tem tamanho 10px (menor que 16px padrao) para caber inline"
+    covered_by_steps: ["STEP-03"]
+
+  # --- F053 ACs ---
+  - ac_id: AC-F053-01
+    how_to_verify: "hasPermission('bishopric', 'home:invite_mgmt') retorna true"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F053-02
+    how_to_verify: "InviteManagementSection visivel para bishopric (guard passa)"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F053-03
+    how_to_verify: "InviteManagementSection continua visivel para secretary"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F053-04
+    how_to_verify: "Observer NAO ve InviteManagementSection (guard bloqueia)"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F053-05
+    how_to_verify: "Bispado ve ambas secoes: NextAssignmentsSection e InviteManagementSection"
+    covered_by_steps: ["STEP-01"]
+
+  # --- F054 ACs ---
+  - ac_id: AC-F054-01
+    how_to_verify: "gap da row em SpeechSlot.tsx e 12 (era 8)"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F054-02
+    how_to_verify: "fontSize do removeButton em SpeechSlot.tsx e 24 (era 20)"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F054-03
+    how_to_verify: "hitSlop permanece adequado (8 ou mais)"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F054-04
+    how_to_verify: "Layout da row nao quebra com espaco maior (field flex:1 + numberOfLines 1)"
+    covered_by_steps: ["STEP-02"]

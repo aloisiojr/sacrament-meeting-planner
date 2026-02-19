@@ -60,6 +60,16 @@ export function InviteActionDropdown({
 
   const hasPhone = !!speech?.speaker_phone;
 
+  const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
+    'assigned_not_invited',
+    'assigned_invited',
+    'assigned_confirmed',
+    'gave_up',
+  ];
+  const statusOptions = ALL_ASSIGNED_STATUSES.filter(
+    (s) => s !== speech?.status
+  );
+
   return (
     <Modal
       visible={visible}
@@ -92,65 +102,28 @@ export function InviteActionDropdown({
             </Text>
           </Pressable>
 
-          {/* Option 2: Assigned/Confirmed */}
-          <Pressable
-            style={styles.optionRow}
-            onPress={() => {
-              if (speech) {
-                onChangeStatus(speech.id, 'assigned_confirmed');
-              }
-            }}
-          >
-            <View
-              style={[
-                styles.indicator,
-                { backgroundColor: STATUS_INDICATOR_COLORS.assigned_confirmed },
-              ]}
-            />
-            <Text style={[styles.optionLabel, { color: colors.text }]}>
-              {t('speechStatus.assigned_confirmed')}
-            </Text>
-          </Pressable>
-
-          {/* Option 3: Assigned/Not invited (reverse transition) */}
-          <Pressable
-            style={styles.optionRow}
-            onPress={() => {
-              if (speech) {
-                onChangeStatus(speech.id, 'assigned_not_invited');
-              }
-            }}
-          >
-            <View
-              style={[
-                styles.indicator,
-                { backgroundColor: STATUS_INDICATOR_COLORS.assigned_not_invited },
-              ]}
-            />
-            <Text style={[styles.optionLabel, { color: colors.text }]}>
-              {t('speechStatus.assigned_not_invited')}
-            </Text>
-          </Pressable>
-
-          {/* Option 4: Gave up */}
-          <Pressable
-            style={styles.optionRow}
-            onPress={() => {
-              if (speech) {
-                onChangeStatus(speech.id, 'gave_up');
-              }
-            }}
-          >
-            <View
-              style={[
-                styles.indicator,
-                { backgroundColor: STATUS_INDICATOR_COLORS.gave_up },
-              ]}
-            />
-            <Text style={[styles.optionLabel, { color: colors.text }]}>
-              {t('speechStatus.gave_up')}
-            </Text>
-          </Pressable>
+          {/* Dynamic status options (all assigned statuses except current) */}
+          {statusOptions.map((statusOption) => (
+            <Pressable
+              key={statusOption}
+              style={styles.optionRow}
+              onPress={() => {
+                if (speech) {
+                  onChangeStatus(speech.id, statusOption);
+                }
+              }}
+            >
+              <View
+                style={[
+                  styles.indicator,
+                  { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
+                ]}
+              />
+              <Text style={[styles.optionLabel, { color: colors.text }]}>
+                {t(`speechStatus.${statusOption}`)}
+              </Text>
+            </Pressable>
+          ))}
 
           {/* Option 5: Cancel */}
           <Pressable

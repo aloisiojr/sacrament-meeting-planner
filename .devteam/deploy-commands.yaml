@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 2
-last_updated: "2026-02-18T08:55:00"
+version: 3
+last_updated: "2026-02-18T19:10:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -33,6 +33,17 @@ services:
             -d '{"query": "<SQL_HERE>"}'
         when: "Quando porta 5432/6543 estiver bloqueada pelo firewall (ex: sandbox)"
         notes: "Usa HTTPS (porta 443) via Management API. Token fica no macOS Keychain."
+
+      - name: "Verificar SECURITY DEFINER em funcao"
+        command: |
+          SQL="SELECT proname, prosecdef FROM pg_proc WHERE proname = '<FUNCTION_NAME>';"
+        when: "Validar que migration de SECURITY DEFINER foi aplicada"
+        notes: "prosecdef=true significa SECURITY DEFINER ativo"
+
+      - name: "Verificar triggers de uma tabela"
+        command: |
+          SQL="SELECT trigger_name, event_manipulation, action_statement FROM information_schema.triggers WHERE trigger_name = '<TRIGGER_NAME>';"
+        when: "Validar que trigger esta corretamente associado"
 
       - name: "Verificar constraints de uma tabela"
         command: |
@@ -123,6 +134,10 @@ troubleshooting:
     solution: "Projeto usa migrations manuais, nao tem tracking table. Migrations devem ser aplicadas manualmente e validadas com queries de verificacao."
     notes: "Tables de migration existentes: auth.schema_migrations, realtime.schema_migrations, storage.migrations"
 
+  - problem: "SQL com $$ dollar quoting falha via JSON/curl"
+    solution: "Usar python3 com raw strings (r\"\"\"...\"\"\") para gerar JSON corretamente. Evitar escaping manual de $$ em shell."
+    command: "python3 -c 'import json; sql=r\"\"\"<SQL>\"\"\"; print(json.dumps({\"query\": sql}))' > /tmp/query.json && curl ... -d @/tmp/query.json"
+
 deploy_history:
   - date: "2026-02-18"
     action: "Migration 012_drop_members_phone_unique_constraint.sql"
@@ -131,3 +146,15 @@ deploy_history:
     result: "Sucesso - constraint members_ward_id_country_code_phone_key removida"
     verified: true
     cr: "CR-78"
+
+  - date: "2026-02-18"
+    action: "Migration 013_fix_notification_trigger_security_definer.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - enqueue_speech_notification() agora usa SECURITY DEFINER (prosecdef=true)"
+    verified: true
+    cr: "CR-91"
+    verification:
+      - "pg_proc.prosecdef = true para enqueue_speech_notification"
+      - "Trigger speech_notification_trigger ainda ativo em INSERT e UPDATE"
+      - "REST API health check: HTTP 200"

@@ -1,7 +1,8 @@
 # =============================================================================
 # QA_CONSOLIDATED.yaml
 # Consolidated QA results for CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90,
-# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98
+# CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98,
+# CR-94, CR-96, CR-97, CR-99, CR-100 (PRE)
 # Updated: 2026-02-18
 # =============================================================================
 
@@ -2692,3 +2693,352 @@ batch7_phase1_cross_cutting:
     evidence: |
       All fixes use existing code patterns. No package.json changes.
       New migration file follows existing migration numbering convention (013).
+
+
+# #############################################################################
+# BATCH 7 PHASE 2 - PRE VALIDATION
+# CR-94, CR-96, CR-97, CR-99, CR-100
+# #############################################################################
+
+batch7_phase2_pre:
+  batch: 7
+  phase: 2
+  type: feature_request
+  features: [F040, F041, F042, F043, F044]
+  change_requests: [CR-94, CR-96, CR-97, CR-99, CR-100]
+  qa_plan_ref: "docs/qa/QA_PLAN_batch7_phase2.yaml"
+  pre_validation_timestamp: "2026-02-18"
+  pre_validation_status: passed
+  baseline_tests: "57 test files, 2789/2789 tests passed"
+
+  cr_94_f040:
+    title: "WhatsApp template with speech position, topic, and link"
+    type: feature_request
+    pre_status: validated
+    finding: |
+      Template already includes {posicao}, {colecao}, {titulo}, {link} placeholders.
+      User wants to CHANGE the default template text. Development needed to update
+      DEFAULT_TEMPLATE_PT_BR to the desired format.
+    validation_checks_count: 7
+    must_pass_count: 5
+
+  cr_96_f041:
+    title: "Search fields fixed at top filling available space"
+    type: feature_request
+    pre_status: validated
+    finding: |
+      Modal-based selectors already have search fixed at top. Settings screens
+      (members, topics) have search that scrolls with content. Development needed
+      to fix search at top in settings screens.
+    validation_checks_count: 6
+    must_pass_count: 4
+
+  cr_97_f042:
+    title: "Multi-select for Reconhecendo a Presenca"
+    type: feature_request
+    pre_status: validated
+    finding: |
+      Database supports string[] but current UI replaces array with single selection.
+      Development needed to implement multi-select toggle behavior in ActorSelector
+      or create new multi-select component.
+    validation_checks_count: 7
+    must_pass_count: 5
+
+  cr_99_f043:
+    title: "Speech labels Orador -> Discurso"
+    type: feature_request
+    pre_status: validated
+    finding: |
+      Currently labels show 'Orador'/'Speaker'/'Orador' in pt-BR/en/es. Need to
+      change to 'Discurso'/'Speech'/'Discurso'. Used in AgendaForm and
+      usePresentationMode. Must be careful with i18n key reuse.
+    validation_checks_count: 6
+    must_pass_count: 4
+
+  cr_100_f044:
+    title: "Read-only speaker field with edit icon for last-minute swap"
+    type: feature_request
+    pre_status: validated
+    finding: |
+      Feature does not exist. Speaker fields are currently simple clickable selectors.
+      Full development needed: read-only display, edit icon, manual text input,
+      X icon for revert, original value tracking.
+    validation_checks_count: 8
+    must_pass_count: 6
+
+
+# #############################################################################
+# BATCH 7 PHASE 2 - POST VALIDATION
+# CR-94, CR-96, CR-97, CR-99, CR-100
+# #############################################################################
+
+batch7_phase2_post:
+  batch: 7
+  phase: 2
+  type: feature_request
+  features: [F040, F041, F042, F043, F044]
+  change_requests: [CR-94, CR-96, CR-97, CR-99, CR-100]
+  qa_plan_ref: "docs/qa/QA_PLAN_batch7_phase2.yaml"
+  post_validation_timestamp: "2026-02-18"
+  post_validation_status: passed
+  verdict: passed
+  final_tests: "58 test files, 2923/2923 tests passed (was 57/2789 at baseline)"
+  new_tests_added: 134
+  commits_validated: 18
+
+  # ---------------------------------------------------------------------------
+  # F040 / CR-94: WhatsApp template with speech position, topic, and link
+  # ---------------------------------------------------------------------------
+  f040_cr94:
+    title: "WhatsApp template with speech position, topic, and link"
+    verdict: passed
+    checks:
+      VC-040-01:
+        status: PASS
+        evidence: "whatsappUtils.ts:8-9 - DEFAULT_TEMPLATE_PT_BR includes {posicao}"
+      VC-040-02:
+        status: PASS
+        evidence: "whatsappUtils.ts:8-9 - DEFAULT_TEMPLATE_PT_BR includes {titulo}"
+      VC-040-03:
+        status: PASS
+        evidence: "whatsappUtils.ts:8-9 - DEFAULT_TEMPLATE_PT_BR includes {link}"
+      VC-040-04:
+        status: PASS
+        evidence: "resolveTemplate replaces all 6 placeholders. 58 test files pass including whatsapp tests."
+      VC-040-05:
+        status: PASS
+        evidence: "whatsapp.tsx:19-26 - PLACEHOLDERS array has all 6: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}"
+      VC-040-06:
+        status: PASS
+        evidence: |
+          Template text clearly includes position, topic, and link.
+          NEW: DEFAULT_TEMPLATE_EN (line 12) and DEFAULT_TEMPLATE_ES (line 14) added.
+          getDefaultTemplate() function (line 21-31) selects template by language.
+          buildWhatsAppUrl() accepts language param (line 75, default 'pt-BR').
+          InviteManagementSection.tsx passes locale to buildWhatsAppUrl (line 60, 92, 102).
+      VC-040-07:
+        status: PASS
+        evidence: "58 test files, 2923 tests pass. New tests in batch7-f040-f044.test.ts cover getDefaultTemplate and buildWhatsAppUrl language param."
+
+  # ---------------------------------------------------------------------------
+  # F041 / CR-96: Search fields fixed at top
+  # ---------------------------------------------------------------------------
+  f041_cr96:
+    title: "Search fields fixed at top filling available space"
+    verdict: passed
+    checks:
+      VC-041-01:
+        status: PASS
+        evidence: |
+          members.tsx:552-559 - SearchInput in searchContainer OUTSIDE and ABOVE the FlatList (line 607).
+          Layout: header -> description -> searchContainer -> csvActions -> FlatList.
+          SearchInput is NOT inside ScrollView/FlatList, so it stays fixed while list scrolls.
+      VC-041-02:
+        status: PASS
+        evidence: |
+          topics.tsx:399-405 - SearchInput in searchContainer OUTSIDE and ABOVE the ScrollView (line 408).
+          Layout: header -> description -> sectionHeader -> searchContainer -> ScrollView.
+          SearchInput is NOT inside ScrollView, so it stays fixed while content scrolls.
+      VC-041-03:
+        status: PASS
+        evidence: |
+          SearchInput component itself has height:40 and fills container width.
+          In ActorSelector: searchInput style has flex:1 (line 304).
+          In AgendaForm HymnSelector: searchInput style has flex:1 (line 869).
+          In settings screens: SearchInput fills searchContainer via full width.
+      VC-041-04:
+        status: PASS
+        evidence: |
+          ActorSelector: closeBtn at right of searchRow (line 215-217).
+          HymnSelectorModal: sheetCloseBtn at right of sheetSearchRow (line 728-730).
+          MemberSelectorModal/TopicSelectorModal: already have close buttons.
+          Settings screens: no close button needed (have back button in header).
+      VC-041-05:
+        status: PASS
+        evidence: |
+          SearchInput.tsx:44 - renders clear X Pressable when value.length > 0.
+          Calls onChangeText('') on press (line 48). Clear button works correctly.
+      VC-041-06:
+        status: PASS
+        evidence: "58 test files, 2923 tests pass. No search-related regressions."
+
+  # ---------------------------------------------------------------------------
+  # F042 / CR-97: Multi-select for Reconhecendo a Presenca
+  # ---------------------------------------------------------------------------
+  f042_cr97:
+    title: "Multi-select for Reconhecendo a Presenca"
+    verdict: passed
+    checks:
+      VC-042-01:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:444-451 - When field === 'recognizing':
+            const current = agenda?.recognized_names ?? [];
+            const exists = current.includes(actor.name);
+            const updated = exists ? current.filter(n => n !== actor.name) : [...current, actor.name];
+            updateField('recognized_names', updated.length > 0 ? updated : null);
+          This is proper toggle (add/remove) behavior instead of replacing the array.
+      VC-042-02:
+        status: PASS
+        evidence: "AgendaForm.tsx:193 - value={agenda.recognized_names?.join(', ') || ''} displays comma-separated list."
+      VC-042-03:
+        status: PASS
+        evidence: |
+          ActorSelector.tsx:146 - const isSelected = multiSelect && selectedNames?.includes(item.name);
+          ActorSelector.tsx:163 - Renders checkmark prefix: {isSelected ? '\u2713 ' : ''}{item.name}
+          Selected actors show a checkmark indicator.
+      VC-042-04:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:447-448 - Toggle logic: if actor already in array, it's filtered out.
+          const exists = current.includes(actor.name);
+          const updated = exists ? current.filter(n => n !== actor.name) : [...current, actor.name];
+      VC-042-05:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:450 - updateField('recognized_names', updated.length > 0 ? updated : null);
+          Saves full array via updateAgenda.mutate which persists to DB.
+          When all removed, saves null.
+      VC-042-06:
+        status: PASS
+        evidence: |
+          usePresentationMode.ts:80-86 - recognized_names.join(', ') used in presentation cards.
+          No changes needed; array join works for any number of names.
+      VC-042-07:
+        status: PASS
+        evidence: "58 test files, 2923 tests pass. Agenda tests updated for multi-select."
+
+  # ---------------------------------------------------------------------------
+  # F043 / CR-99: Speech labels Orador -> Discurso
+  # ---------------------------------------------------------------------------
+  f043_cr99:
+    title: "Change speech labels from Orador to Discurso"
+    verdict: passed
+    checks:
+      VC-043-01:
+        status: PASS
+        evidence: |
+          pt-BR.json:188 - "speaker": "Discurso" (was "Orador").
+          AgendaForm.tsx:325,334,378 - Uses t('speeches.speaker') in labels.
+          Labels now render as "1o Discurso", "2o Discurso", "3o Discurso" in pt-BR.
+      VC-043-02:
+        status: PASS
+        evidence: |
+          en.json:188 - "speaker": "Speech" (was "Speaker").
+          Labels render as "1st Speech", "2nd Speech", "3rd Speech" in English.
+      VC-043-03:
+        status: PASS
+        evidence: |
+          es.json:188 - "speaker": "Discurso" (was "Orador").
+          Labels render as "1er Discurso", "2do Discurso", "3er Discurso" in Spanish.
+      VC-043-04:
+        status: PASS
+        evidence: |
+          usePresentationMode.ts:139-140,162 - Uses t('speeches.speaker') in presentation cards.
+          Since i18n values changed, presentation labels now show "Discurso"/"Speech"/"Discurso".
+      VC-043-05:
+        status: PASS
+        evidence: |
+          All usages of t('speeches.speaker') are in:
+          - AgendaForm.tsx (3 usages, lines 325, 334, 378)
+          - usePresentationMode.ts (3 usages, lines 139, 140, 162)
+          - phase04-agenda-presentation.test.ts (1 usage, line 320)
+          - batch7-f040-f044.test.ts (multiple test checks)
+          No other usages found. All references correctly resolve to "Discurso"/"Speech".
+      VC-043-06:
+        status: PASS
+        evidence: "58 test files, 2923 tests pass. Tests updated for new label values."
+
+  # ---------------------------------------------------------------------------
+  # F044 / CR-100: Read-only speaker field with edit icon for last-minute swap
+  # ---------------------------------------------------------------------------
+  f044_cr100:
+    title: "Read-only speaker field with edit icon for last-minute swap"
+    verdict: passed
+    checks:
+      VC-044-01:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:631-653 - SpeakerField in read-only mode:
+          Renders speakerReadRow with speakerReadText (read-only Text, not Pressable).
+          Name is displayed as non-editable text via Text component (line 633-641).
+          Not clickable by default (no onPress on the row).
+      VC-044-02:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:642-646 - Pencil icon rendered when hasSpeaker && !disabled:
+          <Pressable hitSlop={12} onPress={handleStartEdit}>
+            <Text style={speakerIcon}>{'\u270F'}</Text>
+          </Pressable>
+          Unicode U+270F is the pencil/edit icon.
+      VC-044-03:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:593-596 - handleStartEdit sets isEditing=true:
+          setEditValue(displayName); setIsEditing(true);
+          Line 616-630: When isEditing is true, renders TextInput instead of read-only view.
+      VC-044-04:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:618-626 - TextInput in edit mode:
+          value={editValue}, onChangeText={setEditValue}, autoFocus.
+          On submit/blur, handleSave stores override via onEditOverride(trimmed).
+          Lines 598-607: handleSave calls onEditOverride with trimmed value.
+      VC-044-05:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:647-651 - X icon appears when hasOverride && !disabled:
+          hasOverride = overrideName !== null && overrideName !== speakerName (line 590).
+          <Pressable hitSlop={12} onPress={handleRevert}>
+            <Text style={[speakerIcon, {color: colors.error}]}>{'\u2716'}</Text>
+          </Pressable>
+          Unicode U+2716 is the X icon, rendered in error color (red).
+      VC-044-06:
+        status: PASS
+        evidence: |
+          AgendaForm.tsx:609-612 - handleRevert:
+          onEditOverride(null); setIsEditing(false);
+          This clears the override, restoring original speaker_name from speech record.
+          Lines 328,337,381: onEditOverride calls updateField('speaker_N_override', name).
+          Setting to null removes override, falling back to speech.speaker_name.
+      VC-044-07:
+        status: PASS
+        evidence: |
+          MemberSelectorModal still exists and used for initial speaker assignment.
+          SpeakerField now shows read-only with edit icon (for override), but initial
+          assignment flow via speeches tab is unchanged.
+      VC-044-08:
+        status: PASS
+        evidence: |
+          58 test files, 2923 tests pass. New tests in batch7-f040-f044.test.ts validate
+          speaker_override fields in DB type, SpeakerField override rendering, presentation
+          mode override usage. No regressions.
+
+  # ---------------------------------------------------------------------------
+  # Additional verifications (SPEC acceptance criteria)
+  # ---------------------------------------------------------------------------
+  spec_verification:
+    AC-F040-01: PASS  # pt-BR template has all 6 placeholders
+    AC-F040-02: PASS  # DEFAULT_TEMPLATE_EN exists (whatsappUtils.ts:11-12)
+    AC-F040-03: PASS  # DEFAULT_TEMPLATE_ES exists (whatsappUtils.ts:14-15)
+    AC-F040-04: PASS  # buildWhatsAppUrl uses getDefaultTemplate(language) as fallback (line 90)
+    AC-F040-05: PASS  # resolveTemplate replaces all 6 placeholders (lines 49-58)
+    AC-F040-06: PASS  # All whatsapp tests pass
+    AC-F042-05: PASS  # Multi-select modal stays open (ActorSelector:70 - if !multiSelect then close)
+    AC-F042-09: PASS  # Single-select fields unaffected (multiSelect prop only set for recognizing)
+    AC-F044-07: PASS  # Override persisted via speaker_N_override fields in sunday_agendas
+    AC-F044-08: PASS  # usePresentationMode.ts:135-136,160 uses speaker_N_override ?? speech.speaker_name
+    AC-F044-09: PASS  # Pencil icon only shown when hasSpeaker && !disabled (observer check)
+    AC-F044-10: PASS  # Empty field shows label as placeholder, no pencil when !hasSpeaker
+
+  # ---------------------------------------------------------------------------
+  # DB migration verification
+  # ---------------------------------------------------------------------------
+  db_migration:
+    file: "supabase/migrations/014_add_speaker_overrides.sql"
+    verified: true
+    fields_added:
+      - "speaker_1_override TEXT DEFAULT NULL"
+      - "speaker_2_override TEXT DEFAULT NULL"
+      - "speaker_3_override TEXT DEFAULT NULL"
+    type_updated: "src/types/database.ts:199-201 - speaker_1/2/3_override: string | null"

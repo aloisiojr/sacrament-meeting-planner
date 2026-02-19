@@ -1,0 +1,563 @@
+# =============================================================================
+# PLAN_P014.yaml
+# Implementation Plan for Batch 7 Phase 2 - UX & Features
+# Features: F040, F041, F042, F043, F044
+# CRs: CR-94, CR-96, CR-97, CR-99, CR-100
+# Created: 2026-02-18
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implementar 5 melhorias de UX e features: templates WhatsApp i18n (F040),
+  search fixo no topo em members/topics (F041), multi-select no campo
+  Reconhecendo a Presenca (F042), labels de discurso Orador->Discurso (F043),
+  e campo read-only de discursante com troca de ultima hora (F044).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F043 - Alterar labels i18n (menor risco, zero dependencias)
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Alterar o valor da key 'speeches.speaker' nos 3 arquivos de locale:
+      pt-BR: 'Orador' -> 'Discurso', en: 'Speaker' -> 'Speech',
+      es: 'Orador' -> 'Discurso'. Atualizar testes existentes que verificam
+      o valor antigo da key. AgendaForm e usePresentationMode usam
+      t('speeches.speaker') e refletirao automaticamente o novo valor.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+      - "src/__tests__/phase04-agenda-presentation.test.ts"
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "pt-BR.json speeches.speaker == 'Discurso'"
+      - "en.json speeches.speaker == 'Speech'"
+      - "es.json speeches.speaker == 'Discurso'"
+      - "Testes atualizados refletem novo valor"
+      - "pnpm test roda sem falha nos testes afetados"
+    tests:
+      - type: unit
+        description: "Verificar que speeches.speaker retorna 'Discurso'/'Speech' nos 3 idiomas"
+    covers:
+      acceptance_criteria: ["AC-F043-01", "AC-F043-02", "AC-F043-03", "AC-F043-04", "AC-F043-05"]
+      edge_cases: ["EC-F043-01"]
+    risks:
+      - risk: "Algum uso oculto de speeches.speaker que deveria manter 'Orador'"
+        mitigation: "Busca no codebase confirmou que TODOS usos sao em Agenda/Presentation"
+
+  # =========================================================================
+  # STEP-02: F040 - Templates WhatsApp i18n
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Adicionar DEFAULT_TEMPLATE_EN e DEFAULT_TEMPLATE_ES em whatsappUtils.ts.
+      Criar funcao getDefaultTemplate(language) que retorna o template do
+      idioma (fallback para pt-BR). Alterar buildWhatsAppUrl com novo parametro
+      opcional 'language' (default 'pt-BR'). Quando template e vazio/null, usa
+      getDefaultTemplate(language). Atualizar re-export em whatsapp.ts.
+      Backward compatible: chamadas existentes sem language usam pt-BR.
+    files:
+      - "src/lib/whatsappUtils.ts"
+      - "src/lib/whatsapp.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "DEFAULT_TEMPLATE_EN exportado de whatsappUtils.ts com 6 placeholders"
+      - "DEFAULT_TEMPLATE_ES exportado de whatsappUtils.ts com 6 placeholders"
+      - "getDefaultTemplate('en') retorna DEFAULT_TEMPLATE_EN"
+      - "getDefaultTemplate('es') retorna DEFAULT_TEMPLATE_ES"
+      - "getDefaultTemplate('pt-BR') retorna DEFAULT_TEMPLATE_PT_BR"
+      - "getDefaultTemplate('fr') retorna DEFAULT_TEMPLATE_PT_BR (fallback)"
+      - "buildWhatsAppUrl sem language continua usando pt-BR (backward compatible)"
+      - "buildWhatsAppUrl com language='en' e template vazio usa DEFAULT_TEMPLATE_EN"
+      - "whatsapp.ts re-exporta novos exports"
+    tests:
+      - type: unit
+        description: "Testar getDefaultTemplate com cada idioma e fallback"
+      - type: unit
+        description: "Testar buildWhatsAppUrl com parametro language e sem"
+    covers:
+      acceptance_criteria: ["AC-F040-01", "AC-F040-02", "AC-F040-03", "AC-F040-04", "AC-F040-05", "AC-F040-06"]
+      edge_cases: ["EC-F040-02"]
+    risks:
+      - risk: "Chamadas existentes de buildWhatsAppUrl quebram com novo parametro"
+        mitigation: "Parametro e opcional com default 'pt-BR', backward compatible"
+
+  # =========================================================================
+  # STEP-03: F040 - Passar idioma da ala ao buildWhatsAppUrl
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Alterar InviteManagementSection.tsx para passar o idioma da ala (ward.language
+      ou getCurrentLanguage()) como ultimo parametro ao chamar buildWhatsAppUrl.
+      Quando ward.whatsapp_template e null/vazio, buildWhatsAppUrl usara o
+      template padrao do idioma da ala ao inves de sempre pt-BR. Quando
+      ward.whatsapp_template e preenchido (template customizado), ele continua
+      sendo usado independente do idioma.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "buildWhatsAppUrl chamado com 5o parametro (language) em InviteManagementSection"
+      - "Template customizado da ala continua tendo prioridade sobre padrao"
+      - "Testes existentes de whatsapp continuam passando"
+    tests:
+      - type: unit
+        description: "Verificar que buildWhatsAppUrl recebe language nas chamadas"
+    covers:
+      acceptance_criteria: ["AC-F040-04"]
+      edge_cases: ["EC-F040-01"]
+    risks:
+      - risk: "Ward language nao disponivel no contexto do componente"
+        mitigation: "getCurrentLanguage() do i18n e sempre disponivel; ward.language e acessivel via useAuth/useWard"
+
+  # =========================================================================
+  # STEP-04: F041 - SearchInput fixo no topo em members.tsx
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em members.tsx, o SearchInput esta dentro do layout scrollavel (abaixo do
+      header, description e csv actions). Reorganizar o layout para que o
+      SearchInput fique fora/acima do FlatList, fixo no topo do conteudo
+      scrollavel. O FlatList ja e o componente scrollavel principal. Mover
+      SearchInput para fora do fluxo scrollavel, posicionando-o entre os
+      elementos fixos (header, description, csv) e o FlatList scrollavel.
+      O SearchInput ja usa flex:1 implicitamente pelo container.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02"]
+    done_when:
+      - "SearchInput em members.tsx nao scrolla com a lista de membros"
+      - "SearchInput permanece visivel ao scrollar a lista"
+      - "SearchInput preenche espaco horizontal (dentro do container com paddingHorizontal)"
+      - "Botao X de limpar busca funciona normalmente"
+      - "Layout nao quebra com lista vazia"
+      - "Keyboard avoiding behavior preservado"
+    tests:
+      - type: unit
+        description: "Verificar que SearchInput esta fora do FlatList na arvore de componentes"
+    covers:
+      acceptance_criteria: ["AC-F041-01", "AC-F041-03", "AC-F041-04", "AC-F041-05"]
+      edge_cases: ["EC-F041-01"]
+    risks:
+      - risk: "Layout quebra com CSV actions e description acima do search"
+        mitigation: "Description e CSV permanecem fixos acima do search, tudo acima do FlatList"
+
+  # =========================================================================
+  # STEP-05: F041 - SearchInput fixo no topo em topics.tsx
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em topics.tsx, o SearchInput esta dentro de um ScrollView que contem
+      header, description, ward topics (com search e lista) e collections.
+      A tela usa ScrollView (nao FlatList) porque renderiza sections
+      heterogeneas. Mover SearchInput para fora do ScrollView ou usar
+      stickyHeaderIndices para mante-lo fixo. Como topics.tsx tem 2 sections
+      (ward topics + collections), a abordagem mais limpa e: (1) manter
+      header e description fora do ScrollView, (2) mover SearchInput para
+      fora do ScrollView, posicionando-o fixo, e (3) ScrollView contem
+      apenas o conteudo scrollavel (topics list + collections).
+    files:
+      - "src/app/(tabs)/settings/topics.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "SearchInput em topics.tsx nao scrolla com a lista de temas"
+      - "SearchInput permanece visivel ao scrollar"
+      - "SearchInput preenche espaco horizontal"
+      - "Texto explicativo (description) pode scrollar ou ficar fixo (acima do search)"
+      - "Section de collections continua scrollavel abaixo dos ward topics"
+      - "Botao X de limpar busca funciona normalmente"
+    tests:
+      - type: unit
+        description: "Verificar que SearchInput esta posicionado fora do ScrollView"
+    covers:
+      acceptance_criteria: ["AC-F041-02", "AC-F041-03", "AC-F041-04", "AC-F041-05", "AC-F041-06"]
+      edge_cases: ["EC-F041-01", "EC-F041-02"]
+    risks:
+      - risk: "ScrollView precisa de height fixa para o search ficar fora"
+        mitigation: "Container pai com flex:1, search fixo, ScrollView com flex:1"
+
+  # =========================================================================
+  # STEP-06: F042 - Multi-select mode no ActorSelector
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Adicionar 2 props opcionais ao ActorSelector: selectedNames (string[])
+      para indicar quais atores ja estao selecionados, e multiSelect (boolean)
+      para controlar o comportamento do modal. Quando multiSelect=true:
+      (1) handleSelect NAO chama handleClose (modal permanece aberto),
+      (2) renderItem mostra checkmark (U+2713) ao lado de atores cujo nome
+      esta em selectedNames, (3) handleAdd (criar ator) tambem nao fecha modal.
+      Quando multiSelect e false/undefined, comportamento atual inalterado.
+    files:
+      - "src/components/ActorSelector.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05"]
+    done_when:
+      - "ActorSelectorProps inclui selectedNames?: string[] e multiSelect?: boolean"
+      - "Quando multiSelect=true, modal nao fecha apos selecao"
+      - "Quando multiSelect=true, checkmark exibido ao lado de atores selecionados"
+      - "Quando multiSelect=false/undefined, modal fecha apos selecao (inalterado)"
+      - "Usos existentes de ActorSelector (presiding, conducting, etc.) inalterados"
+    tests:
+      - type: unit
+        description: "Testar que ActorSelector aceita novas props opcionais"
+      - type: unit
+        description: "Testar que checkmark aparece para atores em selectedNames"
+    covers:
+      acceptance_criteria: ["AC-F042-04", "AC-F042-05", "AC-F042-06", "AC-F042-09"]
+      edge_cases: []
+    risks:
+      - risk: "handleAdd em multiSelect deveria fechar modal apos criar ator novo"
+        mitigation: "Em multiSelect, handleAdd cria o ator e chama onSelect mas nao fecha"
+
+  # =========================================================================
+  # STEP-07: F042 - Toggle handler para recognized_names no AgendaForm
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      No AgendaForm, alterar o handler do campo 'recognizing' no ActorSelector
+      onSelect callback. Atualmente faz: updateField('recognized_names', [actor.name])
+      e setSelectorModal(null). Alterar para: (1) toggle add/remove do array
+      (se nome ja existe no array, remove; senao, adiciona), (2) NAO chamar
+      setSelectorModal(null) (modal permanece aberto para multi-select),
+      (3) passar selectedNames={agenda.recognized_names ?? []} e
+      multiSelect={true} ao ActorSelector para o campo 'recognizing'.
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "Selecionar ator nao selecionado adiciona ao array recognized_names"
+      - "Selecionar ator ja selecionado remove do array (toggle)"
+      - "Modal permanece aberto apos selecao"
+      - "selectedNames passado ao ActorSelector para indicador visual"
+      - "multiSelect=true passado ao ActorSelector para campo recognizing"
+      - "Outros campos de ator (presiding, conducting, etc.) inalterados"
+      - "recognized_names persiste no banco via updateField"
+    tests:
+      - type: unit
+        description: "Testar toggle logic: add e remove de nomes no array"
+      - type: unit
+        description: "Testar que campo recognizing usa multiSelect=true"
+    covers:
+      acceptance_criteria: ["AC-F042-01", "AC-F042-02", "AC-F042-03", "AC-F042-07", "AC-F042-08"]
+      edge_cases: ["EC-F042-01", "EC-F042-02", "EC-F042-03"]
+    risks:
+      - risk: "Race condition entre updateField chamadas rapidas"
+        mitigation: "updateField e debounced pelo auto-save pattern existente"
+
+  # =========================================================================
+  # STEP-08: F044 - Migracao DB para campos speaker_*_override
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Criar migracao 014_add_speaker_overrides.sql adicionando 3 campos
+      nullable TEXT na tabela sunday_agendas: speaker_1_override,
+      speaker_2_override, speaker_3_override. Campos com DEFAULT NULL.
+      Adicionar COMMENTs para documentacao. Atualizar tipo SundayAgenda
+      em database.ts com os 3 novos campos opcionais.
+    files:
+      - "supabase/migrations/014_add_speaker_overrides.sql"
+      - "src/types/database.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "014_add_speaker_overrides.sql criado com ALTER TABLE + COMMENTs"
+      - "SundayAgenda interface em database.ts inclui speaker_1_override, speaker_2_override, speaker_3_override como string | null"
+      - "RLS existente cobre novos campos automaticamente (mesma tabela)"
+    tests:
+      - type: unit
+        description: "Verificar que tipo SundayAgenda inclui os 3 novos campos"
+    covers:
+      acceptance_criteria: ["AC-F044-07"]
+      edge_cases: []
+    risks:
+      - risk: "Migracao precisa ser aplicada via Management API (porta 5432 bloqueada)"
+        mitigation: "Migracao criada no formato padrao Supabase, aplicada pelo pipeline normal"
+
+  # =========================================================================
+  # STEP-09: F044 - Reescrever SpeakerField com modo read-only e override
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Reescrever o sub-componente SpeakerField dentro de AgendaForm.tsx:
+      (1) Estado normal (read-only): mostra speakerName como texto nao-editavel,
+      icone de lapis (U+270F) a direita. Sem speakerName designado: mostra
+      placeholder, sem lapis. (2) Ao clicar lapis: campo se torna TextInput
+      editavel com valor atual, icone X (U+2716) a direita. (3) Ao clicar X:
+      reverte ao nome original (limpa override). (4) Override salvo via
+      updateField('speaker_N_override', name). (5) Observer: sem icone de lapis.
+      (6) Ler override de agenda.speaker_N_override e exibir override quando
+      existir (override ?? speakerName). Remover o MemberSelectorModal de
+      speaker (setSpeakerModalPosition) ja que SpeakerField nao abre mais modal.
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-07", "STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "SpeakerField mostra nome designado como read-only com icone lapis"
+      - "Clicar lapis ativa TextInput editavel"
+      - "TextInput editavel salva override via updateField"
+      - "Icone X visivel quando override difere do original"
+      - "Clicar X reverte ao nome original (override = null)"
+      - "Observer nao ve icone de lapis"
+      - "Campo vazio (sem designacao) mostra placeholder sem lapis"
+      - "speakerModalPosition e MemberSelectorModal de speaker removidos"
+      - "Override lido de agenda.speaker_N_override"
+    tests:
+      - type: unit
+        description: "Testar SpeakerField em modo read-only com e sem override"
+      - type: unit
+        description: "Testar toggle entre modo read-only e modo edicao"
+      - type: unit
+        description: "Testar que observer nao ve icone de lapis"
+    covers:
+      acceptance_criteria: ["AC-F044-01", "AC-F044-02", "AC-F044-03", "AC-F044-04", "AC-F044-05", "AC-F044-06", "AC-F044-07", "AC-F044-09", "AC-F044-10"]
+      edge_cases: ["EC-F044-01", "EC-F044-02", "EC-F044-03"]
+    risks:
+      - risk: "Auto-save dispara a cada caractere digitado no TextInput"
+        mitigation: "Usar DebouncedTextInput ou onBlur/onSubmitEditing para salvar override"
+
+  # =========================================================================
+  # STEP-10: F044 - usePresentationMode usa override quando existir
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Em usePresentationMode.ts, alterar buildPresentationCards para usar
+      agenda.speaker_N_override ?? speech.speaker_name nas 3 posicoes de
+      discurso. Quando override existe (nao null), o nome exibido no modo
+      apresentacao e o override. Quando null, exibe o nome original da
+      tabela speeches. Afeta os labels das posicoes 1, 2 e 3.
+    files:
+      - "src/hooks/usePresentationMode.ts"
+    dependencies: ["STEP-08"]
+    parallelizable_with: ["STEP-09"]
+    done_when:
+      - "buildPresentationCards usa agenda.speaker_1_override ?? speech1.speaker_name"
+      - "buildPresentationCards usa agenda.speaker_2_override ?? speech2.speaker_name"
+      - "buildPresentationCards usa agenda.speaker_3_override ?? speech3.speaker_name"
+      - "Quando override e null, exibe speech.speaker_name (comportamento atual)"
+      - "Quando override existe, exibe o override"
+    tests:
+      - type: unit
+        description: "Testar buildPresentationCards com e sem overrides"
+      - type: unit
+        description: "Testar que override null preserva comportamento atual"
+    covers:
+      acceptance_criteria: ["AC-F044-08"]
+      edge_cases: []
+    risks:
+      - risk: "Agenda nao tem os campos de override carregados"
+        mitigation: "useAgenda faz SELECT * da sunday_agendas, novos campos incluidos automaticamente"
+
+  # =========================================================================
+  # STEP-11: Testes consolidados de todas as features
+  # =========================================================================
+
+  - id: STEP-11
+    description: >
+      Criar arquivo de testes batch7-phase2.test.ts com testes para:
+      (1) F040: getDefaultTemplate por idioma, buildWhatsAppUrl com language,
+      (2) F041: estrutura do layout (SearchInput fora do scroll) via leitura
+      de source files, (3) F042: toggle logic do recognized_names,
+      ActorSelector com selectedNames e multiSelect props,
+      (4) F043: verificacao dos valores das keys i18n,
+      (5) F044: SpeakerField props e estados, buildPresentationCards com override,
+      tipo SundayAgenda com novos campos. Atualizar testes existentes que
+      verificam o antigo label 'speaker' ou templates.
+    files:
+      - "src/__tests__/batch7-phase2.test.ts"
+      - "src/__tests__/whatsapp-utils.test.ts"
+      - "src/__tests__/cr004-f004-error-handling.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09", "STEP-10"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch7-phase2.test.ts criado com testes para F040-F044"
+      - "Testes de whatsapp-utils.test.ts atualizados para novos exports"
+      - "pnpm test roda sem falhas em todos os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch7 phase2"
+      - type: integration
+        description: "buildPresentationCards com dados de agenda contendo overrides"
+    covers:
+      acceptance_criteria: ["AC-F040-06", "AC-F042-08", "AC-F043-05"]
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes quebram com mudancas de export"
+        mitigation: "Atualizar imports e asserts em testes existentes no mesmo commit"
+
+  # =========================================================================
+  # STEP-12: Documentacao do projeto (CODE_LEDGER, project-status)
+  # =========================================================================
+
+  - id: STEP-12
+    description: >
+      Atualizar docs/code/CODE_LEDGER.yaml com os commits de Batch 7 Phase 2
+      (F040-F044). Atualizar .devteam/project-status.yaml marcando phase 2
+      como completed e atualizando os artifacts. Atualizar
+      docs/plans/PLAN_CONSOLIDATED.yaml adicionando PLAN_P014.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+    dependencies: ["STEP-11"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch7 phase2"
+      - "project-status.yaml atualizado"
+      - "PLAN_CONSOLIDATED atualizado com PLAN_P014"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F040 ACs ---
+  - ac_id: AC-F040-01
+    how_to_verify: "Ler DEFAULT_TEMPLATE_PT_BR e verificar 6 placeholders presentes"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F040-02
+    how_to_verify: "Ler DEFAULT_TEMPLATE_EN e verificar 6 placeholders presentes"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F040-03
+    how_to_verify: "Ler DEFAULT_TEMPLATE_ES e verificar 6 placeholders presentes"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F040-04
+    how_to_verify: "Chamar buildWhatsAppUrl com template vazio e language='en', verificar que usa template ingles"
+    covered_by_steps: ["STEP-02", "STEP-03"]
+  - ac_id: AC-F040-05
+    how_to_verify: "Chamar resolveTemplate com template e verificar que todos 6 placeholders sao substituidos"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F040-06
+    how_to_verify: "pnpm test -- whatsapp roda sem falha"
+    covered_by_steps: ["STEP-02", "STEP-11"]
+
+  # --- F041 ACs ---
+  - ac_id: AC-F041-01
+    how_to_verify: "SearchInput em members.tsx esta fora do FlatList (posicionado acima)"
+    covered_by_steps: ["STEP-04"]
+  - ac_id: AC-F041-02
+    how_to_verify: "SearchInput em topics.tsx esta fora do ScrollView (posicionado acima)"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F041-03
+    how_to_verify: "SearchInput containers usam paddingHorizontal 16 (preenche espaco)"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-F041-04
+    how_to_verify: "SearchInput tem botao X que limpa busca e restaura lista"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-F041-05
+    how_to_verify: "KeyboardAvoidingView envolve o layout, search permanece visivel"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-F041-06
+    how_to_verify: "Selectors modais nao foram alterados (verificar que arquivos nao mudaram)"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  # --- F042 ACs ---
+  - ac_id: AC-F042-01
+    how_to_verify: "Selecionar ator nao presente em recognized_names adiciona ao array"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F042-02
+    how_to_verify: "Selecionar ator ja presente em recognized_names remove do array"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F042-03
+    how_to_verify: "Campo mostra nomes separados por ', ' (join ja existente)"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F042-04
+    how_to_verify: "Atores selecionados tem checkmark no ActorSelector"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F042-05
+    how_to_verify: "Modal nao fecha apos selecao quando multiSelect=true"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F042-06
+    how_to_verify: "Modal fecha ao clicar overlay ou botao fechar"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F042-07
+    how_to_verify: "updateField('recognized_names', array) persiste array completo"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F042-08
+    how_to_verify: "buildPresentationCards usa recognized_names.join(', ') (sem mudanca)"
+    covered_by_steps: ["STEP-07", "STEP-11"]
+  - ac_id: AC-F042-09
+    how_to_verify: "Campos presiding, conducting, etc. nao passam multiSelect"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  # --- F043 ACs ---
+  - ac_id: AC-F043-01
+    how_to_verify: "pt-BR.json speeches.speaker == 'Discurso'"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F043-02
+    how_to_verify: "en.json speeches.speaker == 'Speech'"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F043-03
+    how_to_verify: "es.json speeches.speaker == 'Discurso'"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F043-04
+    how_to_verify: "usePresentationMode usa t('speeches.speaker') que agora retorna 'Discurso'"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F043-05
+    how_to_verify: "Busca por t('speeches.speaker') retorna apenas usos em AgendaForm e usePresentationMode"
+    covered_by_steps: ["STEP-01", "STEP-11"]
+
+  # --- F044 ACs ---
+  - ac_id: AC-F044-01
+    how_to_verify: "SpeakerField mostra speakerName como texto nao-editavel"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-02
+    how_to_verify: "Icone lapis (U+270F) visivel a direita do nome"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-03
+    how_to_verify: "Clicar lapis transforma campo em TextInput editavel"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-04
+    how_to_verify: "TextInput permite digitar nome e salva override"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-05
+    how_to_verify: "Icone X visivel quando override difere do original"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-06
+    how_to_verify: "Clicar X reverte nome e limpa override (null)"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-07
+    how_to_verify: "Override salvo em speaker_N_override via updateField"
+    covered_by_steps: ["STEP-08", "STEP-09"]
+  - ac_id: AC-F044-08
+    how_to_verify: "buildPresentationCards usa override quando existir"
+    covered_by_steps: ["STEP-10"]
+  - ac_id: AC-F044-09
+    how_to_verify: "Observer nao ve icone de lapis (isObserver=true)"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-F044-10
+    how_to_verify: "Campo vazio sem designacao mostra placeholder, sem lapis"
+    covered_by_steps: ["STEP-09"]

@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-18"
-  total_features: 38
+  total_features: 43
   total_change_requests: 100
-  implemented_crs: 90
-  pending_crs: 10
+  implemented_crs: 95
+  pending_crs: 5
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -32,6 +32,7 @@ metadata:
     - docs/specs/SPEC_F027_F031.yaml
     - docs/specs/SPEC_F032_F034.yaml
     - docs/specs/SPEC_F035_F039.yaml
+    - docs/specs/SPEC_F040_F044.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -230,7 +231,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 90 CRs, 78 implementados)
+# FEATURES (estado atual apos 100 CRs, 95 implementados)
 # =============================================================================
 
 features:
@@ -718,6 +719,97 @@ features:
       - "Completa integracao que CR-74 iniciou"
 
   # ---------------------------------------------------------------------------
+  # Batch 7 Phase 2 (F040-F044) - UX & Features
+  # ---------------------------------------------------------------------------
+
+  - id: F040
+    name: "Update default WhatsApp invitation template (i18n)"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar templates padrao de convite WhatsApp por idioma (en, es alem do
+      pt-BR existente). Ao gerar convite sem template customizado, usar o template
+      do idioma da ala como default. Template existente pt-BR ja inclui todos os
+      6 placeholders ({nome}, {data}, {posicao}, {colecao}, {titulo}, {link}).
+    modified_by_crs: [94]
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
+    notes:
+      - "CR-94: Trocar template padrao para incluir posicao, tema e link"
+      - "Template pt-BR atual ja satisfaz; melhoria e templates i18n"
+      - "Novos exports: DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES"
+      - "buildWhatsAppUrl agora aceita idioma da ala como parametro"
+
+  - id: F041
+    name: "Search fields fixed at top in Settings screens"
+    status: pending
+    rfs: []
+    description: >
+      Fixar campos de busca (SearchInput) no topo das telas de Settings de
+      Membros e Temas, para que nao scrollem junto com o conteudo. Os selectors
+      modais (MemberSelectorModal, TopicSelectorModal, ActorSelector,
+      HymnSelectorModal) ja implementam esse padrao corretamente.
+    modified_by_crs: [96]
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
+    notes:
+      - "CR-96: Campos de busca fixos no topo com espaco preenchido"
+      - "Fix necessario apenas em members.tsx e topics.tsx (Settings)"
+      - "Modais ja tem search fixo no header"
+
+  - id: F042
+    name: "Multi-select for Reconhecendo a Presenca field"
+    status: pending
+    rfs: []
+    description: >
+      Permitir selecao multipla de nomes no campo 'Reconhecendo a Presenca' da
+      agenda. Atualmente cada selecao substitui a anterior. O banco de dados ja
+      suporta array (string[]). Implementar toggle (add/remove) no handler de
+      selecao, indicador visual no ActorSelector, e manter modal aberto para
+      permitir selecoes adicionais.
+    modified_by_crs: [97]
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
+    notes:
+      - "CR-97: Campo Reconhecendo deve permitir selecao multipla"
+      - "DB ja suporta array (recognized_names: string[])"
+      - "ActorSelector precisa de modo multi-select"
+      - "Modal nao fecha apos selecao no modo multi-select"
+
+  - id: F043
+    name: "Change speech labels from Orador to Discurso"
+    status: pending
+    rfs: []
+    description: >
+      Alterar labels de discursantes na edicao de agenda e Modo Apresentacao
+      de '1o Orador'/'2o Orador'/'3o Orador' para '1o Discurso'/'2o Discurso'/
+      '3o Discurso'. Alterar i18n key 'speeches.speaker' de 'Orador' para
+      'Discurso' (pt-BR), 'Speaker' para 'Speech' (en), 'Orador' para
+      'Discurso' (es).
+    modified_by_crs: [99]
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
+    notes:
+      - "CR-99: Labels '1o Orador' -> '1o Discurso' na agenda"
+      - "Afeta AgendaForm.tsx e usePresentationMode.ts"
+      - "Alterar valor da i18n key speeches.speaker nos 3 idiomas"
+      - "Nao afeta aba Discursos (usa keys diferentes)"
+
+  - id: F044
+    name: "Read-only speaker field with last-minute swap"
+    status: pending
+    rfs: []
+    description: >
+      Campos de discursante na aba Agenda passam a ser read-only por padrao,
+      mostrando o nome designado. Icone de lapis permite 'Troca de Ultima Hora':
+      campo vira TextInput manual. Icone X reverte ao nome original designado.
+      Override persistido em novos campos speaker_*_override na tabela
+      sunday_agendas. Nao altera a designacao na tabela speeches.
+    modified_by_crs: [100]
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
+    notes:
+      - "CR-100: Campo discursante read-only com icone de edicao"
+      - "Nova migracao DB: speaker_1/2/3_override em sunday_agendas"
+      - "Override nao altera tabela speeches (extensao do snapshot pattern)"
+      - "Modo Apresentacao usa override quando existir"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
   # ---------------------------------------------------------------------------
 
@@ -876,126 +968,63 @@ features:
       - "CR-22: Tornou descricoes human-readable"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (10 CRs pendentes de implementacao - Batch 7)
+# PENDING CHANGE REQUESTS (5 CRs pendentes de implementacao - Batch 7 Phase 2)
 # =============================================================================
 
 pending_crs:
-
-  # --- Batch 7 Phase 1 (Bug Fixes) ---
-
-  - id: 91
-    type: bug_critical
-    area: "Push Notifications (F017)"
-    feature_id: F035
-    spec_file: "docs/specs/SPEC_F035_F039.yaml"
-    related_crs: []
-    description: >
-      Erro RLS policy ao designar orador: trigger enqueue_speech_notification()
-      nao usa SECURITY DEFINER. INSERT em notification_queue bloqueado.
-    acceptance_criteria:
-      - "Funcao trigger usa SECURITY DEFINER"
-      - "notification_queue permanece sem policies de client"
-      - "Nenhum erro ao designar orador"
-    files_likely_impacted:
-      - supabase/migrations/003_notification_triggers.sql
-
-  - id: 92
-    type: bug
-    area: "Members (F003)"
-    feature_id: F036
-    spec_file: "docs/specs/SPEC_F035_F039.yaml"
-    related_crs: [85]
-    description: >
-      Duplicate key error no dropdown de paises. keyExtractor usa item.code
-      mas +1 (US/Canada) e +7 (Russia/Kazakhstan) sao duplicados.
-    acceptance_criteria:
-      - "keyExtractor usa item.label (unico)"
-      - "Sem warning de duplicate key no console"
-    files_likely_impacted:
-      - src/app/(tabs)/settings/members.tsx
-
-  - id: 93
-    type: bug
-    area: "Auth/Invitations (F001, F018)"
-    feature_id: F037
-    spec_file: "docs/specs/SPEC_F035_F039.yaml"
-    related_crs: []
-    description: >
-      Deep link protocol deve ser sacrmeetman:// ao inves de wardmanager://.
-    acceptance_criteria:
-      - "app.json scheme e 'sacrmeetman'"
-      - "Edge Function gera sacrmeetman://invite/${token}"
-      - "Nenhuma referencia a wardmanager:// no codigo"
-    files_likely_impacted:
-      - app.json
-      - supabase/functions/create-invitation/index.ts
-
-  - id: 95
-    type: bug
-    area: "Speeches (F007, F008)"
-    feature_id: F038
-    spec_file: "docs/specs/SPEC_F035_F039.yaml"
-    related_crs: [6, 7, 56]
-    description: >
-      Ao mudar tipo de domingo de 'Discursos' para outro, campos de
-      designacao de discursantes nao somem. Usa isExcludedFromAgenda()
-      que so filtra 2 de 6 tipos.
-    acceptance_criteria:
-      - "Speech slots visiveis SOMENTE quando tipo e 'speeches'"
-      - "Todos os outros tipos escondem speech slots"
-    files_likely_impacted:
-      - src/app/(tabs)/speeches.tsx
-
-  - id: 98
-    type: bug
-    area: "Agenda (F012, F015)"
-    feature_id: F039
-    spec_file: "docs/specs/SPEC_F035_F039.yaml"
-    related_crs: [74]
-    description: >
-      Campos de oracao de abertura e fechamento nao sao clicaveis.
-      PrayerSelector nao recebe prop 'visible' para auto-abrir modal.
-    acceptance_criteria:
-      - "Clicar no campo de oracao abre modal imediatamente"
-      - "PrayerSelector aceita props visible + onClose"
-      - "Padrao consistente com ActorSelector"
-    files_likely_impacted:
-      - src/components/PrayerSelector.tsx
-      - src/components/AgendaForm.tsx
 
   # --- Batch 7 Phase 2 (Features & UX) ---
 
   - id: 94
     type: ui
     area: "WhatsApp Template (F010, F024)"
+    feature_id: F040
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
     related_crs: [14, 63]
     description: >
-      Trocar template padrao de convite WhatsApp para incluir posicao do
-      discurso, tema e link.
+      Adicionar templates padrao de convite WhatsApp por idioma (en, es).
+      Template pt-BR existente ja satisfaz requisitos. Melhoria: usar
+      template do idioma da ala como default.
+    acceptance_criteria:
+      - "Templates padrao existem para pt-BR, en, es"
+      - "buildWhatsAppUrl usa template do idioma da ala como fallback"
+      - "Todos os 6 placeholders presentes em todos os templates"
     files_likely_impacted:
-      - src/lib/whatsappTemplate.ts
-      - src/i18n/locales/pt-BR.json
-      - src/i18n/locales/en.json
-      - src/i18n/locales/es.json
+      - src/lib/whatsappUtils.ts
+      - src/lib/whatsapp.ts
 
   - id: 96
     type: ux
-    area: "Search fields"
+    area: "Search fields (Settings)"
+    feature_id: F041
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
     related_crs: [39, 84]
     description: >
-      Campos de busca (membros, temas, atores) devem ser fixos no topo e
-      preencher espaco disponivel, com botao fechar a direita.
+      Campos de busca em Settings de Membros e Temas devem ser fixos no topo,
+      nao scrollar com o conteudo. Selectors modais ja implementam corretamente.
+    acceptance_criteria:
+      - "SearchInput em members.tsx fixo acima do ScrollView/FlatList"
+      - "SearchInput em topics.tsx fixo acima do ScrollView/FlatList"
+      - "flex:1 para preencher espaco horizontal"
     files_likely_impacted:
-      - src/components/SearchInput.tsx
-      - src/components/ActorSelector.tsx
-      - src/components/MemberSelectorModal.tsx
+      - src/app/(tabs)/settings/members.tsx
+      - src/app/(tabs)/settings/topics.tsx
 
   - id: 97
     type: feature
     area: "Agenda (F012, F013)"
+    feature_id: F042
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
     related_crs: [73]
     description: >
       Campo 'Reconhecendo a Presenca' deve permitir selecao multipla de nomes.
+      Toggle (add/remove) no handler, indicador visual no ActorSelector,
+      modal permanece aberto para selecoes adicionais.
+    acceptance_criteria:
+      - "Selecionar ator adiciona ao array (toggle)"
+      - "Atores selecionados indicados visualmente no modal"
+      - "Modal nao fecha apos selecao"
+      - "Array completo salvo em recognized_names"
     files_likely_impacted:
       - src/components/AgendaForm.tsx
       - src/components/ActorSelector.tsx
@@ -1003,12 +1032,18 @@ pending_crs:
   - id: 99
     type: ui
     area: "Agenda (F012)"
+    feature_id: F043
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
     related_crs: [29, 69]
     description: >
       Trocar labels dos discursos na edicao de agenda: '1o Orador' para
-      '1o Discurso' (idem 2o e 3o).
+      '1o Discurso' (idem 2o e 3o). Alterar i18n key speeches.speaker.
+    acceptance_criteria:
+      - "pt-BR: '1o Discurso', '2o Discurso', '3o Discurso'"
+      - "en: '1st Speech', '2nd Speech', '3rd Speech'"
+      - "es: '1er Discurso', '2do Discurso', '3er Discurso'"
+      - "Modo Apresentacao tambem usa labels atualizados"
     files_likely_impacted:
-      - src/components/AgendaForm.tsx
       - src/i18n/locales/pt-BR.json
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
@@ -1016,13 +1051,24 @@ pending_crs:
   - id: 100
     type: feature
     area: "Agenda (F012)"
+    feature_id: F044
+    spec_file: "docs/specs/SPEC_F040_F044.yaml"
     related_crs: [26]
     description: >
       Campo de discursante read-only com icone de edicao para 'Troca de
-      Ultima Hora' - campo texto manual, icone X para reverter ao
-      designado original.
+      Ultima Hora'. Campo texto manual, icone X para reverter ao designado
+      original. Override persistido em sunday_agendas (novos campos).
+    acceptance_criteria:
+      - "Campo mostra nome designado como read-only"
+      - "Icone lapis permite modo edicao (TextInput)"
+      - "Icone X reverte ao nome original"
+      - "Override persistido em sunday_agendas (speaker_*_override)"
+      - "Modo Apresentacao usa override quando existir"
     files_likely_impacted:
       - src/components/AgendaForm.tsx
+      - src/hooks/usePresentationMode.ts
+      - src/types/database.ts
+      - supabase/migrations/ (nova migracao)
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -1326,6 +1372,58 @@ design_decisions:
       e HymnSelectorModal (visible prop). AgendaForm passa visible={true}
       ao renderizar PrayerSelector via selectorModal state.
 
+  - id: DD-32
+    title: "Default WhatsApp template por idioma da ala"
+    decided_in: CR-94
+    decision: >
+      Templates padrao de convite WhatsApp existem para cada idioma suportado:
+      DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES.
+      buildWhatsAppUrl recebe idioma da ala e usa template correspondente como
+      fallback quando template customizado da ala e null/vazio. Anteriormente,
+      sempre usava pt-BR independente do idioma.
+    superseded:
+      - "Sempre usar DEFAULT_TEMPLATE_PT_BR como fallback (comportamento anterior)"
+
+  - id: DD-33
+    title: "Search fixo no topo em telas de Settings (members, topics)"
+    decided_in: CR-96
+    decision: >
+      Nas telas de gerenciamento de Membros e Temas em Settings, o SearchInput
+      e posicionado fora do ScrollView/FlatList, fixo no topo da area de
+      conteudo. A lista scrollavel fica abaixo. Textos explicativos (F026, F033)
+      scrollam junto com o conteudo. Selectors modais ja implementam esse padrao.
+
+  - id: DD-34
+    title: "Multi-select para Reconhecendo a Presenca (toggle add/remove)"
+    decided_in: CR-97
+    decision: >
+      O campo 'Reconhecendo a Presenca' usa ActorSelector em modo multi-select:
+      selecionar ator que nao esta no array adiciona; selecionar ator que ja esta
+      remove (toggle). Modal nao fecha automaticamente apos selecao. Atores
+      selecionados tem indicador visual (checkmark ou background). Outros campos
+      de ator (presidir, dirigir, pianista, regente) continuam single-select.
+
+  - id: DD-35
+    title: "Labels de discurso na agenda: 'Discurso' (nao 'Orador')"
+    decided_in: CR-99
+    decision: >
+      Na edicao de agenda e Modo Apresentacao, labels de discursantes sao
+      '1o Discurso', '2o Discurso', '3o Discurso' (pt-BR). Implementado via
+      alteracao do valor da i18n key 'speeches.speaker' de 'Orador' para
+      'Discurso'. Todos os usos dessa key sao em contexto de Agenda.
+    superseded:
+      - "Labels '1o Orador', '2o Orador', '3o Orador' (anteriores)"
+
+  - id: DD-36
+    title: "Speaker override para troca de ultima hora (campos em sunday_agendas)"
+    decided_in: CR-100
+    decision: >
+      A tabela sunday_agendas recebe campos speaker_1_override, speaker_2_override,
+      speaker_3_override (nullable text). Quando preenchido, o override substitui
+      o speaker_name da tabela speeches na exibicao da agenda e Modo Apresentacao.
+      O override NAO altera a tabela speeches. Icone lapis ativa modo edicao,
+      icone X reverte ao nome original. Extensao do snapshot pattern (DD-05).
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -1474,6 +1572,31 @@ business_rules:
     origin: CR-98
     notes: "Padrao consistente: componente recebe visible={true} e abre modal imediatamente"
 
+  - id: BR-33
+    rule: "Template padrao de WhatsApp varia por idioma da ala (pt-BR, en, es)"
+    origin: CR-94
+    notes: "buildWhatsAppUrl recebe idioma e seleciona template correspondente como fallback"
+
+  - id: BR-34
+    rule: "SearchInput em telas de Settings (Members, Topics) fixo no topo, fora do ScrollView"
+    origin: CR-96
+    notes: "Selectors modais ja implementam esse padrao. Fix apenas em telas fullscreen de Settings."
+
+  - id: BR-35
+    rule: "Campo 'Reconhecendo a Presenca' usa selecao multipla (toggle add/remove no array)"
+    origin: CR-97
+    notes: "Modal permanece aberto. Outros campos de ator (presidir, dirigir, etc.) continuam single-select."
+
+  - id: BR-36
+    rule: "Labels de discurso na agenda sao 'Discurso'/'Speech' (nao 'Orador'/'Speaker')"
+    origin: CR-99
+    supersedes: "Labels anteriores '1o Orador', '2o Orador', '3o Orador'"
+
+  - id: BR-37
+    rule: "Troca de ultima hora de discursante usa override na sunday_agendas, NAO altera speeches"
+    origin: CR-100
+    notes: "Campos speaker_*_override nullable. Quando null, exibe speaker_name da tabela speeches."
+
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
 # =============================================================================
@@ -1556,7 +1679,8 @@ data_model:
       unique_constraints: ["(ward_id, sunday_date)"]
       notes: >
         Atores armazenados como snapshot (nome) + FK opcional. Oracoes: member_id
-        para membros, null + name para nomes customizados (CR-74).
+        para membros, null + name para nomes customizados (CR-74). Override de
+        discursante para troca de ultima hora: speaker_*_override (CR-100).
 
     - name: device_push_tokens
       description: "Tokens de push notification por dispositivo"
@@ -1571,7 +1695,7 @@ data_model:
     - name: invitations
       description: "Convites por link para novos usuarios"
       key_columns: [id, ward_id, email, role, token, expires_at, used_at, created_by]
-      notes: "Token unico. Deep link: wardmanager://invite/{token}. Expira em 30 dias."
+      notes: "Token unico. Deep link: sacrmeetman://invite/{token}. Expira em 30 dias."
 
     - name: activity_log
       description: "Historico de acoes (audit log)"
@@ -1723,7 +1847,8 @@ cr_history:
 
   batch_7:
     range: "CR-91 a CR-100"
-    status: "10 pendentes (91-100), Fase 1 em progresso (91, 92, 93, 95, 98)"
+    status: "5 implementadas (91, 92, 93, 95, 98), 5 pendentes (94, 96, 97, 99, 100)"
     files:
       - "docs/specs/SPEC_F035_F039.yaml (CR-91, 92, 93, 95, 98 - Fase 1: Bug Fixes)"
-    summary: "RLS policy fix, duplicate key fix, deep link protocol change, speech fields visibility fix, prayer fields clickable fix, WhatsApp template update, search fields UX, multi-select recognizing, agenda speaker labels, last-minute speaker change"
+      - "docs/specs/SPEC_F040_F044.yaml (CR-94, 96, 97, 99, 100 - Fase 2: UX & Features)"
+    summary: "Fase 1 (implementada): RLS policy fix, duplicate key fix, deep link protocol, speech fields visibility, prayer fields clickable. Fase 2 (pendente): WhatsApp template i18n, search fields layout, multi-select recognizing, agenda speech labels, last-minute speaker swap."

@@ -4,7 +4,7 @@
 # CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98,
 # CR-94, CR-96, CR-97, CR-99, CR-100 (PRE),
 # CR-101, CR-102, CR-103, CR-104, CR-108, CR-109 (PRE+POST),
-# CR-105, CR-106, CR-107, CR-110, CR-111 (PRE)
+# CR-105, CR-106, CR-107, CR-110, CR-111 (PRE+POST)
 # Updated: 2026-02-18
 # =============================================================================
 
@@ -3527,6 +3527,65 @@ cr_105:
       No icon library installed - project uses Unicode/emoji for all icons.
       Feature does not exist. 4 must_pass + 1 should_pass checks planned.
 
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "phase-002"
+    verdict: passed
+
+    reviewer_verdict: approved
+    tester_verdict: approved
+    tester_tests_passed: 3061
+    tester_tests_total: 3061
+
+    must_pass_results:
+      - id: CR105-VC-01
+        description: "WhatsApp button shows WhatsApp icon instead of text 'WhatsApp'"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:37-46 defines WhatsAppIcon component using
+          react-native-svg (Svg + Path). Lines 207-208 render <WhatsAppIcon size={18}
+          color={colors.onPrimary} /> for isNotInvited branch. No literal 'WhatsApp'
+          text appears in the button.
+
+      - id: CR105-VC-02
+        description: "Status change button shows three-dots (ellipsis) icon instead of text"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:210-217 renders Unicode '\u22EE' (vertical
+          ellipsis) character for invited status. The t('speeches.changeStatus') text
+          is no longer rendered in the button. The actionIcon style has fontSize 18.
+
+      - id: CR105-VC-03
+        description: "WhatsApp icon button retains original onPress behavior"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:199-203: onPress calls handleNotInvitedAction(speech)
+          when isNotInvited is true. handleNotInvitedAction (lines 71-97) still calls
+          buildWhatsAppUrl, openWhatsApp, and changeStatus.mutate to 'assigned_invited'.
+
+      - id: CR105-VC-04
+        description: "Three-dots button retains status change behavior"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:199-203: onPress calls handleInvitedAction(speech)
+          when isNotInvited is false. handleInvitedAction (lines 99-103) sets
+          dropdownSpeech state which opens InviteActionDropdown component.
+
+    should_pass_results:
+      - id: CR105-VC-05
+        description: "Buttons have appropriate accessibility labels"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:204-205: accessibilityRole="button" and
+          accessibilityLabel={isNotInvited ? 'WhatsApp' : t('speeches.changeStatus')}
+          Both buttons have meaningful labels for screen readers.
+
+    summary: |
+      All 4 must_pass and 1 should_pass checks passed. WhatsApp SVG icon replaces
+      text, vertical ellipsis replaces status text, behaviors retained, accessibility
+      labels present.
+
 # #############################################################################
 # CR-106: Replace Alert with custom dropdown for status actions (F051)
 # #############################################################################
@@ -3548,6 +3607,90 @@ cr_106:
       'Ver conversa' and 'Designado/Nao-Convidado' (reset to not-invited).
       Feature does not exist. 6 must_pass + 1 should_pass checks planned.
 
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "phase-002"
+    verdict: passed
+
+    reviewer_verdict: approved
+    tester_verdict: approved
+    tester_tests_passed: 3061
+    tester_tests_total: 3061
+
+    must_pass_results:
+      - id: CR106-VC-01
+        description: "Alert.alert is no longer used for invited speech status change"
+        status: PASSED
+        evidence: |
+          Grep for 'Alert' in InviteManagementSection.tsx returns 0 matches.
+          Alert is NOT imported from react-native (line 9-14: View, Text, StyleSheet,
+          Pressable only). handleInvitedAction (lines 99-103) now calls
+          setDropdownSpeech(speech) to open the InviteActionDropdown modal component.
+
+      - id: CR106-VC-02
+        description: "Custom dropdown contains 'Ver conversa' option"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:78-93 renders 'Ver conversa' option with WhatsApp
+          icon. Uses t('home.viewConversation') i18n key. pt-BR.json has
+          "viewConversation": "Ver conversa", en.json has "View conversation",
+          es.json has "Ver conversacion". onPress calls onOpenWhatsApp(speech).
+
+      - id: CR106-VC-03
+        description: "Custom dropdown contains 'Designado/Confirmado' option"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:96-113 renders option with green indicator
+          (STATUS_INDICATOR_COLORS.assigned_confirmed) and label
+          t('speechStatus.assigned_confirmed'). onPress calls
+          onChangeStatus(speech.id, 'assigned_confirmed').
+
+      - id: CR106-VC-04
+        description: "Custom dropdown contains 'Designado/Nao-Convidado' option"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:116-133 renders option with yellow indicator
+          (STATUS_INDICATOR_COLORS.assigned_not_invited) and label
+          t('speechStatus.assigned_not_invited'). onPress calls
+          onChangeStatus(speech.id, 'assigned_not_invited'). This is a NEW option
+          not present in the old Alert. VALID_TRANSITIONS in useSpeeches.ts line 62
+          supports assigned_invited -> assigned_not_invited.
+
+      - id: CR106-VC-05
+        description: "Custom dropdown contains 'Desistiu' option"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:136-153 renders option with red indicator
+          (STATUS_INDICATOR_COLORS.gave_up) and label t('speechStatus.gave_up').
+          onPress calls onChangeStatus(speech.id, 'gave_up').
+
+      - id: CR106-VC-06
+        description: "Custom dropdown contains 'Cancelar' option (close/dismiss)"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx:156-163 renders cancel button with
+          t('common.cancel') label. onPress calls onClose() which dismisses
+          the dropdown without status change. Also, overlay Pressable (line 70)
+          onPress={onClose} allows tapping outside to dismiss.
+
+    should_pass_results:
+      - id: CR106-VC-07
+        description: "Custom dropdown is visually styled (not native Alert)"
+        status: PASSED
+        evidence: |
+          InviteActionDropdown.tsx uses React Native Modal (line 64) with
+          transparent background. Content has borderRadius: 12 (line 179),
+          backgroundColor: colors.card, elevation: 5, shadow styling (lines 184-187).
+          Follows the visual pattern of StatusChangeModal. Imports
+          STATUS_INDICATOR_COLORS from StatusChangeModal for consistency.
+
+    summary: |
+      All 6 must_pass and 1 should_pass checks passed. Alert.alert completely
+      replaced by custom InviteActionDropdown modal. All 5 options present:
+      Ver conversa (WhatsApp), Designado/Confirmado, Designado/Nao-Convidado (new),
+      Desistiu, Cancelar. VALID_TRANSITIONS updated to support reverse transition.
+
 # #############################################################################
 # CR-107: Show speech position + LED + status name in second line (F052)
 # #############################################################################
@@ -3567,6 +3710,61 @@ cr_107:
       shows "{position}o" (e.g. "1o"). No StatusLED component rendered, no
       status name text. User wants "1o Discurso - <LED> <status name>".
       Feature does not exist. 3 must_pass + 1 should_pass checks planned.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "phase-002"
+    verdict: passed
+
+    reviewer_verdict: approved
+    tester_verdict: approved
+    tester_tests_passed: 3061
+    tester_tests_total: 3061
+
+    must_pass_results:
+      - id: CR107-VC-01
+        description: "Second line shows speech position label (e.g. '1o Discurso')"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:179-181 renders speechNum Text with
+          t('speeches.slot', { number: `${speech.position}\u00BA` }) which produces
+          "1o Discurso", "2o Discurso", etc. using the speeches.slot i18n key.
+
+      - id: CR107-VC-02
+        description: "Second line includes StatusLED component"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:21 imports StatusLED from './StatusLED'.
+          Line 185 renders <StatusLED status={speech.status} size={10} /> inline
+          in the speechInfoRow View (flexDirection: 'row', alignItems: 'center').
+          Size is 10px, appropriate for inline text rendering.
+
+      - id: CR107-VC-03
+        description: "Second line includes translated status name"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:186-188 renders a Text with
+          t(`speechStatus.${speech.status}`) which provides the translated
+          status name (e.g. "Designado/Nao convidado" for assigned_not_invited).
+          The statusName style has fontSize: 12 and flex: 1.
+
+    should_pass_results:
+      - id: CR107-VC-04
+        description: "Format matches requested pattern: 'No Discurso - LED StatusName'"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:178-189 renders speechInfoRow View with:
+          1. Text with slot label (e.g. "1o Discurso")
+          2. Text with ' - ' separator (lines 182-184)
+          3. StatusLED size={10} (line 185)
+          4. Text with ' ' + translated status name (lines 186-188)
+          All in flexDirection: 'row' with alignItems: 'center'. The full
+          rendering is: "1o Discurso - [LED] Designado/Nao convidado".
+
+    summary: |
+      All 3 must_pass and 1 should_pass checks passed. Second line now shows
+      full slot label + separator + StatusLED inline + translated status name.
 
 # #############################################################################
 # CR-110: Show invite management for bishopric role (F053)
@@ -3589,6 +3787,59 @@ cr_110:
       has it. Bishopric has 'invite:manage' but not 'home:invite_mgmt'.
       Feature does not exist. 3 must_pass + 1 should_pass checks planned.
 
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "phase-002"
+    verdict: passed
+
+    reviewer_verdict: approved
+    tester_verdict: approved
+    tester_tests_passed: 3061
+    tester_tests_total: 3061
+
+    must_pass_results:
+      - id: CR110-VC-01
+        description: "Bishopric role has 'home:invite_mgmt' permission"
+        status: PASSED
+        evidence: |
+          permissions.ts:16-41 defines bishopric role permissions. Line 33
+          contains 'home:invite_mgmt' in the Set. This permission was added
+          between 'home:next_assignments' (line 32) and 'agenda:read' (line 34).
+
+      - id: CR110-VC-02
+        description: "InviteManagementSection permission guard still works for both roles"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:139 still uses:
+          if (!hasPermission('home:invite_mgmt')) return null;
+          This guard now passes for both bishopric (line 33 in permissions.ts)
+          and secretary (line 57 in permissions.ts) since both have the permission.
+
+      - id: CR110-VC-03
+        description: "Observer role still cannot see invite management section"
+        status: PASSED
+        evidence: |
+          permissions.ts:67-71 defines observer role with only 3 permissions:
+          'member:read', 'agenda:read', 'presentation:start'. The observer Set
+          does NOT include 'home:invite_mgmt'. hasPermission('observer',
+          'home:invite_mgmt') returns false.
+
+    should_pass_results:
+      - id: CR110-VC-04
+        description: "Existing permission tests still pass"
+        status: PASSED
+        evidence: |
+          All 3061 tests pass across 60 test files including permissions.test.ts.
+          The permission test file was updated with batch8-phase2 tests that
+          verify bishopric has 'home:invite_mgmt', secretary retains it, and
+          observer does not have it.
+
+    summary: |
+      All 3 must_pass and 1 should_pass checks passed. Bishopric role now has
+      'home:invite_mgmt' permission. Both bishopric and secretary see the invite
+      management section. Observer remains excluded.
+
 # #############################################################################
 # CR-111: Increase LED-X spacing and X icon size in expanded card (F054)
 # #############################################################################
@@ -3609,3 +3860,54 @@ cr_111:
       300, paddingHorizontal 4 (lines 248-252). User wants more spacing between
       LED and X, and larger X icon. Feature does not exist.
       2 must_pass + 2 should_pass checks planned.
+
+  post_validation:
+    timestamp: "2026-02-18"
+    status: passed
+    phase: "phase-002"
+    verdict: passed
+
+    reviewer_verdict: approved
+    tester_verdict: approved
+    tester_tests_passed: 3061
+    tester_tests_total: 3061
+
+    must_pass_results:
+      - id: CR111-VC-01
+        description: "Gap between LED and X button is increased"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:229 row style now has gap: 12 (was 8). This increases
+          spacing between all row elements including LED and X button from 8px
+          to 12px, a 50% increase.
+
+      - id: CR111-VC-02
+        description: "X icon size is increased"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:249 removeButton style now has fontSize: 24 (was 20).
+          The X icon character ('\u00D7') is rendered at 24px, 20% larger than
+          before.
+
+    should_pass_results:
+      - id: CR111-VC-03
+        description: "X button hitSlop is still adequate for touch target"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:168 Pressable wrapping the X button still has hitSlop={8}.
+          Combined with the larger fontSize (24) and paddingHorizontal: 4 (line 251),
+          the touch target is adequate.
+
+      - id: CR111-VC-04
+        description: "Layout does not break with increased spacing"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:231-232 field style retains flex: 1 which allows the
+          speaker name text field to shrink/grow. The increased gap (12) and
+          larger X icon (24) do not cause layout issues since the speaker
+          field accommodates via flex and numberOfLines={1} truncation.
+
+    summary: |
+      All 2 must_pass and 2 should_pass checks passed. Row gap increased from
+      8 to 12, X fontSize increased from 20 to 24. Touch target and layout
+      remain functional.

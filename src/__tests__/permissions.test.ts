@@ -28,7 +28,7 @@ const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
   'settings:users': { bishopric: true, secretary: true, observer: false },
   'invite:manage': { bishopric: true, secretary: true, observer: false },
   'home:next_assignments': { bishopric: true, secretary: false, observer: false },
-  'home:invite_mgmt': { bishopric: false, secretary: true, observer: false },
+  'home:invite_mgmt': { bishopric: true, secretary: true, observer: false },
   'agenda:read': { bishopric: true, secretary: true, observer: true },
   'agenda:write': { bishopric: true, secretary: true, observer: false },
   'agenda:assign_speaker': { bishopric: true, secretary: true, observer: false },
@@ -86,8 +86,8 @@ describe('Permissions', () => {
       }
     });
 
-    it('should NOT grant Bishopric home:invite_mgmt', () => {
-      expect(hasPermission('bishopric', 'home:invite_mgmt')).toBe(false);
+    it('should grant Bishopric home:invite_mgmt', () => {
+      expect(hasPermission('bishopric', 'home:invite_mgmt')).toBe(true);
     });
 
     it('should grant Secretary appropriate permissions minus speech:assign', () => {
@@ -116,9 +116,9 @@ describe('Permissions', () => {
   });
 
   describe('getPermissions', () => {
-    it('should return 23 permissions for Bishopric', () => {
+    it('should return 24 permissions for Bishopric', () => {
       const perms = getPermissions('bishopric');
-      expect(perms.length).toBe(23);
+      expect(perms.length).toBe(24);
     });
 
     it('should return 21 permissions for Secretary', () => {

@@ -43,6 +43,8 @@ export const COUNTRY_CODES: CountryCode[] = [
   { code: '+257', flag: '\u{1F1E7}\u{1F1EE}', label: 'Burundi (+257)' },
   { code: '+855', flag: '\u{1F1F0}\u{1F1ED}', label: 'Cambodia (+855)' },
   { code: '+237', flag: '\u{1F1E8}\u{1F1F2}', label: 'Cameroon (+237)' },
+  // USA before Canada: +1 defaults to US flag (ADR-043)
+  { code: '+1', flag: '\u{1F1FA}\u{1F1F8}', label: 'United States (+1)' },
   { code: '+1', flag: '\u{1F1E8}\u{1F1E6}', label: 'Canada (+1)' },
   { code: '+238', flag: '\u{1F1E8}\u{1F1FB}', label: 'Cape Verde (+238)' },
   { code: '+236', flag: '\u{1F1E8}\u{1F1EB}', label: 'Central African Republic (+236)' },
@@ -179,7 +181,6 @@ export const COUNTRY_CODES: CountryCode[] = [
   { code: '+380', flag: '\u{1F1FA}\u{1F1E6}', label: 'Ukraine (+380)' },
   { code: '+971', flag: '\u{1F1E6}\u{1F1EA}', label: 'United Arab Emirates (+971)' },
   { code: '+44', flag: '\u{1F1EC}\u{1F1E7}', label: 'United Kingdom (+44)' },
-  { code: '+1', flag: '\u{1F1FA}\u{1F1F8}', label: 'United States (+1)' },
   { code: '+598', flag: '\u{1F1FA}\u{1F1FE}', label: 'Uruguay (+598)' },
   { code: '+998', flag: '\u{1F1FA}\u{1F1FF}', label: 'Uzbekistan (+998)' },
   { code: '+678', flag: '\u{1F1FB}\u{1F1FA}', label: 'Vanuatu (+678)' },
@@ -196,6 +197,13 @@ export const COUNTRY_CODES: CountryCode[] = [
 export function getFlagForCode(code: string): string {
   const entry = COUNTRY_CODES.find((c) => c.code === code);
   return entry?.flag ?? '\u{1F310}';
+}
+
+/**
+ * Find a country entry by its unique label (e.g., 'United States (+1)').
+ */
+export function getCountryByLabel(label: string): CountryCode | undefined {
+  return COUNTRY_CODES.find((c) => c.label === label);
 }
 
 /**

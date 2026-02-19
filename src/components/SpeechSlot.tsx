@@ -44,6 +44,8 @@ export interface SpeechSlotProps {
   onOpenSpeakerSelector?: (speechId: string) => void;
   /** Called to open the topic selector. */
   onOpenTopicSelector?: (speechId: string) => void;
+  /** Called when the topic assignment is cleared. */
+  onClearTopic?: (speechId: string) => void;
 }
 
 // --- Position Labels ---
@@ -67,6 +69,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   onRemoveAssignment,
   onOpenSpeakerSelector,
   onOpenTopicSelector,
+  onClearTopic,
 }: SpeechSlotProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -118,6 +121,11 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       },
     ]);
   }, [speech, canUnassign, t, onRemoveAssignment]);
+
+  const handleClearTopic = useCallback(() => {
+    if (!speech) return;
+    onClearTopic?.(speech.id);
+  }, [speech, onClearTopic]);
 
   // Topic display: "Collection : Title" format
   const topicDisplay = speech?.topic_title
@@ -196,6 +204,15 @@ export const SpeechSlot = React.memo(function SpeechSlot({
         >
           {topicDisplay ?? t('speeches.selectTopic')}
         </Text>
+        {topicDisplay && canAssign && (
+          <Pressable
+            hitSlop={8}
+            onPress={handleClearTopic}
+            accessibilityLabel={t('common.delete')}
+          >
+            <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
+          </Pressable>
+        )}
         {canAssign && (
           <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
             {'\u25BC'}

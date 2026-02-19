@@ -176,7 +176,7 @@ function SpeechesTabContent() {
               animated: true,
               viewPosition: 0,
             });
-          }, 300);
+          }, 400);
         }
       }
     },
@@ -345,15 +345,6 @@ function SpeechesTabContent() {
     ]
   );
 
-  const getItemLayout = useCallback(
-    (_data: unknown, index: number) => ({
-      length: 70, // Approximate height of a collapsed SundayCard
-      offset: 70 * index,
-      index,
-    }),
-    []
-  );
-
   if (speechesError || exceptionsError) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -372,7 +363,6 @@ function SpeechesTabContent() {
         data={listItems}
         keyExtractor={(item) => item.key}
         renderItem={renderItem}
-        getItemLayout={getItemLayout}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.3}
         onScrollToIndexFailed={(info) => {

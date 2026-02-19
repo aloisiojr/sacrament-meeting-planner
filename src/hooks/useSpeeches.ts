@@ -58,10 +58,10 @@ export interface ChangeStatusInput {
  */
 export const VALID_TRANSITIONS: Record<SpeechStatus, SpeechStatus[]> = {
   not_assigned: ['assigned_not_invited'],
-  assigned_not_invited: ['assigned_invited', 'not_assigned'],
-  assigned_invited: ['assigned_confirmed', 'assigned_not_invited', 'gave_up', 'not_assigned'],
-  assigned_confirmed: ['not_assigned'],
-  gave_up: ['not_assigned'],
+  assigned_not_invited: ['assigned_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+  assigned_invited: ['assigned_not_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+  assigned_confirmed: ['assigned_not_invited', 'assigned_invited', 'gave_up', 'not_assigned'],
+  gave_up: ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'not_assigned'],
 };
 
 /**

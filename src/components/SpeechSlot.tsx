@@ -132,6 +132,14 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
 
       <View style={styles.row}>
+        {/* LED */}
+        <StatusLED
+          status={status}
+          size={16}
+          onPress={handleStatusPress}
+          disabled={isObserver || status === 'not_assigned'}
+        />
+
         {/* Speaker field */}
         <Pressable
           style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
@@ -155,14 +163,6 @@ export const SpeechSlot = React.memo(function SpeechSlot({
             </Text>
           )}
         </Pressable>
-
-        {/* LED */}
-        <StatusLED
-          status={status}
-          size={16}
-          onPress={handleStatusPress}
-          disabled={isObserver || status === 'not_assigned'}
-        />
 
         {/* Remove button */}
         {hasSpeaker && canUnassign && (
@@ -261,6 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     marginTop: 6,
+    marginLeft: 28,
   },
   topicText: {
     flex: 1,

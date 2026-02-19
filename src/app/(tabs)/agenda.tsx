@@ -125,9 +125,22 @@ function AgendaTabContent() {
       } else {
         lazyCreate.mutate(date);
         setExpandedDate(date);
+        // Auto-scroll to expanded card (ADR-047)
+        const index = listItems.findIndex(
+          (i) => i.type === 'sunday' && (i as { type: 'sunday'; data: AgendaSunday }).data.date === date
+        );
+        if (index >= 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0,
+            });
+          }, 300);
+        }
       }
     },
-    [expandedDate, lazyCreate]
+    [expandedDate, lazyCreate, listItems]
   );
 
   const getItemKey = useCallback((item: ListItem, index: number): string => {

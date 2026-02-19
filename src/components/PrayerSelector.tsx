@@ -41,6 +41,8 @@ export interface PrayerSelectorProps {
   visible?: boolean;
   /** Called when the modal closes. */
   onClose?: () => void;
+  /** When true, only render the Modal (no inline Pressable button). */
+  modalOnly?: boolean;
 }
 
 export function PrayerSelector({
@@ -50,6 +52,7 @@ export function PrayerSelector({
   disabled = false,
   visible,
   onClose,
+  modalOnly = false,
 }: PrayerSelectorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -90,6 +93,7 @@ export function PrayerSelector({
 
   return (
     <>
+      {!modalOnly && (
       <Pressable
         style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
         onPress={() => !disabled && setModalVisible(true)}
@@ -113,6 +117,7 @@ export function PrayerSelector({
         )}
         <Text style={[styles.arrow, { color: colors.textSecondary }]}>{'\u25BC'}</Text>
       </Pressable>
+      )}
 
       <Modal
         visible={modalVisible}

@@ -154,6 +154,11 @@ export function PrayerSelector({
             </Pressable>
           </View>
 
+          {/* Hint for custom name discoverability */}
+          <Text style={[styles.customNameHintText, { color: colors.textSecondary }]}>
+            {t('agenda.customNameHint')}
+          </Text>
+
           {/* Custom name option (shown when search has text and doesn't exactly match a member) */}
           {customName.trim().length > 0 && (
             <Pressable
@@ -273,6 +278,11 @@ const styles = StyleSheet.create({
   },
   customNameHint: {
     fontSize: 13,
+  },
+  customNameHintText: {
+    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   memberItem: {
     paddingHorizontal: 16,

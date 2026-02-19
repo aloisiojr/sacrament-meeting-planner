@@ -15,6 +15,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
+import { getDefaultTemplate } from '../../../lib/whatsappUtils';
 
 const PLACEHOLDERS = [
   '{nome}',
@@ -58,7 +59,7 @@ export default function WhatsAppTemplateScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('wards')
-        .select('whatsapp_template')
+        .select('whatsapp_template, language')
         .eq('id', wardId)
         .single();
       if (error) throw error;
@@ -72,8 +73,17 @@ export default function WhatsAppTemplateScreen() {
 
   // Initialize template from DB
   useEffect(() => {
-    if (ward?.whatsapp_template && !initialized) {
-      setTemplate(ward.whatsapp_template);
+    if (ward && !initialized) {
+      if (ward.whatsapp_template === null || ward.whatsapp_template === undefined) {
+        // DB is null: show default template for ward language
+        setTemplate(getDefaultTemplate(ward.language ?? 'pt-BR'));
+      } else if (ward.whatsapp_template === '') {
+        // DB is empty string: user intentionally cleared, respect it
+        setTemplate('');
+      } else {
+        // DB has custom value: use it
+        setTemplate(ward.whatsapp_template);
+      }
       setInitialized(true);
     }
   }, [ward, initialized]);

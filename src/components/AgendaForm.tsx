@@ -584,6 +584,7 @@ function SpeakerField({
   disabled: boolean;
   colors: ThemeColors;
 }) {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
@@ -651,6 +652,11 @@ function SpeakerField({
             </Pressable>
           )}
         </View>
+      )}
+      {hasOverride && !isEditing && (
+        <Text style={[styles.lastMinuteLabel, { color: colors.textTertiary }]}>
+          {t('agenda.lastMinuteAssignment')}
+        </Text>
       )}
     </FieldRow>
   );
@@ -905,5 +911,11 @@ const styles = StyleSheet.create({
   },
   speakerIcon: {
     fontSize: 18,
+  },
+  lastMinuteLabel: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 2,
+    marginLeft: 2,
   },
 });

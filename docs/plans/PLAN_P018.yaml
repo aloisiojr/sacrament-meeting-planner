@@ -1,0 +1,624 @@
+# =============================================================================
+# PLAN_P018.yaml
+# Implementation Plan for Batch 9 Phase 2 - Speech Cards & Agenda
+# Features: F060, F061, F062, F063, F064
+# CRs: CR-114, CR-115, CR-116, CR-119, CR-121
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Melhorar UX dos cards de discurso e agenda: adicionar botao X para remover
+  tema atribuido (F060), exibir dialogo de confirmacao ao mudar tipo de domingo
+  quando ha atribuicoes (F061), filtrar opcoes do LED click para assigned_invited
+  mostrando apenas confirmado/desistiu (F062), reordenar layout do SpeechSlot
+  para [LED][Field][X] com alinhamento de tema (F063), e adicionar label
+  "(Designacao de ultima hora)" na agenda quando override ativo (F064).
+
+strategy:
+  order: "Happy path (layout + core features) -> Edge cases (filtering, i18n) -> Tests -> Documentation"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F063 - Reordenar layout do SpeechSlot [LED][Field][X]
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/components/SpeechSlot.tsx, reordenar o JSX dentro de <View style={styles.row}>
+      (linhas 134-180) para:
+      1) StatusLED (mover de linha 160-165 para primeira posicao na row)
+      2) Pressable speaker field (manter flex:1, mover de linha 136-157 para segunda posicao)
+      3) Pressable X remove button (manter na terceira posicao, linhas 168-179)
+      Adicionar marginLeft: 28 ao styles.topicField (28 = LED 16px + gap 12px).
+      Isso alinha o inicio do texto do campo de tema com o inicio do texto do speaker.
+      Verificar: canUnassign ja e false para secretary e observer (sem regressao).
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-04", "STEP-05"]
+    done_when:
+      - "StatusLED e o primeiro elemento dentro de styles.row"
+      - "Speaker field (Pressable flex:1) e o segundo elemento"
+      - "Botao X e o terceiro/ultimo elemento"
+      - "styles.topicField tem marginLeft: 28"
+      - "Inicio do texto do tema alinhado com inicio do texto do speaker"
+      - "canUnassign=false para secretary e observer (sem regressao)"
+      - "LED continua funcional (Pressable para status change)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que StatusLED e renderizado como primeiro filho de styles.row"
+      - type: unit
+        description: "Verificar que topicField tem marginLeft 28"
+    covers:
+      acceptance_criteria: ["AC-F063-01", "AC-F063-02", "AC-F063-03", "AC-F063-04", "AC-F063-05", "AC-F063-06", "AC-F063-07"]
+      edge_cases: ["EC-F063-01", "EC-F063-02"]
+    risks:
+      - risk: "Reordenacao pode quebrar alinhamento visual em dispositivos pequenos"
+        mitigation: "flex:1 no speaker field garante adaptacao. gap:12 entre elementos mantido."
+
+  # =========================================================================
+  # STEP-02: F060 - Adicionar prop onClearTopic e botao X no campo de tema
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/components/SpeechSlot.tsx:
+      (1) Adicionar prop onClearTopic?: (speechId: string) => void ao SpeechSlotProps
+          (apos onOpenTopicSelector na linha 46).
+      (2) Adicionar onClearTopic ao destructuring do componente (linha 69).
+      (3) Adicionar handler handleClearTopic = useCallback(() => {
+            if (!speech) return;
+            onClearTopic?.(speech.id);
+          }, [speech, onClearTopic]);
+      (4) No campo de tema (Pressable linhas 183-204), entre topicText e fieldArrow,
+          renderizar botao X:
+          {topicDisplay && canAssign && (
+            <Pressable hitSlop={8} onPress={handleClearTopic}
+              accessibilityLabel={t('common.remove')}>
+              <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
+            </Pressable>
+          )}
+      (5) Sem dialogo de confirmacao (tema facilmente re-atribuivel via TopicSelectorModal).
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Prop onClearTopic adicionada a SpeechSlotProps"
+      - "Botao X (Unicode U+00D7) aparece no campo de tema entre texto e dropdown arrow"
+      - "Botao X visivel apenas quando topicDisplay tem valor E canAssign e true"
+      - "Botao X NAO visivel quando nao ha tema ou canAssign e false"
+      - "Pressionar X chama onClearTopic(speechId)"
+      - "Nao ha dialogo de confirmacao ao pressionar X"
+      - "Clicar no campo de tema (nao no X) ainda abre TopicSelectorModal"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que botao X aparece quando topicDisplay && canAssign"
+      - type: unit
+        description: "Verificar que botao X NAO aparece quando canAssign=false"
+      - type: unit
+        description: "Verificar que pressionar X chama onClearTopic com speechId"
+    covers:
+      acceptance_criteria: ["AC-F060-01", "AC-F060-02", "AC-F060-03", "AC-F060-04", "AC-F060-05", "AC-F060-06"]
+      edge_cases: ["EC-F060-01", "EC-F060-02"]
+    risks:
+      - risk: "Botao X muito proximo do dropdown arrow no campo de tema"
+        mitigation: "hitSlop={8} e gap natural entre elementos. Pode ajustar marginHorizontal se necessario."
+
+  # =========================================================================
+  # STEP-03: F060 - Wiring de onClearTopic em speeches.tsx e NextSundaysSection
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Wiring do callback onClearTopic nos componentes pai que renderizam SpeechSlot:
+      (1) Em src/app/(tabs)/speeches.tsx:
+          - Adicionar handler handleClearTopic = useCallback((speechId: string) => {
+              assignTopic.mutate({ speechId, topicTitle: null, topicLink: null,
+                topicCollection: null });
+            }, [assignTopic]);
+          - Passar onClearTopic={handleClearTopic} ao SpeechSlot.
+      (2) Em src/components/NextSundaysSection.tsx:
+          - Mesmo padrao: adicionar handleClearTopic e passar ao SpeechSlot.
+      (3) Verificar se NextAssignmentsSection.tsx tambem renderiza SpeechSlot
+          (se sim, aplicar mesmo wiring).
+      Reutiliza mutation existente assignTopic com valores null (ADR-044).
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/components/NextSundaysSection.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "speeches.tsx passa onClearTopic ao SpeechSlot"
+      - "NextSundaysSection.tsx passa onClearTopic ao SpeechSlot"
+      - "assignTopic.mutate chamado com topicTitle=null, topicLink=null, topicCollection=null"
+      - "Remover tema via X funciona na aba Discursos"
+      - "Remover tema via X funciona na aba Home (NextSundaysSection)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que speeches.tsx wira onClearTopic com mutation de null"
+      - type: unit
+        description: "Verificar que NextSundaysSection wira onClearTopic com mutation de null"
+    covers:
+      acceptance_criteria: ["AC-F060-02"]
+      edge_cases: ["EC-F060-01", "EC-F060-02"]
+    risks:
+      - risk: "assignTopic.mutate pode nao aceitar null nos campos de topic"
+        mitigation: "Campos sao nullable no DB schema. Mutation faz update parcial - null e valor valido."
+
+  # =========================================================================
+  # STEP-04: F062 - Adicionar prop allowedStatuses ao StatusChangeModal
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em src/components/StatusChangeModal.tsx:
+      (1) Adicionar prop opcional allowedStatuses?: SpeechStatus[] a StatusChangeModalProps
+          (apos onClose na linha 31).
+      (2) Adicionar allowedStatuses ao destructuring do componente (linha 50).
+      (3) Alterar logica: apos const availableStatuses = getAvailableStatuses(currentStatus)
+          (linha 55), adicionar:
+          const filtered = allowedStatuses
+            ? availableStatuses.filter(s => allowedStatuses.includes(s))
+            : availableStatuses;
+      (4) Trocar FlatList data={availableStatuses} (linha 89-90) por data={filtered}.
+      Backward compatible: quando allowedStatuses nao e passado (undefined),
+      filtered = availableStatuses (comportamento original preservado).
+    files:
+      - "src/components/StatusChangeModal.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-05"]
+    done_when:
+      - "Prop allowedStatuses adicionada a StatusChangeModalProps (opcional)"
+      - "Quando allowedStatuses passado, modal mostra interseccao de allowedStatuses com availableStatuses"
+      - "Quando allowedStatuses nao passado, modal mostra todas as transicoes (comportamento original)"
+      - "FlatList usa 'filtered' ao inves de 'availableStatuses'"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que allowedStatuses filtra as opcoes exibidas"
+      - type: unit
+        description: "Verificar que sem allowedStatuses, todas as transicoes sao exibidas"
+    covers:
+      acceptance_criteria: ["AC-F062-06"]
+      edge_cases: []
+    risks:
+      - risk: "Nenhum risco significativo - prop opcional com backward compatibility"
+        mitigation: "N/A"
+
+  # =========================================================================
+  # STEP-05: F062 - LED click no SpeechSlot filtra para confirmed/gave_up
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/components/SpeechSlot.tsx:
+      (1) Antes do return JSX, adicionar:
+          const ledAllowedStatuses = status === 'assigned_invited'
+            ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
+            : undefined;
+      (2) No StatusChangeModal (linha 207-212), passar nova prop:
+          <StatusChangeModal
+            ...
+            allowedStatuses={ledAllowedStatuses}
+          />
+      Resultado: quando LED e clicado no status assigned_invited, modal mostra
+      apenas "Confirmado" e "Desistiu". Para todos os outros status, comportamento
+      original (todas as transicoes).
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "ledAllowedStatuses definido como ['assigned_confirmed', 'gave_up'] quando status === 'assigned_invited'"
+      - "ledAllowedStatuses e undefined para outros status"
+      - "StatusChangeModal recebe allowedStatuses={ledAllowedStatuses}"
+      - "LED click no assigned_invited mostra apenas 2 opcoes"
+      - "LED click em outros status mostra todas as transicoes"
+      - "LED desabilitado para not_assigned (sem regressao)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que LED click no assigned_invited mostra apenas confirmed/gave_up"
+      - type: unit
+        description: "Verificar que LED click no assigned_not_invited mostra todas as transicoes"
+    covers:
+      acceptance_criteria: ["AC-F062-01", "AC-F062-02", "AC-F062-03", "AC-F062-04", "AC-F062-05"]
+      edge_cases: ["EC-F062-01", "EC-F062-02"]
+    risks:
+      - risk: "Nenhum risco significativo - filtro apenas no SpeechSlot, outros usos do modal nao afetados"
+        mitigation: "N/A"
+
+  # =========================================================================
+  # STEP-06: F061 - Confirmacao ao mudar tipo de domingo com atribuicoes
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em src/components/SundayCard.tsx:
+      (1) Adicionar import de Alert do 'react-native' (ja importado na linha 8).
+      (2) SundayTypeDropdown: adicionar prop speeches: Speech[] a interface
+          SundayTypeDropdownProps (linha 85-90).
+      (3) Adicionar speeches ao destructuring (linha 92).
+      (4) Em handleSelect (linha 104), ANTES da logica existente, adicionar:
+          const hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title);
+          if (currentType === SUNDAY_TYPE_SPEECHES && hasAssignments && type !== SUNDAY_TYPE_SPEECHES) {
+            setModalVisible(false);
+            Alert.alert(
+              t('sundayExceptions.changeConfirmTitle'),
+              t('sundayExceptions.changeConfirmMessage'),
+              [
+                { text: t('common.cancel'), style: 'cancel' },
+                { text: t('common.confirm'), style: 'destructive', onPress: () => {
+                    if (type === 'other') {
+                      setCustomReason('');
+                      setOtherModalVisible(true);
+                    } else {
+                      onSelect(type as SundayExceptionReason);
+                    }
+                  }
+                }
+              ]
+            );
+            return;
+          }
+      (5) SundayCard: passar speeches prop ao SundayTypeDropdown (linha 344):
+          <SundayTypeDropdown ... speeches={speeches} />
+    files:
+      - "src/components/SundayCard.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-07"]
+    done_when:
+      - "SundayTypeDropdown recebe prop speeches: Speech[]"
+      - "SundayCard passa speeches ao SundayTypeDropdown"
+      - "Confirmacao exibida quando currentType===speeches E tem atribuicoes E novo tipo !== speeches"
+      - "Nenhuma confirmacao quando nao ha atribuicoes"
+      - "Nenhuma confirmacao ao reverter PARA speeches"
+      - "Cancelar na confirmacao mantem tipo atual"
+      - "Confirmar na confirmacao efetua a mudanca (incluindo 'other' com modal de texto)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que Alert.alert e chamado quando ha atribuicoes e tipo muda"
+      - type: unit
+        description: "Verificar que nenhum Alert quando nao ha atribuicoes"
+      - type: unit
+        description: "Verificar que reverter para speeches nao exibe confirmacao"
+    covers:
+      acceptance_criteria: ["AC-F061-01", "AC-F061-02", "AC-F061-03", "AC-F061-04", "AC-F061-05", "AC-F061-06"]
+      edge_cases: ["EC-F061-01", "EC-F061-02"]
+    risks:
+      - risk: "Alert.alert nao fecha o dropdown modal corretamente (dupla modal)"
+        mitigation: "setModalVisible(false) chamado antes do Alert.alert"
+
+  # =========================================================================
+  # STEP-07: F061 + F064 - Adicionar i18n keys para confirmacao e last-minute
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Adicionar novas chaves i18n nos 3 locales:
+      (1) src/i18n/locales/pt-BR.json:
+          - sundayExceptions.changeConfirmTitle: "Alterar tipo de domingo"
+          - sundayExceptions.changeConfirmMessage: "Existem discursantes ou temas atribuidos. Deseja realmente alterar o tipo?"
+          - agenda.lastMinuteAssignment: "(Designacao de ultima hora)"
+      (2) src/i18n/locales/en.json:
+          - sundayExceptions.changeConfirmTitle: "Change sunday type"
+          - sundayExceptions.changeConfirmMessage: "There are speakers or topics assigned. Do you really want to change the type?"
+          - agenda.lastMinuteAssignment: "(Last-minute assignment)"
+      (3) src/i18n/locales/es.json:
+          - sundayExceptions.changeConfirmTitle: "Cambiar tipo de domingo"
+          - sundayExceptions.changeConfirmMessage: "Hay oradores o temas asignados. Desea realmente cambiar el tipo?"
+          - agenda.lastMinuteAssignment: "(Designacion de ultima hora)"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-06"]
+    done_when:
+      - "pt-BR.json contem sundayExceptions.changeConfirmTitle e changeConfirmMessage"
+      - "en.json contem sundayExceptions.changeConfirmTitle e changeConfirmMessage"
+      - "es.json contem sundayExceptions.changeConfirmTitle e changeConfirmMessage"
+      - "pt-BR.json contem agenda.lastMinuteAssignment = '(Designacao de ultima hora)'"
+      - "en.json contem agenda.lastMinuteAssignment = '(Last-minute assignment)'"
+      - "es.json contem agenda.lastMinuteAssignment = '(Designacion de ultima hora)'"
+      - "JSON valido em todos os 3 locales (sem erros de parse)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que novas keys i18n existem nos 3 idiomas"
+      - type: unit
+        description: "Verificar que JSON e valido apos adicao"
+    covers:
+      acceptance_criteria: ["AC-F061-07", "AC-F064-04", "AC-F064-05", "AC-F064-06"]
+      edge_cases: []
+    risks:
+      - risk: "JSON invalido apos edicao manual dos locales"
+        mitigation: "Verificar com JSON.parse ou linter apos salvar"
+
+  # =========================================================================
+  # STEP-08: F064 - Label "(Designacao de ultima hora)" no AgendaForm
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Em src/components/AgendaForm.tsx, no SpeakerField (linhas 572-657):
+      (1) Importar useTranslation no SpeakerField (se nao estiver disponivel
+          via prop ou contexto) -- verificar se o componente pai ja passa t
+          ou se SpeakerField precisa chamar useTranslation diretamente.
+      (2) Apos o bloco else (View speakerReadRow, linhas 632-653), antes de
+          fechar o FieldRow (linha 655), adicionar:
+          {hasOverride && !isEditing && (
+            <Text style={[styles.lastMinuteLabel, { color: colors.textTertiary }]}>
+              {t('agenda.lastMinuteAssignment')}
+            </Text>
+          )}
+      (3) Adicionar novo estilo lastMinuteLabel ao StyleSheet:
+          lastMinuteLabel: {
+            fontSize: 11,
+            fontStyle: 'italic',
+            marginTop: 2,
+          }
+      O label aparece abaixo do campo de speaker read-only quando ha override
+      ativo. Desaparece quando override e revertido (handleRevert). NAO aparece
+      durante edicao (isEditing=true).
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "Label '(Designacao de ultima hora)' renderizado quando hasOverride=true e !isEditing"
+      - "Label NAO renderizado quando hasOverride=false"
+      - "Label NAO renderizado quando isEditing=true"
+      - "Label desaparece ao reverter override (handleRevert)"
+      - "Label com fontSize 11, fontStyle italic, cor textTertiary"
+      - "Label traduzido via t('agenda.lastMinuteAssignment')"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que label aparece quando hasOverride=true e !isEditing"
+      - type: unit
+        description: "Verificar que label NAO aparece quando hasOverride=false"
+      - type: unit
+        description: "Verificar que label NAO aparece quando isEditing=true"
+    covers:
+      acceptance_criteria: ["AC-F064-01", "AC-F064-02", "AC-F064-03", "AC-F064-07", "AC-F064-08"]
+      edge_cases: ["EC-F064-01", "EC-F064-02", "EC-F064-03"]
+    risks:
+      - risk: "SpeakerField nao tem acesso a funcao t() de useTranslation"
+        mitigation: "Verificar se AgendaForm ja passa t como prop ou se SpeakerField pode chamar useTranslation"
+
+  # =========================================================================
+  # STEP-09: Testes consolidados Batch 9 Phase 2 (F060-F064)
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Criar arquivo de testes src/__tests__/batch9-phase2.test.ts com testes
+      para todas as 5 features deste batch:
+      (1) F060: Verificar que botao X aparece no campo de tema quando
+          topicDisplay && canAssign. Verificar que X nao aparece sem tema
+          ou sem canAssign. Verificar que pressionar X chama onClearTopic.
+          Verificar wiring em speeches.tsx e NextSundaysSection.
+      (2) F061: Verificar que Alert.alert e chamado quando tipo muda de
+          speeches COM atribuicoes. Verificar que nao e chamado sem atribuicoes.
+          Verificar que reverter para speeches nao exibe confirmacao.
+      (3) F062: Verificar que LED click no assigned_invited mostra apenas
+          confirmed e gave_up. Verificar que outros status mostram todas
+          as transicoes. Verificar backward compatibility do StatusChangeModal.
+      (4) F063: Verificar ordem dos elementos na row: LED, Field, X.
+          Verificar marginLeft do topicField (28px).
+      (5) F064: Verificar que label lastMinuteAssignment aparece quando
+          hasOverride=true e !isEditing. Verificar que desaparece ao
+          reverter. Verificar i18n em 3 idiomas.
+      Atualizar testes existentes que possam ser impactados pelas mudancas.
+    files:
+      - "src/__tests__/batch9-phase2.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch9-phase2.test.ts criado"
+      - "Testes cobrem F060 (botao X tema + wiring onClearTopic)"
+      - "Testes cobrem F061 (confirmacao mudanca de tipo + Alert.alert)"
+      - "Testes cobrem F062 (LED filter + allowedStatuses)"
+      - "Testes cobrem F063 (layout reorder + marginLeft topicField)"
+      - "Testes cobrem F064 (label lastMinuteAssignment + i18n)"
+      - "pnpm test roda sem falha em TODOS os testes"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch9 phase2 (F060-F064)"
+    covers:
+      acceptance_criteria: ["AC-F060-01", "AC-F060-03", "AC-F060-04", "AC-F061-01", "AC-F061-02", "AC-F061-05", "AC-F062-01", "AC-F062-02", "AC-F062-06", "AC-F063-01", "AC-F063-04", "AC-F064-01", "AC-F064-02", "AC-F064-04"]
+      edge_cases: ["EC-F060-01", "EC-F061-01", "EC-F062-01", "EC-F063-01", "EC-F064-01"]
+    risks:
+      - risk: "Mocking de Alert.alert para testes de F061"
+        mitigation: "jest.spyOn(Alert, 'alert') padrao ja usado no projeto"
+
+  # =========================================================================
+  # STEP-10: Atualizar testes existentes impactados
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Atualizar testes existentes que possam ser impactados pelas mudancas:
+      (1) Verificar src/__tests__/batch9-phase1.test.ts - testes de SpeechSlot
+          podem precisar de ajuste por causa do layout reorder (F063).
+      (2) Verificar src/__tests__/batch8-phase2.test.ts - testes do
+          StatusChangeModal podem precisar de ajuste pela nova prop
+          allowedStatuses (F062).
+      (3) Verificar outros testes que renderizam SpeechSlot ou SundayCard.
+      (4) Ajustar snapshots ou assertions conforme necessario.
+    files:
+      - "src/__tests__/batch9-phase1.test.ts"
+      - "src/__tests__/batch8-phase2.test.ts"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "Testes existentes atualizados para refletir mudancas de F060-F064"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Nenhum teste com falsa cobertura (assercoes corretas)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes podem nao estar mocking SpeechSlot props corretamente"
+        mitigation: "Revisar cada teste e adicionar novas props quando necessario"
+
+  # =========================================================================
+  # STEP-11: Documentacao do projeto (CODE_LEDGER, project-status)
+  # =========================================================================
+
+  - id: STEP-11
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 9 Phase 2
+      (F060-F064) com arquivos impactados.
+      (2) .devteam/project-status.yaml - marcar phase 2 como completed,
+      atualizar current_agent para "completed".
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - PLAN_P018 ja adicionado,
+      marcar status como completed.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+    dependencies: ["STEP-10"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch9 phase2"
+      - "project-status.yaml phase 2 marcada como completed"
+      - "PLAN_CONSOLIDATED PLAN_P018 status marcado como completed"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F060 ACs ---
+  - ac_id: AC-F060-01
+    how_to_verify: "Botao X (U+00D7) visivel no campo de tema entre texto e dropdown arrow quando tema atribuido"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F060-02
+    how_to_verify: "Pressionar X chama onClearTopic -> assignTopic.mutate com null -> topic limpo no campo"
+    covered_by_steps: ["STEP-02", "STEP-03", "STEP-09"]
+  - ac_id: AC-F060-03
+    how_to_verify: "Botao X NAO renderizado quando canAssign=false (observer, secretary)"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F060-04
+    how_to_verify: "Botao X NAO renderizado quando topic_title e null (sem tema atribuido)"
+    covered_by_steps: ["STEP-02", "STEP-09"]
+  - ac_id: AC-F060-05
+    how_to_verify: "Clicar no campo de tema (nao no X) ainda abre TopicSelectorModal normalmente"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-F060-06
+    how_to_verify: "Tema removido diretamente sem Alert.alert (sem confirmacao)"
+    covered_by_steps: ["STEP-02"]
+
+  # --- F061 ACs ---
+  - ac_id: AC-F061-01
+    how_to_verify: "Alert.alert de confirmacao exibido ao mudar DE speeches COM atribuicoes"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F061-02
+    how_to_verify: "Mudanca de tipo direta sem confirmacao quando nao ha atribuicoes"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F061-03
+    how_to_verify: "Cancelar na confirmacao mantem tipo 'speeches' inalterado"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F061-04
+    how_to_verify: "Confirmar na confirmacao efetua a mudanca para o tipo selecionado"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F061-05
+    how_to_verify: "Reverter PARA speeches nao exibe confirmacao (nada esta sendo perdido)"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+  - ac_id: AC-F061-06
+    how_to_verify: "SundayTypeDropdown recebe speeches[] via prop e verifica atribuicoes"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-F061-07
+    how_to_verify: "Titulo e mensagem traduzidos em pt-BR, en, es"
+    covered_by_steps: ["STEP-07", "STEP-09"]
+
+  # --- F062 ACs ---
+  - ac_id: AC-F062-01
+    how_to_verify: "LED click no assigned_invited mostra apenas 'Confirmado' e 'Desistiu' (2 opcoes)"
+    covered_by_steps: ["STEP-05", "STEP-09"]
+  - ac_id: AC-F062-02
+    how_to_verify: "LED click no assigned_not_invited mostra todas as transicoes disponiveis"
+    covered_by_steps: ["STEP-05", "STEP-09"]
+  - ac_id: AC-F062-03
+    how_to_verify: "LED click no assigned_confirmed mostra transicao para not_assigned"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F062-04
+    how_to_verify: "Labels traduzidos usando i18n keys existentes speechStatus.assigned_confirmed e speechStatus.gave_up"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F062-05
+    how_to_verify: "LED desabilitado para not_assigned (disabled prop inalterado)"
+    covered_by_steps: ["STEP-05"]
+  - ac_id: AC-F062-06
+    how_to_verify: "StatusChangeModal sem allowedStatuses mostra todas as transicoes (backward compatible)"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+
+  # --- F063 ACs ---
+  - ac_id: AC-F063-01
+    how_to_verify: "LED e o primeiro elemento na row (antes do speaker field)"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F063-02
+    how_to_verify: "X button e o ultimo elemento na row (apos speaker field)"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F063-03
+    how_to_verify: "Speaker field com flex:1 entre LED e X"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F063-04
+    how_to_verify: "Campo de tema com marginLeft 28 (LED 16 + gap 12) alinhado com speaker field"
+    covered_by_steps: ["STEP-01", "STEP-09"]
+  - ac_id: AC-F063-05
+    how_to_verify: "Todas as 3 posicoes usam SpeechSlot com layout identico"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F063-06
+    how_to_verify: "LED continua funcional (clicavel para status change)"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-F063-07
+    how_to_verify: "Secretary e Observer nao veem botao X (canUnassign=false)"
+    covered_by_steps: ["STEP-01"]
+
+  # --- F064 ACs ---
+  - ac_id: AC-F064-01
+    how_to_verify: "Label '(Designacao de ultima hora)' visivel quando hasOverride=true e !isEditing"
+    covered_by_steps: ["STEP-08", "STEP-09"]
+  - ac_id: AC-F064-02
+    how_to_verify: "Label NAO visivel quando overrideName e null"
+    covered_by_steps: ["STEP-08", "STEP-09"]
+  - ac_id: AC-F064-03
+    how_to_verify: "Label desaparece ao clicar X (handleRevert seta overrideName=null)"
+    covered_by_steps: ["STEP-08"]
+  - ac_id: AC-F064-04
+    how_to_verify: "Label exibe '(Designacao de ultima hora)' em pt-BR"
+    covered_by_steps: ["STEP-07", "STEP-09"]
+  - ac_id: AC-F064-05
+    how_to_verify: "Label exibe '(Last-minute assignment)' em en"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F064-06
+    how_to_verify: "Label exibe '(Designacion de ultima hora)' em es"
+    covered_by_steps: ["STEP-07"]
+  - ac_id: AC-F064-07
+    how_to_verify: "Label com fontSize 11, fontStyle italic, cor textTertiary"
+    covered_by_steps: ["STEP-08"]
+  - ac_id: AC-F064-08
+    how_to_verify: "Label NAO exibido durante modo de edicao (isEditing=true)"
+    covered_by_steps: ["STEP-08"]

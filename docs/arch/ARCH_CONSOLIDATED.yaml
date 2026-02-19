@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-19"
-  last_updated_by: "batch-9-phase-1"
+  last_updated_by: "batch-9-phase-2"
   total_modules: 8
-  total_adrs: 34
+  total_adrs: 36
   total_crs_implemented: 82
   pending_arch: "none"
   source_documents:
@@ -24,6 +24,7 @@ metadata:
     - docs/arch/ARCH_M015.yaml
     - docs/arch/ARCH_M016.yaml
     - docs/arch/ARCH_M017.yaml
+    - docs/arch/ARCH_M018.yaml
 
 # =============================================================================
 # TECH STACK
@@ -240,7 +241,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -254,6 +255,9 @@ modules:
       CR-106/F051: Transicao reversa assigned_invited -> assigned_not_invited adicionada a VALID_TRANSITIONS.
       CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem. Usado em handleDropdownWhatsApp.
       CR-122/F058: getPositionLabel() retorna t('speeches.lastSpeech') quando position===3.
+      CR-114/F060: Botao X para remover atribuicao de tema. onClearTopic prop no SpeechSlot.
+      CR-116/F062: StatusChangeModal recebe allowedStatuses prop. LED click em assigned_invited filtra para confirmed/gave_up.
+      CR-119/F063: Layout reordenado [LED][Speaker][X]. topicField marginLeft 28px para alinhamento.
 
   - id: M004
     name: AgendaModule
@@ -276,7 +280,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -291,6 +295,7 @@ modules:
       Modo Apresentacao: read-only, accordion com 4 secoes (normal) ou 3 (especial).
       CR-122/F058: Label do SpeakerField posicao 3 usa t('speeches.lastSpeech'). Presentation mode idem.
       CR-125/F059: PrayerSelector recebe modalOnly={true} no AgendaForm para nao duplicar botao inline.
+      CR-121/F064: SpeakerField mostra label "(Designacao de ultima hora)" quando hasOverride=true e !isEditing.
 
   - id: M005
     name: NotificationModule
@@ -398,7 +403,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -422,6 +427,8 @@ modules:
       CR-112/F055: handleDropdownWhatsApp usa buildWhatsAppConversationUrl (sem ?text=) ao inves de buildWhatsAppUrl.
       CR-113/F056: InviteActionDropdown titulo usa t('speeches.changeStatus') ao inves de speaker_name.
       CR-122/F058: InviteManagementSection segunda linha usa t('speeches.lastSpeech') para position===3.
+      CR-114/F060: NextSundaysSection wiring de onClearTopic para SpeechSlot.
+      CR-115/F061: SundayCard.SundayTypeDropdown confirmacao Alert.alert ao mudar tipo com atribuicoes existentes.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -797,6 +804,24 @@ adrs:
     consequences:
       - "Resolve ambiguidade visual sem migracao de dados"
       - "Se usuario selecionou Canada, reabrir edicao mostrara USA (tradeoff aceito)"
+
+  - id: ADR-044
+    title: "Reutilizar mutation assignTopic com valores null para clear topic"
+    context: "F060 precisa limpar atribuicao de tema. Opcoes: (a) criar mutation separada clearTopic, (b) reutilizar assignTopic passando null."
+    decision: "Reutilizar assignTopic.mutate com topicTitle=null, topicLink=null, topicCollection=null. A mutation existente ja faz update parcial no speech."
+    decided_in: "CR-114"
+    consequences:
+      - "Zero codigo novo no hook useSpeeches"
+      - "Semanticamente 'assign null' pode confundir, mas padrao claro no contexto"
+
+  - id: ADR-045
+    title: "Confirmacao de mudanca de tipo com Alert.alert nativo"
+    context: "F061 precisa de dialogo de confirmacao ao mudar tipo de domingo com atribuicoes existentes. Opcoes: (a) Alert.alert nativo, (b) modal customizado."
+    decision: "Usar Alert.alert nativo. Padrao consistente com delete member, import CSV, remove speech assignment."
+    decided_in: "CR-115"
+    consequences:
+      - "Consistencia com padroes existentes do app"
+      - "Estilo nativo varia entre iOS e Android (aceito)"
 
 # =============================================================================
 # DATABASE SCHEMA
@@ -1175,16 +1200,16 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline."
-    "SundayCard.tsx": "Card expandivel por domingo"
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status)"
+    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]."
     "StatusLED.tsx": "LED 3D animado de status de discurso"
-    "StatusChangeModal.tsx": "Modal de mudanca de status"
+    "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez)"
     "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix)"
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
@@ -1193,7 +1218,7 @@ file_structure:
     "ErrorBoundary.tsx": "Error boundary do React"
     "QueryErrorView.tsx": "View de erro para queries"
     "ExitConfirmation.tsx": "Confirmacao ao sair do app"
-    "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos"
+    "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos. CR-114/F060: wiring de onClearTopic."
     "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
     "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary)"
     "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus')."
@@ -1442,6 +1467,14 @@ change_requests_history:
     doc: "ARCH_M017.yaml"
     status: "pending implementation"
     adrs: [ADR-042, ADR-043]
+    new_files: []
+
+  batch_9_phase_2:
+    crs: "CR-114, CR-115, CR-116, CR-119, CR-121"
+    scope: "Speech Cards & Agenda: remove topic X button (F060), type change confirmation (F061), LED filtered options (F062), speech card layout reorder (F063), last-minute assignment label (F064)"
+    doc: "ARCH_M018.yaml"
+    status: "pending implementation"
+    adrs: [ADR-044, ADR-045]
     new_files: []
 
 # =============================================================================

@@ -1,0 +1,517 @@
+# =============================================================================
+# QA_PLAN_batch9_phase2.yaml
+# PRE-validation QA Plan for Batch 9 Phase 2
+# CRs: CR-114, CR-115, CR-116, CR-119, CR-121
+# Features: F060, F061, F062, F063, F064
+# Generated: 2026-02-19
+# =============================================================================
+
+batch: 9
+phase: 2
+title: "Speech cards & agenda: theme X button, type change confirmation, LED options, card redesign, last-minute label"
+type: feature_request
+status: validated
+generated_at: "2026-02-19"
+
+# #############################################################################
+# CR-114 / F060: Adicionar X ao lado do campo de temas para remover tema
+# #############################################################################
+
+cr_114:
+  cr_id: CR-114
+  feature_id: F060
+  title: "Add X button next to topic field to remove assigned topic"
+  type: feature_request
+  user_request: |
+    Adicionar X ao lado do campo de temas para remover tema.
+
+  baseline:
+    description: |
+      SpeechSlot.tsx renders a topic field (Pressable, line 183-204) showing the
+      assigned topic in "Collection : Title" format. There is NO X/clear button to
+      remove/unassign the topic. The only way to change a topic is to select a different
+      one via TopicSelectorModal. There is no API call or handler to clear the topic
+      assignment (set topic_title, topic_link, topic_collection to null).
+    evidence:
+      - "SpeechSlot.tsx:182-204 shows topic field with no clear/X button"
+      - "SpeechSlot props has onAssignTopic but no onClearTopic/onRemoveTopic"
+      - "The speaker row (line 167-179) HAS an X remove button (handleRemove) but topic row does not"
+
+  affected_files:
+    - src/components/SpeechSlot.tsx
+
+  validation_checks:
+    - id: CR114-VC-01
+      description: "X button appears next to topic field when a topic is assigned"
+      type: functional
+      how_to_verify: |
+        Check SpeechSlot.tsx for a new X button/Pressable rendered conditionally when
+        speech.topic_title is set. Button should be near the topic field (similar pattern
+        to existing speaker remove button at lines 167-179).
+      expected_result: |
+        An X (or similar clear icon) button renders next to the topic field ONLY when a
+        topic is assigned (topic_title exists). Not shown when topic is empty.
+      priority: must_pass
+
+    - id: CR114-VC-02
+      description: "Pressing the X button clears the topic assignment"
+      type: functional
+      how_to_verify: |
+        Check that pressing the X triggers a callback (onClearTopic or similar) that
+        calls the appropriate mutation to set topic_title, topic_link, topic_collection
+        to null. Verify the handler exists in parent components (NextSundaysSection,
+        speeches.tsx, NextAssignmentsSection).
+      expected_result: |
+        Pressing X clears topic_title, topic_link, topic_collection to null via mutation.
+        Parent components wire the callback correctly.
+      priority: must_pass
+
+    - id: CR114-VC-03
+      description: "Confirmation dialog shown before clearing topic (like speaker removal)"
+      type: functional
+      how_to_verify: |
+        Check if the X press shows an Alert.alert confirmation dialog (similar to
+        handleRemove for speakers at line 110-120). This is important since accidental
+        topic removal could be inconvenient.
+      expected_result: |
+        A confirmation dialog asks user before clearing the topic, OR there is a
+        good UX reason documented for not having one (e.g., topic can be easily re-assigned).
+      priority: should_pass
+
+    - id: CR114-VC-04
+      description: "X button respects permission checks (Bishopric only)"
+      type: functional
+      how_to_verify: |
+        Verify the X button is only rendered for users with the appropriate permission
+        (canAssign or equivalent). Observers and Secretary should not see the X.
+      expected_result: |
+        X button only visible when user has assign permission. Hidden for observers.
+      priority: must_pass
+
+    - id: CR114-VC-05
+      description: "Existing topic assignment flow still works"
+      type: regression
+      how_to_verify: |
+        Verify TopicSelectorModal flow is unchanged - pressing the topic field still
+        opens the modal and selecting a topic still works correctly.
+      expected_result: |
+        Topic selection via modal works exactly as before.
+      priority: must_pass
+
+  pass_criteria: |
+    ALL must_pass checks (VC-01, VC-02, VC-04, VC-05) MUST pass.
+    If any must_pass fails -> verdict=failed.
+    If all must_pass pass but should_pass fails -> verdict=partial.
+
+# #############################################################################
+# CR-115 / F061: Confirmacao ao mudar tipo de domingo
+# #############################################################################
+
+cr_115:
+  cr_id: CR-115
+  feature_id: F061
+  title: "Show confirmation dialog when changing sunday type if speakers/topics are assigned"
+  type: feature_request
+  user_request: |
+    Confirmacao ao mudar tipo de domingo quando ha discursantes/temas.
+
+  baseline:
+    description: |
+      SundayCard.tsx contains SundayTypeDropdown (lines 85-243) which allows changing
+      the sunday type (speeches, testimony_meeting, primary_presentation, etc.).
+      Currently, handleSelect (line 104) immediately calls onSelect or onRevertToSpeeches
+      with NO confirmation dialog. If a sunday already has speeches assigned (with
+      speakers or topics), changing to a non-speech type effectively hides/orphans
+      those assignments without warning the user.
+    evidence:
+      - "SundayCard.tsx:104-116 handleSelect has no confirmation check"
+      - "No Alert.alert or Modal confirmation before type change"
+      - "Changing type from 'speeches' to 'testimony_meeting' orphans assigned speeches"
+
+  affected_files:
+    - src/components/SundayCard.tsx
+
+  validation_checks:
+    - id: CR115-VC-01
+      description: "Confirmation dialog shown when changing FROM 'speeches' type with assigned speakers/topics"
+      type: functional
+      how_to_verify: |
+        Check SundayTypeDropdown or SundayCard for a confirmation dialog (Alert.alert
+        or Modal) that triggers when:
+        1. Current type is 'speeches' (SUNDAY_TYPE_SPEECHES)
+        2. User selects a different type
+        3. There are speeches with assigned speakers (speaker_name not null) or
+           topics (topic_title not null) for that sunday
+      expected_result: |
+        A confirmation dialog appears warning the user that changing the sunday type
+        will affect existing speech assignments. User can confirm or cancel.
+      priority: must_pass
+
+    - id: CR115-VC-02
+      description: "No confirmation when changing type with NO assigned speakers/topics"
+      type: functional
+      how_to_verify: |
+        Verify that if the sunday has no assigned speeches (all speaker_name are null
+        and all topic_title are null), the type change happens immediately without
+        confirmation.
+      expected_result: |
+        Type change proceeds directly when there are no assignments to lose.
+      priority: must_pass
+
+    - id: CR115-VC-03
+      description: "Cancel in confirmation dialog does NOT change the type"
+      type: functional
+      how_to_verify: |
+        Check that pressing Cancel/No in the confirmation dialog does not trigger
+        onSelect or onRevertToSpeeches. The dropdown should remain on the current type.
+      expected_result: |
+        Cancelling the dialog preserves the current sunday type.
+      priority: must_pass
+
+    - id: CR115-VC-04
+      description: "Confirm in dialog proceeds with the type change"
+      type: functional
+      how_to_verify: |
+        Check that pressing Confirm/Yes in the dialog calls the original onSelect
+        or onRevertToSpeeches as before.
+      expected_result: |
+        Confirming the dialog changes the sunday type as expected.
+      priority: must_pass
+
+    - id: CR115-VC-05
+      description: "SundayCard receives speeches data to check for assignments"
+      type: functional
+      how_to_verify: |
+        Verify that SundayCard or SundayTypeDropdown has access to the speeches data
+        for the sunday to check whether speakers/topics are assigned. This may require
+        passing speeches as a prop to SundayTypeDropdown.
+      expected_result: |
+        The confirmation logic has access to speeches data to make the decision.
+      priority: must_pass
+
+    - id: CR115-VC-06
+      description: "Changing FROM a non-speech type to speeches does not show confirmation"
+      type: functional
+      how_to_verify: |
+        Verify that switching from testimony_meeting/primary_presentation back to
+        speeches does NOT show a confirmation (since nothing is being lost).
+      expected_result: |
+        Reverting to speeches type does not trigger confirmation.
+      priority: should_pass
+
+  pass_criteria: |
+    ALL must_pass checks (VC-01 through VC-05) MUST pass.
+    If any must_pass fails -> verdict=failed.
+    If all must_pass pass but should_pass fails -> verdict=partial.
+
+# #############################################################################
+# CR-116 / F062: Clicar no LED mostra opcoes confirmado e desistiu
+# #############################################################################
+
+cr_116:
+  cr_id: CR-116
+  feature_id: F062
+  title: "Clicking on LED shows 'confirmed' and 'gave up' options directly"
+  type: feature_request
+  user_request: |
+    Clicar no LED mostra opcoes confirmado e desistiu.
+
+  baseline:
+    description: |
+      Currently, StatusLED (StatusLED.tsx) is pressable and opens StatusChangeModal
+      (StatusChangeModal.tsx). The modal shows ALL valid transitions from the current
+      status based on VALID_TRANSITIONS in useSpeeches.ts. For example, from
+      assigned_invited, it shows: assigned_confirmed, assigned_not_invited, gave_up,
+      not_assigned. The user request asks that clicking the LED should directly show
+      only "confirmed" and "gave up" options (the two most common actions after an
+      invite is sent). This is about streamlining the UX of status change via LED click.
+
+      StatusChangeModal (StatusChangeModal.tsx) currently shows:
+      - The current status (highlighted)
+      - All available transitions as options
+      - A close button
+
+      The LED in SpeechSlot (line 160-165) fires handleStatusPress which opens the
+      StatusChangeModal. The LED in SundayCard header (line 322-338) also renders
+      StatusLEDs but those use onStatusPress which is currently a no-op in speeches.tsx.
+    evidence:
+      - "StatusLED.tsx:194-205 wraps content in Pressable when onPress is provided"
+      - "SpeechSlot.tsx:96-99 handleStatusPress opens StatusChangeModal"
+      - "StatusChangeModal.tsx:55 shows getAvailableStatuses(currentStatus)"
+      - "VALID_TRANSITIONS shows all possible next states, not just confirmed/gave_up"
+
+  affected_files:
+    - src/components/StatusChangeModal.tsx
+    - src/components/SpeechSlot.tsx
+    - src/components/StatusLED.tsx
+
+  validation_checks:
+    - id: CR116-VC-01
+      description: "LED click shows only 'confirmed' and 'gave up' options (for appropriate states)"
+      type: functional
+      how_to_verify: |
+        Check StatusChangeModal or SpeechSlot for changes that filter the available
+        statuses to show only assigned_confirmed and gave_up when the LED is clicked.
+        This applies when the current status allows these transitions (i.e., from
+        assigned_invited state).
+      expected_result: |
+        When LED is clicked and status is assigned_invited, the modal/popup shows
+        only "Confirmado"/"Confirmed" and "Desistiu"/"Gave Up" as options.
+      priority: must_pass
+
+    - id: CR116-VC-02
+      description: "Full status change modal still accessible via alternative interaction"
+      type: functional
+      how_to_verify: |
+        Check if the full status lifecycle transitions are still accessible somewhere
+        (e.g., long press, or from a different UI element). The streamlined LED click
+        should not remove the ability to make other transitions.
+      expected_result: |
+        Users can still access all valid transitions through some interaction path.
+        The LED shortcut only provides the two most common options.
+      priority: should_pass
+
+    - id: CR116-VC-03
+      description: "LED click works correctly for assigned_not_invited status"
+      type: functional
+      how_to_verify: |
+        Check behavior when LED is clicked and status is assigned_not_invited.
+        From this state, valid transitions are assigned_invited and not_assigned.
+        The "confirmed" and "gave_up" options may not apply here.
+      expected_result: |
+        LED click behavior is appropriate for each status state. If confirmed/gave_up
+        are not valid transitions from the current state, the behavior should adapt.
+      priority: must_pass
+
+    - id: CR116-VC-04
+      description: "StatusChangeModal integration with i18n labels"
+      type: functional
+      how_to_verify: |
+        Verify that the option labels use i18n keys (speechStatus.assigned_confirmed,
+        speechStatus.gave_up) for all 3 locales (pt-BR, en, es).
+      expected_result: |
+        Labels are translated correctly in all supported locales.
+      priority: must_pass
+
+    - id: CR116-VC-05
+      description: "LED remains non-interactive for not_assigned status"
+      type: regression
+      how_to_verify: |
+        Verify that StatusLED is still disabled (no press handler) when status is
+        not_assigned. Check SpeechSlot line 164: disabled={isObserver || status === 'not_assigned'}.
+      expected_result: |
+        LED does not respond to press when status is not_assigned.
+      priority: must_pass
+
+  pass_criteria: |
+    ALL must_pass checks (VC-01, VC-03, VC-04, VC-05) MUST pass.
+    If any must_pass fails -> verdict=failed.
+    If all must_pass pass but should_pass (VC-02) fails -> verdict=partial.
+
+# #############################################################################
+# CR-119 / F063: Redesign dos cards de designacao de discursos
+# #############################################################################
+
+cr_119:
+  cr_id: CR-119
+  feature_id: F063
+  title: "Redesign speech assignment cards (LED left, X right, same component)"
+  type: feature_request
+  user_request: |
+    Redesign dos cards de designacao de discursos (LED esquerda, X direita,
+    mesmo componente).
+
+  baseline:
+    description: |
+      SpeechSlot.tsx currently has this layout for the speaker row (lines 134-180):
+      - Speaker field (Pressable, flex:1) with name or placeholder
+      - StatusLED (size 16, centered) - in the MIDDLE
+      - Remove button (X, size 24) - on the RIGHT
+
+      The current order is: [Speaker Field] [LED] [X]
+
+      The user wants the layout to be: [LED] [Speaker Field] [X]
+      with LED on the LEFT side of the row. Additionally, the request mentions
+      "mesmo componente" (same component) meaning all speech position cards should
+      use the same unified component layout.
+
+      The topic field (lines 183-204) is below the speaker row and does NOT have
+      LED or X button.
+    evidence:
+      - "SpeechSlot.tsx:134-180 speaker row has order: Field, LED, X"
+      - "SpeechSlot.tsx:129 container, 134 row starts with speaker field first"
+      - "StatusLED rendered at line 160-165 (after field, before X)"
+      - "Remove button (X) at line 167-179 (rightmost)"
+
+  affected_files:
+    - src/components/SpeechSlot.tsx
+
+  validation_checks:
+    - id: CR119-VC-01
+      description: "LED is positioned on the LEFT side of the speech card row"
+      type: functional
+      how_to_verify: |
+        Check SpeechSlot.tsx render order. The StatusLED should appear BEFORE the
+        speaker field in the row JSX. The layout should be:
+        [LED] [Speaker Field] [X]
+      expected_result: |
+        In the styles.row container, StatusLED renders first (leftmost), then the
+        speaker field, then the remove button.
+      priority: must_pass
+
+    - id: CR119-VC-02
+      description: "X button remains on the RIGHT side of the speech card row"
+      type: functional
+      how_to_verify: |
+        Verify the remove button (X) is still the last element in the row.
+      expected_result: |
+        Remove button (X) is rightmost in the row after LED and speaker field.
+      priority: must_pass
+
+    - id: CR119-VC-03
+      description: "All 3 speech positions use the same component layout"
+      type: functional
+      how_to_verify: |
+        Verify that positions 1, 2, and 3 all render through the same SpeechSlot
+        component with the same layout (no position-specific rendering differences
+        for the card structure).
+      expected_result: |
+        All positions use identical card layout structure from SpeechSlot.
+      priority: must_pass
+
+    - id: CR119-VC-04
+      description: "LED is still functional (pressable for status change)"
+      type: regression
+      how_to_verify: |
+        Verify StatusLED still has onPress={handleStatusPress} and the status change
+        modal still opens when LED is pressed.
+      expected_result: |
+        LED press still triggers status change modal/popup.
+      priority: must_pass
+
+    - id: CR119-VC-05
+      description: "Speaker field still fills available space (flex:1)"
+      type: functional
+      how_to_verify: |
+        Verify the speaker field still has flex:1 in styles to fill the space
+        between LED and X button.
+      expected_result: |
+        Speaker field occupies remaining horizontal space.
+      priority: must_pass
+
+    - id: CR119-VC-06
+      description: "Topic field layout is not broken by the row reorder"
+      type: regression
+      how_to_verify: |
+        Verify the topic field below the speaker row is unchanged and still displays
+        correctly with proper styling.
+      expected_result: |
+        Topic field renders correctly below the speaker row.
+      priority: should_pass
+
+  pass_criteria: |
+    ALL must_pass checks (VC-01 through VC-05) MUST pass.
+    If any must_pass fails -> verdict=failed.
+    If all must_pass pass but should_pass (VC-06) fails -> verdict=partial.
+
+# #############################################################################
+# CR-121 / F064: Label "(Designacao de ultima hora)" na agenda
+# #############################################################################
+
+cr_121:
+  cr_id: CR-121
+  feature_id: F064
+  title: "Show '(Last-minute assignment)' label when making assignment in agenda"
+  type: feature_request
+  user_request: |
+    Label "(Designacao de ultima hora)" ao fazer designacao na agenda.
+
+  baseline:
+    description: |
+      AgendaForm.tsx renders speaker fields for positions 1, 2, and 3 using the
+      SpeakerField sub-component (lines 324-384). Each SpeakerField shows the
+      speaker name from the speeches hook or an override name. The AgendaForm has
+      an override mechanism (speaker_1_override, speaker_2_override, speaker_3_override)
+      allowing the user to edit the speaker name directly in the agenda. When the
+      user types a name in the agenda override field (instead of using the speech
+      assignment flow), this is a "last-minute assignment" -- someone assigned
+      right before the meeting starts without going through the normal invite flow.
+
+      Currently, there is NO visual indicator to distinguish between:
+      1. A speaker assigned through the normal flow (via SpeechSlot + invite management)
+      2. A speaker whose name was typed directly in the agenda override field
+
+      There is no "last-minute" or "ultima hora" label anywhere in the codebase.
+    evidence:
+      - "AgendaForm.tsx:572-657 SpeakerField sub-component has no last-minute indicator"
+      - "AgendaForm.tsx:324-384 speaker fields use SpeakerField with override mechanism"
+      - "No i18n key for lastMinute/ultimaHora in any locale file"
+      - "Grep for 'last.minute|ultima.hora|lastMinute' returns zero results"
+
+  affected_files:
+    - src/components/AgendaForm.tsx
+    - src/i18n/locales/pt-BR.json
+    - src/i18n/locales/en.json
+    - src/i18n/locales/es.json
+
+  validation_checks:
+    - id: CR121-VC-01
+      description: "'(Last-minute assignment)' label shown when speaker has override name"
+      type: functional
+      how_to_verify: |
+        Check SpeakerField in AgendaForm.tsx for a label/Text element that appears
+        when overrideName is not null AND overrideName differs from speakerName.
+        This indicates the name was typed directly in the agenda (last-minute).
+      expected_result: |
+        A label like "(Designacao de ultima hora)" / "(Last-minute assignment)" is
+        displayed near the speaker field when an override is active.
+      priority: must_pass
+
+    - id: CR121-VC-02
+      description: "Label NOT shown when speaker comes from normal assignment flow"
+      type: functional
+      how_to_verify: |
+        Verify that when overrideName is null (normal flow) or when overrideName equals
+        speakerName, no last-minute label is displayed.
+      expected_result: |
+        No last-minute label for normally assigned speakers.
+      priority: must_pass
+
+    - id: CR121-VC-03
+      description: "i18n keys exist for all 3 locales"
+      type: functional
+      how_to_verify: |
+        Check pt-BR.json, en.json, es.json for new keys related to last-minute
+        assignment label.
+      expected_result: |
+        Keys exist in all 3 locale files:
+        - pt-BR: "(Designacao de ultima hora)" or similar
+        - en: "(Last-minute assignment)" or similar
+        - es: "(Designacion de ultima hora)" or similar
+      priority: must_pass
+
+    - id: CR121-VC-04
+      description: "Label disappears when override is cleared (reverted to original)"
+      type: functional
+      how_to_verify: |
+        Verify that when user clears the override (via handleRevert or clearing the
+        input), the last-minute label is removed.
+      expected_result: |
+        Label dynamically appears/disappears based on override state.
+      priority: must_pass
+
+    - id: CR121-VC-05
+      description: "Label styling is visually distinct but non-intrusive"
+      type: functional
+      how_to_verify: |
+        Check the styling of the label (fontSize, color, fontStyle). It should be
+        subtle (e.g., smaller font, secondary/tertiary color, italic) to not
+        distract from the main content.
+      expected_result: |
+        Label has subdued styling (smaller font, muted color, or italic).
+      priority: should_pass
+
+  pass_criteria: |
+    ALL must_pass checks (VC-01 through VC-04) MUST pass.
+    If any must_pass fails -> verdict=failed.
+    If all must_pass pass but should_pass (VC-05) fails -> verdict=partial.

@@ -97,8 +97,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   }, [speech, canAssign, onOpenTopicSelector]);
 
   const handleStatusPress = useCallback(() => {
-    if (!canChangeStatus || !speech || status === 'not_assigned' ||
-        status === 'assigned_confirmed' || status === 'gave_up') return;
+    if (!canChangeStatus || !speech || status === 'not_assigned') return;
     setStatusModalVisible(true);
   }, [canChangeStatus, speech, status]);
 
@@ -154,8 +153,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           status={status}
           size={16}
           onPress={handleStatusPress}
-          disabled={isObserver || status === 'not_assigned' ||
-                    status === 'assigned_confirmed' || status === 'gave_up'}
+          disabled={isObserver || status === 'not_assigned'}
         />
 
         {/* Speaker field */}

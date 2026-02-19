@@ -189,17 +189,29 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.recognizing')} colors={colors}>
-        <SelectorField
-          value={agenda.recognized_names?.join(', ') || ''}
-          placeholder={t('agenda.recognizing')}
-          onPress={() => {
-            if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'can_recognize' });
-            }
+        <Pressable
+          style={[styles.selectorField, { borderColor: colors.border }]}
+          onPress={isObserver ? undefined : () => {
+            setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'can_recognize' });
           }}
           disabled={isObserver}
-          colors={colors}
-        />
+        >
+          {(agenda.recognized_names?.length ?? 0) > 0 ? (
+            agenda.recognized_names!.map((name, idx) => (
+              <Text
+                key={idx}
+                style={[styles.recognizingName, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+            ))
+          ) : (
+            <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
+              {t('agenda.recognizing')}
+            </Text>
+          )}
+        </Pressable>
       </FieldRow>
 
       <FieldRow label={t('agenda.announcements')} colors={colors}>
@@ -804,6 +816,10 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 15,
+  },
+  recognizingName: {
+    fontSize: 15,
+    paddingVertical: 2,
   },
   textInput: {
     borderWidth: 1,

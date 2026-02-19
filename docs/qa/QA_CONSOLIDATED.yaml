@@ -7,7 +7,8 @@
 # CR-105, CR-106, CR-107, CR-110, CR-111 (PRE+POST),
 # CR-112, CR-113, CR-117, CR-122, CR-125 (PRE+POST),
 # CR-114, CR-115, CR-116, CR-119, CR-121 (PRE+POST),
-# CR-118, CR-120, CR-123 (PRE+POST)
+# CR-118, CR-120, CR-123 (PRE+POST),
+# CR-126, CR-127, CR-129, CR-130 (PRE+POST)
 # Updated: 2026-02-19
 # =============================================================================
 
@@ -5069,3 +5070,238 @@ cr_123:
         status: PASSED
         evidence: |
           npx vitest run: 63 test files, 3296/3296 tests passed.
+
+# #############################################################################
+# Batch 10 Phase 1: CR-126, CR-127, CR-129, CR-130
+# #############################################################################
+
+cr_126:
+  cr_id: CR-126
+  title: "Redesign LEDs: flat circle (no 3D), new color scheme"
+  type: feature_request
+  spec: specs/SPEC_F069_F072.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      StatusLED currently uses 3D-style design with 3 layers (outerRing, innerCircle,
+      glowDot). Colors need updating: assigned_not_invited should be orange (currently
+      same yellow as assigned_invited), gave_up should be dark wine (currently bright red).
+      StatusChangeModal also has STATUS_INDICATOR_COLORS that need matching updates.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: d6519da
+        message: "feat(status-led): redesign StatusLED to flat circle with new color scheme (CR-126)"
+      - hash: 516b606
+        message: "feat(status-modal): update STATUS_INDICATOR_COLORS to match new flat LED colors (CR-126)"
+      - hash: 118645f
+        message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 84
+
+    validation_checks:
+      - id: VC-126-01
+        status: passed
+        evidence: "StatusLED.tsx: single <Animated.View> with styles.circle and backgroundColor. No outerRing, innerCircle, or glowDot layers. Flat circle design confirmed."
+      - id: VC-126-02
+        status: passed
+        evidence: "STATUS_COLORS: not_assigned=#9CA3AF (gray), assigned_not_invited=#F97316 (orange), assigned_invited=#EAB308 (yellow), assigned_confirmed=#22C55E (green), gave_up=#7F1D1D (dark wine). All 5 distinct colors match spec."
+      - id: VC-126-03
+        status: passed
+        evidence: "StatusChangeModal.tsx STATUS_INDICATOR_COLORS matches exactly: same 5 hex values as StatusLED STATUS_COLORS."
+      - id: VC-126-04
+        status: passed
+        evidence: "StatusLED.tsx lines 89-107: assigned_not_invited triggers withRepeat/withSequence fading animation (opacity 0.3 to 1) on the single flat circle."
+      - id: VC-126-05
+        status: passed
+        evidence: "StatusLED.tsx: statusLabels for all 5 states, accessibilityRole='button'/'image' and accessibilityLabel preserved for both pressable and non-pressable modes."
+      - id: VC-126-06
+        status: passed
+        evidence: "InviteActionDropdown imports STATUS_INDICATOR_COLORS from StatusChangeModal (line 18). Colors inherited automatically. No other hardcoded status colors found."
+
+cr_127:
+  cr_id: CR-127
+  title: "DB cleanup on sunday type change from speeches"
+  type: bugfix
+  spec: specs/SPEC_F069_F072.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Bug confirmed: useSetSundayType only updates sunday_exceptions table.
+      When changing from 'speeches' to another type and confirming the dialog,
+      speech rows (speaker_name, topic_title, etc.) are NOT deleted. The confirmation
+      dialog from CR-115 works but the cleanup action is missing.
+      Reproduction: assign speaker/topic, change type, confirm, change back -
+      old assignments still visible.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: c7a278c
+        message: "feat(speeches): add useDeleteSpeechesByDate hook for sunday type cleanup (CR-127)"
+      - hash: e6b8dd2
+        message: "feat(sunday-card): add onDeleteSpeeches prop to SundayTypeDropdown for type change cleanup (CR-127)"
+      - hash: 5ef1ed5
+        message: "feat(speeches): wire handleDeleteSpeeches to SundayCard for type change cleanup (CR-127)"
+      - hash: 118645f
+        message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 84
+
+    validation_checks:
+      - id: VC-127-01
+        status: passed
+        evidence: "useDeleteSpeechesByDate hook (useSpeeches.ts:322-348) performs DELETE on speeches by ward_id+sunday_date. SundayCard.tsx line 128 calls onDeleteSpeeches in confirmation. speeches.tsx wires deleteSpeechesByDate.mutate. Query cache invalidated. Audit log entry logged."
+      - id: VC-127-02
+        status: passed
+        evidence: "SundayCard.tsx lines 118 and 141: onDeleteSpeeches only called when currentType === SUNDAY_TYPE_SPEECHES. Non-speech to non-speech changes do not trigger cleanup."
+      - id: VC-127-03
+        status: passed
+        evidence: "SundayCard.tsx lines 117-139: Alert.alert confirmation still shown when currentType === SUNDAY_TYPE_SPEECHES && hasAssignments. onDeleteSpeeches called inside confirm onPress."
+      - id: VC-127-04
+        status: passed
+        evidence: "npx vitest run: 64 test files, 3380 tests, all passing."
+
+    reproduction_retest:
+      reproduced_before: true
+      fixed_after: true
+      evidence: |
+        useDeleteSpeechesByDate hook performs DELETE FROM speeches WHERE ward_id=? AND sunday_date=?.
+        Called from SundayCard confirmation callback before type change. Query cache invalidated
+        (speechKeys.all). Audit log entry created. Speech data properly cleaned up on type change.
+
+cr_129:
+  cr_id: CR-129
+  title: "LED click shows all status options except not_assigned"
+  type: feature_request
+  spec: specs/SPEC_F069_F072.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      SpeechSlot currently restricts LED options: ledAllowedStatuses only set
+      for assigned_invited (shows confirmed + gave_up). Other statuses use
+      VALID_TRANSITIONS defaults which are restrictive. CR-129 requests that
+      LED click always shows all options except not_assigned, regardless of
+      current status. This is a regression of CR-116.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: a101989
+        message: "feat(speech-slot): filter LED to exclude not_assigned and disable for terminal states (CR-129)"
+      - hash: f797810
+        message: "fix(tests): update batch9 F062 tests for CR-129 changes to ledAllowedStatuses"
+      - hash: 118645f
+        message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 84
+
+    validation_checks:
+      - id: VC-129-01
+        status: passed
+        evidence: "SpeechSlot.tsx lines 138-144: ledAllowedStatuses is constant array of all 4 non-not_assigned statuses. Passed to StatusChangeModal at line 239. Modal intersects with VALID_TRANSITIONS: assigned_not_invited->1 option, assigned_invited->3 options."
+      - id: VC-129-02
+        status: passed
+        evidence: "SpeechSlot.tsx line 100: handleStatusPress returns early for status==='not_assigned'. Line 157: disabled prop includes status==='not_assigned'."
+      - id: VC-129-03
+        status: passed
+        evidence: "ledAllowedStatuses constant has all 4 non-not_assigned statuses. StatusChangeModal filters VALID_TRANSITIONS by intersection. assigned_confirmed and gave_up get empty results so LED is disabled for these (line 101, 157-158)."
+      - id: VC-129-04
+        status: passed
+        evidence: "StatusChangeModal renders FlatList with STATUS_INDICATOR_COLORS[item] indicator and translated labels via getStatusLabel. All 4 statuses display correctly with updated colors from CR-126."
+
+cr_130:
+  cr_id: CR-130
+  title: "Country code US/Canada selection bug"
+  type: bugfix
+  spec: specs/SPEC_F069_F072.yaml
+  qa_plan: qa/QA_PLAN_batch10_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Bug confirmed: US and Canada both have code '+1'. MemberEditor uses
+      countryCode state (string '+1') which is ambiguous. getFlagForCode and
+      COUNTRY_CODES.find both return first match (always US). Selecting Canada
+      sets code to '+1' but display resolves to US flag. Root cause: identifier
+      must be unique (label) not dial code (shared).
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: fd63a3e
+        message: "fix(members): use getCountryByLabel for flag display to fix shared dial code (CR-130)"
+      - hash: 118645f
+        message: "test(batch10-phase1): add 84 tests for F069, F070, F071, F072"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 84
+
+    validation_checks:
+      - id: VC-130-01
+        status: passed
+        evidence: "members.tsx line 98: getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode). Canada selection sets countryLabel='Canada (+1)', getCountryByLabel returns Canada entry with Canada flag."
+      - id: VC-130-02
+        status: passed
+        evidence: "Same mechanism: US selection sets countryLabel='United States (+1)', getCountryByLabel returns US entry with US flag."
+      - id: VC-130-03
+        status: passed
+        evidence: "countryLabel state (line 58-59) used as unique identifier. Display uses getCountryByLabel(countryLabel) which looks up by unique label, not ambiguous dial code."
+      - id: VC-130-04
+        status: passed
+        evidence: "getFlagForCode unchanged in countryCodes.ts. Used as fallback in members.tsx line 98. Also used in MemberRow display (line 234) for existing member list."
+      - id: VC-130-05
+        status: passed
+        evidence: "members.tsx line 75: handleSave passes countryCode (dial code string '+1') to onSave. DB correctly stores '+1' for both US and Canada."
+      - id: VC-130-06
+        status: passed
+        evidence: "members.tsx lines 57-59: initialization uses COUNTRY_CODES.find(c => c.code === ...) returning first match for +1 (US). Acceptable per spec."
+
+    reproduction_retest:
+      reproduced_before: true
+      fixed_after: true
+      evidence: |
+        members.tsx line 98 changed from getFlagForCode(countryCode) to
+        getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode).
+        getCountryByLabel uses unique label to find correct entry. When Canada
+        is selected, countryLabel='Canada (+1)' resolves to Canada flag.
+        When US is selected, countryLabel='United States (+1)' resolves to US flag.
+
+    cross_cutting:
+      - id: VC-CROSS-01
+        status: passed
+        evidence: "npx vitest run: 64 test files, 3380 tests all passing. Baseline was 3296 tests (63 files). +84 new tests, +1 test file."

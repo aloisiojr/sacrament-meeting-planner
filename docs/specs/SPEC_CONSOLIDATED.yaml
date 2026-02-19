@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-19"
-  total_features: 68
-  total_change_requests: 125
+  total_features: 72
+  total_change_requests: 130
   implemented_crs: 96
-  pending_crs: 29
+  pending_crs: 34
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -38,6 +38,7 @@ metadata:
     - docs/specs/SPEC_F055_F059.yaml
     - docs/specs/SPEC_F060_F064.yaml
     - docs/specs/SPEC_F065_F068.yaml
+    - docs/specs/SPEC_F069_F072.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1037,13 +1038,14 @@ features:
       retornando Canada (primeiro na lista alfabetica). Fix: reordenar para USA
       antes de Canada e ajustar highlight no dropdown de selecao para usar label
       (unico) ao inves de code.
-    modified_by_crs: [117]
+    modified_by_crs: [117, 130]
     spec_file: "docs/specs/SPEC_F055_F059.yaml"
     notes:
       - "CR-117: +1 mostra bandeira do Canada ao inves de EUA"
-      - "getFlagForCode usa .find() que retorna primeiro match (Canada)"
+      - "CR-130: Display ainda usa getFlagForCode ao inves de label (F072)"
+      - "getFlagForCode usa .find() que retorna primeiro match"
       - "Reordenar USA antes de Canada em COUNTRY_CODES"
-      - "Ajustar highlight no dropdown de members.tsx para comparar por label"
+      - "Ajustar display e highlight para usar label ao inves de code"
 
   - id: F058
     name: "Change third speech label from ordinal to 'Ultimo Discurso'"
@@ -1111,10 +1113,11 @@ features:
       Se nao ha atribuicoes, mudanca direta sem confirmacao. Reverter PARA
       speeches tambem nao requer confirmacao. SundayTypeDropdown recebe
       speeches[] para verificar atribuicoes.
-    modified_by_crs: [115]
+    modified_by_crs: [115, 127]
     spec_file: "docs/specs/SPEC_F060_F064.yaml"
     notes:
       - "CR-115: Confirmacao ao mudar tipo de domingo com atribuicoes"
+      - "CR-127: Apos confirmacao, tambem apagar speeches do banco (F070)"
       - "SundayTypeDropdown precisa acessar speeches[] do SundayCard"
       - "Novas i18n keys sundayExceptions.changeConfirmTitle/Message"
       - "Usa Alert.alert nativo (padrao consistente com app)"
@@ -1129,12 +1132,13 @@ features:
       e gave_up (as 2 acoes mais comuns apos convite). Para outros status,
       todas as transicoes validas sao mostradas normalmente. Nova prop opcional
       allowedStatuses no StatusChangeModal.
-    modified_by_crs: [116]
+    modified_by_crs: [116, 129]
     spec_file: "docs/specs/SPEC_F060_F064.yaml"
     notes:
       - "CR-116: LED click mostra apenas 'confirmado' e 'desistiu'"
+      - "CR-129: Alterar para mostrar todos exceto not_assigned (F071)"
       - "Nova prop allowedStatuses no StatusChangeModal"
-      - "Filtro aplica-se APENAS a assigned_invited"
+      - "Filtro aplica-se a TODOS os status interativos"
       - "Outros contextos de uso do modal nao afetados"
 
   - id: F063
@@ -1245,6 +1249,84 @@ features:
       - "PrayerSelector.tsx ja suporta custom names (memberId: null)"
       - "handleCustomName, customNameButton ja existem"
       - "Nenhuma alteracao de codigo necessaria"
+
+  # ---------------------------------------------------------------------------
+  # Batch 10 Phase 1 (F069-F072) - LED Redesign, Data Cleanup, Status Options, Country Code Fix
+  # ---------------------------------------------------------------------------
+
+  - id: F069
+    name: "StatusLED redesign - flat circle without 3D, new color scheme"
+    status: pending
+    rfs: []
+    description: >
+      Trocar StatusLED de design 3D (3 camadas: outerRing, innerCircle, glowDot)
+      para circulo plano (flat) com cor solida unica. Novas cores:
+      not_assigned=Cinza, assigned_not_invited=Laranja, assigned_invited=Amarelo,
+      assigned_confirmed=Verde, gave_up=Vinho Escuro. Animacao de fading mantida
+      para assigned_not_invited. Atualizar STATUS_INDICATOR_COLORS no
+      StatusChangeModal com mesmas cores.
+    modified_by_crs: [126]
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    notes:
+      - "CR-126: LED flat sem efeito 3D com novo esquema de cores"
+      - "Remover LEDColors interface, usar string simples"
+      - "Remover 3 camadas (outerRing, innerCircle, glowDot)"
+      - "Manter animacao de fading para assigned_not_invited"
+      - "Atualizar STATUS_INDICATOR_COLORS no StatusChangeModal"
+
+  - id: F070
+    name: "Delete speeches when changing sunday type away from 'speeches'"
+    status: pending
+    rfs: []
+    description: >
+      Regressao do CR-115 (F061). Ao confirmar mudanca de tipo de domingo de
+      'speeches' para outro, apagar registros de speeches (tabela speeches)
+      para aquele ward_id + sunday_date. useSetSundayType so atualizava
+      sunday_exceptions sem limpar speeches. Novo hook useDeleteSpeechesByDate
+      chamado antes de setSundayType na callback de confirmacao.
+    modified_by_crs: [127]
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    notes:
+      - "CR-127: Bug critico - speeches nao apagados ao mudar tipo de domingo"
+      - "Regressao de CR-115: confirmacao existe mas nao limpa dados"
+      - "Novo hook useDeleteSpeechesByDate em useSpeeches.ts"
+      - "Delete chamado antes de setSundayType na callback de confirmacao"
+      - "Audit log registra a limpeza"
+
+  - id: F071
+    name: "LED click shows all status options except 'not_assigned'"
+    status: pending
+    rfs: []
+    description: >
+      Regressao do CR-116 (F062). Ao clicar no LED, mostrar todas as opcoes
+      de status EXCETO 'nao designado'. Isso substitui o filtro anterior que
+      mostrava apenas 'confirmado' e 'desistiu' para assigned_invited.
+      Para assigned_confirmed e gave_up, LED fica desabilitado pois a unica
+      transicao (not_assigned) esta excluida pelo filtro.
+    modified_by_crs: [129]
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    notes:
+      - "CR-129: LED click mostra todos os status exceto not_assigned"
+      - "Regressao de CR-116: filtro era muito restritivo"
+      - "LED desabilitado para assigned_confirmed e gave_up"
+      - "StatusChangeModal sem filtro nao afetado"
+
+  - id: F072
+    name: "Fix country code display for US/Canada (+1 ambiguity)"
+    status: pending
+    rfs: []
+    description: >
+      Regressao do CR-117 (F057). Display do pais selecionado usa
+      getFlagForCode(countryCode) que retorna primeiro match para +1 (sempre US).
+      Fix: usar getCountryByLabel(countryLabel)?.flag para exibir bandeira,
+      pois countryLabel e unico ('Canada (+1)' vs 'United States (+1)').
+    modified_by_crs: [130]
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    notes:
+      - "CR-130: Selecionar Canada mostra bandeira de US"
+      - "Regressao de CR-117: display usa code ao inves de label"
+      - "getCountryByLabel ja existe em countryCodes.ts"
+      - "Inicializacao com +1 mostra US por padrao (aceitavel)"
 
   # ---------------------------------------------------------------------------
   # Infrastructure (F011, F020-F023)
@@ -1902,6 +1984,87 @@ pending_crs:
       - src/i18n/locales/pt-BR.json
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
+
+  # --- Batch 10 Phase 1 (LED Redesign, Data Cleanup, Status Options, Country Code Fix) ---
+
+  - id: 126
+    type: ui
+    area: "StatusLED (F008, F051)"
+    feature_id: F069
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    related_crs: [116, 119]
+    description: >
+      Trocar StatusLED de design 3D para circulo plano (flat). Novas cores:
+      not_assigned=Cinza, assigned_not_invited=Laranja, assigned_invited=Amarelo,
+      assigned_confirmed=Verde, gave_up=Vinho Escuro. Atualizar
+      STATUS_INDICATOR_COLORS no StatusChangeModal.
+    acceptance_criteria:
+      - "LED e circulo flat sem efeito 3D (unica camada)"
+      - "Cores corretas por status (cinza, laranja, amarelo, verde, vinho)"
+      - "Animacao de fading mantida para assigned_not_invited"
+      - "Reduced motion respeitado"
+      - "StatusChangeModal usa mesmas novas cores"
+    files_likely_impacted:
+      - src/components/StatusLED.tsx
+      - src/components/StatusChangeModal.tsx
+
+  - id: 127
+    type: bug_critical
+    area: "SundayTypes (F007, F061)"
+    feature_id: F070
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    related_crs: [6, 7, 56, 95, 115]
+    description: >
+      Regressao de CR-115. Ao confirmar mudanca de tipo de domingo, speeches
+      nao sao apagados do banco. Fix: deletar registros de speeches para
+      ward_id + sunday_date apos confirmacao.
+    acceptance_criteria:
+      - "Speeches apagados do banco apos confirmar mudanca de tipo"
+      - "Cancelar no dialogo NAO apaga speeches"
+      - "Reverter para speeches NAO tenta deletar"
+      - "Query cache invalidado apos delete"
+      - "Audit log registra limpeza"
+    files_likely_impacted:
+      - src/hooks/useSpeeches.ts
+      - src/components/SundayCard.tsx
+      - src/app/(tabs)/speeches.tsx
+
+  - id: 129
+    type: feature
+    area: "SpeechSlot (F008, F062)"
+    feature_id: F071
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    related_crs: [116]
+    description: >
+      Regressao de CR-116. LED click mostra todas as opcoes exceto
+      not_assigned. LED desabilitado para assigned_confirmed e gave_up.
+    acceptance_criteria:
+      - "assigned_not_invited: mostra apenas assigned_invited"
+      - "assigned_invited: mostra 3 opcoes (sem not_assigned)"
+      - "assigned_confirmed e gave_up: LED desabilitado"
+      - "not_assigned: LED desabilitado (preservado)"
+      - "Observer nao pode clicar LED (preservado)"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 130
+    type: bug
+    area: "Country Codes (F003, F057)"
+    feature_id: F072
+    spec_file: "docs/specs/SPEC_F069_F072.yaml"
+    related_crs: [85, 92, 117]
+    description: >
+      Regressao de CR-117. Display usa getFlagForCode(countryCode) que
+      retorna US para +1. Fix: usar getCountryByLabel(countryLabel) para
+      exibir bandeira correta.
+    acceptance_criteria:
+      - "Selecionar Canada mostra bandeira do Canada"
+      - "Selecionar US mostra bandeira dos US"
+      - "Russia vs Kazakhstan (+7) funciona corretamente"
+      - "Highlight na lista mostra apenas pais selecionado"
+      - "Inicializacao com +1 mostra US por padrao (aceitavel)"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/members.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)

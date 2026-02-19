@@ -1,0 +1,788 @@
+# =============================================================================
+# SPEC_F069_F072.yaml
+# Specification for Batch 10 Phase 1 - LED Redesign, Sunday Type Data Cleanup,
+#   Speech LED Status Options, Country Code Display Fix
+# Features: F069, F070, F071, F072
+# CRs: CR-126, CR-127, CR-129, CR-130
+# Created: 2026-02-19
+# Status: pending
+# =============================================================================
+
+type: spec
+status: pending
+batch: 10
+phase: 1
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+features:
+
+  # ===========================================================================
+  # F069 / CR-126: LED redesign - flat circle, new color scheme
+  # ===========================================================================
+
+  - id: F069
+    name: "StatusLED redesign - flat circle without 3D effect, new color scheme"
+    cr_id: 126
+    type: ui
+    priority: high
+
+    description: >
+      O StatusLED atual (StatusLED.tsx) usa design 3D com 3 camadas visuais:
+      outerRing (circulo externo escuro), innerCircle (circulo interno claro
+      com animacao de fade), e glowDot (ponto de brilho para efeito 3D,
+      posicionado no canto superior esquerdo do innerCircle). Cada status tem
+      3 cores separadas (outer, inner, glow) na tabela STATUS_COLORS.
+      O StatusChangeModal (StatusChangeModal.tsx) tambem tem sua propria
+      tabela de cores STATUS_INDICATOR_COLORS para os indicadores circulares
+      nas opcoes do modal.
+      O usuario quer:
+      1. Trocar o design de 3D para circulo plano (flat) - remover as 3
+         camadas (outerRing, innerCircle, glowDot) e usar um unico circulo
+         simples com cor solida.
+      2. Trocar as cores para:
+         - Nao designado (not_assigned): Cinza ("apagado")
+         - Designado / Nao-Convidado (assigned_not_invited): Laranja
+         - Designado / Convidado (assigned_invited): Amarelo
+         - Confirmado (assigned_confirmed): Verde
+         - Desistiu (gave_up): Vinho Escuro (dark wine / burgundy)
+      A animacao de fading para assigned_not_invited PERMANECE (o circulo
+      flat pisca/faz fade, mesma logica de antes mas aplicada ao unico
+      circulo). A acessibilidade (reduced motion) tambem permanece.
+      As cores devem ser atualizadas tanto no StatusLED quanto no
+      StatusChangeModal (STATUS_INDICATOR_COLORS).
+
+    user_request: >
+      "Vamos trocar novamente o esquema das LEDs. Nao estou convencido que
+      precisa ter efeito 3D, ao inves, pode ser um Circulo plano (flat). E
+      vamos trocar as cores tambem: Nao designado: Cinza ('apagado'),
+      Designado / Nao-Convidado: Laranja, Designado / Convidado: Amarelo,
+      Confirmado: Verde, Desistiu: Vinho Escuro."
+
+    analysis: >
+      Baseline:
+      - StatusLED.tsx: 3 camadas visuais (outerRing, innerCircle, glowDot).
+        STATUS_COLORS e Record<SpeechStatus, LEDColors> com { outer, inner, glow }.
+        Cores atuais: not_assigned=#6B7280/#9CA3AF, assigned_not_invited e
+        assigned_invited=#D97706/#FBBF24/#FDE68A (ambos amarelos),
+        assigned_confirmed=#059669/#34D399/#A7F3D0 (verde),
+        gave_up=#DC2626/#F87171/#FECACA (vermelho).
+        Animacao de fading em assigned_not_invited: withRepeat/withSequence
+        com opacity 0.3 a 1 em ~2s.
+      - StatusChangeModal.tsx: STATUS_INDICATOR_COLORS e Record<SpeechStatus, string>
+        com cores flat unicas por status. Cores atuais:
+        not_assigned=#9CA3AF, assigned_not_invited=#FBBF24,
+        assigned_invited=#FBBF24, assigned_confirmed=#34D399, gave_up=#F87171.
+      Fix proposto:
+      1. StatusLED.tsx: Substituir LEDColors interface por string simples.
+         STATUS_COLORS vira Record<SpeechStatus, string>. Novas cores:
+         - not_assigned: '#9CA3AF' (cinza - mantido)
+         - assigned_not_invited: '#F97316' (laranja - Tailwind orange-500)
+         - assigned_invited: '#EAB308' (amarelo - Tailwind yellow-500)
+         - assigned_confirmed: '#22C55E' (verde - Tailwind green-500)
+         - gave_up: '#7F1D1D' (vinho escuro / burgundy - Tailwind red-900)
+      2. Remover as 3 camadas (outerRing, innerCircle, glowDot). Renderizar
+         um unico <Animated.View> circular com backgroundColor da cor do
+         status. O tamanho e o prop size (default 16).
+      3. Manter a animacao de fading (opacity pulse) para assigned_not_invited.
+         A animacao agora aplica ao unico circulo ao inves do innerCircle.
+      4. StatusChangeModal.tsx: Atualizar STATUS_INDICATOR_COLORS com as
+         mesmas novas cores.
+      5. Remover styles.outerRing, styles.innerCircle, styles.glowDot.
+         Adicionar styles.circle (novo estilo flat).
+
+    root_cause: >
+      StatusLED usa design 3D com 3 camadas. Cores nao correspondem ao
+      esquema desejado pelo usuario (laranja para nao-convidado, amarelo para
+      convidado, vinho escuro para desistiu).
+
+    acceptance_criteria:
+      - id: AC-F069-01
+        description: "LED e um circulo flat sem efeito 3D"
+        given: "StatusLED renderizado para qualquer status"
+        when: "O componente e exibido na tela"
+        then: "LED e um unico circulo com cor solida, sem camadas internas, sem ponto de brilho, sem efeito de profundidade"
+        status: pending
+
+      - id: AC-F069-02
+        description: "Cor cinza para not_assigned"
+        given: "Speech com status not_assigned"
+        when: "StatusLED e renderizado"
+        then: "LED exibe circulo cinza (#9CA3AF ou equivalente)"
+        status: pending
+
+      - id: AC-F069-03
+        description: "Cor laranja para assigned_not_invited"
+        given: "Speech com status assigned_not_invited"
+        when: "StatusLED e renderizado"
+        then: "LED exibe circulo laranja (#F97316 ou equivalente)"
+        status: pending
+
+      - id: AC-F069-04
+        description: "Cor amarelo para assigned_invited"
+        given: "Speech com status assigned_invited"
+        when: "StatusLED e renderizado"
+        then: "LED exibe circulo amarelo (#EAB308 ou equivalente)"
+        status: pending
+
+      - id: AC-F069-05
+        description: "Cor verde para assigned_confirmed"
+        given: "Speech com status assigned_confirmed"
+        when: "StatusLED e renderizado"
+        then: "LED exibe circulo verde (#22C55E ou equivalente)"
+        status: pending
+
+      - id: AC-F069-06
+        description: "Cor vinho escuro para gave_up"
+        given: "Speech com status gave_up"
+        when: "StatusLED e renderizado"
+        then: "LED exibe circulo vinho escuro/burgundy (#7F1D1D ou equivalente)"
+        status: pending
+
+      - id: AC-F069-07
+        description: "Animacao de fading mantida para assigned_not_invited"
+        given: "Speech com status assigned_not_invited"
+        when: "StatusLED e renderizado com reduced motion desabilitado"
+        then: "LED pisca/faz fade com ciclo de ~2s (opacity 0.3 a 1, repetindo infinitamente)"
+        status: pending
+
+      - id: AC-F069-08
+        description: "Reduced motion respeita preferencia de acessibilidade"
+        given: "Dispositivo com reduced motion habilitado"
+        when: "StatusLED e renderizado para assigned_not_invited"
+        then: "LED nao anima (opacity fixa em 1)"
+        status: pending
+
+      - id: AC-F069-09
+        description: "StatusChangeModal usa mesmas novas cores"
+        given: "StatusChangeModal aberto"
+        when: "Opcoes de status sao exibidas"
+        then: "Indicadores circulares usam mesmas cores: cinza, laranja, amarelo, verde, vinho escuro"
+        status: pending
+
+      - id: AC-F069-10
+        description: "LED pressable preservado (regressao check)"
+        given: "StatusLED com onPress e nao disabled"
+        when: "Usuario pressiona o LED"
+        then: "onPress e chamado (abre StatusChangeModal)"
+        status: pending
+
+      - id: AC-F069-11
+        description: "LED tamanho prop preservado (regressao check)"
+        given: "StatusLED com size prop customizado"
+        when: "O componente e renderizado"
+        then: "LED tem o tamanho especificado pelo prop size"
+        status: pending
+
+      - id: AC-F069-12
+        description: "LED no SundayCard header (3 LEDs colapsado) usa novas cores"
+        given: "SundayCard colapsado na aba Discursos"
+        when: "Os 3 LEDs no header sao exibidos"
+        then: "LEDs usam as novas cores flat (cinza, laranja, amarelo, verde, vinho)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F069-01
+        case: "Cor vinho escuro em tema claro (light mode)"
+        expected: "Vinho escuro (#7F1D1D) e visivel contra fundo claro do card"
+        status: pending
+      - id: EC-F069-02
+        case: "Cor vinho escuro em tema escuro (dark mode)"
+        expected: "Vinho escuro (#7F1D1D) pode ter baixo contraste em fundo escuro. Aceitar como adequado pois o circulo e pequeno (16px) e o status 'desistiu' e raro. Se necessario, ajustar para cor mais clara em dark mode futuramente."
+        status: pending
+      - id: EC-F069-03
+        case: "InviteManagementSection e InviteActionDropdown que usam STATUS_INDICATOR_COLORS"
+        expected: "Estes componentes importam STATUS_INDICATOR_COLORS de StatusChangeModal.tsx. Ao atualizar as cores no StatusChangeModal, os indicadores nesses componentes tambem sao atualizados automaticamente."
+        status: pending
+
+    files_impacted:
+      - path: "src/components/StatusLED.tsx"
+        change: "Remover LEDColors interface. STATUS_COLORS vira Record<SpeechStatus, string> com novas cores flat. Remover 3 camadas (outerRing, innerCircle, glowDot). Renderizar unico Animated.View circular. Manter animacao de fading. Remover styles nao usados, adicionar styles.circle."
+      - path: "src/components/StatusChangeModal.tsx"
+        change: "Atualizar STATUS_INDICATOR_COLORS com novas cores: not_assigned=#9CA3AF, assigned_not_invited=#F97316, assigned_invited=#EAB308, assigned_confirmed=#22C55E, gave_up=#7F1D1D."
+
+    dependencies: []
+    related_features: [F008, F051, F062, F063]
+    related_crs: [116, 119]
+
+  # ===========================================================================
+  # F070 / CR-127: Delete speeches when changing sunday type away from speeches
+  # ===========================================================================
+
+  - id: F070
+    name: "Delete speech assignments when changing sunday type away from 'speeches'"
+    cr_id: 127
+    type: bug_critical
+    priority: critical
+
+    description: >
+      Regressao do CR-115 (F061). O CR-115 adicionou dialogo de confirmacao ao
+      mudar tipo de domingo de 'speeches' para outro quando ha discursantes ou
+      temas atribuidos. No entanto, quando o usuario confirma a mudanca, o
+      useSetSundayType (useSundayTypes.ts linhas 209-289) apenas atualiza a
+      tabela sunday_exceptions sem apagar os registros de speeches associados
+      aquele domingo. Isso significa que os dados de designacao (speaker_name,
+      topic_title, etc.) permanecem no banco de dados, e se o usuario voltar
+      para 'speeches' os dados antigos reaparecem.
+      O comportamento correto e: quando o usuario confirma a mudanca de tipo
+      de domingo (de 'speeches' para outro), alem de atualizar sunday_exceptions,
+      tambem deve apagar os registros de speeches (tabela speeches) para aquele
+      domingo (ward_id + sunday_date). Isso garante que os dados de designacao
+      nao fiquem orfaos no banco.
+      A logica de limpeza deve estar no fluxo de mudanca de tipo, nao no
+      useSetSundayType generico (que pode ser usado em outros contextos).
+      A melhor abordagem e criar um novo hook/funcao que combina:
+      1. Chamar delete/reset nos speeches do domingo
+      2. Chamar setSundayType para atualizar a excecao
+      Ou alternativamente, o SundayTypeDropdown pode chamar a limpeza dos
+      speeches ANTES de chamar onSelect (na callback de confirmacao).
+      A abordagem mais limpa e: no speeches.tsx (ou onde handleTypeChange e
+      definido), apos o usuario confirmar no Alert.alert, deletar os speeches
+      daquele domingo via supabase e entao chamar setSundayType.
+      NOTA: O SundayTypeDropdown ja verifica hasAssignments e mostra o Alert.
+      A logica de limpeza deve ser adicionada no callback de confirmacao.
+
+    user_request: >
+      "Quando alguem selecionar uma opcao diferente de 'Domingo com Discursos'
+      e houver discursantes e/ou temas selecionados, e a pessoa confirmar no
+      dialogo que ela quer continuar, temos que apagar as designacoes de
+      pessoas e temas desse domingo do banco de dados."
+
+    analysis: >
+      Baseline:
+      - SundayCard.tsx: SundayTypeDropdown.handleSelect (linhas 106-141)
+        verifica hasAssignments, mostra Alert.alert, e no onPress do
+        confirmacao chama onSelect(type). Nao ha logica de limpeza de speeches.
+      - speeches.tsx: handleTypeChange (linhas 242-246) chama
+        setSundayType.mutate({ date, reason, custom_reason }). Nao ha
+        logica de limpeza de speeches.
+      - useSundayTypes.ts: useSetSundayType (linhas 209-289) faz upsert
+        em sunday_exceptions. Nao toca na tabela speeches.
+      - useSpeeches.ts: useRemoveAssignment (linhas 289-317) remove um
+        speaker de um speech individual (update com null). Nao existe
+        funcao para deletar todos os speeches de um domingo.
+      Fix proposto:
+      1. Criar novo hook useDeleteSpeechesByDate em useSpeeches.ts que
+         deleta todos os registros da tabela speeches para um dado
+         ward_id + sunday_date.
+      2. No SundayTypeDropdown, adicionar prop onDeleteSpeeches (callback)
+         que e chamado APOS confirmacao e ANTES de onSelect. Isso
+         permite ao componente pai (speeches.tsx) wiring da logica.
+      3. Em speeches.tsx, handleTypeChange recebe info de que e uma
+         mudanca que requer limpeza. Uma abordagem mais simples:
+         Mover a logica de confirmacao + limpeza para o callback do
+         SundayTypeDropdown. O onSelect ja e chamado APOS confirmacao.
+         Adicionar novo prop onConfirmWithCleanup que recebe (date, type)
+         e faz: deleteSpeechesByDate(date) + setSundayType(date, type).
+      Abordagem FINAL (mais simples): O SundayTypeDropdown ja tem a
+      logica de confirmacao. Precisa de um callback para limpar speeches.
+      Adicionar prop onDeleteSpeeches?: (date: string) => void ao
+      SundayTypeDropdown. No onPress do Alert de confirmacao, chamar
+      onDeleteSpeeches antes de onSelect. O SundayCard passa este
+      prop. O speeches.tsx/SundayCard passa uma funcao que deleta
+      speeches. O delete usa supabase diretamente ou um hook dedicado.
+
+    root_cause: >
+      useSetSundayType (useSundayTypes.ts:209-289) so atualiza
+      sunday_exceptions. Nao apaga os registros de speeches (speaker_name,
+      topic_title, member_id, etc.) associados ao domingo quando o tipo
+      muda de 'speeches' para outro. Os dados ficam orfaos no banco.
+
+    acceptance_criteria:
+      - id: AC-F070-01
+        description: "Speeches apagados do banco apos confirmar mudanca de tipo"
+        given: "Domingo com tipo 'speeches' e discursantes/temas atribuidos"
+        when: "Usuario seleciona outro tipo e confirma no dialogo"
+        then: "Todos os registros da tabela speeches para aquele ward_id + sunday_date sao deletados do banco de dados"
+        status: pending
+
+      - id: AC-F070-02
+        description: "Cancelar no dialogo NAO apaga speeches"
+        given: "Domingo com tipo 'speeches' e discursantes/temas atribuidos"
+        when: "Usuario seleciona outro tipo e cancela no dialogo"
+        then: "Nenhum registro de speeches e apagado. Tipo permanece 'speeches'."
+        status: pending
+
+      - id: AC-F070-03
+        description: "Sem atribuicoes: mudanca direta sem apagar (nada para apagar)"
+        given: "Domingo com tipo 'speeches' e NENHUM discursante ou tema atribuido"
+        when: "Usuario seleciona outro tipo"
+        then: "Mudanca direta sem confirmacao. Speeches vazios (se existirem) sao apagados tambem."
+        status: pending
+
+      - id: AC-F070-04
+        description: "Reverter para 'speeches' NAO tenta deletar"
+        given: "Domingo com tipo diferente de 'speeches' (ex: testimony_meeting)"
+        when: "Usuario seleciona 'Domingo com Discursos'"
+        then: "Tipo reverte para speeches sem tentativa de deletar registros (nao devem existir speeches nesse estado)"
+        status: pending
+
+      - id: AC-F070-05
+        description: "Dados de speeches nao reaparecem ao voltar para 'speeches'"
+        given: "Domingo que foi mudado de 'speeches' para outro tipo com confirmacao"
+        when: "Usuario muda de volta para 'speeches'"
+        then: "Os slots de discurso estao vazios (not_assigned). Os dados antigos foram apagados e nao reaparecem."
+        status: pending
+
+      - id: AC-F070-06
+        description: "Query cache invalidado apos delete"
+        given: "Speeches apagados do banco"
+        when: "A tela e atualizada"
+        then: "A query de speeches e invalidada para refletir o estado atual (slots vazios)"
+        status: pending
+
+      - id: AC-F070-07
+        description: "Audit log registra a limpeza"
+        given: "Speeches apagados apos confirmacao"
+        when: "A operacao e concluida"
+        then: "Uma entrada no audit log registra a acao de limpeza (ex: 'Designacoes do domingo DD/MM removidas ao mudar tipo')"
+        status: pending
+
+      - id: AC-F070-08
+        description: "Confirmacao com tipo 'other' funciona corretamente"
+        given: "Domingo com speeches atribuidos"
+        when: "Usuario seleciona 'Outro' e confirma no primeiro dialogo"
+        then: "Speeches sao apagados, modal de texto customizado abre, e apos confirmar o texto o tipo e atualizado"
+        status: pending
+
+    edge_cases:
+      - id: EC-F070-01
+        case: "Apenas topic atribuido (sem speaker)"
+        expected: "Confirmacao exibida (topic_title preenchido). Speeches apagados ao confirmar."
+        status: pending
+      - id: EC-F070-02
+        case: "3 speeches com mix de designacoes e vazios"
+        expected: "Todos os 3 registros de speeches sao apagados (inclusive os sem designacao)"
+        status: pending
+      - id: EC-F070-03
+        case: "Erro ao deletar speeches (ex: sem conexao)"
+        expected: "Erro tratado com fallback. Tipo de domingo NAO muda se delete falhar. Mensagem de erro exibida."
+        status: pending
+      - id: EC-F070-04
+        case: "Speeches ja deletados manualmente antes de mudar tipo"
+        expected: "Delete por ward_id+sunday_date retorna 0 rows afetados. Nao causa erro. Tipo muda normalmente."
+        status: pending
+
+    files_impacted:
+      - path: "src/hooks/useSpeeches.ts"
+        change: "Adicionar hook useDeleteSpeechesByDate que deleta registros da tabela speeches para ward_id + sunday_date. Invalidar speechKeys.all apos delete."
+      - path: "src/components/SundayCard.tsx"
+        change: "SundayTypeDropdown: adicionar prop onDeleteSpeeches. No callback de confirmacao do Alert.alert, chamar onDeleteSpeeches(date) antes de onSelect. SundayCard: passar prop onDeleteSpeeches recebido do pai."
+      - path: "src/app/(tabs)/speeches.tsx"
+        change: "Wiring de onDeleteSpeeches: criar handler que chama deleteSpeechesByDate.mutate(date). Passar para SundayCard."
+
+    dependencies: [F061]
+    related_features: [F007, F008, F061]
+    related_crs: [6, 7, 56, 95, 115]
+
+  # ===========================================================================
+  # F071 / CR-129: LED click shows all statuses except not_assigned
+  # ===========================================================================
+
+  - id: F071
+    name: "LED click shows all status options except 'not_assigned'"
+    cr_id: 129
+    type: feature
+    priority: medium
+
+    description: >
+      Regressao do CR-116 (F062). O CR-116 fez com que ao clicar no LED de um
+      speech no status assigned_invited, o StatusChangeModal mostrasse APENAS
+      'confirmado' e 'desistiu'. No entanto, o usuario agora quer que ao
+      clicar no LED, TODAS as opcoes de status sejam mostradas EXCETO
+      'nao designado' (not_assigned). Isso se aplica a QUALQUER status em que
+      o LED e interativo (assigned_not_invited, assigned_invited,
+      assigned_confirmed, gave_up).
+      Atualmente no SpeechSlot.tsx (linha 138-140):
+        const ledAllowedStatuses = status === 'assigned_invited'
+          ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
+          : undefined;
+      Isso filtra apenas para assigned_invited e mostra tudo para outros.
+      O novo comportamento deve ser: para QUALQUER status interativo do LED,
+      passar allowedStatuses com todos os status EXCETO not_assigned:
+      ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'gave_up'].
+      O StatusChangeModal ja faz interseccao de allowedStatuses com
+      getAvailableStatuses(currentStatus), entao apenas as transicoes validas
+      E que estao na lista de permitidos serao exibidas.
+      Resultado pratico por status:
+      - assigned_not_invited: VALID_TRANSITIONS = [assigned_invited, not_assigned]
+        interseccao com allowed (sem not_assigned) = [assigned_invited]
+      - assigned_invited: VALID_TRANSITIONS = [assigned_confirmed, assigned_not_invited, gave_up, not_assigned]
+        interseccao com allowed (sem not_assigned) = [assigned_confirmed, assigned_not_invited, gave_up]
+      - assigned_confirmed: VALID_TRANSITIONS = [not_assigned]
+        interseccao com allowed (sem not_assigned) = [] (lista vazia)
+      - gave_up: VALID_TRANSITIONS = [not_assigned]
+        interseccao com allowed (sem not_assigned) = [] (lista vazia)
+      Para assigned_confirmed e gave_up, o resultado seria lista vazia. Isso
+      significa que o modal abriria sem opcoes. Para evitar isso, o LED deve
+      ser desabilitado (nao interativo) quando a interseccao resultar em lista
+      vazia. Na pratica, isso significa manter o LED desabilitado para
+      assigned_confirmed e gave_up, ou verificar antes de abrir o modal.
+      Abordagem: o handleStatusPress ja verifica status === 'not_assigned'
+      para desabilitar. Adicionar verificacao para assigned_confirmed e gave_up
+      tambem, pois nao terao opcoes no modal apos o filtro.
+
+    user_request: >
+      "Quando alguem clicar no LED de um discurso, mostre todas as opcoes de
+      status com excecao do 'nao designado'"
+
+    analysis: >
+      Baseline:
+      - SpeechSlot.tsx:137-140: ledAllowedStatuses filtra apenas para
+        assigned_invited, mostrando [assigned_confirmed, gave_up].
+        Para outros status, undefined (sem filtro, mostra todos).
+      - SpeechSlot.tsx:99-102: handleStatusPress: desabilita para
+        !canChangeStatus, !speech, ou status === 'not_assigned'.
+      - StatusChangeModal.tsx:59-61: availableStatuses filtrados por
+        allowedStatuses (interseccao) quando prop passada.
+      - useSpeeches.ts:59-65: VALID_TRANSITIONS define transicoes validas.
+      Fix proposto:
+      1. SpeechSlot.tsx: Alterar ledAllowedStatuses para ser constante
+         (nao dependente do status):
+         const ledAllowedStatuses: SpeechStatus[] = [
+           'assigned_not_invited', 'assigned_invited',
+           'assigned_confirmed', 'gave_up'
+         ];
+         Isso exclui 'not_assigned' de todas as opcoes exibidas.
+      2. handleStatusPress: Adicionar verificacao de que a interseccao de
+         VALID_TRANSITIONS e ledAllowedStatuses nao e vazia. Se vazia,
+         nao abrir modal. Na pratica, desabilitar LED tambem para
+         assigned_confirmed e gave_up (cujas unicas transicoes sao
+         para not_assigned, que sera filtrado).
+      3. StatusLED disabled prop: Adicionar assigned_confirmed e gave_up
+         como estados desabilitados.
+
+    root_cause: >
+      SpeechSlot.tsx:138-140 filtra ledAllowedStatuses apenas para
+      assigned_invited com [assigned_confirmed, gave_up]. Para outros
+      status, nao aplica filtro. O usuario quer filtro uniforme: todos
+      os status exceto not_assigned, para qualquer status interativo.
+
+    acceptance_criteria:
+      - id: AC-F071-01
+        description: "LED click em assigned_not_invited mostra apenas assigned_invited"
+        given: "SpeechSlot com speech no status assigned_not_invited"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal mostra apenas 1 opcao: assigned_invited (interseccao de transitions [assigned_invited, not_assigned] com allowed [sem not_assigned])"
+        status: pending
+
+      - id: AC-F071-02
+        description: "LED click em assigned_invited mostra 3 opcoes (sem not_assigned)"
+        given: "SpeechSlot com speech no status assigned_invited"
+        when: "Usuario clica no LED"
+        then: "StatusChangeModal mostra 3 opcoes: assigned_confirmed, assigned_not_invited, gave_up (interseccao de transitions [assigned_confirmed, assigned_not_invited, gave_up, not_assigned] com allowed [sem not_assigned])"
+        status: pending
+
+      - id: AC-F071-03
+        description: "LED desabilitado para assigned_confirmed"
+        given: "SpeechSlot com speech no status assigned_confirmed"
+        when: "Usuario tenta clicar no LED"
+        then: "LED nao responde ao clique (nao abre modal). A unica transicao valida (not_assigned) esta excluida pelo filtro."
+        status: pending
+
+      - id: AC-F071-04
+        description: "LED desabilitado para gave_up"
+        given: "SpeechSlot com speech no status gave_up"
+        when: "Usuario tenta clicar no LED"
+        then: "LED nao responde ao clique (nao abre modal). A unica transicao valida (not_assigned) esta excluida pelo filtro."
+        status: pending
+
+      - id: AC-F071-05
+        description: "LED desabilitado para not_assigned (preservado)"
+        given: "SpeechSlot com speech no status not_assigned"
+        when: "Usuario tenta clicar no LED"
+        then: "LED nao responde ao clique (comportamento existente preservado)"
+        status: pending
+
+      - id: AC-F071-06
+        description: "StatusChangeModal sem prop de filtro nao afetado (regressao)"
+        given: "StatusChangeModal usado em InviteActionDropdown (sem allowedStatuses)"
+        when: "Modal e aberto"
+        then: "Todas as transicoes validas sao exibidas (comportamento original preservado)"
+        status: pending
+
+      - id: AC-F071-07
+        description: "Observer nao pode clicar LED (preservado)"
+        given: "Usuario com role observer"
+        when: "LED e renderizado"
+        then: "LED nao e interativo (disabled=true, comportamento existente preservado)"
+        status: pending
+
+    edge_cases:
+      - id: EC-F071-01
+        case: "assigned_confirmed com remocao de designacao necessaria"
+        expected: "O LED nao permite mudar status. O usuario deve usar o botao X para remover a designacao inteira (que reseta para not_assigned). Isso e intencional: uma vez confirmado, o status so muda via remocao completa."
+        status: pending
+      - id: EC-F071-02
+        case: "gave_up com necessidade de re-designar"
+        expected: "O LED nao permite mudar status. O usuario deve usar o botao X para remover e re-designar. Isso e consistente com o fluxo de assigned_confirmed."
+        status: pending
+
+    files_impacted:
+      - path: "src/components/SpeechSlot.tsx"
+        change: "Alterar ledAllowedStatuses para constante com todos os status exceto not_assigned. Atualizar handleStatusPress e disabled do StatusLED para desabilitar em assigned_confirmed e gave_up (alem de not_assigned)."
+
+    dependencies: []
+    related_features: [F008, F062]
+    related_crs: [116]
+
+  # ===========================================================================
+  # F072 / CR-130: Country code display fix for US/Canada
+  # ===========================================================================
+
+  - id: F072
+    name: "Fix country code display for countries sharing same dial code (US/Canada)"
+    cr_id: 130
+    type: bug
+    priority: high
+
+    description: >
+      Regressao do CR-117 (F057). O CR-117 corrigiu a ordem de US/Canada na
+      lista de codigos movendo US antes de Canada. Tambem adicionou
+      countryLabel state para tracking da selecao por label (unico) ao inves
+      de code (duplicado). No entanto, o display do pais selecionado ainda
+      usa getFlagForCode(countryCode) que faz .find() pelo code. Para paises
+      com code unico funciona, mas para US e Canada (ambos +1), o display
+      sempre mostra a bandeira do primeiro match (US), mesmo quando Canada
+      foi selecionado.
+      O bug esta na exibicao, nao na selecao. Quando o usuario seleciona
+      Canada, setCountryCode('+1') e setCountryLabel('Canada (+1)') sao
+      chamados corretamente. O countryLabel tem o valor correto ('Canada (+1)').
+      Mas a exibicao no botao (linha 98) usa getFlagForCode(countryCode) que
+      retorna a bandeira de US (primeiro +1 na lista).
+      Fix: O display deve usar countryLabel para determinar a bandeira,
+      nao countryCode. Criar funcao getCountryByLabel (ja existe em
+      countryCodes.ts!) para buscar o entry pelo label e usar seu flag.
+      Alternativamente, armazenar o entry completo (incluindo flag) no
+      state ao selecionar, ao inves de reconstruir a partir do code.
+      Abordagem proposta: usar getCountryByLabel(countryLabel)?.flag para
+      exibir a bandeira no botao, ao inves de getFlagForCode(countryCode).
+      Isso resolve o problema porque countryLabel e unico ('Canada (+1)'
+      vs 'United States (+1)'), enquanto countryCode e ambiguo ('+1').
+      Tambem e necessario corrigir a inicializacao: quando member existente
+      tem country_code '+1', o state countryLabel e inicializado com o
+      primeiro match (.find() por code). Isso pode ser US mesmo se o membro
+      era Canada. Para resolver completamente, seria necessario armazenar o
+      label no banco (country_label field). Mas como mitigacao imediata, a
+      inicializacao com primeiro match (US para +1) e aceitavel, pois US e
+      o caso padrao para +1 no contexto LDS.
+
+    user_request: >
+      "Quando esta selecionado US como codigo internacional, e eu seleciono
+      Canada, ele nao troca. Se esta selecionado outro pais e eu seleciono
+      Canada, ele na verdade, mostra US. Acho que o problema nao esta com a
+      selecao em si, mas em como ele mostra a selecao no campo"
+
+    analysis: >
+      Baseline:
+      - members.tsx:57: countryCode state = member?.country_code ?? '+55'
+      - members.tsx:58-60: countryLabel state inicializado com
+        COUNTRY_CODES.find(c => c.code === member?.country_code)?.label
+        Para +1 retorna 'United States (+1)' (primeiro match).
+      - members.tsx:98: display usa getFlagForCode(countryCode) que
+        sempre retorna bandeira de US para +1.
+      - members.tsx:99: exibe countryCode ('+1') - correto mas ambiguo.
+      - members.tsx:156-158: ao selecionar, setCountryCode(item.code) e
+        setCountryLabel(item.label). O label e correto.
+      - members.tsx:154: highlight usa item.label === countryLabel (correto,
+        unico). Isso ja funciona: apenas o pais selecionado fica highlighted.
+      - countryCodes.ts:205-207: getCountryByLabel(label) ja existe e
+        retorna o entry pelo label. Perfeito para usar na exibicao.
+      Fix proposto:
+      1. members.tsx:98: Trocar getFlagForCode(countryCode) por
+         getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode).
+         Isso usa o label (unico) para encontrar a bandeira correta.
+         O fallback getFlagForCode e para o caso improvavel de countryLabel
+         nao encontrado.
+      2. Isso resolve o display: ao selecionar Canada, countryLabel='Canada (+1)',
+         getCountryByLabel retorna entry com flag do Canada.
+      3. A inicializacao (member existente com +1) continuara mostrando US
+         como padrao. Isso e aceitavel (US padrao para +1, usuario pode
+         re-selecionar Canada se necessario).
+
+    root_cause: >
+      members.tsx:98 usa getFlagForCode(countryCode) para exibir a bandeira.
+      Para codigos compartilhados (+1: US e Canada, +7: Kazakhstan e Russia),
+      getFlagForCode retorna sempre o primeiro match na lista. O state
+      countryLabel tem o valor correto mas nao e usado para exibicao da
+      bandeira.
+
+    acceptance_criteria:
+      - id: AC-F072-01
+        description: "Selecionar Canada com US selecionado mostra bandeira do Canada"
+        given: "MemberEditor com countryCode +1 (US selecionado)"
+        when: "Usuario abre dropdown, seleciona Canada"
+        then: "Botao de country code mostra bandeira do Canada e codigo +1"
+        status: pending
+
+      - id: AC-F072-02
+        description: "Selecionar Canada com outro pais selecionado mostra bandeira do Canada"
+        given: "MemberEditor com countryCode +55 (Brazil selecionado)"
+        when: "Usuario abre dropdown, seleciona Canada"
+        then: "Botao de country code mostra bandeira do Canada e codigo +1 (nao bandeira de US)"
+        status: pending
+
+      - id: AC-F072-03
+        description: "Selecionar US continua funcionando corretamente"
+        given: "MemberEditor com qualquer pais selecionado"
+        when: "Usuario abre dropdown, seleciona United States"
+        then: "Botao de country code mostra bandeira dos US e codigo +1"
+        status: pending
+
+      - id: AC-F072-04
+        description: "Selecionar Russia vs Kazakhstan funciona corretamente (+7)"
+        given: "MemberEditor com qualquer pais selecionado"
+        when: "Usuario seleciona Russia (+7)"
+        then: "Botao mostra bandeira da Russia e codigo +7"
+        status: pending
+
+      - id: AC-F072-05
+        description: "Selecionar Kazakhstan funciona corretamente (+7)"
+        given: "MemberEditor com qualquer pais selecionado"
+        when: "Usuario seleciona Kazakhstan (+7)"
+        then: "Botao mostra bandeira do Kazakhstan e codigo +7"
+        status: pending
+
+      - id: AC-F072-06
+        description: "Highlight na lista mostra apenas pais selecionado (preservado)"
+        given: "countryCode +1 com countryLabel 'Canada (+1)'"
+        when: "Dropdown de paises e aberto"
+        then: "Apenas Canada aparece highlighted na lista (US nao esta highlighted)"
+        status: pending
+
+      - id: AC-F072-07
+        description: "Pais com codigo unico nao afetado (regressao check)"
+        given: "MemberEditor com countryCode +55 (Brazil)"
+        when: "Botao de country code e exibido"
+        then: "Bandeira do Brazil e mostrada corretamente"
+        status: pending
+
+      - id: AC-F072-08
+        description: "Inicializacao com membro existente +1 mostra US por padrao"
+        given: "Membro existente no banco com country_code='+1'"
+        when: "MemberEditor e aberto para editar esse membro"
+        then: "Bandeira dos US e mostrada por padrao (primeiro match para +1). Usuario pode re-selecionar Canada se necessario."
+        status: pending
+
+    edge_cases:
+      - id: EC-F072-01
+        case: "countryLabel nao encontrado (entry removido da lista)"
+        expected: "Fallback para getFlagForCode(countryCode) que retorna primeiro match ou globe emoji"
+        status: pending
+      - id: EC-F072-02
+        case: "Novo membro sem country_code (default +55)"
+        expected: "countryLabel inicializado como 'Brazil (+55)', bandeira do Brazil mostrada corretamente"
+        status: pending
+
+    files_impacted:
+      - path: "src/app/(tabs)/settings/members.tsx"
+        change: "Linha 98: trocar getFlagForCode(countryCode) por getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode). Adicionar import de getCountryByLabel de countryCodes.ts (ja importado parcialmente)."
+
+    dependencies: []
+    related_features: [F003, F029, F057]
+    related_crs: [85, 92, 117]
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+  - id: OQ-F069-01
+    feature: F069
+    question: >
+      A cor vinho escuro (#7F1D1D) pode ter baixo contraste em dark mode
+      (fundo escuro do card). Deve-se usar uma cor mais clara de vinho em
+      dark mode (ex: #991B1B) ou manter a mesma cor em ambos os modos?
+    impact: "Visibilidade do status 'desistiu' em dark mode"
+    default_if_unanswered: >
+      Manter mesma cor (#7F1D1D) em ambos os modos. O circulo e pequeno
+      (16px) e o status 'desistiu' e raro. Se necessario, ajustar
+      futuramente com CR dedicado.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: ASM-F069-01
+    description: >
+      As cores exatas para os novos status seguem a paleta Tailwind CSS
+      mais proxima: cinza (#9CA3AF), laranja (#F97316, orange-500), amarelo
+      (#EAB308, yellow-500), verde (#22C55E, green-500), vinho escuro
+      (#7F1D1D, red-900). Se o usuario preferir tons ligeiramente diferentes,
+      basta ajustar os hex codes.
+    impact: "Nenhum - cores facilmente ajustaveis"
+
+  - id: ASM-F069-02
+    description: >
+      A animacao de fading (pulse de opacidade) para assigned_not_invited
+      e mantida no design flat. O comportamento e identico ao anterior
+      (opacity 0.3 a 1 em ~2s, repetindo infinitamente), apenas aplicado
+      ao circulo flat unico ao inves da camada interna.
+    impact: "Nenhum - mesma animacao, componente simplificado"
+
+  - id: ASM-F069-03
+    description: >
+      Os componentes InviteManagementSection e InviteActionDropdown importam
+      STATUS_INDICATOR_COLORS de StatusChangeModal.tsx. Ao atualizar as cores
+      no StatusChangeModal, esses componentes herdam automaticamente as novas
+      cores sem alteracao de codigo.
+    impact: "Nenhum - single source of truth para cores de indicador"
+
+  - id: ASM-F070-01
+    description: >
+      A limpeza dos speeches ao mudar tipo de domingo usa DELETE na tabela
+      speeches (nao UPDATE com null). Isso remove completamente os registros
+      ao inves de apenas limpar os campos. Isso e mais limpo pois os registros
+      de speeches para domingos nao-discourse nao devem existir.
+    impact: "Nenhum - DELETE e a operacao mais adequada. Os speeches serao
+      re-criados via useGetOrCreateSpeeches quando o tipo voltar para 'speeches'."
+
+  - id: ASM-F070-02
+    description: >
+      A limpeza dos speeches tambem se aplica quando nao ha atribuicoes
+      (speeches existem mas estao vazios). Isso garante consistencia: domingos
+      nao-discourse nunca tem registros na tabela speeches.
+    impact: "Baixo - speeches vazios nao tem dados significativos"
+
+  - id: ASM-F070-03
+    description: >
+      A limpeza e feita antes de atualizar o tipo de domingo. Se o delete
+      falhar, o tipo nao e alterado (operacao atomica do ponto de vista do
+      usuario). Na implementacao, o delete e chamado primeiro, e se bem-sucedido,
+      o tipo e alterado em seguida. Nao ha transacao SQL formal, mas o
+      ordenamento garante consistencia: se o delete falha, o tipo nao muda.
+    impact: "Baixo - ordem de operacoes garante consistencia"
+
+  - id: ASM-F071-01
+    description: >
+      Para os status assigned_confirmed e gave_up, o LED se torna
+      nao-interativo (igual a not_assigned). Isso porque a unica transicao
+      valida para esses status e not_assigned, que esta excluida do filtro.
+      O usuario deve usar o botao X para remover a designacao inteira se
+      precisar mudar o status. Isso e consistente com o modelo mental de
+      que "confirmado" e "desistiu" sao estados terminais do convite.
+    impact: "Medio - muda UX de assigned_confirmed e gave_up. Anteriormente
+      o LED permitia reverter para not_assigned via modal. Agora so via X."
+
+  - id: ASM-F072-01
+    description: >
+      A inicializacao do countryLabel para membros existentes com +1 usa o
+      primeiro match (US). Isso e aceitavel pois nao ha como distinguir US de
+      Canada no banco (ambos armazenam '+1' em country_code). Para correcao
+      completa, seria necessario armazenar country_label no banco (migracao).
+      Isso fica como melhoria futura se necessario.
+    impact: "Baixo - US e o padrao para +1 no contexto LDS. Usuarios do
+      Canada podem re-selecionar ao editar o membro."
+
+  - id: ASM-F072-02
+    description: >
+      A funcao getCountryByLabel ja existe em countryCodes.ts (linhas 205-207)
+      e nao precisa ser criada. Apenas precisa ser importada em members.tsx.
+    impact: "Nenhum - reutilizacao de funcao existente"
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []

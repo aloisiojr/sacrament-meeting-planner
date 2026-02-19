@@ -1,0 +1,574 @@
+# =============================================================================
+# PLAN_P020.yaml
+# Implementation Plan for Batch 10 Phase 1 - LED Redesign, Sunday Type Data
+#   Cleanup, Speech LED Status Options, Country Code Display Fix
+# Features: F069, F070, F071, F072
+# CRs: CR-126, CR-127, CR-129, CR-130
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  4 mudancas de UI/logica: redesign do StatusLED para circulo flat com novo
+  esquema de cores (F069), limpeza de speeches ao mudar tipo de domingo (F070),
+  filtro de status no LED click excluindo not_assigned + desabilitar LED para
+  assigned_confirmed e gave_up (F071), e fix de exibicao de bandeira para
+  paises com codigo compartilhado (F072).
+
+strategy:
+  order: "Happy path (F069 LED flat -> F070 delete speeches -> F071 LED filter -> F072 country display) -> Edge cases -> Tests -> Documentation"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F069 - StatusLED flat circle + novas cores
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/components/StatusLED.tsx:
+      (1) Remover interface LEDColors { outer, inner, glow }.
+      (2) STATUS_COLORS vira Record<SpeechStatus, string> com cores flat:
+          - not_assigned: '#9CA3AF' (cinza)
+          - assigned_not_invited: '#F97316' (laranja - orange-500)
+          - assigned_invited: '#EAB308' (amarelo - yellow-500)
+          - assigned_confirmed: '#22C55E' (verde - green-500)
+          - gave_up: '#7F1D1D' (vinho escuro - red-900)
+      (3) Remover variaveis halfSize, innerSize, glowSize.
+      (4) Remover a variavel colors (= STATUS_COLORS[status]).
+      (5) Renomear animatedInnerStyle para animatedStyle.
+      (6) Substituir content (3 camadas: outerRing > innerCircle > glowDot) por
+          unico <Animated.View> circular:
+            <Animated.View style={[styles.circle, {
+              width: size, height: size, borderRadius: size / 2,
+              backgroundColor: STATUS_COLORS[status],
+            }, animatedStyle]} />
+      (7) Remover styles.outerRing, styles.innerCircle, styles.glowDot.
+          Adicionar styles.circle: {} (dimensoes via inline style).
+      (8) Manter toda logica de Pressable/View wrapper, acessibilidade,
+          animacao de fading para assigned_not_invited, reduced motion.
+      (9) Atualizar JSDoc no topo do arquivo.
+    files:
+      - "src/components/StatusLED.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-03", "STEP-04"]
+    done_when:
+      - "LEDColors interface removida"
+      - "STATUS_COLORS e Record<SpeechStatus, string> com 5 cores flat"
+      - "StatusLED renderiza unico Animated.View circular (sem outerRing, innerCircle, glowDot)"
+      - "Animacao de fading para assigned_not_invited mantida (opacity 0.3 a 1, ~2s)"
+      - "Reduced motion mantido (opacity fixa em 1)"
+      - "styles.outerRing, styles.innerCircle, styles.glowDot removidos"
+      - "styles.circle adicionado"
+      - "StatusLEDProps inalterado (API publica preservada)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que StatusLED renderiza unico circulo flat"
+      - type: unit
+        description: "Verificar cores flat para cada status"
+    covers:
+      acceptance_criteria: ["AC-F069-01", "AC-F069-02", "AC-F069-03", "AC-F069-04", "AC-F069-05", "AC-F069-06", "AC-F069-07", "AC-F069-08", "AC-F069-10", "AC-F069-11", "AC-F069-12"]
+      edge_cases: ["EC-F069-01", "EC-F069-02"]
+    risks:
+      - risk: "Vinho escuro (#7F1D1D) pode ter baixo contraste em dark mode"
+        mitigation: "Aceito: circulo pequeno (16px), status 'desistiu' raro. Ajustar futuramente se necessario."
+
+  # =========================================================================
+  # STEP-02: F069 - StatusChangeModal cores atualizadas
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/components/StatusChangeModal.tsx:
+      Atualizar STATUS_INDICATOR_COLORS para consistencia com StatusLED:
+        not_assigned: '#9CA3AF' (mantido)
+        assigned_not_invited: '#F97316' (era '#FBBF24')
+        assigned_invited: '#EAB308' (era '#FBBF24')
+        assigned_confirmed: '#22C55E' (era '#34D399')
+        gave_up: '#7F1D1D' (era '#F87171')
+      NOTA: InviteManagementSection e InviteActionDropdown importam
+      STATUS_INDICATOR_COLORS deste arquivo. Herdam automaticamente (EC-F069-03).
+    files:
+      - "src/components/StatusChangeModal.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "STATUS_INDICATOR_COLORS atualizado com 5 novas cores"
+      - "assigned_not_invited: '#F97316'"
+      - "assigned_invited: '#EAB308'"
+      - "assigned_confirmed: '#22C55E'"
+      - "gave_up: '#7F1D1D'"
+      - "InviteManagementSection e InviteActionDropdown herdam novas cores automaticamente"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que STATUS_INDICATOR_COLORS tem novas cores"
+    covers:
+      acceptance_criteria: ["AC-F069-09"]
+      edge_cases: ["EC-F069-03"]
+    risks:
+      - risk: "InviteManagementSection e InviteActionDropdown podem ter testes que verificam cores"
+        mitigation: "Atualizar assertions de cor nos testes se necessario"
+
+  # =========================================================================
+  # STEP-03: F070 - Hook useDeleteSpeechesByDate
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/hooks/useSpeeches.ts, adicionar novo hook useDeleteSpeechesByDate
+      apos os hooks existentes (~apos useRemoveAssignment, linha 317):
+      (1) Export function useDeleteSpeechesByDate() que retorna useMutation.
+      (2) mutationFn: recebe sundayDate (string ISO YYYY-MM-DD), executa
+          supabase.from('speeches').delete().eq('ward_id', wardId).eq('sunday_date', sundayDate).
+          Se error, throw error.
+      (3) onSuccess: invalidar speechKeys.all. Logar atividade com logAction
+          (action_type 'speech_cleanup', descricao com data human-readable).
+      (4) Usar wardId, user, userName de useAuth(). QueryClient de useQueryClient().
+      (5) Importar formatDateHumanReadable e getCurrentLanguage (ja importados no arquivo).
+    files:
+      - "src/hooks/useSpeeches.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04"]
+    done_when:
+      - "useDeleteSpeechesByDate exportado de useSpeeches.ts"
+      - "mutationFn deleta speeches por ward_id + sunday_date"
+      - "onSuccess invalida speechKeys.all"
+      - "onSuccess registra log de atividade com action_type 'speech_cleanup'"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que useDeleteSpeechesByDate chama supabase.delete com ward_id e sunday_date"
+      - type: unit
+        description: "Verificar que onSuccess invalida speechKeys.all"
+    covers:
+      acceptance_criteria: ["AC-F070-01", "AC-F070-06", "AC-F070-07"]
+      edge_cases: ["EC-F070-03", "EC-F070-04"]
+    risks:
+      - risk: "Delete pode falhar silenciosamente se ward_id nao corresponde"
+        mitigation: "RLS garante que so deleta speeches da propria ala. Erro propagado ao MutationCache global."
+
+  # =========================================================================
+  # STEP-04: F072 - Fix exibicao de bandeira via getCountryByLabel
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Em src/app/(tabs)/settings/members.tsx:
+      (1) Import: adicionar getCountryByLabel ao import de countryCodes.ts:
+          De: import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes';
+          Para: import { COUNTRY_CODES, getFlagForCode, getCountryByLabel, type CountryCode } from '../../../lib/countryCodes';
+      (2) Linha 98: trocar exibicao da bandeira no botao de country code:
+          De: <Text style={styles.flagText}>{getFlagForCode(countryCode)}</Text>
+          Para: <Text style={styles.flagText}>{getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)}</Text>
+      (3) Fallback getFlagForCode preservado para caso countryLabel nao encontrado.
+      A funcao getCountryByLabel ja existe em countryCodes.ts e nao precisa ser criada.
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+    done_when:
+      - "getCountryByLabel importado de countryCodes.ts"
+      - "Exibicao de bandeira usa getCountryByLabel(countryLabel)?.flag"
+      - "Fallback getFlagForCode(countryCode) preservado"
+      - "Selecionar Canada mostra bandeira do Canada (nao US)"
+      - "Selecionar US continua mostrando bandeira de US"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que bandeira usa getCountryByLabel ao inves de getFlagForCode"
+      - type: unit
+        description: "Verificar que fallback getFlagForCode funciona quando label nao encontrado"
+    covers:
+      acceptance_criteria: ["AC-F072-01", "AC-F072-02", "AC-F072-03", "AC-F072-04", "AC-F072-05", "AC-F072-06", "AC-F072-07", "AC-F072-08"]
+      edge_cases: ["EC-F072-01", "EC-F072-02"]
+    risks:
+      - risk: "Inicializacao de membro existente com +1 mostra US por default"
+        mitigation: "Aceito (ASM-F072-01). US e padrao para +1 no contexto LDS. Correcao completa requer migracao de banco."
+
+  # =========================================================================
+  # STEP-05: F070 - SundayCard.tsx: prop onDeleteSpeeches no dropdown
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/components/SundayCard.tsx:
+      (1) SundayTypeDropdownProps: adicionar 2 props:
+          - date: string (para passar ao onDeleteSpeeches)
+          - onDeleteSpeeches?: (date: string) => void
+      (2) SundayCardProps: adicionar 1 prop:
+          - onDeleteSpeeches?: (date: string) => void
+      (3) SundayTypeDropdown componente: receber date e onDeleteSpeeches.
+      (4) handleSelect, no onPress do Alert de confirmacao (linha 123):
+          Antes de chamar onSelect ou setOtherModalVisible, chamar:
+            onDeleteSpeeches?.(date);
+      (5) Fluxo sem confirmacao (sem assignments) quando currentType === SUNDAY_TYPE_SPEECHES
+          (linhas 136-141): antes de onSelect ou setOtherModalVisible, chamar:
+            if (currentType === SUNDAY_TYPE_SPEECHES) { onDeleteSpeeches?.(date); }
+          Isso garante que speeches vazios tambem sao apagados (ASM-F070-02).
+      (6) SundayCard: passar date={date} e onDeleteSpeeches={onDeleteSpeeches}
+          ao SundayTypeDropdown no JSX expandedContent.
+    files:
+      - "src/components/SundayCard.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "SundayTypeDropdownProps tem props date e onDeleteSpeeches"
+      - "SundayCardProps tem prop onDeleteSpeeches"
+      - "No callback de confirmacao, onDeleteSpeeches chamado antes de onSelect"
+      - "No fluxo sem confirmacao de speeches, onDeleteSpeeches chamado antes de onSelect"
+      - "SundayCard passa date e onDeleteSpeeches ao SundayTypeDropdown"
+      - "Cancelar no dialogo NAO chama onDeleteSpeeches"
+      - "Reverter para speeches (onRevertToSpeeches) NAO chama onDeleteSpeeches"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que onDeleteSpeeches e chamado no callback de confirmacao"
+      - type: unit
+        description: "Verificar que cancelar NAO chama onDeleteSpeeches"
+      - type: unit
+        description: "Verificar que reverter para speeches NAO chama onDeleteSpeeches"
+    covers:
+      acceptance_criteria: ["AC-F070-01", "AC-F070-02", "AC-F070-03", "AC-F070-04", "AC-F070-05", "AC-F070-08"]
+      edge_cases: ["EC-F070-01", "EC-F070-02", "EC-F070-04"]
+    risks:
+      - risk: "onDeleteSpeeches e onSelect sao chamados em sequencia (nao atomico)"
+        mitigation: "Ordem garante: delete primeiro, tipo depois. Se delete falhar, mutation error global previne mudanca de tipo na UX (ADR-050)."
+
+  # =========================================================================
+  # STEP-06: F070 - speeches.tsx: wiring de handleDeleteSpeeches
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em src/app/(tabs)/speeches.tsx:
+      (1) Import: adicionar useDeleteSpeechesByDate ao import de useSpeeches:
+          Adicionar useDeleteSpeechesByDate a lista de imports.
+      (2) Instanciar: const deleteSpeechesByDate = useDeleteSpeechesByDate();
+          (junto com os outros mutations, ~linha 139)
+      (3) Criar handler:
+          const handleDeleteSpeeches = useCallback(
+            (date: string) => { deleteSpeechesByDate.mutate(date); },
+            [deleteSpeechesByDate]
+          );
+          (apos handleRemoveException, ~linha 255)
+      (4) No renderItem, passar onDeleteSpeeches={handleDeleteSpeeches} ao SundayCard:
+          <SundayCard
+            ...
+            onDeleteSpeeches={handleDeleteSpeeches}
+          >
+      (5) Adicionar handleDeleteSpeeches ao array de dependencias do renderItem useCallback.
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-03", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "useDeleteSpeechesByDate importado e instanciado"
+      - "handleDeleteSpeeches handler criado com useCallback"
+      - "SundayCard recebe prop onDeleteSpeeches={handleDeleteSpeeches}"
+      - "handleDeleteSpeeches no array de dependencias do renderItem"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que SundayCard recebe prop onDeleteSpeeches"
+    covers:
+      acceptance_criteria: ["AC-F070-01", "AC-F070-05", "AC-F070-06"]
+      edge_cases: ["EC-F070-03"]
+    risks:
+      - risk: "Adicionar dependencia ao renderItem pode causar re-renders extras"
+        mitigation: "handleDeleteSpeeches e memoizado com useCallback. Impacto minimo."
+
+  # =========================================================================
+  # STEP-07: F071 - SpeechSlot LED filter + disable para estados terminais
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Em src/components/SpeechSlot.tsx:
+      (1) Substituir linhas 137-140 (ledAllowedStatuses condicional) por constante:
+          const ledAllowedStatuses: SpeechStatus[] = [
+            'assigned_not_invited',
+            'assigned_invited',
+            'assigned_confirmed',
+            'gave_up',
+          ];
+          Isso exclui 'not_assigned' de todas as opcoes exibidas no modal.
+      (2) handleStatusPress (linha 99-102): adicionar guard para assigned_confirmed e gave_up:
+          De:
+            if (!canChangeStatus || !speech || status === 'not_assigned') return;
+          Para:
+            if (!canChangeStatus || !speech || status === 'not_assigned' ||
+                status === 'assigned_confirmed' || status === 'gave_up') return;
+      (3) StatusLED disabled prop (linha 153): adicionar assigned_confirmed e gave_up:
+          De:
+            disabled={isObserver || status === 'not_assigned'}
+          Para:
+            disabled={isObserver || status === 'not_assigned' ||
+                      status === 'assigned_confirmed' || status === 'gave_up'}
+      Resultado pratico:
+      - not_assigned: LED desabilitado (comportamento existente preservado)
+      - assigned_not_invited: LED abre modal -> [assigned_invited] (unica opcao)
+      - assigned_invited: LED abre modal -> [assigned_confirmed, assigned_not_invited, gave_up] (3 opcoes)
+      - assigned_confirmed: LED desabilitado (nenhuma opcao apos filtro)
+      - gave_up: LED desabilitado (nenhuma opcao apos filtro)
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "ledAllowedStatuses e constante com 4 status (todos exceto not_assigned)"
+      - "handleStatusPress retorna cedo para assigned_confirmed e gave_up"
+      - "StatusLED disabled para assigned_confirmed e gave_up"
+      - "LED de assigned_not_invited abre modal com 1 opcao (assigned_invited)"
+      - "LED de assigned_invited abre modal com 3 opcoes (assigned_confirmed, assigned_not_invited, gave_up)"
+      - "LED de not_assigned continua desabilitado"
+      - "Observer continua sem acesso ao LED"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que ledAllowedStatuses exclui not_assigned"
+      - type: unit
+        description: "Verificar que LED e desabilitado para assigned_confirmed e gave_up"
+      - type: unit
+        description: "Verificar que handleStatusPress retorna para estados terminais"
+    covers:
+      acceptance_criteria: ["AC-F071-01", "AC-F071-02", "AC-F071-03", "AC-F071-04", "AC-F071-05", "AC-F071-06", "AC-F071-07"]
+      edge_cases: ["EC-F071-01", "EC-F071-02"]
+    risks:
+      - risk: "Usuarios podem nao entender que LED nao e clicavel para assigned_confirmed e gave_up"
+        mitigation: "Consistente com not_assigned. Usuarios usam botao X para remover e re-designar."
+
+  # =========================================================================
+  # STEP-08: Testes consolidados Batch 10 Phase 1 (F069-F072)
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Criar arquivo de testes src/__tests__/batch10-phase1.test.ts com testes
+      para todas as 4 features deste batch:
+      (1) F069 StatusLED: Verificar que StatusLED renderiza unico circulo flat
+          (sem outerRing, innerCircle, glowDot). Verificar cor para cada status
+          (cinza, laranja, amarelo, verde, vinho). Verificar animacao de fading
+          para assigned_not_invited. Verificar reduced motion desabilita animacao.
+          Verificar que onPress e chamado quando nao disabled. Verificar size prop.
+      (2) F069 StatusChangeModal: Verificar STATUS_INDICATOR_COLORS com novas cores.
+      (3) F070 useDeleteSpeechesByDate: Verificar que deleta speeches por
+          ward_id + sunday_date. Verificar invalidacao de cache.
+      (4) F070 SundayCard: Verificar que onDeleteSpeeches e chamado no callback
+          de confirmacao. Verificar que cancelar NAO chama onDeleteSpeeches.
+          Verificar que reverter para speeches NAO chama onDeleteSpeeches.
+          Verificar fluxo sem assignments (speeches vazios apagados).
+      (5) F070 speeches.tsx: Verificar que SundayCard recebe onDeleteSpeeches.
+      (6) F071 SpeechSlot: Verificar ledAllowedStatuses exclui not_assigned.
+          Verificar LED desabilitado para assigned_confirmed e gave_up.
+          Verificar LED habilitado para assigned_not_invited e assigned_invited.
+          Verificar handleStatusPress retorna para estados terminais.
+      (7) F072 members.tsx: Verificar que bandeira usa getCountryByLabel.
+          Verificar fallback getFlagForCode. Verificar que selecionar Canada
+          mostra bandeira correta.
+    files:
+      - "src/__tests__/batch10-phase1.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch10-phase1.test.ts criado"
+      - "Testes cobrem F069 (LED flat + novas cores em StatusLED e StatusChangeModal)"
+      - "Testes cobrem F070 (useDeleteSpeechesByDate + SundayCard onDeleteSpeeches + speeches.tsx wiring)"
+      - "Testes cobrem F071 (LED filter + disable para estados terminais)"
+      - "Testes cobrem F072 (bandeira via getCountryByLabel + fallback)"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch10 phase1 (F069-F072)"
+    covers:
+      acceptance_criteria: ["AC-F069-01", "AC-F069-02", "AC-F069-03", "AC-F069-04", "AC-F069-05", "AC-F069-06", "AC-F069-07", "AC-F069-08", "AC-F069-09", "AC-F069-10", "AC-F069-11", "AC-F069-12", "AC-F070-01", "AC-F070-02", "AC-F070-03", "AC-F070-04", "AC-F070-05", "AC-F070-06", "AC-F070-07", "AC-F070-08", "AC-F071-01", "AC-F071-02", "AC-F071-03", "AC-F071-04", "AC-F071-05", "AC-F071-06", "AC-F071-07", "AC-F072-01", "AC-F072-02", "AC-F072-03", "AC-F072-04", "AC-F072-05", "AC-F072-06", "AC-F072-07", "AC-F072-08"]
+      edge_cases: ["EC-F069-01", "EC-F069-02", "EC-F069-03", "EC-F070-01", "EC-F070-02", "EC-F070-03", "EC-F070-04", "EC-F071-01", "EC-F071-02", "EC-F072-01", "EC-F072-02"]
+    risks:
+      - risk: "Mocking de supabase.delete para testes de F070"
+        mitigation: "Seguir padrao de mocking existente nos testes batch9-*.test.ts"
+
+  # =========================================================================
+  # STEP-09: Atualizar testes existentes impactados
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Atualizar testes existentes que possam ser impactados pelas mudancas:
+      (1) Verificar testes que usam StatusLED (podem verificar estrutura 3D).
+      (2) Verificar testes de SpeechSlot (ledAllowedStatuses e disabled).
+      (3) Verificar testes de SundayCard (novas props).
+      (4) Verificar testes de StatusChangeModal (cores de STATUS_INDICATOR_COLORS).
+      (5) Verificar testes de members.tsx (bandeira de country code).
+      (6) Ajustar snapshots ou assertions conforme necessario.
+    files:
+      - "src/__tests__/batch9-phase2.test.ts"
+      - "src/__tests__/batch7-phase2.test.ts"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Testes existentes atualizados para refletir mudancas de F069-F072"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Nenhum teste com falsa cobertura (assercoes corretas)"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes podem ter assertions sobre a estrutura 3D do LED"
+        mitigation: "Atualizar assertions para verificar circulo flat unico"
+
+  # =========================================================================
+  # STEP-10: Documentacao do projeto
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 10 Phase 1
+          (F069-F072) com arquivos impactados.
+      (2) .devteam/project-status.yaml - atualizar fase/batch atual.
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - adicionar PLAN_P020, marcar
+          como completed apos implementacao.
+      (4) docs/tests/TEST_CONSOLIDATED.yaml - adicionar testes de F069-F072.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch10 phase1"
+      - "project-status.yaml atualizado"
+      - "PLAN_CONSOLIDATED tem PLAN_P020"
+      - "TEST_CONSOLIDATED atualizado com testes de F069-F072"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F069 ACs ---
+  - ac_id: AC-F069-01
+    how_to_verify: "StatusLED renderiza unico Animated.View circular sem camadas internas"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-02
+    how_to_verify: "STATUS_COLORS['not_assigned'] === '#9CA3AF'"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-03
+    how_to_verify: "STATUS_COLORS['assigned_not_invited'] === '#F97316'"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-04
+    how_to_verify: "STATUS_COLORS['assigned_invited'] === '#EAB308'"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-05
+    how_to_verify: "STATUS_COLORS['assigned_confirmed'] === '#22C55E'"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-06
+    how_to_verify: "STATUS_COLORS['gave_up'] === '#7F1D1D'"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-07
+    how_to_verify: "Animacao de fading (opacity 0.3 a 1, ~2s) ativa para assigned_not_invited"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-08
+    how_to_verify: "Reduced motion desabilita animacao (opacity fixa em 1)"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-09
+    how_to_verify: "STATUS_INDICATOR_COLORS em StatusChangeModal com mesmas cores"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-F069-10
+    how_to_verify: "onPress funciona quando LED nao disabled (Pressable wrapper preservado)"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-11
+    how_to_verify: "size prop controla dimensoes do circulo"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+  - ac_id: AC-F069-12
+    how_to_verify: "LEDs no SundayCard header usam novas cores (usam StatusLED componente)"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+
+  # --- F070 ACs ---
+  - ac_id: AC-F070-01
+    how_to_verify: "useDeleteSpeechesByDate.mutate(date) deleta speeches + SundayTypeDropdown chama onDeleteSpeeches antes de onSelect"
+    covered_by_steps: ["STEP-03", "STEP-05", "STEP-06", "STEP-08"]
+  - ac_id: AC-F070-02
+    how_to_verify: "Cancelar no Alert NAO chama onDeleteSpeeches"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-F070-03
+    how_to_verify: "Sem assignments: onDeleteSpeeches chamado quando currentType === SUNDAY_TYPE_SPEECHES"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-F070-04
+    how_to_verify: "Reverter para speeches: onRevertToSpeeches chamado, NAO onDeleteSpeeches"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-F070-05
+    how_to_verify: "Dados apagados nao reaparecem ao voltar para speeches (speeches re-criados vazios por useLazyCreateSpeeches)"
+    covered_by_steps: ["STEP-03", "STEP-06", "STEP-08"]
+  - ac_id: AC-F070-06
+    how_to_verify: "speechKeys.all invalidado no onSuccess do useDeleteSpeechesByDate"
+    covered_by_steps: ["STEP-03", "STEP-08"]
+  - ac_id: AC-F070-07
+    how_to_verify: "logAction chamado com 'speech_cleanup' no onSuccess"
+    covered_by_steps: ["STEP-03", "STEP-08"]
+  - ac_id: AC-F070-08
+    how_to_verify: "Tipo 'other': onDeleteSpeeches chamado antes de abrir modal de texto"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+
+  # --- F071 ACs ---
+  - ac_id: AC-F071-01
+    how_to_verify: "assigned_not_invited: modal mostra [assigned_invited] (interseccao de transitions com allowed)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-02
+    how_to_verify: "assigned_invited: modal mostra [assigned_confirmed, assigned_not_invited, gave_up]"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-03
+    how_to_verify: "assigned_confirmed: LED desabilitado (nao abre modal)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-04
+    how_to_verify: "gave_up: LED desabilitado (nao abre modal)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-05
+    how_to_verify: "not_assigned: LED desabilitado (comportamento existente preservado)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-06
+    how_to_verify: "StatusChangeModal sem allowedStatuses (InviteActionDropdown) nao afetado"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-F071-07
+    how_to_verify: "Observer: LED sempre desabilitado (preservado)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+
+  # --- F072 ACs ---
+  - ac_id: AC-F072-01
+    how_to_verify: "Selecionar Canada: getCountryByLabel('Canada (+1)') retorna entry com bandeira do Canada"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-02
+    how_to_verify: "Selecionar Canada com +55 selecionado: bandeira troca para Canada (nao US)"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-03
+    how_to_verify: "Selecionar US: getCountryByLabel('United States (+1)') retorna bandeira US"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-04
+    how_to_verify: "Selecionar Russia: getCountryByLabel('Russia (+7)') retorna bandeira Russia"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-05
+    how_to_verify: "Selecionar Kazakhstan: getCountryByLabel('Kazakhstan (+7)') retorna bandeira Kazakhstan"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-06
+    how_to_verify: "Highlight na lista usa item.label === countryLabel (ja funciona, preservado)"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-07
+    how_to_verify: "Brasil (+55): getCountryByLabel('Brazil (+55)') retorna bandeira Brasil (codigo unico)"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-F072-08
+    how_to_verify: "Membro existente com +1: inicializacao mostra US por default (primeiro match)"
+    covered_by_steps: ["STEP-04", "STEP-08"]

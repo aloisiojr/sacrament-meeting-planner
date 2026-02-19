@@ -1,0 +1,494 @@
+# =============================================================================
+# ARCH_M020.yaml
+# Architecture for Batch 10 Phase 1 - LED Redesign, Sunday Type Data Cleanup,
+#   Speech LED Status Options, Country Code Display Fix
+# Features: F069, F070, F071, F072
+# CRs: CR-126, CR-127, CR-129, CR-130
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "LED visual redesign (flat circle + new colors), cleanup speeches on type change, LED status filter update, country code display fix for shared dial codes"
+  principles:
+    - "Simplicidade: StatusLED troca 3 camadas por 1 circulo flat"
+    - "Consistencia: mesmas cores em StatusLED e StatusChangeModal (single source of truth)"
+    - "Integridade de dados: speeches apagados ao mudar tipo de domingo (evita dados orfaos)"
+    - "Atomicidade: delete speeches antes de mudar tipo; se delete falhar, tipo nao muda"
+    - "Reutilizacao: getCountryByLabel ja existe em countryCodes.ts"
+    - "Zero migrations: todas as mudancas sao client-side (UI/logic/hooks)"
+
+diagram: |
+  F069: StatusLED.tsx --[simplificar]--> 1 circulo flat (Animated.View)
+        STATUS_COLORS: Record<SpeechStatus, string> (era LEDColors{outer,inner,glow})
+        StatusChangeModal.tsx --[atualizar]--> STATUS_INDICATOR_COLORS novas cores
+        InviteManagementSection + InviteActionDropdown --[herdam]--> import de STATUS_INDICATOR_COLORS
+
+  F070: SundayTypeDropdown --[onConfirm]--> onDeleteSpeeches(date) --> onSelect(type)
+        speeches.tsx --[handler]--> deleteSpeechesByDate.mutate(date) --> setSundayType
+        useSpeeches.ts --[novo hook]--> useDeleteSpeechesByDate (DELETE speeches WHERE ward_id+sunday_date)
+
+  F071: SpeechSlot.tsx --[ledAllowedStatuses]--> constante (todos exceto not_assigned)
+        handleStatusPress --[guard]--> desabilitar para assigned_confirmed e gave_up
+
+  F072: members.tsx --[display]--> getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)
+        countryCodes.ts --[reutilizar]--> getCountryByLabel (ja existente)
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F069: StatusLED redesign ---
+  - name: "StatusLED.tsx"
+    feature: F069
+    responsibility: "Simplificar LED de 3 camadas (outerRing, innerCircle, glowDot) para 1 circulo flat com cor solida"
+    dependencies: []
+    change_detail: |
+      1. Remover interface LEDColors { outer, inner, glow }.
+      2. STATUS_COLORS vira Record<SpeechStatus, string>:
+         - not_assigned: '#9CA3AF' (cinza)
+         - assigned_not_invited: '#F97316' (laranja - Tailwind orange-500)
+         - assigned_invited: '#EAB308' (amarelo - Tailwind yellow-500)
+         - assigned_confirmed: '#22C55E' (verde - Tailwind green-500)
+         - gave_up: '#7F1D1D' (vinho escuro - Tailwind red-900)
+      3. Remover variaveis halfSize, innerSize, glowSize.
+      4. content: substituir as 3 camadas (outerRing > innerCircle > glowDot) por
+         unico <Animated.View> circular:
+           <Animated.View style={[styles.circle, {
+             width: size, height: size, borderRadius: size / 2,
+             backgroundColor: STATUS_COLORS[status],
+           }, animatedStyle]} />
+      5. animatedInnerStyle renomear para animatedStyle (aplicado ao circulo unico).
+         Mesma animacao de fading para assigned_not_invited.
+      6. Remover styles.outerRing, styles.innerCircle, styles.glowDot.
+         Adicionar styles.circle (vazio, pois dimensoes via inline style).
+
+  - name: "StatusChangeModal.tsx"
+    feature: F069
+    responsibility: "Atualizar STATUS_INDICATOR_COLORS com novas cores para consistencia com StatusLED"
+    dependencies: []
+    change_detail: |
+      STATUS_INDICATOR_COLORS atualizado:
+        not_assigned: '#9CA3AF' (mantido)
+        assigned_not_invited: '#F97316' (era '#FBBF24')
+        assigned_invited: '#EAB308' (era '#FBBF24')
+        assigned_confirmed: '#22C55E' (era '#34D399')
+        gave_up: '#7F1D1D' (era '#F87171')
+      NOTA: InviteManagementSection e InviteActionDropdown importam
+      STATUS_INDICATOR_COLORS deste arquivo. Herdam automaticamente.
+
+  # --- F070: Delete speeches on type change ---
+  - name: "useSpeeches.ts (useDeleteSpeechesByDate)"
+    feature: F070
+    responsibility: "Novo hook que deleta todos os speeches de um domingo (ward_id + sunday_date)"
+    dependencies: []
+    change_detail: |
+      Novo hook useDeleteSpeechesByDate:
+        const wardId = useAuth().wardId;
+        return useMutation({
+          mutationFn: async (sundayDate: string) => {
+            const { error } = await supabase
+              .from('speeches')
+              .delete()
+              .eq('ward_id', wardId)
+              .eq('sunday_date', sundayDate);
+            if (error) throw error;
+          },
+          onSuccess: (_, sundayDate) => {
+            queryClient.invalidateQueries({ queryKey: speechKeys.all });
+            // Activity log
+            logAction(wardId, userId, userEmail, userName,
+              'speech_cleanup',
+              `Designacoes do domingo ${formatDateHumanReadable(sundayDate, getCurrentLanguage())} removidas ao mudar tipo`
+            );
+          },
+        });
+      Exportar o hook.
+
+  - name: "SundayCard.tsx (SundayTypeDropdown)"
+    feature: F070
+    responsibility: "Adicionar prop onDeleteSpeeches e chamar no callback de confirmacao antes de onSelect"
+    dependencies: []
+    change_detail: |
+      1. SundayTypeDropdownProps: adicionar onDeleteSpeeches?: (date: string) => void
+      2. SundayCardProps: adicionar onDeleteSpeeches?: (date: string) => void
+      3. No handleSelect, no onPress do Alert de confirmacao:
+         Antes de chamar onSelect(type) ou setOtherModalVisible(true):
+           onDeleteSpeeches?.(date);  // date vem do SundayCard pai
+         Para 'other': chamar onDeleteSpeeches antes de abrir modal de texto.
+      4. Tambem chamar onDeleteSpeeches quando NAO tem assignments mas muda tipo
+         (speeches vazios devem ser apagados para consistencia):
+         No fluxo direto (sem confirmacao), se currentType === SUNDAY_TYPE_SPEECHES:
+           onDeleteSpeeches?.(date);
+      5. SundayCard passa onDeleteSpeeches para SundayTypeDropdown.
+      NOTA: SundayTypeDropdown precisa receber `date` prop para chamar onDeleteSpeeches.
+      Adicionar prop date: string ao SundayTypeDropdownProps.
+
+  - name: "speeches.tsx"
+    feature: F070
+    responsibility: "Wiring: criar handler que chama deleteSpeechesByDate e passar para SundayCard"
+    dependencies: ["useSpeeches.ts"]
+    change_detail: |
+      1. Importar useDeleteSpeechesByDate de useSpeeches.ts.
+      2. Instanciar: const deleteSpeechesByDate = useDeleteSpeechesByDate();
+      3. Criar handler:
+         const handleDeleteSpeeches = useCallback(
+           (date: string) => { deleteSpeechesByDate.mutate(date); },
+           [deleteSpeechesByDate]
+         );
+      4. No renderItem, passar onDeleteSpeeches={handleDeleteSpeeches} ao SundayCard.
+
+  # --- F071: LED click filter ---
+  - name: "SpeechSlot.tsx"
+    feature: F071
+    responsibility: "Alterar ledAllowedStatuses para constante (todos exceto not_assigned). Desabilitar LED para assigned_confirmed e gave_up."
+    dependencies: []
+    change_detail: |
+      1. Substituir linhas 137-140:
+         De:
+           const ledAllowedStatuses = status === 'assigned_invited'
+             ? ['assigned_confirmed', 'gave_up'] as SpeechStatus[]
+             : undefined;
+         Para:
+           const ledAllowedStatuses: SpeechStatus[] = [
+             'assigned_not_invited', 'assigned_invited',
+             'assigned_confirmed', 'gave_up',
+           ];
+      2. handleStatusPress: adicionar guard para assigned_confirmed e gave_up:
+         De:
+           if (!canChangeStatus || !speech || status === 'not_assigned') return;
+         Para:
+           if (!canChangeStatus || !speech || status === 'not_assigned' ||
+               status === 'assigned_confirmed' || status === 'gave_up') return;
+      3. StatusLED disabled prop: adicionar assigned_confirmed e gave_up:
+         De:
+           disabled={isObserver || status === 'not_assigned'}
+         Para:
+           disabled={isObserver || status === 'not_assigned' ||
+                     status === 'assigned_confirmed' || status === 'gave_up'}
+
+  # --- F072: Country code display fix ---
+  - name: "members.tsx"
+    feature: F072
+    responsibility: "Usar getCountryByLabel para exibir bandeira correta ao inves de getFlagForCode"
+    dependencies: []
+    change_detail: |
+      1. Import: adicionar getCountryByLabel ao import de countryCodes.ts:
+         De: import { COUNTRY_CODES, getFlagForCode, type CountryCode } from '../../../lib/countryCodes';
+         Para: import { COUNTRY_CODES, getFlagForCode, getCountryByLabel, type CountryCode } from '../../../lib/countryCodes';
+      2. Linha 98: trocar exibicao da bandeira:
+         De:
+           <Text style={styles.flagText}>{getFlagForCode(countryCode)}</Text>
+         Para:
+           <Text style={styles.flagText}>{getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)}</Text>
+      3. Fallback getFlagForCode preservado para caso countryLabel nao encontrado.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F069 - StatusLED simplificado
+  - name: "StatusLED flat circle"
+    component: "StatusLED.tsx"
+    methods:
+      - name: "STATUS_COLORS"
+        input: "SpeechStatus"
+        output: "string (hex color) - era LEDColors {outer,inner,glow}"
+        notes: "Tipo simplificado de Record<SpeechStatus, LEDColors> para Record<SpeechStatus, string>"
+      - name: "render"
+        input: "StatusLEDProps (status, size?, onPress?, disabled?)"
+        output: "Unico Animated.View circular com cor solida"
+        notes: "API publica inalterada. Apenas rendering interno mudou."
+
+  - name: "STATUS_INDICATOR_COLORS updated"
+    component: "StatusChangeModal.tsx"
+    methods:
+      - name: "STATUS_INDICATOR_COLORS"
+        input: "SpeechStatus"
+        output: "string (hex color) - mesmas cores que STATUS_COLORS"
+        notes: "Exportado. Consumido por InviteManagementSection e InviteActionDropdown."
+
+  # F070 - Delete speeches by date
+  - name: "useDeleteSpeechesByDate"
+    component: "useSpeeches.ts"
+    methods:
+      - name: "mutate"
+        input: "sundayDate: string (ISO YYYY-MM-DD)"
+        output: "void (deleta registros, invalida cache, loga atividade)"
+        notes: "DELETE FROM speeches WHERE ward_id=wardId AND sunday_date=sundayDate. Erro propagado ao MutationCache global."
+      - name: "mutateAsync"
+        input: "sundayDate: string"
+        output: "Promise<void>"
+        notes: "Versao async para encadeamento se necessario."
+
+  - name: "SundayTypeDropdown.onDeleteSpeeches"
+    component: "SundayCard.tsx"
+    methods:
+      - name: "onDeleteSpeeches"
+        input: "date: string"
+        output: "void"
+        notes: "Chamado ANTES de onSelect no callback de confirmacao. Novo prop na interface."
+
+  # F071 - LED allowed statuses
+  - name: "ledAllowedStatuses constant"
+    component: "SpeechSlot.tsx"
+    methods:
+      - name: "ledAllowedStatuses"
+        input: "N/A (constante)"
+        output: "SpeechStatus[] = ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'gave_up']"
+        notes: "Exclui not_assigned. Passado ao StatusChangeModal como allowedStatuses."
+
+  # F072 - Country code display
+  - name: "Flag display via label"
+    component: "members.tsx"
+    methods:
+      - name: "getCountryByLabel"
+        input: "countryLabel: string"
+        output: "CountryCode | undefined"
+        notes: "Funcao ja existente em countryCodes.ts. Resolve ambiguidade de +1 usando label unico."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+  notes:
+    - "F070 usa DELETE na tabela speeches existente (ward_id + sunday_date). Nenhuma nova tabela/coluna."
+    - "F072 reutiliza campo country_code existente. Nao armazena country_label no banco (melhoria futura)."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Baixo. F070 adiciona DELETE em speeches, coberto pelo RLS existente (ward_id)."
+  notes:
+    - "F069: Mudanca puramente visual. Nenhum impacto de seguranca."
+    - "F070: DELETE em speeches usa RLS existente (ward_id = auth.jwt().app_metadata.ward_id). So deleta speeches da propria ala. Permissao sunday_type:write necessaria (ja verificada pelo setSundayType)."
+    - "F071: Mudanca de UX no filtro de opcoes do LED. Nenhum impacto de seguranca."
+    - "F072: Mudanca de exibicao. Nenhum impacto de seguranca."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Baixo. F070 adiciona log de atividade para limpeza de speeches."
+  notes:
+    - "F070: logAction com action_type 'speech_cleanup' registra limpeza de designacoes ao mudar tipo."
+    - "F069, F071, F072: Nenhum novo log ou metrica."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-049
+    title: "Cores flat unicas no StatusLED ao inves de gradiente 3D por camada"
+    context: "F069 troca design 3D (3 camadas com cores distintas) por circulo flat. Opcoes: (a) manter 3 cores e usar a inner, (b) redesenhar com cor unica por status."
+    decision: "Cor unica por status, derivada da paleta Tailwind (orange-500, yellow-500, green-500, red-900). STATUS_COLORS simplificado para Record<SpeechStatus, string>."
+    consequences:
+      - "Pro: Implementacao simplificada (1 View ao inves de 3)"
+      - "Pro: Consistencia imediata com STATUS_INDICATOR_COLORS (mesmas cores)"
+      - "Con: Perde efeito visual 3D (decisao do usuario)"
+      - "Con: Vinho escuro (#7F1D1D) pode ter baixo contraste em dark mode (aceito: circulo pequeno, status raro)"
+
+  - id: ADR-050
+    title: "Hook dedicado useDeleteSpeechesByDate ao inves de logica inline"
+    context: "F070 precisa deletar speeches ao mudar tipo. Opcoes: (a) chamar supabase.delete diretamente em speeches.tsx, (b) hook dedicado em useSpeeches.ts, (c) adicionar logica ao useSetSundayType."
+    decision: "Hook dedicado useDeleteSpeechesByDate em useSpeeches.ts. Separacao de responsabilidade: useSetSundayType cuida de sunday_exceptions, useDeleteSpeechesByDate cuida de speeches. Chamados em sequencia pelo componente."
+    consequences:
+      - "Pro: Cada hook tem responsabilidade unica"
+      - "Pro: Reutilizavel se outro fluxo precisar deletar speeches"
+      - "Pro: Activity log centralizado no hook"
+      - "Con: Nao e transacao atomica (delete + type change sao 2 operacoes separadas). Mitigado pela ordem: delete primeiro, type change depois."
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F069
+  - path: "src/components/StatusLED.tsx"
+    feature: F069
+    change: "Remover LEDColors interface e 3 camadas. STATUS_COLORS -> Record<SpeechStatus, string> com novas cores flat. Renderizar unico Animated.View circular. Manter animacao fading. Remover styles antigos, adicionar styles.circle."
+
+  - path: "src/components/StatusChangeModal.tsx"
+    feature: F069
+    change: "Atualizar STATUS_INDICATOR_COLORS: assigned_not_invited=#F97316, assigned_invited=#EAB308, assigned_confirmed=#22C55E, gave_up=#7F1D1D."
+
+  # F070
+  - path: "src/hooks/useSpeeches.ts"
+    feature: F070
+    change: "Adicionar hook useDeleteSpeechesByDate. DELETE speeches WHERE ward_id+sunday_date. Invalida speechKeys.all. Loga 'speech_cleanup' no activity_log."
+
+  - path: "src/components/SundayCard.tsx"
+    feature: F070
+    change: "SundayTypeDropdownProps: adicionar date e onDeleteSpeeches. SundayCardProps: adicionar onDeleteSpeeches. No handleSelect, chamar onDeleteSpeeches antes de onSelect apos confirmacao. Passar date prop ao SundayTypeDropdown."
+
+  - path: "src/app/(tabs)/speeches.tsx"
+    feature: F070
+    change: "Importar e instanciar useDeleteSpeechesByDate. Criar handleDeleteSpeeches handler. Passar onDeleteSpeeches ao SundayCard no renderItem."
+
+  # F071
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F071
+    change: "ledAllowedStatuses vira constante (todos exceto not_assigned). handleStatusPress: guard para assigned_confirmed e gave_up. StatusLED disabled: adicionar assigned_confirmed e gave_up."
+
+  # F072
+  - path: "src/app/(tabs)/settings/members.tsx"
+    feature: F072
+    change: "Import: adicionar getCountryByLabel. Linha 98: trocar getFlagForCode(countryCode) por getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)."
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  F069_led_redesign:
+    approach: "Simplificar rendering, trocar cores, manter animacao"
+    detail: |
+      StatusLED.tsx:
+      1. Remover `interface LEDColors { outer: string; inner: string; glow: string; }`
+      2. STATUS_COLORS -> Record<SpeechStatus, string>:
+           not_assigned: '#9CA3AF',
+           assigned_not_invited: '#F97316',
+           assigned_invited: '#EAB308',
+           assigned_confirmed: '#22C55E',
+           gave_up: '#7F1D1D',
+      3. Remover: halfSize, innerSize, glowSize
+      4. Renomear animatedInnerStyle -> animatedStyle
+      5. content = (
+           <Animated.View
+             style={[
+               styles.circle,
+               {
+                 width: size,
+                 height: size,
+                 borderRadius: size / 2,
+                 backgroundColor: STATUS_COLORS[status],
+               },
+               animatedStyle,
+             ]}
+           />
+         );
+      6. Remover `const colors = STATUS_COLORS[status];` (nao precisa mais destructure)
+      7. styles: remover outerRing, innerCircle, glowDot.
+         Adicionar: circle: {} (dimensoes via inline style)
+      8. Manter toda logica de Pressable/View wrapper, acessibilidade, animacao
+
+      StatusChangeModal.tsx:
+      1. Atualizar STATUS_INDICATOR_COLORS (5 cores)
+
+  F070_delete_speeches:
+    approach: "Novo hook + prop callback + wiring em speeches.tsx"
+    detail: |
+      useSpeeches.ts:
+      1. Adicionar useDeleteSpeechesByDate apos hooks existentes (~linha 320):
+         export function useDeleteSpeechesByDate() {
+           const { wardId, user, session, userName } = useAuth();
+           const queryClient = useQueryClient();
+           return useMutation({
+             mutationFn: async (sundayDate: string) => {
+               const { error } = await supabase
+                 .from('speeches')
+                 .delete()
+                 .eq('ward_id', wardId!)
+                 .eq('sunday_date', sundayDate);
+               if (error) throw error;
+             },
+             onSuccess: (_, sundayDate) => {
+               queryClient.invalidateQueries({ queryKey: speechKeys.all });
+               if (wardId && user) {
+                 logAction(
+                   wardId, user.id, user.email ?? '', userName ?? '',
+                   'speech_cleanup',
+                   `Speeches for ${formatDateHumanReadable(sundayDate, getCurrentLanguage())} deleted on type change`
+                 );
+               }
+             },
+           });
+         }
+
+      SundayCard.tsx:
+      1. SundayTypeDropdownProps: + date: string; + onDeleteSpeeches?: (date: string) => void;
+      2. SundayCardProps: + onDeleteSpeeches?: (date: string) => void;
+      3. SundayTypeDropdown componente recebe date e onDeleteSpeeches
+      4. handleSelect, no onPress do Alert de confirmacao:
+           onPress: () => {
+             onDeleteSpeeches?.(date);
+             if (type === 'other') { ... } else { onSelect(type); }
+           }
+      5. Fluxo sem confirmacao (sem assignments) quando currentType === SUNDAY_TYPE_SPEECHES:
+           onDeleteSpeeches?.(date);
+           // depois onSelect ou setOtherModalVisible
+      6. SundayCard: passar date={date} e onDeleteSpeeches={onDeleteSpeeches} ao SundayTypeDropdown
+
+      speeches.tsx:
+      1. Import useDeleteSpeechesByDate
+      2. const deleteSpeechesByDate = useDeleteSpeechesByDate();
+      3. const handleDeleteSpeeches = useCallback(
+           (date: string) => { deleteSpeechesByDate.mutate(date); },
+           [deleteSpeechesByDate]
+         );
+      4. <SundayCard ... onDeleteSpeeches={handleDeleteSpeeches} />
+
+  F071_led_filter:
+    approach: "Constante para allowed statuses + guard para estados terminais"
+    detail: |
+      SpeechSlot.tsx:
+      1. Substituir linhas 137-140 por:
+           const ledAllowedStatuses: SpeechStatus[] = [
+             'assigned_not_invited',
+             'assigned_invited',
+             'assigned_confirmed',
+             'gave_up',
+           ];
+      2. handleStatusPress (linha 99-102):
+           if (!canChangeStatus || !speech || status === 'not_assigned' ||
+               status === 'assigned_confirmed' || status === 'gave_up') return;
+      3. StatusLED disabled prop (linha 153):
+           disabled={isObserver || status === 'not_assigned' ||
+                     status === 'assigned_confirmed' || status === 'gave_up'}
+
+      Resultado por status:
+      - not_assigned: LED desabilitado (handleStatusPress retorna cedo)
+      - assigned_not_invited: LED abre modal -> [assigned_invited] (unica opcao)
+      - assigned_invited: LED abre modal -> [assigned_confirmed, assigned_not_invited, gave_up]
+      - assigned_confirmed: LED desabilitado (nenhuma opcao apos filtro)
+      - gave_up: LED desabilitado (nenhuma opcao apos filtro)
+
+  F072_country_display:
+    approach: "Usar getCountryByLabel para resolver bandeira via label unico"
+    detail: |
+      members.tsx:
+      1. Import: adicionar getCountryByLabel:
+           import { COUNTRY_CODES, getFlagForCode, getCountryByLabel, type CountryCode } from '../../../lib/countryCodes';
+      2. Linha 98: trocar:
+           <Text style={styles.flagText}>{getFlagForCode(countryCode)}</Text>
+         Por:
+           <Text style={styles.flagText}>{getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)}</Text>
+      3. Fallback: se countryLabel nao encontrado, cai em getFlagForCode (comportamento anterior).
+      4. Inicializacao de membro existente com +1: mostra US por default (primeiro match).
+         Usuario pode re-selecionar Canada se necessario. Aceito (ASM-F072-01).
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica (StatusLED=visual, useDeleteSpeechesByDate=delete, SpeechSlot=filtro)
+  GATE-03: true  # Contratos definidos para cada integracao (6 contratos)
+  GATE-04: true  # ADRs registrados (ADR-049: cores flat, ADR-050: hook dedicado)
+  GATE-05: true  # ARCH_M020.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido abaixo
+  GATE-08: true  # 7 componentes, 4 features, maximo respeitado

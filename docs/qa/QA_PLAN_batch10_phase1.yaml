@@ -1,0 +1,396 @@
+# =============================================================================
+# QA_PLAN_batch10_phase1.yaml
+# QA Plan for Batch 10 Phase 1: CR-126, CR-127, CR-129, CR-130
+# Created: 2026-02-19
+# =============================================================================
+
+type: qa_plan
+id: QA-batch10-phase1
+created_at: "2026-02-19"
+request_type: mixed  # feature_request + bugfix
+
+features:
+  - cr: CR-126
+    type: feature_request
+    description: "Redesign LEDs: flat circle (no 3D effect). Colors: Not assigned=Gray, Assigned/Not-Invited=Orange, Assigned/Invited=Yellow, Confirmed=Green, Gave up=Dark Wine"
+
+  - cr: CR-127
+    type: bugfix
+    description: "When changing sunday type from 'Discursos' to another type and confirming the dialog, speech assignments (speakers and topics) for that sunday are NOT deleted from the database"
+
+  - cr: CR-129
+    type: feature_request
+    description: "When clicking on a speech LED, show all status options except 'not_assigned'"
+
+  - cr: CR-130
+    type: bugfix
+    description: "Country code US/Canada: selecting Canada when US is selected doesn't switch; selecting Canada with another country selected shows US instead"
+
+user_requests:
+  cr_126: |
+    Redesign LEDs: circulo plano (flat) sem efeito 3D. Cores: Nao designado=Cinza,
+    Designado/Nao-Convidado=Laranja, Designado/Convidado=Amarelo, Confirmado=Verde,
+    Desistiu=Vinho Escuro
+  cr_127: |
+    Ao mudar tipo de domingo de 'Discursos' para outro e confirmar no dialogo,
+    as designacoes de pessoas e temas desse domingo nao sao apagadas do banco de dados
+  cr_129: |
+    Ao clicar no LED de um discurso, mostrar todas as opcoes de status exceto 'nao designado'
+  cr_130: |
+    Country code US/Canada: ao selecionar Canada com US selecionado nao troca;
+    ao selecionar Canada com outro pais selecionado mostra US. Problema na exibicao
+    da selecao no campo
+
+# ===========================================================================
+# BASELINE: Current state before development
+# ===========================================================================
+
+baseline:
+  cr_126:
+    description: |
+      StatusLED currently uses a 3D-style design with outer ring, inner circle,
+      and glow dot (highlight). The component has: outerRing (background color),
+      innerCircle (lighter color), and glowDot (semi-transparent highlight).
+      Colors are: not_assigned (gray), assigned_not_invited (amber/yellow),
+      assigned_invited (amber/yellow, same as not_invited), assigned_confirmed (green),
+      gave_up (red). The 3D effect comes from the multi-layer rendering with
+      glowDot positioned at top-left.
+    evidence:
+      - "src/components/StatusLED.tsx: 3-layer design (outerRing, innerCircle, glowDot)"
+      - "STATUS_COLORS: not_assigned={outer:#6B7280, inner:#9CA3AF}, assigned_not_invited={outer:#D97706, inner:#FBBF24, glow:#FDE68A}, assigned_invited=same as not_invited, assigned_confirmed={outer:#059669, inner:#34D399, glow:#A7F3D0}, gave_up={outer:#DC2626, inner:#F87171, glow:#FECACA}"
+      - "StatusChangeModal.tsx also has STATUS_INDICATOR_COLORS that need updating"
+      - "SundayCard.tsx renders LEDs with size=14 on the header"
+
+  cr_127:
+    description: |
+      When user changes sunday type from 'speeches' to another type (e.g., testimony_meeting),
+      the SundayTypeDropdown shows a confirmation dialog (Alert) if there are existing
+      speaker/topic assignments. However, after confirming, only the sunday_exceptions
+      table is updated (via useSetSundayType). The speeches table rows for that sunday
+      are NOT deleted or cleared. The assignments remain in the database orphaned.
+    evidence:
+      - "SundayCard.tsx line 113-135: confirmation dialog shown but only calls onSelect(type) after confirm"
+      - "speeches.tsx line 242-247: handleTypeChange only calls setSundayType.mutate()"
+      - "useSundayTypes.ts line 209-289: useSetSundayType only updates sunday_exceptions table, does NOT touch speeches table"
+      - "Bug confirmed: no speech cleanup code exists anywhere in the type change flow"
+
+  cr_129:
+    description: |
+      Currently, when clicking a speech LED:
+      - If status is 'not_assigned': LED press is blocked (disabled)
+      - If status is 'assigned_not_invited': shows default transitions (assigned_invited, not_assigned)
+      - If status is 'assigned_invited': shows only confirmed + gave_up (via ledAllowedStatuses filter)
+      - If status is 'assigned_confirmed': shows only not_assigned
+      - If status is 'gave_up': shows only not_assigned
+
+      CR-129 requests: show ALL options except 'not_assigned' when clicking LED,
+      regardless of current status. This is a regression of CR-116 behavior.
+    evidence:
+      - "SpeechSlot.tsx line 138-140: ledAllowedStatuses only set for assigned_invited status"
+      - "SpeechSlot.tsx line 99-102: handleStatusPress blocks press when status is 'not_assigned'"
+      - "StatusChangeModal.tsx line 58-61: uses getAvailableStatuses() intersected with allowedStatuses"
+      - "useSpeeches.ts line 59-65: VALID_TRANSITIONS defines restrictive lifecycle"
+
+  cr_130:
+    description: |
+      US (+1) and Canada (+1) share the same country code '+1'. The country code selector
+      in MemberEditor identifies selected country by comparing item.code with countryCode state.
+      Since both US and Canada have code '+1', selecting Canada sets countryCode to '+1' but
+      the display (flag and code) will show the first match which is always US.
+      The initial countryLabel state uses COUNTRY_CODES.find(c => c.code === ...) which
+      always returns US first since it's listed before Canada.
+    evidence:
+      - "countryCodes.ts line 47-48: US and Canada both have code: '+1'"
+      - "members.tsx line 57: countryCode state is just the dial code string '+1'"
+      - "members.tsx line 59: initial countryLabel finds first match by code, always US for +1"
+      - "members.tsx line 98: getFlagForCode(countryCode) also finds first match, always US flag"
+      - "members.tsx line 154: highlight uses item.label === countryLabel which works correctly for selection highlighting"
+      - "members.tsx line 157: setCountryCode(item.code) sets '+1' for both US and Canada - indistinguishable"
+      - "Bug: the identifier must be label (unique) not code (duplicate for US/Canada)"
+
+# ===========================================================================
+# VALIDATION CHECKS
+# ===========================================================================
+
+validation_checks:
+
+  # --- CR-126: LED Redesign ---
+
+  - id: VC-126-01
+    cr: CR-126
+    description: "StatusLED renders as flat circle without 3D effect (no glow dot, no multi-layer gradient)"
+    type: functional
+    how_to_verify: |
+      Read src/components/StatusLED.tsx. Verify:
+      1. No glowDot or 3D highlight element exists
+      2. Single flat circle rendering (no innerCircle/outerRing multi-layer)
+      3. Simple background color applied to a single circle View
+    expected_result: "StatusLED uses a single flat circle with plain background color, no 3D effects"
+    priority: must_pass
+
+  - id: VC-126-02
+    cr: CR-126
+    description: "LED colors match specification: Gray, Orange, Yellow, Green, Dark Wine"
+    type: functional
+    how_to_verify: |
+      Read StatusLED color map. Verify:
+      - not_assigned: Gray (e.g., #9CA3AF or similar gray)
+      - assigned_not_invited: Orange (e.g., #F97316 or similar orange, NOT yellow)
+      - assigned_invited: Yellow (e.g., #FBBF24 or similar yellow)
+      - assigned_confirmed: Green (e.g., #34D399 or similar green)
+      - gave_up: Dark Wine/Burgundy (e.g., #7F1D1D, #6B1F2B, or similar dark red/wine, NOT bright red)
+    expected_result: "5 distinct colors matching the spec: gray, orange, yellow, green, dark wine"
+    priority: must_pass
+
+  - id: VC-126-03
+    cr: CR-126
+    description: "StatusChangeModal indicator colors updated to match new LED colors"
+    type: functional
+    how_to_verify: |
+      Read src/components/StatusChangeModal.tsx. Verify STATUS_INDICATOR_COLORS
+      matches the new color scheme (same colors as StatusLED).
+    expected_result: "StatusChangeModal uses same color values as StatusLED"
+    priority: must_pass
+
+  - id: VC-126-04
+    cr: CR-126
+    description: "Fading animation still works for assigned_not_invited status"
+    type: behavioral
+    how_to_verify: |
+      Read StatusLED animation code. Verify assigned_not_invited still has
+      the fading/pulsing animation with reanimated.
+    expected_result: "assigned_not_invited LED still pulses/fades"
+    priority: should_pass
+
+  - id: VC-126-05
+    cr: CR-126
+    description: "LED accessibility labels preserved"
+    type: regression
+    how_to_verify: |
+      Read StatusLED. Verify accessibilityRole and accessibilityLabel
+      are still present for all states.
+    expected_result: "All accessibility attributes preserved"
+    priority: should_pass
+
+  - id: VC-126-06
+    cr: CR-126
+    description: "InviteManagementSection LED colors also updated"
+    type: regression
+    how_to_verify: |
+      Search for any other LED/status color references in the codebase
+      (InviteManagementSection, SundayCard, etc.) and verify they use
+      the new color scheme or reference StatusLED/StatusChangeModal colors.
+    expected_result: "All status color references in the app are consistent"
+    priority: should_pass
+
+  # --- CR-127: DB Cleanup on Sunday Type Change ---
+
+  - id: VC-127-01
+    cr: CR-127
+    description: "When changing sunday type from 'speeches' to another type, speech rows for that sunday are deleted/cleared from DB"
+    type: functional
+    how_to_verify: |
+      Read useSetSundayType or the type change handler. Verify that when changing
+      FROM 'speeches' type, the mutation also deletes or clears speech records
+      (speaker_name, speaker_id, topic_title, etc.) for that sunday date.
+    expected_result: "Speech data is cleaned up when sunday type changes away from 'speeches'"
+    priority: must_pass
+
+  - id: VC-127-02
+    cr: CR-127
+    description: "Cleanup only happens when changing FROM 'speeches' type (not between non-speech types)"
+    type: behavioral
+    how_to_verify: |
+      Verify that changing between two non-speech types (e.g., testimony_meeting
+      to general_conference) does NOT trigger speech cleanup unnecessarily.
+    expected_result: "Cleanup only triggered when previous type was 'speeches'"
+    priority: should_pass
+
+  - id: VC-127-03
+    cr: CR-127
+    description: "Confirmation dialog still appears before cleanup when assignments exist"
+    type: behavioral
+    how_to_verify: |
+      Read SundayTypeDropdown. Verify the Alert.alert confirmation dialog
+      is still shown when there are existing assignments before the type change.
+    expected_result: "Confirmation dialog still works as before (CR-115)"
+    priority: must_pass
+
+  - id: VC-127-04
+    cr: CR-127
+    description: "Existing tests still pass after DB cleanup implementation"
+    type: regression
+    how_to_verify: |
+      Run npx vitest run and verify all existing tests pass.
+    expected_result: "All 3296+ tests pass"
+    priority: must_pass
+
+  # --- CR-129: LED Click Shows All Options ---
+
+  - id: VC-129-01
+    cr: CR-129
+    description: "When clicking LED, StatusChangeModal shows all statuses EXCEPT 'not_assigned'"
+    type: functional
+    how_to_verify: |
+      Read SpeechSlot.tsx. Verify that ledAllowedStatuses filters out 'not_assigned'
+      for ALL non-not_assigned statuses (not just assigned_invited).
+      The allowedStatuses should be: assigned_not_invited, assigned_invited,
+      assigned_confirmed, gave_up.
+    expected_result: "LED click shows 4 status options (all except not_assigned) regardless of current status"
+    priority: must_pass
+
+  - id: VC-129-02
+    cr: CR-129
+    description: "LED is still not clickable when status is 'not_assigned'"
+    type: behavioral
+    how_to_verify: |
+      Read SpeechSlot.tsx handleStatusPress. Verify it still returns early
+      when status === 'not_assigned'.
+    expected_result: "LED click blocked for not_assigned status"
+    priority: must_pass
+
+  - id: VC-129-03
+    cr: CR-129
+    description: "VALID_TRANSITIONS or allowedStatuses filter updated to support all transitions from LED"
+    type: functional
+    how_to_verify: |
+      Check if VALID_TRANSITIONS was updated or if allowedStatuses filter
+      bypasses VALID_TRANSITIONS to allow all non-not_assigned options.
+    expected_result: "All 4 non-not_assigned statuses available from LED for any current status"
+    priority: must_pass
+
+  - id: VC-129-04
+    cr: CR-129
+    description: "StatusChangeModal still renders correct indicators and labels"
+    type: regression
+    how_to_verify: |
+      Read StatusChangeModal rendering. Verify all 4 options render with
+      correct colors and labels.
+    expected_result: "Modal shows correct colored indicators and translated labels"
+    priority: should_pass
+
+  # --- CR-130: Country Code US/Canada Fix ---
+
+  - id: VC-130-01
+    cr: CR-130
+    description: "Selecting Canada in country picker actually shows Canada flag and label (not US)"
+    type: functional
+    how_to_verify: |
+      Read MemberEditor. Verify that the country selection mechanism uses
+      a unique identifier (e.g., label) instead of code (which is duplicate for +1).
+      After selecting Canada, the displayed flag should be Canada flag, not US flag.
+    expected_result: "Canada selection shows Canadian flag and 'Canada (+1)' label"
+    priority: must_pass
+
+  - id: VC-130-02
+    cr: CR-130
+    description: "Selecting US still works correctly and shows US flag"
+    type: functional
+    how_to_verify: |
+      Verify US selection still shows US flag and 'United States (+1)' label.
+    expected_result: "US selection unaffected by the fix"
+    priority: must_pass
+
+  - id: VC-130-03
+    cr: CR-130
+    description: "Country code state uses unique identifier to distinguish US from Canada"
+    type: functional
+    how_to_verify: |
+      Read the state management for country code selection. Verify the component
+      uses label (unique per country) or index or another unique field instead
+      of just the dial code string for identity.
+    expected_result: "State uniquely identifies country even when dial codes are shared"
+    priority: must_pass
+
+  - id: VC-130-04
+    cr: CR-130
+    description: "getFlagForCode still works correctly for display purposes"
+    type: regression
+    how_to_verify: |
+      Read countryCodes.ts and verify getFlagForCode is either updated to handle
+      the unique identifier or still used correctly for non-ambiguous codes.
+    expected_result: "Flag display works correctly for all countries"
+    priority: should_pass
+
+  - id: VC-130-05
+    cr: CR-130
+    description: "Saving member with Canada country code stores '+1' correctly in DB"
+    type: functional
+    how_to_verify: |
+      Verify that handleSave still passes the correct country_code ('+1') to onSave
+      even though the internal identifier may now be label-based.
+    expected_result: "DB stores '+1' for both US and Canada members"
+    priority: must_pass
+
+  - id: VC-130-06
+    cr: CR-130
+    description: "Editing existing member with +1 country code loads correct country"
+    type: behavioral
+    how_to_verify: |
+      Verify that when editing a member who has country_code '+1', the initial
+      state correctly determines whether to show US or Canada (may default to US
+      if no additional metadata distinguishes them, which is acceptable).
+    expected_result: "Existing +1 members load with a reasonable default (US is acceptable)"
+    priority: should_pass
+
+  # --- Cross-cutting ---
+
+  - id: VC-CROSS-01
+    description: "All existing tests still pass"
+    type: regression
+    how_to_verify: |
+      Run npx vitest run and verify all tests pass.
+    expected_result: "All 3296+ tests pass (plus any new tests)"
+    priority: must_pass
+
+# ===========================================================================
+# REPRODUCTION STEPS (for bugfixes)
+# ===========================================================================
+
+reproduction_steps:
+  cr_127:
+    - step: "Open Speeches tab, expand a sunday with type 'Discursos'"
+      expected: "Sunday card expands showing speech slots"
+      actual: "Works correctly"
+    - step: "Assign a speaker and topic to one of the speech slots"
+      expected: "Speaker and topic saved to database"
+      actual: "Works correctly"
+    - step: "Change sunday type from 'Discursos' to 'Reuniao de Testemunho' via dropdown"
+      expected: "Confirmation dialog appears"
+      actual: "Confirmation dialog appears correctly (CR-115)"
+    - step: "Confirm the type change"
+      expected: "Sunday type changes AND speech assignments are deleted from DB"
+      actual: "BUG: Sunday type changes but speech assignments remain in DB (orphaned)"
+    - step: "Change sunday type back to 'Discursos'"
+      expected: "Speech slots appear empty (since data was cleaned)"
+      actual: "BUG: Old assignments still visible because they were never deleted"
+
+  cr_130:
+    - step: "Open Settings > Members, add a new member"
+      expected: "Member editor opens with country code defaulting to Brazil (+55)"
+      actual: "Works correctly"
+    - step: "Click country code button, select 'United States (+1)'"
+      expected: "Shows US flag with +1"
+      actual: "Works correctly"
+    - step: "Click country code button again, select 'Canada (+1)'"
+      expected: "Shows Canada flag with +1"
+      actual: "BUG: Still shows US flag with +1 (doesn't switch)"
+    - step: "Click country code button, select 'Brazil (+55)' first, then select 'Canada (+1)'"
+      expected: "Shows Canada flag with +1"
+      actual: "BUG: Shows US flag with +1 (always resolves to first match for code '+1')"
+
+# ===========================================================================
+# PASS CRITERIA
+# ===========================================================================
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.
+
+  must_pass checks:
+  - VC-126-01, VC-126-02, VC-126-03 (LED redesign)
+  - VC-127-01, VC-127-03, VC-127-04 (DB cleanup)
+  - VC-129-01, VC-129-02, VC-129-03 (LED click options)
+  - VC-130-01, VC-130-02, VC-130-03, VC-130-05 (country code fix)
+  - VC-CROSS-01 (all tests pass)

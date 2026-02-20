@@ -1,0 +1,93 @@
+# =============================================================================
+# SPEC_F078.yaml
+# Feature F078 / CR-135: Change custom name help text
+# Batch: 11
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 11
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F078
+  name: "Change custom name help text in PrayerSelector"
+  cr_id: 135
+  type: ui_text_change
+  priority: low
+  related_features: [F068, F076]
+
+  user_request: >
+    "Trocar o texto de ajuda: 'Digite um nome para usar nome personalizado'
+    para 'Para escolher um nao membro, digite o nome da pessoa e adicione
+    como nome personalizado'"
+
+  description: >
+    Alterar o texto de ajuda (hint) do campo de nome personalizado no
+    PrayerSelector de 'Digite um nome para usar nome personalizado' para
+    'Para escolher um nao membro, digite o nome da pessoa e adicione como
+    nome personalizado'. Alterar equivalentes em en e es.
+
+  current_behavior: >
+    pt-BR.json:227: "customNameHint": "Digite um nome para usar nome personalizado"
+    en.json: "Type a name to use a custom name"
+    es.json: "Escriba un nombre para usar un nombre personalizado"
+    Renderizado em PrayerSelector.tsx via t('agenda.customNameHint').
+
+  expected_behavior: >
+    pt-BR: "Para escolher um nao membro, digite o nome da pessoa e adicione como nome personalizado"
+    en: "To choose a non-member, type the person's name and add as a custom name"
+    es: "Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado"
+    Mesmo local de renderizacao (PrayerSelector.tsx, sem alteracao de codigo).
+
+  files_impacted:
+    - path: src/i18n/locales/pt-BR.json
+      changes:
+        - "Alterar agenda.customNameHint para novo texto"
+
+    - path: src/i18n/locales/en.json
+      changes:
+        - "Alterar agenda.customNameHint para equivalente em ingles"
+
+    - path: src/i18n/locales/es.json
+      changes:
+        - "Alterar agenda.customNameHint para equivalente em espanhol"
+
+  acceptance_criteria:
+    - id: AC-078-01
+      description: "Texto pt-BR atualizado"
+      given: "App configurado em pt-BR"
+      when: "Usuario abre PrayerSelector"
+      then: "Hint exibe 'Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado'"
+
+    - id: AC-078-02
+      description: "Texto en atualizado"
+      given: "App configurado em en"
+      when: "Usuario abre PrayerSelector"
+      then: "Hint exibe 'To choose a non-member, type the person's name and add as a custom name'"
+
+    - id: AC-078-03
+      description: "Texto es atualizado"
+      given: "App configurado em es"
+      when: "Usuario abre PrayerSelector"
+      then: "Hint exibe 'Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado'"
+
+    - id: AC-078-04
+      description: "PrayerSelector continua renderizando hint corretamente"
+      given: "Qualquer idioma"
+      when: "PrayerSelector aberto"
+      then: "Hint text renderizado na mesma posicao (via t('agenda.customNameHint'))"
+
+  edge_cases:
+    - id: EC-078-01
+      case: "Texto longo pode quebrar layout em telas estreitas"
+      expected: "Texto flui naturalmente com quebra de linha (comportamento existente do Text)"
+
+  implementation_notes: >
+    Alteracao apenas nos arquivos de i18n. Nenhuma alteracao de codigo TypeScript
+    necessaria. A key agenda.customNameHint ja existe nos 3 locales. Texto
+    pt-BR deve usar acentos corretos conforme ortografia (nao -> nao com til,
+    etc).

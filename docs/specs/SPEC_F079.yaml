@@ -1,0 +1,102 @@
+# =============================================================================
+# SPEC_F079.yaml
+# Feature F079 / CR-136: Agenda tab initial scroll to next sunday
+# Batch: 11
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 11
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F079
+  name: "Fix Agenda tab initial scroll to show next sunday in the middle"
+  cr_id: 136
+  type: bugfix
+  priority: high
+  related_features: [F075]
+
+  user_request: >
+    "Quando clico pela primeira vez na aba Agenda, o proximo domingo tem que
+    aparecer no meio da tela. Com Discursos ja acontece isso. Atualmente esta
+    aparecendo de mais de 6 meses atras"
+
+  description: >
+    Ao clicar pela primeira vez na aba Agenda, o proximo domingo deve aparecer
+    no meio da tela (viewPosition: 0.5). Atualmente mostra domingos de 6+ meses
+    atras porque o scroll inicial nao esta funcionando de forma confiavel. A aba
+    Discursos ja funciona corretamente.
+
+  current_behavior: >
+    agenda.tsx linhas 112-119: useEffect dispara scrollToIndex com
+    {index: initialIndex, animated: false} sem viewPosition. O
+    onScrollToIndexFailed nao e implementado no arquivo atual. O scroll
+    posiciona o item no topo da lista quando funciona, mas frequentemente
+    mostra conteudo antigo (6+ meses) quando o scrollToIndex falha
+    silenciosamente porque os itens alvo ainda nao foram renderizados.
+
+  expected_behavior: >
+    Ao abrir a aba Agenda pela primeira vez, o proximo domingo aparece
+    centralizado verticalmente na tela (viewPosition: 0.5). O fallback
+    (onScrollToIndexFailed) deve ser robusto o suficiente para posicionar
+    proximo ao domingo correto mesmo quando scrollToIndex falha.
+
+  files_impacted:
+    - path: src/app/(tabs)/agenda.tsx
+      changes:
+        - "Adicionar viewPosition: 0.5 ao scrollToIndex no useEffect inicial (linha 116)"
+        - "Adicionar ou melhorar onScrollToIndexFailed handler no FlatList"
+
+  acceptance_criteria:
+    - id: AC-079-01
+      description: "Proximo domingo centralizado na tela ao abrir Agenda"
+      given: "Usuario abre aba Agenda pela primeira vez"
+      when: "Lista carrega"
+      then: "Proximo domingo aparece no meio (ou proximo ao meio) da area visivel"
+
+    - id: AC-079-02
+      description: "scrollToIndex usa viewPosition para centralizar"
+      given: "scrollToIndex e chamado no useEffect inicial"
+      when: "FlatList renderizou itens suficientes"
+      then: "scrollToIndex recebe viewPosition: 0.5 (centralizado)"
+
+    - id: AC-079-03
+      description: "Fallback de scroll funciona quando scrollToIndex falha"
+      given: "scrollToIndex falha (itens nao renderizados ainda)"
+      when: "onScrollToIndexFailed e chamado"
+      then: "Fallback posiciona a lista perto do proximo domingo"
+
+    - id: AC-079-04
+      description: "Aba Discursos nao afetada"
+      given: "Aba Discursos com scroll inicial funcionando"
+      when: "Mudancas aplicadas na Agenda"
+      then: "Scroll inicial da aba Discursos continua funcionando como antes"
+
+  edge_cases:
+    - id: EC-079-01
+      case: "Lista vazia (sem domingos carregados)"
+      expected: "Nenhum scroll tentado (guard initialIndex <= 0)"
+
+    - id: EC-079-02
+      case: "Proximo domingo e o primeiro item da lista"
+      expected: "Scroll posiciona no topo (ou perto do topo)"
+
+  implementation_notes: >
+    Adicionar viewPosition: 0.5 ao scrollToIndex no useEffect inicial de
+    agenda.tsx (linha 116). Adicionar onScrollToIndexFailed handler no FlatList
+    que faz retry com setTimeout similar ao padrao de speeches.tsx. O retry
+    usa Math.min(info.index, listItems.length - 1) e chama scrollToIndex
+    novamente com viewPosition: 0.5. NAO alterar speeches.tsx.
+    NOTA: F075 (CR-132) tambem altera agenda.tsx (remove getItemLayout,
+    substitui initialScrollIndex). Se F075 for implementada antes, a
+    implementacao de F079 deve se basear no useEffect ja existente.
+
+  resolved_questions:
+    - id: OQ-4
+      question: "Aplicar viewPosition: 0.5 tambem na aba Discursos para consistencia?"
+      answer: "Apenas na Agenda. Discursos ja funciona corretamente."
+      decided_by: user

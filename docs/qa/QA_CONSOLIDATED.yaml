@@ -9,7 +9,8 @@
 # CR-114, CR-115, CR-116, CR-119, CR-121 (PRE+POST),
 # CR-118, CR-120, CR-123 (PRE+POST),
 # CR-126, CR-127, CR-129, CR-130 (PRE+POST),
-# CR-128, CR-131, CR-132, CR-133 (PRE+POST)
+# CR-128, CR-131, CR-132, CR-133 (PRE+POST),
+# CR-134, CR-135, CR-136, CR-137, CR-138 (PRE+POST)
 # Updated: 2026-02-19
 # =============================================================================
 
@@ -5502,3 +5503,245 @@ cr_133:
       - id: VC-CROSS-01
         status: passed
         evidence: "npx vitest run: 65 test files, 3449 tests all passing. Baseline was 3380 tests (64 files). +69 new tests, +1 test file."
+
+# #############################################################################
+# CR-134: Show all status options except current and not_assigned (Batch 11)
+# #############################################################################
+
+cr_134:
+  cr_id: CR-134
+  title: "Show all status options except current and not_assigned in status change UI"
+  type: bugfix
+  spec: specs/SPEC_F077.yaml
+  qa_plan: qa/QA_PLAN_011.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Bug confirmed in code. InviteActionDropdown uses hardcoded options without
+      filtering current status. VALID_TRANSITIONS too restrictive (e.g.,
+      assigned_not_invited only transitions to assigned_invited). SpeechSlot
+      blocks LED press for assigned_confirmed and gave_up.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 7eb8422
+        message: "expand VALID_TRANSITIONS full mesh (CR-134)"
+      - hash: 345db12
+        message: "remove LED blocking (CR-134)"
+      - hash: c7f5d4d
+        message: "dynamize InviteActionDropdown (CR-134)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-134-01
+        status: passed
+        evidence: "StatusChangeModal.tsx lines 58-61: getAvailableStatuses(currentStatus) returns VALID_TRANSITIONS[current]. With expanded VALID_TRANSITIONS (useSpeeches.ts:59-65), each assigned status maps to all 3 other assigned statuses + not_assigned. allowedStatuses (ledAllowedStatuses) filters out not_assigned. Result: from any assigned status, modal shows exactly 3 options (all assigned statuses except current). Verified: assigned_not_invited -> [assigned_invited, assigned_confirmed, gave_up]."
+      - id: VC-134-02
+        status: passed
+        evidence: "InviteActionDropdown.tsx lines 63-71: ALL_ASSIGNED_STATUSES array contains all 4 assigned statuses. statusOptions = ALL_ASSIGNED_STATUSES.filter(s => s !== speech?.status). This dynamically excludes the current status. Lines 106-126: statusOptions.map renders each option with colored indicator and translated label. Current status is NOT shown as clickable option."
+      - id: VC-134-03
+        status: passed
+        evidence: "SpeechSlot.tsx lines 99-102: handleStatusPress now only checks status === 'not_assigned' (removed checks for assigned_confirmed and gave_up). Line 156: disabled={isObserver || status === 'not_assigned'} - LED is pressable for all assigned statuses. Previously blocked assigned_confirmed and gave_up."
+      - id: VC-134-04
+        status: passed
+        evidence: "useSpeeches.ts lines 59-65: VALID_TRANSITIONS now has full mesh for assigned statuses. assigned_not_invited -> [assigned_invited, assigned_confirmed, gave_up, not_assigned]. assigned_invited -> [assigned_not_invited, assigned_confirmed, gave_up, not_assigned]. assigned_confirmed -> [assigned_not_invited, assigned_invited, gave_up, not_assigned]. gave_up -> [assigned_not_invited, assigned_invited, assigned_confirmed, not_assigned]. Each assigned status can transition to all 3 other assigned statuses."
+      - id: VC-134-05
+        status: passed
+        evidence: "SpeechSlot.tsx lines 104-111: handleStatusSelect calls onChangeStatus(speech.id, newStatus). InviteActionDropdown.tsx lines 110-113: onChangeStatus(speech.id, statusOption). Both call the same mutation path. No change to the mutation logic itself. changeStatus.mutate still receives (speechId, status) and persists via Supabase update."
+
+# #############################################################################
+# CR-135: Change custom name help text (Batch 11)
+# #############################################################################
+
+cr_135:
+  cr_id: CR-135
+  title: "Change custom name help text in PrayerSelector"
+  type: ui_text_change
+  spec: specs/SPEC_F078.yaml
+  qa_plan: qa/QA_PLAN_011.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Text change clearly defined. Current pt-BR text at customNameHint key.
+      Same key used in en and es locales. PrayerSelector renders via
+      t('agenda.customNameHint').
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 5b7d8ed
+        message: "change customNameHint text (CR-135)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-135-01
+        status: passed
+        evidence: "pt-BR.json line 230: customNameHint = 'Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado'. Matches user's requested text with proper accent on 'não'."
+      - id: VC-135-02
+        status: passed
+        evidence: "en.json line 230: customNameHint = 'To choose a non-member, type the person\\'s name and add as a custom name'. Equivalent English translation of the new pt-BR message."
+      - id: VC-135-03
+        status: passed
+        evidence: "es.json line 230: customNameHint = 'Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado'. Equivalent Spanish translation of the new pt-BR message."
+      - id: VC-135-04
+        status: passed
+        evidence: "PrayerSelector.tsx lines 165-166: renders t('agenda.customNameHint') in customNameHintText Text element. No changes to rendering logic - same i18n key, same component position."
+
+# #############################################################################
+# CR-136: Agenda tab initial scroll to next sunday (Batch 11)
+# #############################################################################
+
+cr_136:
+  cr_id: CR-136
+  title: "Fix Agenda tab initial scroll to show next sunday in the middle"
+  type: bugfix
+  spec: specs/SPEC_F079.yaml
+  qa_plan: qa/QA_PLAN_011.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Scroll behavior difference confirmed. agenda.tsx uses scrollToIndex without
+      viewPosition. onScrollToIndexFailed uses inaccurate scrollToOffset fallback.
+      User wants next sunday centered (viewPosition:0.5).
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 80fe032
+        message: "agenda viewPosition 0.5 (CR-136)"
+      - hash: 7c348fa
+        message: "agenda onScrollToIndexFailed retry (CR-136)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-136-01
+        status: passed
+        evidence: "agenda.tsx line 116: flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false, viewPosition: 0.5 }). viewPosition:0.5 centers the next sunday item vertically in the viewport."
+      - id: VC-136-02
+        status: passed
+        evidence: "agenda.tsx lines 102-107: initialIndex = listItems.findIndex(item => item.type === 'sunday' && item.data.date === nextSunday). Correctly finds next sunday in listItems. Lines 112-119: useEffect fires when initialIndex > 0 and listItems.length > 0, guards with hasScrolled ref to scroll only once."
+      - id: VC-136-03
+        status: passed
+        evidence: "agenda.tsx lines 186-199: onScrollToIndexFailed first does scrollToOffset(averageItemLength * index) to get close, then after 100ms timeout retries scrollToIndex with Math.min(info.index, listItems.length - 1) and viewPosition:0.5. Two-step fallback is more reliable than the previous single scrollToOffset approach."
+      - id: VC-136-04
+        status: passed
+        evidence: "speeches.tsx lines 145-157: Initial scroll logic unchanged. Uses scrollToIndex({index, animated:false}) without viewPosition. onScrollToIndexFailed (lines 368-376) unchanged: scrollToIndex with Math.min(info.index, listItems.length-1). No modifications to speeches.tsx in this batch."
+
+# #############################################################################
+# CR-137: Checkbox-style UI for recognizing presence list (Batch 11)
+# #############################################################################
+
+cr_137:
+  cr_id: CR-137
+  title: "Checkbox-style visual for multi-select in ActorSelector (Recognizing Presence)"
+  type: ux_improvement
+  spec: specs/SPEC_F080.yaml
+  qa_plan: qa/QA_PLAN_011.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      UX issues confirmed. ActorSelector uses text prefix checkmark (U+2713),
+      not a checkbox. X delete icon confusing in multiSelect mode. De-selection
+      via name area not visually clear.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 29ca68a
+        message: "checkbox unicode visual (CR-137)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-137-01
+        status: passed
+        evidence: "ActorSelector.tsx lines 162-166: In multiSelect mode, renders a separate Text element with style 'checkbox' (fontSize:20, marginRight:8) showing U+2611 (ballot box with check) when selected or U+2610 (empty ballot box) when not selected. This is a proper checkbox-style visual, clearly distinct from the name text."
+      - id: VC-137-02
+        status: passed
+        evidence: "ActorSelector.tsx line 161: Pressable with style actorNameArea wraps BOTH the checkbox Text and the actor name Text. onPress={() => handleSelect(item)} triggers toggle. Clicking anywhere in the row (checkbox or name) triggers selection toggle. Lines 368-372: actorNameArea style has flex:1, flexDirection:'row', alignItems:'center'."
+      - id: VC-137-03
+        status: passed
+        evidence: "ActorSelector.tsx lines 172-186: actorActions (edit/delete icons) are outside the Pressable actorNameArea. They are in a separate View with style actorActions (flexDirection:'row', gap:20, marginLeft:16). The checkbox is inside the Pressable name area, visually separated from the action icons on the right. The checkbox (U+2610/U+2611) clearly communicates selection state, making the X icon (U+2716) unambiguously the delete action."
+      - id: VC-137-04
+        status: passed
+        evidence: "ActorSelector.tsx line 162: 'multiSelect &&' condition guards checkbox rendering. When multiSelect is false/undefined, no checkbox is shown. Lines 167-169: actor name renders directly without checkbox prefix. Single-select behavior unchanged: handleSelect still calls onSelect(actor) and closes modal (line 70-74)."
+      - id: VC-137-05
+        status: passed
+        evidence: "AgendaForm.tsx lines 456-462: Toggle logic unchanged. When selectorModal.field === 'recognizing': gets current recognized_names, checks exists = current.includes(actor.name), creates updated = exists ? filter : [...current, actor.name], calls updateField. No changes to AgendaForm.tsx in this batch."
+
+# #############################################################################
+# CR-138: Change actor delete confirmation text (Batch 11)
+# #############################################################################
+
+cr_138:
+  cr_id: CR-138
+  title: "Change actor delete confirmation text to context-specific message"
+  type: ui_text_change
+  spec: specs/SPEC_F081.yaml
+  qa_plan: qa/QA_PLAN_011.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Text change clearly defined. ActorSelector uses shared members.deleteConfirm
+      key. New i18n key needed to avoid affecting member/topic management pages.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: ee2c738
+        message: "actors.deleteConfirm key reference (CR-138)"
+      - hash: 081b280
+        message: "actors.deleteConfirm i18n strings (CR-138)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    validation_checks:
+      - id: VC-138-01
+        status: passed
+        evidence: "ActorSelector.tsx line 129: t('actors.deleteConfirm') - uses new i18n key 'actors.deleteConfirm' instead of 'members.deleteConfirm'. Key is in the 'actors' namespace, separate from 'members'."
+      - id: VC-138-02
+        status: passed
+        evidence: "pt-BR.json line 174: actors.deleteConfirm = 'Tem certeza que deseja excluir essa pessoa da lista de pessoas que podem ser escolhidas para serem reconhecidas durante a Reunião Sacramental?'. Matches user's exact requested text."
+      - id: VC-138-03
+        status: passed
+        evidence: "en.json line 174: actors.deleteConfirm = 'Are you sure you want to remove this person from the list of people who can be chosen to be acknowledged during Sacrament Meeting?'. Equivalent English translation."
+      - id: VC-138-04
+        status: passed
+        evidence: "es.json line 174: actors.deleteConfirm = '¿Está seguro de que desea eliminar a esta persona de la lista de personas que pueden ser elegidas para ser reconocidas durante la Reunión Sacramental?'. Equivalent Spanish translation with proper Spanish punctuation."
+      - id: VC-138-05
+        status: passed
+        evidence: "pt-BR.json line 159: members.deleteConfirm = 'Tem certeza que deseja excluir este membro?' (unchanged). en.json line 159: members.deleteConfirm = 'Are you sure you want to delete this member?' (unchanged). es.json line 159: members.deleteConfirm = '¿Está seguro de que desea eliminar este miembro?' (unchanged). settings/members.tsx and settings/topics.tsx still use t('members.deleteConfirm')."
+
+    cross_cutting:
+      - id: VC-CROSS-01
+        status: passed
+        evidence: "npx vitest run: 66 test files, 3542 tests all passing. Baseline was 3449 tests (65 files). +93 new tests, +1 test file."

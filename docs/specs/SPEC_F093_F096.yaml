@@ -1,0 +1,837 @@
+# =============================================================================
+# SPEC_F093_F096.yaml
+# Features F093-F096 / CR-150 to CR-153: Card layouts, Pianist/Conductor,
+# Intermediate Hymn toggle, Agenda card status lines
+# Batch: 14 Phase 2
+# Created: 2026-02-20
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 14
+phase: 2
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F093 / CR-150: Collapsed designation card layouts with speaker names and LEDs
+# =============================================================================
+
+features:
+
+  - id: F093
+    name: "Collapsed designation card layouts with speaker names and vertical LEDs"
+    cr_id: 150
+    type: ui
+    priority: medium
+    related_features: [F008, F009, F045]
+    related_crs: [101, 119, 150]
+
+    user_request: >
+      "Layout dos cards de designacoes contraidos (Home e Discursos): mostrar
+      nomes dos 3 discursantes (um por linha, '{N}o Discurso: <nome>') e LEDs
+      verticais alinhados a direita. Esconder ao expandir. Linhas vazias
+      mantidas para alinhamento"
+
+    current_behavior: >
+      Quando o card de domingo esta contraido (collapsed) na aba Discursos
+      (SundayCard.tsx) e na aba Home (NextSundaysSection via SundayCard):
+      - O header mostra apenas DateBlock (dia/mes) a esquerda
+      - Centro vazio (headerCenter) ou texto de excecao (se nao for speeches)
+      - 3 LEDs de status horizontais a direita (quando isSpeechesType)
+      - NAO mostra nomes dos discursantes quando contraido
+      - LEDs sao horizontais (flexDirection: 'row', gap: 6)
+      - Ao expandir, mostra SundayTypeDropdown + SpeechSlots (com nomes)
+
+    expected_behavior: >
+      Quando o card de domingo tipo 'speeches' esta contraido:
+      - DateBlock a esquerda (sem alteracao)
+      - Centro: 3 linhas de texto, uma por discurso:
+        * "1o Discurso: <nome>" (ou "1o Discurso:" se vazio)
+        * "2o Discurso: <nome>" (ou "2o Discurso:" se vazio)
+        * "Ultimo Discurso: <nome>" (ou "Ultimo Discurso:" se vazio)
+      - A direita: 3 LEDs dispostos VERTICALMENTE (flexDirection: 'column'),
+        alinhados com as linhas de texto
+      - Linhas sem discursante designado DEVEM ser mantidas (para alinhamento)
+      - Ao EXPANDIR o card, as linhas de nomes E os LEDs verticais devem ser
+        escondidos (nao ficar duplicado com os SpeechSlots expandidos)
+      - Quando o tipo de domingo NAO e 'speeches', comportamento inalterado
+        (mostra texto de excecao, sem LEDs)
+
+    files_impacted:
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "Adicionar bloco condicional no header para mostrar 3 linhas de nomes quando collapsed E isSpeechesType"
+          - "Mudar layout dos LEDs de horizontal para vertical no collapsed"
+          - "Esconder nomes e LEDs quando expanded (ja existem nos SpeechSlots)"
+          - "Usar i18n keys existentes para labels dos discursos (speeches.slot, speeches.lastSpeech) - decisao OQ-3"
+
+    acceptance_criteria:
+      - id: AC-093-01
+        description: "Card collapsed tipo speeches mostra 3 linhas de discursantes"
+        given: "Card de domingo tipo 'speeches' contraido com discursantes designados"
+        when: "Visualizar o card contraido na aba Discursos ou Home"
+        then: "3 linhas visiveis: '1o Discurso: <nome>', '2o Discurso: <nome>', 'Ultimo Discurso: <nome>'"
+
+      - id: AC-093-02
+        description: "Linhas vazias mantidas para alinhamento"
+        given: "Card contraido com apenas 1 discursante designado (posicao 1)"
+        when: "Visualizar card contraido"
+        then: "3 linhas exibidas: '1o Discurso: <nome>', '2o Discurso:', 'Ultimo Discurso:' (linhas 2 e 3 sem nome mas presentes)"
+
+      - id: AC-093-03
+        description: "LEDs dispostos verticalmente no card contraido"
+        given: "Card contraido tipo speeches"
+        when: "Visualizar LEDs"
+        then: "3 LEDs empilhados verticalmente (um em cima do outro), alinhados a direita das linhas de texto"
+
+      - id: AC-093-04
+        description: "Nomes e LEDs escondidos ao expandir"
+        given: "Card expandido"
+        when: "Visualizar card expandido"
+        then: "Linhas de nomes e LEDs verticais NAO aparecem (conteudo expandido com SpeechSlots os substitui)"
+
+      - id: AC-093-05
+        description: "Card nao-speeches inalterado"
+        given: "Card contraido com tipo diferente de 'speeches' (ex: testimony_meeting)"
+        when: "Visualizar card contraido"
+        then: "Mostra texto de excecao em amarelo, sem linhas de discursantes, sem LEDs"
+
+      - id: AC-093-06
+        description: "Funciona na aba Home (NextSundaysSection)"
+        given: "Card contraido na secao 'Proximas Designacoes' da Home"
+        when: "Visualizar cards da Home"
+        then: "Mesmo layout do card contraido na aba Discursos (3 linhas + LEDs verticais)"
+
+      - id: AC-093-07
+        description: "Funciona na aba Discursos"
+        given: "Card contraido na aba Discursos (speeches.tsx)"
+        when: "Visualizar cards da aba Discursos"
+        then: "3 linhas de nomes + LEDs verticais quando tipo speeches"
+
+    edge_cases:
+      - id: EC-093-01
+        case: "Nenhum discursante designado"
+        expected: "3 linhas vazias: '1o Discurso:', '2o Discurso:', 'Ultimo Discurso:' + 3 LEDs cinza (not_assigned)"
+
+      - id: EC-093-02
+        case: "Nome de discursante muito longo"
+        expected: "Texto truncado com ellipsis (numberOfLines={1}), LEDs verticais permanecem alinhados"
+
+      - id: EC-093-03
+        case: "Card de domingo passado (isPast && !expanded -> opacity 0.6)"
+        expected: "Layout com nomes e LEDs identico, com opacidade reduzida aplicada ao card inteiro"
+
+  # =============================================================================
+  # F094 / CR-151: Pianist and Conductor fields in Agenda
+  # =============================================================================
+
+  - id: F094
+    name: "Pianist and Conductor fields in Agenda Welcome section"
+    cr_id: 151
+    type: feature
+    priority: medium
+    related_features: [F012, F013]
+    related_crs: [73, 151]
+
+    user_request: >
+      "Campos Pianista e Regente na agenda (secao Boas-Vindas), mapeiam para
+      atores de musica. Posicao: Pianista, Regente, Hino de Abertura"
+
+    current_behavior: >
+      A secao Boas-Vindas do AgendaForm.tsx exibe os campos nesta ordem:
+      1. Presidindo (ActorSelector, roleFilter: can_preside)
+      2. Dirigindo (ActorSelector, roleFilter: can_conduct)
+      3. Reconhecendo a Presenca (ActorSelector, multi-select, roleFilter: can_recognize)
+      4. Anuncios (DebouncedTextInput, multiline)
+      5. Hino de Abertura (HymnSelectorModal)
+      6. Oracao de Abertura (PrayerSelector)
+      NAO existem campos para Pianista e Regente na UI.
+      POREM, a tabela sunday_agendas JA TEM as colunas:
+      - pianist_name TEXT
+      - pianist_actor_id UUID
+      - conductor_name TEXT
+      - conductor_actor_id UUID
+      E o tipo SundayAgenda em database.ts JA POSSUI essas propriedades.
+      O hook useAgenda ja faz SELECT * e retorna esses campos.
+      Ou seja, falta APENAS adicionar os campos na UI do AgendaForm
+      e no Modo Apresentacao (buildPresentationCards).
+
+    expected_behavior: >
+      A secao Boas-Vindas do AgendaForm.tsx passa a exibir:
+      1. Presidindo
+      2. Dirigindo
+      3. Reconhecendo a Presenca
+      4. Anuncios
+      5. **Pianista** (ActorSelector, roleFilter: can_music) <-- NOVO
+      6. **Regente** (ActorSelector, roleFilter: can_music)  <-- NOVO
+      7. Hino de Abertura
+      8. Oracao de Abertura
+      Campos Pianista e Regente:
+      - Usam ActorSelector com roleFilter 'can_music'
+      - Salvam em pianist_name/pianist_actor_id e conductor_name/conductor_actor_id
+      - Sao read-only para Observer (isObserver)
+      - Aparecem tambem no Modo Apresentacao (presentation.tsx via
+        buildPresentationCards), na Card 1 (Welcome), entre "Announcements"
+        e "Opening Hymn"
+      Keys i18n: agenda.pianist e agenda.conductor (JA EXISTEM em pt-BR.json)
+
+    files_impacted:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Adicionar campo Pianista (SelectorField + ActorSelector, roleFilter: 'can_music', fields: pianist_name/pianist_actor_id)"
+          - "Adicionar campo Regente (SelectorField + ActorSelector, roleFilter: 'can_music', fields: conductor_name/conductor_actor_id)"
+          - "Posicao: apos Anuncios, antes do Hino de Abertura"
+
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+        changes:
+          - "Adicionar campos Pianista e Regente na Card 1 (Welcome) do buildPresentationCards"
+          - "Posicao: apos announcements, antes de openingHymn"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Verificar que agenda.pianist e agenda.conductor existem (adicionar se faltarem)"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Verificar que agenda.pianist e agenda.conductor existem (adicionar se faltarem)"
+
+    acceptance_criteria:
+      - id: AC-094-01
+        description: "Campo Pianista visivel na secao Boas-Vindas da Agenda"
+        given: "Agenda expandida para um domingo"
+        when: "Visualizar secao Boas-Vindas"
+        then: "Campo 'Pianista' visivel entre Anuncios e Hino de Abertura"
+
+      - id: AC-094-02
+        description: "Campo Regente visivel na secao Boas-Vindas da Agenda"
+        given: "Agenda expandida para um domingo"
+        when: "Visualizar secao Boas-Vindas"
+        then: "Campo 'Regente' visivel entre Pianista e Hino de Abertura"
+
+      - id: AC-094-03
+        description: "Pianista usa ActorSelector com filtro can_music"
+        given: "Clicar no campo Pianista"
+        when: "Modal de selecao de ator abre"
+        then: "Lista mostra apenas atores com can_music=true"
+
+      - id: AC-094-04
+        description: "Regente usa ActorSelector com filtro can_music"
+        given: "Clicar no campo Regente"
+        when: "Modal de selecao de ator abre"
+        then: "Lista mostra apenas atores com can_music=true"
+
+      - id: AC-094-05
+        description: "Selecionar pianista salva automaticamente"
+        given: "Selecionar um ator como pianista"
+        when: "Ator selecionado"
+        then: "pianist_name e pianist_actor_id salvos via updateAgenda.mutate (auto-save)"
+
+      - id: AC-094-06
+        description: "Selecionar regente salva automaticamente"
+        given: "Selecionar um ator como regente"
+        when: "Ator selecionado"
+        then: "conductor_name e conductor_actor_id salvos via updateAgenda.mutate (auto-save)"
+
+      - id: AC-094-07
+        description: "Campos read-only para Observer"
+        given: "Usuario com role Observer"
+        when: "Visualizar campos Pianista e Regente"
+        then: "Campos mostram valor salvo mas nao sao clicaveis"
+
+      - id: AC-094-08
+        description: "Pianista e Regente no Modo Apresentacao"
+        given: "Modo Apresentacao ativo com pianista e regente designados"
+        when: "Visualizar Card 1 (Welcome)"
+        then: "Campos Pianista e Regente aparecem apos Anuncios, antes de Hino de Abertura"
+
+      - id: AC-094-09
+        description: "Ordem dos campos na secao Welcome"
+        given: "Agenda expandida"
+        when: "Visualizar secao Boas-Vindas"
+        then: "Ordem: Presidindo, Dirigindo, Reconhecendo, Anuncios, Pianista, Regente, Hino de Abertura, Oracao de Abertura"
+
+    edge_cases:
+      - id: EC-094-01
+        case: "Nenhum ator com can_music cadastrado"
+        expected: "Lista vazia no ActorSelector. Usuario pode adicionar atores com can_music em Configuracoes > Atores"
+
+      - id: EC-094-02
+        case: "Mesmo ator selecionado como Pianista e Regente"
+        expected: "Permitido. A mesma pessoa pode tocar piano e reger em alas pequenas"
+
+      - id: EC-094-03
+        case: "Pianista/Regente sem nome no modo apresentacao"
+        expected: "Campo aparece com valor vazio (string vazia), igual aos outros campos do modo apresentacao"
+
+  # =============================================================================
+  # F095 / CR-152: Intermediate Hymn toggle in Agenda
+  # =============================================================================
+
+  - id: F095
+    name: "Toggle for Intermediate Hymn in Agenda"
+    cr_id: 152
+    type: feature
+    priority: medium
+    related_features: [F012, F084]
+    related_crs: [152]
+
+    user_request: >
+      "Toggle para Hino Intermediario na agenda. Auto-desligado e escondido
+      quando apresentacao especial esta ligada ou reuniao de testemunho/primaria.
+      Caso contrario, mostrado e ligado por padrao"
+
+    current_behavior: >
+      No AgendaForm.tsx, a logica atual para Hino Intermediario:
+      - Se has_special_presentation === true: mostra campo de descricao da
+        apresentacao especial (TextInput)
+      - Se has_special_presentation === false: mostra seletor de Hino
+        Intermediario (HymnSelectorModal)
+      Ou seja, e um "ou exclusivo" controlado pelo toggle de Apresentacao Especial.
+      NAO existe toggle independente para o Hino Intermediario.
+      Quando nao ha apresentacao especial, o Hino Intermediario SEMPRE aparece.
+      Para reunioes especiais (testimony_meeting, primary_presentation), a secao
+      inteira de discursos e substituida, entao nem o toggle nem o hino aparecem.
+
+    expected_behavior: >
+      Adicionar um toggle "Hino Intermediario" na secao de discursos do AgendaForm:
+      - Toggle visivel SOMENTE quando:
+        * Tipo de domingo e 'speeches' (reuniao normal, nao especial)
+        * Toggle de Apresentacao Especial esta DESLIGADO
+      - Toggle LIGADO por padrao (quando visivel)
+      - Toggle DESLIGADO automaticamente quando:
+        * Apresentacao Especial e ligada -> toggle escondido E desligado
+        * Tipo muda para reuniao de testemunho/primaria -> toggle escondido E desligado
+      - Quando toggle LIGADO: mostra seletor de Hino Intermediario (como hoje)
+      - Quando toggle DESLIGADO: esconde seletor de Hino Intermediario
+      - O toggle e o seletor ficam na mesma posicao: apos Apresentacao Especial
+        (quando esta desligada), antes da secao "Ultimo Discurso"
+      - Estado PERSISTIDO no DB: nova coluna has_intermediate_hymn (BOOLEAN,
+        DEFAULT true) na tabela sunday_agendas (decisao OQ-2)
+      - Distingue entre "nunca selecionou hino" (has_intermediate_hymn=true,
+        intermediate_hymn_id=null) e "desligou o toggle" (has_intermediate_hymn=false)
+
+    files_impacted:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Adicionar ToggleField 'Hino Intermediario' abaixo do toggle 'Apresentacao Especial'"
+          - "Toggle visivel somente quando !isSpecial && !has_special_presentation"
+          - "Seletor de Hino Intermediario visivel somente quando toggle esta ligado"
+          - "Toggle controlado pela coluna has_intermediate_hymn do DB (persistido, decisao OQ-2)"
+
+      - path: supabase/migrations/NNNN_add_has_intermediate_hymn.sql
+        action: create
+        changes:
+          - "ALTER TABLE sunday_agendas ADD COLUMN has_intermediate_hymn BOOLEAN NOT NULL DEFAULT true"
+          - "Nova migracao SQL para adicionar coluna (decisao OQ-2)"
+
+      - path: src/types/database.ts
+        action: modify
+        changes:
+          - "Adicionar has_intermediate_hymn: boolean ao tipo SundayAgenda"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Verificar que agenda.intermediateHymn existe (ja existe: 'Hino Intermediario')"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Verificar que agenda.intermediateHymn existe"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Verificar que agenda.intermediateHymn existe"
+
+    acceptance_criteria:
+      - id: AC-095-01
+        description: "Toggle Hino Intermediario visivel em reuniao normal sem apresentacao especial"
+        given: "Domingo tipo 'speeches' com toggle de Apresentacao Especial desligado"
+        when: "Visualizar secao de discursos na agenda"
+        then: "Toggle 'Hino Intermediario' visivel e LIGADO por padrao"
+
+      - id: AC-095-02
+        description: "Seletor de hino visivel quando toggle ligado"
+        given: "Toggle 'Hino Intermediario' ligado"
+        when: "Visualizar secao de discursos"
+        then: "Seletor de Hino Intermediario visivel abaixo do toggle"
+
+      - id: AC-095-03
+        description: "Seletor de hino escondido quando toggle desligado"
+        given: "Toggle 'Hino Intermediario' desligado pelo usuario"
+        when: "Visualizar secao de discursos"
+        then: "Seletor de Hino Intermediario NAO visivel"
+
+      - id: AC-095-04
+        description: "Toggle escondido quando Apresentacao Especial ligada"
+        given: "Toggle de Apresentacao Especial LIGADO"
+        when: "Visualizar secao de discursos"
+        then: "Toggle 'Hino Intermediario' NAO visivel (escondido, nao apenas desabilitado)"
+
+      - id: AC-095-05
+        description: "Toggle escondido em reuniao de testemunho"
+        given: "Domingo tipo 'testimony_meeting'"
+        when: "Visualizar agenda"
+        then: "Toggle 'Hino Intermediario' NAO visivel (secao de discursos inteira e substituida)"
+
+      - id: AC-095-06
+        description: "Toggle escondido em reuniao da primaria"
+        given: "Domingo tipo 'primary_presentation'"
+        when: "Visualizar agenda"
+        then: "Toggle 'Hino Intermediario' NAO visivel"
+
+      - id: AC-095-07
+        description: "Modo Apresentacao respeita ausencia de Hino Intermediario"
+        given: "Toggle 'Hino Intermediario' desligado e nenhum hino selecionado"
+        when: "Visualizar Modo Apresentacao"
+        then: "Campo 'Hino Intermediario' NAO aparece na card de discursos"
+
+    edge_cases:
+      - id: EC-095-01
+        case: "Toggle desligado mas hino intermediario previamente selecionado"
+        expected: >
+          Seletor de hino escondido. O intermediate_hymn_id permanece salvo no DB
+          (nao e apagado). Se usuario ligar o toggle novamente, o hino aparece.
+
+      - id: EC-095-02
+        case: "Ligar Apresentacao Especial com toggle de Hino ligado"
+        expected: >
+          Toggle de Hino Intermediario escondido. has_intermediate_hymn permanece
+          true no DB (nao e alterado). Se desligar Apresentacao Especial depois,
+          toggle reaparece com o estado salvo no DB.
+
+      - id: EC-095-03
+        case: "Observer com toggle desligado"
+        expected: "Observer ve o seletor de hino oculto (mesmo visual que usuario com permissao)"
+
+  # =============================================================================
+  # F096 / CR-153: Collapsed agenda card status lines
+  # =============================================================================
+
+  - id: F096
+    name: "Collapsed agenda card status lines with completion info"
+    cr_id: 153
+    type: ui
+    priority: medium
+    related_features: [F012, F046]
+    related_crs: [102, 153]
+
+    user_request: >
+      "Layout dos cards de agenda contraidos com linhas de status:
+      Falta (Presidir|Dirigir|Pianista|Regente), Discursantes X/3,
+      Oradores Y/2, Hinos Z/W. Para excecoes nao-discursos, mostrar
+      texto da excecao em amarelo"
+
+    current_behavior: >
+      Na aba Agenda (agenda.tsx), o card contraido (AgendaSundayCard) mostra:
+      - DateBlock a esquerda (dia/mes)
+      - Centro: label de excecao em amarelo (se NAO for speeches)
+        ou vazio (se for speeches ou sem excecao)
+      - Chevron a direita (seta para expandir/contrair)
+      NAO mostra nenhuma informacao de status de preenchimento.
+      O usuario precisa expandir o card para ver se faltam campos.
+
+    expected_behavior: >
+      Na aba Agenda, o card contraido mostra linhas de status de preenchimento:
+
+      **Dados carregados via query de range (decisao OQ-1):**
+      Agendas para todo o range visivel sao carregadas antecipadamente
+      (semelhante a como speeches sao carregados via useSpeeches). Novo hook
+      useAgendaRange ou similar que faz SELECT de sunday_agendas para o range
+      de datas visiveis. Dados disponíveis para status lines sem expandir.
+
+      **Para domingos tipo 'speeches' (reuniao normal):**
+      Centro do card mostra ate 4 linhas de texto compacto:
+      - Linha 1: "Falta: " seguido dos campos vazios entre Presidir, Dirigir,
+        Pianista, Regente (separados por " | "). Se todos preenchidos, nao mostra
+        essa linha.
+        Ex: "Falta: Dirigir | Pianista" ou "Falta: Presidir"
+      - Linha 2: "Discursantes X/3" (conta quantos dos 3 speeches tem speaker_name)
+        Nota: deve usar speaker override se existir (mesmo criterio do modo apresentacao)
+      - Linha 3: "Oradores Y/2" (conta opening_prayer_name e closing_prayer_name
+        preenchidos - decisao OQ-4: Oradores = Oracoes)
+      - Linha 4: "Hinos Z/W" onde Z = hinos preenchidos, W = total de hinos
+        aplicaveis. Hinos aplicaveis: abertura, sacramento, intermediario (se
+        has_intermediate_hymn=true e sem apresentacao especial), encerramento.
+
+      Cores: texto em cor secundaria (textSecondary). Se todos os itens de uma
+      linha estiverem completos, a linha fica em verde (success/confirmado).
+
+      **Para domingos tipo excecao (nao-speeches):**
+      Comportamento igual ao atual: texto da excecao em amarelo no centro.
+      SEM linhas de status (reunioes especiais tem agenda simplificada).
+
+      **Para excecoes excluidas da agenda (general_conference, stake_conference):**
+      Comportamento igual ao atual: texto em amarelo, card nao-expandivel.
+
+    files_impacted:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+        changes:
+          - "No AgendaSundayCard, quando collapsed e tipo speeches: renderizar linhas de status"
+          - "Calcular campos faltantes (presiding, conducting, pianist, conductor)"
+          - "Contar discursantes preenchidos (speeches com speaker_name ou override)"
+          - "Contar oradores preenchidos (opening_prayer_name, closing_prayer_name) - decisao OQ-4"
+          - "Contar hinos preenchidos vs total aplicavel (usa has_intermediate_hymn - decisao OQ-2)"
+          - "Linha 'Falta: ...' so aparece se houver campo vazio"
+          - "Cores: textSecondary normal, verde se linha completa"
+
+      - path: src/hooks/useAgendaRange.ts
+        action: create
+        changes:
+          - "Novo hook para carregar agendas do range visivel (decisao OQ-1)"
+          - "SELECT * FROM sunday_agendas WHERE sunday_date BETWEEN start AND end AND ward_id = ?"
+          - "Retorna Map<string, SundayAgenda> indexado por sunday_date"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "agenda.statusMissing: 'Falta: '"
+          - "agenda.statusSpeakers: 'Discursantes {{filled}}/{{total}}'"
+          - "agenda.statusPrayers: 'Oradores {{filled}}/{{total}}'"
+          - "agenda.statusHymns: 'Hinos {{filled}}/{{total}}'"
+          - "agenda.statusPresiding: 'Presidir'"
+          - "agenda.statusConducting: 'Dirigir'"
+          - "agenda.statusPianist: 'Pianista'"
+          - "agenda.statusConductor: 'Regente'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Mesmas keys traduzidas para ingles"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Mesmas keys traduzidas para espanhol"
+
+    acceptance_criteria:
+      - id: AC-096-01
+        description: "Card collapsed speeches mostra linha 'Falta' com campos vazios"
+        given: "Card de agenda contraido tipo speeches com campos Dirigir e Pianista vazios"
+        when: "Visualizar card contraido"
+        then: "Linha 'Falta: Dirigir | Pianista' visivel no centro do card"
+
+      - id: AC-096-02
+        description: "Linha 'Falta' escondida quando todos preenchidos"
+        given: "Card de agenda contraido com Presidir, Dirigir, Pianista e Regente preenchidos"
+        when: "Visualizar card contraido"
+        then: "Linha 'Falta' NAO aparece"
+
+      - id: AC-096-03
+        description: "Contagem de discursantes exibida"
+        given: "Card contraido com 2 de 3 discursantes designados"
+        when: "Visualizar card contraido"
+        then: "Linha 'Discursantes 2/3' visivel"
+
+      - id: AC-096-04
+        description: "Discursantes usa speaker override quando existir"
+        given: "Discurso 1 sem speaker_name mas com speaker_1_override preenchido"
+        when: "Contagem de discursantes"
+        then: "Discurso 1 conta como preenchido (override substitui)"
+
+      - id: AC-096-05
+        description: "Contagem de oradores (oracoes) exibida"
+        given: "Card contraido com opening_prayer_name preenchido e closing_prayer_name vazio"
+        when: "Visualizar card contraido"
+        then: "Linha 'Oradores 1/2' visivel (decisao OQ-4: Oradores = Oracoes)"
+
+      - id: AC-096-06
+        description: "Contagem de hinos exibida"
+        given: "Card contraido com 2 de 3 hinos preenchidos (abertura, sacramento preenchidos; encerramento vazio)"
+        when: "Visualizar card contraido"
+        then: "Linha 'Hinos 2/3' visivel (ou 'Hinos 2/4' se hino intermediario aplicavel)"
+
+      - id: AC-096-07
+        description: "Hino intermediario conta no total somente quando aplicavel"
+        given: "Toggle de Apresentacao Especial ligado (sem Hino Intermediario)"
+        when: "Contar total de hinos"
+        then: "Total de hinos = 3 (abertura, sacramento, encerramento). Intermediario excluido."
+
+      - id: AC-096-08
+        description: "Linha com todos itens completos fica verde"
+        given: "Card contraido com todos 3 discursantes designados"
+        when: "Visualizar linha 'Discursantes 3/3'"
+        then: "Texto da linha em cor verde (success/confirmed)"
+
+      - id: AC-096-09
+        description: "Card de excecao nao-speeches mostra texto em amarelo"
+        given: "Card contraido tipo 'testimony_meeting'"
+        when: "Visualizar card contraido na aba Agenda"
+        then: "Texto 'Reuniao de Testemunho' em amarelo. SEM linhas de status."
+
+      - id: AC-096-10
+        description: "Card general_conference inalterado"
+        given: "Card de Conferencia Geral (nao-expandivel)"
+        when: "Visualizar card na aba Agenda"
+        then: "Texto em amarelo, nao expandivel, sem linhas de status"
+
+      - id: AC-096-11
+        description: "Status lines escondidas ao expandir"
+        given: "Card contraido mostrando linhas de status"
+        when: "Expandir o card"
+        then: "Linhas de status desaparecem (substituidas pelo AgendaForm expandido)"
+
+    edge_cases:
+      - id: EC-096-01
+        case: "Agenda ainda nao criada para o domingo"
+        expected: >
+          Todos os campos contam como vazios. Linhas mostram:
+          'Falta: Presidir | Dirigir | Pianista | Regente',
+          'Discursantes 0/3', 'Oradores 0/2', 'Hinos 0/3'.
+
+      - id: EC-096-02
+        case: "Domingo sem speeches no banco (speeches nao lazy-created)"
+        expected: >
+          Speeches contam como 0/3. Card contraido deve calcular status
+          mesmo sem expandir (precisa de dados de agenda e speeches disponíveis).
+
+      - id: EC-096-03
+        case: "Card de domingo passado (isPast)"
+        expected: "Linhas de status exibidas com mesma logica, opacidade reduzida no card"
+
+      - id: EC-096-04
+        case: "Nenhum campo preenchido"
+        expected: >
+          'Falta: Presidir | Dirigir | Pianista | Regente',
+          'Discursantes 0/3', 'Oradores 0/2', 'Hinos 0/3'. Nenhuma linha verde.
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    status: resolved
+    decision: "A"
+    decided_by: user
+    decided_on: "2026-02-20"
+    question: >
+      No CR-153 (F096), as linhas de status do card de agenda contraido precisam
+      de dados de agenda (presiding, conducting, pianist, conductor, hinos) e
+      speeches. Na aba Agenda, os dados de speeches ja sao carregados
+      (allSpeeches via useSpeeches para o range visivel) e passados via
+      speechMap para cada card. Porem, os dados de agenda (sunday_agendas) so
+      sao carregados quando o card e expandido (lazy creation via
+      useLazyCreateAgenda). Para mostrar status lines no collapsed, precisamos
+      dos dados de agenda ANTES de expandir. Opcoes:
+      (A) Carregar agendas para todo o range visivel (semelhante a speeches) -
+          requer novo query useAgendaRange ou similar
+      (B) Usar apenas o que ja esta disponivel: speeches (para contagem de
+          discursantes) e excecoes, sem campos de agenda (sem linha 'Falta' e
+          sem contagem de hinos ate expandir pela primeira vez, ai usar cache)
+      (C) Carregar agendas sob demanda para cada card (muitas queries)
+    context: >
+      Impacta performance e arquitetura. Opcao A e mais completa mas adiciona
+      query; opcao B e mais leve mas com informacao parcial.
+    options:
+      - "A: Carregar agendas para o range visivel (query adicional)"
+      - "B: Usar apenas speeches disponíveis para status parcial"
+      - "C: Queries individuais por card (nao recomendado)"
+    resolution: >
+      Opcao A escolhida. Carregar agendas para todo o range visivel via novo hook
+      useAgendaRange. Dados completos para status lines sem precisar expandir.
+
+  - id: OQ-2
+    status: resolved
+    decision: "A"
+    decided_by: user
+    decided_on: "2026-02-20"
+    question: >
+      No CR-152 (F095), o toggle de Hino Intermediario deve ter estado persistido
+      no banco (nova coluna has_intermediate_hymn na tabela sunday_agendas) ou
+      deve ser derivado do estado do intermediate_hymn_id (se null = desligado,
+      se preenchido = ligado)?
+    context: >
+      Se persistido: precisa nova migracao SQL. Se derivado: toggle inicia
+      como "ligado por padrao" quando intermediate_hymn_id e null (mas ai nao
+      da pra distinguir "nunca selecionou hino" de "desligou o toggle").
+      A CR diz "ligado por padrao", sugerindo estado independente.
+    options:
+      - "A: Nova coluna has_intermediate_hymn (persistido, nova migracao)"
+      - "B: Derivado do intermediate_hymn_id (null = padrao ligado, nao persistido)"
+      - "C: Estado local (nao persistido, reinicia ao reabrir)"
+    resolution: >
+      Opcao A escolhida. Nova coluna has_intermediate_hymn BOOLEAN DEFAULT true
+      na tabela sunday_agendas. Distingue claramente entre 'nunca selecionou'
+      e 'desligou toggle'. Requer nova migracao SQL.
+
+  - id: OQ-3
+    status: resolved
+    decision: "A"
+    decided_by: user
+    decided_on: "2026-02-20"
+    question: >
+      No CR-150 (F093), o label dos discursos no card collapsed deve usar o
+      formato i18n existente (speeches.slot com parametro number como 'Xo',
+      speeches.lastSpeech para posicao 3) ou deve ter keys i18n proprias para
+      o formato collapsed (ex: 'collapsedCard.speech1', etc.)?
+    context: >
+      Reutilizar as keys existentes mantem consistencia. Keys proprias permitem
+      customizar texto para o espaco reduzido do card collapsed.
+    options:
+      - "A: Reutilizar keys existentes (speeches.slot, speeches.lastSpeech)"
+      - "B: Criar keys proprias para o card collapsed"
+    resolution: >
+      Opcao A escolhida. Reutilizar keys i18n existentes (speeches.slot e
+      speeches.lastSpeech) para manter consistencia visual e de traducao.
+
+  - id: OQ-4
+    status: resolved
+    decision: "A"
+    decided_by: user
+    decided_on: "2026-02-20"
+    question: >
+      No CR-153 (F096), o campo "Oradores" mencionado no CR
+      ("Oradores Y/2") se refere a quais campos exatamente? Na agenda atual,
+      os "oradores" sao opening_prayer_name e closing_prayer_name? Ou se refere
+      a outra coisa?
+      A CR original diz: "Discursantes X/3, Oradores Y/2, Hinos Z/W".
+      "Oradores" pode significar as oracoes (opening/closing prayer).
+    context: >
+      Se "Oradores" = oracoes, entao Y/2 conta opening_prayer_name e
+      closing_prayer_name preenchidos. Isso precisa ser confirmado.
+    options:
+      - "A: Oradores = Oracoes (opening_prayer_name + closing_prayer_name) -> Y/2"
+      - "B: Oradores removido do layout (nao faz sentido no contexto)"
+    resolution: >
+      Opcao A escolhida. "Oradores Y/2" conta opening_prayer_name e
+      closing_prayer_name preenchidos. Nova linha de status adicionada ao F096.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: >
+      Os campos Pianista e Regente (CR-151) usam o mesmo componente ActorSelector
+      ja utilizado para Presidindo, Dirigindo e Reconhecendo. O roleFilter sera
+      'can_music' (ja existente no tipo ActorRoleFilter e no filtro filterActorsByRole).
+    reason: "Padrao de UI consistente com campos existentes"
+    impact_if_wrong: "Pode precisar de novo componente ou roleFilter diferente"
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: >
+      As keys i18n agenda.pianist e agenda.conductor ja existem nos 3 idiomas:
+      pt-BR ('Pianista'/'Regente'), en ('Pianist'/'Conductor'), es ('Pianista'/'Director').
+      Nao precisa adicionar keys novas para esses campos.
+    reason: "Verificado em todos os 3 arquivos de locale"
+    impact_if_wrong: "Nenhum, keys confirmadas como existentes"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: >
+      O toggle de Hino Intermediario (CR-152) nao se aplica a reunioes especiais
+      (testimony_meeting, primary_presentation, ward_conference, other), pois
+      nessas reunioes a secao de discursos inteira e substituida por conteudo
+      especifico. Portanto, o toggle so existe na secao de discursos de
+      reuniao normal.
+    reason: "A funcao isSpecialMeeting() ja controla isso: reunioes especiais nao mostram secao de discursos"
+    impact_if_wrong: "Nenhum, ja controlado pela logica existente"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: >
+      No CR-150, o card collapsed SundayCard.tsx e usado TANTO na aba Discursos
+      (speeches.tsx) QUANTO na Home (NextSundaysSection.tsx). A mudanca no
+      componente SundayCard afeta ambos automaticamente.
+    reason: "SundayCard e componente compartilhado, verificado nos dois arquivos"
+    impact_if_wrong: "Nenhum, componente confirmado como compartilhado"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: >
+      O CR-153 se aplica APENAS a aba Agenda (agenda.tsx / AgendaSundayCard),
+      NAO aos cards da aba Discursos ou Home (que usam SundayCard.tsx). Os cards
+      da aba Agenda sao um componente SEPARADO (AgendaSundayCard dentro de
+      agenda.tsx), diferente do SundayCard.tsx usado em Discursos e Home.
+    reason: "agenda.tsx define seu proprio AgendaSundayCard; SundayCard.tsx e usado em speeches.tsx e NextSundaysSection.tsx"
+    impact_if_wrong: "Se o CR quiser status lines nos cards de Discursos/Home tambem, sera escopo adicional"
+    needs_confirmation: false
+    confirmed: true
+    confirmed_by: user
+    confirmed_on: "2026-02-20"
+
+  - id: A-6
+    assumption: >
+      O "Regente" mencionado no CR-151 se refere ao regente de musica
+      (music conductor), NAO ao dirigente da reuniao (meeting conductor/conducting).
+      O campo "Dirigindo" (conducting) ja existe e se refere a quem dirige
+      a reuniao. "Regente" e quem rege os hinos na congregacao.
+    reason: "O CR diz 'mapeiam para atores de musica' (can_music), confirmando que e regente de musica"
+    impact_if_wrong: "Nenhum, confirmado pelo texto da CR"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: overlap
+    status: resolved
+    description: >
+      O CR-153 menciona "Oradores Y/2" nas linhas de status do card de
+      agenda contraido, mas nao ha conceito claro de "Oradores" no modelo
+      atual. O modelo tem: discursantes (speakers, 3 posicoes), oracoes
+      (opening_prayer, closing_prayer), atores (presiding, conducting, etc).
+      "Oradores" pode ser as oracoes ou pode ser um conceito novo. Isso
+      gera ambiguidade.
+    existing_spec: >
+      No SPEC_CONSOLIDATED, speeches tem 3 posicoes com speaker_name.
+      Agenda tem opening_prayer_name e closing_prayer_name. Nao existe
+      conceito de "Oradores" como entidade separada.
+    new_request: "Oradores Y/2 no layout contraido"
+    question: "OQ-4: O que 'Oradores Y/2' significa exatamente?"
+    resolution: >
+      OQ-4 resolvida: "Oradores" = Oracoes (opening_prayer_name + closing_prayer_name).
+      Contagem Y/2. Nova linha de status adicionada ao F096 (AC-096-05).
+
+  - id: INC-2
+    type: missing_context
+    status: resolved
+    description: >
+      CR-152 diz "ligado por padrao" para o toggle de Hino Intermediario, mas
+      o estado atual do AgendaForm nao tem um campo dedicado para esse toggle.
+      O intermediate_hymn_id ja existe no DB e pode ser null (sem hino
+      selecionado). Se o toggle for "ligado por padrao", ao abrir um card pela
+      primeira vez o seletor de hino deve aparecer mesmo que nenhum hino tenha
+      sido selecionado. Isso requer ou uma nova coluna no DB ou estado local.
+    existing_spec: >
+      SundayAgenda tem intermediate_hymn_id (UUID nullable) e
+      has_special_presentation (boolean). Nao tem campo para toggle de
+      hino intermediario.
+    new_request: "Toggle ligado por padrao, desligado quando apresentacao especial ativa"
+    question: "OQ-2: Toggle persistido ou derivado?"
+    resolution: >
+      OQ-2 resolvida: Nova coluna has_intermediate_hymn BOOLEAN DEFAULT true
+      na tabela sunday_agendas. Migracao SQL necessaria. F095 atualizado com
+      files_impacted incluindo migracao e database.ts.
+
+# =============================================================================
+# VALIDATION GATE (Final - all OQs resolved, spec complete)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true   # Identifiquei todas ambiguidades (OQ-1 a OQ-4)
+  GATE-03: true   # Listei TODAS open questions com IDs (OQ-1 a OQ-4) - TODAS RESOLVIDAS
+  GATE-04: true   # Listei TODAS assumptions com IDs (A-1 a A-6) - A-5 CONFIRMADA
+  GATE-05: true   # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-1, INC-2) - AMBAS RESOLVIDAS
+  GATE-06: true   # Status e "complete"
+  GATE-07: true   # Todas OQs resolvidas com decisao do usuario
+  GATE-08: true   # SPEC atualizado com impactos das decisoes (DB migration, useAgendaRange, Oradores)

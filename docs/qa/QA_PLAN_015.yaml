@@ -1,0 +1,270 @@
+# =============================================================================
+# QA_PLAN_015.yaml
+# QA Plan for Batch 14 Phase 2: CR-150, CR-151, CR-152, CR-153
+# Features: F093, F094, F095, F096
+# Created: 2026-02-20
+# =============================================================================
+
+type: qa_plan
+id: QA-015
+created_at: "2026-02-20T00:00:00Z"
+request_type: feature_request
+feature_or_bug: "Batch 14 Phase 2: Collapsed designation cards with speaker names and vertical LEDs, Pianist/Conductor fields in agenda, Intermediate Hymn toggle, Collapsed agenda cards with status lines"
+user_request: |
+  CR-150 (F093): Layout cards designacoes contraidos: nomes dos 3 discursantes com LEDs verticais
+  CR-151 (F094): Campos Pianista e Regente na agenda (atores de musica)
+  CR-152 (F095): Toggle para Hino Intermediario na agenda
+  CR-153 (F096): Layout cards agenda contraidos com linhas de status de preenchimento
+
+# =============================================================================
+# CR-150 (F093): Collapsed designation cards with speaker names + vertical LEDs
+# =============================================================================
+baseline_cr150:
+  description: |
+    The SundayCard component (src/components/SundayCard.tsx) is used in the Speeches tab
+    and Home tab. When collapsed, the card header shows:
+    - Left: DateBlock (day number + month abbreviation in a 44x44 box)
+    - Center: headerCenter with exception text (only if NOT speeches type)
+    - Right: 3 horizontal StatusLED dots (only if speeches type), in a row with gap 6
+
+    The collapsed card does NOT show speaker names. The LEDs are arranged HORIZONTALLY
+    (flexDirection: 'row'). There is no text next to the LEDs showing who is assigned.
+    Speaker names (speech.speaker_name) are only visible when the card is EXPANDED
+    and SpeechSlot components are rendered.
+
+    The user wants: collapsed cards should show the 3 speaker names next to the LEDs,
+    and the LEDs should be arranged VERTICALLY instead of horizontally.
+  evidence:
+    - "src/components/SundayCard.tsx lines 357-373: LEDs rendered horizontally in styles.leds (flexDirection: 'row', gap: 6)"
+    - "src/components/SundayCard.tsx lines 306-310: speechStatuses computed from positions 1,2,3 but only used for LED colors"
+    - "src/components/SundayCard.tsx lines 342-355: headerCenter only shows exception text, never speaker names"
+    - "Speaker names only accessible via speeches prop (speech.speaker_name) but not rendered in collapsed state"
+    - "StatusLED (src/components/StatusLED.tsx) is 16px circles, no adjacent text"
+
+# =============================================================================
+# CR-151 (F094): Pianist and Conductor fields in agenda
+# =============================================================================
+baseline_cr151:
+  description: |
+    The database schema (supabase/migrations/001_initial_schema.sql) already has the columns:
+    - pianist_name TEXT
+    - pianist_actor_id UUID REFERENCES meeting_actors(id)
+    - conductor_name TEXT
+    - conductor_actor_id UUID REFERENCES meeting_actors(id)
+
+    The SundayAgenda TypeScript type (src/types/database.ts lines 179-182) already declares:
+    - pianist_name: string | null
+    - pianist_actor_id: string | null
+    - conductor_name: string | null
+    - conductor_actor_id: string | null
+
+    The i18n files already have translation keys:
+    - en.json: "pianist": "Pianist", "conductor": "Conductor"
+    - pt-BR.json: "pianist": "Pianista", "conductor": "Regente"
+    - es.json: "pianist": "Pianista", "conductor": "Director"
+
+    The MeetingActor type has a can_music boolean flag for filtering music actors.
+    The ActorSelector component supports roleFilter='can_music'.
+
+    HOWEVER, the AgendaForm component (src/components/AgendaForm.tsx) does NOT render
+    any fields for pianist or conductor. These fields exist in the DB and types but are
+    completely absent from the UI. The user wants these fields visible and functional
+    in the agenda form.
+  evidence:
+    - "supabase/migrations/001_initial_schema.sql lines 181-184: pianist_name, pianist_actor_id, conductor_name, conductor_actor_id columns exist"
+    - "src/types/database.ts lines 179-182: TypeScript fields for pianist/conductor exist"
+    - "src/i18n/locales/en.json line 226-227: pianist and conductor keys exist"
+    - "src/components/AgendaForm.tsx: NO references to 'pianist' or 'conductor' anywhere in the file"
+    - "src/hooks/useActors.ts: ActorRoleFilter includes 'can_music'"
+
+# =============================================================================
+# CR-152 (F095): Toggle for Intermediate Hymn in agenda
+# =============================================================================
+baseline_cr152:
+  description: |
+    Currently in the AgendaForm (src/components/AgendaForm.tsx lines 354-384), the
+    intermediate hymn field behavior is:
+    - If has_special_presentation is TRUE: show special presentation description input
+    - If has_special_presentation is FALSE: show intermediate hymn selector
+
+    There is NO separate toggle for the intermediate hymn. The intermediate hymn is
+    ALWAYS shown when there is no special presentation. The user wants a toggle that
+    allows hiding/showing the intermediate hymn independently.
+
+    The database has intermediate_hymn_id (UUID) and has_special_presentation (BOOLEAN)
+    but there is NO has_intermediate_hymn field.
+
+    The user's request implies: when the special presentation toggle is OFF, there should
+    be a separate toggle to show/hide the intermediate hymn field. This allows meetings
+    where neither a special presentation nor an intermediate hymn is desired.
+  evidence:
+    - "src/components/AgendaForm.tsx lines 354-384: ToggleField for has_special_presentation, then conditional showing either description or intermediate hymn"
+    - "src/types/database.ts: SundayAgenda has has_special_presentation (boolean) and intermediate_hymn_id (string|null) but NO has_intermediate_hymn"
+    - "supabase/migrations/001_initial_schema.sql lines 197-199: has_special_presentation BOOLEAN and intermediate_hymn_id UUID, no has_intermediate_hymn"
+    - "Intermediate hymn is unconditionally shown when has_special_presentation is false - no way to hide it"
+
+# =============================================================================
+# CR-153 (F096): Collapsed agenda cards with status lines
+# =============================================================================
+baseline_cr153:
+  description: |
+    The Agenda tab (src/app/(tabs)/agenda.tsx) uses AgendaSundayCard which renders:
+    - Collapsed: DateBlock + center (exception label if not speeches) + chevron
+    - Expanded: SundayTypeDropdown + AgendaForm
+
+    When collapsed, there is NO indication of how much of the agenda is filled out.
+    The user wants: collapsed agenda cards should show status lines indicating the
+    fill state of the agenda fields (e.g., how many required fields are filled vs empty).
+
+    The agenda has many fields: presiding, conducting, opening hymn, opening prayer,
+    sacrament hymn, closing hymn, closing prayer, etc. A status line would summarize
+    how many of these fields have been filled in.
+  evidence:
+    - "src/app/(tabs)/agenda.tsx lines 296-385: AgendaSundayCard has no status info when collapsed"
+    - "src/app/(tabs)/agenda.tsx lines 344-361: collapsed state only shows DateBlock, exception label, and chevron"
+    - "No fill-status computation exists anywhere for agenda fields"
+    - "AgendaForm is only rendered when isExpanded is true (line 363-381)"
+
+# =============================================================================
+# Validation Checks (to be executed in POST mode)
+# =============================================================================
+validation_checks:
+
+  # --- CR-150 (F093): Collapsed designation cards with speaker names + vertical LEDs ---
+  - id: VC-150-01
+    description: "Collapsed SundayCard shows speaker names next to LEDs for speeches-type sundays"
+    type: functional
+    how_to_verify: "Check SundayCard.tsx collapsed header for rendering of speech.speaker_name text alongside StatusLED components"
+    expected_result: "Each of the 3 speech positions shows the speaker name (or placeholder) next to its LED in the collapsed card header"
+    priority: must_pass
+
+  - id: VC-150-02
+    description: "LEDs are arranged vertically instead of horizontally in collapsed state"
+    type: functional
+    how_to_verify: "Check styles for the LEDs container - should use flexDirection column instead of row"
+    expected_result: "LEDs container style uses flexDirection: 'column' or equivalent vertical layout"
+    priority: must_pass
+
+  - id: VC-150-03
+    description: "Speaker names truncate gracefully when too long"
+    type: behavioral
+    how_to_verify: "Check if Text components for speaker names use numberOfLines={1} or ellipsizeMode"
+    expected_result: "Long names are truncated with ellipsis, not wrapping to multiple lines"
+    priority: should_pass
+
+  - id: VC-150-04
+    description: "No regression in expanded card behavior"
+    type: regression
+    how_to_verify: "Verify SundayCard expanded state still renders SundayTypeDropdown and children correctly"
+    expected_result: "Expanded card functionality unchanged"
+    priority: must_pass
+
+  # --- CR-151 (F094): Pianist and Conductor fields in agenda ---
+  - id: VC-151-01
+    description: "Pianist field appears in AgendaForm with ActorSelector for can_music role"
+    type: functional
+    how_to_verify: "Check AgendaForm.tsx for pianist field rendering with SelectorField and ActorSelector using roleFilter='can_music'"
+    expected_result: "Pianist field renders with name display, taps opens ActorSelector filtered by can_music"
+    priority: must_pass
+
+  - id: VC-151-02
+    description: "Conductor field appears in AgendaForm with ActorSelector for can_music role"
+    type: functional
+    how_to_verify: "Check AgendaForm.tsx for conductor field rendering with SelectorField and ActorSelector using roleFilter='can_music'"
+    expected_result: "Conductor field renders with name display, taps opens ActorSelector filtered by can_music"
+    priority: must_pass
+
+  - id: VC-151-03
+    description: "Pianist and Conductor fields save correctly to database via updateField"
+    type: functional
+    how_to_verify: "Verify handleActorSelect is called with correct field names (pianist_name, pianist_actor_id, conductor_name, conductor_actor_id)"
+    expected_result: "Selection triggers updateAgenda.mutate with pianist_name/pianist_actor_id or conductor_name/conductor_actor_id"
+    priority: must_pass
+
+  - id: VC-151-04
+    description: "Pianist and Conductor fields are disabled for Observer role"
+    type: functional
+    how_to_verify: "Check that isObserver check prevents interaction with pianist/conductor fields"
+    expected_result: "Observer cannot open selector for pianist/conductor fields"
+    priority: must_pass
+
+  - id: VC-151-05
+    description: "Pianist and Conductor appear in Presentation Mode"
+    type: functional
+    how_to_verify: "Check usePresentationMode.ts buildPresentationCards for pianist/conductor fields in welcome card"
+    expected_result: "Presentation cards include pianist and conductor names"
+    priority: should_pass
+
+  # --- CR-152 (F095): Toggle for Intermediate Hymn ---
+  - id: VC-152-01
+    description: "A toggle control exists for the intermediate hymn, separate from the special presentation toggle"
+    type: functional
+    how_to_verify: "Check AgendaForm.tsx for a new toggle or switch that controls intermediate hymn visibility"
+    expected_result: "A ToggleField or Switch exists that controls whether the intermediate hymn selector is shown"
+    priority: must_pass
+
+  - id: VC-152-02
+    description: "When intermediate hymn toggle is OFF, the hymn selector is hidden"
+    type: functional
+    how_to_verify: "Verify conditional rendering of intermediate hymn selector based on toggle state"
+    expected_result: "Intermediate hymn selector only appears when toggle is ON"
+    priority: must_pass
+
+  - id: VC-152-03
+    description: "Toggle state persists to database"
+    type: functional
+    how_to_verify: "Check if toggle updates a database field (new or existing) via updateField"
+    expected_result: "Toggle state is saved and restored on reload"
+    priority: must_pass
+
+  - id: VC-152-04
+    description: "Interaction between special presentation toggle and intermediate hymn toggle is correct"
+    type: behavioral
+    how_to_verify: "Verify that when has_special_presentation is ON, the intermediate hymn section is hidden (special presentation takes priority)"
+    expected_result: "Special presentation ON hides intermediate hymn section entirely. When special presentation OFF, intermediate hymn toggle controls visibility"
+    priority: must_pass
+
+  # --- CR-153 (F096): Collapsed agenda cards with status lines ---
+  - id: VC-153-01
+    description: "Collapsed agenda card shows fill-status information"
+    type: functional
+    how_to_verify: "Check AgendaSundayCard in agenda.tsx for status line rendering in collapsed state"
+    expected_result: "Collapsed card shows some indicator of how many agenda fields are filled (e.g., 'X/Y filled' or progress dots)"
+    priority: must_pass
+
+  - id: VC-153-02
+    description: "Status line reflects actual agenda data (not hardcoded)"
+    type: functional
+    how_to_verify: "Verify that status computation reads from agenda data (useAgenda hook or passed props)"
+    expected_result: "Status changes when agenda fields are filled/emptied"
+    priority: must_pass
+
+  - id: VC-153-03
+    description: "Status line handles edge cases (no agenda created yet, all fields empty, all fields filled)"
+    type: edge_case
+    how_to_verify: "Check logic for agenda=null, all fields null, all fields populated"
+    expected_result: "No crashes or incorrect displays for edge cases. Shows appropriate status for each case"
+    priority: should_pass
+
+  - id: VC-153-04
+    description: "No regression in expanded agenda card behavior"
+    type: regression
+    how_to_verify: "Verify expanded card still shows SundayTypeDropdown and AgendaForm correctly"
+    expected_result: "Expanded state unchanged and fully functional"
+    priority: must_pass
+
+  # --- Cross-cutting regression ---
+  - id: VC-REGR-01
+    description: "All existing tests pass without regressions"
+    type: regression
+    how_to_verify: "Run vitest run and check pass count"
+    expected_result: "Zero failures in existing tests"
+    priority: must_pass
+
+# =============================================================================
+# Pass Criteria
+# =============================================================================
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.

@@ -7,11 +7,11 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-20"
-  last_updated_by: "batch-14-phase-1"
+  last_updated_by: "batch-14-phase-2"
   total_modules: 8
-  total_adrs: 56
-  total_crs_implemented: 89
-  pending_arch: "ARCH_M025 (batch-14-phase-1: CR-145 to CR-149)"
+  total_adrs: 58
+  total_crs_implemented: 93
+  pending_arch: "ARCH_M026 (batch-14-phase-2: CR-150 to CR-153)"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
@@ -32,6 +32,7 @@ metadata:
     - docs/arch/ARCH_M023.yaml
     - docs/arch/ARCH_M024.yaml
     - docs/arch/ARCH_M025.yaml
+    - docs/arch/ARCH_M026.yaml
 
 # =============================================================================
 # TECH STACK
@@ -237,7 +238,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051]
+    spec_features: [F008, F010, F024, F051, F093]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -254,7 +255,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -278,11 +279,12 @@ modules:
       CR-129/F071: LED click filtra todos os status exceto not_assigned. LED desabilitado para assigned_confirmed e gave_up.
       CR-128/F073: Topic X button extraido do campo para sibling em topicRow container (padrao identico ao speaker row).
       CR-134/F077: VALID_TRANSITIONS expandido para full mesh entre status atribuidos. SpeechSlot LED clicavel para todos exceto not_assigned. InviteActionDropdown opcoes dinamicas. SUPERSEDES F062 e F071.
+      CR-150/F093: SundayCard collapsed mostra nomes dos 3 discursantes (um por linha) + LEDs verticais. Usa i18n keys existentes (speeches.slot, speeches.lastSpeech).
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016]
+    spec_features: [F012, F016, F094, F095, F096]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -300,7 +302,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -323,6 +325,9 @@ modules:
       CR-133/F076: PrayerSelector hint text para discoverability + pre-populate no re-edit de nomes customizados.
       CR-136/F079: agenda.tsx scrollToIndex inicial com viewPosition:0.5 para centralizar proximo domingo. onScrollToIndexFailed melhorado com retry.
       CR-141/F084: SundayTypeDropdown adicionado como primeiro campo no card expandido da Agenda. Exportado de SundayCard.tsx. Mesmos hooks que speeches.tsx.
+      CR-151/F094: Campos Pianista e Regente adicionados na secao Boas-Vindas (ActorSelector can_music). Presentation mode inclui ambos.
+      CR-152/F095: Toggle has_intermediate_hymn com persistencia no DB (migracao 016). Controla visibilidade do seletor de hino intermediario.
+      CR-153/F096: Status lines no card de agenda contraido (Falta, Discursantes, Oracoes, Hinos). useAgendaRange para dados sem expandir.
 
   - id: M005
     name: NotificationModule
@@ -432,7 +437,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -461,6 +466,7 @@ modules:
       CR-146/F089: _layout.tsx QueryClient config: networkMode 'offlineFirst', offline-aware retry, silence MutationCache.onError when offline.
       CR-148/F091: i18n sundayExceptions.changeConfirmTitle/changeConfirmMessage atualizados com texto especifico.
       CR-149/F092: index.tsx remove showMeetingButton condicao, botao visivel sempre. isTodaySunday nao mais importado.
+      CR-150/F093: SundayCard collapsed header mostra 3 linhas de nomes de discursantes + LEDs verticais. Escondidos ao expandir.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1042,6 +1048,26 @@ adrs:
       - "No mutation error Alerts when offline"
       - "Auto-refetch on reconnect via onlineManager"
 
+  - id: ADR-066
+    title: "Range query for agenda data (useAgendaRange) to enable collapsed status lines"
+    context: "F096 needs agenda field data for collapsed cards. Current useAgenda only fetches single sunday on expand. Status lines need data before expand."
+    decision: "Add useAgendaRange hook with SELECT * FROM sunday_agendas WHERE range. Mirrors existing useSpeeches range pattern. Uses already-defined agendaKeys.byDateRange."
+    decided_in: "CR-153"
+    consequences:
+      - "Status lines show correct data without expanding card"
+      - "One additional query per mount (same pattern as speeches range)"
+      - "TanStack Query caching prevents duplicate fetches"
+
+  - id: ADR-067
+    title: "Persist has_intermediate_hymn as DB column instead of deriving from intermediate_hymn_id"
+    context: "F095 toggle needs to distinguish 'never selected hymn' (ON, null) from 'explicitly turned off' (OFF). Cannot derive from hymn_id alone."
+    decision: "New column has_intermediate_hymn BOOLEAN DEFAULT true in sunday_agendas. Migration 016."
+    decided_in: "CR-152"
+    consequences:
+      - "Clear semantic distinction between 'no hymn yet' and 'no hymn wanted'"
+      - "Default true = backward compatible"
+      - "One migration file (016_add_has_intermediate_hymn.sql)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1088,10 +1114,10 @@ database_schema:
 
     - name: sunday_agendas
       description: "Agenda completa da reuniao sacramental por domingo"
-      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, opening_prayer_member_id, opening_prayer_name, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, intermediate_hymn_id, closing_hymn_id, closing_prayer_member_id, closing_prayer_name, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
+      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, opening_prayer_member_id, opening_prayer_name, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, closing_hymn_id, closing_prayer_member_id, closing_prayer_name, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
       unique: ["(ward_id, sunday_date)"]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap"
+      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016)"
 
     - name: ward_collection_config
       description: "Configuracao de colecoes ativas por ala"
@@ -1176,6 +1202,7 @@ database_schema:
     - "013_fix_notification_trigger_security_definer.sql"
     - "014_add_speaker_overrides.sql"
     - "015_fix_function_search_path.sql"
+    - "016_add_has_intermediate_hymn.sql"
 
   key_relationships:
     - "members.ward_id -> wards.id"

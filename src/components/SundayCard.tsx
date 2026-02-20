@@ -85,7 +85,7 @@ function DateBlock({ date, locale }: DateBlockProps) {
 
 // --- SundayTypeDropdown ---
 
-interface SundayTypeDropdownProps {
+export interface SundayTypeDropdownProps {
   currentType: SundayTypeOption;
   onSelect: (type: SundayExceptionReason, customReason?: string) => void;
   onRevertToSpeeches: () => void;
@@ -95,7 +95,7 @@ interface SundayTypeDropdownProps {
   onDeleteSpeeches?: (date: string) => void;
 }
 
-function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches }: SundayTypeDropdownProps) {
+export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches }: SundayTypeDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);

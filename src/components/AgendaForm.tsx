@@ -396,19 +396,30 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               editable={!isObserver}
             />
           ) : (
-            <FieldRow label={t('agenda.intermediateHymn', 'Intermediate Hymn')} colors={colors}>
-              <SelectorField
-                value={getHymnDisplay(agenda.intermediate_hymn_id, allHymns)}
-                placeholder={t('agenda.intermediateHymn', 'Intermediate Hymn')}
-                onPress={() => {
-                  if (!isObserver) {
-                    setSelectorModal({ type: 'hymn', field: 'intermediate_hymn_id' });
-                  }
-                }}
+            <>
+              <ToggleField
+                label={t('agenda.intermediateHymn')}
+                value={agenda.has_intermediate_hymn}
+                onToggle={(val) => updateField('has_intermediate_hymn', val)}
                 disabled={isObserver}
                 colors={colors}
               />
-            </FieldRow>
+              {agenda.has_intermediate_hymn && (
+                <FieldRow label={t('agenda.intermediateHymn', 'Intermediate Hymn')} colors={colors}>
+                  <SelectorField
+                    value={getHymnDisplay(agenda.intermediate_hymn_id, allHymns)}
+                    placeholder={t('agenda.intermediateHymn', 'Intermediate Hymn')}
+                    onPress={() => {
+                      if (!isObserver) {
+                        setSelectorModal({ type: 'hymn', field: 'intermediate_hymn_id' });
+                      }
+                    }}
+                    disabled={isObserver}
+                    colors={colors}
+                  />
+                </FieldRow>
+              )}
+            </>
           )}
 
           {/* Section 4: Last Speech */}

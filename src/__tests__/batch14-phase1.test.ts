@@ -70,7 +70,7 @@ describe('F091 (CR-148): Update sunday type change confirmation message', () => 
 
     it('es changeConfirmMessage mentions y/o and seran eliminadas', () => {
       const locale = readLocale('es') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas asignados');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas designados');
       expect(locale.sundayExceptions.changeConfirmMessage).toContain('seran eliminadas');
     });
   });

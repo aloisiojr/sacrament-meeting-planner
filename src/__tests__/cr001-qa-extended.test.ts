@@ -148,20 +148,18 @@ describe('CR-01: Home tab section title (structural)', () => {
     });
   });
 
-  describe('AC-3: Title is hidden on non-Sundays (conditional render)', () => {
-    it('title is wrapped in showMeetingButton conditional', () => {
-      expect(homeContent).toContain('showMeetingButton');
-      expect(homeContent).toContain('isTodaySunday');
+  describe('AC-3: Button is always visible (F092 removed conditional)', () => {
+    it('button is rendered unconditionally (no showMeetingButton)', () => {
+      expect(homeContent).not.toContain('showMeetingButton');
+      expect(homeContent).not.toContain('isTodaySunday');
     });
 
-    it('meetingAgendaTitle and startMeeting button are in the same conditional block', () => {
-      // Both should be inside the {showMeetingButton && (...)} block
+    it('meetingAgendaTitle and startMeeting button are rendered', () => {
       const meetingTitleIdx = homeContent.indexOf('meetingAgendaTitle');
       const startMeetingIdx = homeContent.indexOf('home.startMeeting');
-      const showMeetingIdx = homeContent.indexOf('showMeetingButton');
-      // Both should appear after showMeetingButton conditional
-      expect(meetingTitleIdx).toBeGreaterThan(showMeetingIdx);
-      expect(startMeetingIdx).toBeGreaterThan(showMeetingIdx);
+      // Both should be present
+      expect(meetingTitleIdx).toBeGreaterThan(-1);
+      expect(startMeetingIdx).toBeGreaterThan(-1);
     });
   });
 });

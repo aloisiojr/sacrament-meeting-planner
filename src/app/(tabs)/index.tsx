@@ -7,14 +7,12 @@
  * - InviteManagementSection: secretary only
  */
 
-import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
-import { isTodaySunday } from '../../hooks/usePresentationMode';
 import { NextSundaysSection } from '../../components/NextSundaysSection';
 import { NextAssignmentsSection } from '../../components/NextAssignmentsSection';
 import { InviteManagementSection } from '../../components/InviteManagementSection';
@@ -24,27 +22,23 @@ function HomeTabContent() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const showMeetingButton = useMemo(() => isTodaySunday(), []);
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {showMeetingButton && (
-          <View>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('home.meetingAgendaTitle')}
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('home.meetingAgendaTitle')}
+          </Text>
+          <Pressable
+            style={[styles.meetingButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push('/presentation')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
+              {t('home.startMeeting')}
             </Text>
-            <Pressable
-              style={[styles.meetingButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/presentation')}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
-                {t('home.startMeeting')}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+          </Pressable>
+        </View>
         <NextSundaysSection />
         <NextAssignmentsSection />
         <InviteManagementSection />

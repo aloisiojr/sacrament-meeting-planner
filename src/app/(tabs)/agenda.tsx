@@ -20,13 +20,15 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
+import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
-import { useSundayExceptions } from '../../hooks/useSundayTypes';
+import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
+import { useSpeeches, useDeleteSpeechesByDate } from '../../hooks/useSpeeches';
 import { useLazyCreateAgenda, isExcludedFromAgenda } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
 import { formatDate, toISODateString, zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
-import type { SundayException } from '../../types/database';
+import type { SundayException, SundayExceptionReason, Speech } from '../../types/database';
 
 // --- Types ---
 
@@ -59,7 +61,13 @@ function AgendaTabContent() {
   } = useSundayList();
 
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
+  const { data: allSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const lazyCreate = useLazyCreateAgenda();
+  const setSundayType = useSetSundayType();
+  const removeSundayException = useRemoveSundayException();
+  const deleteSpeechesByDate = useDeleteSpeechesByDate();
+  const { hasPermission } = useAuth();
+  const canEditType = hasPermission('sunday_type:write');
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
@@ -71,6 +79,17 @@ function AgendaTabContent() {
     }
     return map;
   }, [exceptions]);
+
+  // Build speech map by sunday date
+  const speechMap = useMemo(() => {
+    const map = new Map<string, typeof allSpeeches>();
+    for (const speech of allSpeeches ?? []) {
+      const existing = map.get(speech.sunday_date) ?? [];
+      existing.push(speech);
+      map.set(speech.sunday_date, existing);
+    }
+    return map;
+  }, [allSpeeches]);
 
   // Build sunday list (all sundays, including Gen Conf / Stake Conf)
   const filteredSundays = useMemo(() => {
@@ -177,10 +196,15 @@ function AgendaTabContent() {
           locale={locale}
           expandable={!exception || !isExcludedFromAgenda(exception.reason)}
           onToggle={() => handleToggle(date)}
+          speeches={speechMap.get(date) ?? []}
+          typeDisabled={!canEditType}
+          onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
+          onRemoveException={(d) => removeSundayException.mutate(d)}
+          onDeleteSpeeches={(d) => deleteSpeechesByDate.mutate(d)}
         />
       );
     },
-    [expandedDate, nextSunday, locale, handleToggle, colors]
+    [expandedDate, nextSunday, locale, handleToggle, colors, speechMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -248,6 +272,11 @@ interface AgendaSundayCardProps {
   locale: SupportedLanguage;
   expandable: boolean;
   onToggle: () => void;
+  speeches: Speech[];
+  typeDisabled: boolean;
+  onTypeChange: (date: string, type: SundayExceptionReason, customReason?: string) => void;
+  onRemoveException: (date: string) => void;
+  onDeleteSpeeches: (date: string) => void;
 }
 
 function AgendaSundayCard({
@@ -259,6 +288,11 @@ function AgendaSundayCard({
   locale,
   expandable,
   onToggle,
+  speeches,
+  typeDisabled,
+  onTypeChange,
+  onRemoveException,
+  onDeleteSpeeches,
 }: AgendaSundayCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -272,6 +306,19 @@ function AgendaSundayCard({
   const exceptionLabel = (exception && exception.reason !== 'speeches')
     ? t(`sundayExceptions.${exception.reason}`, exception.reason)
     : null;
+
+  const currentType = exception?.reason ?? SUNDAY_TYPE_SPEECHES;
+
+  const handleTypeSelect = useCallback(
+    (type: SundayExceptionReason, customReason?: string) => {
+      onTypeChange(date, type, customReason);
+    },
+    [date, onTypeChange]
+  );
+
+  const handleRevertToSpeeches = useCallback(() => {
+    onRemoveException(date);
+  }, [date, onRemoveException]);
 
   return (
     <View
@@ -315,6 +362,15 @@ function AgendaSundayCard({
 
       {expandable && isExpanded && (
         <View style={styles.expandedContent}>
+          <SundayTypeDropdown
+            currentType={currentType}
+            onSelect={handleTypeSelect}
+            onRevertToSpeeches={handleRevertToSpeeches}
+            disabled={typeDisabled}
+            speeches={speeches}
+            date={date}
+            onDeleteSpeeches={onDeleteSpeeches}
+          />
           <ThemedErrorBoundary>
             <AgendaForm
               sundayDate={date}

@@ -193,6 +193,7 @@ export interface SundayAgenda {
   sacrament_hymn_id: string | null;
   // Speeches
   has_special_presentation: boolean;
+  has_intermediate_hymn: boolean;
   special_presentation_description: string | null;
   intermediate_hymn_id: string | null;
   // Speaker overrides (last-minute swap)

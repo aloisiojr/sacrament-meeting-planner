@@ -1,0 +1,821 @@
+# =============================================================================
+# PLAN_P026.yaml
+# Batch 14 Phase 2: Collapsed card layouts, Pianist/Conductor, Intermediate
+#                     Hymn toggle, Agenda card status lines
+# Features: F093 (CR-150), F094 (CR-151), F095 (CR-152), F096 (CR-153)
+# Created: 2026-02-20
+# Phase: 2 of 2
+# Total ACs: 34 (F093: 7, F094: 9, F095: 7, F096: 11)
+# Total ECs: 13 (F093: 3, F094: 3, F095: 3, F096: 4)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 14
+created: "2026-02-20"
+last_updated: "2026-02-20"
+spec_ref: "docs/specs/SPEC_F093_F096.yaml"
+arch_ref: "docs/arch/ARCH_M026.yaml"
+
+goal: >
+  Implement 4 features: collapsed designation card layouts with speaker names
+  and vertical LEDs in SundayCard (F093), pianist and conductor fields in
+  AgendaForm and presentation mode (F094), intermediate hymn toggle with DB
+  persistence (F095), and collapsed agenda card status lines with useAgendaRange
+  hook (F096).
+
+strategy:
+  order: "DB schema -> Type updates -> Hooks -> UI components -> Presentation mode -> Tests"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Tests created alongside or before code"
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F095 - DB migration for has_intermediate_hymn column
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F095: Add has_intermediate_hymn column via migration 016"
+    feature: F095
+    cr: 152
+    depends_on: []
+    parallelizable_with: [S02, S03]
+    files:
+      - path: supabase/migrations/016_add_has_intermediate_hymn.sql
+        action: create
+      - path: src/types/database.ts
+        action: modify
+    changes:
+      - description: >
+          Create migration file 016_add_has_intermediate_hymn.sql:
+          ALTER TABLE sunday_agendas ADD COLUMN has_intermediate_hymn BOOLEAN NOT NULL DEFAULT true;
+
+          Update SundayAgenda interface in src/types/database.ts:
+          Add has_intermediate_hymn: boolean; after has_special_presentation line.
+
+          Default true ensures backward compatibility (existing agendas show
+          hymn selector as before). Distinguishes 'never selected hymn'
+          (has_intermediate_hymn=true, intermediate_hymn_id=null) from
+          'explicitly turned off' (has_intermediate_hymn=false).
+    done_when:
+      - "supabase/migrations/016_add_has_intermediate_hymn.sql exists"
+      - "SQL contains ALTER TABLE sunday_agendas ADD COLUMN has_intermediate_hymn BOOLEAN NOT NULL DEFAULT true"
+      - "SundayAgenda interface in database.ts has has_intermediate_hymn: boolean"
+      - "has_intermediate_hymn is placed after has_special_presentation in the interface"
+    tests:
+      - type: unit
+        description: >
+          Test that migration file exists and contains correct ALTER TABLE statement.
+          Test that SundayAgenda type includes has_intermediate_hymn: boolean.
+    covers:
+      acceptance_criteria: [AC-095-01]
+      edge_cases: [EC-095-01, EC-095-02]
+    risks:
+      - risk: "Migration number 016 may conflict if another migration is added concurrently"
+        mitigation: "Check existing migrations before creating. Currently 015 is the latest."
+    commit_message: "feat(db): add has_intermediate_hymn column to sunday_agendas (F095, CR-152)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F093 - Collapsed SundayCard speaker names + vertical LEDs
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F093: Add speaker names and vertical LEDs to collapsed SundayCard"
+    feature: F093
+    cr: 150
+    depends_on: []
+    parallelizable_with: [S01, S03]
+    files:
+      - path: src/components/SundayCard.tsx
+        action: modify
+    changes:
+      - description: >
+          Modify SundayCard collapsed header to show speaker names and vertical LEDs
+          when isSpeechesType and !expanded:
+
+          1. In headerCenter (line 342-355), add conditional block when
+             isSpeechesType && !expanded:
+             - Render 3 Text lines, one per speech position
+             - Format: "{positionLabel}: {speakerName}" or "{positionLabel}:" if empty
+             - Position 1: t('speeches.slot', { number: '1\u00BA' }) + ': ' + name
+             - Position 2: t('speeches.slot', { number: '2\u00BA' }) + ': ' + name
+             - Position 3: t('speeches.lastSpeech') + ': ' + name
+             - Each line: numberOfLines={1}, ellipsizeMode='tail', fontSize: 11
+             - Lines for empty speakers still rendered (for alignment)
+
+          2. Change LEDs container (line 358-373):
+             - When !expanded: flexDirection 'column', gap 4 (vertical)
+             - Entire LEDs block hidden when expanded (SpeechSlots have own LEDs)
+             - Wrap in condition: {!expanded && isSpeechesType && (...)}
+
+          3. When expanded: headerCenter is empty, LEDs not rendered
+             (SpeechSlots in expandedContent provide both names and LEDs)
+
+          Note: SundayCard is shared between Discursos (speeches.tsx) and
+          Home (NextSundaysSection), so both tabs get the new layout automatically.
+    done_when:
+      - "SundayCard collapsed header shows 3 lines of speaker names when isSpeechesType && !expanded"
+      - "Lines use format '{positionLabel}: {speakerName}' with i18n keys speeches.slot and speeches.lastSpeech"
+      - "Empty speaker positions show label only (e.g. '1o Discurso:')"
+      - "LEDs are vertical (flexDirection: 'column') when collapsed"
+      - "Speaker names and LEDs are hidden when expanded"
+      - "Non-speeches cards show exception text as before (no change)"
+    tests:
+      - type: unit
+        description: >
+          Test that SundayCard collapsed header renders 3 speaker name lines
+          when isSpeechesType. Test LEDs use flexDirection 'column' when collapsed.
+          Test names and LEDs hidden when expanded. Test non-speeches type unchanged.
+    covers:
+      acceptance_criteria: [AC-093-01, AC-093-02, AC-093-03, AC-093-04, AC-093-05, AC-093-06, AC-093-07]
+      edge_cases: [EC-093-01, EC-093-02, EC-093-03]
+    risks:
+      - risk: "Speaker names may be too wide for the header center area"
+        mitigation: "numberOfLines={1} with ellipsizeMode='tail' truncates long names. LEDs remain aligned."
+    commit_message: "feat(ui): add speaker names and vertical LEDs to collapsed SundayCard (F093, CR-150)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F094 - Pianist and Conductor fields in AgendaForm
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F094: Add Pianist and Conductor fields in AgendaForm Welcome section"
+    feature: F094
+    cr: 151
+    depends_on: []
+    parallelizable_with: [S01, S02]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+    changes:
+      - description: >
+          Add Pianist and Conductor fields in the Welcome section of AgendaForm,
+          between Announcements and Opening Hymn (after line 227, before line 229).
+
+          1. Add Pianist field:
+             <FieldRow label={t('agenda.pianist')} colors={colors}>
+               <SelectorField
+                 value={agenda.pianist_name ?? ''}
+                 placeholder={t('agenda.pianist')}
+                 onPress={() => {
+                   if (!isObserver) {
+                     setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_music' });
+                   }
+                 }}
+                 disabled={isObserver}
+                 colors={colors}
+               />
+             </FieldRow>
+
+          2. Add Conductor (Regente) field:
+             <FieldRow label={t('agenda.conductor')} colors={colors}>
+               <SelectorField
+                 value={agenda.conductor_name ?? ''}
+                 placeholder={t('agenda.conductor')}
+                 onPress={() => {
+                   if (!isObserver) {
+                     setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_music' });
+                   }
+                 }}
+                 disabled={isObserver}
+                 colors={colors}
+               />
+             </FieldRow>
+
+          Both use same ActorSelector pattern as Presiding/Conducting.
+          roleFilter 'can_music' filters to music actors only.
+          DB fields: pianist_name/pianist_actor_id, conductor_name/conductor_actor_id
+          (already exist in SundayAgenda type and DB table).
+          The existing handleActorSelect builds field names as ${field}_name and
+          ${field}_actor_id, so field: 'pianist' -> pianist_name + pianist_actor_id.
+
+          Final field order in Welcome section:
+          1. Presidindo (existing)
+          2. Dirigindo (existing)
+          3. Reconhecendo a Presenca (existing)
+          4. Anuncios (existing)
+          5. Pianista (NEW)
+          6. Regente (NEW)
+          7. Hino de Abertura (existing)
+          8. Oracao de Abertura (existing)
+    done_when:
+      - "AgendaForm Welcome section has Pianist field between Announcements and Opening Hymn"
+      - "AgendaForm Welcome section has Conductor field between Pianist and Opening Hymn"
+      - "Both fields use ActorSelector with roleFilter 'can_music'"
+      - "Both fields use SelectorField pattern (same as Presiding/Conducting)"
+      - "Both fields are read-only when isObserver"
+      - "Pianist saves to pianist_name/pianist_actor_id"
+      - "Conductor saves to conductor_name/conductor_actor_id"
+      - "i18n keys agenda.pianist and agenda.conductor used (already exist)"
+    tests:
+      - type: unit
+        description: >
+          Test that AgendaForm has Pianist and Conductor fields in correct position.
+          Test that both use roleFilter 'can_music'. Test read-only for Observer.
+    covers:
+      acceptance_criteria: [AC-094-01, AC-094-02, AC-094-03, AC-094-04, AC-094-05, AC-094-06, AC-094-07, AC-094-09]
+      edge_cases: [EC-094-01, EC-094-02]
+    risks:
+      - risk: "None significant - follows exact same pattern as existing Presiding/Conducting fields"
+        mitigation: "N/A"
+    commit_message: "feat(agenda): add pianist and conductor fields in Welcome section (F094, CR-151)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F094 + F095 - Presentation mode updates
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "F094+F095: Add Pianist/Conductor to Card 1 and conditional intermediate hymn in presentation mode"
+    feature: [F094, F095]
+    cr: [151, 152]
+    depends_on: [S01, S03]
+    parallelizable_with: []
+    files:
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+    changes:
+      - description: >
+          Modify buildPresentationCards in usePresentationMode.ts:
+
+          F094: Add pianist and conductor to Card 1 (Welcome):
+          After the announcements push (line 93) and before the openingHymn push (line 94):
+          welcomeFields.push(
+            { label: t('agenda.pianist'), value: agenda?.pianist_name ?? '', type: 'text' },
+            { label: t('agenda.conductor'), value: agenda?.conductor_name ?? '', type: 'text' },
+          );
+
+          F095: Conditional intermediate hymn in Card 3 (Speeches):
+          Change line 149-154 from:
+            } else {
+              speechFields.push({
+                label: t('agenda.intermediateHymn', 'Intermediate Hymn'),
+                value: hymnLookup(agenda?.intermediate_hymn_id ?? null),
+                type: 'hymn',
+              });
+            }
+          To:
+            } else if (agenda?.has_intermediate_hymn !== false) {
+              speechFields.push({
+                label: t('agenda.intermediateHymn', 'Intermediate Hymn'),
+                value: hymnLookup(agenda?.intermediate_hymn_id ?? null),
+                type: 'hymn',
+              });
+            }
+
+          Note: Using !== false so that null/undefined (agenda not yet loaded or
+          old agendas without the field) defaults to showing the hymn (backward
+          compatible with DEFAULT true).
+    done_when:
+      - "Card 1 (Welcome) includes Pianist and Conductor fields after announcements, before Opening Hymn"
+      - "Pianist field uses agenda?.pianist_name ?? ''"
+      - "Conductor field uses agenda?.conductor_name ?? ''"
+      - "Intermediate hymn in Card 3 only shown when agenda?.has_intermediate_hymn !== false"
+      - "When has_intermediate_hymn is false, intermediate hymn field is skipped entirely"
+    tests:
+      - type: unit
+        description: >
+          Test Pianist and Conductor fields appear in Card 1 in correct position.
+          Test intermediate hymn shown when has_intermediate_hymn is true/null/undefined.
+          Test intermediate hymn hidden when has_intermediate_hymn is false.
+    covers:
+      acceptance_criteria: [AC-094-08, AC-095-07]
+      edge_cases: [EC-094-03, EC-095-01]
+    risks:
+      - risk: "Checking !== false may have edge cases with undefined"
+        mitigation: "undefined !== false is true, which means intermediate hymn shows by default. This matches the DEFAULT true behavior."
+    commit_message: "feat(presentation): add pianist/conductor fields and conditional intermediate hymn (F094+F095, CR-151+CR-152)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F095 - Intermediate hymn toggle in AgendaForm
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "F095: Add intermediate hymn toggle in AgendaForm speeches section"
+    feature: F095
+    cr: 152
+    depends_on: [S01]
+    parallelizable_with: [S02, S03]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+    changes:
+      - description: >
+          Add a ToggleField for intermediate hymn in the speeches section,
+          between the special presentation toggle and the intermediate hymn selector.
+
+          Modify the current logic (lines 354-384) from:
+            <ToggleField label={t('agenda.musicalNumber')} ... />
+            {agenda.has_special_presentation ? (
+              <DebouncedTextInput ... />  // special presentation description
+            ) : (
+              <FieldRow label={t('agenda.intermediateHymn')} ... />  // hymn selector
+            )}
+
+          To:
+            <ToggleField label={t('agenda.musicalNumber')} ... />
+            {agenda.has_special_presentation ? (
+              <DebouncedTextInput ... />  // special presentation description
+            ) : (
+              <>
+                <ToggleField
+                  label={t('agenda.intermediateHymn')}
+                  value={agenda.has_intermediate_hymn}
+                  onToggle={(val) => updateField('has_intermediate_hymn', val)}
+                  disabled={isObserver}
+                  colors={colors}
+                />
+                {agenda.has_intermediate_hymn && (
+                  <FieldRow label={t('agenda.intermediateHymn')} colors={colors}>
+                    <SelectorField
+                      value={getHymnDisplay(agenda.intermediate_hymn_id, allHymns)}
+                      placeholder={t('agenda.intermediateHymn')}
+                      onPress={() => {
+                        if (!isObserver) {
+                          setSelectorModal({ type: 'hymn', field: 'intermediate_hymn_id' });
+                        }
+                      }}
+                      disabled={isObserver}
+                      colors={colors}
+                    />
+                  </FieldRow>
+                )}
+              </>
+            )}
+
+          Toggle visibility rules:
+          - Visible ONLY when !isSpecial && !agenda.has_special_presentation
+            (already handled by the outer condition)
+          - When toggle ON: shows hymn selector below it
+          - When toggle OFF: hides hymn selector
+          - Persisted via has_intermediate_hymn column (updateField auto-saves)
+          - intermediate_hymn_id NOT cleared when toggle is turned off
+            (preserved for if user turns toggle back on)
+    done_when:
+      - "ToggleField for 'Hino Intermediario' visible when !has_special_presentation"
+      - "Toggle uses agenda.has_intermediate_hymn value from DB"
+      - "Toggle calls updateField('has_intermediate_hymn', val) on change"
+      - "Hymn selector visible only when has_intermediate_hymn is true"
+      - "Toggle hidden when has_special_presentation is true"
+      - "Toggle disabled for Observer (isObserver)"
+      - "intermediate_hymn_id NOT cleared when toggle turned off"
+    tests:
+      - type: unit
+        description: >
+          Test toggle visible when !has_special_presentation. Test toggle hidden
+          when has_special_presentation. Test hymn selector shown when toggle ON.
+          Test hymn selector hidden when toggle OFF. Test toggle disabled for Observer.
+    covers:
+      acceptance_criteria: [AC-095-01, AC-095-02, AC-095-03, AC-095-04, AC-095-05, AC-095-06]
+      edge_cases: [EC-095-01, EC-095-02, EC-095-03]
+    risks:
+      - risk: "has_intermediate_hymn may be undefined for agendas created before migration"
+        mitigation: "Migration sets DEFAULT true for existing rows. New agendas via useLazyCreateAgenda will get DB default. agenda.has_intermediate_hymn will always be boolean."
+    commit_message: "feat(agenda): add intermediate hymn toggle with DB persistence (F095, CR-152)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: F096 - useAgendaRange hook
+  # ---------------------------------------------------------------------------
+  - id: S06
+    title: "F096: Add useAgendaRange hook for loading agenda data by date range"
+    feature: F096
+    cr: 153
+    depends_on: [S01]
+    parallelizable_with: [S02, S03, S05]
+    files:
+      - path: src/hooks/useAgenda.ts
+        action: modify
+    changes:
+      - description: >
+          Add useAgendaRange hook to existing useAgenda.ts file (after useUpdateAgenda).
+          This mirrors the existing useSpeeches range pattern.
+
+          export function useAgendaRange(startDate: string, endDate: string) {
+            const { wardId } = useAuth();
+
+            return useQuery({
+              queryKey: agendaKeys.byDateRange(wardId, startDate, endDate),
+              queryFn: async (): Promise<SundayAgenda[]> => {
+                const { data, error } = await supabase
+                  .from('sunday_agendas')
+                  .select('*')
+                  .eq('ward_id', wardId)
+                  .gte('sunday_date', startDate)
+                  .lte('sunday_date', endDate)
+                  .order('sunday_date');
+
+                if (error) throw error;
+                return data ?? [];
+              },
+              enabled: !!wardId && !!startDate && !!endDate,
+            });
+          }
+
+          Note: agendaKeys.byDateRange is already defined in useAgenda.ts (line 19-20)
+          but was previously unused. Now it gets used by this new hook.
+          TanStack Query caching prevents duplicate fetches.
+          The hook loads all agendas for the visible date range, enabling
+          collapsed card status lines without expanding each card.
+    done_when:
+      - "useAgendaRange function exported from useAgenda.ts"
+      - "Query uses agendaKeys.byDateRange query key"
+      - "SELECT * FROM sunday_agendas WHERE ward_id = ? AND sunday_date BETWEEN start AND end"
+      - "Returns SundayAgenda[] (array)"
+      - "enabled: !!wardId && !!startDate && !!endDate"
+      - "Results ordered by sunday_date"
+    tests:
+      - type: unit
+        description: >
+          Test that useAgendaRange is exported from useAgenda.ts. Test that it
+          uses the correct query key pattern. Test that it has enabled guard.
+    covers:
+      acceptance_criteria: [AC-096-01, AC-096-03]
+      edge_cases: [EC-096-01, EC-096-02]
+    risks:
+      - risk: "Additional query on mount may affect performance"
+        mitigation: "Same pattern as useSpeeches range query already in use. TanStack Query caching prevents duplicate fetches. One additional SELECT per mount is acceptable."
+    commit_message: "feat(hooks): add useAgendaRange hook for agenda range queries (F096, CR-153)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: F096 - i18n keys for agenda status lines
+  # ---------------------------------------------------------------------------
+  - id: S07
+    title: "F096: Add i18n keys for agenda status lines in 3 locales"
+    feature: F096
+    cr: 153
+    depends_on: []
+    parallelizable_with: [S01, S02, S03, S05, S06]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Add 8 new i18n keys for agenda status lines in the agenda section
+          of all 3 locale files:
+
+          pt-BR:
+            "statusMissing": "Falta: ",
+            "statusSpeakers": "Discursantes {{filled}}/{{total}}",
+            "statusPrayers": "Orações {{filled}}/{{total}}",
+            "statusHymns": "Hinos {{filled}}/{{total}}",
+            "statusPresiding": "Presidir",
+            "statusConducting": "Dirigir",
+            "statusPianist": "Pianista",
+            "statusConductor": "Regente"
+
+          en:
+            "statusMissing": "Missing: ",
+            "statusSpeakers": "Speakers {{filled}}/{{total}}",
+            "statusPrayers": "Prayers {{filled}}/{{total}}",
+            "statusHymns": "Hymns {{filled}}/{{total}}",
+            "statusPresiding": "Preside",
+            "statusConducting": "Conduct",
+            "statusPianist": "Pianist",
+            "statusConductor": "Conductor"
+
+          es:
+            "statusMissing": "Falta: ",
+            "statusSpeakers": "Oradores {{filled}}/{{total}}",
+            "statusPrayers": "Oraciones {{filled}}/{{total}}",
+            "statusHymns": "Himnos {{filled}}/{{total}}",
+            "statusPresiding": "Presidir",
+            "statusConducting": "Dirigir",
+            "statusPianist": "Pianista",
+            "statusConductor": "Director"
+    done_when:
+      - "All 3 locale files have agenda.statusMissing key"
+      - "All 3 locale files have agenda.statusSpeakers key with {{filled}} and {{total}} params"
+      - "All 3 locale files have agenda.statusPrayers key with {{filled}} and {{total}} params"
+      - "All 3 locale files have agenda.statusHymns key with {{filled}} and {{total}} params"
+      - "All 3 locale files have agenda.statusPresiding, statusConducting, statusPianist, statusConductor keys"
+      - "Keys placed in the agenda section of each locale file"
+    tests:
+      - type: unit
+        description: >
+          Test that all 8 new agenda status keys exist in all 3 locale files.
+          Test that template keys contain {{filled}} and {{total}} interpolation params.
+    covers:
+      acceptance_criteria: [AC-096-01, AC-096-03, AC-096-05, AC-096-06]
+      edge_cases: []
+    risks:
+      - risk: "None significant - simple i18n key addition"
+        mitigation: "N/A"
+    commit_message: "feat(i18n): add agenda status line keys in 3 languages (F096, CR-153)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: F096 - Collapsed agenda card status lines
+  # ---------------------------------------------------------------------------
+  - id: S08
+    title: "F096: Add status lines to collapsed AgendaSundayCard in agenda.tsx"
+    feature: F096
+    cr: 153
+    depends_on: [S06, S07]
+    parallelizable_with: []
+    files:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+    changes:
+      - description: >
+          1. Import useAgendaRange from useAgenda.ts:
+             import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../../hooks/useAgenda';
+             import type { SundayAgenda } from '../../types/database';
+
+          2. In AgendaTabContent, call useAgendaRange:
+             const { data: allAgendas } = useAgendaRange(startDate, endDate);
+
+          3. Build agendaMap (similar to speechMap):
+             const agendaMap = useMemo(() => {
+               const map = new Map<string, SundayAgenda>();
+               for (const agenda of allAgendas ?? []) {
+                 map.set(agenda.sunday_date, agenda);
+               }
+               return map;
+             }, [allAgendas]);
+
+          4. Pass agenda to AgendaSundayCard in renderItem:
+             <AgendaSundayCard ... agenda={agendaMap.get(date) ?? null} />
+
+          5. Update AgendaSundayCardProps to include:
+             agenda: SundayAgenda | null;
+
+          6. In AgendaSundayCard, when collapsed (!isExpanded) AND tipo speeches
+             (!exceptionLabel), render 4 status lines in cardCenter:
+
+             Compute status from agenda and speeches props:
+             - missingRoles: check presiding_name, conducting_name, pianist_name,
+               conductor_name on agenda. For each null/empty, add translated label.
+             - speakersFilled: count speeches positions 1-3 where
+               agenda?.speaker_N_override ?? speech?.speaker_name is non-empty
+             - prayersFilled: count agenda opening_prayer_name, closing_prayer_name
+               that are non-empty
+             - hymnsFilled/hymnsTotal: count opening_hymn_id, sacrament_hymn_id,
+               closing_hymn_id + intermediate_hymn_id if
+               (agenda?.has_intermediate_hymn !== false && !agenda?.has_special_presentation)
+
+             Render:
+             - Line 1 (if missingRoles.length > 0):
+               "{t('agenda.statusMissing')}{missingRoles.join(' | ')}"
+             - Line 2: t('agenda.statusSpeakers', { filled: speakersFilled, total: 3 })
+             - Line 3: t('agenda.statusPrayers', { filled: prayersFilled, total: 2 })
+             - Line 4: t('agenda.statusHymns', { filled: hymnsFilled, total: hymnsTotal })
+
+             Colors:
+             - Default: colors.textSecondary
+             - Complete (filled === total for that line): '#22c55e' (green-500)
+             - Line 1 (Falta): always colors.textSecondary (never green, since it
+               only appears when something is missing)
+
+          7. Status lines hidden when expanded (existing condition handles this:
+             they are inside {!isExpanded && !exceptionLabel && (...)})
+
+          8. Exception cards (testimony_meeting, etc.) keep current yellow text,
+             no status lines.
+    done_when:
+      - "useAgendaRange called in AgendaTabContent with startDate, endDate"
+      - "agendaMap built from useAgendaRange results"
+      - "agenda prop passed to AgendaSundayCard"
+      - "Collapsed speeches card shows 'Falta: X | Y' line when roles are missing"
+      - "'Falta' line hidden when all 4 roles filled"
+      - "Collapsed card shows 'Discursantes X/3' with speaker count"
+      - "Speaker count uses speaker_N_override ?? speaker_name"
+      - "Collapsed card shows 'Oracoes X/2' with prayer count"
+      - "Collapsed card shows 'Hinos X/W' with hymn count (W depends on has_intermediate_hymn)"
+      - "Complete lines (filled === total) shown in green (#22c55e)"
+      - "Incomplete lines shown in textSecondary color"
+      - "Status lines hidden when expanded"
+      - "Exception cards unchanged (yellow text, no status lines)"
+    tests:
+      - type: unit
+        description: >
+          Test status line computation for various scenarios: all empty, all filled,
+          partial fill. Test missing roles line appears/disappears correctly.
+          Test speaker override counted. Test hymn total adjusts for has_intermediate_hymn.
+          Test green color for complete lines. Test no status lines for exceptions.
+    covers:
+      acceptance_criteria: [AC-096-01, AC-096-02, AC-096-03, AC-096-04, AC-096-05, AC-096-06, AC-096-07, AC-096-08, AC-096-09, AC-096-10, AC-096-11]
+      edge_cases: [EC-096-01, EC-096-02, EC-096-03, EC-096-04]
+    risks:
+      - risk: "Performance impact of rendering status lines for many cards"
+        mitigation: "Status computation is lightweight (field null checks). FlatList only renders visible cards. agendaMap lookup is O(1)."
+      - risk: "Agenda null for sundays not yet expanded (never lazy-created)"
+        mitigation: "When agenda is null, all fields count as empty. Status lines show Falta for all 4 roles, Discursantes 0/3, Oracoes 0/2, Hinos 0/3."
+    commit_message: "feat(ui): add status lines to collapsed agenda cards (F096, CR-153)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: Tests for Batch 14 Phase 2
+  # ---------------------------------------------------------------------------
+  - id: S09
+    title: "Batch 14 Phase 2 tests for F093, F094, F095, F096"
+    feature: all
+    cr: [150, 151, 152, 153]
+    depends_on: [S01, S02, S03, S04, S05, S06, S07, S08]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch14-phase2.test.ts
+        action: create
+    changes:
+      - description: >
+          Create comprehensive test file batch14-phase2.test.ts covering all 4 features.
+
+          F093 tests (SundayCard collapsed layout):
+          - Verify SundayCard.tsx contains collapsed speaker name rendering logic
+          - Verify speeches.slot and speeches.lastSpeech i18n keys used for labels
+          - Verify LEDs use flexDirection 'column' when collapsed
+          - Verify names and LEDs conditional on !expanded && isSpeechesType
+          - Verify non-speeches type does not render speaker names
+          - Verify numberOfLines={1} on speaker name Text components
+
+          F094 tests (Pianist/Conductor fields):
+          - Verify AgendaForm.tsx contains pianist SelectorField
+          - Verify AgendaForm.tsx contains conductor SelectorField
+          - Verify both use roleFilter 'can_music'
+          - Verify field order: announcements -> pianist -> conductor -> openingHymn
+          - Verify agenda.pianist and agenda.conductor i18n keys exist in 3 locales
+          - Verify buildPresentationCards includes pianist and conductor in Card 1
+          - Verify pianist/conductor position after announcements, before openingHymn
+
+          F095 tests (Intermediate hymn toggle):
+          - Verify migration file 016_add_has_intermediate_hymn.sql exists
+          - Verify migration contains correct ALTER TABLE statement
+          - Verify SundayAgenda type has has_intermediate_hymn: boolean
+          - Verify AgendaForm has ToggleField for intermediateHymn
+          - Verify hymn selector conditional on has_intermediate_hymn
+          - Verify toggle hidden when has_special_presentation
+          - Verify buildPresentationCards checks has_intermediate_hymn !== false
+
+          F096 tests (Agenda status lines):
+          - Verify useAgendaRange exported from useAgenda.ts
+          - Verify useAgendaRange uses agendaKeys.byDateRange
+          - Verify agenda.tsx imports useAgendaRange
+          - Verify AgendaSundayCardProps has agenda prop
+          - Verify all 8 agenda status i18n keys exist in 3 locales
+          - Verify agenda.tsx contains status line rendering logic
+          - Verify Falta line uses statusMissing key
+          - Verify speaker count uses override logic
+          - Verify hymn total adjusts for has_intermediate_hymn
+          - Verify green color (#22c55e) for complete lines
+          - Verify status lines not rendered for exception types
+    done_when:
+      - "batch14-phase2.test.ts created with tests for all 4 features"
+      - "All tests pass with vitest"
+      - "Coverage: 34 ACs + 13 ECs across 4 features"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 34 ACs and 13 ECs across 4 features"
+    covers:
+      acceptance_criteria: [AC-093-01, AC-093-02, AC-093-03, AC-093-04, AC-093-05, AC-093-06, AC-093-07, AC-094-01, AC-094-02, AC-094-03, AC-094-04, AC-094-05, AC-094-06, AC-094-07, AC-094-08, AC-094-09, AC-095-01, AC-095-02, AC-095-03, AC-095-04, AC-095-05, AC-095-06, AC-095-07, AC-096-01, AC-096-02, AC-096-03, AC-096-04, AC-096-05, AC-096-06, AC-096-07, AC-096-08, AC-096-09, AC-096-10, AC-096-11]
+      edge_cases: [EC-093-01, EC-093-02, EC-093-03, EC-094-01, EC-094-02, EC-094-03, EC-095-01, EC-095-02, EC-095-03, EC-096-01, EC-096-02, EC-096-03, EC-096-04]
+    risks:
+      - risk: "Test file may be large"
+        mitigation: "Organize by feature with describe blocks. Each feature has its own describe section."
+    commit_message: "test(batch14): add tests for F093, F094, F095, F096 (CR-150 to CR-153)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+
+  # F093 - Collapsed designation card layouts
+  - ac_id: AC-093-01
+    how_to_verify: "SundayCard collapsed header shows 3 lines: '1o Discurso: <name>', '2o Discurso: <name>', 'Ultimo Discurso: <name>' when isSpeechesType && !expanded."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-02
+    how_to_verify: "Empty speaker positions show label only (e.g. '1o Discurso:') without name but line still rendered for vertical alignment."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-03
+    how_to_verify: "LEDs container uses flexDirection: 'column' when !expanded. 3 LEDs stacked vertically."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-04
+    how_to_verify: "Speaker names and LEDs not rendered when expanded (condition: !expanded && isSpeechesType)."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-05
+    how_to_verify: "Non-speeches type shows exception text in yellow, no speaker names, no LEDs."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-06
+    how_to_verify: "SundayCard is shared component used in Home (NextSundaysSection). Same layout applies automatically."
+    covered_by_steps: [S02, S09]
+
+  - ac_id: AC-093-07
+    how_to_verify: "SundayCard is used in Discursos tab (speeches.tsx). Same layout applies automatically."
+    covered_by_steps: [S02, S09]
+
+  # F094 - Pianist and Conductor fields
+  - ac_id: AC-094-01
+    how_to_verify: "AgendaForm Welcome section has Pianist field between Announcements and Opening Hymn."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-02
+    how_to_verify: "AgendaForm Welcome section has Conductor field between Pianist and Opening Hymn."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-03
+    how_to_verify: "Pianist ActorSelector uses roleFilter 'can_music'. Only can_music actors listed."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-04
+    how_to_verify: "Conductor ActorSelector uses roleFilter 'can_music'. Only can_music actors listed."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-05
+    how_to_verify: "Selecting pianist triggers updateAgenda.mutate with pianist_name and pianist_actor_id fields."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-06
+    how_to_verify: "Selecting conductor triggers updateAgenda.mutate with conductor_name and conductor_actor_id fields."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-07
+    how_to_verify: "Both fields disabled for Observer (isObserver check in onPress)."
+    covered_by_steps: [S03, S09]
+
+  - ac_id: AC-094-08
+    how_to_verify: "buildPresentationCards Card 1 includes pianist_name and conductor_name after announcements, before openingHymn."
+    covered_by_steps: [S04, S09]
+
+  - ac_id: AC-094-09
+    how_to_verify: "Field order: Presidindo, Dirigindo, Reconhecendo, Anuncios, Pianista, Regente, Hino de Abertura, Oracao de Abertura."
+    covered_by_steps: [S03, S09]
+
+  # F095 - Intermediate hymn toggle
+  - ac_id: AC-095-01
+    how_to_verify: "ToggleField 'Hino Intermediario' visible when !isSpecial && !has_special_presentation. Uses has_intermediate_hymn DB value (default true)."
+    covered_by_steps: [S01, S05, S09]
+
+  - ac_id: AC-095-02
+    how_to_verify: "Hymn selector visible below toggle when has_intermediate_hymn is true."
+    covered_by_steps: [S05, S09]
+
+  - ac_id: AC-095-03
+    how_to_verify: "Hymn selector hidden when has_intermediate_hymn is false."
+    covered_by_steps: [S05, S09]
+
+  - ac_id: AC-095-04
+    how_to_verify: "Toggle hidden when has_special_presentation is true (outer condition already handles this)."
+    covered_by_steps: [S05, S09]
+
+  - ac_id: AC-095-05
+    how_to_verify: "Toggle not visible for testimony_meeting (isSpecial=true, speeches section replaced)."
+    covered_by_steps: [S05, S09]
+
+  - ac_id: AC-095-06
+    how_to_verify: "Toggle not visible for primary_presentation (isSpecial=true)."
+    covered_by_steps: [S05, S09]
+
+  - ac_id: AC-095-07
+    how_to_verify: "buildPresentationCards checks has_intermediate_hymn !== false before adding hymn field."
+    covered_by_steps: [S04, S09]
+
+  # F096 - Collapsed agenda card status lines
+  - ac_id: AC-096-01
+    how_to_verify: "Collapsed speeches card shows 'Falta: Dirigir | Pianista' when conducting_name and pianist_name are empty."
+    covered_by_steps: [S06, S07, S08, S09]
+
+  - ac_id: AC-096-02
+    how_to_verify: "Falta line not shown when all 4 roles (presiding, conducting, pianist, conductor) are filled."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-03
+    how_to_verify: "Collapsed card shows 'Discursantes 2/3' when 2 of 3 speakers assigned."
+    covered_by_steps: [S06, S07, S08, S09]
+
+  - ac_id: AC-096-04
+    how_to_verify: "Speaker count uses speaker_N_override ?? speech.speaker_name. Override counts as filled."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-05
+    how_to_verify: "Collapsed card shows 'Oracoes 1/2' when only opening_prayer_name filled."
+    covered_by_steps: [S07, S08, S09]
+
+  - ac_id: AC-096-06
+    how_to_verify: "Collapsed card shows 'Hinos 2/3' or 'Hinos 2/4' depending on intermediate hymn applicability."
+    covered_by_steps: [S07, S08, S09]
+
+  - ac_id: AC-096-07
+    how_to_verify: "Hymn total is 3 when has_special_presentation=true (intermediate excluded). 4 when has_intermediate_hymn=true."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-08
+    how_to_verify: "Line with filled===total uses green color (#22c55e). E.g. 'Discursantes 3/3' is green."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-09
+    how_to_verify: "Exception card (testimony_meeting) shows yellow text, no status lines."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-10
+    how_to_verify: "General conference card shows yellow text, non-expandable, no status lines (unchanged)."
+    covered_by_steps: [S08, S09]
+
+  - ac_id: AC-096-11
+    how_to_verify: "Status lines disappear when card is expanded (replaced by AgendaForm)."
+    covered_by_steps: [S08, S09]

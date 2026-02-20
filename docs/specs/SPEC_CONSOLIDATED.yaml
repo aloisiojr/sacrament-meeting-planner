@@ -55,6 +55,7 @@ metadata:
     - docs/specs/SPEC_F090.yaml
     - docs/specs/SPEC_F091.yaml
     - docs/specs/SPEC_F092.yaml
+    - docs/specs/SPEC_F093_F096.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1792,8 +1793,84 @@ features:
       - "Remover condicao showMeetingButton/isTodaySunday"
       - "getTodaySundayDate() ja tem logica de data correta"
 
+  # ---------------------------------------------------------------------------
+  # Batch 14 Phase 2: Card Layouts, Pianist/Conductor, Hymn Toggle, Status Lines (F093-F096)
+  # ---------------------------------------------------------------------------
+
+  - id: F093
+    name: "Collapsed designation card layouts with speaker names and vertical LEDs"
+    status: pending
+    rfs: []
+    description: >
+      Card de domingo contraido (Home e Discursos) mostra 3 linhas de nomes dos
+      discursantes ('{N}o Discurso: <nome>') e LEDs verticais alinhados a direita.
+      Linhas vazias mantidas para alinhamento. Escondidos ao expandir.
+    modified_by_crs: [150]
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    notes:
+      - "CR-150: Layout dos cards contraidos com nomes de discursantes"
+      - "7 acceptance criteria"
+      - "1 arquivo modificado (SundayCard.tsx)"
+      - "LEDs de horizontal para vertical no collapsed"
+      - "Afeta aba Discursos e Home (componente compartilhado)"
+
+  - id: F094
+    name: "Pianist and Conductor fields in Agenda Welcome section"
+    status: pending
+    rfs: []
+    description: >
+      Campos Pianista e Regente na secao Boas-Vindas da agenda, usando
+      ActorSelector com roleFilter can_music. Posicao: apos Anuncios, antes
+      de Hino de Abertura. DB ja tem colunas; falta apenas UI e apresentacao.
+    modified_by_crs: [151]
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    notes:
+      - "CR-151: Campos Pianista e Regente na agenda"
+      - "9 acceptance criteria"
+      - "2 arquivos modificados (AgendaForm.tsx, usePresentationMode.ts)"
+      - "DB colunas ja existem (pianist_*, conductor_*)"
+      - "i18n keys ja existem nos 3 idiomas"
+
+  - id: F095
+    name: "Toggle for Intermediate Hymn in Agenda"
+    status: pending
+    rfs: []
+    description: >
+      Toggle para Hino Intermediario na agenda. Ligado por padrao em reuniao
+      normal. Auto-desligado e escondido quando apresentacao especial ligada
+      ou reuniao de testemunho/primaria. Controla visibilidade do seletor de hino.
+      Estado persistido no DB via nova coluna has_intermediate_hymn BOOLEAN
+      DEFAULT true (decisao OQ-2). Requer nova migracao SQL.
+    modified_by_crs: [152]
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    notes:
+      - "CR-152: Toggle para Hino Intermediario"
+      - "7 acceptance criteria"
+      - "2 arquivos modificados (AgendaForm.tsx, database.ts) + 1 migracao SQL"
+      - "Nova coluna has_intermediate_hymn BOOLEAN DEFAULT true (decisao OQ-2)"
+      - "Interacao com toggle de Apresentacao Especial"
+
+  - id: F096
+    name: "Collapsed agenda card status lines with completion info"
+    status: pending
+    rfs: []
+    description: >
+      Card de agenda contraido mostra linhas de status: Falta (campos vazios),
+      Discursantes X/3, Oradores Y/2 (oracoes, decisao OQ-4), Hinos Z/W.
+      Para excecoes nao-discursos, mostra texto da excecao em amarelo. Linhas
+      completas em verde. Agendas carregadas via query de range (decisao OQ-1).
+    modified_by_crs: [153]
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    notes:
+      - "CR-153: Layout dos cards de agenda contraidos com status"
+      - "11 acceptance criteria"
+      - "1 arquivo modificado (agenda.tsx) + 1 novo hook (useAgendaRange.ts)"
+      - "Agendas carregadas para range visivel (decisao OQ-1)"
+      - "Oradores = oracoes opening/closing prayer (decisao OQ-4)"
+      - "Depende de F094 (Pianista/Regente) e F095 (toggle Hino)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (51 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14)
+# PENDING CHANGE REQUESTS (55 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14)
 # =============================================================================
 
 pending_crs:
@@ -2791,6 +2868,90 @@ pending_crs:
       - "Label e estilo identicos ao atual"
     files_likely_impacted:
       - src/app/(tabs)/index.tsx
+
+  # --- Batch 14 Phase 2 (Card Layouts, Pianist/Conductor, Hymn Toggle, Status Lines) ---
+
+  - id: 150
+    type: ui
+    area: "Speech Cards (F008, F009, F045)"
+    feature_id: F093
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    related_crs: [101, 119]
+    description: >
+      Layout dos cards de designacoes contraidos (Home e Discursos): mostrar
+      nomes dos 3 discursantes (um por linha) e LEDs verticais alinhados a direita.
+      Esconder ao expandir. Linhas vazias mantidas para alinhamento.
+    acceptance_criteria:
+      - "Card collapsed speeches mostra 3 linhas de discursantes"
+      - "LEDs dispostos verticalmente, alinhados a direita"
+      - "Linhas vazias mantidas para alinhamento"
+      - "Nomes e LEDs escondidos ao expandir"
+      - "Funciona na aba Discursos e Home"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 151
+    type: feature
+    area: "Agenda (F012, F013)"
+    feature_id: F094
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    related_crs: [73]
+    description: >
+      Campos Pianista e Regente na secao Boas-Vindas da agenda. ActorSelector
+      com roleFilter can_music. Posicao: apos Anuncios, antes de Hino de Abertura.
+      Aparecem tambem no Modo Apresentacao.
+    acceptance_criteria:
+      - "Campo Pianista visivel na secao Boas-Vindas"
+      - "Campo Regente visivel na secao Boas-Vindas"
+      - "Ambos usam ActorSelector com filtro can_music"
+      - "Selecao salva automaticamente via auto-save"
+      - "Campos read-only para Observer"
+      - "Aparecem no Modo Apresentacao Card 1"
+      - "Ordem: Anuncios, Pianista, Regente, Hino de Abertura"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+      - src/hooks/usePresentationMode.ts
+
+  - id: 152
+    type: feature
+    area: "Agenda (F012)"
+    feature_id: F095
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    related_crs: []
+    description: >
+      Toggle para Hino Intermediario na agenda. Ligado por padrao em reuniao
+      normal. Auto-desligado e escondido quando apresentacao especial ou
+      reuniao especial. Controla visibilidade do seletor de hino.
+    acceptance_criteria:
+      - "Toggle visivel em reuniao normal sem apresentacao especial"
+      - "Ligado por padrao"
+      - "Seletor de hino visivel quando toggle ligado"
+      - "Toggle escondido quando Apresentacao Especial ligada"
+      - "Toggle escondido em reuniao de testemunho/primaria"
+      - "Modo Apresentacao respeita toggle"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+
+  - id: 153
+    type: ui
+    area: "Agenda (F012, F046)"
+    feature_id: F096
+    spec_file: "docs/specs/SPEC_F093_F096.yaml"
+    related_crs: [102]
+    description: >
+      Layout dos cards de agenda contraidos com linhas de status: Falta
+      (Presidir|Dirigir|Pianista|Regente), Discursantes X/3, Oradores Y/2,
+      Hinos Z/W. Para excecoes nao-discursos, texto da excecao em amarelo.
+    acceptance_criteria:
+      - "Linha 'Falta' mostra campos vazios"
+      - "Linha 'Falta' escondida quando todos preenchidos"
+      - "Contagem de discursantes X/3"
+      - "Contagem de hinos Z/W"
+      - "Linha completa em verde"
+      - "Excecao nao-speeches mostra texto em amarelo"
+      - "Status lines escondidas ao expandir"
+    files_likely_impacted:
+      - src/app/(tabs)/agenda.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -3933,12 +4094,13 @@ cr_history:
     summary: "Settings tab options renamed with i18n, Sunday type selector in Agenda tab, Activity log entries overhaul with structured format and i18n, Replace pg_timezone_names with static list (analysis), Fix mutable search_path in 7 PostgreSQL functions."
 
   batch_14:
-    range: "CR-145 a CR-149"
-    status: "5 pendentes fase 1 (145, 146, 147, 148, 149)"
+    range: "CR-145 a CR-153"
+    status: "5 pendentes fase 1 (145, 146, 147, 148, 149), 4 pendentes fase 2 (150, 151, 152, 153)"
     files:
       - "docs/specs/SPEC_F088.yaml (CR-145 - Email Reset Customization)"
       - "docs/specs/SPEC_F089.yaml (CR-146 - Offline Graceful Degradation)"
       - "docs/specs/SPEC_F090.yaml (CR-147 - Offline Banner Readability)"
       - "docs/specs/SPEC_F091.yaml (CR-148 - Sunday Type Change Confirmation)"
       - "docs/specs/SPEC_F092.yaml (CR-149 - Presentation Mode Button Always Visible)"
-    summary: "Phase 1: Password reset email customization (branding + redirect URL), graceful offline degradation (suppress errors, show cache, reconnect), offline banner readability on iPhone (safe area insets), sunday type change confirmation message with specific text (i18n), presentation mode button always visible (remove Sunday-only condition)."
+      - "docs/specs/SPEC_F093_F096.yaml (CR-150 to CR-153 - Card Layouts, Pianist/Conductor, Hymn Toggle, Status Lines)"
+    summary: "Phase 1: Password reset email customization (branding + redirect URL), graceful offline degradation (suppress errors, show cache, reconnect), offline banner readability on iPhone (safe area insets), sunday type change confirmation message with specific text (i18n), presentation mode button always visible (remove Sunday-only condition). Phase 2: Collapsed card layouts with speaker names and vertical LEDs, pianist/conductor fields in agenda welcome section, toggle for intermediate hymn, collapsed agenda card status lines with completion info."

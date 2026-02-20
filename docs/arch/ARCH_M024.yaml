@@ -1,0 +1,990 @@
+# =============================================================================
+# ARCH_M024.yaml
+# Architecture for Batch 13 - Settings Rename, Agenda Sunday Type,
+#                              Activity Log, Supabase Fixes
+# Features: F083, F084, F085, F086, F087
+# CRs: CR-140, CR-141, CR-142, CR-143, CR-144
+# Created: 2026-02-20
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Five changes spanning i18n label updates (F083), Agenda tab SundayTypeDropdown
+    integration (F084), activity log structured descriptions with i18n rendering
+    (F085), pg_timezone_names investigation (F086), and SQL function search_path
+    security fix (F087).
+  principles:
+    - "Reuse over duplication: F084 exports existing SundayTypeDropdown from SundayCard.tsx"
+    - "Hybrid log format: structured placeholders in DB, i18n rendering in UI (F085)"
+    - "Backward compatibility: old plain-text log entries rendered as-is via fallback (F085)"
+    - "Security by default: all PL/pgSQL functions get SET search_path = '' (F087)"
+    - "Investigation-driven: F086 documents that pg_timezone_names is external to app code"
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │  Batch 13 Changes Overview                                                  │
+  │                                                                             │
+  │  F083 (i18n only)           F084 (Agenda + SundayCard)                     │
+  │  ┌────────────────┐         ┌──────────────────────────────────────────┐   │
+  │  │ pt-BR.json     │         │ agenda.tsx                               │   │
+  │  │ en.json        │         │  └─ AgendaSundayCard                     │   │
+  │  │ es.json        │         │      └─ SundayTypeDropdown (exported)    │   │
+  │  │                │         │           ├─ uses useSetSundayType       │   │
+  │  │ 10 label       │         │           ├─ uses useRemoveSundayException│  │
+  │  │ changes each   │         │           ├─ uses useDeleteSpeechesByDate│   │
+  │  └────────────────┘         │           └─ Alert.alert confirmation    │   │
+  │                             │      └─ AgendaForm                       │   │
+  │                             └──────────────────────────────────────────┘   │
+  │                                                                             │
+  │  F085 (Activity Log Overhaul)                                              │
+  │  ┌──────────────────────────────────────────────────────────────────────┐  │
+  │  │ lib/activityLog.ts                                                   │  │
+  │  │  ├─ buildLogDescription(type, params) → "type|k=v|k=v"             │  │
+  │  │  ├─ parseLogDescription(desc) → {type, params}                      │  │
+  │  │  └─ formatLogDescription(desc, t) → translated string              │  │
+  │  │                                                                      │  │
+  │  │ Hooks (6 files):  logAction now uses buildLogDescription()          │  │
+  │  │  useMembers, useSpeeches, useTopics, useActors,                     │  │
+  │  │  useSundayTypes, useAgenda                                          │  │
+  │  │                                                                      │  │
+  │  │ settings/users.tsx: name-update + removed logs                      │  │
+  │  │ settings/history.tsx: formatLogDescription(desc, t) rendering       │  │
+  │  │                                                                      │  │
+  │  │ i18n: 24 activityLog.events.* keys × 3 languages                   │  │
+  │  └──────────────────────────────────────────────────────────────────────┘  │
+  │                                                                             │
+  │  F086 (Investigation only)    F087 (SQL migration)                         │
+  │  ┌──────────────────┐         ┌──────────────────────────────────────┐     │
+  │  │ No code changes  │         │ 015_fix_function_search_path.sql    │     │
+  │  │ pg_timezone_names │         │  7 functions with:                  │     │
+  │  │ is external to   │         │  SET search_path = ''               │     │
+  │  │ app codebase     │         │  + explicit schema qualifiers       │     │
+  │  └──────────────────┘         │  (public.*, auth.*)                 │     │
+  │                               └──────────────────────────────────────┘     │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# F083: Rename Settings tab options with i18n
+# =============================================================================
+
+f083_settings_rename:
+  summary: >
+    Change 10 i18n label values across 3 locale files (pt-BR, en, es).
+    No TypeScript code changes. Keys remain the same, only values change.
+
+  components:
+    - name: "i18n locale value updates"
+      files:
+        - path: src/i18n/locales/pt-BR.json
+          action: modify
+        - path: src/i18n/locales/en.json
+          action: modify
+        - path: src/i18n/locales/es.json
+          action: modify
+      responsibility: "Update 10 label values per language file"
+      detail: |
+        Keys and new values (pt-BR / en / es):
+        settings.members:  "Discursantes" / "Speakers" / "Oradores"
+        settings.topics:   "Biblioteca de Temas" / "Topic Library" / "Biblioteca de Temas"
+        settings.users:    "Usuarios do App" / "App Users" / "Usuarios de la App"
+        settings.history:  "Historico de Uso" / "Usage History" / "Historial de Uso"
+        settings.theme:    "Tema Claro/Escuro" / "Light/Dark Theme" / "Tema Claro/Oscuro"
+        members.title:     "Discursantes" / "Speakers" / "Oradores"
+        topics.title:      "Biblioteca de Temas" / "Topic Library" / "Biblioteca de Temas"
+        users.title:       "Usuarios do App" / "App Users" / "Usuarios de la App"
+        activityLog.title: "Historico de Uso" / "Usage History" / "Historial de Uso"
+        settings.theme (used by theme screen title): same as card label
+
+  contracts:
+    - name: "i18n label contract"
+      methods:
+        - name: "t('settings.members')"
+          input: "locale context"
+          output: "'Discursantes' (pt-BR) | 'Speakers' (en) | 'Oradores' (es)"
+        - name: "t('members.title')"
+          input: "locale context"
+          output: "Same values as settings.members"
+        - name: "t('settings.topics')"
+          input: "locale context"
+          output: "'Biblioteca de Temas' (pt-BR) | 'Topic Library' (en) | 'Biblioteca de Temas' (es)"
+        - name: "t('topics.title')"
+          input: "locale context"
+          output: "Same values as settings.topics"
+        - name: "t('settings.users')"
+          input: "locale context"
+          output: "'Usuarios do App' (pt-BR) | 'App Users' (en) | 'Usuarios de la App' (es)"
+        - name: "t('users.title')"
+          input: "locale context"
+          output: "Same values as settings.users"
+        - name: "t('settings.history')"
+          input: "locale context"
+          output: "'Historico de Uso' (pt-BR) | 'Usage History' (en) | 'Historial de Uso' (es)"
+        - name: "t('activityLog.title')"
+          input: "locale context"
+          output: "'Historico de Uso' (pt-BR) | 'Usage History' (en) | 'Historial de Uso' (es)"
+        - name: "t('settings.theme')"
+          input: "locale context"
+          output: "'Tema Claro/Escuro' (pt-BR) | 'Light/Dark Theme' (en) | 'Tema Claro/Oscuro' (es)"
+
+  notes: |
+    IMPORTANT: Do NOT change any i18n keys that reference "members" in other
+    contexts (e.g., members.addMember, members.deleteConfirm). Only the specific
+    10 keys listed above should have their VALUES changed.
+
+    The settings.theme key is used for BOTH the card label in settings/index.tsx
+    AND the header title in settings/theme.tsx, so changing this single key
+    value affects both locations.
+
+# =============================================================================
+# F084: Sunday type selector in Agenda tab
+# =============================================================================
+
+f084_agenda_sunday_type:
+  summary: >
+    Export SundayTypeDropdown from SundayCard.tsx and render it as the first
+    field inside the expanded AgendaSundayCard in agenda.tsx. Reuses all
+    existing logic (useSetSundayType, useRemoveSundayException,
+    useDeleteSpeechesByDate, Alert.alert confirmation).
+
+  components:
+    - name: "SundayTypeDropdown export"
+      path: src/components/SundayCard.tsx
+      action: modify
+      responsibility: "Export the existing SundayTypeDropdown component for reuse in agenda.tsx"
+      detail: |
+        Currently SundayTypeDropdown is a file-level function (not exported).
+        Change: add 'export' keyword to make it importable.
+
+        export function SundayTypeDropdown({ ... }: SundayTypeDropdownProps) { ... }
+
+        Also export the SundayTypeDropdownProps interface for type safety.
+
+        The SundayCard component continues to use it internally as before.
+        Zero behavior change for SundayCard or speeches.tsx.
+
+    - name: "Agenda tab integration"
+      path: src/app/(tabs)/agenda.tsx
+      action: modify
+      responsibility: "Render SundayTypeDropdown in expanded agenda cards with full type-change logic"
+      dependencies:
+        - "SundayTypeDropdown from components/SundayCard"
+        - "useSetSundayType, useRemoveSundayException from hooks/useSundayTypes"
+        - "useDeleteSpeechesByDate from hooks/useSpeeches"
+        - "useSpeeches (to get speeches for the expanded sunday)"
+        - "useAuth (for permission check)"
+      detail: |
+        Changes to AgendaTabContent:
+        1. Import SundayTypeDropdown from components/SundayCard
+        2. Import useSetSundayType, useRemoveSundayException from hooks/useSundayTypes
+        3. Import useDeleteSpeechesByDate, useSpeeches from hooks/useSpeeches
+        4. Import useAuth from contexts/AuthContext
+        5. Add hooks: setSundayType, removeSundayException, deleteSpeechesByDate
+        6. Fetch speeches for expanded sunday via useSpeeches (need startDate/endDate)
+        7. Add handler functions: handleTypeChange, handleRemoveException, handleDeleteSpeeches
+        8. Check permission: hasPermission('sunday_type_write') for disabled prop
+
+        Changes to AgendaSundayCard:
+        1. Add new props: speeches, onTypeChange, onRemoveException, onDeleteSpeeches, typeDisabled
+        2. Derive currentType from exception?.reason ?? 'speeches'
+        3. Render SundayTypeDropdown as first element inside expandedContent,
+           ABOVE the ThemedErrorBoundary/AgendaForm block
+        4. Pass speeches, currentType, handlers, and disabled to SundayTypeDropdown
+
+        IMPORTANT: The dropdown operates on sunday_exceptions table (via
+        useSetSundayType/useRemoveSundayException), NOT on sunday_agendas.
+        This is independent of whether an agenda record exists.
+
+        SPEECH DATA: The speeches for the expanded sunday are needed ONLY to
+        check if there are assignments (for the confirmation dialog). Since
+        only one card is expanded at a time, we can fetch speeches for the
+        expanded date. The useSpeeches hook already fetches by date range;
+        we filter for the expanded date's speeches.
+
+  contracts:
+    - name: "SundayTypeDropdown reuse contract"
+      component: "SundayCard.tsx"
+      methods:
+        - name: "SundayTypeDropdown"
+          input: "SundayTypeDropdownProps: { currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches }"
+          output: "JSX.Element (dropdown Pressable + selection Modal + other-reason Modal)"
+          notes: "Identical behavior to speeches.tsx usage. No new props needed."
+
+    - name: "Agenda type change contract"
+      component: "agenda.tsx"
+      methods:
+        - name: "handleTypeChange(date, type, customReason?)"
+          input: "date: string, type: SundayExceptionReason, customReason?: string"
+          output: "void - calls setSundayType.mutate()"
+          notes: "Same pattern as speeches.tsx handleTypeChange"
+        - name: "handleRemoveException(date)"
+          input: "date: string"
+          output: "void - calls removeSundayException.mutate()"
+          notes: "Reverts to 'speeches' type by removing the exception"
+        - name: "handleDeleteSpeeches(date)"
+          input: "date: string"
+          output: "void - calls deleteSpeechesByDate.mutate()"
+          notes: "Deletes speeches before type change (called by SundayTypeDropdown)"
+
+  notes: |
+    The AgendaForm component already adapts its displayed sections based on
+    exceptionReason. When type changes from 'speeches' to another type:
+    1. SundayTypeDropdown handles confirmation dialog + deletes speeches
+    2. setSundayType.mutate() updates the exception
+    3. React Query invalidation triggers re-render
+    4. AgendaForm re-renders with new exceptionReason, hiding speech sections
+
+    PERMISSION: Observer sees dropdown but disabled=true. This matches
+    speeches.tsx behavior where typeDisabled is passed based on role.
+    Use hasPermission('sunday_type_write') from useAuth.
+
+# =============================================================================
+# F085: Activity log entries overhaul with i18n
+# =============================================================================
+
+f085_activity_log_overhaul:
+  summary: >
+    Change activity log from storing human-readable text to storing structured
+    placeholders ("action_type|key=value|key=value"). UI renders translated
+    text via i18n interpolation. Old entries displayed as-is (fallback).
+
+  components:
+    - name: "activityLog.ts structured format"
+      path: src/lib/activityLog.ts
+      action: modify
+      responsibility: "Add buildLogDescription, parseLogDescription, formatLogDescription functions"
+      exports:
+        - name: "buildLogDescription(actionType, params)"
+          description: >
+            Builds a structured log description string.
+            Example: buildLogDescription('member:create', { nome: 'Maria' })
+            Returns: "member:create|nome=Maria"
+        - name: "parseLogDescription(description)"
+          description: >
+            Parses a structured log description string.
+            Input: "member:create|nome=Maria"
+            Returns: { actionType: 'member:create', params: { nome: 'Maria' } }
+            Returns null if description doesn't contain '|' (old format).
+        - name: "formatLogDescription(description, t)"
+          description: >
+            Renders a log description as translated text.
+            If structured format: parses and uses t('activityLog.events.member_create', { nome: 'Maria' })
+            If plain text (no '|'): returns description as-is (fallback).
+            If unknown action_type: returns raw description (fallback).
+      detail: |
+        buildLogDescription(actionType: string, params: Record<string, string>): string
+          - Joins: actionType + '|' + Object.entries(params).map(([k,v]) => k=v).join('|')
+          - Pipe character '|' in values is escaped as '\\|' (edge case defense)
+
+        parseLogDescription(description: string): { actionType: string, params: Record<string, string> } | null
+          - If !description.includes('|') -> return null (old format)
+          - Split by '|', first segment = actionType
+          - Remaining segments split by first '=' -> key/value pairs
+          - Unescape '\\|' in values
+
+        formatLogDescription(description: string, t: TFunction): string
+          - const parsed = parseLogDescription(description)
+          - If null -> return description (fallback for old entries)
+          - Normalize actionType: replace ':' with '_' for i18n key
+          - const i18nKey = 'activityLog.events.' + normalized
+          - Try t(i18nKey, parsed.params)
+          - If result === i18nKey (key not found) -> return description (fallback)
+          - For special params:
+            - 'status': translate via t('speechStatus.' + params.status)
+            - 'tipo': translate via t('sundayExceptions.' + params.tipo)
+            - 'funcao': translate via ACTOR_ROLE_MAP[params.funcao]
+            - 'data': format via formatDateHumanReadable()
+          - Return translated string
+
+        ACTOR_ROLE_MAP (const in activityLog.ts):
+          can_preside: 'actorRoles.preside'
+          can_conduct: 'actorRoles.conduct'
+          can_recognize: 'actorRoles.recognize'
+          can_music: 'actorRoles.music'
+          can_piano: 'actorRoles.piano'
+
+        logAction() and createLogger(): unchanged signature, callers pass
+        buildLogDescription() result as description parameter.
+
+    - name: "useMembers.ts log updates"
+      path: src/hooks/useMembers.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useCreateMember onSuccess:
+          OLD: logAction(..., 'member:create', `${data.full_name} adicionado como membro`, userName)
+          NEW: logAction(..., 'member:create', buildLogDescription('member:create', { nome: data.full_name }), userName)
+        useUpdateMember onSuccess:
+          OLD: logAction(..., 'member:update', `${data.full_name} atualizado`, userName)
+          NEW: logAction(..., 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName)
+        useDeleteMember onSuccess:
+          OLD: logAction(..., 'member:delete', `${memberName} removido`, userName)
+          NEW: logAction(..., 'member:delete', buildLogDescription('member:delete', { nome: memberName }), userName)
+
+    - name: "useSpeeches.ts log updates"
+      path: src/hooks/useSpeeches.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls; add speech:assign_theme log"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useAssignSpeaker onSuccess:
+          NEW: buildLogDescription('speech:assign', { nome: data.speaker_name, N: String(data.position), data: data.sunday_date })
+        useAssignTopic onSuccess (NEW - currently has no logAction):
+          ADD: logAction(..., 'speech:assign_theme', buildLogDescription('speech:assign_theme', { colecao, titulo, N: String(position), data: sundayDate }), userName)
+          Note: need to extract collection/title from mutation variables
+        useChangeStatus onSuccess:
+          NEW: buildLogDescription('speech:status_change', { nome: data.speaker_name ?? 'N/A', status: data.status, data: data.sunday_date, N: String(data.position) })
+        useRemoveAssignment onSuccess:
+          NEW: buildLogDescription('speech:unassign', { nome: result.previousSpeaker, data: result.speech.sunday_date, N: String(result.speech.position) })
+        useDeleteSpeechesByDate onSuccess:
+          NEW: buildLogDescription('speech_cleanup', { data: sundayDate })
+
+    - name: "useTopics.ts log updates"
+      path: src/hooks/useTopics.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useCreateWardTopic: buildLogDescription('topic:create', { titulo })
+        useUpdateWardTopic: buildLogDescription('topic:update', { titulo })
+        useDeleteWardTopic: buildLogDescription('topic:delete', { titulo })
+        useToggleCollection: buildLogDescription('collection:activate' or 'collection:deactivate', { nome })
+
+    - name: "useActors.ts log updates"
+      path: src/hooks/useActors.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useCreateActor: buildLogDescription('actor:create', { nome, funcao: roleKey })
+          roleKey = first true role field (can_preside, can_conduct, etc.)
+        useUpdateActor: buildLogDescription('actor:update', { nome })
+        useDeleteActor: buildLogDescription('actor:delete', { nome })
+
+    - name: "useSundayTypes.ts log updates"
+      path: src/hooks/useSundayTypes.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useSetSundayType: buildLogDescription('sunday_type:change', { data: date, tipo: reason })
+
+    - name: "useAgenda.ts log updates"
+      path: src/hooks/useAgenda.ts
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        useUpdateAgenda: buildLogDescription('agenda:edit', { data: sundayDate })
+
+    - name: "settings/users.tsx log updates"
+      path: src/app/(tabs)/settings/users.tsx
+      action: modify
+      responsibility: "Replace hardcoded log descriptions with buildLogDescription calls"
+      detail: |
+        Import buildLogDescription from lib/activityLog.
+        Name update: buildLogDescription('user:name-update', { nome: fullName })
+        User delete: buildLogDescription('user:removed', { nome: userName, email: userEmail })
+
+    - name: "settings/history.tsx rendering"
+      path: src/app/(tabs)/settings/history.tsx
+      action: modify
+      responsibility: "Render structured log descriptions as translated text"
+      detail: |
+        Import formatLogDescription from lib/activityLog.
+        In ActivityLogEntry:
+          OLD: <Text>{item.description}</Text>
+          NEW: <Text>{formatLogDescription(item.description, t)}</Text>
+
+        formatLogDescription handles:
+        - Structured format: parses and translates via i18n
+        - Plain text format: returns as-is (backward compatibility)
+
+    - name: "i18n activity log event keys"
+      files:
+        - path: src/i18n/locales/pt-BR.json
+          action: modify
+        - path: src/i18n/locales/en.json
+          action: modify
+        - path: src/i18n/locales/es.json
+          action: modify
+      responsibility: "Add 24 activityLog.events.* keys + actor role keys per language"
+      detail: |
+        New i18n keys (section activityLog.events):
+          member_create: '"{{nome}}" adicionado como discursante'
+          member_update: 'Discursante "{{nome}}" teve seus dados atualizados'
+          member_delete: '"{{nome}}" foi removido(a) da lista de discursantes'
+          speech_assign: '"{{nome}}" designado para {{N}}o discurso dia {{data}}'
+          speech_assign_theme: '"{{colecao}} - {{titulo}}" foi designado para {{N}}o discurso dia {{data}}'
+          speech_unassign: 'Designacao de {{nome}} foi removida ({{data}}, {{N}}o discurso)'
+          speech_status_change: 'Status de {{nome}} alterado para {{status}} ({{data}}, {{N}}o discurso)'
+          speech_cleanup: 'Discursos de {{data}} foram removidos pois o Domingo nao tera discursos'
+          topic_create: 'Tema "{{titulo}}" adicionado'
+          topic_update: 'Tema "{{titulo}}" atualizado'
+          topic_delete: 'Tema "{{titulo}}" removido'
+          collection_activate: 'Colecao "{{nome}}" ativada'
+          collection_deactivate: 'Colecao "{{nome}}" desativada'
+          actor_create: '"{{nome}}" foi adicionado como participante da Reuniao Sacramental para "{{funcao}}"'
+          actor_update: 'Participante "{{nome}}" teve dados atualizados'
+          actor_delete: '"{{nome}}" foi removido(a) da lista de participantes da Reuniao Sacramental'
+          sunday_type_change: 'Domingo dia {{data}} ajustado para {{tipo}}'
+          agenda_edit: 'Agenda do dia {{data}} editada'
+          agenda_last_minute_speech: 'Discursante do {{N}}o discurso do dia {{data}} foi alterado para {{nome}} de ultima hora'
+          agenda_last_minute_speech_removed: 'Discursante de ultima hora do {{N}}o discurso do dia {{data}} foi removido'
+          user_invitation: 'Convite para usar o app foi criado para {{email}}'
+          user_invitation_accepted: 'Novo usuario "{{nome}}" aceitou o convite para usar o app'
+          user_name_update: 'Usuario do app teve nome atualizado para "{{nome}}"'
+          user_removed: 'Usuario do app "{{nome}}" ("{{email}}") foi removido'
+
+        New i18n keys (section actorRoles):
+          preside: 'presidir'
+          conduct: 'dirigir'
+          recognize: 'ser reconhecido'
+          music: 'reger'
+          piano: 'tocar piano'
+
+        NOTES:
+        - agenda_last_minute_speech and agenda_last_minute_speech_removed are
+          i18n keys only (F044 speaker override logging not yet implemented)
+        - user_invitation and user_invitation_accepted are generated by Edge
+          Functions server-side. i18n keys created for UI display only.
+        - {{data}} is stored as ISO date (YYYY-MM-DD) and translated via
+          formatDateHumanReadable() in formatLogDescription()
+        - {{status}} is stored as enum key (e.g., 'assigned_confirmed') and
+          translated via t('speechStatus.{status}') in formatLogDescription()
+        - {{tipo}} is stored as exception reason and translated via
+          t('sundayExceptions.{tipo}') in formatLogDescription()
+        - {{funcao}} is stored as role key (e.g., 'can_preside') and translated
+          via t(ACTOR_ROLE_MAP[funcao]) in formatLogDescription()
+
+  contracts:
+    - name: "buildLogDescription contract"
+      component: "lib/activityLog.ts"
+      methods:
+        - name: "buildLogDescription(actionType, params)"
+          input: "actionType: string, params: Record<string, string>"
+          output: "string in format 'action_type|key1=value1|key2=value2'"
+          notes: "Pipe characters in values escaped as '\\|'"
+
+    - name: "parseLogDescription contract"
+      component: "lib/activityLog.ts"
+      methods:
+        - name: "parseLogDescription(description)"
+          input: "description: string"
+          output: "{ actionType: string, params: Record<string, string> } | null"
+          notes: "Returns null if no '|' found (plain text / old format)"
+
+    - name: "formatLogDescription contract"
+      component: "lib/activityLog.ts"
+      methods:
+        - name: "formatLogDescription(description, t)"
+          input: "description: string, t: TFunction (from react-i18next)"
+          output: "string (translated human-readable text)"
+          notes: |
+            Flow:
+            1. parseLogDescription(description)
+            2. If null -> return description (fallback)
+            3. Translate special params (status, tipo, funcao, data)
+            4. t('activityLog.events.' + actionType.replace(':','_'), translatedParams)
+            5. If key not found -> return description (fallback)
+
+    - name: "Hook log integration contract"
+      component: "All 6 hooks + users.tsx"
+      methods:
+        - name: "logAction with buildLogDescription"
+          input: "Same logAction signature; description param now uses buildLogDescription()"
+          output: "void (non-blocking insert into activity_log)"
+          notes: "logAction() signature unchanged. Only the description string content changes."
+
+  notes: |
+    SPECIAL PARAM TRANSLATION in formatLogDescription():
+    The function must translate certain params BEFORE passing to t():
+
+    1. 'data' param: ISO date -> human readable via formatDateHumanReadable()
+       "2026-03-01" -> "1 de marco de 2026" (pt-BR)
+
+    2. 'status' param: enum key -> translated status name
+       "assigned_confirmed" -> t('speechStatus.assigned_confirmed') -> "Designado/Confirmado"
+
+    3. 'tipo' param: exception reason -> translated type name
+       "testimony_meeting" -> t('sundayExceptions.testimony_meeting') -> "Reuniao de Testemunho"
+
+    4. 'funcao' param: actor role key -> translated role name
+       "can_preside" -> t(ACTOR_ROLE_MAP['can_preside']) -> "presidir"
+
+    EDGE FUNCTION LOGS:
+    user:invitation and user:invitation_accepted are generated by Edge Functions.
+    For now, create i18n keys only. Edge Functions can adopt the structured
+    format in a future update. The fallback in formatLogDescription ensures
+    old Edge Function logs display correctly.
+
+    MISSING LOG: useAssignTopic currently does NOT call logAction.
+    This CR adds it as speech:assign_theme.
+
+# =============================================================================
+# F086: pg_timezone_names investigation
+# =============================================================================
+
+f086_timezone_investigation:
+  summary: >
+    Investigation concludes: the app does NOT query pg_timezone_names.
+    The 92 calls with 0% cache hit are from Supabase infrastructure
+    (Dashboard, PostgREST schema cache, or pg_cron timezone validation).
+    No code changes needed.
+
+  investigation_findings:
+    - finding: "No reference to pg_timezone_names in any .ts/.tsx file"
+      evidence: "grep -r 'pg_timezone_names' src/ -> zero matches"
+    - finding: "No reference to pg_timezone_names in any SQL migration"
+      evidence: "grep -r 'pg_timezone_names' supabase/migrations/ -> zero matches"
+    - finding: "App uses static TIMEZONES constant in timezone.tsx"
+      evidence: "src/app/(tabs)/settings/timezone.tsx contains ~60 hardcoded IANA timezone entries"
+    - finding: "wards.timezone column is plain TEXT without CHECK constraint against pg_timezone_names"
+      evidence: "001_initial_schema.sql: timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo'"
+    - finding: "create_weekly_reminders uses ward.timezone with AT TIME ZONE but does not query pg_timezone_names"
+      evidence: "004_weekly_reminder_function.sql line 61: AT TIME ZONE COALESCE(ward.timezone, 'America/Sao_Paulo')"
+    - finding: "pg_timezone_names queries likely come from Supabase Dashboard introspection or PostgREST schema cache refresh"
+      evidence: "92 calls with 0% cache hit suggests automated polling, not user-triggered"
+
+  components: []
+  files_impacted: []
+
+  conclusion: >
+    No code change needed. The pg_timezone_names query is external to the app
+    codebase. It is generated by Supabase infrastructure (Dashboard schema
+    introspection, PostgREST type system cache, or pg_cron internal timezone
+    resolution). The app correctly uses a static timezone list. To reduce
+    these queries, the user could: (1) avoid keeping the Supabase Dashboard
+    open, or (2) contact Supabase support about disabling internal
+    pg_timezone_names polling. This is NOT an app-level issue.
+
+# =============================================================================
+# F087: Fix mutable search_path in PostgreSQL functions
+# =============================================================================
+
+f087_search_path_fix:
+  summary: >
+    Create migration 015_fix_function_search_path.sql that recreates all 7
+    PostgreSQL functions with SET search_path = '' and explicit schema
+    qualifiers on all table references.
+
+  components:
+    - name: "015_fix_function_search_path.sql"
+      path: supabase/migrations/015_fix_function_search_path.sql
+      action: create
+      responsibility: "Recreate 7 functions with fixed search_path and schema-qualified table references"
+      detail: |
+        Functions to fix (in order):
+
+        1. update_updated_at_column()
+           Source: 001_initial_schema.sql
+           Language: plpgsql
+           Changes: Add SET search_path = ''
+           Table refs: None (uses NEW trigger variable only)
+
+        2. auth.ward_id()
+           Source: 002_rls_policies.sql
+           Language: sql
+           Changes: Add SET search_path = ''
+           Table refs: None (uses auth.jwt() which is already schema-qualified)
+           Note: Function is in auth schema, so CREATE OR REPLACE FUNCTION auth.ward_id()
+
+        3. list_ward_users(target_ward_id uuid)
+           Source: 011_add_user_name_support.sql (latest version)
+           Language: sql
+           Changes: Add SET search_path = ''
+           Table refs: auth.users -> already qualified
+           Properties: SECURITY DEFINER, STABLE (preserved)
+           Note: Must DROP + CREATE because return type includes full_name from migration 011
+
+        4. create_weekly_reminders()
+           Source: 004_weekly_reminder_function.sql
+           Language: plpgsql
+           Changes: Add SET search_path = ''
+           Table refs:
+             wards -> public.wards
+             sunday_exceptions -> public.sunday_exceptions
+             speeches -> public.speeches
+             notification_queue -> public.notification_queue
+
+        5. enqueue_speech_notification()
+           Source: 013_fix_notification_trigger_security_definer.sql (latest version)
+           Language: plpgsql
+           Changes: Add SET search_path = ''
+           Table refs:
+             notification_queue -> public.notification_queue
+           Properties: SECURITY DEFINER (preserved)
+           Note: Uses NEW trigger variable (not affected by search_path)
+
+        6. delete_old_activity_log()
+           Source: 005_activity_log_retention.sql
+           Language: plpgsql
+           Changes: Add SET search_path = ''
+           Table refs:
+             activity_log -> public.activity_log
+
+        7. import_members(target_ward_id uuid, new_members jsonb)
+           Source: 007_import_members_rpc.sql
+           Language: plpgsql
+           Changes: Add SET search_path = ''
+           Table refs:
+             members -> public.members
+           Properties: SECURITY DEFINER (preserved)
+
+        SYNTAX for SET search_path:
+          For plpgsql functions:
+            CREATE OR REPLACE FUNCTION func_name()
+            RETURNS ... AS $$
+            BEGIN ... END;
+            $$ LANGUAGE plpgsql SET search_path = '';
+
+          For sql functions:
+            CREATE OR REPLACE FUNCTION func_name()
+            RETURNS ... LANGUAGE sql STABLE SET search_path = '' AS $$ ... $$;
+
+        ORDER MATTERS: update_updated_at_column and auth.ward_id first
+        because other functions may depend on them (triggers reference
+        update_updated_at_column; RLS policies use auth.ward_id).
+        However, CREATE OR REPLACE preserves existing triggers, so
+        order is not strictly critical here.
+
+  contracts:
+    - name: "Migration 015 contract"
+      component: "015_fix_function_search_path.sql"
+      methods:
+        - name: "All 7 functions"
+          input: "Same as original function signatures"
+          output: "Same as original function outputs"
+          notes: |
+            Behavior unchanged. Only security property added.
+            SET search_path = '' ensures functions only resolve objects
+            via explicit schema qualification, preventing search_path
+            manipulation attacks.
+
+  notes: |
+    LEAKED PASSWORD PROTECTION:
+    The Supabase Database Linter also reports 'Leaked Password Protection
+    Disabled'. This is NOT a code change - it must be enabled via:
+    Supabase Dashboard > Authentication > Settings > Password Protection
+    > Enable "Leaked password protection"
+
+    This should be documented as a manual step for the user to perform
+    in the Supabase Dashboard. It cannot be done via SQL migration.
+
+    MIGRATION IDEMPOTENCY:
+    CREATE OR REPLACE FUNCTION is idempotent. Running the migration
+    multiple times has no adverse effect. The function body is
+    replaced with the same content plus SET search_path = ''.
+
+    TRIGGER PRESERVATION:
+    CREATE OR REPLACE FUNCTION does NOT drop or recreate triggers.
+    Existing triggers (set_updated_at, speech_notification_trigger)
+    continue to reference the same function name and work correctly.
+
+    SPECIAL CASE - list_ward_users:
+    This function was DROP + CREATE in migration 011 because the return
+    type changed. In migration 015, we use CREATE OR REPLACE because
+    the return type is unchanged (just adding SET search_path = '').
+    However, if the function was already dropped and recreated in 011
+    with the new return type, CREATE OR REPLACE will work.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-061
+    title: "Export SundayTypeDropdown instead of duplicating for Agenda tab"
+    context: >
+      F084 needs the same sunday type dropdown in Agenda tab. The component
+      is currently an unexported function in SundayCard.tsx. Options:
+      (a) export from SundayCard.tsx, (b) extract to separate file,
+      (c) duplicate in agenda.tsx.
+    decision: >
+      Export the existing SundayTypeDropdown and its props interface from
+      SundayCard.tsx. The component is self-contained (manages its own
+      modal state, uses useTranslation and useTheme internally). Exporting
+      is the minimal change that enables reuse.
+    consequences:
+      - "Zero code duplication"
+      - "SundayCard.tsx internal usage unchanged"
+      - "agenda.tsx imports and renders with same props as speeches.tsx"
+      - "Component stays in SundayCard.tsx (not extracted to separate file) to minimize disruption"
+
+  - id: ADR-062
+    title: "Structured pipe-delimited format for activity log descriptions"
+    context: >
+      F085 needs i18n-aware activity log rendering. Options:
+      (a) JSON in description column, (b) pipe-delimited string,
+      (c) separate columns for action_type params (schema change).
+    decision: >
+      Use pipe-delimited format: "action_type|key1=value1|key2=value2".
+      Parse in UI via formatLogDescription(). Old entries without '|' are
+      displayed as plain text (backward compatible fallback).
+    consequences:
+      - "No schema change (description remains TEXT)"
+      - "Compact format, human-readable in raw DB queries"
+      - "Backward compatible: old entries work via fallback"
+      - "Pipe in values escaped as '\\|' (rare edge case)"
+      - "i18n rendering happens in UI, not at log creation time"
+      - "Language changes reflect immediately in log display"
+
+  - id: ADR-063
+    title: "SET search_path = '' (empty string) for all functions"
+    context: >
+      F087 fixes the function_search_path_mutable warning. Options:
+      (a) SET search_path = 'public', (b) SET search_path = '',
+      (c) SET search_path = 'public, auth'.
+    decision: >
+      Use SET search_path = '' (empty string). All table references are
+      explicitly schema-qualified (public.table_name, auth.users). This
+      is the most restrictive and secure option, matching Supabase's
+      own recommendation. Functions in the auth schema (auth.ward_id)
+      use auth.jwt() which is already qualified.
+    consequences:
+      - "Most secure: no implicit schema resolution"
+      - "All table references must be explicitly qualified"
+      - "Consistent approach across all 7 functions"
+      - "Matches Supabase Database Linter recommendation"
+
+# =============================================================================
+# DESIGN DECISIONS (from SPEC extractor)
+# =============================================================================
+
+design_decisions:
+  - id: DD-54
+    title: "F083 changes values only, not keys"
+    detail: >
+      i18n keys remain identical (settings.members, members.title, etc.).
+      Only the translated VALUES change. This means zero TypeScript code
+      changes and zero risk of breaking key references.
+
+  - id: DD-55
+    title: "F084 uses same hooks as speeches.tsx"
+    detail: >
+      agenda.tsx imports useSetSundayType, useRemoveSundayException,
+      useDeleteSpeechesByDate - the exact same hooks that speeches.tsx uses.
+      Ensures identical behavior and avoids logic duplication.
+
+  - id: DD-56
+    title: "F085 translates special params in formatLogDescription"
+    detail: >
+      status, tipo, funcao, and data params are stored as raw keys/ISO dates
+      but need translation at render time. formatLogDescription handles this
+      translation before passing to i18next interpolation.
+
+  - id: DD-57
+    title: "F086 is investigation-only, no code change"
+    detail: >
+      After thorough investigation (grep of all .ts/.tsx files and SQL
+      migrations), pg_timezone_names is confirmed to be external to the app.
+      The app uses a static timezone list. No code change needed.
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F083 - i18n label changes
+  - path: src/i18n/locales/pt-BR.json
+    action: modify
+    feature: F083, F085
+    change: "F083: Update 10 label values. F085: Add 24 activityLog.events keys + actorRoles keys"
+
+  - path: src/i18n/locales/en.json
+    action: modify
+    feature: F083, F085
+    change: "F083: Update 10 label values. F085: Add 24 activityLog.events keys + actorRoles keys"
+
+  - path: src/i18n/locales/es.json
+    action: modify
+    feature: F083, F085
+    change: "F083: Update 10 label values. F085: Add 24 activityLog.events keys + actorRoles keys"
+
+  # F084 - Agenda Sunday type
+  - path: src/components/SundayCard.tsx
+    action: modify
+    feature: F084
+    change: "Export SundayTypeDropdown function and SundayTypeDropdownProps interface"
+
+  - path: src/app/(tabs)/agenda.tsx
+    action: modify
+    feature: F084
+    change: "Import SundayTypeDropdown; add hooks; render dropdown in expanded card; add type change handlers"
+
+  # F085 - Activity log overhaul
+  - path: src/lib/activityLog.ts
+    action: modify
+    feature: F085
+    change: "Add buildLogDescription, parseLogDescription, formatLogDescription functions; add ACTOR_ROLE_MAP constant"
+
+  - path: src/hooks/useMembers.ts
+    action: modify
+    feature: F085
+    change: "Replace 3 hardcoded log descriptions with buildLogDescription calls"
+
+  - path: src/hooks/useSpeeches.ts
+    action: modify
+    feature: F085
+    change: "Replace 4 hardcoded log descriptions with buildLogDescription calls; add speech:assign_theme logAction"
+
+  - path: src/hooks/useTopics.ts
+    action: modify
+    feature: F085
+    change: "Replace log descriptions with buildLogDescription calls (topic:create/update/delete, collection:activate/deactivate)"
+
+  - path: src/hooks/useActors.ts
+    action: modify
+    feature: F085
+    change: "Replace log descriptions with buildLogDescription calls (actor:create/update/delete)"
+
+  - path: src/hooks/useSundayTypes.ts
+    action: modify
+    feature: F085
+    change: "Replace log description with buildLogDescription call (sunday_type:change)"
+
+  - path: src/hooks/useAgenda.ts
+    action: modify
+    feature: F085
+    change: "Replace log description with buildLogDescription call (agenda:edit)"
+
+  - path: src/app/(tabs)/settings/users.tsx
+    action: modify
+    feature: F085
+    change: "Replace log descriptions with buildLogDescription calls (user:name-update, user:removed)"
+
+  - path: src/app/(tabs)/settings/history.tsx
+    action: modify
+    feature: F085
+    change: "Import formatLogDescription; render translated log descriptions instead of raw text"
+
+  # F086 - No code changes
+  # (documented in architecture only)
+
+  # F087 - SQL migration
+  - path: supabase/migrations/015_fix_function_search_path.sql
+    action: create
+    feature: F087
+    change: "Recreate 7 functions with SET search_path = '' and explicit schema qualifiers"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: >
+    No schema changes. The activity_log.description column continues to be
+    TEXT. The format of the stored text changes from human-readable strings
+    to structured "action_type|key=value" format, but this is a data format
+    change, not a schema change. Old entries remain valid.
+  entities: []
+  notes:
+    - "activity_log.description: text format changes from prose to 'type|k=v' (backward compatible)"
+    - "No new tables or columns"
+    - "Migration 015 only modifies function definitions (SET search_path)"
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Positive. F087 fixes 7 functions with mutable search_path (security hardening)."
+  notes:
+    - "SET search_path = '' prevents search_path manipulation attacks"
+    - "All table references explicitly schema-qualified (public.*, auth.*)"
+    - "SECURITY DEFINER preserved on functions that already have it"
+    - "Leaked Password Protection must be enabled manually in Supabase Dashboard"
+    - "No new attack surface introduced by any feature in this batch"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Positive. F085 makes activity logs language-aware and more descriptive."
+  notes:
+    - "Activity logs now render in the ward's current language"
+    - "Structured format enables future log analytics (parse action_type)"
+    - "Old plain-text entries remain readable via fallback"
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  implementation_order:
+    description: "Recommended implementation order"
+    detail: |
+      1. F083 (i18n label changes) - standalone, no dependencies
+      2. F087 (SQL migration) - standalone, no dependencies
+      3. F084 (Agenda SundayTypeDropdown) - standalone, needs SundayCard export
+      4. F085 (Activity log overhaul) - largest scope, touches many files
+      5. F086 (Investigation) - no code changes, just documentation
+
+      F083, F087, and F084 are independent and can be implemented in parallel.
+      F085 has the most files impacted and should be implemented carefully.
+      F086 requires no implementation (already documented in architecture).
+
+  f084_speech_data_strategy:
+    description: "How to get speeches for the expanded sunday in agenda.tsx"
+    detail: |
+      The useSpeeches hook fetches speeches by date range. In agenda.tsx,
+      we already have startDate and endDate. However, we need speeches
+      specifically for the expanded date to pass to SundayTypeDropdown.
+
+      Strategy: Import useSpeeches from hooks/useSpeeches. Use the same
+      startDate/endDate range. The hook returns all speeches in range.
+      Filter speeches for expandedDate when passing to SundayTypeDropdown:
+        const expandedSpeeches = speeches?.filter(s => s.sunday_date === expandedDate) ?? [];
+
+      This avoids adding a new hook or query. The speeches data is already
+      cached by TanStack Query, so filtering is instant.
+
+      ALTERNATIVE: If importing all speeches is too heavy, we could create
+      a useExpandedDateSpeeches hook that only fetches when expandedDate
+      changes. But given the app's scale (~100 sundays, ~300 speeches),
+      fetching all is acceptable.
+
+  f085_edge_function_logs:
+    description: "Edge Function log format migration"
+    detail: |
+      Edge Functions (create-invitation, register-invited-user) generate
+      activity log entries server-side. These currently use plain text.
+
+      For this batch: create i18n keys for display (user_invitation,
+      user_invitation_accepted) but do NOT modify Edge Functions.
+      The formatLogDescription fallback handles plain text gracefully.
+
+      Future: Edge Functions can adopt buildLogDescription format when
+      they are next modified.
+
+  f087_migration_testing:
+    description: "Testing the SQL migration"
+    detail: |
+      The migration cannot be tested via Vitest (no local PostgreSQL).
+      Testing strategy:
+      1. Apply migration on Supabase staging project
+      2. Verify all functions exist with search_path = ''
+      3. Run manual smoke tests: create member, assign speech, import CSV
+      4. Check Supabase Database Linter: no more search_path warnings
+
+      For the dev team: include the migration file in the PR and note
+      that it must be applied to staging before merging.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos com input/output para cada integracao
+  GATE-04: true  # ADRs registrados (ADR-061, ADR-062, ADR-063)
+  GATE-05: true  # ARCH_M024.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # Componentes mapeados para todas as 5 features

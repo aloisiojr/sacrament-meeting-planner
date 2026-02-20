@@ -1600,8 +1600,100 @@ features:
       - "5 novos arquivos (4 test files + 1 setup), 0 arquivos existentes modificados"
       - "Infraestrutura ja suporta: Vitest 4 + @testing-library/react-native 13"
 
+  # ---------------------------------------------------------------------------
+  # Batch 13: Settings Rename, Agenda Sunday Type, Activity Log i18n, Query Perf, Security (F083-F087)
+  # ---------------------------------------------------------------------------
+
+  - id: F083
+    name: "Rename Settings tab options with i18n"
+    status: pending
+    rfs: []
+    description: >
+      Alterar os labels (nomes) de 5 opcoes na aba Configuracoes e seus
+      respectivos titulos nas telas internas. Membros->Discursantes,
+      Temas->Biblioteca de Temas, Usuarios->Usuarios do App,
+      Historico->Historico de Uso, Tema->Tema Claro/Escuro. Mudancas
+      exclusivamente nos 3 arquivos de i18n (pt-BR, en, es).
+    modified_by_crs: [140]
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    notes:
+      - "CR-140: Renomear opcoes da aba Configuracoes com i18n"
+      - "10 acceptance criteria (5 cards + 5 titulos internos)"
+      - "3 arquivos modificados (somente locales JSON)"
+      - "Nenhuma alteracao de codigo TypeScript"
+
+  - id: F084
+    name: "Sunday type selector as first field in Agenda card"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar seletor de tipo de Domingo como primeiro campo do card de
+      Agenda (igual aba Discursos). Se trocar de Discursos para outro tipo
+      com designacoes, mostrar dialogo de confirmacao e apagar speeches.
+      Reutiliza SundayTypeDropdown existente.
+    modified_by_crs: [141]
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    notes:
+      - "CR-141: Seletor de tipo de domingo na aba Agenda"
+      - "9 acceptance criteria"
+      - "Reutiliza componente SundayTypeDropdown existente"
+      - "Reutiliza logica de confirmacao + delete de F061/F070"
+
+  - id: F085
+    name: "Activity log entries overhaul with friendly i18n descriptions"
+    status: pending
+    rfs: []
+    description: >
+      Revisao completa das entradas do historico de atividades. Formato
+      estruturado no banco (action_type|key=value) com renderizacao i18n
+      na UI. 24 tipos de eventos com templates traduzidos em 3 idiomas.
+      Fallback para registros antigos em formato texto plano.
+    modified_by_crs: [142]
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    notes:
+      - "CR-142: Activity log entries overhaul com i18n"
+      - "17 acceptance criteria"
+      - "24 action_types com templates i18n"
+      - "Abordagem hibrida: formato estruturado no banco + renderizacao i18n na UI"
+      - "Fallback para registros antigos (texto plano)"
+      - "Adiciona logAction faltante em useAssignTopic"
+
+  - id: F086
+    name: "Replace pg_timezone_names with static timezone list"
+    status: pending
+    rfs: []
+    description: >
+      Query pg_timezone_names com 0% cache hit rate e 270ms mean. App ja
+      usa lista estatica de timezones. Verificar se ha referencia server-side
+      a pg_timezone_names e remover. Se for query do dashboard, documentar.
+    modified_by_crs: [143]
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    notes:
+      - "CR-143: Otimizacao de query performance Supabase"
+      - "3 acceptance criteria (verificacao, nao implementacao)"
+      - "App ja usa lista estatica TIMEZONES no timezone.tsx"
+      - "Potencialmente nada a implementar se for query do dashboard"
+
+  - id: F087
+    name: "Fix mutable search_path in 7 PostgreSQL functions"
+    status: pending
+    rfs: []
+    description: >
+      7 funcoes PostgreSQL sem search_path fixo: update_updated_at_column,
+      ward_id, list_ward_users, create_weekly_reminders,
+      enqueue_speech_notification, delete_old_activity_log, import_members.
+      Nova migracao SQL (015) recria todas com SET search_path = '' e
+      referencias de tabela qualificadas com schema explicito.
+    modified_by_crs: [144]
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    notes:
+      - "CR-144: Correcoes de seguranca Supabase (search_path)"
+      - "9 acceptance criteria"
+      - "1 novo arquivo SQL de migracao"
+      - "Leaked Password Protection: configuracao de dashboard (nao codigo)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (41 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12)
+# PENDING CHANGE REQUESTS (46 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13)
 # =============================================================================
 
 pending_crs:
@@ -2392,6 +2484,115 @@ pending_crs:
       - src/__tests__/integration/auth-flow.integration.test.ts
       - src/__tests__/integration/components-hooks.integration.test.tsx
 
+  # --- Batch 13 (Settings Rename, Agenda Sunday Type, Activity Log i18n, Query Perf, Security) ---
+
+  - id: 140
+    type: ui_text_change
+    area: "Settings tab (F003, F005, F018, F019, F021)"
+    feature_id: F083
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    related_crs: []
+    description: >
+      Renomear opcoes da aba Configuracoes com i18n: Membros->Discursantes,
+      Temas->Biblioteca de Temas, Usuarios->Usuarios do App,
+      Historico->Historico de Uso, Tema->Tema Claro/Escuro. Tanto no card
+      do settings/index.tsx quanto no titulo da tela interna.
+    acceptance_criteria:
+      - "Label e titulo de Members alterados para Discursantes/Speakers/Oradores"
+      - "Label e titulo de Topics alterados para Biblioteca de Temas/Topic Library/Biblioteca de Temas"
+      - "Label e titulo de Users alterados para Usuarios do App/App Users/Usuarios de la App"
+      - "Label e titulo de History alterados para Historico de Uso/Usage History/Historial de Uso"
+      - "Label e titulo de Theme alterados para Tema Claro/Escuro/Light/Dark Theme/Tema Claro/Oscuro"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 141
+    type: feature
+    area: "Agenda tab (F012, F007)"
+    feature_id: F084
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    related_crs: [95, 127]
+    description: >
+      Adicionar seletor de tipo de Domingo como primeiro campo do card de
+      Agenda (igual aba Discursos). Se trocar de Discursos para outro tipo
+      com designacoes, mostrar dialogo de confirmacao e apagar speeches.
+    acceptance_criteria:
+      - "SundayTypeDropdown visivel como primeiro campo no card expandido da Agenda"
+      - "Dropdown mostra mesmas opcoes da aba Discursos"
+      - "Trocar de Discursos para outro tipo com designacoes mostra confirmacao"
+      - "Confirmar apaga speeches; cancelar preserva"
+      - "Observador ve dropdown desabilitado"
+      - "Mudanca na Agenda reflete na aba Discursos (cache invalidation)"
+    files_likely_impacted:
+      - src/app/(tabs)/agenda.tsx
+
+  - id: 142
+    type: ui_text_change
+    area: "Activity Log (F019)"
+    feature_id: F085
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    related_crs: [22]
+    description: >
+      Revisao completa das entradas do historico de atividades: formato
+      estruturado no banco com renderizacao i18n na UI. 24 tipos de eventos.
+      Fallback para registros antigos em formato texto plano.
+    acceptance_criteria:
+      - "24 action_types com templates i18n em 3 idiomas"
+      - "Formato estruturado no banco (action_type|key=value)"
+      - "Renderizacao amigavel na UI via t() com interpolacao"
+      - "Registros antigos exibidos como fallback (texto plano)"
+      - "Logs exibidos no idioma correto (nao mais hardcoded)"
+      - "speech:assign_theme passa a ser logado (antes nao era)"
+    files_likely_impacted:
+      - src/lib/activityLog.ts
+      - src/app/(tabs)/settings/history.tsx
+      - src/hooks/useMembers.ts
+      - src/hooks/useSpeeches.ts
+      - src/hooks/useTopics.ts
+      - src/hooks/useActors.ts
+      - src/hooks/useSundayTypes.ts
+      - src/hooks/useAgenda.ts
+      - src/app/(tabs)/settings/users.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 143
+    type: performance
+    area: "Timezone (F002)"
+    feature_id: F086
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    related_crs: []
+    description: >
+      pg_timezone_names com 0% cache hit rate e 270ms mean. App ja usa
+      lista estatica. Verificar se ha referencia server-side e documentar.
+    acceptance_criteria:
+      - "Nenhuma referencia a pg_timezone_names no codebase do app"
+      - "Nenhuma referencia a pg_timezone_names nos arquivos de migracao SQL"
+      - "Timezone selector continua usando lista estatica"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/timezone.tsx
+
+  - id: 144
+    type: security
+    area: "Database Functions (F001, F002, F003, F004, F017, F019)"
+    feature_id: F087
+    spec_file: "docs/specs/SPEC_F083.yaml"
+    related_crs: []
+    description: >
+      7 funcoes sem search_path fixo. Nova migracao SQL com SET search_path = ''
+      e referencias de tabela qualificadas. Leaked Password Protection e
+      configuracao de dashboard (nao codigo).
+    acceptance_criteria:
+      - "7 funcoes recriadas com SET search_path = ''"
+      - "Todas as tabelas qualificadas com schema explicito (public.*, auth.*)"
+      - "Funcionalidade preservada apos migracao"
+      - "Supabase Database Linter sem warnings function_search_path_mutable"
+    files_likely_impacted:
+      - supabase/migrations/015_fix_function_search_path.sql
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -2901,6 +3102,45 @@ design_decisions:
       aplica-se APENAS a aba Agenda. A aba Discursos ja funciona corretamente
       e NAO deve ser alterada. Respeitar escopo do pedido do usuario.
 
+  - id: DD-54
+    title: "Settings labels renomeados para refletir funcao no app"
+    decided_in: CR-140
+    decision: >
+      Labels da aba Configuracoes renomeados para melhor comunicar a funcao
+      de cada tela: Membros->Discursantes (sao pessoas que discursam),
+      Temas->Biblioteca de Temas (e um catalogo), Usuarios->Usuarios do App
+      (distingue de membros), Historico->Historico de Uso (mais descritivo),
+      Tema->Tema Claro/Escuro (explicita a funcao). Tanto no card do index
+      quanto no titulo da tela interna. Somente alteracao de i18n values.
+
+  - id: DD-55
+    title: "SundayTypeDropdown na aba Agenda (reutilizacao de componente)"
+    decided_in: CR-141
+    decision: >
+      A aba Agenda reutiliza o SundayTypeDropdown da aba Discursos como
+      primeiro campo do card expandido. Toda a logica de selecao, confirmacao
+      e apagamento de speeches e herdada do componente existente. Nao e
+      necessario criar componente novo.
+
+  - id: DD-56
+    title: "Activity log: formato estruturado no banco com renderizacao i18n na UI"
+    decided_in: CR-142
+    decision: >
+      Descricoes de log mudam de texto plano para formato estruturado:
+      "action_type|key1=valor1|key2=valor2". Na UI, formatLogDescription()
+      faz parse e usa t('activityLog.events.{type}', {params}). Registros
+      antigos (sem '|') exibidos como fallback. Isso permite que logs
+      aparecam no idioma correto da ala apos mudanca de idioma.
+
+  - id: DD-57
+    title: "Funcoes PL/pgSQL com search_path imutavel (SET search_path = '')"
+    decided_in: CR-144
+    decision: >
+      Todas as funcoes PL/pgSQL devem ter SET search_path = '' para prevenir
+      ataques de search_path manipulation. Referencias a tabelas devem ser
+      qualificadas com schema explicito (public.tabela, auth.tabela).
+      Migracao 015 recria as 7 funcoes afetadas.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -3165,6 +3405,21 @@ business_rules:
     origin: CR-138
     supersedes: "Uso de members.deleteConfirm em ActorSelector (compartilhava com members/topics)"
 
+  - id: BR-56
+    rule: "SundayTypeDropdown deve estar disponivel na aba Agenda como primeiro campo do card expandido"
+    origin: CR-141
+    notes: "Mesmas opcoes e logica da aba Discursos. Observador ve dropdown desabilitado."
+
+  - id: BR-57
+    rule: "Activity log armazena formato estruturado (action_type|key=value) e renderiza via i18n na UI"
+    origin: CR-142
+    notes: "Registros antigos (texto plano sem '|') exibidos como fallback. 24 action_types definidos."
+
+  - id: BR-58
+    rule: "Toda funcao PL/pgSQL deve ter SET search_path = '' e referencias de tabela qualificadas com schema"
+    origin: CR-144
+    notes: "Previne ataques de search_path manipulation. 7 funcoes corrigidas na migracao 015."
+
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
 # =============================================================================
@@ -3274,9 +3529,13 @@ data_model:
         - "topic:create, topic:update, topic:delete"
         - "collection:activate, collection:deactivate"
         - "sunday_type:change"
-        - "speech:assign, speech:unassign, speech:status_change"
+        - "speech:assign, speech:assign_theme, speech:unassign, speech:status_change, speech_cleanup"
+        - "actor:create, actor:update, actor:delete"
+        - "agenda:edit, agenda:last_minute_speech, agenda:last_minute_speech_removed"
         - "user:self_register, user:invite, user:register_via_invite, user:role_change, user:delete"
+        - "user:invitation, user:invitation_accepted, user:name-update, user:removed"
         - "settings:language, settings:timezone"
+      notes: "CR-142: formato estruturado 'action_type|key=value|key=value' para novos registros. Registros antigos (texto plano) mantidos como fallback."
 
 # =============================================================================
 # NAVIGATION STRUCTURE

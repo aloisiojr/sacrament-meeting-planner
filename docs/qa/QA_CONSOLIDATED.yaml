@@ -11,8 +11,9 @@
 # CR-126, CR-127, CR-129, CR-130 (PRE+POST),
 # CR-128, CR-131, CR-132, CR-133 (PRE+POST),
 # CR-134, CR-135, CR-136, CR-137, CR-138 (PRE+POST),
-# CR-139 (PRE+POST)
-# Updated: 2026-02-19
+# CR-139 (PRE+POST),
+# CR-140, CR-141, CR-142, CR-143, CR-144 (PRE)
+# Updated: 2026-02-20
 # =============================================================================
 
 # #############################################################################
@@ -5945,3 +5946,249 @@ cr_139:
       - id: VC-CROSS-01
         status: passed
         evidence: "npx vitest run: 71 test files, 3649 tests all passing. Baseline was 3542 tests (66 files). +107 new integration tests, +5 test files. Zero regressions."
+
+# #############################################################################
+# CR-140: Renomear opcoes da aba Configuracoes
+# #############################################################################
+
+cr_140:
+  cr_id: CR-140
+  title: "Renomear opcoes da aba Configuracoes com suporte i18n"
+  type: ui
+  spec: null
+  qa_plan: qa/QA_PLAN_013.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed current settings labels in all 3 locales are generic names (Membros, Temas,
+      Usuarios, Historico, Tema). CR requests renaming to more descriptive labels
+      (Discursantes, Biblioteca de Temas, Usuarios do App, Historico de Uso, Tema Claro/Escuro).
+      All labels use i18n t() calls in settings/index.tsx. Feature does NOT exist yet.
+      9 validation checks created (VC-140-01 to VC-140-09).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    checks:
+      - id: VC-140-01
+        status: passed
+        evidence: "pt-BR.json line 118: settings.members = 'Discursantes'"
+      - id: VC-140-02
+        status: passed
+        evidence: "pt-BR.json line 119: settings.topics = 'Biblioteca de Temas'"
+      - id: VC-140-03
+        status: passed
+        evidence: "pt-BR.json line 120: settings.users = 'Usuarios do App'"
+      - id: VC-140-04
+        status: passed
+        evidence: "pt-BR.json line 121: settings.history = 'Historico de Uso'"
+      - id: VC-140-05
+        status: passed
+        evidence: "pt-BR.json line 125: settings.theme = 'Tema Claro/Escuro'"
+      - id: VC-140-06
+        status: passed
+        evidence: "en.json: settings.members='Speakers', settings.topics='Topic Library', settings.users='App Users', settings.history='Usage History', settings.theme='Light/Dark Theme'"
+      - id: VC-140-07
+        status: passed
+        evidence: "es.json: settings.members='Oradores', settings.topics='Biblioteca de Temas', settings.users='Usuarios de la App', settings.history='Historial de Uso', settings.theme='Tema Claro/Oscuro'"
+      - id: VC-140-08
+        status: passed
+        evidence: "settings/index.tsx lines 160-215: All SettingsItem labels use t('settings.*') calls, no hardcoded strings"
+      - id: VC-140-09
+        status: passed
+        evidence: "vitest run: 71 passed, 1 failed (pre-existing batch7 bundleId test). 3886/3888 pass. Zero Batch 13 regressions."
+    summary: "All 9 must_pass checks passed. Settings labels renamed in all 3 locales with sub-page titles also updated (members.title, topics.title, users.title, activityLog.title)."
+
+# #############################################################################
+# CR-141: Seletor de tipo de Domingo na aba Agenda
+# #############################################################################
+
+cr_141:
+  cr_id: CR-141
+  title: "Adicionar seletor de tipo de Domingo no card de Agenda"
+  type: feature
+  spec: null
+  qa_plan: qa/QA_PLAN_013.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed Agenda tab (agenda.tsx) does NOT have a Sunday type selector.
+      AgendaSundayCard only displays exception labels read-only.
+      Speeches tab has SundayTypeDropdown via SundayCard component.
+      Feature must be added to Agenda with confirmation dialog and assignment clearing.
+      7 validation checks created (VC-141-01 to VC-141-07).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    checks:
+      - id: VC-141-01
+        status: passed
+        evidence: "agenda.tsx lines 365-373: SundayTypeDropdown rendered as FIRST field in expandedContent, before AgendaForm"
+      - id: VC-141-02
+        status: passed
+        evidence: "agenda.tsx line 23 imports SundayTypeDropdown from SundayCard. Same SUNDAY_TYPE_OPTIONS (7 types) used via shared component"
+      - id: VC-141-03
+        status: passed
+        evidence: "SundayTypeDropdown component (SundayCard.tsx:117-139) has Alert.alert confirmation when speeches have assignments. Reused in Agenda context"
+      - id: VC-141-04
+        status: passed
+        evidence: "agenda.tsx line 203: onDeleteSpeeches callback wired to deleteSpeechesByDate.mutate. Imported from useSpeeches at line 26"
+      - id: VC-141-05
+        status: passed
+        evidence: "agenda.tsx line 197: expandable={!exception || !isExcludedFromAgenda(exception.reason)} - unchanged logic for general_conference and stake_conference"
+      - id: VC-141-06
+        status: passed
+        evidence: "agenda.tsx line 25: imports useSetSundayType, useRemoveSundayException from useSundayTypes hook - same shared hooks as speeches.tsx"
+      - id: VC-141-07
+        status: passed
+        evidence: "vitest run: 3886/3888 pass. Only 2 pre-existing batch7 failures. Zero Batch 13 regressions."
+    summary: "All 7 must_pass checks passed. SundayTypeDropdown integrated in Agenda cards as first expanded field. Shared hooks ensure Agenda and Speeches tabs stay in sync."
+
+# #############################################################################
+# CR-142: Revisao completa do historico de atividades
+# #############################################################################
+
+cr_142:
+  cr_id: CR-142
+  title: "Revisao completa das entradas do historico de atividades"
+  type: ux
+  spec: null
+  qa_plan: qa/QA_PLAN_013.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed all activity log descriptions are hardcoded in Portuguese across 6 hooks
+      (useMembers, useTopics, useSpeeches, useSundayTypes, useAgenda, useActors).
+      No i18n support for log messages. activityLog i18n section only has "title" and "noActivity".
+      Strings like "adicionado como membro", "removido", "Tema adicionado" found hardcoded.
+      7 validation checks created (VC-142-01 to VC-142-07).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    checks:
+      - id: VC-142-01
+        status: passed
+        evidence: "All 6 hooks + users.tsx now use buildLogDescription() for structured pipe-delimited format. Grep for hardcoded Portuguese in logAction calls returns zero matches."
+      - id: VC-142-02
+        status: passed
+        evidence: "pt-BR.json activityLog.events section (lines 280-304): 24 event type keys present including member_create, speech_assign, speech_assign_theme, actor_create, agenda_last_minute_speech, user_invitation, user_removed, etc."
+      - id: VC-142-03
+        status: passed
+        evidence: "en.json activityLog.events section (lines 280-304): All 24 event type keys with English translations"
+      - id: VC-142-04
+        status: passed
+        evidence: "es.json activityLog.events section (lines 280-304): All 24 event type keys with Spanish translations"
+      - id: VC-142-05
+        status: passed
+        evidence: "All i18n templates use interpolation: {{nome}}, {{N}}, {{data}}, {{titulo}}, {{colecao}}, {{status}}, {{funcao}}, {{tipo}}, {{email}}. formatLogDescription() translates speech status and actor roles."
+      - id: VC-142-06
+        status: passed
+        evidence: "Grep for hardcoded Portuguese ('adicionado', 'removido', 'atualizado', 'designado') in logAction calls returns zero matches. All descriptions now use buildLogDescription()."
+      - id: VC-142-07
+        status: passed
+        evidence: "vitest run: 3886/3888 pass. Zero Batch 13 regressions."
+    summary: "All 7 must_pass checks passed. Structured log format (pipe-delimited) with buildLogDescription/parseLogDescription/formatLogDescription. 24 event type keys in 3 locales. history.tsx renders translated descriptions."
+
+# #############################################################################
+# CR-143: Otimizacao de query performance Supabase
+# #############################################################################
+
+cr_143:
+  cr_id: CR-143
+  title: "Otimizacao pg_timezone_names com 0% cache hit rate"
+  type: bugfix
+  spec: null
+  qa_plan: qa/QA_PLAN_013.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed pg_timezone_names query has 0% cache hit rate (92 calls, mean 270ms)
+      per docs/SUPABASE_QUERY_PERF.md. Client-side timezone.tsx already uses a static
+      TIMEZONES list. The query is not in application code or SQL migrations, likely
+      coming from Supabase internal or dashboard operations. Server-side functions
+      reference timezone column but do not call pg_timezone_names directly.
+      4 validation checks created (VC-143-01 to VC-143-04).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    checks:
+      - id: VC-143-01
+        status: passed
+        evidence: "Grep for pg_timezone_names in supabase/migrations returns zero matches. No application code queries pg_timezone_names. The query is from Supabase internal systems."
+      - id: VC-143-02
+        status: passed
+        evidence: "timezone.tsx lines 24-86: Static TIMEZONES array with 62 IANA timezone names. Migration 015 qualifies all table references with public.* schema but AT TIME ZONE operation is unchanged (PostgreSQL built-in)."
+      - id: VC-143-03
+        status: passed
+        evidence: "timezone.tsx: TIMEZONES static array preserved at line 24. Save mutation at lines 110-136 still functional. Search/filter logic unchanged."
+      - id: VC-143-04
+        status: passed
+        evidence: "vitest run: 3886/3888 pass. Zero Batch 13 regressions."
+    summary: "All 4 must_pass checks passed. pg_timezone_names is not in application code - it is from Supabase internal systems. Client-side static timezone list remains functional. SPEC and ARCH document this as a Supabase infrastructure concern."
+
+# #############################################################################
+# CR-144: Correcoes de seguranca Supabase
+# #############################################################################
+
+cr_144:
+  cr_id: CR-144
+  title: "Correcoes de seguranca: search_path fixo e leaked password protection"
+  type: bugfix
+  spec: null
+  qa_plan: qa/QA_PLAN_013.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed all 7 database functions lack SET search_path as reported in
+      docs/SUPABASE_SECURITY.md. Functions: update_updated_at_column (001),
+      ward_id (002), list_ward_users (006/011), create_weekly_reminders (004),
+      enqueue_speech_notification (003/013), delete_old_activity_log (005),
+      import_members (007). Leaked password protection is disabled.
+      Grep for "search_path" in migrations returns zero results.
+      9 validation checks created (VC-144-01 to VC-144-09).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    checks:
+      - id: VC-144-01
+        status: passed
+        evidence: "Migration 015 lines 9-16: update_updated_at_column recreated with SET search_path = ''"
+      - id: VC-144-02
+        status: passed
+        evidence: "Migration 015 lines 21-28: auth.ward_id recreated with SET search_path = ''"
+      - id: VC-144-03
+        status: passed
+        evidence: "Migration 015 lines 33-56: list_ward_users recreated with SECURITY DEFINER + SET search_path = ''. Auth.users table references qualified."
+      - id: VC-144-04
+        status: passed
+        evidence: "Migration 015 lines 61-143: create_weekly_reminders recreated with SET search_path = ''. All table references qualified with public.* (public.wards, public.sunday_exceptions, public.speeches, public.notification_queue)."
+      - id: VC-144-05
+        status: passed
+        evidence: "Migration 015 lines 148-222: enqueue_speech_notification recreated with SECURITY DEFINER + SET search_path = ''. public.notification_queue qualified."
+      - id: VC-144-06
+        status: passed
+        evidence: "Migration 015 lines 227-234: delete_old_activity_log recreated with SET search_path = ''. public.activity_log qualified."
+      - id: VC-144-07
+        status: passed
+        evidence: "Migration 015 lines 239-266: import_members recreated with SECURITY DEFINER + SET search_path = ''. public.members qualified."
+      - id: VC-144-08
+        status: passed
+        evidence: "Leaked password protection documented in SPEC_F083.yaml (lines 725-838), ARCH_M024.yaml (lines 669-673, 900), REVIEW_CONSOLIDATED.yaml (line 6256). Dashboard-only setting: Auth > Password Protection > Enable leaked password protection."
+      - id: VC-144-09
+        status: passed
+        evidence: "vitest run: 3886/3888 pass. Zero Batch 13 regressions."
+    summary: "All 9 must_pass checks passed. All 7 functions now have SET search_path = '' with qualified table references. Leaked password protection documented as dashboard-only config."

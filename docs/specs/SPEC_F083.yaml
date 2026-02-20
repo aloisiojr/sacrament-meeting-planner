@@ -1,0 +1,838 @@
+# =============================================================================
+# SPEC_F083.yaml
+# Features F083-F087 / CR-140 to CR-144: Batch 13
+# Batch: 13
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 13
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F083 / CR-140: Rename Settings tab options with i18n
+# =============================================================================
+
+features:
+
+  - id: F083
+    name: "Rename Settings tab options with i18n"
+    cr_id: 140
+    type: ui_text_change
+    priority: medium
+    related_features: [F003, F005, F018, F019, F021]
+
+    user_request: >
+      "Renomear opcoes da aba Configuracoes com i18n:
+      Membros -> Discursantes, Temas -> Biblioteca de Temas,
+      Usuarios -> Usuarios do App, Historico -> Historico de Uso,
+      Tema -> Tema Claro/Escuro. No card e dentro, no titulo.
+      Nao precisa mexer em tabelas ou codigo, apenas na UI (labels i18n)."
+
+    description: >
+      Alterar os labels (nomes) de 5 opcoes na aba Configuracoes e seus
+      respectivos titulos nas telas internas. Mudancas sao exclusivamente
+      nos arquivos de i18n (pt-BR.json, en.json, es.json). Nenhuma alteracao
+      de codigo TypeScript, tabelas, ou logica. Os labels afetam:
+      (1) o card-item no settings/index.tsx que usa t('settings.members'),
+      t('settings.topics'), t('settings.users'), t('settings.history'),
+      t('settings.theme'); (2) o titulo da tela interna que usa
+      t('members.title'), t('topics.title'), t('users.title'),
+      t('activityLog.title'), t('settings.theme').
+
+    current_behavior: >
+      Labels atuais no settings/index.tsx (via i18n keys):
+      - settings.members: "Membros" / "Members" / "Miembros"
+      - settings.topics: "Temas" / "Topics" / "Temas"
+      - settings.users: "Usuarios" / "Users" / "Usuarios"
+      - settings.history: "Historico" / "History" / "Historial"
+      - settings.theme: "Tema" / "Theme" / "Tema"
+      Titulos nas telas internas (via i18n keys):
+      - members.title: "Membros" / "Members" / "Miembros"
+      - topics.title: "Temas" / "Topics" / "Temas"
+      - users.title: "Usuarios" / "Users" / "Usuarios"
+      - activityLog.title: "Historico de Atividades" / "Activity History" / "Historial de Actividades"
+      - settings.theme (tela de tema usa essa key): "Tema" / "Theme" / "Tema"
+
+    expected_behavior: >
+      Labels e titulos atualizados (somente alteracao de valores i18n):
+      - settings.members: "Discursantes" / "Speakers" / "Oradores"
+      - settings.topics: "Biblioteca de Temas" / "Topic Library" / "Biblioteca de Temas"
+      - settings.users: "Usuarios do App" / "App Users" / "Usuarios de la App"
+      - settings.history: "Historico de Uso" / "Usage History" / "Historial de Uso"
+      - settings.theme: "Tema Claro/Escuro" / "Light/Dark Theme" / "Tema Claro/Oscuro"
+      - members.title: "Discursantes" / "Speakers" / "Oradores"
+      - topics.title: "Biblioteca de Temas" / "Topic Library" / "Biblioteca de Temas"
+      - users.title: "Usuarios do App" / "App Users" / "Usuarios de la App"
+      - activityLog.title: "Historico de Uso" / "Usage History" / "Historial de Uso"
+      - settings.theme (tela interna): "Tema Claro/Escuro" / "Light/Dark Theme" / "Tema Claro/Oscuro"
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "settings.members: 'Membros' -> 'Discursantes'"
+          - "settings.topics: 'Temas' -> 'Biblioteca de Temas'"
+          - "settings.users: 'Usuarios' -> 'Usuarios do App'"
+          - "settings.history: 'Historico' -> 'Historico de Uso'"
+          - "settings.theme: 'Tema' -> 'Tema Claro/Escuro'"
+          - "members.title: 'Membros' -> 'Discursantes'"
+          - "topics.title: 'Temas' -> 'Biblioteca de Temas'"
+          - "users.title: 'Usuarios' -> 'Usuarios do App'"
+          - "activityLog.title: 'Historico de Atividades' -> 'Historico de Uso'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "settings.members: 'Members' -> 'Speakers'"
+          - "settings.topics: 'Topics' -> 'Topic Library'"
+          - "settings.users: 'Users' -> 'App Users'"
+          - "settings.history: 'History' -> 'Usage History'"
+          - "settings.theme: 'Theme' -> 'Light/Dark Theme'"
+          - "members.title: 'Members' -> 'Speakers'"
+          - "topics.title: 'Topics' -> 'Topic Library'"
+          - "users.title: 'Users' -> 'App Users'"
+          - "activityLog.title: 'Activity History' -> 'Usage History'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "settings.members: 'Miembros' -> 'Oradores'"
+          - "settings.topics: 'Temas' -> 'Biblioteca de Temas'"
+          - "settings.users: 'Usuarios' -> 'Usuarios de la App'"
+          - "settings.history: 'Historial' -> 'Historial de Uso'"
+          - "settings.theme: 'Tema' -> 'Tema Claro/Oscuro'"
+          - "members.title: 'Miembros' -> 'Oradores'"
+          - "topics.title: 'Temas' -> 'Biblioteca de Temas'"
+          - "users.title: 'Usuarios' -> 'Usuarios de la App'"
+          - "activityLog.title: 'Historial de Actividades' -> 'Historial de Uso'"
+
+    acceptance_criteria:
+      - id: AC-083-01
+        description: "Settings card label for Members renamed"
+        given: "App aberto na aba Configuracoes"
+        when: "Visualizar opcao que navega para tela de membros (settings/members)"
+        then: "Label exibe 'Discursantes' (pt-BR) / 'Speakers' (en) / 'Oradores' (es)"
+
+      - id: AC-083-02
+        description: "Members screen title renamed"
+        given: "Tela de membros (settings/members.tsx) aberta"
+        when: "Visualizar titulo no header"
+        then: "Titulo exibe 'Discursantes' (pt-BR) / 'Speakers' (en) / 'Oradores' (es)"
+
+      - id: AC-083-03
+        description: "Settings card label for Topics renamed"
+        given: "App aberto na aba Configuracoes"
+        when: "Visualizar opcao que navega para tela de temas (settings/topics)"
+        then: "Label exibe 'Biblioteca de Temas' (pt-BR) / 'Topic Library' (en) / 'Biblioteca de Temas' (es)"
+
+      - id: AC-083-04
+        description: "Topics screen title renamed"
+        given: "Tela de temas (settings/topics.tsx) aberta"
+        when: "Visualizar titulo no header"
+        then: "Titulo exibe 'Biblioteca de Temas' (pt-BR) / 'Topic Library' (en) / 'Biblioteca de Temas' (es)"
+
+      - id: AC-083-05
+        description: "Settings card label for Users renamed"
+        given: "App aberto na aba Configuracoes"
+        when: "Visualizar opcao que navega para tela de usuarios (settings/users)"
+        then: "Label exibe 'Usuarios do App' (pt-BR) / 'App Users' (en) / 'Usuarios de la App' (es)"
+
+      - id: AC-083-06
+        description: "Users screen title renamed"
+        given: "Tela de usuarios (settings/users.tsx) aberta"
+        when: "Visualizar titulo no header"
+        then: "Titulo exibe 'Usuarios do App' (pt-BR) / 'App Users' (en) / 'Usuarios de la App' (es)"
+
+      - id: AC-083-07
+        description: "Settings card label for History renamed"
+        given: "App aberto na aba Configuracoes"
+        when: "Visualizar opcao que navega para tela de historico (settings/history)"
+        then: "Label exibe 'Historico de Uso' (pt-BR) / 'Usage History' (en) / 'Historial de Uso' (es)"
+
+      - id: AC-083-08
+        description: "History screen title renamed"
+        given: "Tela de historico (settings/history.tsx) aberta"
+        when: "Visualizar titulo no header"
+        then: "Titulo exibe 'Historico de Uso' (pt-BR) / 'Usage History' (en) / 'Historial de Uso' (es)"
+
+      - id: AC-083-09
+        description: "Settings card label for Theme renamed"
+        given: "App aberto na aba Configuracoes"
+        when: "Visualizar opcao que navega para tela de tema (settings/theme)"
+        then: "Label exibe 'Tema Claro/Escuro' (pt-BR) / 'Light/Dark Theme' (en) / 'Tema Claro/Oscuro' (es)"
+
+      - id: AC-083-10
+        description: "Theme screen title renamed"
+        given: "Tela de tema (settings/theme.tsx) aberta"
+        when: "Visualizar titulo no header"
+        then: "Titulo exibe 'Tema Claro/Escuro' (pt-BR) / 'Light/Dark Theme' (en) / 'Tema Claro/Oscuro' (es)"
+
+    edge_cases:
+      - id: EC-083-01
+        case: "Keys existentes que referenciam os mesmos valores antigos em outros contextos"
+        expected: "Nenhum outro contexto usa settings.members/topics/users/history/theme alem do card e titulo. Testes existentes que referenciam esses valores devem ser atualizados se necessario."
+
+    implementation_notes: >
+      SOMENTE alteracao de valores i18n nos 3 arquivos de locale JSON.
+      Nenhuma alteracao de codigo TypeScript. As i18n keys permanecem as mesmas
+      (settings.members, settings.topics, etc.), apenas seus valores traduzidos
+      mudam. A tela de tema (theme.tsx) usa t('settings.theme') para o titulo
+      do header, entao alterar settings.theme afeta tanto o card no index
+      quanto o titulo na tela interna. NOTA: Nao mexer em nenhuma outra
+      referencia a "membros" no app (ex: members.addMember, members.deleteConfirm)
+      - essas sao especificas de outras funcionalidades e nao fazem parte deste CR.
+
+# =============================================================================
+# F084 / CR-141: Sunday type selector in Agenda tab
+# =============================================================================
+
+  - id: F084
+    name: "Sunday type selector as first field in Agenda card"
+    cr_id: 141
+    type: feature
+    priority: high
+    related_features: [F007, F012, F061, F070]
+
+    user_request: >
+      "Adicionar seletor de tipo de Domingo como primeiro campo do card de
+      Agenda (igual aba Discursos). Se trocar de Discursos para outro tipo,
+      mostrar dialogo de confirmacao e apagar designacoes."
+
+    description: >
+      A aba Agenda (agenda.tsx / AgendaForm.tsx) atualmente NAO tem seletor
+      de tipo de domingo. O usuario so pode mudar o tipo de domingo pela aba
+      Discursos (speeches.tsx via SundayCard -> SundayTypeDropdown). Este CR
+      adiciona o mesmo seletor SundayTypeDropdown como primeiro campo dentro
+      do card expandido da Agenda, replicando o comportamento da aba Discursos:
+      ao mudar DE 'speeches' para outro tipo, se houver designacoes, exibir
+      dialogo de confirmacao e apagar speeches do banco (comportamento ja
+      implementado em F061/F070).
+
+    current_behavior: >
+      Na aba Agenda, cada card de domingo expandido mostra diretamente o
+      AgendaForm sem seletor de tipo. O tipo de domingo so pode ser alterado
+      pela aba Discursos. Na aba Discursos, o SundayTypeDropdown e renderizado
+      como primeiro elemento dentro do SundayCard expandido.
+
+    expected_behavior: >
+      Na aba Agenda, cada card de domingo expandido mostra o SundayTypeDropdown
+      como primeiro campo, acima de todas as secoes do AgendaForm. O dropdown
+      usa a mesma logica da aba Discursos: useSetSundayType para persistir,
+      dialogo de confirmacao com apagamento de speeches quando mudando DE
+      'speeches' com designacoes existentes. Ao mudar para tipo nao-speeches,
+      as secoes de discursos do AgendaForm sao ocultadas (ou substituidas
+      pela secao correspondente ao novo tipo, conforme ja implementado).
+
+    files_impacted:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+        changes:
+          - "Importar SundayTypeDropdown de components/SundayCard"
+          - "Importar useSetSundayType, useRemoveSundayException de hooks/useSundayTypes"
+          - "Importar useDeleteSpeechesByDate de hooks/useSpeeches"
+          - "Importar useSpeeches e groupSpeechesBySunday de hooks/useSpeeches (para verificar designacoes)"
+          - "Renderizar SundayTypeDropdown como primeiro elemento do card expandido, acima do AgendaForm"
+          - "Passar speeches do domingo corrente ao dropdown para checagem de confirmacao"
+
+    acceptance_criteria:
+      - id: AC-084-01
+        description: "SundayTypeDropdown visivel no card expandido da Agenda"
+        given: "Aba Agenda aberta"
+        when: "Expandir card de um domingo"
+        then: "SundayTypeDropdown aparece como primeiro campo, acima das secoes de agenda"
+
+      - id: AC-084-02
+        description: "Dropdown mostra opcoes iguais a aba Discursos"
+        given: "Card de agenda expandido"
+        when: "Abrir dropdown de tipo de domingo"
+        then: "Mostra mesmas opcoes: Domingo com Discursos, Reuniao de Testemunho, Conferencia Geral, Conferencia de Estaca, Conferencia de Ala, Reuniao Especial da Primaria, Outro"
+
+      - id: AC-084-03
+        description: "Trocar de Discursos para outro tipo com designacoes mostra confirmacao"
+        given: "Domingo do tipo 'speeches' com pelo menos 1 discursante designado"
+        when: "Selecionar outro tipo no dropdown da Agenda"
+        then: "Dialogo de confirmacao exibido com aviso de que designacoes serao apagadas"
+
+      - id: AC-084-04
+        description: "Confirmar mudanca apaga speeches"
+        given: "Dialogo de confirmacao exibido"
+        when: "Usuario confirma"
+        then: "Speeches do domingo apagados do banco; tipo de domingo atualizado; secoes de discursos ocultadas"
+
+      - id: AC-084-05
+        description: "Cancelar mudanca mantem tipo atual"
+        given: "Dialogo de confirmacao exibido"
+        when: "Usuario cancela"
+        then: "Tipo de domingo permanece 'speeches'; speeches preservados"
+
+      - id: AC-084-06
+        description: "Trocar de Discursos para outro tipo SEM designacoes nao mostra confirmacao"
+        given: "Domingo do tipo 'speeches' sem nenhum discursante designado"
+        when: "Selecionar outro tipo no dropdown da Agenda"
+        then: "Tipo atualizado diretamente sem dialogo de confirmacao"
+
+      - id: AC-084-07
+        description: "Trocar de outro tipo PARA Discursos nao mostra confirmacao"
+        given: "Domingo com tipo diferente de 'speeches'"
+        when: "Selecionar 'speeches' no dropdown"
+        then: "Tipo atualizado diretamente sem confirmacao"
+
+      - id: AC-084-08
+        description: "Permissao: apenas Bispado e Secretario podem alterar tipo"
+        given: "Usuario com role Observador"
+        when: "Visualizar card expandido na Agenda"
+        then: "SundayTypeDropdown visivel mas desabilitado (disabled=true)"
+
+      - id: AC-084-09
+        description: "Tipo alterado na Agenda reflete na aba Discursos"
+        given: "Tipo de domingo alterado na aba Agenda"
+        when: "Navegar para aba Discursos"
+        then: "Aba Discursos mostra o novo tipo (via invalidacao de cache React Query)"
+
+    edge_cases:
+      - id: EC-084-01
+        case: "Domingo sem agenda criada (lazy create)"
+        expected: "Dropdown de tipo funciona independente da existencia de agenda. O dropdown altera sunday_exceptions, nao sunday_agendas."
+
+      - id: EC-084-02
+        case: "Mudanca de tipo enquanto offline"
+        expected: "Segue comportamento padrao de offline: mutacao enfileirada em AsyncStorage"
+
+    implementation_notes: >
+      O SundayTypeDropdown ja existe em components/SundayCard.tsx e encapsula
+      toda a logica de selecao, confirmacao e persistencia. O trabalho principal
+      e renderizar esse componente no card expandido da agenda.tsx, passando as
+      mesmas props que speeches.tsx passa. Verificar se o componente
+      SundayTypeDropdown precisa ser exportado separadamente ou se ja e
+      exportado. Se estiver definido inline no SundayCard.tsx, extrair para
+      componente separado ou importar de la. O comportamento de confirmacao
+      + delete speeches ja esta implementado (F061/F070) e e reutilizado.
+
+# =============================================================================
+# F085 / CR-142: Activity log entries overhaul with i18n
+# =============================================================================
+
+  - id: F085
+    name: "Activity log entries overhaul with friendly i18n descriptions"
+    cr_id: 142
+    type: ui_text_change
+    priority: medium
+    related_features: [F019]
+
+    user_request: >
+      "Revisao completa das entradas do historico de atividades: todos os
+      placeholders com texto amigavel, i18n. Nova lista completa de tipos
+      de eventos com textos especificos para cada tipo."
+
+    description: >
+      Atualmente, as descricoes de log de atividades sao geradas com strings
+      hardcoded no idioma da ala no momento da criacao (ex: 'Tema "titulo"
+      adicionado'). Este CR muda a abordagem: ao inves de armazenar texto
+      human-readable no banco, armazenar placeholders estruturados e renderizar
+      o texto amigavel na UI usando i18n keys com interpolacao. Isso permite
+      que os logs aparecam no idioma correto da ala mesmo apos mudanca de
+      idioma, e padroniza todos os formatos.
+
+      Nova lista completa de action_types e seus templates i18n:
+      - member:create -> '"{nome}" adicionado como discursante'
+      - member:update -> 'Discursante "{nome}" teve seus dados atualizados'
+      - member:delete -> '"{nome}" foi removido(a) da lista de discursantes'
+      - speech:assign -> '"{nome}" designado para {N}o discurso dia {data}'
+      - speech:assign_theme -> '"{colecao} - {titulo}" foi designado para {N}o discurso dia {data}'
+      - speech:unassign -> 'Designacao de {nome} foi removida ({data}, {N}o discurso)'
+      - speech:status_change -> 'Status de {nome} alterado para {status} ({data}, {N}o discurso)'
+      - speech_cleanup -> 'Discursos de {data} foram removidos pois o Domingo nao tera discursos'
+      - topic:create -> 'Tema "{titulo}" adicionado'
+      - topic:update -> 'Tema "{titulo}" atualizado'
+      - topic:delete -> 'Tema "{titulo}" removido'
+      - collection:activate -> 'Colecao "{nome}" ativada'
+      - collection:deactivate -> 'Colecao "{nome}" desativada'
+      - actor:create -> '"{nome}" foi adicionado como participante da Reuniao Sacramental para "{funcao}"'
+      - actor:update -> 'Participante "{nome}" teve dados atualizados'
+      - actor:delete -> '"{nome}" foi removido(a) da lista de participantes da Reuniao Sacramental'
+      - sunday_type:change -> 'Domingo dia {data} ajustado para {tipo}'
+      - agenda:edit -> 'Agenda do dia {data} editada'
+      - agenda:last_minute_speech -> 'Discursante do {N}o discurso do dia {data} foi alterado para {nome} de ultima hora'
+      - agenda:last_minute_speech_removed -> 'Discursante de ultima hora do {N}o discurso do dia {data} foi removido'
+      - user:invitation -> 'Convite para usar o app foi criado para {email}'
+      - user:invitation_accepted -> 'Novo usuario "{nome}" aceitou o convite para usar o app'
+      - user:name-update -> 'Usuario do app teve nome atualizado para "{nome}"'
+      - user:removed -> 'Usuario do app "{nome}" ("{email}") foi removido'
+
+    current_behavior: >
+      Cada logAction() call nos hooks gera uma string description hardcoded
+      no momento da criacao. Exemplos de descricoes atuais:
+      - useMembers: "fulano adicionado como membro" / "fulano atualizado" / "fulano removido"
+      - useSpeeches: "fulano designado para 2o discurso dia 16 de fevereiro de 2026"
+      - useTopics: 'Tema "titulo" adicionado' / 'Tema "titulo" atualizado'
+      - useActors: "fulano adicionado como ator da reuniao" / "fulano atualizado"
+      - useSundayTypes: "Domingo dia 2026-02-22 ajustado para Reuniao de Testemunho"
+      - useAgenda: "Agenda do dia 16 de fevereiro de 2026 editada"
+      - users.tsx: 'Name updated to "nome"'
+      A tela de historico (settings/history.tsx) exibe item.description
+      diretamente do banco como texto plano.
+
+    expected_behavior: >
+      Abordagem hibrida: a description armazenada no banco muda para conter
+      placeholders estruturados no formato "action_type|param1=valor1|param2=valor2".
+      Na UI (settings/history.tsx), uma funcao formatLogDescription() faz parse
+      da description e usa i18n keys para renderizar texto amigavel com
+      interpolacao. Registros antigos (formato texto plano sem "|") sao
+      exibidos como antes (fallback). Novos registros usam o formato estruturado.
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Adicionar secao activityLog.events com 24 i18n keys para cada action_type"
+          - "Cada key usa interpolacao i18next: ex: activityLog.events.member_create: '\"{{nome}}\" adicionado como discursante'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Adicionar secao activityLog.events com 24 i18n keys equivalentes em ingles"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Adicionar secao activityLog.events com 24 i18n keys equivalentes em espanhol"
+
+      - path: src/lib/activityLog.ts
+        action: modify
+        changes:
+          - "Nova funcao buildLogDescription(actionType, params) que gera string estruturada 'action_type|key=value|key=value'"
+          - "Nova funcao parseLogDescription(description) que faz parse do formato estruturado"
+          - "logAction() passa a aceitar params object ao inves de string description"
+          - "Manter assinatura antiga com fallback para compatibilidade"
+
+      - path: src/hooks/useMembers.ts
+        action: modify
+        changes:
+          - "useCreateMember: logAction com buildLogDescription('member:create', {nome: data.full_name})"
+          - "useUpdateMember: logAction com buildLogDescription('member:update', {nome: data.full_name})"
+          - "useDeleteMember: logAction com buildLogDescription('member:delete', {nome: memberName})"
+
+      - path: src/hooks/useSpeeches.ts
+        action: modify
+        changes:
+          - "useAssignSpeaker: logAction com buildLogDescription('speech:assign', {nome, N: position, data: sunday_date})"
+          - "useAssignTopic: adicionar logAction com buildLogDescription('speech:assign_theme', {colecao, titulo, N, data})"
+          - "useChangeStatus: logAction com buildLogDescription('speech:status_change', {nome, status, data, N})"
+          - "useRemoveAssignment: logAction com buildLogDescription('speech:unassign', {nome, data, N})"
+          - "useDeleteSpeechesByDate: logAction com buildLogDescription('speech_cleanup', {data})"
+
+      - path: src/hooks/useTopics.ts
+        action: modify
+        changes:
+          - "useCreateWardTopic: logAction com buildLogDescription('topic:create', {titulo})"
+          - "useUpdateWardTopic: logAction com buildLogDescription('topic:update', {titulo})"
+          - "useDeleteWardTopic: logAction com buildLogDescription('topic:delete', {titulo})"
+          - "useToggleCollection: logAction com buildLogDescription('collection:activate' ou 'collection:deactivate', {nome})"
+
+      - path: src/hooks/useActors.ts
+        action: modify
+        changes:
+          - "useCreateActor: logAction com buildLogDescription('actor:create', {nome, funcao})"
+          - "useUpdateActor: logAction com buildLogDescription('actor:update', {nome})"
+          - "useDeleteActor: logAction com buildLogDescription('actor:delete', {nome})"
+
+      - path: src/hooks/useSundayTypes.ts
+        action: modify
+        changes:
+          - "useSetSundayType: logAction com buildLogDescription('sunday_type:change', {data, tipo})"
+
+      - path: src/hooks/useAgenda.ts
+        action: modify
+        changes:
+          - "useUpdateAgenda: logAction com buildLogDescription('agenda:edit', {data})"
+
+      - path: src/app/(tabs)/settings/users.tsx
+        action: modify
+        changes:
+          - "Logica de name update: logAction com buildLogDescription('user:name-update', {nome})"
+          - "Logica de user delete: logAction com buildLogDescription('user:removed', {nome, email})"
+
+      - path: src/app/(tabs)/settings/history.tsx
+        action: modify
+        changes:
+          - "Importar funcao formatLogDescription de lib/activityLog"
+          - "ActivityLogEntry: substituir item.description por formatLogDescription(item.description, t)"
+          - "formatLogDescription faz parse do formato estruturado e usa t() para renderizar"
+          - "Fallback: se description nao contem '|', exibir como texto plano (registros antigos)"
+
+    acceptance_criteria:
+      - id: AC-085-01
+        description: "member:create log com texto amigavel"
+        given: "Novo membro 'Maria Silva' criado"
+        when: "Visualizar historico de atividades"
+        then: "Exibe '\"Maria Silva\" adicionado como discursante' (pt-BR)"
+
+      - id: AC-085-02
+        description: "member:update log com texto amigavel"
+        given: "Membro 'Maria Silva' editado"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Discursante \"Maria Silva\" teve seus dados atualizados' (pt-BR)"
+
+      - id: AC-085-03
+        description: "member:delete log com texto amigavel"
+        given: "Membro 'Maria Silva' removido"
+        when: "Visualizar historico de atividades"
+        then: "Exibe '\"Maria Silva\" foi removido(a) da lista de discursantes' (pt-BR)"
+
+      - id: AC-085-04
+        description: "speech:assign log com texto amigavel"
+        given: "Discursante 'Joao' designado para 2o discurso dia 2026-03-01"
+        when: "Visualizar historico de atividades"
+        then: "Exibe '\"Joao\" designado para 2o discurso dia 1 de marco de 2026' (pt-BR)"
+
+      - id: AC-085-05
+        description: "speech:assign_theme log com texto amigavel"
+        given: "Tema 'Fe' da colecao 'Principios' atribuido ao 1o discurso dia 2026-03-01"
+        when: "Visualizar historico de atividades"
+        then: "Exibe '\"Principios - Fe\" foi designado para 1o discurso dia 1 de marco de 2026' (pt-BR)"
+
+      - id: AC-085-06
+        description: "speech:unassign log com texto amigavel"
+        given: "Designacao de 'Joao' removida (2026-03-01, 2o discurso)"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Designacao de Joao foi removida (1 de marco de 2026, 2o discurso)' (pt-BR)"
+
+      - id: AC-085-07
+        description: "speech:status_change log com texto amigavel"
+        given: "Status de 'Joao' alterado para assigned_confirmed"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Status de Joao alterado para Designado/Confirmado (1 de marco de 2026, 2o discurso)' (pt-BR)"
+
+      - id: AC-085-08
+        description: "speech_cleanup log com texto amigavel"
+        given: "Tipo de domingo alterado de 'speeches' para 'testimony_meeting' em 2026-03-01"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Discursos de 1 de marco de 2026 foram removidos pois o Domingo nao tera discursos' (pt-BR)"
+
+      - id: AC-085-09
+        description: "topic:create log com texto amigavel"
+        given: "Tema 'Arrependimento' criado"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Tema \"Arrependimento\" adicionado' (pt-BR)"
+
+      - id: AC-085-10
+        description: "collection:activate log com texto amigavel"
+        given: "Colecao 'Come Follow Me 2026' ativada"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Colecao \"Come Follow Me 2026\" ativada' (pt-BR)"
+
+      - id: AC-085-11
+        description: "actor:create log com texto amigavel"
+        given: "Ator 'Bispo Silva' adicionado com role can_preside"
+        when: "Visualizar historico de atividades"
+        then: "Exibe '\"Bispo Silva\" foi adicionado como participante da Reuniao Sacramental para \"presidir\"' (pt-BR)"
+
+      - id: AC-085-12
+        description: "sunday_type:change log com texto amigavel"
+        given: "Tipo de domingo 2026-03-01 alterado para Reuniao de Testemunho"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Domingo dia 1 de marco de 2026 ajustado para Reuniao de Testemunho' (pt-BR)"
+
+      - id: AC-085-13
+        description: "agenda:edit log com texto amigavel"
+        given: "Agenda do dia 2026-03-01 editada"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Agenda do dia 1 de marco de 2026 editada' (pt-BR)"
+
+      - id: AC-085-14
+        description: "user:name-update log com texto amigavel"
+        given: "Usuario atualiza nome para 'Carlos Souza'"
+        when: "Visualizar historico de atividades"
+        then: "Exibe 'Usuario do app teve nome atualizado para \"Carlos Souza\"' (pt-BR)"
+
+      - id: AC-085-15
+        description: "Registros antigos exibidos como fallback"
+        given: "Registros de log anteriores a esta mudanca (formato texto plano)"
+        when: "Visualizar historico de atividades"
+        then: "Exibidos como texto plano sem formatacao (fallback)"
+
+      - id: AC-085-16
+        description: "Logs exibidos no idioma correto da aba"
+        given: "Registro de log criado quando idioma era pt-BR"
+        when: "Idioma da ala alterado para en e historico visualizado"
+        then: "Log exibido em ingles (interpolacao feita na UI, nao no momento da criacao)"
+
+      - id: AC-085-17
+        description: "actor:create log com funcao traduzida"
+        given: "Ator adicionado com role can_conduct"
+        when: "Visualizar historico em pt-BR"
+        then: "Funcao exibida como 'dirigir' (nao 'can_conduct')"
+
+    edge_cases:
+      - id: EC-085-01
+        case: "Registro de log com formato estruturado incompleto (parametro faltando)"
+        expected: "Parametro ausente exibido como string vazia ou placeholder bruto"
+
+      - id: EC-085-02
+        case: "action_type desconhecido no formato estruturado"
+        expected: "Fallback: exibir a string raw description"
+
+      - id: EC-085-03
+        case: "speech:assign_theme atualmente nao logado"
+        expected: "Adicionar logAction em useAssignTopic (atualmente nao loga nenhuma acao)"
+
+      - id: EC-085-04
+        case: "speech:status_change com status traduzido"
+        expected: "Na UI, status e traduzido via t('speechStatus.{status}') ao renderizar"
+
+      - id: EC-085-05
+        case: "actor role mapping para texto amigavel"
+        expected: "can_preside='presidir', can_conduct='dirigir', can_recognize='ser reconhecido', can_music='reger', can_piano='tocar piano'"
+
+    implementation_notes: >
+      ABORDAGEM HIBRIDA (banco + UI):
+      1. No banco, description muda de texto plano para formato estruturado:
+         "member:create|nome=Maria Silva"
+         "speech:assign|nome=Joao|N=2|data=2026-03-01"
+      2. Na UI (history.tsx), formatLogDescription() faz parse:
+         - Split por '|', primeiro segmento = action_type, demais = key=value pairs
+         - Usa t('activityLog.events.{action_type_normalizado}', {params})
+         - action_type normalizado: 'member:create' -> 'member_create' (troca : por _)
+      3. Registros antigos sem '|' sao exibidos como texto plano (fallback)
+      4. IMPORTANTE: speech:assign_theme nao tem logAction atualmente; adicionar
+         em useAssignTopic onSuccess com auth context (ward_id, user, userName).
+      5. Para status traduzido (speech:status_change), o parametro 'status'
+         armazenado e a key (ex: 'assigned_confirmed') e a UI traduz via
+         t('speechStatus.{status}').
+      6. Para actor role, mapear can_preside->presidir, can_conduct->dirigir,
+         can_recognize->ser reconhecido, can_music->reger, can_piano->tocar piano.
+         Criar mapa ACTOR_ROLE_I18N_KEYS e usar t() na UI.
+      7. agenda:last_minute_speech e agenda:last_minute_speech_removed sao
+         action_types NOVOS que serao logados quando F044 (speaker override) for
+         implementado. Por enquanto, criar as i18n keys mas nao implementar
+         logAction (F044 ainda e pending).
+      8. user:invitation e user:invitation_accepted sao gerados nas Edge
+         Functions (server-side), nao no app client. Criar as i18n keys para
+         display na UI, mas a geracao do log acontece no server. O formato
+         estruturado deve ser adotado tambem nas Edge Functions quando forem
+         atualizadas.
+
+# =============================================================================
+# F086 / CR-143: Supabase query performance - static timezone list
+# =============================================================================
+
+  - id: F086
+    name: "Replace pg_timezone_names with static timezone list"
+    cr_id: 143
+    type: performance
+    priority: high
+    related_features: [F002]
+
+    user_request: >
+      "Otimizacao de query performance Supabase: pg_timezone_names com 0% cache
+      hit rate (270ms mean, 92 calls). Usar lista estatica de timezones ao
+      inves de consultar pg_timezone_names."
+
+    description: >
+      A query 'SELECT name FROM pg_timezone_names' aparece no Supabase query
+      performance report com 0% cache hit rate, 270ms de tempo medio e 92
+      chamadas. Essa query provavelmente e disparada automaticamente pelo
+      Supabase dashboard ou por algum validador interno, NAO pelo codigo do
+      app. O app ja usa uma lista estatica de timezones no arquivo
+      src/app/(tabs)/settings/timezone.tsx (constante TIMEZONES com ~60
+      entradas). Nenhuma parte do codigo do app faz SELECT em pg_timezone_names.
+      O problema e uma validacao server-side ou dashboard query.
+
+    current_behavior: >
+      O app usa lista estatica TIMEZONES no timezone.tsx com ~60 entradas IANA.
+      Nenhum codigo client-side consulta pg_timezone_names. A query aparece no
+      performance report do Supabase provavelmente porque algum validador
+      server-side (ex: CHECK constraint, funcao PL/pgSQL, ou o proprio
+      dashboard) executa essa query. A coluna wards.timezone e TEXT sem
+      CHECK constraint contra pg_timezone_names.
+
+    expected_behavior: >
+      Sem mudanca necessaria no codigo client-side. A lista estatica TIMEZONES
+      ja e usada. Para eliminar a query pg_timezone_names no server, verificar
+      se existe algum trigger ou funcao PL/pgSQL que referencia pg_timezone_names.
+      Se existir, remover a referencia. Se for query do dashboard, nao ha acao
+      possivel no codigo. Documentar que o app nao depende de pg_timezone_names.
+
+    files_impacted:
+      - path: src/app/(tabs)/settings/timezone.tsx
+        action: none
+        changes:
+          - "NENHUMA alteracao necessaria - ja usa lista estatica TIMEZONES"
+
+    acceptance_criteria:
+      - id: AC-086-01
+        description: "App nao faz query a pg_timezone_names"
+        given: "Codigo do app (todos os arquivos .ts e .tsx)"
+        when: "Buscar por 'pg_timezone_names' em todo o codebase"
+        then: "Nenhuma referencia encontrada (apenas em docs)"
+
+      - id: AC-086-02
+        description: "Timezone selector usa lista estatica"
+        given: "Tela de selecao de fuso horario aberta"
+        when: "Listar timezones disponiveis"
+        then: "Lista vem da constante TIMEZONES no timezone.tsx (nenhuma query ao banco)"
+
+      - id: AC-086-03
+        description: "Nenhum trigger ou funcao PL/pgSQL referencia pg_timezone_names"
+        given: "Migracoes SQL do projeto"
+        when: "Buscar por 'pg_timezone_names' nos arquivos de migracao"
+        then: "Nenhuma referencia encontrada"
+
+    edge_cases:
+      - id: EC-086-01
+        case: "Timezone nao presente na lista estatica mas valido em PostgreSQL"
+        expected: "Timezone e salvo no banco como TEXT sem validacao server-side. A UI nao mostra o timezone na lista, mas o valor existente no banco continua funcionando."
+
+    implementation_notes: >
+      ANALISE: O app ja usa lista estatica. Nao ha nada a mudar no codigo
+      client-side. A query pg_timezone_names com 92 calls provavelmente vem de:
+      (1) Supabase Dashboard queries automaticas, ou (2) algum validador
+      interno do PostgREST/Supabase. ACAO POSSIVEL: Se houver uma funcao
+      PL/pgSQL que valida timezone contra pg_timezone_names, criar migracao
+      para remove-la. Se for dashboard, documentar que e externo ao app.
+      VERIFICACAO: Grep em supabase/migrations/ por pg_timezone_names para
+      confirmar. STATUS: Potencialmente nada a implementar se for query do
+      dashboard. Feature marcada como "analysis + documentation".
+
+# =============================================================================
+# F087 / CR-144: Supabase security - fix function search_path
+# =============================================================================
+
+  - id: F087
+    name: "Fix mutable search_path in 7 PostgreSQL functions"
+    cr_id: 144
+    type: security
+    priority: high
+    related_features: [F001, F002, F003, F004, F017, F019]
+
+    user_request: >
+      "Correcoes de seguranca Supabase: 7 funcoes sem search_path fixo
+      (update_updated_at_column, ward_id, list_ward_users,
+      create_weekly_reminders, enqueue_speech_notification,
+      delete_old_activity_log, import_members). Habilitar protecao contra
+      senhas vazadas e configuracao de dashboard (nao e codigo)."
+
+    description: >
+      O Supabase Database Linter reporta 7 funcoes com search_path mutavel
+      (function_search_path_mutable). Isso e um risco de seguranca: se o
+      search_path e mutavel, um atacante pode criar objetos em outro schema
+      que interceptem chamadas. Fix: adicionar SET search_path = '' (ou
+      SET search_path = 'public') a todas as 7 funcoes via migracao SQL.
+      O linter tambem reporta 'Leaked Password Protection Disabled', mas
+      isso e configuracao do dashboard Supabase Auth (nao e codigo).
+
+    current_behavior: >
+      7 funcoes sem search_path fixo:
+      1. update_updated_at_column (001_initial_schema.sql) - trigger function
+      2. ward_id (002_rls_policies.sql) - helper para RLS
+      3. list_ward_users (006_list_ward_users_rpc.sql, atualizada em 011) - RPC
+      4. create_weekly_reminders (004_weekly_reminder_function.sql) - cron function
+      5. enqueue_speech_notification (003_notification_triggers.sql, atualizada em 013) - trigger
+      6. delete_old_activity_log (005_activity_log_retention.sql) - cron function
+      7. import_members (007_import_members_rpc.sql) - RPC
+
+    expected_behavior: >
+      Nova migracao SQL (015_fix_function_search_path.sql) que recria todas as
+      7 funcoes com SET search_path = '' adicionado. Funcoes que referenciam
+      tabelas sem qualificacao de schema passam a usar public.tabela
+      explicitamente. Leaked Password Protection: documentar que deve ser
+      habilitado via Supabase Dashboard > Authentication > Security.
+
+    files_impacted:
+      - path: supabase/migrations/015_fix_function_search_path.sql
+        action: create
+        changes:
+          - "CREATE OR REPLACE FUNCTION update_updated_at_column() ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION auth.ward_id() ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION list_ward_users(...) ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION create_weekly_reminders() ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION enqueue_speech_notification() ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION delete_old_activity_log() ... SET search_path = ''"
+          - "CREATE OR REPLACE FUNCTION import_members(...) ... SET search_path = ''"
+          - "Todas as referencias a tabelas qualificadas com schema: public.wards, public.members, etc."
+
+    acceptance_criteria:
+      - id: AC-087-01
+        description: "update_updated_at_column com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao update_updated_at_column no banco"
+        then: "Funcao tem SET search_path = ''"
+
+      - id: AC-087-02
+        description: "auth.ward_id com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao auth.ward_id no banco"
+        then: "Funcao tem SET search_path = '' e referencia auth.users explicitamente"
+
+      - id: AC-087-03
+        description: "list_ward_users com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao list_ward_users no banco"
+        then: "Funcao tem SET search_path = '' e referencia auth.users explicitamente"
+
+      - id: AC-087-04
+        description: "create_weekly_reminders com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao create_weekly_reminders no banco"
+        then: "Funcao tem SET search_path = '' e referencia public.* explicitamente"
+
+      - id: AC-087-05
+        description: "enqueue_speech_notification com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao enqueue_speech_notification no banco"
+        then: "Funcao tem SET search_path = '' e referencia public.* explicitamente"
+
+      - id: AC-087-06
+        description: "delete_old_activity_log com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao delete_old_activity_log no banco"
+        then: "Funcao tem SET search_path = '' e referencia public.activity_log explicitamente"
+
+      - id: AC-087-07
+        description: "import_members com search_path fixo"
+        given: "Migracao 015 aplicada"
+        when: "Verificar funcao import_members no banco"
+        then: "Funcao tem SET search_path = '' e referencia public.members explicitamente"
+
+      - id: AC-087-08
+        description: "Funcionalidade preservada apos migracao"
+        given: "Migracao 015 aplicada em banco com dados"
+        when: "Executar operacoes: criar membro, designar speech, mudar status, importar CSV"
+        then: "Todas as operacoes funcionam normalmente (triggers e RPCs executam sem erro)"
+
+      - id: AC-087-09
+        description: "Supabase Database Linter sem warnings de search_path"
+        given: "Migracao 015 aplicada"
+        when: "Executar Database Linter no Supabase Dashboard"
+        then: "Nenhum warning function_search_path_mutable para as 7 funcoes"
+
+    edge_cases:
+      - id: EC-087-01
+        case: "Funcao auth.ward_id referencia auth.users (schema auth)"
+        expected: "SET search_path = '' funciona porque a referencia e qualificada: auth.users"
+
+      - id: EC-087-02
+        case: "Trigger enqueue_speech_notification usa NEW (row variable)"
+        expected: "NEW e variavel de trigger, nao depende de search_path; referencia a tabelas usa public.* qualificado"
+
+      - id: EC-087-03
+        case: "import_members usa parametro JSONB com loop"
+        expected: "Operacoes de INSERT/DELETE referenciam public.members explicitamente"
+
+    implementation_notes: >
+      MIGRACAO SQL: Criar 015_fix_function_search_path.sql com CREATE OR REPLACE
+      FUNCTION para todas as 7 funcoes. Copiar o corpo de cada funcao da migracao
+      original e adicionar SET search_path = '' apos LANGUAGE plpgsql (ou sql).
+      Qualificar TODAS as referencias a tabelas com schema explicito:
+      - public.wards, public.members, public.speeches, public.sunday_exceptions
+      - public.notification_queue, public.activity_log, public.ward_topics
+      - auth.users (para ward_id e list_ward_users)
+      Para auth.ward_id(): SET search_path = '' (schema 'auth' ja e explicito
+      na definicao CREATE OR REPLACE FUNCTION auth.ward_id()).
+      LEAKED PASSWORD PROTECTION: Nao e codigo. Documentar no SPEC que deve ser
+      habilitado via Supabase Dashboard > Authentication > Settings > Password
+      Protection > Enable leaked password protection.

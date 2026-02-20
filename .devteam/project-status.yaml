@@ -1,34 +1,38 @@
 project:
-  name: "Batch 12 - Integration Tests"
+  name: "Batch 13 - Settings Rename, Agenda Sunday Type, Activity Log, Supabase Fixes"
   type: feature_request
-  created_at: "2026-02-19"
+  created_at: "2026-02-20"
   user_request: |
-    O projeto só tem testes unitários, antes de publicar, precisamos de testes de integração.
+    1. Renomear opções da aba Configurações com i18n: Membros→Discursantes, Temas→Biblioteca de Temas, Usuários→Usuários do App, Histórico→Histórico de Uso, Tema→Tema Claro/Escuro
+    2. Adicionar seletor de tipo de Domingo no card de Agenda (igual aba Discursos), com diálogo de confirmação ao trocar de Discursos para outro tipo
+    3. Revisão completa do histórico de atividades com nova lista de tipos de eventos e mensagens i18n
+    4. Otimização de query performance Supabase (pg_timezone_names com 0% cache hit)
+    5. Correções de segurança Supabase (7 funções sem search_path fixo, habilitar proteção contra senhas vazadas)
 
 phases:
   total: 1
   current: 1
   summary:
     - phase: 1
-      description: "Add integration tests covering core user flows across all tabs"
+      description: "Implement all 5 CRs: settings rename, agenda sunday type, activity log revision, Supabase perf and security fixes"
       status: completed
 
 current_phase:
   id: 1
-  started_at: "2026-02-19"
-  features: [F082]
-  change_requests: [CR-139]
+  started_at: "2026-02-20"
+  features: [F083, F084, F085, F086, F087]
+  change_requests: [CR-140, CR-141, CR-142, CR-143, CR-144]
   current_agent: "none"
   current_step: "Project complete"
   completed_steps:
-    - "QA PRE validation (validated=true, QA_PLAN_012 saved, 11 checks defined)"
-    - "Requirements extraction (F082 spec finalized, 0 open questions, 30 ACs, 7 ECs)"
-    - "Architecture definition (ARCH_M023, ADR-057 to ADR-060, 5 new files + 1 modified)"
-    - "Implementation plan (PLAN_P023, 8 steps, 30 ACs covered, 7 ECs covered)"
-    - "Code implementation (10 commits, 107 integration tests, 5 new test files, 3649 total passing)"
-    - "Testing (107 tests pass, approved_with_gaps, 14/30 ACs direct, 7/7 ECs, 0 regressions)"
-    - "Code review (verdict: approved, 0 P0/P1, 4 P2 informational, no deploys needed)"
-    - "QA POST validation (verdict: passed, 6/6 must-pass, 5/5 should-pass)"
+    - "QA PRE validation (validated=true, QA_PLAN_013, 36 checks)"
+    - "Requirements extraction (F083-F087, 48 ACs, OQ-001 resolved)"
+    - "Architecture definition (ARCH_M024, ADR-061 to ADR-063, 15 files)"
+    - "Implementation plan (PLAN_P024, 10 steps, 48 ACs, 35 testes)"
+    - "Code implementation (13 commits, 22+ files, 3886 tests passing)"
+    - "Testing (218 new tests, all pass, verdict approved, 48/48 ACs)"
+    - "Code review (verdict: approved, 0 P0/P1, 2 P2 informational)"
+    - "QA POST validation (verdict: passed, 36/36 checks)"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -39,5 +43,11 @@ artifacts:
   review_consolidated: "docs/reviews/REVIEW_CONSOLIDATED.yaml"
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
-pending_deploys: []
+pending_deploys:
+  - type: database_migration
+    file: "supabase/migrations/015_fix_function_search_path.sql"
+    instructions: "Apply via Supabase Dashboard SQL Editor or supabase db push. Idempotent."
+  - type: dashboard_configuration
+    description: "Enable Leaked Password Protection"
+    instructions: "Supabase Dashboard > Authentication > Attack Protection > Enable Leaked Password Protection"
 last_updated: "2026-02-20"

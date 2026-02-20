@@ -1,0 +1,782 @@
+# =============================================================================
+# PLAN_P024.yaml
+# Batch 13: Settings Rename, Agenda Sunday Type, Activity Log, Supabase Fixes
+# Features: F083 (CR-140), F084 (CR-141), F085 (CR-142), F086 (CR-143),
+#            F087 (CR-144)
+# Created: 2026-02-20
+# Phase: 1 of 1
+# Total ACs: 48 (F083: 10, F084: 9, F085: 17, F086: 3, F087: 9)
+# =============================================================================
+
+type: plan
+status: pending
+batch: 13
+created: "2026-02-20"
+last_updated: "2026-02-20"
+spec_ref: "docs/specs/SPEC_F083.yaml"
+arch_ref: "docs/arch/ARCH_M024.yaml"
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F083 - Rename Settings tab labels (i18n only)
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F083: Rename Settings tab labels in 3 locale files"
+    feature: F083
+    cr: 140
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          In pt-BR.json, update 9 i18n values (keys unchanged):
+          settings.members: "Membros" -> "Discursantes"
+          settings.topics: "Temas" -> "Biblioteca de Temas"
+          settings.users: "Usuarios" -> "Usuarios do App"
+          settings.history: "Historico" -> "Historico de Uso"
+          settings.theme: "Tema" -> "Tema Claro/Escuro"
+          members.title: "Membros" -> "Discursantes"
+          topics.title: "Temas" -> "Biblioteca de Temas"
+          users.title: "Usuarios" -> "Usuarios do App"
+          activityLog.title: "Historico de Atividades" -> "Historico de Uso"
+      - description: >
+          In en.json, update 9 i18n values (keys unchanged):
+          settings.members: "Members" -> "Speakers"
+          settings.topics: "Topics" -> "Topic Library"
+          settings.users: "Users" -> "App Users"
+          settings.history: "History" -> "Usage History"
+          settings.theme: "Theme" -> "Light/Dark Theme"
+          members.title: "Members" -> "Speakers"
+          topics.title: "Topics" -> "Topic Library"
+          users.title: "Users" -> "App Users"
+          activityLog.title: "Activity History" -> "Usage History"
+      - description: >
+          In es.json, update 9 i18n values (keys unchanged):
+          settings.members: "Miembros" -> "Oradores"
+          settings.topics: "Temas" -> "Biblioteca de Temas"
+          settings.users: "Usuarios" -> "Usuarios de la App"
+          settings.history: "Historial" -> "Historial de Uso"
+          settings.theme: "Tema" -> "Tema Claro/Oscuro"
+          members.title: "Miembros" -> "Oradores"
+          topics.title: "Temas" -> "Biblioteca de Temas"
+          users.title: "Usuarios" -> "Usuarios de la App"
+          activityLog.title: "Historial de Actividades" -> "Historial de Uso"
+    done_when: >
+      All 9 values updated in each of the 3 locale files. Keys unchanged.
+      No TypeScript file changes. App displays new labels on Settings tab
+      and inner screen titles. Existing tests referencing old values updated
+      if any.
+    covers:
+      - AC-083-01  # settings.members card label
+      - AC-083-02  # members screen title
+      - AC-083-03  # settings.topics card label
+      - AC-083-04  # topics screen title
+      - AC-083-05  # settings.users card label
+      - AC-083-06  # users screen title
+      - AC-083-07  # settings.history card label
+      - AC-083-08  # history screen title
+      - AC-083-09  # settings.theme card label
+      - AC-083-10  # theme screen title
+    risks:
+      - risk: "Existing tests may assert old label values"
+        mitigation: "Search for old values in test files and update"
+    commit_msg: "feat(i18n): rename Settings tab labels in 3 locale files (F083, CR-140)"
+
+    tests:
+      - id: T-083-01
+        type: grep
+        description: "Verify pt-BR.json has 'Discursantes' for settings.members and members.title"
+        expected: "Both values match 'Discursantes'"
+      - id: T-083-02
+        type: grep
+        description: "Verify en.json has 'Speakers' for settings.members and members.title"
+        expected: "Both values match 'Speakers'"
+      - id: T-083-03
+        type: grep
+        description: "Verify es.json has 'Oradores' for settings.members and members.title"
+        expected: "Both values match 'Oradores'"
+      - id: T-083-04
+        type: grep
+        description: "Verify pt-BR.json has 'Biblioteca de Temas' for settings.topics and topics.title"
+        expected: "Both values match 'Biblioteca de Temas'"
+      - id: T-083-05
+        type: grep
+        description: "Verify pt-BR.json has 'Historico de Uso' for settings.history and activityLog.title"
+        expected: "Both values match 'Historico de Uso'"
+      - id: T-083-06
+        type: grep
+        description: "Verify pt-BR.json has 'Tema Claro/Escuro' for settings.theme"
+        expected: "Value matches 'Tema Claro/Escuro'"
+      - id: T-083-07
+        type: grep
+        description: "Verify no old values remain (grep for old exact values in locale files)"
+        expected: "No matches for old values 'Membros', 'Topics' as settings.members/topics labels"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F087 - SQL migration for search_path fix
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F087: Create migration 015 to fix search_path in 7 SQL functions"
+    feature: F087
+    cr: 144
+    depends_on: []
+    files:
+      - path: supabase/migrations/015_fix_function_search_path.sql
+        action: create
+    changes:
+      - description: >
+          Create new migration file 015_fix_function_search_path.sql with
+          CREATE OR REPLACE FUNCTION for all 7 functions. Each function gets
+          SET search_path = '' added after LANGUAGE clause. All unqualified
+          table references replaced with explicit schema qualifiers:
+          1. update_updated_at_column() - plpgsql, no table refs (uses NEW only)
+          2. auth.ward_id() - sql, refs auth.jwt() (already qualified)
+          3. list_ward_users(uuid) - sql SECURITY DEFINER STABLE, refs auth.users
+          4. create_weekly_reminders() - plpgsql, refs public.wards,
+             public.sunday_exceptions, public.speeches, public.notification_queue
+          5. enqueue_speech_notification() - plpgsql SECURITY DEFINER,
+             refs public.notification_queue
+          6. delete_old_activity_log() - plpgsql, refs public.activity_log
+          7. import_members(uuid, jsonb) - plpgsql SECURITY DEFINER,
+             refs public.members
+          Function bodies copied from latest versions (migrations 001-013).
+          SECURITY DEFINER preserved where present. Triggers not affected.
+    done_when: >
+      File supabase/migrations/015_fix_function_search_path.sql exists with
+      all 7 CREATE OR REPLACE FUNCTION statements. Each has
+      SET search_path = ''. All table references use explicit schema.
+      SQL is syntactically valid. A comment at top documents purpose.
+    covers:
+      - AC-087-01  # update_updated_at_column search_path
+      - AC-087-02  # auth.ward_id search_path
+      - AC-087-03  # list_ward_users search_path
+      - AC-087-04  # create_weekly_reminders search_path
+      - AC-087-05  # enqueue_speech_notification search_path
+      - AC-087-06  # delete_old_activity_log search_path
+      - AC-087-07  # import_members search_path
+      - AC-087-08  # functionality preserved (manual test)
+      - AC-087-09  # Supabase linter clean (manual test)
+    risks:
+      - risk: "Function body mismatch with latest version in migrations"
+        mitigation: "Copy from latest migration version (011 for list_ward_users, 013 for enqueue_speech_notification)"
+      - risk: "Syntax error in CREATE OR REPLACE"
+        mitigation: "Review SQL syntax carefully; test on staging before merge"
+    commit_msg: "fix(db): add SET search_path='' to 7 SQL functions (F087, CR-144)"
+
+    tests:
+      - id: T-087-01
+        type: grep
+        description: "Verify migration file contains SET search_path = '' for each function"
+        expected: "7 occurrences of 'search_path' in migration file"
+      - id: T-087-02
+        type: grep
+        description: "Verify all 7 function names present in migration"
+        expected: "update_updated_at_column, ward_id, list_ward_users, create_weekly_reminders, enqueue_speech_notification, delete_old_activity_log, import_members"
+      - id: T-087-03
+        type: grep
+        description: "Verify public. prefix on table references"
+        expected: "public.notification_queue, public.activity_log, public.members, public.wards appear"
+      - id: T-087-04
+        type: grep
+        description: "Verify no unqualified table references in function bodies"
+        expected: "No bare table names (wards, members, speeches, etc.) without public. prefix inside function bodies"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F084 - Export SundayTypeDropdown from SundayCard.tsx
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F084: Export SundayTypeDropdown from SundayCard.tsx"
+    feature: F084
+    cr: 141
+    depends_on: []
+    files:
+      - path: src/components/SundayCard.tsx
+        action: modify
+    changes:
+      - description: >
+          Add 'export' keyword to the SundayTypeDropdown function declaration
+          and the SundayTypeDropdownProps interface. Change:
+            interface SundayTypeDropdownProps -> export interface SundayTypeDropdownProps
+            function SundayTypeDropdown -> export function SundayTypeDropdown
+          No other changes to SundayCard.tsx. Internal usage unchanged.
+    done_when: >
+      SundayTypeDropdown and SundayTypeDropdownProps are exported from
+      SundayCard.tsx. SundayCard continues to use them internally.
+      TypeScript compiles without errors.
+    covers: []  # prerequisite for S04
+    risks:
+      - risk: "None - adding export is non-breaking"
+        mitigation: "N/A"
+    commit_msg: "refactor(SundayCard): export SundayTypeDropdown for reuse (F084, CR-141)"
+
+    tests:
+      - id: T-084-export-01
+        type: grep
+        description: "Verify export keyword on SundayTypeDropdown"
+        expected: "'export function SundayTypeDropdown' found in SundayCard.tsx"
+      - id: T-084-export-02
+        type: grep
+        description: "Verify export keyword on SundayTypeDropdownProps"
+        expected: "'export interface SundayTypeDropdownProps' found in SundayCard.tsx"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F084 - Integrate SundayTypeDropdown in agenda.tsx
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "F084: Render SundayTypeDropdown in expanded agenda cards"
+    feature: F084
+    cr: 141
+    depends_on: [S03]
+    files:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+    changes:
+      - description: >
+          In AgendaTabContent:
+          1. Import SundayTypeDropdown from components/SundayCard
+          2. Import useSetSundayType, useRemoveSundayException from hooks/useSundayTypes
+          3. Import useDeleteSpeechesByDate, useSpeeches from hooks/useSpeeches
+          4. Import useAuth from contexts/AuthContext (already imported)
+          5. Add hooks: setSundayType = useSetSundayType(),
+             removeSundayException = useRemoveSundayException(),
+             deleteSpeechesByDate = useDeleteSpeechesByDate()
+          6. Fetch speeches via useSpeeches(startDate, endDate)
+          7. Add hasTypePermission = hasPermission('sunday_type_write') from useAuth
+          8. Add handler: handleTypeChange(date, type, customReason?) calling
+             setSundayType.mutate({date, reason: type, customReason})
+          9. Add handler: handleRemoveException(date) calling
+             removeSundayException.mutate(date)
+          10. Add handler: handleDeleteSpeeches(date) calling
+              deleteSpeechesByDate.mutate(date)
+          11. Pass new props to AgendaSundayCard: speeches, onTypeChange,
+              onRemoveException, onDeleteSpeeches, typeDisabled
+
+      - description: >
+          In AgendaSundayCard:
+          1. Add props: speeches (Speech[]), onTypeChange, onRemoveException,
+             onDeleteSpeeches, typeDisabled (boolean)
+          2. Derive currentType from exception?.reason ?? 'speeches'
+          3. Render SundayTypeDropdown as FIRST element inside expandedContent,
+             ABOVE ThemedErrorBoundary/AgendaForm:
+             <SundayTypeDropdown
+               currentType={currentType}
+               onSelect={(type, custom) => onTypeChange?.(date, type, custom)}
+               onRevertToSpeeches={() => onRemoveException?.(date)}
+               disabled={typeDisabled}
+               speeches={speeches}
+               date={date}
+               onDeleteSpeeches={onDeleteSpeeches}
+             />
+          4. Filter speeches for expanded date from parent:
+             const expandedSpeeches = speeches?.filter(s => s.sunday_date === date) ?? []
+    done_when: >
+      Expanding a sunday card in the Agenda tab shows SundayTypeDropdown as
+      first field. Dropdown works: selecting a type persists it, confirmation
+      dialog shows when changing from speeches with assignments, cancel
+      preserves current state, Observer sees disabled dropdown.
+    covers:
+      - AC-084-01  # dropdown visible in expanded agenda card
+      - AC-084-02  # dropdown shows same options as speeches tab
+      - AC-084-03  # confirmation when changing from speeches with assignments
+      - AC-084-04  # confirm deletes speeches and updates type
+      - AC-084-05  # cancel preserves current state
+      - AC-084-06  # no confirmation when no assignments
+      - AC-084-07  # no confirmation when reverting to speeches
+      - AC-084-08  # Observer sees disabled dropdown
+      - AC-084-09  # type change reflects in speeches tab (React Query invalidation)
+    risks:
+      - risk: "Fetching all speeches for the date range may be heavy"
+        mitigation: "useSpeeches already cached by TanStack Query; filter in-memory is instant for ~300 speeches"
+      - risk: "Permission check may use different permission key"
+        mitigation: "Verify useAuth exposes hasPermission and check the correct permission name"
+    commit_msg: "feat(agenda): add SundayTypeDropdown to expanded agenda cards (F084, CR-141)"
+
+    tests:
+      - id: T-084-01
+        type: grep
+        description: "Verify SundayTypeDropdown imported in agenda.tsx"
+        expected: "import { SundayTypeDropdown } from or import SundayTypeDropdown found"
+      - id: T-084-02
+        type: grep
+        description: "Verify SundayTypeDropdown rendered in AgendaSundayCard"
+        expected: "<SundayTypeDropdown found in agenda.tsx"
+      - id: T-084-03
+        type: grep
+        description: "Verify useSetSundayType imported and used"
+        expected: "useSetSundayType found in agenda.tsx"
+      - id: T-084-04
+        type: grep
+        description: "Verify useDeleteSpeechesByDate imported and used"
+        expected: "useDeleteSpeechesByDate found in agenda.tsx"
+      - id: T-084-05
+        type: grep
+        description: "Verify typeDisabled prop passed based on permission"
+        expected: "typeDisabled or disabled prop connected to permission check"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F085 - Activity log utility functions
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "F085: Add buildLogDescription, parseLogDescription, formatLogDescription to activityLog.ts"
+    feature: F085
+    cr: 142
+    depends_on: []
+    files:
+      - path: src/lib/activityLog.ts
+        action: modify
+    changes:
+      - description: >
+          Add 3 new exported functions and 1 constant to activityLog.ts:
+
+          1. ACTOR_ROLE_MAP constant mapping role keys to i18n keys:
+             { can_preside: 'actorRoles.preside', can_conduct: 'actorRoles.conduct',
+               can_recognize: 'actorRoles.recognize', can_music: 'actorRoles.music',
+               can_piano: 'actorRoles.piano' }
+
+          2. buildLogDescription(actionType: string, params: Record<string, string>): string
+             Joins actionType + '|' + entries.map(([k,v]) => k + '=' + v.replace(/\|/g, '\\|')).join('|')
+             Returns structured string like "member:create|nome=Maria Silva"
+
+          3. parseLogDescription(description: string): { actionType: string, params: Record<string, string> } | null
+             If !description.includes('|') -> return null (old format fallback)
+             Split by unescaped '|', first segment = actionType
+             Remaining segments split by first '=' -> key/value pairs
+             Unescape '\\|' in values
+             Returns parsed object or null
+
+          4. formatLogDescription(description: string, t: TFunction): string
+             - Call parseLogDescription(description)
+             - If null -> return description (fallback for old entries)
+             - Normalize actionType: replace ':' with '_' (e.g., 'member:create' -> 'member_create')
+             - Build i18nKey = 'activityLog.events.' + normalized
+             - Translate special params BEFORE interpolation:
+               - 'data' param: format via formatDateHumanReadable(value, locale)
+               - 'status' param: t('speechStatus.' + value)
+               - 'tipo' param: t('sundayExceptions.' + value)
+               - 'funcao' param: t(ACTOR_ROLE_MAP[value]) if found, else value
+             - Call t(i18nKey, translatedParams)
+             - If result === i18nKey (key not found) -> return description (fallback)
+             - Return translated string
+
+          Import TFunction type from react-i18next.
+          Import formatDateHumanReadable and getCurrentLanguage from dateUtils/i18n.
+          Existing logAction and createLogger remain unchanged.
+    done_when: >
+      activityLog.ts exports buildLogDescription, parseLogDescription,
+      formatLogDescription, and ACTOR_ROLE_MAP. Functions handle pipe escaping,
+      old format fallback, unknown action_type fallback, and special param
+      translation. TypeScript compiles without errors.
+    covers:
+      - AC-085-15  # old entries displayed as fallback
+      - AC-085-16  # logs displayed in current language
+    risks:
+      - risk: "Pipe character in parameter values could break parsing"
+        mitigation: "Escape pipe as \\| in buildLogDescription, unescape in parseLogDescription"
+      - risk: "formatDateHumanReadable may not exist or have different signature"
+        mitigation: "Verify dateUtils exports; it was added in CR-027"
+    commit_msg: "feat(activityLog): add structured log format functions (F085, CR-142)"
+
+    tests:
+      - id: T-085-util-01
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "buildLogDescription creates pipe-delimited string"
+        expected: "buildLogDescription('member:create', {nome: 'Maria'}) returns 'member:create|nome=Maria'"
+      - id: T-085-util-02
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "parseLogDescription parses structured format"
+        expected: "parseLogDescription('member:create|nome=Maria') returns {actionType: 'member:create', params: {nome: 'Maria'}}"
+      - id: T-085-util-03
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "parseLogDescription returns null for old format"
+        expected: "parseLogDescription('Maria adicionada como membro') returns null"
+      - id: T-085-util-04
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "buildLogDescription escapes pipe in values"
+        expected: "buildLogDescription('topic:create', {titulo: 'A|B'}) returns 'topic:create|titulo=A\\|B'"
+      - id: T-085-util-05
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "parseLogDescription handles multiple params"
+        expected: "parseLogDescription('speech:assign|nome=Joao|N=2|data=2026-03-01') returns correct object with 3 params"
+      - id: T-085-util-06
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "formatLogDescription returns raw string for unknown action_type"
+        expected: "Returns raw description when i18n key not found"
+      - id: T-085-util-07
+        type: unit
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "formatLogDescription returns raw string for old format (no pipe)"
+        expected: "Returns original description unchanged"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: F085 - Add i18n keys for activity log events
+  # ---------------------------------------------------------------------------
+  - id: S06
+    title: "F085: Add 24 activityLog.events i18n keys + actorRoles keys to 3 locale files"
+    feature: F085
+    cr: 142
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Add activityLog.events section with 24 keys in pt-BR.json:
+          member_create, member_update, member_delete,
+          speech_assign, speech_assign_theme, speech_unassign,
+          speech_status_change, speech_cleanup,
+          topic_create, topic_update, topic_delete,
+          collection_activate, collection_deactivate,
+          actor_create, actor_update, actor_delete,
+          sunday_type_change, agenda_edit,
+          agenda_last_minute_speech, agenda_last_minute_speech_removed,
+          user_invitation, user_invitation_accepted,
+          user_name_update, user_removed.
+          All with {{interpolation}} placeholders.
+          Add actorRoles section with 5 keys: preside, conduct, recognize,
+          music, piano (pt-BR: presidir, dirigir, ser reconhecido, reger, tocar piano).
+      - description: >
+          Add same 24 + 5 keys in en.json with English translations.
+      - description: >
+          Add same 24 + 5 keys in es.json with Spanish translations.
+    done_when: >
+      All 3 locale files have 24 activityLog.events.* keys and 5 actorRoles.*
+      keys with correct translations and {{interpolation}} placeholders.
+      JSON is valid and properly formatted.
+    covers:
+      - AC-085-17  # actor role translated
+    risks:
+      - risk: "JSON syntax error from manual editing"
+        mitigation: "Validate JSON after editing each file"
+    commit_msg: "feat(i18n): add 24 activity log event keys + actor role keys in 3 languages (F085, CR-142)"
+
+    tests:
+      - id: T-085-i18n-01
+        type: grep
+        description: "Verify pt-BR.json contains activityLog.events.member_create"
+        expected: "Key exists with value containing '{{nome}}'"
+      - id: T-085-i18n-02
+        type: grep
+        description: "Verify en.json contains activityLog.events.member_create"
+        expected: "Key exists with English translation containing '{{nome}}'"
+      - id: T-085-i18n-03
+        type: grep
+        description: "Verify es.json contains activityLog.events.member_create"
+        expected: "Key exists with Spanish translation containing '{{nome}}'"
+      - id: T-085-i18n-04
+        type: grep
+        description: "Verify all 24 event keys exist in pt-BR.json"
+        expected: "All 24 keys present"
+      - id: T-085-i18n-05
+        type: grep
+        description: "Verify actorRoles.preside exists in pt-BR.json"
+        expected: "Value is 'presidir'"
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: F085 - Update hooks to use buildLogDescription
+  # ---------------------------------------------------------------------------
+  - id: S07
+    title: "F085: Replace hardcoded log descriptions in 6 hooks + users.tsx"
+    feature: F085
+    cr: 142
+    depends_on: [S05]
+    files:
+      - path: src/hooks/useMembers.ts
+        action: modify
+      - path: src/hooks/useSpeeches.ts
+        action: modify
+      - path: src/hooks/useTopics.ts
+        action: modify
+      - path: src/hooks/useActors.ts
+        action: modify
+      - path: src/hooks/useSundayTypes.ts
+        action: modify
+      - path: src/hooks/useAgenda.ts
+        action: modify
+      - path: src/app/(tabs)/settings/users.tsx
+        action: modify
+    changes:
+      - description: >
+          In each file, import buildLogDescription from lib/activityLog.
+          Replace each logAction description string with buildLogDescription() call:
+
+          useMembers.ts (3 changes):
+          - useCreateMember: buildLogDescription('member:create', { nome: data.full_name })
+          - useUpdateMember: buildLogDescription('member:update', { nome: data.full_name })
+          - useDeleteMember: buildLogDescription('member:delete', { nome: memberName })
+
+          useSpeeches.ts (5 changes):
+          - useAssignSpeaker: buildLogDescription('speech:assign', { nome, N: String(position), data: sunday_date })
+          - useAssignTopic onSuccess: ADD NEW logAction with buildLogDescription('speech:assign_theme', { colecao, titulo, N, data })
+            (currently has no logAction - this is a new log entry per EC-085-03)
+          - useChangeStatus: buildLogDescription('speech:status_change', { nome, status, data, N })
+          - useRemoveAssignment: buildLogDescription('speech:unassign', { nome, data, N })
+          - useDeleteSpeechesByDate: buildLogDescription('speech_cleanup', { data: sundayDate })
+
+          useTopics.ts (4-5 changes):
+          - useCreateWardTopic: buildLogDescription('topic:create', { titulo })
+          - useUpdateWardTopic: buildLogDescription('topic:update', { titulo })
+          - useDeleteWardTopic: buildLogDescription('topic:delete', { titulo })
+          - useToggleCollection: buildLogDescription('collection:activate' or 'collection:deactivate', { nome })
+
+          useActors.ts (3 changes):
+          - useCreateActor: buildLogDescription('actor:create', { nome, funcao: roleKey })
+            roleKey = first true boolean role field (can_preside, can_conduct, etc.)
+          - useUpdateActor: buildLogDescription('actor:update', { nome })
+          - useDeleteActor: buildLogDescription('actor:delete', { nome })
+
+          useSundayTypes.ts (1 change):
+          - useSetSundayType: buildLogDescription('sunday_type:change', { data: date, tipo: reason })
+
+          useAgenda.ts (1 change):
+          - useUpdateAgenda: buildLogDescription('agenda:edit', { data: sundayDate })
+
+          settings/users.tsx (2 changes):
+          - Name update: buildLogDescription('user:name-update', { nome: fullName })
+          - User delete: buildLogDescription('user:removed', { nome: userName, email: userEmail })
+
+    done_when: >
+      All logAction calls in the 7 files use buildLogDescription instead of
+      hardcoded strings. The actionType parameter of logAction remains unchanged.
+      New logAction added for speech:assign_theme in useAssignTopic.
+      TypeScript compiles without errors. Activity log entries in database
+      now use structured format "action_type|key=value".
+    covers:
+      - AC-085-01   # member:create
+      - AC-085-02   # member:update
+      - AC-085-03   # member:delete
+      - AC-085-04   # speech:assign
+      - AC-085-05   # speech:assign_theme
+      - AC-085-06   # speech:unassign
+      - AC-085-07   # speech:status_change
+      - AC-085-08   # speech_cleanup
+      - AC-085-09   # topic:create
+      - AC-085-10   # collection:activate
+      - AC-085-11   # actor:create with role
+      - AC-085-12   # sunday_type:change
+      - AC-085-13   # agenda:edit
+      - AC-085-14   # user:name-update
+    risks:
+      - risk: "useAssignTopic may not have auth context available for logAction"
+        mitigation: "Check if wardId, userId, userEmail are available in onSuccess scope; extract from auth hook"
+      - risk: "Actor role extraction may differ from expected boolean fields"
+        mitigation: "Read useActors.ts to find exact role field names and extraction pattern"
+    commit_msg: "feat(hooks): use structured log descriptions in all hooks (F085, CR-142)"
+
+    tests:
+      - id: T-085-hooks-01
+        type: grep
+        description: "Verify buildLogDescription imported in useMembers.ts"
+        expected: "import { buildLogDescription } found"
+      - id: T-085-hooks-02
+        type: grep
+        description: "Verify buildLogDescription imported in useSpeeches.ts"
+        expected: "import { buildLogDescription } found"
+      - id: T-085-hooks-03
+        type: grep
+        description: "Verify buildLogDescription imported in useTopics.ts"
+        expected: "import { buildLogDescription } found"
+      - id: T-085-hooks-04
+        type: grep
+        description: "Verify buildLogDescription imported in useActors.ts"
+        expected: "import { buildLogDescription } found"
+      - id: T-085-hooks-05
+        type: grep
+        description: "Verify new logAction for speech:assign_theme in useSpeeches.ts"
+        expected: "speech:assign_theme found in useSpeeches.ts"
+      - id: T-085-hooks-06
+        type: grep
+        description: "Verify buildLogDescription used in settings/users.tsx"
+        expected: "buildLogDescription found in users.tsx"
+      - id: T-085-hooks-07
+        type: grep
+        description: "Verify no old hardcoded log descriptions remain (search for old patterns)"
+        expected: "No remaining 'adicionado como membro' or similar hardcoded strings in logAction calls"
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: F085 - Render formatted descriptions in history.tsx
+  # ---------------------------------------------------------------------------
+  - id: S08
+    title: "F085: Render translated log descriptions in history.tsx"
+    feature: F085
+    cr: 142
+    depends_on: [S05, S06]
+    files:
+      - path: src/app/(tabs)/settings/history.tsx
+        action: modify
+    changes:
+      - description: >
+          1. Import formatLogDescription from lib/activityLog
+          2. In the ActivityLogEntry rendering, replace direct item.description
+             usage with formatLogDescription(item.description, t):
+             OLD: <Text>{item.description}</Text>
+             NEW: <Text>{formatLogDescription(item.description, t)}</Text>
+          3. formatLogDescription handles both structured and plain text formats
+             automatically (backward compatible fallback)
+    done_when: >
+      history.tsx renders activity log entries through formatLogDescription.
+      New structured entries display translated text. Old plain-text entries
+      display as-is. Language changes reflect immediately in log display.
+    covers:
+      - AC-085-15  # old entries fallback
+      - AC-085-16  # logs in current language
+    risks:
+      - risk: "item.description may be null or undefined"
+        mitigation: "formatLogDescription should handle falsy input gracefully (return empty string)"
+    commit_msg: "feat(history): render structured log descriptions with i18n (F085, CR-142)"
+
+    tests:
+      - id: T-085-render-01
+        type: grep
+        description: "Verify formatLogDescription imported in history.tsx"
+        expected: "import { formatLogDescription } found"
+      - id: T-085-render-02
+        type: grep
+        description: "Verify formatLogDescription called in render"
+        expected: "formatLogDescription(item.description found"
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: F085 - Unit tests for activity log functions
+  # ---------------------------------------------------------------------------
+  - id: S09
+    title: "F085: Write unit tests for activity log utility functions"
+    feature: F085
+    cr: 142
+    depends_on: [S05, S06]
+    files:
+      - path: src/lib/__tests__/activityLog.test.ts
+        action: create
+    changes:
+      - description: >
+          Create test file with test cases for:
+          1. buildLogDescription: basic case, multiple params, pipe escaping,
+             empty params
+          2. parseLogDescription: basic case, multiple params, pipe unescaping,
+             old format (no pipe) returns null, empty string
+          3. formatLogDescription: structured format with mocked t(), old format
+             fallback, unknown action_type fallback, special param translation
+             (status, tipo, funcao, data)
+          Mock react-i18next t() function and formatDateHumanReadable.
+    done_when: >
+      Test file exists with comprehensive tests for all 3 functions.
+      All tests pass via 'npx vitest run src/lib/__tests__/activityLog.test.ts'.
+    covers:
+      - AC-085-15  # tests verify fallback behavior
+      - AC-085-16  # tests verify i18n rendering
+      - AC-085-17  # tests verify actor role translation
+    risks:
+      - risk: "Mock setup for t() may be complex"
+        mitigation: "Use simple mock function that returns interpolated string"
+    commit_msg: "test(activityLog): add unit tests for structured log functions (F085, CR-142)"
+
+    tests:
+      - id: T-085-test-01
+        type: vitest
+        file: src/lib/__tests__/activityLog.test.ts
+        description: "All unit tests pass"
+        expected: "0 failures"
+
+  # ---------------------------------------------------------------------------
+  # STEP 10: F086 - Documentation only (investigation results)
+  # ---------------------------------------------------------------------------
+  - id: S10
+    title: "F086: Document pg_timezone_names investigation results"
+    feature: F086
+    cr: 143
+    depends_on: []
+    files: []
+    changes:
+      - description: >
+          No code changes. F086 is investigation-only.
+          Findings already documented in ARCH_M024.yaml:
+          1. App does NOT query pg_timezone_names (grep confirms zero matches)
+          2. App uses static TIMEZONES constant in timezone.tsx (~60 entries)
+          3. No SQL migration references pg_timezone_names
+          4. The 92 queries come from Supabase infrastructure (Dashboard/PostgREST)
+          5. No action possible from app code
+
+          VERIFICATION: Run grep for 'pg_timezone_names' in src/ and
+          supabase/migrations/ to confirm zero matches.
+    done_when: >
+      Grep confirms no references to pg_timezone_names in app code or
+      SQL migrations. Investigation documented in ARCH_M024.yaml.
+      No code changes needed.
+    covers:
+      - AC-086-01  # no reference in app code
+      - AC-086-02  # timezone selector uses static list
+      - AC-086-03  # no reference in SQL migrations
+    risks:
+      - risk: "None - documentation only"
+        mitigation: "N/A"
+    commit_msg: null  # no commit needed
+
+    tests:
+      - id: T-086-01
+        type: grep
+        description: "Verify no pg_timezone_names in src/ directory"
+        expected: "Zero matches"
+      - id: T-086-02
+        type: grep
+        description: "Verify no pg_timezone_names in supabase/migrations/"
+        expected: "Zero matches"
+      - id: T-086-03
+        type: grep
+        description: "Verify TIMEZONES constant exists in timezone.tsx"
+        expected: "const TIMEZONES or TIMEZONES = found"
+
+# =============================================================================
+# Summary
+# =============================================================================
+
+summary:
+  total_steps: 10
+  total_files_impacted: 17
+  new_files: 2
+  modified_files: 15
+  total_tests: 35
+  features_covered: [F083, F084, F085, F086, F087]
+  crs_covered: [140, 141, 142, 143, 144]
+  acs_covered: 48
+
+  implementation_order: >
+    S01 (F083 i18n), S02 (F087 SQL), S03 (F084 export), S10 (F086 investigation)
+    can run in parallel (independent). Then S04 (F084 agenda integration) depends
+    on S03. S05 (F085 utilities) and S06 (F085 i18n) can run in parallel.
+    S07 (F085 hooks) depends on S05. S08 (F085 history) depends on S05+S06.
+    S09 (F085 tests) depends on S05+S06.
+
+  dependency_graph: |
+    S01 (F083) ──────────────────── independent
+    S02 (F087) ──────────────────── independent
+    S03 (F084 export) ──> S04 (F084 agenda integration)
+    S05 (F085 utils) ──> S07 (F085 hooks)
+    S05 (F085 utils) ──> S08 (F085 history render)
+    S06 (F085 i18n) ───> S08 (F085 history render)
+    S05 + S06 ─────────> S09 (F085 tests)
+    S10 (F086 docs) ─────────────── independent (no commit)
+
+  notes:
+    - "F083, F087, F084 (S03), F086 can be implemented in parallel"
+    - "F085 is the largest feature with 5 steps (S05-S09)"
+    - "F086 requires no code changes (investigation documented in ARCH_M024)"
+    - "S02 (SQL migration) must be applied to staging before production merge"
+    - "S07 touches 7 files but each change is mechanical (replace description string)"

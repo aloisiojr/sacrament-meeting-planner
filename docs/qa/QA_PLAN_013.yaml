@@ -1,0 +1,341 @@
+# =============================================================================
+# QA_PLAN_013.yaml
+# QA Plan for Batch 13: CR-140, CR-141, CR-142, CR-143, CR-144
+# Created: 2026-02-20
+# =============================================================================
+
+type: qa_plan
+id: QA-013
+created_at: "2026-02-20T00:00:00Z"
+request_type: mixed
+feature_or_bug: "Batch 13: Settings rename, Agenda Sunday type selector, Activity log revision, Supabase query perf, Supabase security"
+user_request: |
+  CR-140: Renomear opcoes da aba Configuracoes: Membros->Discursantes, Temas->Biblioteca de Temas,
+          Usuarios->Usuarios do App, Historico->Historico de Uso, Tema->Tema Claro/Escuro.
+          Todas com suporte i18n.
+  CR-141: Adicionar seletor de tipo de Domingo como primeiro campo do card de Agenda (igual aba Discursos).
+          Se trocar de Discursos para outro tipo, mostrar dialogo de confirmacao e apagar designacoes.
+  CR-142: Revisao completa das entradas do historico de atividades: todos os placeholders com texto
+          amigavel, i18n, nova lista de tipos de eventos com mensagens especificas.
+  CR-143: Otimizacao de query performance Supabase: pg_timezone_names com 0% cache hit rate,
+          considerar lista estatica de timezones.
+  CR-144: Correcoes de seguranca Supabase: 7 funcoes sem search_path fixo
+          (update_updated_at_column, ward_id, list_ward_users, create_weekly_reminders,
+          enqueue_speech_notification, delete_old_activity_log, import_members)
+          e habilitar protecao contra senhas vazadas.
+
+# =============================================================================
+# Estado atual documentado (baseline)
+# =============================================================================
+baseline:
+  description: |
+    CR-140: Settings tab uses i18n keys: settings.members="Membros", settings.topics="Temas",
+            settings.users="Usuarios", settings.history="Historico", settings.theme="Tema".
+            English: Members, Topics, Users, History, Theme. Spanish: Miembros, Temas, Usuarios, Historial, Tema.
+    CR-141: Agenda tab (agenda.tsx) does NOT have a Sunday type selector. It shows exception labels
+            if already set, but the user cannot change the Sunday type from the Agenda card.
+            The Speeches tab (speeches.tsx) DOES have a SundayTypeDropdown via SundayCard component.
+    CR-142: Activity log entries are written with hardcoded Portuguese strings in hooks
+            (useMembers, useTopics, useSpeeches, useSundayTypes, useAgenda, useActors).
+            No i18n support for log descriptions. The activityLog i18n section only has "title" and "noActivity".
+    CR-143: pg_timezone_names query has 0% cache hit rate (92 calls, mean 270ms).
+            Client-side timezone.tsx already uses a static TIMEZONES list.
+            Server-side SQL functions do not reference pg_timezone_names directly in migrations.
+    CR-144: All 7 database functions lack SET search_path. Leaked password protection is disabled.
+  evidence:
+    - "src/app/(tabs)/settings/index.tsx uses t('settings.members'), t('settings.topics'), etc."
+    - "src/i18n/locales/pt-BR.json: settings.members='Membros', settings.topics='Temas', etc."
+    - "src/app/(tabs)/agenda.tsx has no SundayTypeDropdown or type selector"
+    - "src/components/SundayCard.tsx has SundayTypeDropdown (used in Speeches tab only)"
+    - "Activity log descriptions hardcoded in PT-BR: 'adicionado como membro', 'removido', etc."
+    - "docs/SUPABASE_QUERY_PERF.md shows pg_timezone_names with 0% cache hit"
+    - "docs/SUPABASE_SECURITY.md shows 7 functions with mutable search_path"
+    - "No search_path found in any supabase/migrations/*.sql file"
+
+# =============================================================================
+# CR-140: Settings Tab Rename (UI, i18n)
+# =============================================================================
+validation_checks_cr140:
+  - id: VC-140-01
+    description: "settings.members label changed to 'Discursantes' in pt-BR"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check settings.members value"
+    expected_result: "settings.members = 'Discursantes' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-140-02
+    description: "settings.topics label changed to 'Biblioteca de Temas' in pt-BR"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check settings.topics value"
+    expected_result: "settings.topics = 'Biblioteca de Temas' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-140-03
+    description: "settings.users label changed to 'Usuarios do App' in pt-BR"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check settings.users value"
+    expected_result: "settings.users = 'Usuarios do App' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-140-04
+    description: "settings.history label changed to 'Historico de Uso' in pt-BR"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check settings.history value"
+    expected_result: "settings.history = 'Historico de Uso' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-140-05
+    description: "settings.theme label changed to 'Tema Claro/Escuro' in pt-BR"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check settings.theme value"
+    expected_result: "settings.theme = 'Tema Claro/Escuro' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-140-06
+    description: "English (en.json) translations updated for all 5 settings labels"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/en.json, check settings.members/topics/users/history/theme"
+    expected_result: "English equivalents of the renamed labels (e.g. Speakers, Topic Library, App Users, Usage History, Light/Dark Theme)"
+    priority: must_pass
+
+  - id: VC-140-07
+    description: "Spanish (es.json) translations updated for all 5 settings labels"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/es.json, check settings.members/topics/users/history/theme"
+    expected_result: "Spanish equivalents of the renamed labels (e.g. Oradores, Biblioteca de Temas, Usuarios de la App, Historial de Uso, Tema Claro/Oscuro)"
+    priority: must_pass
+
+  - id: VC-140-08
+    description: "Settings index.tsx still uses t() for all labels (no hardcoded strings)"
+    type: regression
+    how_to_verify: "Read src/app/(tabs)/settings/index.tsx, verify all labels use t('settings.*')"
+    expected_result: "All SettingsItem labels use t() calls, no hardcoded text"
+    priority: must_pass
+
+  - id: VC-140-09
+    description: "All existing tests pass after rename"
+    type: regression
+    how_to_verify: "Run full test suite"
+    expected_result: "All tests pass"
+    priority: must_pass
+
+# =============================================================================
+# CR-141: Agenda Sunday Type Selector (Feature)
+# =============================================================================
+validation_checks_cr141:
+  - id: VC-141-01
+    description: "Agenda card has a Sunday type selector as the first field when expanded"
+    type: functional
+    how_to_verify: "Read agenda.tsx or AgendaForm component, verify Sunday type dropdown is rendered"
+    expected_result: "A Sunday type selector (dropdown or similar) is the first field in the expanded Agenda card"
+    priority: must_pass
+
+  - id: VC-141-02
+    description: "Sunday type selector in Agenda works the same as in Speeches tab"
+    type: functional
+    how_to_verify: "Compare type options in Agenda vs SundayCard component"
+    expected_result: "Same SUNDAY_TYPE_OPTIONS are available (speeches, general_conference, stake_conference, testimony_meeting, ward_conference, special_program, other)"
+    priority: must_pass
+
+  - id: VC-141-03
+    description: "Confirmation dialog shown when switching from Discursos to another type"
+    type: functional
+    how_to_verify: "Read the Agenda Sunday type change handler code, verify Alert/dialog logic"
+    expected_result: "Alert.alert or confirmation dialog is shown before changing from 'speeches' to another type"
+    priority: must_pass
+
+  - id: VC-141-04
+    description: "Agenda assignments are cleared when switching away from Discursos"
+    type: functional
+    how_to_verify: "Verify that the type change handler calls agenda/speech deletion when switching type"
+    expected_result: "When confirmed, existing agenda data and/or speeches for that Sunday are deleted"
+    priority: must_pass
+
+  - id: VC-141-05
+    description: "Non-expandable cards for excluded sunday types remain unchanged"
+    type: regression
+    how_to_verify: "Read agenda.tsx, verify isExcludedFromAgenda logic still applies"
+    expected_result: "Gen Conf and Stake Conf sundays remain non-expandable (no agenda form shown)"
+    priority: must_pass
+
+  - id: VC-141-06
+    description: "Sunday type changes in Agenda reflect in Speeches tab (shared data)"
+    type: functional
+    how_to_verify: "Verify both tabs use same useSundayExceptions/useSetSundayType hooks or share state"
+    expected_result: "Changing type in Agenda tab is reflected in Speeches tab and vice versa"
+    priority: must_pass
+
+  - id: VC-141-07
+    description: "All existing tests pass after adding Sunday type selector to Agenda"
+    type: regression
+    how_to_verify: "Run full test suite"
+    expected_result: "All tests pass"
+    priority: must_pass
+
+# =============================================================================
+# CR-142: Activity Log Revision (UX, i18n)
+# =============================================================================
+validation_checks_cr142:
+  - id: VC-142-01
+    description: "Activity log descriptions use i18n keys instead of hardcoded Portuguese strings"
+    type: functional
+    how_to_verify: "Read hooks (useMembers, useTopics, useSpeeches, useSundayTypes, useAgenda, useActors), verify logAction calls use t() or i18n interpolation"
+    expected_result: "All logAction description arguments use translated strings via t() or equivalent"
+    priority: must_pass
+
+  - id: VC-142-02
+    description: "New i18n keys for activity log event types exist in pt-BR.json"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json, check for activityLog event message keys"
+    expected_result: "activityLog section has keys for all event types (member:create, member:update, member:delete, topic:create, topic:update, topic:delete, speech:assign, speech:status_change, speech:unassign, speech:delete, sunday_type:change, agenda:edit, settings:timezone, actor:create, actor:update, actor:delete, etc.)"
+    priority: must_pass
+
+  - id: VC-142-03
+    description: "English (en.json) has corresponding activity log event keys"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/en.json, check for activityLog event message keys"
+    expected_result: "All activity log event type keys have English translations"
+    priority: must_pass
+
+  - id: VC-142-04
+    description: "Spanish (es.json) has corresponding activity log event keys"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/es.json, check for activityLog event message keys"
+    expected_result: "All activity log event type keys have Spanish translations"
+    priority: must_pass
+
+  - id: VC-142-05
+    description: "Activity log descriptions include friendly text with proper context"
+    type: functional
+    how_to_verify: "Review the i18n templates and verify they include dynamic values (member name, topic title, date, etc.)"
+    expected_result: "Messages use interpolation like '{{name}} added as speaker' instead of raw field values"
+    priority: must_pass
+
+  - id: VC-142-06
+    description: "No hardcoded Portuguese strings remain in logAction calls"
+    type: regression
+    how_to_verify: "Grep for Portuguese strings in logAction calls across all hooks"
+    expected_result: "Zero hardcoded Portuguese strings in logAction description arguments"
+    priority: must_pass
+
+  - id: VC-142-07
+    description: "All existing tests pass after activity log revision"
+    type: regression
+    how_to_verify: "Run full test suite"
+    expected_result: "All tests pass"
+    priority: must_pass
+
+# =============================================================================
+# CR-143: Supabase Query Performance (Bugfix)
+# =============================================================================
+validation_checks_cr143:
+  - id: VC-143-01
+    description: "pg_timezone_names query eliminated or replaced with static approach"
+    type: functional
+    how_to_verify: "Search all SQL migrations, RPC functions, and client code for pg_timezone_names usage"
+    expected_result: "No pg_timezone_names query exists in application code or new migrations"
+    priority: must_pass
+
+  - id: VC-143-02
+    description: "Timezone validation uses a static list or avoids pg_timezone_names"
+    type: functional
+    how_to_verify: "Check if a SQL migration adds a static timezone lookup table or removes pg_timezone_names dependency"
+    expected_result: "Either a static timezones table/constraint or removal of server-side timezone name validation"
+    priority: must_pass
+
+  - id: VC-143-03
+    description: "Client-side timezone list remains functional"
+    type: regression
+    how_to_verify: "Verify timezone.tsx still uses static TIMEZONES array and save/select works"
+    expected_result: "timezone.tsx TIMEZONES array is preserved; save mutation still works"
+    priority: must_pass
+
+  - id: VC-143-04
+    description: "All existing tests pass after timezone optimization"
+    type: regression
+    how_to_verify: "Run full test suite"
+    expected_result: "All tests pass"
+    priority: must_pass
+
+# =============================================================================
+# CR-144: Supabase Security Fixes (Bugfix)
+# =============================================================================
+validation_checks_cr144:
+  - id: VC-144-01
+    description: "update_updated_at_column function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL that recreates/alters the function, check for SET search_path"
+    expected_result: "Function includes SET search_path = public (or appropriate schema)"
+    priority: must_pass
+
+  - id: VC-144-02
+    description: "ward_id function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check ward_id function for SET search_path"
+    expected_result: "Function includes SET search_path = '' or SET search_path = public"
+    priority: must_pass
+
+  - id: VC-144-03
+    description: "list_ward_users function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check list_ward_users for SET search_path"
+    expected_result: "Function includes SET search_path"
+    priority: must_pass
+
+  - id: VC-144-04
+    description: "create_weekly_reminders function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check create_weekly_reminders for SET search_path"
+    expected_result: "Function includes SET search_path"
+    priority: must_pass
+
+  - id: VC-144-05
+    description: "enqueue_speech_notification function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check enqueue_speech_notification for SET search_path"
+    expected_result: "Function includes SET search_path"
+    priority: must_pass
+
+  - id: VC-144-06
+    description: "delete_old_activity_log function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check delete_old_activity_log for SET search_path"
+    expected_result: "Function includes SET search_path"
+    priority: must_pass
+
+  - id: VC-144-07
+    description: "import_members function has SET search_path"
+    type: functional
+    how_to_verify: "Read migration SQL, check import_members for SET search_path"
+    expected_result: "Function includes SET search_path"
+    priority: must_pass
+
+  - id: VC-144-08
+    description: "Leaked password protection enablement documented or applied"
+    type: functional
+    how_to_verify: "Check for documentation, migration, or config change enabling HaveIBeenPwned integration"
+    expected_result: "A migration, config change, or documentation exists to enable leaked password protection in Supabase Auth"
+    priority: must_pass
+
+  - id: VC-144-09
+    description: "All existing tests pass after security fixes"
+    type: regression
+    how_to_verify: "Run full test suite"
+    expected_result: "All tests pass"
+    priority: must_pass
+
+# =============================================================================
+# Pass criteria
+# =============================================================================
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.
+
+  CR-140: 9 must_pass checks (VC-140-01 to VC-140-09)
+  CR-141: 7 must_pass checks (VC-141-01 to VC-141-07)
+  CR-142: 7 must_pass checks (VC-142-01 to VC-142-07)
+  CR-143: 4 must_pass checks (VC-143-01 to VC-143-04)
+  CR-144: 9 must_pass checks (VC-144-01 to VC-144-09)
+
+  Total: 36 must_pass checks

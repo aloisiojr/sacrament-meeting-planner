@@ -24,11 +24,11 @@ import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
 import { useSpeeches, useDeleteSpeechesByDate } from '../../hooks/useSpeeches';
-import { useLazyCreateAgenda, isExcludedFromAgenda } from '../../hooks/useAgenda';
+import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
 import { formatDate, toISODateString, zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
-import type { SundayException, SundayExceptionReason, Speech } from '../../types/database';
+import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
 
 // --- Types ---
 
@@ -62,6 +62,7 @@ function AgendaTabContent() {
 
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
   const { data: allSpeeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: allAgendas } = useAgendaRange(startDate, endDate);
   const lazyCreate = useLazyCreateAgenda();
   const setSundayType = useSetSundayType();
   const removeSundayException = useRemoveSundayException();
@@ -90,6 +91,15 @@ function AgendaTabContent() {
     }
     return map;
   }, [allSpeeches]);
+
+  // Build agenda map by sunday date
+  const agendaMap = useMemo(() => {
+    const map = new Map<string, SundayAgenda>();
+    for (const agenda of allAgendas ?? []) {
+      map.set(agenda.sunday_date, agenda);
+    }
+    return map;
+  }, [allAgendas]);
 
   // Build sunday list (all sundays, including Gen Conf / Stake Conf)
   const filteredSundays = useMemo(() => {
@@ -197,6 +207,7 @@ function AgendaTabContent() {
           expandable={!exception || !isExcludedFromAgenda(exception.reason)}
           onToggle={() => handleToggle(date)}
           speeches={speechMap.get(date) ?? []}
+          agenda={agendaMap.get(date) ?? null}
           typeDisabled={!canEditType}
           onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
           onRemoveException={(d) => removeSundayException.mutate(d)}
@@ -204,7 +215,7 @@ function AgendaTabContent() {
         />
       );
     },
-    [expandedDate, nextSunday, locale, handleToggle, colors, speechMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
+    [expandedDate, nextSunday, locale, handleToggle, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -273,6 +284,7 @@ interface AgendaSundayCardProps {
   expandable: boolean;
   onToggle: () => void;
   speeches: Speech[];
+  agenda: SundayAgenda | null;
   typeDisabled: boolean;
   onTypeChange: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   onRemoveException: (date: string) => void;
@@ -289,6 +301,7 @@ function AgendaSundayCard({
   expandable,
   onToggle,
   speeches,
+  agenda,
   typeDisabled,
   onTypeChange,
   onRemoveException,
@@ -351,6 +364,66 @@ function AgendaSundayCard({
               {exceptionLabel}
             </Text>
           )}
+          {!isExpanded && !exceptionLabel && (() => {
+            // Compute status lines for collapsed speeches card
+            const missingRoles: string[] = [];
+            if (!agenda?.presiding_name) missingRoles.push(t('agenda.statusPresiding'));
+            if (!agenda?.conducting_name) missingRoles.push(t('agenda.statusConducting'));
+            if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
+            if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
+
+            let speakersFilled = 0;
+            for (let pos = 1; pos <= 3; pos++) {
+              const overrideField = `speaker_${pos}_override` as keyof SundayAgenda;
+              const overrideVal = agenda?.[overrideField] as string | null;
+              const speech = speeches.find((s) => s.position === pos);
+              if (overrideVal ?? speech?.speaker_name) speakersFilled++;
+            }
+
+            let prayersFilled = 0;
+            if (agenda?.opening_prayer_name) prayersFilled++;
+            if (agenda?.closing_prayer_name) prayersFilled++;
+
+            let hymnsFilled = 0;
+            let hymnsTotal = 3; // opening, sacrament, closing
+            if (agenda?.opening_hymn_id) hymnsFilled++;
+            if (agenda?.sacrament_hymn_id) hymnsFilled++;
+            if (agenda?.closing_hymn_id) hymnsFilled++;
+            if (agenda?.has_intermediate_hymn !== false && !agenda?.has_special_presentation) {
+              hymnsTotal = 4;
+              if (agenda?.intermediate_hymn_id) hymnsFilled++;
+            }
+
+            const GREEN = '#22c55e';
+
+            return (
+              <>
+                {missingRoles.length > 0 && (
+                  <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {`${t('agenda.statusMissing')}${missingRoles.join(' | ')}`}
+                  </Text>
+                )}
+                <Text
+                  style={[styles.statusLine, { color: speakersFilled === 3 ? GREEN : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {t('agenda.statusSpeakers', { filled: speakersFilled, total: 3 })}
+                </Text>
+                <Text
+                  style={[styles.statusLine, { color: prayersFilled === 2 ? GREEN : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {t('agenda.statusPrayers', { filled: prayersFilled, total: 2 })}
+                </Text>
+                <Text
+                  style={[styles.statusLine, { color: hymnsFilled === hymnsTotal ? GREEN : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {t('agenda.statusHymns', { filled: hymnsFilled, total: hymnsTotal })}
+                </Text>
+              </>
+            );
+          })()}
         </View>
 
         {expandable && (
@@ -451,6 +524,9 @@ const styles = StyleSheet.create({
   exceptionText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  statusLine: {
+    fontSize: 11,
   },
   chevron: {
     fontSize: 12,

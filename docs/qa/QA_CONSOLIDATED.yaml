@@ -10,7 +10,8 @@
 # CR-118, CR-120, CR-123 (PRE+POST),
 # CR-126, CR-127, CR-129, CR-130 (PRE+POST),
 # CR-128, CR-131, CR-132, CR-133 (PRE+POST),
-# CR-134, CR-135, CR-136, CR-137, CR-138 (PRE+POST)
+# CR-134, CR-135, CR-136, CR-137, CR-138 (PRE+POST),
+# CR-139 (PRE+POST)
 # Updated: 2026-02-19
 # =============================================================================
 
@@ -5745,3 +5746,202 @@ cr_138:
       - id: VC-CROSS-01
         status: passed
         evidence: "npx vitest run: 66 test files, 3542 tests all passing. Baseline was 3449 tests (65 files). +93 new tests, +1 test file."
+
+# #############################################################################
+# CR-139: Integration Tests (Batch 12)
+# #############################################################################
+
+cr_139:
+  cr_id: CR-139
+  title: "Add integration tests to the project"
+  type: testing_infrastructure
+  spec: specs/SPEC_F082.yaml
+  qa_plan: qa/QA_PLAN_012.yaml
+
+  pre_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    summary: |
+      Confirmed no integration tests exist in project. All 65 existing test files
+      are unit-level (source reading or pure function tests). Testing infrastructure
+      (Vitest + @testing-library/react-native) already supports integration tests.
+      4 integration boundaries identified for coverage.
+
+  post_validation:
+    timestamp: "2026-02-19"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 7328fd5
+        message: "feat(auth): export AuthContext const for integration test wrapper"
+      - hash: 52dbb00
+        message: "test(integration): add shared test infrastructure with TestWrapper and mock factories"
+      - hash: bc14ca4
+        message: "refactor(integration): add renderHook/act/waitFor using react-test-renderer"
+      - hash: 6f75162
+        message: "test(integration): add hooks-supabase integration tests for 9 hooks with ReactQuery"
+      - hash: 88f2dfe
+        message: "test(integration): add permissions-roles integration tests for RBAC matrix"
+      - hash: 5c7b01c
+        message: "test(integration): add sync-realtime integration tests for offline queue and connection"
+      - hash: c63fc52
+        message: "test(integration): add sunday-types-auto integration tests for auto-assignment rules"
+      - hash: 48562ca
+        message: "test(integration): add speech-lifecycle integration tests for status transitions"
+      - hash: 0781c5d
+        message: "docs(tests): update TEST_CONSOLIDATED with F082 integration tests (107 new tests)"
+      - hash: 5434985
+        message: "docs(ledger): update CODE_LEDGER with CR-139 integration test commits"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved_with_gaps
+    tester_tests_passed: 107
+    tester_tests_total: 107
+    tester_suite_passed: 3649
+    tester_suite_total: 3649
+    tester_note: |
+      14/30 ACs covered directly by integration tests. 16 ACs require
+      react-native runtime (component rendering with JSX). This is a known
+      technical limitation documented in SPEC. All 7 original ECs covered;
+      coder expanded to 14 ECs.
+
+    must_pass_results:
+      - id: MP-01
+        description: "Integration test files exist in a dedicated directory"
+        status: PASSED
+        evidence: |
+          5 integration test files in src/__tests__/integration/:
+          - setup-integration.ts (shared infrastructure, 501 lines)
+          - hooks-supabase.integration.test.ts (9 hooks, 650 lines)
+          - permissions-roles.integration.test.ts (RBAC matrix, 273 lines)
+          - sync-realtime.integration.test.ts (sync/offline, 332 lines)
+          - sunday-types-auto.integration.test.ts (auto-assign rules, 362 lines)
+          - speech-lifecycle.integration.test.ts (status transitions, 329 lines)
+
+      - id: MP-02
+        description: "At least one hook integration test uses renderHook with QueryClient"
+        status: PASSED
+        evidence: |
+          hooks-supabase.integration.test.ts uses renderHook from setup-integration.ts
+          with createWrapper() which provides QueryClientProvider + AuthContext.Provider.
+          Example at line 108-113:
+            const wrapper = createWrapper(undefined, queryClient);
+            const { result } = renderHook(() => useActors(), { wrapper });
+            await waitFor(() => expect(result.current.data).toBeDefined());
+          All 9 hooks (useActors, useAgenda, useSpeeches, useMembers, useHymns,
+          useTopics, useSundayList, useSundayTypes, useActivityLog) tested this way.
+
+      - id: MP-03
+        description: "Supabase client is mocked at module level"
+        status: PASSED
+        evidence: |
+          Each test file calls vi.mock('../../lib/supabase') at top level with a
+          factory returning { supabase: { from: vi.fn(), auth: {...}, channel: vi.fn() } }.
+          Example in hooks-supabase.integration.test.ts lines 27-39.
+          mockSupabaseFrom() helper in setup-integration.ts:236 configures
+          chainable responses via Proxy pattern.
+
+      - id: MP-04
+        description: "At least one provider integration test verifies hook orchestration"
+        status: PASSED
+        evidence: |
+          sync-realtime.integration.test.ts tests SyncProvider orchestration:
+          - SYNCED_TABLES configuration (7 tables mapped to query keys)
+          - TABLE_TO_QUERY_KEYS mapping verified for all tables
+          - Connection utilities (isNetInfoOnline) tested with 5 state combinations
+          - Offline queue tested: enqueue/dequeue FIFO, persistence, capacity limits
+          permissions-roles.integration.test.ts tests AuthContext permission gating:
+          - Permission matrix for bishopric/secretary/observer roles
+          - hasPermission delegation from AuthContext to permissions lib
+
+      - id: MP-05
+        description: "All existing unit tests still pass after adding integration tests"
+        status: PASSED
+        evidence: |
+          npx vitest run: 71 test files, 3649 tests, ALL PASSING.
+          Previous baseline: 66 files, 3542 tests.
+          Delta: +5 test files, +107 new integration tests.
+          Zero regressions in existing tests.
+
+      - id: MP-06
+        description: "Integration tests run with standard 'vitest run'"
+        status: PASSED
+        evidence: |
+          vitest.config.ts unchanged. Include pattern 'src/**/*.test.{ts,tsx}'
+          picks up src/__tests__/integration/*.integration.test.ts files.
+          No special configuration needed.
+
+    should_pass_results:
+      - id: SP-01
+        description: "Integration tests cover at least 3 different hooks"
+        status: PASSED
+        evidence: |
+          9 hooks tested in hooks-supabase.integration.test.ts:
+          useActors, useAgenda, useSpeeches, useMembers, useHymns,
+          useTopics, useSundayList, useSundayTypes, useActivityLog.
+          Additional hooks tested in other files:
+          useAutoAssignSundayTypes, useSundayExceptions, useRemoveSundayException,
+          useAssignSpeaker, useAssignTopic, useRemoveAssignment, useChangeStatus.
+
+      - id: SP-02
+        description: "Integration tests include error/edge case scenarios"
+        status: PASSED
+        evidence: |
+          Error scenarios tested:
+          - EC-082-01: Supabase error -> isError=true (hooks-supabase line 164-174)
+          - EC-082-02: Empty wardId -> no query fires (hooks-supabase line 176-186)
+          - EC-082-03: Mutation failure -> cache NOT invalidated (hooks-supabase line 188-222)
+          - EC-082-06: Unmount before query completes (hooks-supabase line 224-249)
+          - EC-082-09: Queue full returns false (sync-realtime line 235-258)
+          - EC-082-13: Full lifecycle sequence validation (speech-lifecycle line 256-278)
+          - EC-082-14: Invalid transition error message (speech-lifecycle line 284-328)
+          14 edge cases total (coder expanded from original 7).
+
+      - id: SP-03
+        description: "Test helper/wrapper is reusable across integration tests"
+        status: PASSED
+        evidence: |
+          setup-integration.ts (501 lines) provides shared infrastructure:
+          - createTestQueryClient() (line 124-131)
+          - createMockAuthContext(overrides) (line 165-179)
+          - TestWrapper component (line 196-209)
+          - createWrapper() factory (line 215-222)
+          - mockSupabaseFrom() / mockSupabaseFromMultiple() (line 236-263)
+          - renderHook() / waitFor() / act() (lines 40-112)
+          - 8 mock data factories (createMockActor, createMockMember, etc.)
+          All 5 test files import from setup-integration.ts.
+
+      - id: SP-04
+        description: "Integration tests cover at least one mutation flow"
+        status: PASSED
+        evidence: |
+          Multiple mutation flows tested:
+          - useCreateActor.mutateAsync() -> invalidateQueries (hooks-supabase line 116-131)
+          - useUpdateActor.mutateAsync() -> invalidateQueries (hooks-supabase line 133-148)
+          - useDeleteActor.mutateAsync() -> invalidateQueries (hooks-supabase line 150-162)
+          - useLazyCreateAgenda.mutateAsync() (hooks-supabase line 257-287)
+          - useAssignSpeaker.mutateAsync() (hooks-supabase line 331-356)
+          - useChangeStatus.mutateAsync() (hooks-supabase line 358-421)
+          - useCreateMember/useUpdateMember/useDeleteMember (hooks-supabase line 443-492)
+          - useCreateWardTopic (hooks-supabase line 520-536)
+          - useSetSundayType (hooks-supabase line 562-593)
+          - useRemoveSundayException (sunday-types-auto line 294-315)
+
+      - id: SP-05
+        description: "Integration tests are clearly documented with describe blocks"
+        status: PASSED
+        evidence: |
+          Each test file uses descriptive describe blocks:
+          - "useActors integration" / "useAgenda integration" / etc.
+          - "Permission matrix integration" / "Auth context permission gating"
+          - "Sync configuration integration" / "Offline queue integration"
+          - "VALID_TRANSITIONS map" / "Assign speaker lifecycle"
+          - "Full lifecycle sequence (EC-082-13)"
+          Each test block clearly names the integration boundary being tested.
+
+    cross_cutting:
+      - id: VC-CROSS-01
+        status: passed
+        evidence: "npx vitest run: 71 test files, 3649 tests all passing. Baseline was 3542 tests (66 files). +107 new integration tests, +5 test files. Zero regressions."

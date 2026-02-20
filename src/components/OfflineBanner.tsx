@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 interface OfflineBannerProps {
@@ -13,11 +14,12 @@ interface OfflineBannerProps {
 
 export function OfflineBanner({ visible }: OfflineBannerProps) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   if (!visible) return null;
 
   return (
-    <View style={styles.banner}>
+    <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.text}>{t('common.offline')}</Text>
       <Text style={styles.subtext}>{t('common.offlineMessage')}</Text>
     </View>
@@ -27,18 +29,18 @@ export function OfflineBanner({ visible }: OfflineBannerProps) {
 const styles = StyleSheet.create({
   banner: {
     backgroundColor: '#E53E3E',
-    paddingVertical: 8,
+    paddingBottom: 8,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   text: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   subtext: {
     color: '#FED7D7',
-    fontSize: 12,
+    fontSize: 13,
     marginTop: 2,
   },
 });

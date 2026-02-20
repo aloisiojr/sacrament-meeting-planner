@@ -753,3 +753,381 @@ describe('F096 (CR-153): Collapsed agenda card status lines', () => {
     });
   });
 });
+
+// =============================================================================
+// ADDITIONAL TESTER TESTS - Batch 14 Phase 2
+// Strengthening coverage for AC/EC gaps and cross-feature validation
+// =============================================================================
+
+describe('F093 Additional Tests: i18n keys and cross-feature', () => {
+
+  // --- i18n keys used by collapsed card exist in all locales ---
+  describe('i18n: speeches.slot and speeches.lastSpeech exist in all locales', () => {
+    const locales = ['pt-BR', 'en', 'es'];
+    for (const loc of locales) {
+      it(`${loc} has speeches.slot key`, () => {
+        const locale = readLocale(loc) as { speeches: Record<string, string> };
+        expect(locale.speeches.slot).toBeDefined();
+        expect(locale.speeches.slot.length).toBeGreaterThan(0);
+      });
+
+      it(`${loc} has speeches.lastSpeech key`, () => {
+        const locale = readLocale(loc) as { speeches: Record<string, string> };
+        expect(locale.speeches.lastSpeech).toBeDefined();
+        expect(locale.speeches.lastSpeech.length).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  // --- AC-093-01 strengthening: verify map renders exactly 3 positions ---
+  describe('AC-093-01 (additional): map renders positions 1, 2, 3', () => {
+    const sundayCardSource = readSourceFile('components/SundayCard.tsx');
+
+    it('map iterates over [1, 2, 3] array', () => {
+      expect(sundayCardSource).toMatch(/\[1, 2, 3\]/);
+    });
+
+    it('key={pos} ensures unique keys for 3 lines', () => {
+      expect(sundayCardSource).toContain('key={pos}');
+    });
+  });
+
+  // --- AC-093-03 strengthening: ledsVertical style vs old horizontal leds ---
+  describe('AC-093-03 (additional): vertical LEDs distinct from old horizontal', () => {
+    const sundayCardSource = readSourceFile('components/SundayCard.tsx');
+
+    it('has both leds and ledsVertical styles defined', () => {
+      expect(sundayCardSource).toContain('leds:');
+      expect(sundayCardSource).toContain('ledsVertical:');
+    });
+
+    it('horizontal leds style has flexDirection row', () => {
+      expect(sundayCardSource).toMatch(/leds:.*?flexDirection:\s*'row'/s);
+    });
+  });
+
+  // --- AC-093-04 strengthening: verify LEDs conditional pattern exactly ---
+  describe('AC-093-04 (additional): LEDs block uses correct condition', () => {
+    const sundayCardSource = readSourceFile('components/SundayCard.tsx');
+
+    it('LEDs block starts with {!expanded && isSpeechesType && (', () => {
+      expect(sundayCardSource).toContain('{!expanded && isSpeechesType && (');
+    });
+
+    it('LEDs View uses ledsVertical style', () => {
+      expect(sundayCardSource).toContain('style={styles.ledsVertical}');
+    });
+  });
+
+  // --- AC-093-05 strengthening: non-speeches shows exceptionText style ---
+  describe('AC-093-05 (additional): exceptionText style with warning color', () => {
+    const sundayCardSource = readSourceFile('components/SundayCard.tsx');
+
+    it('exceptionText style exists', () => {
+      expect(sundayCardSource).toContain('exceptionText:');
+    });
+
+    it('exception text uses colors.warning', () => {
+      expect(sundayCardSource).toContain('colors.warning');
+    });
+  });
+
+  // --- EC-093-02 strengthening: speakerNameLine style details ---
+  describe('EC-093-02 (additional): speakerNameLine style complete', () => {
+    const sundayCardSource = readSourceFile('components/SundayCard.tsx');
+
+    it('speakerNameLine uses colors.textSecondary', () => {
+      expect(sundayCardSource).toContain("styles.speakerNameLine, { color: colors.textSecondary }");
+    });
+  });
+});
+
+describe('F094 Additional Tests: field mapping and disabled state', () => {
+
+  const agendaFormSource = readSourceFile('components/AgendaForm.tsx');
+
+  // --- AC-094-05 strengthening: handleActorSelect derives field names ---
+  describe('AC-094-05 (additional): handleActorSelect field name derivation', () => {
+    it('handleActorSelect builds nameField as ${field}_name', () => {
+      expect(agendaFormSource).toContain('`${selectorModal.field}_name`');
+    });
+
+    it('handleActorSelect builds idField as ${field}_actor_id', () => {
+      expect(agendaFormSource).toContain('`${selectorModal.field}_actor_id`');
+    });
+  });
+
+  // --- AC-094-07 strengthening: SelectorField disabled prop ---
+  describe('AC-094-07 (additional): SelectorField disabled prop passed', () => {
+    it('pianist SelectorField has disabled={isObserver}', () => {
+      // Verify the pianist section specifically has disabled={isObserver}
+      const pianistSection = agendaFormSource.match(/agenda\.pianist_name.*?disabled=\{isObserver\}/s);
+      expect(pianistSection).not.toBeNull();
+    });
+
+    it('conductor SelectorField has disabled={isObserver}', () => {
+      const conductorSection = agendaFormSource.match(/agenda\.conductor_name.*?disabled=\{isObserver\}/s);
+      expect(conductorSection).not.toBeNull();
+    });
+  });
+
+  // --- AC-094-09 strengthening: full field order verification ---
+  describe('AC-094-09 (additional): full field order with all 8 fields', () => {
+    it('presiding appears before conducting', () => {
+      const presidingIdx = agendaFormSource.indexOf("t('agenda.presiding')");
+      const conductingIdx = agendaFormSource.indexOf("t('agenda.conducting')");
+      expect(presidingIdx).toBeLessThan(conductingIdx);
+    });
+
+    it('conducting appears before recognizing', () => {
+      const conductingIdx = agendaFormSource.indexOf("t('agenda.conducting')");
+      const recognizingIdx = agendaFormSource.indexOf("t('agenda.recognizing')");
+      expect(conductingIdx).toBeLessThan(recognizingIdx);
+    });
+
+    it('recognizing appears before announcements', () => {
+      const recognizingIdx = agendaFormSource.indexOf("t('agenda.recognizing')");
+      const announcementsIdx = agendaFormSource.indexOf("t('agenda.announcements')");
+      expect(recognizingIdx).toBeLessThan(announcementsIdx);
+    });
+
+    it('conductor appears before openingHymn', () => {
+      const conductorIdx = agendaFormSource.indexOf("t('agenda.conductor')");
+      const openingHymnIdx = agendaFormSource.indexOf("t('agenda.openingHymn')");
+      expect(conductorIdx).toBeLessThan(openingHymnIdx);
+    });
+
+    it('openingHymn appears before openingPrayer', () => {
+      const openingHymnIdx = agendaFormSource.indexOf("t('agenda.openingHymn')");
+      const openingPrayerIdx = agendaFormSource.indexOf("t('agenda.openingPrayer')");
+      expect(openingHymnIdx).toBeLessThan(openingPrayerIdx);
+    });
+  });
+
+  // --- EC-094-02 strengthening: separate field names allow same actor ---
+  describe('EC-094-02 (additional): fields are independent', () => {
+    it('pianist and conductor use different field names', () => {
+      expect(agendaFormSource).toContain("field: 'pianist'");
+      expect(agendaFormSource).toContain("field: 'conductor'");
+    });
+
+    it('pianist_name and conductor_name are separate DB fields', () => {
+      expect(agendaFormSource).toContain('agenda.pianist_name');
+      expect(agendaFormSource).toContain('agenda.conductor_name');
+    });
+  });
+});
+
+describe('F095 Additional Tests: toggle behavior and special meeting types', () => {
+
+  const agendaFormSource = readSourceFile('components/AgendaForm.tsx');
+  const agendaHookSource = readSourceFile('hooks/useAgenda.ts');
+
+  // --- AC-095-01 strengthening: toggle value from DB ---
+  describe('AC-095-01 (additional): toggle value persisted in DB', () => {
+    it('updateField called with has_intermediate_hymn key', () => {
+      expect(agendaFormSource).toContain("updateField('has_intermediate_hymn', val)");
+    });
+  });
+
+  // --- AC-095-02/03 strengthening: conditional rendering pattern ---
+  describe('AC-095-02/03 (additional): hymn selector inside toggle conditional', () => {
+    it('hymn selector uses intermediate_hymn_id field for hymn selection', () => {
+      expect(agendaFormSource).toContain("field: 'intermediate_hymn_id'");
+    });
+
+    it('hymn selector uses getHymnDisplay for value', () => {
+      expect(agendaFormSource).toContain('getHymnDisplay(agenda.intermediate_hymn_id, allHymns)');
+    });
+  });
+
+  // --- AC-095-05/06 strengthening: isSpecialMeeting covers all types ---
+  describe('AC-095-05/06 (additional): isSpecialMeeting covers all special types', () => {
+    it('isSpecialMeeting includes testimony_meeting', () => {
+      expect(agendaHookSource).toContain("reason === 'testimony_meeting'");
+    });
+
+    it('isSpecialMeeting includes ward_conference', () => {
+      expect(agendaHookSource).toContain("reason === 'ward_conference'");
+    });
+
+    it('isSpecialMeeting includes primary_presentation', () => {
+      expect(agendaHookSource).toContain("reason === 'primary_presentation'");
+    });
+
+    it('isSpecialMeeting includes other', () => {
+      expect(agendaHookSource).toContain("reason === 'other'");
+    });
+  });
+
+  // --- EC-095-01 strengthening: intermediate_hymn_id preserved ---
+  describe('EC-095-01 (additional): hymn ID preserved when toggle turned off', () => {
+    it('no code clears intermediate_hymn_id anywhere in AgendaForm', () => {
+      // Ensure we never set intermediate_hymn_id to null when toggling
+      expect(agendaFormSource).not.toMatch(/updateField\('intermediate_hymn_id',\s*null\)/);
+    });
+  });
+
+  // --- EC-095-03 strengthening: Observer disabled on intermediate hymn toggle ---
+  describe('EC-095-03 (additional): Observer sees disabled hymn selector too', () => {
+    it('intermediate hymn SelectorField has disabled={isObserver}', () => {
+      // Inside the hymn selector for intermediate hymn, check disabled prop
+      const intermediateSection = agendaFormSource.match(/intermediate_hymn_id.*?disabled=\{isObserver\}/s);
+      expect(intermediateSection).not.toBeNull();
+    });
+  });
+});
+
+describe('F096 Additional Tests: status computation and cross-feature validation', () => {
+
+  const agendaSource = readSourceFile('app/(tabs)/agenda.tsx');
+  const presentationSource = readSourceFile('hooks/usePresentationMode.ts');
+
+  // --- AC-096-01 strengthening: IIFE pattern for status computation ---
+  describe('AC-096-01 (additional): status computation uses IIFE', () => {
+    it('uses immediately invoked function expression for status lines', () => {
+      expect(agendaSource).toContain('{!isExpanded && !exceptionLabel && (() => {');
+    });
+  });
+
+  // --- AC-096-04 strengthening: speaker override template literal ---
+  describe('AC-096-04 (additional): override field uses template literal', () => {
+    it('override field uses keyof SundayAgenda cast', () => {
+      expect(agendaSource).toContain('as keyof SundayAgenda');
+    });
+
+    it('override field name includes speaker_${pos}_override template', () => {
+      expect(agendaSource).toContain('`speaker_${pos}_override`');
+    });
+  });
+
+  // --- AC-096-05 strengthening: prayers always total 2 ---
+  describe('AC-096-05 (additional): prayers count details', () => {
+    it('prayersFilled starts at 0', () => {
+      expect(agendaSource).toContain('let prayersFilled = 0');
+    });
+
+    it('opening_prayer_name increments count', () => {
+      expect(agendaSource).toContain("if (agenda?.opening_prayer_name) prayersFilled++");
+    });
+
+    it('closing_prayer_name increments count', () => {
+      expect(agendaSource).toContain("if (agenda?.closing_prayer_name) prayersFilled++");
+    });
+
+    it('prayersFilled compared against 2 for green color', () => {
+      expect(agendaSource).toContain('prayersFilled === 2 ? GREEN');
+    });
+
+    it('total parameter is 2 for prayers', () => {
+      expect(agendaSource).toContain('total: 2');
+    });
+  });
+
+  // --- AC-096-07 strengthening: intermediate hymn total across features ---
+  describe('AC-096-07 (additional): cross-feature consistency for has_intermediate_hymn', () => {
+    it('agenda.tsx checks has_intermediate_hymn !== false', () => {
+      expect(agendaSource).toContain("has_intermediate_hymn !== false");
+    });
+
+    it('presentation mode also checks has_intermediate_hymn !== false', () => {
+      expect(presentationSource).toContain('has_intermediate_hymn !== false');
+    });
+  });
+
+  // --- AC-096-08 strengthening: GREEN color definition ---
+  describe('AC-096-08 (additional): GREEN constant definition', () => {
+    it('GREEN constant defined as #22c55e', () => {
+      expect(agendaSource).toContain("const GREEN = '#22c55e'");
+    });
+  });
+
+  // --- AC-096-09/10 strengthening: exception handling details ---
+  describe('AC-096-09/10 (additional): exception label computation', () => {
+    it('exceptionLabel derived from exception.reason', () => {
+      expect(agendaSource).toContain("exception.reason !== 'speeches'");
+    });
+
+    it('exceptionLabel uses t() for translation', () => {
+      expect(agendaSource).toContain("t(`sundayExceptions.${exception.reason}`");
+    });
+  });
+
+  // --- AC-096-11 strengthening: status lines not rendered when expanded ---
+  describe('AC-096-11 (additional): status lines pattern detail', () => {
+    it('status lines inside condition that checks both !isExpanded AND !exceptionLabel', () => {
+      // This ensures the IIFE only runs for non-exception, collapsed cards
+      expect(agendaSource).toContain('!isExpanded && !exceptionLabel');
+    });
+  });
+
+  // --- i18n interpolation params comprehensive check ---
+  describe('i18n interpolation params complete check', () => {
+    const locales = ['pt-BR', 'en', 'es'];
+    const interpolatedKeys = ['statusSpeakers', 'statusPrayers', 'statusHymns'];
+
+    for (const loc of locales) {
+      for (const key of interpolatedKeys) {
+        it(`${loc} agenda.${key} has {{filled}} param`, () => {
+          const locale = readLocale(loc) as { agenda: Record<string, string> };
+          expect(locale.agenda[key]).toContain('{{filled}}');
+        });
+
+        it(`${loc} agenda.${key} has {{total}} param`, () => {
+          const locale = readLocale(loc) as { agenda: Record<string, string> };
+          expect(locale.agenda[key]).toContain('{{total}}');
+        });
+      }
+    }
+  });
+
+  // --- useAgendaRange strengthening: query details ---
+  describe('useAgendaRange (additional): query configuration', () => {
+    const agendaHookSource = readSourceFile('hooks/useAgenda.ts');
+
+    it('useAgendaRange queries from sunday_agendas table', () => {
+      expect(agendaHookSource).toContain("'sunday_agendas'");
+    });
+
+    it('useAgendaRange filters by ward_id', () => {
+      expect(agendaHookSource).toContain("eq('ward_id', wardId)");
+    });
+
+    it('useAgendaRange filters by startDate (gte)', () => {
+      expect(agendaHookSource).toContain("gte('sunday_date', startDate)");
+    });
+
+    it('useAgendaRange filters by endDate (lte)', () => {
+      expect(agendaHookSource).toContain("lte('sunday_date', endDate)");
+    });
+  });
+
+  // --- agendaMap creation in agenda.tsx ---
+  describe('agendaMap (additional): creation and usage', () => {
+    it('agendaMap uses useMemo for performance', () => {
+      expect(agendaSource).toMatch(/const agendaMap = useMemo/);
+    });
+
+    it('agendaMap iterates over allAgendas', () => {
+      expect(agendaSource).toContain('for (const agenda of allAgendas ?? [])');
+    });
+
+    it('agendaMap sets by sunday_date key', () => {
+      expect(agendaSource).toContain('map.set(agenda.sunday_date, agenda)');
+    });
+  });
+
+  // --- EC-096-04 strengthening: all 4 status keys used for missing roles ---
+  describe('EC-096-04 (additional): all 4 roles in missingRoles construction', () => {
+    it('missingRoles starts as empty array', () => {
+      expect(agendaSource).toContain('const missingRoles: string[] = []');
+    });
+
+    it('each role pushes translated label', () => {
+      expect(agendaSource).toContain("missingRoles.push(t('agenda.statusPresiding'))");
+      expect(agendaSource).toContain("missingRoles.push(t('agenda.statusConducting'))");
+      expect(agendaSource).toContain("missingRoles.push(t('agenda.statusPianist'))");
+      expect(agendaSource).toContain("missingRoles.push(t('agenda.statusConductor'))");
+    });
+  });
+});

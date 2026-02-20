@@ -12,7 +12,8 @@
 # CR-128, CR-131, CR-132, CR-133,
 # CR-134, CR-135, CR-136, CR-137, CR-138, CR-139,
 # CR-140, CR-141, CR-142, CR-143, CR-144,
-# CR-145, CR-146, CR-147, CR-148, CR-149
+# CR-145, CR-146, CR-147, CR-148, CR-149,
+# CR-150, CR-151, CR-152, CR-153
 # Generated: 2026-02-20
 # =============================================================================
 
@@ -2461,3 +2462,171 @@ batch14_phase1_test_results:
         description: "Updated index.tsx header comment to reflect always-visible button (P2 R-B14-3)"
       - id: CHG-347
         description: "Updated test assertions in batch14-phase1.test.ts and batch9-phase2.test.ts for designados"
+
+  # --- Batch 14, Phase 2: CR-150 (F093), CR-151 (F094), CR-152 (F095), CR-153 (F096) ---
+
+  - step: S01
+    cr: CR-152
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-01
+    hash: 3c09a4e
+    message: "feat(db): add has_intermediate_hymn column to sunday_agendas (F095, CR-152)"
+    files_changed:
+      - supabase/migrations/016_add_has_intermediate_hymn.sql
+      - src/types/database.ts
+    changes:
+      - id: CHG-348
+        description: "Created migration 016 adding has_intermediate_hymn BOOLEAN NOT NULL DEFAULT true to sunday_agendas"
+      - id: CHG-349
+        description: "Added has_intermediate_hymn: boolean field to SundayAgenda interface after has_special_presentation"
+    acs_covered: [AC-095-01]
+
+  - step: S02
+    cr: CR-150
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-02
+    hash: 1c940f8
+    message: "feat(ui): add speaker names and vertical LEDs to collapsed SundayCard (F093, CR-150)"
+    files_changed:
+      - src/components/SundayCard.tsx
+    changes:
+      - id: CHG-350
+        description: "Added 3 speaker name lines (11px) in headerCenter when isSpeechesType && !expanded"
+      - id: CHG-351
+        description: "Changed LEDs layout from horizontal (row) to vertical (column, gap:4) when !expanded"
+      - id: CHG-352
+        description: "Hidden LEDs when expanded (conditioned on !expanded && isSpeechesType)"
+      - id: CHG-353
+        description: "Added speakerNameLine style (fontSize: 11) and ledsVertical style"
+    acs_covered: [AC-093-01, AC-093-02, AC-093-03, AC-093-04, AC-093-05]
+    ecs_covered: [EC-093-01, EC-093-02, EC-093-03]
+
+  - step: S03
+    cr: CR-151
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-03
+    hash: 860f9c1
+    message: "feat(agenda): add pianist and conductor fields in Welcome section (F094, CR-151)"
+    files_changed:
+      - src/components/AgendaForm.tsx
+    changes:
+      - id: CHG-354
+        description: "Added Pianist SelectorField with roleFilter can_music after Announcements"
+      - id: CHG-355
+        description: "Added Conductor SelectorField with roleFilter can_music after Pianist"
+    acs_covered: [AC-094-01, AC-094-02, AC-094-03, AC-094-04, AC-094-05, AC-094-06, AC-094-07, AC-094-09]
+
+  - step: S04
+    cr: [CR-151, CR-152]
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-04
+    hash: b6acf6f
+    message: "feat(presentation): add pianist/conductor fields and conditional intermediate hymn (F094+F095, CR-151+CR-152)"
+    files_changed:
+      - src/hooks/usePresentationMode.ts
+    changes:
+      - id: CHG-356
+        description: "Added pianist_name and conductor_name fields to Card 1 (Welcome) in buildPresentationCards"
+      - id: CHG-357
+        description: "Changed intermediate hymn from unconditional to has_intermediate_hymn !== false check"
+    acs_covered: [AC-094-08, AC-095-07]
+
+  - step: S05
+    cr: CR-152
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-05
+    hash: dac0e09
+    message: "feat(agenda): add intermediate hymn toggle with DB persistence (F095, CR-152)"
+    files_changed:
+      - src/components/AgendaForm.tsx
+    changes:
+      - id: CHG-358
+        description: "Added ToggleField for has_intermediate_hymn in else branch of has_special_presentation"
+      - id: CHG-359
+        description: "Wrapped hymn selector in has_intermediate_hymn conditional rendering"
+    acs_covered: [AC-095-01, AC-095-02, AC-095-03, AC-095-04, AC-095-05]
+    ecs_covered: [EC-095-01, EC-095-02, EC-095-03]
+
+  - step: S06
+    cr: CR-153
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-06
+    hash: aa55dbb
+    message: "feat(hooks): add useAgendaRange hook for agenda range queries (F096, CR-153)"
+    files_changed:
+      - src/hooks/useAgenda.ts
+    changes:
+      - id: CHG-360
+        description: "Added useAgendaRange hook querying sunday_agendas by date range with enabled guard"
+    acs_covered: [AC-096-10]
+
+  - step: S07
+    cr: CR-153
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-07
+    hash: dad8cd1
+    message: "feat(i18n): add agenda status line keys in 3 languages (F096, CR-153)"
+    files_changed:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    changes:
+      - id: CHG-361
+        description: "Added 8 agenda status keys (statusMissing, statusSpeakers, statusPrayers, statusHymns, statusPresiding, statusConducting, statusPianist, statusConductor) in 3 locales"
+    acs_covered: [AC-096-01, AC-096-03, AC-096-05, AC-096-06]
+
+  - step: S08
+    cr: CR-153
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-08
+    hash: 9c678ba
+    message: "feat(ui): add status lines to collapsed agenda cards (F096, CR-153)"
+    files_changed:
+      - src/app/(tabs)/agenda.tsx
+    changes:
+      - id: CHG-362
+        description: "Imported useAgendaRange and SundayAgenda type"
+      - id: CHG-363
+        description: "Called useAgendaRange and built agendaMap from results"
+      - id: CHG-364
+        description: "Passed agenda prop to AgendaSundayCard"
+      - id: CHG-365
+        description: "Added status line rendering: missing roles, speakers X/3, prayers X/2, hymns X/N with green when complete"
+      - id: CHG-366
+        description: "Added statusLine style (fontSize: 11) and green color #22c55e constant"
+    acs_covered: [AC-096-01, AC-096-02, AC-096-03, AC-096-04, AC-096-05, AC-096-06, AC-096-07, AC-096-08, AC-096-09, AC-096-10, AC-096-11]
+    ecs_covered: [EC-096-01, EC-096-02, EC-096-03, EC-096-04]
+
+  - step: S09
+    cr: [CR-150, CR-151, CR-152, CR-153]
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: STEP-09
+    hash: 726d736
+    message: "test(batch14): add 133 tests for F093-F096 (CR-150 to CR-153)"
+    files_changed:
+      - src/__tests__/batch14-phase2.test.ts
+    tests_added: 133
+    acs_covered: [AC-093-01, AC-093-07, AC-094-01, AC-094-09, AC-095-01, AC-095-07, AC-096-01, AC-096-11]
+    ecs_covered: [EC-093-01, EC-093-03, EC-094-01, EC-094-03, EC-095-01, EC-095-03, EC-096-01, EC-096-04]
+
+  - step: S10-fix
+    cr: CR-150
+    plan_ref: plans/PLAN_P026.yaml
+    plan_step: test-fix
+    hash: f605c32
+    message: "fix(tests): update batch8 LED conditional tests for F093 SundayCard changes"
+    files_changed:
+      - src/__tests__/batch8-phase1.test.ts
+    changes:
+      - id: CHG-367
+        description: "Updated 2 batch8-phase1 AC-F045-01 tests for F093 LED conditional pattern change (ledsVertical with !expanded guard)"
+
+batch14_phase2_test_results:
+  new_tests: 133
+  new_tests_passing: 133
+  full_suite_tests: 4130
+  full_suite_passing: 4128
+  full_suite_files: 74
+  regressions: 0
+  pre_existing_failures: 2
+  pre_existing_failure_details: "batch7-f035-f039.test.ts: 2 tests about com.wardmanager.app bundle ID (pre-existing, unrelated to Batch 14)"

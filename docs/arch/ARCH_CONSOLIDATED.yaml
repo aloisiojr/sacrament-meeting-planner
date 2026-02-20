@@ -7,11 +7,11 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-19"
-  last_updated_by: "batch-11"
+  last_updated_by: "batch-12"
   total_modules: 8
-  total_adrs: 47
+  total_adrs: 51
   total_crs_implemented: 89
-  pending_arch: "ARCH_M022 (batch-11: CR-134, CR-135, CR-136, CR-137, CR-138)"
+  pending_arch: "ARCH_M023 (batch-12: CR-139)"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
@@ -29,6 +29,7 @@ metadata:
     - docs/arch/ARCH_M020.yaml
     - docs/arch/ARCH_M021.yaml
     - docs/arch/ARCH_M022.yaml
+    - docs/arch/ARCH_M023.yaml
 
 # =============================================================================
 # TECH STACK
@@ -942,6 +943,42 @@ adrs:
       - "Zero dependencias (consistente com DD-25)"
       - "Aparencia pode variar entre plataformas (aceito: app ja usa Unicode extensivamente)"
 
+  - id: ADR-057
+    title: "Chainable Supabase mock via Proxy pattern for integration tests"
+    context: "All hooks use PostgREST chainable query builder. Need reusable mock that mirrors chain pattern."
+    decision: "Create mockSupabaseFrom() helper in setup-integration.ts with Proxy-based chainable mock. Terminal methods resolve with configurable {data, error}."
+    decided_in: "CR-139"
+    consequences:
+      - "Single mock setup per test; mirrors real Supabase API"
+      - "Must be maintained if SDK adds new methods (stable since v2)"
+
+  - id: ADR-058
+    title: "TestWrapper uses AuthContext.Provider directly, not AuthProvider"
+    context: "Testing hooks needing useAuth(). Real AuthProvider triggers getSession/onAuthStateChange side effects."
+    decision: "TestWrapper wraps children in AuthContext.Provider with mock value. Auth-flow tests test real AuthProvider separately."
+    decided_in: "CR-139"
+    consequences:
+      - "Hooks get real context values without side effects"
+      - "Auth-flow tests validate real AuthProvider independently"
+
+  - id: ADR-059
+    title: "vi.mock() called per test file, not in shared setup"
+    context: "setup-integration.ts could call vi.mock() globally but vi.mock() has module-scope hoisting."
+    decision: "Each test file calls its own vi.mock(). setup-integration.ts only exports helpers and factories."
+    decided_in: "CR-139"
+    consequences:
+      - "Explicit mock scope per file; no hidden cross-file mock contamination"
+      - "Some vi.mock() lines repeated across test files (acceptable)"
+
+  - id: ADR-060
+    title: "AuthContext export for direct Provider usage in tests"
+    context: "TestWrapper needs <AuthContext.Provider> directly. AuthContext const not exported."
+    decision: "Export AuthContext from AuthContext.tsx. Standard React testing pattern. Alternative: mock useAuth via vi.mock if export rejected."
+    decided_in: "CR-139"
+    consequences:
+      - "Standard React context testing pattern; minimal change"
+      - "Alternative available if export is not desired"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1627,6 +1664,19 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-053, ADR-054, ADR-055, ADR-056]
     new_files: []
+
+  batch_12:
+    crs: "CR-139"
+    scope: "Integration tests for hooks+Supabase+ReactQuery, SyncProvider orchestration, AuthContext flow, and component-hook data flow (F082)"
+    doc: "ARCH_M023.yaml"
+    status: "pending implementation"
+    adrs: [ADR-057, ADR-058, ADR-059, ADR-060]
+    new_files:
+      - "src/__tests__/integration/setup-integration.ts"
+      - "src/__tests__/integration/hooks-supabase.integration.test.ts"
+      - "src/__tests__/integration/sync-provider.integration.test.ts"
+      - "src/__tests__/integration/auth-flow.integration.test.ts"
+      - "src/__tests__/integration/components-hooks.integration.test.tsx"
 
 # =============================================================================
 # OBSERVABILITY

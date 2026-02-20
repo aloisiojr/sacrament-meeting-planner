@@ -1,0 +1,209 @@
+# =============================================================================
+# QA_PLAN_012.yaml
+# QA Plan for CR-139: Integration Tests
+# Created: 2026-02-19
+# =============================================================================
+
+type: qa_plan
+id: QA-012
+created_at: "2026-02-19"
+request_type: feature_request
+
+feature:
+  cr: CR-139
+  id: F082
+  type: infrastructure
+  description: >
+    Add integration tests to the project. Currently the project only has unit
+    tests (~65 test files in src/__tests__/) that primarily test via source file
+    reading (fs.readFileSync + string assertions) or pure utility function calls.
+    Integration tests should verify that multiple modules work together correctly:
+    hooks with React Query, providers with their child hooks, components with
+    their hooks, and data flow between layers (Supabase -> hooks -> components).
+
+user_request: >
+  O projeto so tem testes unitarios, antes de publicar, precisamos de testes
+  de integracao. Vamos fazer?
+
+pre_validation:
+  timestamp: "2026-02-19"
+  status: passed
+  validated: true
+
+  evidence:
+    - id: EV-01
+      description: "No integration tests exist in the project"
+      searches_performed:
+        - type: glob
+          pattern: "src/__tests__/**/*integration*"
+          result: "No files found"
+        - type: glob
+          pattern: "src/**/*integration*"
+          result: "No files found"
+        - type: grep
+          pattern: "integration|e2e|detox|maestro|cypress"
+          file: "package.json"
+          result: "No matches found"
+        - type: grep
+          pattern: "integration|e2e|detox|maestro"
+          files: "*.config.*"
+          result: "No matches found"
+
+    - id: EV-02
+      description: "All existing tests are unit-level (source reading or pure function)"
+      paths_checked:
+        - "src/__tests__/batch11.test.ts - uses fs.readFileSync + string assertions"
+        - "src/__tests__/cr004-f003-sync-offline.test.ts - uses fs.readFileSync + string assertions"
+        - "src/__tests__/useAgenda-utils.test.ts - tests pure utility functions"
+        - "src/__tests__/useSpeeches-utils.test.ts - tests pure utility functions"
+      total_test_files: 65
+      test_directory: "src/__tests__/"
+
+    - id: EV-03
+      description: "Project uses Vitest + @testing-library/react-native"
+      vitest_config: "vitest.config.ts (environment: node, include: src/**/*.test.{ts,tsx})"
+      testing_library: "@testing-library/react-native@^13.3.3 (in devDependencies)"
+      setup_file: "src/__tests__/setup.ts (mocks AsyncStorage)"
+
+    - id: EV-04
+      description: "Key integration boundaries identified"
+      boundaries:
+        - name: "Hooks + Supabase + React Query"
+          hooks:
+            - "useAgenda (useQuery/useMutation + supabase)"
+            - "useSpeeches (useQuery/useMutation + supabase)"
+            - "useMembers (useQuery/useMutation + supabase)"
+            - "useHymns (useQuery/useMutation + supabase)"
+            - "useSundayList (useQuery + supabase)"
+            - "useSundayTypes (useQuery/useMutation + supabase)"
+            - "useTopics (useQuery/useMutation + supabase)"
+            - "useActors (useQuery/useMutation + supabase)"
+            - "useActivityLog (useQuery/useMutation + supabase)"
+          rationale: "These hooks combine React Query state management with Supabase API calls"
+
+        - name: "SyncProvider orchestration"
+          file: "src/providers/SyncProvider.tsx"
+          integrates:
+            - "useConnection (NetInfo)"
+            - "useRealtimeSync (Supabase realtime channels)"
+            - "useOfflineQueueProcessor (offline queue + supabase)"
+            - "useRegisterPushToken (notifications)"
+            - "useNotificationHandler (notifications)"
+            - "OfflineBanner (component)"
+          rationale: "SyncProvider is the central orchestration point for connectivity features"
+
+        - name: "AuthContext + navigation guard"
+          file: "src/contexts/AuthContext.tsx"
+          integrates:
+            - "Supabase auth"
+            - "Ward/role state"
+            - "Navigation guard"
+          rationale: "Auth context controls access to the entire app"
+
+        - name: "Components + hooks data flow"
+          examples:
+            - "AgendaForm + useAgenda (form state -> mutation -> query invalidation)"
+            - "SpeechSlot + useSpeeches (status changes -> mutation -> UI update)"
+            - "SundayCard + useSundayList (display -> query -> formatted data)"
+            - "HymnSelector + useHymns (search -> query -> selection -> mutation)"
+            - "MemberSelectorModal + useMembers (search -> filter -> select)"
+
+  scope_definition: >
+    Integration tests should test the interaction between multiple modules
+    without requiring a running Supabase instance. Tests will mock Supabase
+    at the client level (supabase.from().select(), etc.) but let React Query,
+    hooks, and components interact naturally. The focus is on verifying that:
+    (1) hooks correctly call Supabase and transform responses via React Query,
+    (2) providers correctly orchestrate their child hooks,
+    (3) components correctly consume hook data and trigger mutations.
+
+  feasibility_assessment:
+    viable: true
+    rationale: >
+      The project already has @testing-library/react-native and Vitest set up.
+      Integration tests can be added using renderHook() with a QueryClient
+      wrapper and mocked Supabase client. Component integration tests can use
+      render() with the same wrapper. No new dependencies needed.
+    risks:
+      - description: "Vitest environment is 'node', may need jsdom for component render tests"
+        severity: medium
+        mitigation: "Can add jsdom as a per-file environment override or add to devDependencies"
+      - description: "Supabase mocking complexity for chained queries"
+        severity: low
+        mitigation: "Create a reusable mock factory for supabase.from().select().eq() chains"
+
+validation_checks:
+
+  must_pass:
+    - id: MP-01
+      description: "Integration test files exist in a dedicated directory or clearly named"
+      verification: >
+        Glob for src/__tests__/integration/*.test.ts or
+        src/__tests__/*integration*.test.ts must find at least one file
+
+    - id: MP-02
+      description: "At least one hook integration test exists that uses renderHook with QueryClient"
+      verification: >
+        At least one test file imports renderHook and creates a QueryClient,
+        wrapping the hook in a QueryClientProvider. The test must verify
+        the hook's interaction with a mocked Supabase client.
+
+    - id: MP-03
+      description: "Supabase client is mocked at module level, not at individual function level"
+      verification: >
+        Tests use vi.mock('../lib/supabase') or equivalent to mock the entire
+        Supabase module, allowing hooks to call supabase.from().select() etc.
+        naturally while controlling the responses.
+
+    - id: MP-04
+      description: "At least one provider integration test verifies hook orchestration"
+      verification: >
+        A test renders SyncProvider (or similar) and verifies that its
+        constituent hooks are called and interact correctly.
+
+    - id: MP-05
+      description: "All existing unit tests still pass after adding integration tests"
+      verification: >
+        vitest run completes with 0 failures. Total test count must be
+        >= previous count (2456+ tests).
+
+    - id: MP-06
+      description: "Integration tests can run with 'vitest run' without special configuration"
+      verification: >
+        The existing vitest.config.ts include pattern (src/**/*.test.{ts,tsx})
+        must pick up the new integration test files without modification, OR
+        the config is updated to include them.
+
+  should_pass:
+    - id: SP-01
+      description: "Integration tests cover at least 3 different hooks"
+      verification: >
+        Test files collectively test at least 3 hooks from the hooks/ directory
+        (e.g., useAgenda, useSpeeches, useMembers) with their React Query
+        integration.
+
+    - id: SP-02
+      description: "Integration tests include error/edge case scenarios"
+      verification: >
+        At least one integration test verifies behavior when Supabase returns
+        an error (e.g., network failure, auth error) and the hook/component
+        handles it correctly via React Query's error state.
+
+    - id: SP-03
+      description: "Test helper/wrapper is reusable across integration tests"
+      verification: >
+        A shared test utility (e.g., createTestQueryClient or renderWithProviders)
+        exists to avoid duplicating QueryClient setup in every test file.
+
+    - id: SP-04
+      description: "Integration tests cover at least one mutation flow (create/update/delete)"
+      verification: >
+        At least one test verifies a mutation operation through the full
+        hook -> Supabase mock -> query invalidation cycle.
+
+    - id: SP-05
+      description: "Integration tests are clearly documented with describe blocks"
+      verification: >
+        Each integration test file uses descriptive describe() blocks that
+        indicate the integration boundary being tested (e.g.,
+        "useAgenda + React Query + Supabase mock").

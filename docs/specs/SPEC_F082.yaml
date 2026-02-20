@@ -1,0 +1,397 @@
+# =============================================================================
+# SPEC_F082.yaml
+# Feature F082 / CR-139: Integration Tests
+# Batch: 12
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 12
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F082
+  name: "Integration tests for hooks, providers, and component-hook data flow"
+  cr_id: 139
+  type: testing_infrastructure
+  priority: high
+  related_features: [F001, F002, F003, F004, F005, F006, F007, F008, F009, F010, F011, F012, F013, F014, F015]
+
+  user_request: >
+    "O projeto so tem testes unitarios, antes de publicar, precisamos de testes
+    de integracao. Vamos fazer?"
+
+  description: >
+    Adicionar testes de integracao ao projeto. Atualmente todos os 65+ arquivos
+    de teste existentes sao testes unitarios (funcoces puras, utilitarios,
+    query keys, validacoes). Os testes de integracao verificam a interacao
+    entre duas ou mais unidades reais trabalhando juntas: hooks com Supabase
+    mockado + React Query, SyncProvider orquestrando seus sub-hooks,
+    AuthContext com fluxo de navegacao, e componentes consumindo dados de hooks.
+    NAO sao testes end-to-end (nao usam backend real nem emulador).
+
+  scope_definition:
+    integration_test: >
+      Teste que exercita a interacao entre 2+ modulos reais do app,
+      com dependencias externas (Supabase, NetInfo, AsyncStorage) mockadas.
+      Usa renderHook/render do @testing-library/react-native com wrappers
+      reais (QueryClientProvider, AuthContext mock). Valida que os modulos
+      se integram corretamente (hook chama Supabase, processa resposta,
+      atualiza cache do React Query, dispara invalidacoes).
+    unit_test: >
+      Teste que exercita uma unica funcao/modulo isoladamente, sem
+      dependencias externas nem wrappers de contexto. Exemplos: sortActors(),
+      filterActorsByRole(), isValidTransition(), formatDate(), etc.
+      E o que ja existe no projeto.
+    e2e_test: >
+      Teste que roda o app completo com backend real (Supabase) ou emulador,
+      simulando interacoes reais do usuario. Fora do escopo desta feature.
+
+  current_behavior: >
+    Projeto possui apenas testes unitarios: importam funcoes puras dos hooks
+    (enforceActorRules, filterActorsByRole, sortActors, etc.), leem arquivos
+    JSON (i18n, types), ou validam utilitarios (dateUtils, csvUtils,
+    permissions, whatsappUtils). Nenhum teste usa renderHook, render(),
+    QueryClientProvider ou mocks de Supabase client. Infraestrutura ja
+    disponivel: Vitest 4, @testing-library/react-native 13.3.3, setup.ts
+    com mock de AsyncStorage.
+
+  expected_behavior: >
+    Novos arquivos de teste de integracao na pasta src/__tests__/integration/
+    cobrindo 4 categorias: (1) Hooks + Supabase + ReactQuery, (2) SyncProvider
+    orchestration, (3) AuthContext + navigation flow, (4) Components + hooks
+    data flow. Cada teste usa renderHook/render com wrappers reais de
+    QueryClient e AuthContext mockado, e Supabase client mockado via vi.mock.
+    Testes existentes NAO sao alterados. Vitest config NAO precisa mudar
+    (pattern src/**/*.test.{ts,tsx} ja cobre o novo diretorio).
+
+  # ---------------------------------------------------------------------------
+  # FILES IMPACTED
+  # ---------------------------------------------------------------------------
+
+  files_impacted:
+    - path: src/__tests__/integration/setup-integration.ts
+      action: create
+      changes:
+        - "Helper de setup: createTestQueryClient() com retry false e gcTime 0"
+        - "Wrapper component: TestWrapper com QueryClientProvider + AuthContext mock"
+        - "Factory: createMockAuthContext(overrides) com defaults para bishopric role"
+        - "Supabase mock helpers: mockSupabaseQuery(), mockSupabaseMutation()"
+        - "Cleanup utility: afterEach com queryClient.clear()"
+
+    - path: src/__tests__/integration/hooks-supabase.integration.test.ts
+      action: create
+      changes:
+        - "Testes de integracao para 9 hooks com Supabase mockado"
+        - "useActors: fetch, create, update, delete com invalidacao de cache"
+        - "useAgenda: fetch, lazy create, update com invalidacao"
+        - "useSpeeches: fetch, lazy create, assign speaker, assign topic, change status, remove assignment"
+        - "useMembers: fetch com busca, create, update, delete"
+        - "useHymns: fetch com filtro por tipo"
+        - "useTopics: fetch, create, update, delete"
+        - "useSundayList: fetch date range com exceptions"
+        - "useSundayTypes: fetch, update exception type"
+        - "useActivityLog: fetch log entries"
+
+    - path: src/__tests__/integration/sync-provider.integration.test.ts
+      action: create
+      changes:
+        - "SyncProvider orchestration: renders children + OfflineBanner"
+        - "useConnection + OfflineBanner: banner visible when offline"
+        - "useRealtimeSync: subscribes to realtime channel on mount"
+        - "useRealtimeSync: falls back to polling when channel errors"
+        - "useOfflineQueueProcessor: processes queue when back online"
+        - "useRealtimeSync: invalidates queries on reconnect"
+
+    - path: src/__tests__/integration/auth-flow.integration.test.ts
+      action: create
+      changes:
+        - "AuthProvider: initializes session from Supabase on mount"
+        - "AuthProvider: extracts role, wardId, userName from app_metadata"
+        - "signIn: calls supabase.auth.signInWithPassword and updates context"
+        - "signOut: calls supabase.auth.signOut and clears session"
+        - "hasPermission: delegates to permissions.ts with correct role"
+        - "Ward language: applies ward language after auth loads (CR-11)"
+
+    - path: src/__tests__/integration/components-hooks.integration.test.tsx
+      action: create
+      changes:
+        - "AgendaForm: renders with useAgenda data and calls useUpdateAgenda on change"
+        - "SpeechSlot: renders speech data from useSpeeches and triggers status change"
+        - "MemberSelectorModal: renders member list from useMembers with search filter"
+        - "TopicSelectorModal: renders topic list from useTopics with search"
+        - "HymnSelector: renders hymn list from useHymns"
+        - "PrayerSelector: renders member list for prayer assignment"
+        - "ActorSelector: renders actor list from useActors filtered by role"
+        - "SearchInput: debounced input triggers parent callback"
+        - "OfflineBanner: visible/hidden based on connection state"
+        - "StatusChangeModal: shows available statuses from useSpeeches transitions"
+
+  # ---------------------------------------------------------------------------
+  # ACCEPTANCE CRITERIA
+  # ---------------------------------------------------------------------------
+
+  acceptance_criteria:
+    # --- Category 1: Hooks + Supabase + ReactQuery ---
+
+    - id: AC-082-01
+      description: "useActors integration: fetch returns actors from Supabase"
+      given: "Supabase mockado retorna lista de actors para ward-1"
+      when: "renderHook(useActors) com TestWrapper (QueryClient + AuthContext ward-1)"
+      then: "Hook retorna data com actors mockados, isLoading false, isError false"
+
+    - id: AC-082-02
+      description: "useActors integration: create actor invalidates cache"
+      given: "useActors carregado com 2 actors"
+      when: "useCreateActor.mutateAsync({name: 'New Actor', can_preside: true})"
+      then: "Supabase insert chamado com ward_id correto; queryClient.invalidateQueries chamado com actorKeys.all"
+
+    - id: AC-082-03
+      description: "useAgenda integration: lazy create when no agenda exists"
+      given: "Supabase retorna null para agenda de 2026-03-01"
+      when: "useLazyCreateAgenda.mutateAsync('2026-03-01')"
+      then: "Supabase insert chamado com ward_id, sunday_date, defaults (has_baby_blessing: false, etc.); cache invalidado"
+
+    - id: AC-082-04
+      description: "useSpeeches integration: fetch speeches for date range"
+      given: "Supabase retorna 6 speeches (2 domingos x 3 speeches)"
+      when: "renderHook(useSpeeches, {dateRange: {start: '2026-03-01', end: '2026-03-15'}})"
+      then: "Hook retorna data com 6 speeches ordenados por sunday_date e position"
+
+    - id: AC-082-05
+      description: "useSpeeches integration: assign speaker updates status"
+      given: "Speech com status not_assigned"
+      when: "useAssignSpeaker.mutateAsync({speechId, memberId, speakerName, speakerPhone})"
+      then: "Supabase update chamado com member_id, speaker_name, speaker_phone, status assigned_not_invited"
+
+    - id: AC-082-06
+      description: "useSpeeches integration: change status validates transition"
+      given: "Speech com status assigned_not_invited"
+      when: "useChangeStatus.mutateAsync({speechId, status: 'assigned_confirmed'})"
+      then: "Supabase fetch current status, valida transicao, update chamado com novo status"
+
+    - id: AC-082-07
+      description: "useMembers integration: fetch with ward isolation"
+      given: "Supabase retorna membros filtrados por ward_id"
+      when: "renderHook(useMembers) com wardId='ward-1'"
+      then: "Supabase query inclui .eq('ward_id', 'ward-1'); data retorna membros corretos"
+
+    - id: AC-082-08
+      description: "useHymns integration: fetch hymns"
+      given: "Supabase retorna lista de hinos"
+      when: "renderHook(useHymns)"
+      then: "Hook retorna data com hinos, isLoading transitions de true para false"
+
+    - id: AC-082-09
+      description: "useTopics integration: create topic invalidates cache"
+      given: "useTopics carregado"
+      when: "useCreateTopic.mutateAsync({title: 'New Topic', collection: 'ward'})"
+      then: "Supabase insert chamado; cache invalidado com topicKeys.all"
+
+    - id: AC-082-10
+      description: "useSundayList integration: fetch sundays with exceptions"
+      given: "Supabase retorna 4 sundays com 1 exception (general_conference)"
+      when: "renderHook(useSundayList, {dateRange})"
+      then: "Hook retorna sundays com exception data merged"
+
+    - id: AC-082-11
+      description: "useSundayTypes integration: update exception type"
+      given: "Sunday sem exception"
+      when: "useSetSundayType.mutateAsync({date: '2026-03-01', reason: 'testimony_meeting'})"
+      then: "Supabase upsert chamado; cache invalidado"
+
+    - id: AC-082-12
+      description: "useActivityLog integration: fetch log entries"
+      given: "Supabase retorna log entries para ward-1"
+      when: "renderHook(useActivityLog)"
+      then: "Hook retorna data com log entries ordenados por created_at desc"
+
+    # --- Category 2: SyncProvider Orchestration ---
+
+    - id: AC-082-13
+      description: "SyncProvider renders children and OfflineBanner"
+      given: "SyncProvider com AuthProvider e QueryClientProvider"
+      when: "Renderizado com children"
+      then: "Children renderizados; OfflineBanner presente no output (hidden by default)"
+
+    - id: AC-082-14
+      description: "SyncProvider: OfflineBanner visible when offline"
+      given: "NetInfo reporta isConnected=false"
+      when: "SyncProvider renderizado"
+      then: "OfflineBanner recebe visible=true"
+
+    - id: AC-082-15
+      description: "useRealtimeSync subscribes to Supabase channel"
+      given: "wardId disponivel e isOnline=true"
+      when: "useRealtimeSync montado"
+      then: "supabase.channel() chamado com 'ward-sync-{wardId}'; channel.subscribe() chamado"
+
+    - id: AC-082-16
+      description: "useRealtimeSync falls back to polling on channel error"
+      given: "Realtime channel emite status 'CHANNEL_ERROR'"
+      when: "useRealtimeSync recebe o evento"
+      then: "setWebSocketConnected(false) chamado; polling iniciado com setInterval"
+
+    - id: AC-082-17
+      description: "useRealtimeSync invalidates all on reconnect"
+      given: "Channel previamente desconectado"
+      when: "Channel emite status 'SUBSCRIBED'"
+      then: "invalidateQueries chamado para todas as SYNCED_TABLES"
+
+    # --- Category 3: AuthContext + Flow ---
+
+    - id: AC-082-18
+      description: "AuthProvider initializes session on mount"
+      given: "Supabase retorna sessao existente"
+      when: "AuthProvider montado"
+      then: "useAuth retorna session, user, role, wardId, loading=false"
+
+    - id: AC-082-19
+      description: "AuthProvider extracts role from app_metadata"
+      given: "User com app_metadata.role='secretary'"
+      when: "AuthProvider processou sessao"
+      then: "useAuth().role === 'secretary'"
+
+    - id: AC-082-20
+      description: "AuthProvider defaults role to observer"
+      given: "User sem app_metadata.role"
+      when: "AuthProvider processou sessao"
+      then: "useAuth().role === 'observer'"
+
+    - id: AC-082-21
+      description: "signIn calls Supabase and updates context"
+      given: "AuthProvider montado sem sessao"
+      when: "signIn('user@test.com', 'password') chamado"
+      then: "supabase.auth.signInWithPassword chamado; onAuthStateChange dispara; session atualizada no contexto"
+
+    - id: AC-082-22
+      description: "signOut clears session"
+      given: "AuthProvider com sessao ativa"
+      when: "signOut() chamado"
+      then: "supabase.auth.signOut chamado; session torna-se null"
+
+    - id: AC-082-23
+      description: "hasPermission delegates to permissions lib"
+      given: "User com role bishopric"
+      when: "hasPermission('speech_assign') chamado"
+      then: "Retorna true (bishopric tem permissao speech_assign)"
+
+    - id: AC-082-24
+      description: "hasPermission respects observer restrictions"
+      given: "User com role observer"
+      when: "hasPermission('settings_access') chamado"
+      then: "Retorna false (observer nao tem acesso a settings)"
+
+    # --- Category 4: Components + Hooks Data Flow ---
+
+    - id: AC-082-25
+      description: "ActorSelector renders actors from useActors"
+      given: "useActors retorna 3 actors (1 can_preside, 1 can_conduct, 1 can_music)"
+      when: "ActorSelector renderizado com role='can_preside'"
+      then: "Apenas 1 actor renderizado; texto do actor visivel"
+
+    - id: AC-082-26
+      description: "SearchInput debounce triggers callback"
+      given: "SearchInput renderizado com onSearch callback"
+      when: "Usuario digita 'Maria' com debounce de 300ms"
+      then: "onSearch chamado com 'Maria' apos debounce; nao chamado durante digitacao"
+
+    - id: AC-082-27
+      description: "OfflineBanner visibility based on connection"
+      given: "OfflineBanner renderizado"
+      when: "visible=true"
+      then: "Banner com texto de offline visivel; quando visible=false, banner nao renderizado ou hidden"
+
+    - id: AC-082-28
+      description: "StatusChangeModal shows valid transitions"
+      given: "Speech com status assigned_not_invited"
+      when: "StatusChangeModal aberto"
+      then: "Opcoes mostradas: assigned_invited, assigned_confirmed, gave_up (excluindo status atual e not_assigned)"
+
+    - id: AC-082-29
+      description: "MemberSelectorModal renders and filters members"
+      given: "useMembers retorna 5 membros"
+      when: "MemberSelectorModal aberto e usuario digita 'Mar'"
+      then: "Apenas membros cujo nome contem 'Mar' sao exibidos"
+
+    - id: AC-082-30
+      description: "HymnSelector renders hymns from useHymns"
+      given: "useHymns retorna lista de hinos"
+      when: "HymnSelector renderizado e aberto"
+      then: "Hinos renderizados na lista; busca filtra corretamente"
+
+  # ---------------------------------------------------------------------------
+  # EDGE CASES
+  # ---------------------------------------------------------------------------
+
+  edge_cases:
+    - id: EC-082-01
+      case: "Supabase retorna erro na query"
+      expected: "Hook retorna isError=true, error com mensagem; componente mostra QueryErrorView"
+
+    - id: EC-082-02
+      case: "wardId vazio (usuario sem ala)"
+      expected: "Hooks com enabled: !!wardId nao disparam query; data undefined"
+
+    - id: EC-082-03
+      case: "Mutation falha (ex: constraint violation)"
+      expected: "mutateAsync rejeita com erro; cache NAO e invalidado (onSuccess nao executado)"
+
+    - id: EC-082-04
+      case: "React Query retry com Supabase error"
+      expected: "TestQueryClient configurado com retry: false para testes determinísticos"
+
+    - id: EC-082-05
+      case: "Multiple hooks sharing same QueryClient"
+      expected: "Cache compartilhado: useActors e useCreateActor veem o mesmo cache"
+
+    - id: EC-082-06
+      case: "Hook desmontado antes de query completar"
+      expected: "Query cancelada pelo React Query; sem memory leak nem state update em componente desmontado"
+
+    - id: EC-082-07
+      case: "NetInfo sem informacao de tipo de rede"
+      expected: "isNetInfoOnline trata state.isConnected === null como online (comportamento existente)"
+
+  # ---------------------------------------------------------------------------
+  # IMPLEMENTATION NOTES
+  # ---------------------------------------------------------------------------
+
+  implementation_notes: >
+    ARQUITETURA:
+    - Criar pasta src/__tests__/integration/ para separar dos testes unitarios
+    - Arquivo setup-integration.ts com helpers reutilizaveis (NAO alterar setup.ts existente)
+    - Cada arquivo de teste importa TestWrapper e createMockAuthContext do setup
+    - Vitest config NAO precisa mudar (pattern src/**/*.test.{ts,tsx} ja cobre)
+    - Package.json: adicionar script "test:integration" com pattern filter (opcional)
+
+    MOCKING STRATEGY:
+    - Supabase client: vi.mock('../lib/supabase') com chainable query builder mock
+    - NetInfo: vi.mock('@react-native-community/netinfo') com addEventListener mock
+    - expo-notifications: vi.mock('expo-notifications') com dummy handlers
+    - expo-linking: vi.mock('expo-linking') com openURL mock
+    - Alert: vi.spyOn(Alert, 'alert') para testar confirmacoes
+    - AsyncStorage: ja mockado em setup.ts (reutilizar)
+    - React Navigation: vi.mock('@react-navigation/native') se necessario para
+      useNavigation/useRoute
+
+    PATTERNS:
+    - renderHook do @testing-library/react-native para hooks
+    - render do @testing-library/react-native para componentes
+    - waitFor para aguardar estados assincronos
+    - act() para wrapping de state updates
+    - createTestQueryClient com retry: false, gcTime: 0, staleTime: 0
+
+    NAO ALTERAR:
+    - Nenhum arquivo de teste existente
+    - Nenhum arquivo de codigo fonte
+    - vitest.config.ts
+    - src/__tests__/setup.ts
+
+    CONTAGEM ESTIMADA:
+    - ~30 acceptance criteria = ~60-80 test cases (it blocks)
+    - 4 arquivos de teste + 1 setup = 5 novos arquivos
+    - 0 arquivos existentes modificados

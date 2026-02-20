@@ -1,0 +1,848 @@
+# =============================================================================
+# ARCH_M023.yaml
+# Architecture for Batch 12 - Integration Tests
+# Feature: F082
+# CR: CR-139
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Add integration tests covering core user flows: hooks with Supabase+ReactQuery,
+    SyncProvider orchestration, AuthContext flow, and component-hook data flow.
+    Zero changes to existing source code or test files.
+  principles:
+    - "Isolation: Integration tests live in src/__tests__/integration/ separate from unit tests"
+    - "Reusability: Shared setup-integration.ts provides TestWrapper, mock factories, and cleanup"
+    - "Determinism: TestQueryClient with retry:false, gcTime:0, staleTime:0"
+    - "No source changes: Only new test files created; no modifications to app code or existing tests"
+    - "Chainable mock: Supabase mock replicates PostgREST chainable query builder pattern"
+    - "Real wrappers: QueryClientProvider and AuthContext used as real providers (not shallow)"
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │  Integration Test Infrastructure                                            │
+  │                                                                             │
+  │  setup-integration.ts                                                       │
+  │  ├── createTestQueryClient() ─── retry:false, gcTime:0, staleTime:0        │
+  │  ├── TestWrapper ────────────── QueryClientProvider + mock AuthContext       │
+  │  ├── createMockAuthContext() ── defaults to bishopric, ward-1               │
+  │  ├── mockSupabaseFrom() ────── chainable query builder mock                 │
+  │  ├── createMockSupabaseAuth()─ getSession, signIn, signOut, onAuthChange    │
+  │  └── Mock data factories ───── createMockActor, Speech, Member, etc.        │
+  │                                                                             │
+  │  ┌────────────────────────────┐  ┌────────────────────────────┐             │
+  │  │ hooks-supabase.test.ts    │  │ sync-provider.test.ts      │             │
+  │  │ 9 hooks x (fetch+mutate)  │  │ SyncProvider orchestration │             │
+  │  │ renderHook + waitFor      │  │ useConnection + OfflineBan  │             │
+  │  │ Supabase mock chain       │  │ useRealtimeSync channel    │             │
+  │  │ Cache invalidation check  │  │ Polling fallback           │             │
+  │  └────────────────────────────┘  └────────────────────────────┘             │
+  │  ┌────────────────────────────┐  ┌────────────────────────────┐             │
+  │  │ auth-flow.test.ts         │  │ components-hooks.test.tsx  │             │
+  │  │ AuthProvider mount        │  │ ActorSelector + useActors  │             │
+  │  │ Session extraction        │  │ SearchInput debounce       │             │
+  │  │ signIn / signOut          │  │ OfflineBanner visibility   │             │
+  │  │ hasPermission delegation  │  │ StatusChangeModal options  │             │
+  │  │ Ward language             │  │ MemberSelectorModal filter │             │
+  │  └────────────────────────────┘  │ HymnSelector rendering   │             │
+  │                                  └────────────────────────────┘             │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+  Data flow per test category:
+
+  Category 1 (Hooks):
+    Test → renderHook(useXxx) → hook calls supabase.from('table') → mock returns data
+        → hook processes via React Query → test asserts data/loading/error states
+        → mutation test → mutateAsync → supabase.from().insert/update/delete (mock)
+        → onSuccess → queryClient.invalidateQueries → assert cache invalidation
+
+  Category 2 (SyncProvider):
+    Test → render(<SyncProvider>) → useConnection reads NetInfo mock
+        → useRealtimeSync subscribes supabase.channel() mock
+        → channel events → invalidateQueries / startPolling
+        → OfflineBanner props driven by showOfflineBanner state
+
+  Category 3 (AuthContext):
+    Test → render(<AuthProvider>) → supabase.auth.getSession() mock
+        → onAuthStateChange listener → setSession → derived role/wardId/userName
+        → signIn/signOut → supabase.auth methods → context updates
+
+  Category 4 (Components):
+    Test → render(<Component>) with TestWrapper → component calls hook
+        → hook fetches from mocked Supabase → component renders data
+        → user interaction (press/type) → callback fired → assert
+
+# =============================================================================
+# COMPONENTS (new files)
+# =============================================================================
+
+components:
+  # --- Setup Infrastructure ---
+  - name: "setup-integration.ts"
+    path: "src/__tests__/integration/setup-integration.ts"
+    responsibility: "Shared test infrastructure: TestWrapper, mock factories, Supabase mock helpers, cleanup"
+    dependencies: []
+    exports:
+      - name: "createTestQueryClient"
+        description: "Creates a QueryClient with retry:false, gcTime:0, staleTime:0 for deterministic tests"
+      - name: "TestWrapper"
+        description: >
+          React component wrapping children in QueryClientProvider + mock AuthContext.
+          Accepts optional overrides for auth context values.
+      - name: "createMockAuthContext"
+        description: >
+          Factory returning AuthContextValue with defaults: role='bishopric', wardId='ward-1',
+          userName='Test User', session with mock user, loading=false.
+          Accepts partial overrides.
+      - name: "mockSupabaseFrom"
+        description: >
+          Returns a chainable mock object mirroring Supabase PostgREST query builder.
+          Supports: select, insert, update, delete, eq, gte, lte, in, or, order,
+          range, single, maybeSingle. Each returns the chain. Terminal calls
+          (single/maybeSingle/then) resolve with configurable {data, error}.
+      - name: "createMockSupabaseAuth"
+        description: >
+          Mock for supabase.auth with: getSession, signInWithPassword, signOut,
+          onAuthStateChange (returns subscription with unsubscribe).
+      - name: "createMockActor / createMockMember / createMockSpeech / createMockHymn / createMockAgenda / createMockSundayException / createMockTopic / createMockActivityLog"
+        description: >
+          Type-safe factory functions returning database entity objects with sensible defaults.
+          Each accepts partial overrides. All include ward_id='ward-1' default.
+    detail: |
+      KEY DESIGN: The setup file does NOT call vi.mock() itself. Each test file
+      calls vi.mock('../lib/supabase') (and other modules) at its own top level.
+      The setup file only exports helper functions and factory utilities.
+
+      This avoids mock scope issues where vi.mock() in a shared file would
+      affect all importing test files unpredictably.
+
+      TestWrapper composition:
+        function TestWrapper({ children, authOverrides }) {
+          const queryClient = createTestQueryClient();
+          const authValue = createMockAuthContext(authOverrides);
+          return (
+            <QueryClientProvider client={queryClient}>
+              <AuthContext.Provider value={authValue}>
+                {children}
+              </AuthContext.Provider>
+            </QueryClientProvider>
+          );
+        }
+
+      NOTE: TestWrapper accesses AuthContext.Provider directly (not via AuthProvider)
+      to avoid triggering the real useEffect that calls supabase.auth.getSession().
+      This is the standard pattern for integration testing with context mocks.
+
+  # --- Category 1: Hooks + Supabase + ReactQuery ---
+  - name: "hooks-supabase.integration.test.ts"
+    path: "src/__tests__/integration/hooks-supabase.integration.test.ts"
+    responsibility: "Integration tests for 9 hooks interacting with mocked Supabase via React Query"
+    dependencies: ["setup-integration.ts"]
+    covers_acs: [AC-082-01, AC-082-02, AC-082-03, AC-082-04, AC-082-05, AC-082-06, AC-082-07, AC-082-08, AC-082-09, AC-082-10, AC-082-11, AC-082-12]
+    covers_ecs: [EC-082-01, EC-082-02, EC-082-03, EC-082-04, EC-082-05, EC-082-06]
+    hooks_tested:
+      - hook: "useActors"
+        tests:
+          - "fetch returns actors from mocked Supabase (AC-082-01)"
+          - "useCreateActor invalidates cache on success (AC-082-02)"
+          - "useUpdateActor/useDeleteActor invalidate cache"
+          - "returns empty array when Supabase errors (EC-082-01)"
+          - "does not fetch when wardId is empty (EC-082-02)"
+      - hook: "useAgenda"
+        tests:
+          - "useLazyCreateAgenda inserts when no agenda exists (AC-082-03)"
+          - "useUpdateAgenda sends partial update"
+      - hook: "useSpeeches"
+        tests:
+          - "fetch speeches for date range (AC-082-04)"
+          - "useAssignSpeaker sets member_id and status (AC-082-05)"
+          - "useChangeStatus validates transition before update (AC-082-06)"
+          - "useChangeStatus rejects invalid transition"
+          - "useRemoveAssignment resets speaker fields"
+      - hook: "useMembers"
+        tests:
+          - "fetch with ward_id filter (AC-082-07)"
+          - "useCreateMember/useUpdateMember/useDeleteMember invalidate cache"
+      - hook: "useHymns"
+        tests:
+          - "fetch hymns by language (AC-082-08)"
+          - "isLoading transitions from true to false"
+      - hook: "useTopics (useWardTopics)"
+        tests:
+          - "useCreateWardTopic invalidates cache (AC-082-09)"
+      - hook: "useSundayList"
+        tests:
+          - "generates sundays within date range (AC-082-10, pure hook no Supabase)"
+      - hook: "useSundayTypes (useSundayExceptions)"
+        tests:
+          - "useSetSundayType upserts exception (AC-082-11)"
+      - hook: "useActivityLog"
+        tests:
+          - "fetch log entries ordered by created_at desc (AC-082-12)"
+    mocking_strategy: |
+      vi.mock('../../lib/supabase') at file top level.
+      vi.mock('../../lib/activityLog') to stub logAction (avoid side effects).
+      vi.mock('../../i18n') to stub getCurrentLanguage -> 'pt-BR'.
+      Each test uses mockSupabaseFrom() to configure return values per test.
+      Tests use renderHook from @testing-library/react-native with TestWrapper.
+    detail: |
+      SUPABASE MOCK CHAIN PATTERN:
+      The mock must support the chainable PostgREST pattern used by all hooks:
+        supabase.from('table').select('*').eq('ward_id', 'ward-1').order(...)
+
+      Implementation: mockSupabaseFrom() returns a Proxy-based object where
+      every method returns the same chain object, and terminal methods
+      (.single(), .maybeSingle(), or direct await) resolve with configured data.
+
+      Example test structure:
+        it('fetch returns actors from Supabase', async () => {
+          const mockActors = [createMockActor({ name: 'Actor 1' })];
+          mockSupabaseFrom('meeting_actors', { data: mockActors, error: null });
+
+          const { result } = renderHook(() => useActors(), { wrapper: TestWrapper });
+          await waitFor(() => expect(result.current.isLoading).toBe(false));
+          expect(result.current.data).toEqual(mockActors);
+        });
+
+      CACHE INVALIDATION PATTERN:
+        const queryClient = createTestQueryClient();
+        const spy = vi.spyOn(queryClient, 'invalidateQueries');
+        // ... render hook, call mutation
+        await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: actorKeys.all }));
+
+  # --- Category 2: SyncProvider Orchestration ---
+  - name: "sync-provider.integration.test.ts"
+    path: "src/__tests__/integration/sync-provider.integration.test.ts"
+    responsibility: "Integration tests for SyncProvider orchestrating sub-hooks"
+    dependencies: ["setup-integration.ts"]
+    covers_acs: [AC-082-13, AC-082-14, AC-082-15, AC-082-16, AC-082-17]
+    covers_ecs: [EC-082-07]
+    tests:
+      - "SyncProvider renders children and OfflineBanner (AC-082-13)"
+      - "OfflineBanner visible when NetInfo reports offline (AC-082-14)"
+      - "useRealtimeSync subscribes to channel with wardId (AC-082-15)"
+      - "useRealtimeSync falls back to polling on CHANNEL_ERROR (AC-082-16)"
+      - "useRealtimeSync invalidates all on SUBSCRIBED reconnect (AC-082-17)"
+      - "NetInfo null isConnected treated as online (EC-082-07)"
+    mocking_strategy: |
+      vi.mock('../../lib/supabase') for supabase.channel() and supabase.removeChannel().
+      vi.mock('@react-native-community/netinfo') for addEventListener.
+      vi.mock('../../hooks/useNotifications') to stub push notification hooks.
+      vi.mock('react-i18next') for useTranslation.
+      Uses render() from @testing-library/react-native with children.
+    detail: |
+      NETINFO MOCK PATTERN:
+      Mock @react-native-community/netinfo with:
+        - addEventListener: vi.fn() that captures the callback
+        - Trigger online/offline by calling the captured callback with state objects:
+          { isConnected: true, isInternetReachable: true }
+          { isConnected: false, isInternetReachable: false }
+          { isConnected: null, isInternetReachable: null }  // EC-082-07
+
+      SUPABASE CHANNEL MOCK:
+      Mock supabase.channel() to return an object with:
+        - on(event, filter, callback): stores callback, returns chain
+        - subscribe(callback): stores subscribe callback, returns channel
+        - unsubscribe(): vi.fn()
+      Test triggers events by calling stored callbacks with status values:
+        subscribeCallback('SUBSCRIBED')
+        subscribeCallback('CHANNEL_ERROR')
+
+      POLLING VERIFICATION:
+      Use vi.useFakeTimers() to test polling fallback:
+        - After CHANNEL_ERROR, advance timers by POLLING_INTERVAL_MS
+        - Assert queryClient.invalidateQueries called
+
+  # --- Category 3: AuthContext Flow ---
+  - name: "auth-flow.integration.test.ts"
+    path: "src/__tests__/integration/auth-flow.integration.test.ts"
+    responsibility: "Integration tests for AuthProvider lifecycle and auth operations"
+    dependencies: ["setup-integration.ts"]
+    covers_acs: [AC-082-18, AC-082-19, AC-082-20, AC-082-21, AC-082-22, AC-082-23, AC-082-24]
+    tests:
+      - "AuthProvider initializes session from Supabase on mount (AC-082-18)"
+      - "AuthProvider extracts role=secretary from app_metadata (AC-082-19)"
+      - "AuthProvider defaults role to observer when missing (AC-082-20)"
+      - "signIn calls supabase.auth.signInWithPassword and updates context (AC-082-21)"
+      - "signOut calls supabase.auth.signOut and clears session (AC-082-22)"
+      - "hasPermission returns true for bishopric speech_assign (AC-082-23)"
+      - "hasPermission returns false for observer settings_access (AC-082-24)"
+    mocking_strategy: |
+      vi.mock('../../lib/supabase') with createMockSupabaseAuth().
+      vi.mock('../../i18n') to stub changeLanguage.
+      This file tests the REAL AuthProvider component (not a mock).
+      Uses renderHook(useAuth) inside <AuthProvider> wrapper.
+    detail: |
+      AUTH MOCK PATTERN:
+      createMockSupabaseAuth() returns:
+        auth: {
+          getSession: vi.fn().mockResolvedValue({
+            data: { session: mockSession },
+            error: null,
+          }),
+          signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
+          signOut: vi.fn().mockResolvedValue({ error: null }),
+          onAuthStateChange: vi.fn((callback) => {
+            authChangeCallback = callback;
+            return { data: { subscription: { unsubscribe: vi.fn() } } };
+          }),
+        }
+
+      The test triggers auth state changes by calling the captured callback:
+        authChangeCallback('SIGNED_IN', mockSession);
+        authChangeCallback('SIGNED_OUT', null);
+
+      SESSION FACTORY:
+      createMockSession({ role, wardId, userName }) returns:
+        {
+          access_token: 'mock-token',
+          user: {
+            id: 'user-1',
+            email: 'test@test.com',
+            app_metadata: { role, ward_id: wardId, full_name: userName },
+          },
+        }
+
+      PERMISSION TESTS:
+      Test hasPermission by rendering useAuth within AuthProvider with specific
+      role in the session, then calling hasPermission with various Permission values.
+      These tests verify the integration between AuthContext and permissions.ts.
+
+  # --- Category 4: Components + Hooks Data Flow ---
+  - name: "components-hooks.integration.test.tsx"
+    path: "src/__tests__/integration/components-hooks.integration.test.tsx"
+    responsibility: "Integration tests for components consuming data from hooks"
+    dependencies: ["setup-integration.ts"]
+    covers_acs: [AC-082-25, AC-082-26, AC-082-27, AC-082-28, AC-082-29, AC-082-30]
+    tests:
+      - "ActorSelector renders actors filtered by role (AC-082-25)"
+      - "SearchInput debounce triggers callback after delay (AC-082-26)"
+      - "OfflineBanner visible/hidden based on visible prop (AC-082-27)"
+      - "StatusChangeModal shows valid transitions excluding not_assigned (AC-082-28)"
+      - "MemberSelectorModal renders and filters members by search (AC-082-29)"
+      - "HymnSelector renders hymns from useHymns (AC-082-30)"
+    mocking_strategy: |
+      vi.mock('../../lib/supabase') for hook data.
+      vi.mock('react-i18next') with useTranslation returning key passthrough.
+      vi.mock('../../contexts/ThemeContext') with mock colors.
+      Uses render() from @testing-library/react-native with TestWrapper.
+      Uses fireEvent for user interactions (press, changeText).
+      Uses act() + fake timers for debounce tests.
+    detail: |
+      COMPONENT RENDERING PATTERN:
+      Components are rendered with real hooks inside TestWrapper. The hooks
+      fetch from mocked Supabase. The test verifies the component renders
+      the correct data and responds to user interactions.
+
+        render(
+          <TestWrapper authOverrides={{ role: 'bishopric' }}>
+            <ActorSelector visible={true} roleFilter="can_preside"
+              onSelect={mockOnSelect} onClose={mockOnClose} />
+          </TestWrapper>
+        );
+
+      DEBOUNCE TESTING (SearchInput AC-082-26):
+      Use vi.useFakeTimers(). Fire changeText events, advance timers,
+      assert callback not called during typing but called after debounce.
+
+      STATUS CHANGE MODAL (AC-082-28):
+      Render StatusChangeModal with currentStatus='assigned_not_invited'.
+      Assert options shown: assigned_invited, assigned_confirmed, gave_up.
+      Assert not_assigned is NOT shown (filtered by allowedStatuses prop).
+
+      I18N MOCK:
+      vi.mock('react-i18next') returns useTranslation with t function that
+      returns the key itself (passthrough). This allows testing text presence
+      without depending on actual translations.
+
+      THEME MOCK:
+      vi.mock('../../contexts/ThemeContext') returns useTheme with mock colors
+      object. This avoids needing the real ThemeProvider in the render tree.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # --- setup-integration.ts exports ---
+  - name: "createTestQueryClient"
+    component: "setup-integration.ts"
+    methods:
+      - name: "createTestQueryClient()"
+        input: "void"
+        output: "QueryClient"
+        notes: >
+          Returns new QueryClient({
+            defaultOptions: {
+              queries: { retry: false, gcTime: 0, staleTime: 0 },
+              mutations: { retry: false },
+            },
+          })
+
+  - name: "TestWrapper"
+    component: "setup-integration.ts"
+    methods:
+      - name: "TestWrapper"
+        input: "{ children: ReactNode, authOverrides?: Partial<AuthContextValue> }"
+        output: "JSX.Element (QueryClientProvider + AuthContext.Provider)"
+        notes: >
+          Creates fresh QueryClient per render. Merges authOverrides into
+          default mock auth context. Does NOT use real AuthProvider.
+
+  - name: "createMockAuthContext"
+    component: "setup-integration.ts"
+    methods:
+      - name: "createMockAuthContext(overrides?)"
+        input: "Partial<AuthContextValue> | undefined"
+        output: "AuthContextValue"
+        notes: |
+          Defaults:
+            session: mockSession (bishopric)
+            user: mockSession.user
+            role: 'bishopric'
+            wardId: 'ward-1'
+            userName: 'Test User'
+            loading: false
+            signIn: vi.fn()
+            signOut: vi.fn()
+            hasPermission: (perm) => hasPermission('bishopric', perm)
+
+  - name: "mockSupabaseFrom"
+    component: "setup-integration.ts"
+    methods:
+      - name: "mockSupabaseFrom(table, response)"
+        input: "table: string, response: { data: any, error: any }"
+        output: "void (configures mock for next supabase.from(table) call)"
+        notes: |
+          Configures the vi.mocked(supabase).from mock to return a chainable
+          query builder that resolves with the given response.
+          Chain methods: select, insert, update, delete, eq, neq, gte, lte,
+          in, or, order, range, single, maybeSingle, limit.
+          All chain methods return the builder. Terminal resolution returns response.
+
+  - name: "createMockSupabaseAuth"
+    component: "setup-integration.ts"
+    methods:
+      - name: "createMockSupabaseAuth(options?)"
+        input: "{ session?: Session | null } | undefined"
+        output: "{ auth: MockAuthObject, getAuthChangeCallback: () => Function }"
+        notes: |
+          Returns mock supabase.auth with getSession, signInWithPassword, signOut,
+          onAuthStateChange. getAuthChangeCallback() returns the captured callback
+          so tests can trigger auth state changes manually.
+
+  - name: "Mock data factories"
+    component: "setup-integration.ts"
+    methods:
+      - name: "createMockActor(overrides?)"
+        input: "Partial<MeetingActor>"
+        output: "MeetingActor"
+        notes: "Defaults: id='actor-1', ward_id='ward-1', name='Test Actor', all roles false"
+      - name: "createMockMember(overrides?)"
+        input: "Partial<Member>"
+        output: "Member"
+        notes: "Defaults: id='member-1', ward_id='ward-1', full_name='Test Member'"
+      - name: "createMockSpeech(overrides?)"
+        input: "Partial<Speech>"
+        output: "Speech"
+        notes: "Defaults: id='speech-1', ward_id='ward-1', status='not_assigned', position=1"
+      - name: "createMockHymn(overrides?)"
+        input: "Partial<Hymn>"
+        output: "Hymn"
+        notes: "Defaults: id='hymn-1', language='pt-BR', number=1, title='Test Hymn'"
+      - name: "createMockAgenda(overrides?)"
+        input: "Partial<SundayAgenda>"
+        output: "SundayAgenda"
+        notes: "Defaults: id='agenda-1', ward_id='ward-1', has_baby_blessing=false"
+      - name: "createMockSundayException(overrides?)"
+        input: "Partial<SundayException>"
+        output: "SundayException"
+        notes: "Defaults: id='exception-1', ward_id='ward-1', reason='speeches'"
+      - name: "createMockTopic(overrides?)"
+        input: "Partial<WardTopic>"
+        output: "WardTopic"
+        notes: "Defaults: id='topic-1', ward_id='ward-1', title='Test Topic'"
+      - name: "createMockActivityLog(overrides?)"
+        input: "Partial<ActivityLog>"
+        output: "ActivityLog"
+        notes: "Defaults: id='log-1', ward_id='ward-1', action='test:action'"
+
+  # --- Test file contracts (what each test verifies) ---
+  - name: "hooks-supabase integration contract"
+    component: "hooks-supabase.integration.test.ts"
+    methods:
+      - name: "Hook fetch integration"
+        input: "mocked Supabase response via mockSupabaseFrom()"
+        output: "hook.data matches mocked data; hook.isLoading transitions to false"
+        notes: "Tests: renderHook → waitFor → assert data/loading/error"
+      - name: "Hook mutation integration"
+        input: "mutateAsync(input) call"
+        output: "Supabase insert/update/delete called; queryClient.invalidateQueries called with correct key"
+        notes: "Tests: renderHook → call mutation → waitFor → assert Supabase calls + cache invalidation"
+      - name: "Hook error integration"
+        input: "Supabase mock returns error"
+        output: "hook.isError === true; hook.error contains message"
+        notes: "Tests EC-082-01, EC-082-03"
+      - name: "Hook disabled integration"
+        input: "wardId='' in AuthContext"
+        output: "hook does not fire query; data is undefined"
+        notes: "Tests EC-082-02"
+
+  - name: "sync-provider integration contract"
+    component: "sync-provider.integration.test.ts"
+    methods:
+      - name: "SyncProvider render"
+        input: "children components"
+        output: "children rendered; OfflineBanner in tree"
+        notes: "AC-082-13"
+      - name: "Offline detection"
+        input: "NetInfo callback with isConnected=false"
+        output: "OfflineBanner visible"
+        notes: "AC-082-14"
+      - name: "Realtime subscription"
+        input: "wardId + isOnline=true"
+        output: "supabase.channel('ward-sync-{wardId}') called; channel.subscribe() called"
+        notes: "AC-082-15"
+      - name: "Polling fallback"
+        input: "channel status = 'CHANNEL_ERROR'"
+        output: "setInterval started; invalidateAll called on tick"
+        notes: "AC-082-16"
+      - name: "Reconnect invalidation"
+        input: "channel status = 'SUBSCRIBED' after previous disconnect"
+        output: "invalidateQueries called for all SYNCED_TABLES"
+        notes: "AC-082-17"
+
+  - name: "auth-flow integration contract"
+    component: "auth-flow.integration.test.ts"
+    methods:
+      - name: "Session initialization"
+        input: "supabase.auth.getSession() returns mock session"
+        output: "useAuth() returns session, user, role, wardId, loading=false"
+        notes: "AC-082-18"
+      - name: "Role extraction"
+        input: "app_metadata.role = 'secretary'"
+        output: "useAuth().role === 'secretary'"
+        notes: "AC-082-19"
+      - name: "Role default"
+        input: "app_metadata without role field"
+        output: "useAuth().role === 'observer'"
+        notes: "AC-082-20"
+      - name: "signIn flow"
+        input: "signIn('user@test.com', 'password')"
+        output: "supabase.auth.signInWithPassword called; onAuthStateChange triggers; session updated"
+        notes: "AC-082-21"
+      - name: "signOut flow"
+        input: "signOut()"
+        output: "supabase.auth.signOut called; session becomes null"
+        notes: "AC-082-22"
+      - name: "Permission check"
+        input: "hasPermission('speech_assign') with bishopric role"
+        output: "returns true"
+        notes: "AC-082-23"
+      - name: "Permission denial"
+        input: "hasPermission('settings_access') with observer role"
+        output: "returns false"
+        notes: "AC-082-24"
+
+  - name: "components-hooks integration contract"
+    component: "components-hooks.integration.test.tsx"
+    methods:
+      - name: "ActorSelector data flow"
+        input: "useActors returns 3 actors; roleFilter='can_preside'"
+        output: "Only actors with can_preside=true rendered"
+        notes: "AC-082-25"
+      - name: "SearchInput debounce"
+        input: "User types 'Maria' with fireEvent.changeText"
+        output: "onChangeText called; clear button appears when text present"
+        notes: "AC-082-26 - SearchInput is synchronous (no built-in debounce). Debounce is in parent component. Test verifies SearchInput renders correctly with value and clear."
+      - name: "OfflineBanner rendering"
+        input: "visible=true / visible=false"
+        output: "Banner shown/hidden accordingly"
+        notes: "AC-082-27"
+      - name: "StatusChangeModal options"
+        input: "currentStatus='assigned_not_invited', allowedStatuses excludes 'not_assigned'"
+        output: "Options: assigned_invited, assigned_confirmed, gave_up"
+        notes: "AC-082-28"
+      - name: "MemberSelectorModal filter"
+        input: "useMembers returns 5 members; user types 'Mar'"
+        output: "Filtered members whose name contains 'Mar' shown"
+        notes: "AC-082-29"
+      - name: "HymnSelector data"
+        input: "useHymns returns hymn list"
+        output: "Hymns rendered in the selector"
+        notes: "AC-082-30"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Apenas novos arquivos de teste."
+  entities: []
+  notes:
+    - "Testes usam mock data factories que geram objetos conformes aos tipos de database.ts"
+    - "Nenhuma tabela criada, alterada ou consultada diretamente"
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Apenas arquivos de teste adicionados."
+  notes:
+    - "Testes nao interagem com backend real"
+    - "Mock data nao contem credenciais reais"
+    - "Nenhum arquivo de codigo fonte alterado"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Apenas arquivos de teste adicionados."
+  notes:
+    - "vitest.config.ts ja inclui pattern src/**/*.test.{ts,tsx} que cobre o novo diretorio"
+    - "Testes de integracao executam junto com testes unitarios via 'npm test'"
+    - "Pode-se filtrar com 'npx vitest --dir src/__tests__/integration' se necessario"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-057
+    title: "Chainable Supabase mock via Proxy pattern for integration tests"
+    context: >
+      All hooks use the Supabase PostgREST chainable query builder:
+      supabase.from('table').select('*').eq('ward_id', x).order(...).
+      Options: (a) mock each method individually per test, (b) create a reusable
+      chainable mock factory, (c) use a Supabase local emulator.
+    decision: >
+      Create mockSupabaseFrom() helper in setup-integration.ts that returns a
+      Proxy-based chainable mock. Every method call returns the same chain.
+      Terminal methods resolve with configurable {data, error}. This avoids
+      30+ individual mock setups per test and stays deterministic (no emulator).
+    consequences:
+      - "Pro: Single mock setup per test via mockSupabaseFrom('table', { data, error })"
+      - "Pro: Mirrors real Supabase API; tests break if hook changes query pattern"
+      - "Pro: No external dependency (emulator) needed"
+      - "Con: Must be maintained if Supabase JS SDK adds new methods"
+      - "Tradeoff accepted: chain pattern is stable since SDK v2"
+
+  - id: ADR-058
+    title: "TestWrapper uses AuthContext.Provider directly, not AuthProvider"
+    context: >
+      Testing hooks that depend on useAuth() requires an auth context.
+      Options: (a) use real AuthProvider (triggers getSession, onAuthStateChange),
+      (b) use AuthContext.Provider directly with mock value, (c) mock useAuth hook.
+    decision: >
+      TestWrapper wraps children in AuthContext.Provider with mock value from
+      createMockAuthContext(). This avoids real AuthProvider side effects while
+      testing hooks in a realistic provider tree. Auth-flow tests are the
+      exception: they test the real AuthProvider separately.
+    consequences:
+      - "Pro: Hooks get real context values without side effects"
+      - "Pro: Tests can override any auth field via authOverrides"
+      - "Pro: auth-flow tests validate the real AuthProvider independently"
+      - "Con: AuthContext must be exported from AuthContext.tsx (already exported as context)"
+      - "Note: AuthContext is already exported as the const, just not explicitly. May need to add a named export."
+
+  - id: ADR-059
+    title: "vi.mock() called per test file, not in shared setup"
+    context: >
+      setup-integration.ts could call vi.mock('../../lib/supabase') to mock
+      Supabase for all test files that import it. But vi.mock() has module-scope
+      hoisting behavior that can cause unexpected interactions between test files.
+    decision: >
+      Each test file calls its own vi.mock() at the top level. setup-integration.ts
+      only exports helper functions (createTestQueryClient, TestWrapper, factories).
+      This keeps mock scope explicit and avoids cross-file mock contamination.
+    consequences:
+      - "Pro: Each test file controls its own mock scope"
+      - "Pro: No hidden mock state from imports"
+      - "Con: Some vi.mock() lines repeated across 4 test files"
+      - "Tradeoff accepted: explicit is better than implicit for test reliability"
+
+  - id: ADR-060
+    title: "AuthContext export for direct Provider usage in tests"
+    context: >
+      TestWrapper needs to use <AuthContext.Provider value={...}> directly.
+      AuthContext is currently a const in AuthContext.tsx but not exported.
+      Options: (a) export AuthContext, (b) create a separate test-only export,
+      (c) mock useAuth instead.
+    decision: >
+      Export the AuthContext const from AuthContext.tsx so TestWrapper can use
+      AuthContext.Provider directly. This is the standard React testing pattern.
+      The export does not change runtime behavior. If the project prefers not to
+      export it, the alternative is to mock useAuth via vi.mock, which is
+      acceptable but less realistic for integration tests.
+    consequences:
+      - "Pro: Standard React context testing pattern"
+      - "Pro: Minimal change (add 'export' keyword)"
+      - "Con: AuthContext internals slightly more exposed"
+      - "Alternative: If export is rejected, use vi.mock('../contexts/AuthContext') to mock useAuth directly"
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - path: "src/__tests__/integration/setup-integration.ts"
+    action: create
+    feature: F082
+    change: >
+      Test infrastructure: createTestQueryClient, TestWrapper, createMockAuthContext,
+      mockSupabaseFrom, createMockSupabaseAuth, 8 mock data factory functions.
+
+  - path: "src/__tests__/integration/hooks-supabase.integration.test.ts"
+    action: create
+    feature: F082
+    change: >
+      Integration tests for 9 hooks (useActors, useAgenda, useSpeeches, useMembers,
+      useHymns, useTopics, useSundayList, useSundayTypes, useActivityLog) with
+      mocked Supabase. Covers AC-082-01 through AC-082-12 and EC-082-01 through EC-082-06.
+
+  - path: "src/__tests__/integration/sync-provider.integration.test.ts"
+    action: create
+    feature: F082
+    change: >
+      Integration tests for SyncProvider, useConnection, useRealtimeSync,
+      useOfflineQueueProcessor orchestration. Covers AC-082-13 through AC-082-17
+      and EC-082-07.
+
+  - path: "src/__tests__/integration/auth-flow.integration.test.ts"
+    action: create
+    feature: F082
+    change: >
+      Integration tests for AuthProvider lifecycle: session init, role extraction,
+      signIn, signOut, hasPermission. Covers AC-082-18 through AC-082-24.
+
+  - path: "src/__tests__/integration/components-hooks.integration.test.tsx"
+    action: create
+    feature: F082
+    change: >
+      Integration tests for components consuming hook data: ActorSelector,
+      SearchInput, OfflineBanner, StatusChangeModal, MemberSelectorModal,
+      HymnSelector. Covers AC-082-25 through AC-082-30.
+
+  - path: "src/contexts/AuthContext.tsx"
+    action: modify
+    feature: F082
+    change: >
+      Export AuthContext const (add 'export' keyword to existing const declaration).
+      No runtime behavior change. Required for TestWrapper to use AuthContext.Provider
+      directly (ADR-060). ALTERNATIVE: if export is not desired, tests will mock
+      useAuth via vi.mock instead.
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  file_organization:
+    description: "All integration tests in src/__tests__/integration/"
+    detail: |
+      src/__tests__/integration/
+        setup-integration.ts          # Shared infrastructure (no tests)
+        hooks-supabase.integration.test.ts    # Category 1: 9 hooks
+        sync-provider.integration.test.ts     # Category 2: SyncProvider
+        auth-flow.integration.test.ts         # Category 3: AuthContext
+        components-hooks.integration.test.tsx  # Category 4: Components
+
+      Naming convention: *.integration.test.{ts,tsx}
+      Vitest pattern src/**/*.test.{ts,tsx} already covers this directory.
+
+  mock_architecture:
+    description: "Layered mock strategy"
+    detail: |
+      Layer 1 - setup.ts (existing): AsyncStorage mock (shared with unit tests)
+      Layer 2 - setup-integration.ts (new): Helper functions and factories
+      Layer 3 - Each test file: vi.mock() calls for Supabase and other modules
+
+      Mocked modules per test file:
+      ┌─────────────────────────────────┬──────┬──────┬──────┬──────┐
+      │ Module                          │ Hook │ Sync │ Auth │ Comp │
+      ├─────────────────────────────────┼──────┼──────┼──────┼──────┤
+      │ ../../lib/supabase              │  ✓   │  ✓   │  ✓   │  ✓   │
+      │ ../../lib/activityLog           │  ✓   │      │      │      │
+      │ ../../i18n                      │  ✓   │      │  ✓   │      │
+      │ @react-native-community/netinfo │      │  ✓   │      │      │
+      │ ../../hooks/useNotifications    │      │  ✓   │      │      │
+      │ react-i18next                   │      │  ✓   │      │  ✓   │
+      │ ../../contexts/ThemeContext      │      │      │      │  ✓   │
+      │ expo-notifications              │      │  ✓   │      │      │
+      │ expo-linking                    │      │  ✓   │      │      │
+      └─────────────────────────────────┴──────┴──────┴──────┴──────┘
+
+  test_patterns:
+    description: "Common test patterns used across all files"
+    detail: |
+      PATTERN 1: Hook fetch test
+        it('fetches X', async () => {
+          mockSupabaseFrom('table', { data: [...], error: null });
+          const { result } = renderHook(() => useX(), { wrapper: TestWrapper });
+          await waitFor(() => expect(result.current.isLoading).toBe(false));
+          expect(result.current.data).toEqual([...]);
+        });
+
+      PATTERN 2: Hook mutation test
+        it('creates X and invalidates cache', async () => {
+          mockSupabaseFrom('table', { data: mockItem, error: null });
+          const { result } = renderHook(() => useCreateX(), { wrapper: TestWrapper });
+          await act(async () => {
+            await result.current.mutateAsync(input);
+          });
+          // Assert Supabase called correctly
+          // Assert cache invalidated
+        });
+
+      PATTERN 3: Component render with hook data
+        it('renders X from useY', async () => {
+          mockSupabaseFrom('table', { data: [...], error: null });
+          const { getByText, queryByText } = render(
+            <TestWrapper><Component {...props} /></TestWrapper>
+          );
+          await waitFor(() => expect(getByText('expected')).toBeTruthy());
+        });
+
+      PATTERN 4: Error case
+        it('handles Supabase error', async () => {
+          mockSupabaseFrom('table', { data: null, error: { message: 'DB error' } });
+          const { result } = renderHook(() => useX(), { wrapper: TestWrapper });
+          await waitFor(() => expect(result.current.isError).toBe(true));
+        });
+
+  estimated_test_count:
+    hooks_supabase: "~25-30 test cases (9 hooks x ~3 tests avg)"
+    sync_provider: "~8-10 test cases"
+    auth_flow: "~8-10 test cases"
+    components_hooks: "~10-12 test cases"
+    total: "~50-62 test cases across 4 files"
+
+  no_changes:
+    description: "Files explicitly NOT modified"
+    list:
+      - "src/__tests__/setup.ts (existing setup, used by both unit and integration tests)"
+      - "vitest.config.ts (pattern already covers new directory)"
+      - "Any existing test file in src/__tests__/*.test.ts"
+      - "Any source code file (hooks, components, contexts, lib) except optional AuthContext export"
+      - "package.json (no new dependencies needed)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica (setup, hooks, sync, auth, components)
+  GATE-03: true  # Contratos definidos com input/output para cada integracao
+  GATE-04: true  # ADRs registrados (ADR-057, ADR-058, ADR-059, ADR-060)
+  GATE-05: true  # ARCH_M023.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # 5 componentes (files), 1 feature

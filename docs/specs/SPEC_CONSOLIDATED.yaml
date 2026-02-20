@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-19"
-  total_features: 81
-  total_change_requests: 138
+  total_features: 82
+  total_change_requests: 139
   implemented_crs: 96
-  pending_crs: 40
+  pending_crs: 41
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -48,6 +48,7 @@ metadata:
     - docs/specs/SPEC_F079.yaml
     - docs/specs/SPEC_F080.yaml
     - docs/specs/SPEC_F081.yaml
+    - docs/specs/SPEC_F082.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1574,8 +1575,33 @@ features:
       - "CR-19: Adicionou botao de voltar na tela"
       - "CR-22: Tornou descricoes human-readable"
 
+  # ---------------------------------------------------------------------------
+  # Testing Infrastructure (F082)
+  # ---------------------------------------------------------------------------
+
+  - id: F082
+    name: "Integration Tests (hooks, providers, component-hook data flow)"
+    status: pending
+    rfs: []
+    description: >
+      Testes de integracao que verificam a interacao entre modulos reais do app:
+      hooks + Supabase mockado + React Query, SyncProvider orquestrando sub-hooks,
+      AuthContext com fluxo de sessao, componentes consumindo dados de hooks.
+      Usa renderHook/render do @testing-library/react-native com wrappers reais
+      (QueryClientProvider, AuthContext mock) e Supabase client mockado.
+      4 categorias: (1) 9 hooks CRUD com Supabase, (2) SyncProvider orchestration,
+      (3) AuthContext flow, (4) Components + hooks data flow.
+      NAO sao testes e2e (nao usam backend real).
+    modified_by_crs: [139]
+    spec_file: "docs/specs/SPEC_F082.yaml"
+    notes:
+      - "CR-139: Adicionar testes de integracao ao projeto"
+      - "30 acceptance criteria, ~60-80 test cases"
+      - "5 novos arquivos (4 test files + 1 setup), 0 arquivos existentes modificados"
+      - "Infraestrutura ja suporta: Vitest 4 + @testing-library/react-native 13"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (30 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 Phase 1 + Batch 8 Phase 2 + Batch 9 Phase 1 + Batch 9 Phase 2 + Batch 10 Phase 1 + Batch 10 Phase 2)
+# PENDING CHANGE REQUESTS (41 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12)
 # =============================================================================
 
 pending_crs:
@@ -2338,6 +2364,33 @@ pending_crs:
       - src/i18n/locales/pt-BR.json
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
+
+  # --- Batch 12 (Integration Tests) ---
+
+  - id: 139
+    type: testing
+    area: "Testing Infrastructure"
+    feature_id: F082
+    spec_file: "docs/specs/SPEC_F082.yaml"
+    related_crs: []
+    description: >
+      Adicionar testes de integracao ao projeto. 4 categorias: hooks + Supabase
+      mockado + React Query, SyncProvider orchestration, AuthContext flow,
+      components + hooks data flow. Usa renderHook/render com wrappers reais
+      e Supabase mockado. 30 ACs, 5 novos arquivos, 0 modificacoes.
+    acceptance_criteria:
+      - "9 hooks testados com Supabase mockado + React Query (fetch, create, update, delete)"
+      - "SyncProvider orchestration testada (connection, realtime, offline queue)"
+      - "AuthContext flow testado (session init, role extraction, signIn, signOut, permissions)"
+      - "Components + hooks data flow testado (ActorSelector, SearchInput, OfflineBanner, StatusChangeModal, MemberSelectorModal, HymnSelector)"
+      - "Todos testes unitarios existentes continuam passando sem modificacao"
+      - "Nenhum arquivo de codigo fonte modificado"
+    files_likely_impacted:
+      - src/__tests__/integration/setup-integration.ts
+      - src/__tests__/integration/hooks-supabase.integration.test.ts
+      - src/__tests__/integration/sync-provider.integration.test.ts
+      - src/__tests__/integration/auth-flow.integration.test.ts
+      - src/__tests__/integration/components-hooks.integration.test.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -3406,3 +3459,10 @@ cr_history:
       - "docs/specs/SPEC_F080.yaml (CR-137: Checkbox UX for recognizing presence)"
       - "docs/specs/SPEC_F081.yaml (CR-138: Actor delete confirmation text)"
     summary: "Status options regression fix (show all except current and not_assigned in both InviteActionDropdown and StatusChangeModal), custom name hint text improvement, Agenda tab initial scroll to center next sunday, checkbox-style UX for multi-select recognizing presence, actor delete confirmation text context-specific."
+
+  batch_12:
+    range: "CR-139"
+    status: "1 pendente (139)"
+    files:
+      - "docs/specs/SPEC_F082.yaml (CR-139: Integration tests)"
+    summary: "Integration tests covering hooks+Supabase+ReactQuery, SyncProvider orchestration, AuthContext flow, and component-hook data flow. 30 acceptance criteria, 5 new files, 0 existing files modified."

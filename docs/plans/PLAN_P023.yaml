@@ -1,0 +1,542 @@
+# =============================================================================
+# PLAN_P023.yaml
+# Implementation Plan for Batch 12 - Integration Tests
+# Feature: F082
+# CR: CR-139
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Adicionar testes de integracao ao projeto cobrindo 4 categorias: (1) Hooks +
+  Supabase + ReactQuery (9 hooks com fetch, mutacao e invalidacao de cache),
+  (2) SyncProvider com orquestracao de sub-hooks (useConnection, useRealtimeSync,
+  useOfflineQueueProcessor), (3) AuthContext com fluxo de sessao, roles e
+  permissoes, (4) Componentes consumindo dados de hooks (ActorSelector,
+  SearchInput, OfflineBanner, StatusChangeModal, MemberSelectorModal,
+  HymnSelector). 5 novos arquivos de teste + 1 modificacao minima em
+  AuthContext.tsx (export do const AuthContext). Zero mudancas em codigo de
+  producao, testes existentes ou vitest.config.ts.
+
+strategy:
+  order: "Setup infrastructure -> Happy path hooks -> SyncProvider -> AuthContext -> Components -> Edge cases (within each file) -> Hardening (verify all tests pass)"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Cada step produz um arquivo de teste completo que roda independentemente"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: Export AuthContext const (pre-requisito para TestWrapper)
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/contexts/AuthContext.tsx, adicionar 'export' ao const AuthContext na
+      linha 31:
+        De:  const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+        Para: export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+      Esta e a unica mudanca em codigo fonte do projeto. E necessaria para que
+      o TestWrapper do setup-integration.ts possa usar AuthContext.Provider
+      diretamente, sem usar o AuthProvider real (que dispara side effects).
+      Conforme ADR-060 do ARCH_M023. Nenhuma mudanca de runtime.
+    files:
+      - "src/contexts/AuthContext.tsx"
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "AuthContext exportado com 'export const AuthContext = createContext<...>'"
+      - "Nenhuma outra mudanca no arquivo"
+      - "Nenhum erro de TypeScript (tsc)"
+      - "pnpm test roda sem falha (testes existentes nao afetados)"
+    tests:
+      - type: unit
+        description: "Verificar que AuthContext e exportavel (import { AuthContext } from '../contexts/AuthContext')"
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Expor AuthContext pode permitir uso indevido em codigo de producao"
+        mitigation: "AuthContext ja era acessivel via useAuth(). Export e padrao React para testes. Nao muda comportamento."
+
+  # =========================================================================
+  # STEP-02: Criar setup-integration.ts (infraestrutura de teste)
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Criar src/__tests__/integration/setup-integration.ts com toda a
+      infraestrutura compartilhada para testes de integracao:
+      (1) createTestQueryClient(): QueryClient com retry:false, gcTime:0,
+          staleTime:0 para testes deterministicos.
+      (2) TestWrapper: componente React que envolve children em
+          QueryClientProvider + AuthContext.Provider com mock value. Aceita
+          authOverrides para customizar valores do contexto de auth.
+      (3) createMockAuthContext(overrides?): factory que retorna AuthContextValue
+          com defaults (role:'bishopric', wardId:'ward-1', userName:'Test User',
+          loading:false, signIn:vi.fn(), signOut:vi.fn(), hasPermission delegando
+          para permissions.ts).
+      (4) mockSupabaseFrom(table, response): configura mock do supabase.from()
+          para retornar chainable query builder que resolve com {data, error}.
+          Suporta: select, insert, update, delete, upsert, eq, neq, gte, lte,
+          in, or, order, range, single, maybeSingle, limit, throwOnError.
+      (5) createMockSupabaseAuth(options?): factory para mock de supabase.auth
+          com getSession, signInWithPassword, signOut, onAuthStateChange.
+          Retorna { auth, getAuthChangeCallback } para controle manual.
+      (6) 8 mock data factories: createMockActor, createMockMember,
+          createMockSpeech, createMockHymn, createMockAgenda,
+          createMockSundayException, createMockTopic, createMockActivityLog.
+          Cada factory retorna objeto type-safe com defaults sensatos e
+          aceita partial overrides.
+      NOTA: setup-integration.ts NAO chama vi.mock(). Cada arquivo de teste
+      chama seus proprios vi.mock() no top level (ADR-059).
+    files:
+      - "src/__tests__/integration/setup-integration.ts"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Arquivo criado em src/__tests__/integration/setup-integration.ts"
+      - "createTestQueryClient exportado e retorna QueryClient com retry:false, gcTime:0"
+      - "TestWrapper exportado e renderiza children em QueryClientProvider + AuthContext.Provider"
+      - "createMockAuthContext exportado com defaults para bishopric role"
+      - "mockSupabaseFrom exportado e configura chainable mock"
+      - "createMockSupabaseAuth exportado com getSession, signIn, signOut, onAuthStateChange"
+      - "8 mock data factories exportadas com defaults type-safe"
+      - "Nenhuma chamada a vi.mock() no arquivo"
+      - "TypeScript compila sem erros"
+    tests:
+      - type: unit
+        description: "Arquivo de setup nao contem testes proprios. Validacao via uso nos 4 arquivos de teste."
+    covers:
+      acceptance_criteria: []
+      edge_cases: ["EC-082-04", "EC-082-05"]
+    risks:
+      - risk: "Mock chainable pode nao cobrir todos os metodos do PostgREST builder"
+        mitigation: "Implementar via Proxy pattern que retorna o mesmo chain para qualquer metodo desconhecido (ADR-057)"
+
+  # =========================================================================
+  # STEP-03: Criar hooks-supabase.integration.test.ts (Cat. 1)
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Criar src/__tests__/integration/hooks-supabase.integration.test.ts com
+      testes de integracao para 9 hooks interagindo com Supabase mockado via
+      React Query:
+      (1) useActors: fetch retorna actors do Supabase (AC-082-01), create
+          invalida cache (AC-082-02), update/delete invalidam cache, erro do
+          Supabase retorna isError (EC-082-01), wardId vazio nao dispara query
+          (EC-082-02).
+      (2) useAgenda: lazy create insere quando nao existe agenda (AC-082-03),
+          update envia partial update.
+      (3) useSpeeches: fetch por date range (AC-082-04), assign speaker muda
+          status (AC-082-05), change status valida transicao (AC-082-06),
+          transicao invalida rejeitada.
+      (4) useMembers: fetch com ward isolation (AC-082-07), create/update/delete
+          invalidam cache.
+      (5) useHymns: fetch retorna hinos (AC-082-08), isLoading transiciona.
+      (6) useTopics: create invalida cache (AC-082-09).
+      (7) useSundayList: fetch sundays com exceptions (AC-082-10).
+      (8) useSundayTypes: update exception type (AC-082-11).
+      (9) useActivityLog: fetch log entries (AC-082-12).
+      Edge cases cobertos inline: Supabase error (EC-082-01), wardId vazio
+      (EC-082-02), mutation failure (EC-082-03), retry false (EC-082-04),
+      shared cache (EC-082-05), hook unmount (EC-082-06).
+      Usa renderHook + waitFor do @testing-library/react-native com TestWrapper.
+    files:
+      - "src/__tests__/integration/hooks-supabase.integration.test.ts"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "Arquivo criado em src/__tests__/integration/"
+      - "vi.mock('../../lib/supabase') no topo do arquivo"
+      - "vi.mock('../../lib/activityLog') para stub logAction"
+      - "vi.mock('../../i18n') para stub getCurrentLanguage"
+      - "9 describe blocks (um por hook)"
+      - "~25-30 test cases (it blocks)"
+      - "Todos os 12 ACs da categoria 1 cobertos (AC-082-01 a AC-082-12)"
+      - "Todos os 6 ECs cobertos (EC-082-01 a EC-082-06)"
+      - "pnpm test roda sem falha (testes novos + existentes)"
+    tests:
+      - type: integration
+        description: "Testes de integracao hook-Supabase-ReactQuery para 9 hooks com fetch, mutacao, cache invalidation, error handling"
+    covers:
+      acceptance_criteria: ["AC-082-01", "AC-082-02", "AC-082-03", "AC-082-04", "AC-082-05", "AC-082-06", "AC-082-07", "AC-082-08", "AC-082-09", "AC-082-10", "AC-082-11", "AC-082-12"]
+      edge_cases: ["EC-082-01", "EC-082-02", "EC-082-03", "EC-082-04", "EC-082-05", "EC-082-06"]
+    risks:
+      - risk: "Hooks podem ter dependencias internas nao previstas no mock"
+        mitigation: "Analisar imports de cada hook e adicionar vi.mock() conforme necessario. activityLog ja previsto."
+      - risk: "Chainable mock pode nao cobrir combinacoes especificas de filtros"
+        mitigation: "Cada teste configura mockSupabaseFrom com dados especificos. Chain resolve com dados configurados independente dos filtros."
+
+  # =========================================================================
+  # STEP-04: Criar sync-provider.integration.test.ts (Cat. 2)
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Criar src/__tests__/integration/sync-provider.integration.test.ts com
+      testes de integracao para SyncProvider e seus sub-hooks:
+      (1) SyncProvider renderiza children e OfflineBanner (AC-082-13).
+      (2) OfflineBanner visivel quando NetInfo reporta offline (AC-082-14).
+      (3) useRealtimeSync se inscreve no channel Supabase com wardId (AC-082-15).
+      (4) useRealtimeSync faz fallback para polling em CHANNEL_ERROR (AC-082-16).
+      (5) useRealtimeSync invalida queries ao reconectar SUBSCRIBED (AC-082-17).
+      (6) NetInfo null isConnected tratado como online (EC-082-07).
+      Usa render() do @testing-library/react-native com children.
+      Mocks: supabase.channel(), @react-native-community/netinfo,
+      useNotifications, react-i18next. Usa vi.useFakeTimers() para polling.
+    files:
+      - "src/__tests__/integration/sync-provider.integration.test.ts"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-03", "STEP-05", "STEP-06"]
+    done_when:
+      - "Arquivo criado em src/__tests__/integration/"
+      - "vi.mock('../../lib/supabase') para channel() e removeChannel()"
+      - "vi.mock('@react-native-community/netinfo') para addEventListener"
+      - "vi.mock('../../hooks/useNotifications') para stub"
+      - "vi.mock('react-i18next') para useTranslation"
+      - "~8-10 test cases (it blocks)"
+      - "5 ACs cobertos (AC-082-13 a AC-082-17)"
+      - "1 EC coberto (EC-082-07)"
+      - "Fake timers para teste de polling"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: integration
+        description: "Testes de integracao para SyncProvider com NetInfo, Supabase Realtime, polling fallback e invalidacao de cache"
+    covers:
+      acceptance_criteria: ["AC-082-13", "AC-082-14", "AC-082-15", "AC-082-16", "AC-082-17"]
+      edge_cases: ["EC-082-07"]
+    risks:
+      - risk: "SyncProvider pode ter side effects complexos na montagem"
+        mitigation: "Mockar todos os hooks externos (NetInfo, Supabase, notifications) para isolar comportamento"
+      - risk: "vi.useFakeTimers() pode interferir com outros mecanismos async"
+        mitigation: "Usar vi.useRealTimers() em afterEach. Configurar shouldAdvanceTime se necessario."
+
+  # =========================================================================
+  # STEP-05: Criar auth-flow.integration.test.ts (Cat. 3)
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Criar src/__tests__/integration/auth-flow.integration.test.ts com testes
+      de integracao para AuthProvider e fluxo de autenticacao:
+      (1) AuthProvider inicializa sessao do Supabase no mount (AC-082-18).
+      (2) AuthProvider extrai role=secretary do app_metadata (AC-082-19).
+      (3) AuthProvider default role observer quando ausente (AC-082-20).
+      (4) signIn chama supabase.auth.signInWithPassword e atualiza contexto
+          (AC-082-21).
+      (5) signOut chama supabase.auth.signOut e limpa sessao (AC-082-22).
+      (6) hasPermission retorna true para bishopric speech_assign (AC-082-23).
+      (7) hasPermission retorna false para observer settings_access (AC-082-24).
+      Este arquivo testa o AuthProvider REAL (nao mock). Usa renderHook(useAuth)
+      dentro de <AuthProvider>. Mock de supabase.auth via createMockSupabaseAuth.
+      Controle manual de auth state changes via callback capturado.
+    files:
+      - "src/__tests__/integration/auth-flow.integration.test.ts"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-03", "STEP-04", "STEP-06"]
+    done_when:
+      - "Arquivo criado em src/__tests__/integration/"
+      - "vi.mock('../../lib/supabase') com createMockSupabaseAuth()"
+      - "vi.mock('../../i18n') para stub changeLanguage"
+      - "Testa AuthProvider REAL (nao mock)"
+      - "Usa renderHook(useAuth) dentro de <AuthProvider>"
+      - "~8-10 test cases (it blocks)"
+      - "7 ACs cobertos (AC-082-18 a AC-082-24)"
+      - "Auth state changes triggados via callback capturado"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: integration
+        description: "Testes de integracao para AuthProvider com sessao, roles, signIn, signOut, hasPermission"
+    covers:
+      acceptance_criteria: ["AC-082-18", "AC-082-19", "AC-082-20", "AC-082-21", "AC-082-22", "AC-082-23", "AC-082-24"]
+      edge_cases: []
+    risks:
+      - risk: "AuthProvider real pode ter useEffect timing issues"
+        mitigation: "Usar waitFor para aguardar states assincronos. act() para wrapping de updates."
+      - risk: "onAuthStateChange callback pode ser chamado durante getSession"
+        mitigation: "Configurar mock getSession antes de render. Callback triggado manualmente apos mount."
+
+  # =========================================================================
+  # STEP-06: Criar components-hooks.integration.test.tsx (Cat. 4)
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Criar src/__tests__/integration/components-hooks.integration.test.tsx com
+      testes de integracao para componentes consumindo dados de hooks:
+      (1) ActorSelector renderiza actors filtrados por role (AC-082-25).
+      (2) SearchInput debounce trigga callback apos delay (AC-082-26).
+      (3) OfflineBanner visivel/hidden baseado em visible prop (AC-082-27).
+      (4) StatusChangeModal mostra transicoes validas excluindo not_assigned
+          (AC-082-28).
+      (5) MemberSelectorModal renderiza e filtra membros por busca (AC-082-29).
+      (6) HymnSelector renderiza hinos de useHymns (AC-082-30).
+      Usa render() do @testing-library/react-native com TestWrapper.
+      Mocks: supabase, react-i18next (key passthrough), ThemeContext (mock colors).
+      Usa fireEvent para interacoes, act() + fake timers para debounce.
+    files:
+      - "src/__tests__/integration/components-hooks.integration.test.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "Arquivo criado em src/__tests__/integration/"
+      - "vi.mock('../../lib/supabase') para hook data"
+      - "vi.mock('react-i18next') com t key passthrough"
+      - "vi.mock('../../contexts/ThemeContext') com mock colors"
+      - "~10-12 test cases (it blocks)"
+      - "6 ACs cobertos (AC-082-25 a AC-082-30)"
+      - "Componentes renderizados com hooks reais + Supabase mockado"
+      - "fireEvent para interacoes de usuario"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: integration
+        description: "Testes de integracao para componentes com hooks: ActorSelector, SearchInput, OfflineBanner, StatusChangeModal, MemberSelectorModal, HymnSelector"
+    covers:
+      acceptance_criteria: ["AC-082-25", "AC-082-26", "AC-082-27", "AC-082-28", "AC-082-29", "AC-082-30"]
+      edge_cases: []
+    risks:
+      - risk: "Componentes podem ter dependencias de navegacao ou modais"
+        mitigation: "Mock @react-navigation/native e modais conforme necessario. Foco na renderizacao e dados."
+      - risk: "Componentes podem ter estilos que dependem de Dimensions ou Platform"
+        mitigation: "React Native testing library ja mocka ambiente basico. Platform.OS ja mockado."
+
+  # =========================================================================
+  # STEP-07: Validacao final e hardening
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Validacao final: executar pnpm test e verificar que TODOS os testes passam
+      (unitarios existentes + novos testes de integracao). Verificar:
+      (1) Nenhum teste existente quebrado.
+      (2) Todos os 30 ACs cobertos por pelo menos 1 teste.
+      (3) Todos os 7 ECs cobertos por pelo menos 1 teste.
+      (4) ~50-62 test cases novos passando.
+      (5) Nenhum warning de TypeScript.
+      (6) vitest.config.ts NAO alterado (pattern src/**/*.test.{ts,tsx} ja cobre).
+      (7) src/__tests__/setup.ts NAO alterado.
+      (8) Nenhum arquivo de codigo fonte alterado (exceto AuthContext.tsx export).
+      Se algum teste falhar, corrigir o mock ou o teste (NUNCA o codigo de producao).
+    files:
+      - "src/__tests__/integration/hooks-supabase.integration.test.ts"
+      - "src/__tests__/integration/sync-provider.integration.test.ts"
+      - "src/__tests__/integration/auth-flow.integration.test.ts"
+      - "src/__tests__/integration/components-hooks.integration.test.tsx"
+    dependencies: ["STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "pnpm test roda sem falha (todos os testes passam)"
+      - "Nenhum teste existente quebrado"
+      - "30 ACs cobertos por pelo menos 1 teste cada"
+      - "7 ECs cobertos por pelo menos 1 teste cada"
+      - "~50-62 test cases novos passando"
+      - "Zero warnings de TypeScript"
+      - "vitest.config.ts inalterado"
+      - "setup.ts inalterado"
+      - "Nenhum codigo de producao alterado (exceto AuthContext export)"
+    tests:
+      - type: integration
+        description: "Full test suite run: todos os testes unitarios e de integracao passando"
+    covers:
+      acceptance_criteria: ["AC-082-01", "AC-082-02", "AC-082-03", "AC-082-04", "AC-082-05", "AC-082-06", "AC-082-07", "AC-082-08", "AC-082-09", "AC-082-10", "AC-082-11", "AC-082-12", "AC-082-13", "AC-082-14", "AC-082-15", "AC-082-16", "AC-082-17", "AC-082-18", "AC-082-19", "AC-082-20", "AC-082-21", "AC-082-22", "AC-082-23", "AC-082-24", "AC-082-25", "AC-082-26", "AC-082-27", "AC-082-28", "AC-082-29", "AC-082-30"]
+      edge_cases: ["EC-082-01", "EC-082-02", "EC-082-03", "EC-082-04", "EC-082-05", "EC-082-06", "EC-082-07"]
+    risks:
+      - risk: "Testes flakey por timing de async operations"
+        mitigation: "Usar waitFor com timeout adequado. act() em state updates. retry:false no QueryClient."
+
+  # =========================================================================
+  # STEP-08: Documentacao do projeto
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 12
+          (F082) com arquivos impactados.
+      (2) .devteam/project-status.yaml - atualizar fase/batch atual.
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - marcar PLAN_P023 como completed.
+      (4) docs/tests/TEST_CONSOLIDATED.yaml - adicionar testes de F082.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch12"
+      - "project-status.yaml atualizado"
+      - "PLAN_CONSOLIDATED tem PLAN_P023 com status completed"
+      - "TEST_CONSOLIDATED atualizado com testes de F082"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- Category 1: Hooks + Supabase + ReactQuery (AC-082-01 to AC-082-12) ---
+
+  - ac_id: AC-082-01
+    how_to_verify: "renderHook(useActors) com TestWrapper retorna data com actors mockados, isLoading false"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-02
+    how_to_verify: "useCreateActor.mutateAsync trigga queryClient.invalidateQueries com actorKeys.all"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-03
+    how_to_verify: "useLazyCreateAgenda.mutateAsync insere agenda com ward_id e defaults corretos"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-04
+    how_to_verify: "renderHook(useSpeeches) retorna 6 speeches ordenados por sunday_date e position"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-05
+    how_to_verify: "useAssignSpeaker.mutateAsync atualiza member_id, speaker_name, speaker_phone, status"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-06
+    how_to_verify: "useChangeStatus.mutateAsync valida transicao antes de chamar Supabase update"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-07
+    how_to_verify: "renderHook(useMembers) com wardId='ward-1' filtra por .eq('ward_id', 'ward-1')"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-08
+    how_to_verify: "renderHook(useHymns) retorna hinos com isLoading transitando de true para false"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-09
+    how_to_verify: "useCreateTopic.mutateAsync trigga invalidateQueries com topicKeys.all"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-10
+    how_to_verify: "renderHook(useSundayList) retorna sundays com exception data merged"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-11
+    how_to_verify: "useSetSundayType.mutateAsync chama Supabase upsert e invalida cache"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-082-12
+    how_to_verify: "renderHook(useActivityLog) retorna entries ordenados por created_at desc"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  # --- Category 2: SyncProvider Orchestration (AC-082-13 to AC-082-17) ---
+
+  - ac_id: AC-082-13
+    how_to_verify: "SyncProvider renderiza children e OfflineBanner presente no output"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-082-14
+    how_to_verify: "OfflineBanner recebe visible=true quando NetInfo.isConnected=false"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-082-15
+    how_to_verify: "supabase.channel() chamado com 'ward-sync-{wardId}'; channel.subscribe() chamado"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-082-16
+    how_to_verify: "Apos CHANNEL_ERROR, polling iniciado com setInterval; invalidateAll chamado"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-082-17
+    how_to_verify: "Apos reconexao SUBSCRIBED, invalidateQueries chamado para SYNCED_TABLES"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  # --- Category 3: AuthContext + Flow (AC-082-18 to AC-082-24) ---
+
+  - ac_id: AC-082-18
+    how_to_verify: "Apos mount, useAuth retorna session, user, role, wardId, loading=false"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-19
+    how_to_verify: "Com app_metadata.role='secretary', useAuth().role === 'secretary'"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-20
+    how_to_verify: "Sem app_metadata.role, useAuth().role === 'observer'"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-21
+    how_to_verify: "signIn chama supabase.auth.signInWithPassword; session atualizada no contexto"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-22
+    how_to_verify: "signOut chama supabase.auth.signOut; session torna-se null"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-23
+    how_to_verify: "hasPermission('speech_assign') com bishopric retorna true"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-082-24
+    how_to_verify: "hasPermission('settings_access') com observer retorna false"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  # --- Category 4: Components + Hooks Data Flow (AC-082-25 to AC-082-30) ---
+
+  - ac_id: AC-082-25
+    how_to_verify: "ActorSelector com roleFilter='can_preside' renderiza apenas actors com can_preside=true"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-082-26
+    how_to_verify: "SearchInput trigga onSearch callback apos debounce; nao durante digitacao"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-082-27
+    how_to_verify: "OfflineBanner visivel com visible=true; hidden com visible=false"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-082-28
+    how_to_verify: "StatusChangeModal com assigned_not_invited mostra 3 opcoes excluindo not_assigned e atual"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-082-29
+    how_to_verify: "MemberSelectorModal com 5 membros e busca 'Mar' mostra apenas membros com 'Mar' no nome"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-082-30
+    how_to_verify: "HymnSelector renderiza hinos retornados por useHymns"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  # --- Edge Cases ---
+
+  - ac_id: EC-082-01
+    how_to_verify: "Hook retorna isError=true quando Supabase mock retorna error"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-082-02
+    how_to_verify: "Hook com wardId='' nao dispara query; data undefined"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-082-03
+    how_to_verify: "Mutation que falha nao invalida cache (onSuccess nao executado)"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-082-04
+    how_to_verify: "TestQueryClient configurado com retry:false para testes deterministicos"
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  - ac_id: EC-082-05
+    how_to_verify: "useActors e useCreateActor compartilham mesmo QueryClient/cache"
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  - ac_id: EC-082-06
+    how_to_verify: "Hook desmontado antes de query completar nao causa memory leak"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-082-07
+    how_to_verify: "NetInfo com isConnected=null tratado como online"
+    covered_by_steps: ["STEP-04"]

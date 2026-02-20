@@ -352,10 +352,31 @@ export const SundayCard = React.memo(function SundayCard({
                 : ''}
             </Text>
           )}
+          {isSpeechesType && !expanded && (
+            <>
+              {[1, 2, 3].map((pos) => {
+                const speech = speeches.find((s) => s.position === pos);
+                const name = speech?.speaker_name ?? '';
+                const posLabel = pos === 3
+                  ? t('speeches.lastSpeech')
+                  : t('speeches.slot', { number: `${pos}\u00BA` });
+                return (
+                  <Text
+                    key={pos}
+                    style={[styles.speakerNameLine, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {`${posLabel}: ${name}`}
+                  </Text>
+                );
+              })}
+            </>
+          )}
         </View>
 
-        {isSpeechesType && (
-          <View style={styles.leds}>
+        {!expanded && isSpeechesType && (
+          <View style={styles.ledsVertical}>
             {speechStatuses.map((status, idx) => (
               <StatusLED
                 key={idx}
@@ -435,6 +456,13 @@ const styles = StyleSheet.create({
   leds: {
     flexDirection: 'row',
     gap: 6,
+  },
+  ledsVertical: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  speakerNameLine: {
+    fontSize: 11,
   },
   expandedContent: {
     paddingHorizontal: 12,

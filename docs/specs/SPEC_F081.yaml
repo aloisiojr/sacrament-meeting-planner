@@ -1,0 +1,115 @@
+# =============================================================================
+# SPEC_F081.yaml
+# Feature F081 / CR-138: Change actor delete confirmation text
+# Batch: 11
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 11
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F081
+  name: "Change actor delete confirmation text to context-specific message"
+  cr_id: 138
+  type: ui_text_change
+  priority: low
+  related_features: [F040]
+
+  user_request: >
+    "Trocar o texto 'Tem certeza que deseja excluir esse membro?' por 'Tem
+    certeza que deseja excluir essa pessoa da lista de pessoas que podem ser
+    escolhidas para serem reconhecidas durante a Reuniao Sacramental?' Fazer
+    para todas as linguas."
+
+  description: >
+    Alterar o texto de confirmacao de exclusao de ator no ActorSelector de
+    'Tem certeza que deseja excluir este membro?' (generico, compartilhado
+    com members/topics) para um texto especifico ao contexto de atores de
+    reuniao. Criar nova i18n key para nao afetar outros usos de
+    members.deleteConfirm.
+
+  current_behavior: >
+    ActorSelector.tsx handleDelete (linha 129): usa t('members.deleteConfirm')
+    que resolve para 'Tem certeza que deseja excluir este membro?' (pt-BR).
+    A mesma key e usada por settings/members.tsx para excluir membros da ala.
+
+  expected_behavior: >
+    ActorSelector.tsx handleDelete: usa nova i18n key (actors.deleteConfirm)
+    com texto especifico ao contexto. members.deleteConfirm permanece inalterada
+    para uso em members.
+
+  files_impacted:
+    - path: src/components/ActorSelector.tsx
+      changes:
+        - "Linha 129: trocar t('members.deleteConfirm') por t('actors.deleteConfirm')"
+
+    - path: src/i18n/locales/pt-BR.json
+      changes:
+        - "Adicionar secao 'actors' com key 'deleteConfirm'"
+        - "Texto: 'Tem certeza que deseja excluir essa pessoa da lista de pessoas que podem ser escolhidas para serem reconhecidas durante a Reunião Sacramental?'"
+
+    - path: src/i18n/locales/en.json
+      changes:
+        - "Adicionar secao 'actors' com key 'deleteConfirm'"
+        - "Texto: 'Are you sure you want to remove this person from the list of people who can be chosen to be acknowledged during Sacrament Meeting?'"
+
+    - path: src/i18n/locales/es.json
+      changes:
+        - "Adicionar secao 'actors' com key 'deleteConfirm'"
+        - "Texto: '¿Está seguro de que desea eliminar a esta persona de la lista de personas que pueden ser elegidas para ser reconocidas durante la Reunión Sacramental?'"
+
+  acceptance_criteria:
+    - id: AC-081-01
+      description: "ActorSelector usa nova key de i18n"
+      given: "ActorSelector.tsx handleDelete"
+      when: "Alert.alert exibido para confirmar exclusao"
+      then: "Usa nova i18n key actors.deleteConfirm (nao members.deleteConfirm)"
+
+    - id: AC-081-02
+      description: "Texto pt-BR conforme especificado"
+      given: "App em pt-BR"
+      when: "Confirmacao de exclusao de ator"
+      then: >
+        Exibe 'Tem certeza que deseja excluir essa pessoa da lista de pessoas
+        que podem ser escolhidas para serem reconhecidas durante a Reunião
+        Sacramental?'
+
+    - id: AC-081-03
+      description: "Texto en equivalente"
+      given: "App em en"
+      when: "Confirmacao de exclusao de ator"
+      then: >
+        Exibe 'Are you sure you want to remove this person from the list of
+        people who can be chosen to be acknowledged during Sacrament Meeting?'
+
+    - id: AC-081-04
+      description: "Texto es equivalente"
+      given: "App em es"
+      when: "Confirmacao de exclusao de ator"
+      then: >
+        Exibe '¿Está seguro de que desea eliminar a esta persona de la lista
+        de personas que pueden ser elegidas para ser reconocidas durante la
+        Reunión Sacramental?'
+
+    - id: AC-081-05
+      description: "members.deleteConfirm inalterada"
+      given: "Tela de membros em Settings"
+      when: "Confirmacao de exclusao de membro"
+      then: "Texto original de members.deleteConfirm preservado"
+
+  edge_cases:
+    - id: EC-081-01
+      case: "Nova i18n key ausente em algum locale"
+      expected: "Fallback para key name (comportamento padrao do i18next)"
+
+  implementation_notes: >
+    Criar nova secao 'actors' nos locales JSON (se nao existir) com key
+    'deleteConfirm'. Alterar ActorSelector.tsx linha 129 de
+    t('members.deleteConfirm') para t('actors.deleteConfirm'). Nenhuma outra
+    alteracao de codigo. NOTA: A palavra "actor/ator" aparece apenas na key
+    de i18n, nao na UI (respeitando BR-03).

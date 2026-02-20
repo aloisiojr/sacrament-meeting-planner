@@ -1,0 +1,668 @@
+# =============================================================================
+# ARCH_M022.yaml
+# Architecture for Batch 11 - Status Options Fix, UX Fixes & Text Changes
+# Features: F077, F078, F079, F080, F081
+# CRs: CR-134, CR-135, CR-136, CR-137, CR-138
+# Created: 2026-02-19
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Fix status transition options to show all except current and not_assigned, change custom name help text, fix Agenda tab initial scroll, add checkbox-style visual in ActorSelector multiselect, change actor delete confirmation text"
+  principles:
+    - "Consistencia: Status options seguem mesma regra em ambos os locais (InviteActionDropdown e StatusChangeModal)"
+    - "Simplicidade: VALID_TRANSITIONS expandido para full mesh entre status atribuidos"
+    - "Referencia: Scroll fix da Agenda replica padrao funcional da aba Speeches (viewPosition: 0.5)"
+    - "Clareza visual: Checkbox unicode resolve ambiguidade entre selecao e exclusao no multiselect"
+    - "Separacao: Nova i18n key actors.deleteConfirm isola texto de atores do texto de membros"
+    - "Zero migrations: Todas as mudancas sao client-side (UI/logic/i18n)"
+
+diagram: |
+  F077: useSpeeches.ts --[expandir]--> VALID_TRANSITIONS full mesh entre 4 status atribuidos
+        SpeechSlot.tsx --[remover]--> bloqueios de handleStatusPress para confirmed/gave_up
+        SpeechSlot.tsx --[remover]--> disabled prop para confirmed/gave_up
+        InviteActionDropdown.tsx --[dinamizar]--> opcoes baseadas em speech.status
+        StatusChangeModal.tsx --[nenhuma mudanca]--> ja funciona com VALID_TRANSITIONS expandido
+
+  F078: pt-BR.json --[alterar]--> agenda.customNameHint (texto mais descritivo)
+        en.json --[alterar]--> agenda.customNameHint
+        es.json --[alterar]--> agenda.customNameHint
+
+  F079: agenda.tsx --[adicionar]--> viewPosition: 0.5 no scrollToIndex inicial
+        agenda.tsx --[melhorar]--> onScrollToIndexFailed com retry + viewPosition: 0.5
+
+  F080: ActorSelector.tsx --[substituir]--> prefixo texto U+2713 por checkbox unicode
+        U+2611 (checked) / U+2610 (unchecked) renderizado como <Text> separado
+
+  F081: ActorSelector.tsx --[trocar]--> t('members.deleteConfirm') por t('actors.deleteConfirm')
+        pt-BR.json --[adicionar]--> secao 'actors' com key 'deleteConfirm'
+        en.json --[adicionar]--> secao 'actors' com key 'deleteConfirm'
+        es.json --[adicionar]--> secao 'actors' com key 'deleteConfirm'
+
+# =============================================================================
+# COMPONENTS (mudancas por feature)
+# =============================================================================
+
+components:
+  # --- F077: Status options fix ---
+  - name: "useSpeeches.ts"
+    feature: F077
+    responsibility: "Expandir VALID_TRANSITIONS para full mesh entre os 4 status atribuidos"
+    dependencies: []
+    change_detail: |
+      1. Alterar VALID_TRANSITIONS (linhas 59-65) para:
+           not_assigned: ['assigned_not_invited'],
+           assigned_not_invited: ['assigned_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+           assigned_invited: ['assigned_not_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+           assigned_confirmed: ['assigned_not_invited', 'assigned_invited', 'gave_up', 'not_assigned'],
+           gave_up: ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'not_assigned'],
+      2. Cada status atribuido pode transicionar para os outros 3 atribuidos + not_assigned (via unassign).
+      3. not_assigned -> [assigned_not_invited] permanece (fluxo de assign).
+      4. A funcao isValidTransition e getAvailableStatuses funcionam automaticamente.
+
+  - name: "SpeechSlot.tsx"
+    feature: F077
+    responsibility: "Remover bloqueios de handleStatusPress e disabled para assigned_confirmed e gave_up"
+    dependencies: ["useSpeeches.ts"]
+    change_detail: |
+      1. Alterar handleStatusPress (linhas 99-103):
+         De:
+           if (!canChangeStatus || !speech || status === 'not_assigned' ||
+               status === 'assigned_confirmed' || status === 'gave_up') return;
+         Para:
+           if (!canChangeStatus || !speech || status === 'not_assigned') return;
+      2. Alterar disabled prop do StatusLED (linhas 157-158):
+         De:
+           disabled={isObserver || status === 'not_assigned' ||
+                     status === 'assigned_confirmed' || status === 'gave_up'}
+         Para:
+           disabled={isObserver || status === 'not_assigned'}
+      3. StatusChangeModal recebe allowedStatuses={ledAllowedStatuses} (linhas 139-144)
+         que ja filtra not_assigned. Com VALID_TRANSITIONS expandido e allowedStatuses
+         filtrando not_assigned, o modal mostrara as 3 opcoes corretas.
+
+  - name: "InviteActionDropdown.tsx"
+    feature: F077
+    responsibility: "Gerar opcoes de status dinamicamente baseadas no speech.status atual"
+    dependencies: ["useSpeeches.ts"]
+    change_detail: |
+      1. Importar SpeechStatus type (ja importado).
+      2. Definir constante ALL_ASSIGNED_STATUSES dentro do componente:
+           const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
+             'assigned_not_invited',
+             'assigned_invited',
+             'assigned_confirmed',
+             'gave_up',
+           ];
+      3. Calcular opcoes dinamicas baseadas no speech.status atual:
+           const statusOptions = ALL_ASSIGNED_STATUSES.filter(
+             (s) => s !== speech?.status
+           );
+      4. Substituir os 3 Pressable hardcoded de status (linhas 95-153) por um .map:
+           {statusOptions.map((statusOption) => (
+             <Pressable
+               key={statusOption}
+               style={styles.optionRow}
+               onPress={() => {
+                 if (speech) {
+                   onChangeStatus(speech.id, statusOption);
+                 }
+               }}
+             >
+               <View
+                 style={[
+                   styles.indicator,
+                   { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
+                 ]}
+               />
+               <Text style={[styles.optionLabel, { color: colors.text }]}>
+                 {t(`speechStatus.${statusOption}`)}
+               </Text>
+             </Pressable>
+           ))}
+      5. A opcao WhatsApp (View conversation) permanece inalterada.
+      6. A opcao Cancel permanece inalterada.
+
+  - name: "StatusChangeModal.tsx"
+    feature: F077
+    responsibility: "Nenhuma alteracao de codigo necessaria"
+    dependencies: ["useSpeeches.ts"]
+    change_detail: |
+      StatusChangeModal ja funciona corretamente:
+      - getAvailableStatuses(currentStatus) retorna transicoes de VALID_TRANSITIONS
+      - allowedStatuses prop filtra not_assigned via ledAllowedStatuses no SpeechSlot
+      - Com VALID_TRANSITIONS expandido, getAvailableStatuses retornara os 3 status
+        atribuidos + not_assigned. allowedStatuses filtra not_assigned, sobrando 3 opcoes.
+      - Nenhuma mudanca necessaria.
+
+  # --- F078: Custom name help text ---
+  - name: "pt-BR.json"
+    feature: F078
+    responsibility: "Alterar agenda.customNameHint para novo texto"
+    dependencies: []
+    change_detail: |
+      Alterar na secao "agenda" (linha 227):
+      De:
+        "customNameHint": "Digite um nome para usar nome personalizado"
+      Para:
+        "customNameHint": "Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado"
+
+  - name: "en.json"
+    feature: F078
+    responsibility: "Alterar agenda.customNameHint para equivalente em ingles"
+    dependencies: []
+    change_detail: |
+      Alterar na secao "agenda" (linha 227):
+      De:
+        "customNameHint": "Type a name to use a custom name"
+      Para:
+        "customNameHint": "To choose a non-member, type the person's name and add as a custom name"
+
+  - name: "es.json"
+    feature: F078
+    responsibility: "Alterar agenda.customNameHint para equivalente em espanhol"
+    dependencies: []
+    change_detail: |
+      Alterar na secao "agenda" (linha 227):
+      De:
+        "customNameHint": "Escriba un nombre para usar un nombre personalizado"
+      Para:
+        "customNameHint": "Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado"
+
+  # --- F079: Agenda tab initial scroll fix ---
+  - name: "agenda.tsx"
+    feature: F079
+    responsibility: "Adicionar viewPosition: 0.5 ao scrollToIndex inicial e melhorar onScrollToIndexFailed"
+    dependencies: []
+    change_detail: |
+      MUDANCA 1 - viewPosition no scroll inicial:
+      1. Alterar useEffect (linhas 112-119), scrollToIndex na linha 116:
+         De:
+           flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+         Para:
+           flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false, viewPosition: 0.5 });
+
+      MUDANCA 2 - onScrollToIndexFailed com retry:
+      1. Alterar onScrollToIndexFailed (linhas 186-192):
+         De:
+           const onScrollToIndexFailed = useCallback(
+             (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+               const offset = info.averageItemLength * info.index;
+               flatListRef.current?.scrollToOffset({ offset, animated: false });
+             },
+             []
+           );
+         Para:
+           const onScrollToIndexFailed = useCallback(
+             (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+               const offset = info.averageItemLength * info.index;
+               flatListRef.current?.scrollToOffset({ offset, animated: false });
+               setTimeout(() => {
+                 flatListRef.current?.scrollToIndex({
+                   index: Math.min(info.index, listItems.length - 1),
+                   animated: false,
+                   viewPosition: 0.5,
+                 });
+               }, 100);
+             },
+             [listItems.length]
+           );
+
+      NOTA: handleToggle scroll (card expand) continua com viewPosition: 0 (posiciona
+      no topo). Apenas o scroll INICIAL usa viewPosition: 0.5 (centralizado).
+      Aba Speeches NAO e alterada (DD-53: viewPosition: 0.5 apenas na Agenda).
+
+  # --- F080: Checkbox visual in multiselect ---
+  - name: "ActorSelector.tsx"
+    feature: F080
+    responsibility: "Substituir prefixo texto checkmark por checkbox unicode visual"
+    dependencies: []
+    change_detail: |
+      1. Em renderItem (linhas 143-187), no bloco nao-editing (linha 161-165):
+         De:
+           <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+             <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
+               {isSelected ? '\u2713 ' : ''}{item.name}
+             </Text>
+           </Pressable>
+         Para:
+           <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+             {multiSelect && (
+               <Text style={[styles.checkbox, { color: colors.text }]}>
+                 {isSelected ? '\u2611' : '\u2610'}
+               </Text>
+             )}
+             <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
+               {item.name}
+             </Text>
+           </Pressable>
+      2. Adicionar estilo actorNameArea flexDirection: 'row' e alignItems: 'center':
+         Alterar styles.actorNameArea (linha 363-365):
+         De:
+           actorNameArea: {
+             flex: 1,
+           },
+         Para:
+           actorNameArea: {
+             flex: 1,
+             flexDirection: 'row',
+             alignItems: 'center',
+           },
+      3. Adicionar novo estilo checkbox:
+           checkbox: {
+             fontSize: 20,
+             marginRight: 8,
+           },
+      4. Em single-select mode (multiSelect falsy), nenhum checkbox renderizado.
+         Condicao {multiSelect && (...)} garante backward compatibility.
+
+  # --- F081: Actor delete confirmation text ---
+  - name: "ActorSelector.tsx (handleDelete)"
+    feature: F081
+    responsibility: "Trocar i18n key de members.deleteConfirm para actors.deleteConfirm"
+    dependencies: []
+    change_detail: |
+      1. Em handleDelete (linha 129):
+         De:
+           t('members.deleteConfirm')
+         Para:
+           t('actors.deleteConfirm')
+      2. Nenhuma outra mudanca de codigo.
+
+  - name: "pt-BR.json (actors section)"
+    feature: F081
+    responsibility: "Adicionar secao actors com key deleteConfirm"
+    dependencies: []
+    change_detail: |
+      Adicionar nova secao "actors" (apos secao "members" ou no final, antes do fechamento):
+        "actors": {
+          "deleteConfirm": "Tem certeza que deseja excluir essa pessoa da lista de pessoas que podem ser escolhidas para serem reconhecidas durante a Reunião Sacramental?"
+        }
+
+  - name: "en.json (actors section)"
+    feature: F081
+    responsibility: "Adicionar secao actors com key deleteConfirm"
+    dependencies: []
+    change_detail: |
+      Adicionar nova secao "actors":
+        "actors": {
+          "deleteConfirm": "Are you sure you want to remove this person from the list of people who can be chosen to be acknowledged during Sacrament Meeting?"
+        }
+
+  - name: "es.json (actors section)"
+    feature: F081
+    responsibility: "Adicionar secao actors com key deleteConfirm"
+    dependencies: []
+    change_detail: |
+      Adicionar nova secao "actors":
+        "actors": {
+          "deleteConfirm": "¿Está seguro de que desea eliminar a esta persona de la lista de personas que pueden ser elegidas para ser reconocidas durante la Reunión Sacramental?"
+        }
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  # F077 - Status transitions
+  - name: "VALID_TRANSITIONS expanded"
+    component: "useSpeeches.ts"
+    methods:
+      - name: "VALID_TRANSITIONS"
+        input: "SpeechStatus (current)"
+        output: "SpeechStatus[] (available transitions)"
+        notes: |
+          Full mesh para status atribuidos:
+          - assigned_not_invited -> [assigned_invited, assigned_confirmed, gave_up, not_assigned]
+          - assigned_invited -> [assigned_not_invited, assigned_confirmed, gave_up, not_assigned]
+          - assigned_confirmed -> [assigned_not_invited, assigned_invited, gave_up, not_assigned]
+          - gave_up -> [assigned_not_invited, assigned_invited, assigned_confirmed, not_assigned]
+          - not_assigned -> [assigned_not_invited] (fluxo de assign, inalterado)
+      - name: "getAvailableStatuses(current)"
+        input: "SpeechStatus"
+        output: "SpeechStatus[] (4 transicoes para status atribuidos, 1 para not_assigned)"
+        notes: "Funcao inalterada, resultados mudam por conta de VALID_TRANSITIONS expandido"
+      - name: "isValidTransition(from, to)"
+        input: "SpeechStatus, SpeechStatus"
+        output: "boolean"
+        notes: "Funcao inalterada, resultados mudam por conta de VALID_TRANSITIONS expandido"
+
+  - name: "SpeechSlot LED interaction"
+    component: "SpeechSlot.tsx"
+    methods:
+      - name: "handleStatusPress"
+        input: "canChangeStatus, speech, status"
+        output: "setStatusModalVisible(true) se canChangeStatus E speech existe E status !== 'not_assigned'"
+        notes: "Removidos bloqueios para assigned_confirmed e gave_up. Apenas not_assigned permanece bloqueado."
+      - name: "StatusLED disabled prop"
+        input: "isObserver, status"
+        output: "disabled={isObserver || status === 'not_assigned'}"
+        notes: "Removidos bloqueios para assigned_confirmed e gave_up"
+
+  - name: "InviteActionDropdown dynamic options"
+    component: "InviteActionDropdown.tsx"
+    methods:
+      - name: "statusOptions computation"
+        input: "speech?.status (SpeechStatus)"
+        output: "SpeechStatus[] - ALL_ASSIGNED_STATUSES filtrado pelo status atual"
+        notes: "Sempre 3 opcoes (4 status atribuidos menos o atual). not_assigned nunca incluido."
+      - name: "render status options"
+        input: "statusOptions: SpeechStatus[]"
+        output: "Pressable[] com LED indicator + label para cada opcao"
+        notes: "Usa STATUS_INDICATOR_COLORS e t('speechStatus.*') existentes"
+
+  # F078 - Custom name hint text
+  - name: "i18n agenda.customNameHint (updated)"
+    component: "i18n locales"
+    methods:
+      - name: "agenda.customNameHint"
+        input: "N/A"
+        output: |
+          pt-BR: 'Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado'
+          en: 'To choose a non-member, type the person's name and add as a custom name'
+          es: 'Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado'
+        notes: "Altera valor existente da key. Nao cria nova key."
+
+  # F079 - Agenda initial scroll
+  - name: "agenda.tsx initial scroll with viewPosition"
+    component: "agenda.tsx"
+    methods:
+      - name: "useEffect initial scroll"
+        input: "initialIndex, listItems.length"
+        output: "scrollToIndex({ index: initialIndex, animated: false, viewPosition: 0.5 })"
+        notes: "viewPosition: 0.5 centraliza o proximo domingo na tela"
+      - name: "onScrollToIndexFailed (improved)"
+        input: "info: { index, highestMeasuredFrameIndex, averageItemLength }"
+        output: "scrollToOffset imediato + setTimeout retry com scrollToIndex(viewPosition: 0.5)"
+        notes: "Retry apos scrollToOffset para corrigir posicao quando itens nao renderizados"
+
+  # F080 - Checkbox visual
+  - name: "ActorSelector checkbox rendering"
+    component: "ActorSelector.tsx"
+    methods:
+      - name: "renderItem checkbox"
+        input: "multiSelect: boolean, isSelected: boolean"
+        output: |
+          Se multiSelect: renderiza <Text> com U+2611 (selecionado) ou U+2610 (nao selecionado)
+          Se !multiSelect: nenhum checkbox renderizado
+        notes: "Checkbox e nome dentro do mesmo Pressable (actorNameArea). Toggle continua no Pressable inteiro."
+      - name: "styles.actorNameArea (updated)"
+        input: "N/A"
+        output: "{ flex: 1, flexDirection: 'row', alignItems: 'center' }"
+        notes: "flexDirection e alignItems adicionados para alinhar checkbox + nome horizontalmente"
+      - name: "styles.checkbox (new)"
+        input: "N/A"
+        output: "{ fontSize: 20, marginRight: 8 }"
+        notes: "Tamanho e espacamento do checkbox unicode"
+
+  # F081 - Actor delete confirm
+  - name: "ActorSelector handleDelete i18n"
+    component: "ActorSelector.tsx"
+    methods:
+      - name: "handleDelete Alert"
+        input: "actor: MeetingActor"
+        output: "Alert.alert(t('common.delete'), t('actors.deleteConfirm'), [...])"
+        notes: "Troca de t('members.deleteConfirm') para t('actors.deleteConfirm')"
+
+  - name: "i18n actors.deleteConfirm (new)"
+    component: "i18n locales"
+    methods:
+      - name: "actors.deleteConfirm"
+        input: "N/A"
+        output: |
+          pt-BR: 'Tem certeza que deseja excluir essa pessoa da lista de pessoas que podem ser escolhidas para serem reconhecidas durante a Reunião Sacramental?'
+          en: 'Are you sure you want to remove this person from the list of people who can be chosen to be acknowledged during Sacrament Meeting?'
+          es: '¿Está seguro de que desea eliminar a esta persona de la lista de personas que pueden ser elegidas para ser reconocidas durante la Reunión Sacramental?'
+        notes: "Nova secao 'actors'. members.deleteConfirm permanece inalterada."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: "Nenhuma mudanca de schema. Todas as features sao client-side."
+  entities: []
+  notes:
+    - "F077: VALID_TRANSITIONS e validacao apenas frontend. Backend aceita qualquer transicao (A-1 confirmado)."
+    - "F078: Mudanca de valor de i18n key existente. Nenhuma mudanca de schema."
+    - "F079: Mudanca de parametro de scroll. Nenhuma mudanca de dados."
+    - "F080: Mudanca de renderizacao. Nenhuma mudanca de dados."
+    - "F081: Nova i18n key + mudanca de referencia no codigo. Nenhuma mudanca de schema."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Nenhum. Todas as features sao mudancas de UI/logic/i18n client-side."
+  notes:
+    - "F077: Mesmas permissoes (speech:change_status) controlam acesso. VALID_TRANSITIONS e validacao UI."
+    - "F078: Mudanca de texto exibido. Nenhum impacto."
+    - "F079: Mudanca de parametro de scroll. Nenhum impacto."
+    - "F080: Mudanca de renderizacao visual. Nenhum impacto."
+    - "F081: Mudanca de texto exibido. Nenhum impacto."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Nenhum. Nenhuma feature adiciona ou modifica logs ou metricas."
+  notes:
+    - "F077: useChangeStatus ja loga 'speech:status_change' para qualquer transicao. Log existente cobre novas transicoes."
+    - "Todas as 5 features sao mudancas de UI/UX sem novos eventos de log."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-053
+    title: "Full mesh VALID_TRANSITIONS entre status atribuidos"
+    context: "F077 precisa que todos os status atribuidos possam transicionar entre si. VALID_TRANSITIONS atual e restritivo: assigned_confirmed -> [not_assigned], gave_up -> [not_assigned]. Opcoes: (a) expandir VALID_TRANSITIONS para full mesh, (b) bypass validacao no UI e validar apenas no backend, (c) remover VALID_TRANSITIONS completamente."
+    decision: "Expandir VALID_TRANSITIONS para full mesh: cada status atribuido pode ir para os outros 3 atribuidos + not_assigned. Manter not_assigned -> [assigned_not_invited] para fluxo de assign."
+    consequences:
+      - "Pro: StatusChangeModal e InviteActionDropdown mostram opcoes corretas automaticamente"
+      - "Pro: isValidTransition e getAvailableStatuses funcionam sem modificacao"
+      - "Pro: useChangeStatus valida transicao antes de persistir"
+      - "Con: Permite transicoes que antes eram bloqueadas (ex: gave_up -> assigned_confirmed)"
+      - "Tradeoff aceito: usuario pediu explicitamente todas as opcoes (exceto atual e not_assigned)"
+
+  - id: ADR-054
+    title: "Opcoes dinamicas via .map() no InviteActionDropdown"
+    context: "F077 precisa que InviteActionDropdown mostre opcoes dinamicas baseadas no status atual. Opcoes atuais sao 3 Pressable hardcoded (assigned_confirmed, assigned_not_invited, gave_up). Opcoes: (a) filtrar array e usar .map(), (b) manter hardcoded com condicoes, (c) reutilizar StatusChangeModal."
+    decision: "Usar ALL_ASSIGNED_STATUSES.filter(s => s !== speech?.status).map() para gerar opcoes dinamicamente. Nao reutilizar StatusChangeModal pois InviteActionDropdown tem opcao WhatsApp adicional (ADR-041)."
+    consequences:
+      - "Pro: Sempre mostra exatamente 3 opcoes corretas"
+      - "Pro: Codigo mais simples e sem duplicacao de status"
+      - "Pro: Novas opcoes de status (se adicionadas no futuro) aparecem automaticamente"
+      - "Con: Ordem das opcoes segue ordem do array, nao pode ser customizada por status"
+      - "Tradeoff aceito: ordem fixa do array e suficiente para o caso de uso"
+
+  - id: ADR-055
+    title: "viewPosition: 0.5 apenas no scroll inicial da aba Agenda (DD-53)"
+    context: "F079 precisa centralizar o proximo domingo na Agenda. Opcoes: (a) viewPosition: 0.5 em ambas as abas, (b) apenas na Agenda. DD-53 decide: apenas Agenda."
+    decision: "Adicionar viewPosition: 0.5 ao scrollToIndex no useEffect inicial da agenda.tsx. NAO alterar speeches.tsx. handleToggle (auto-scroll on expand) continua com viewPosition: 0 em ambas as abas."
+    consequences:
+      - "Pro: Proximo domingo centralizado na tela ao abrir Agenda"
+      - "Pro: Speeches tab inalterada (ja funciona corretamente)"
+      - "Pro: handleToggle mantido com viewPosition: 0 (card expandido fica no topo)"
+
+  - id: ADR-056
+    title: "Checkbox Unicode (U+2611/U+2610) ao inves de View customizada"
+    context: "F080 precisa de checkbox visual no ActorSelector multiselect. Opcoes: (a) Unicode U+2611/U+2610 como <Text>, (b) View customizada com borderWidth/borderRadius. DD-25 proibe icon libraries."
+    decision: "Usar Unicode U+2611 (ballot box with check) e U+2610 (ballot box) como <Text> com fontSize: 20 e marginRight: 8. Renderizado dentro do Pressable actorNameArea, antes do nome."
+    consequences:
+      - "Pro: Simples, zero dependencias (consistente com DD-25)"
+      - "Pro: Visual reconhecivel como checkbox"
+      - "Pro: Pressable actorNameArea engloba checkbox + nome, mantendo area clicavel"
+      - "Con: Aparencia pode variar entre plataformas (fonte do sistema)"
+      - "Tradeoff aceito: app ja usa Unicode extensivamente (U+270E pencil, U+2716 X, etc)"
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F077
+  - path: "src/hooks/useSpeeches.ts"
+    feature: F077
+    change: "Expandir VALID_TRANSITIONS para full mesh: cada status atribuido pode ir para os outros 3 + not_assigned."
+
+  - path: "src/components/SpeechSlot.tsx"
+    feature: F077
+    change: "Remover bloqueios de handleStatusPress para assigned_confirmed e gave_up. Remover disabled prop para assigned_confirmed e gave_up no StatusLED."
+
+  - path: "src/components/InviteActionDropdown.tsx"
+    feature: F077
+    change: "Gerar opcoes de status dinamicamente via ALL_ASSIGNED_STATUSES.filter(s => s !== speech?.status).map(). Remover 3 Pressable hardcoded."
+
+  # F078
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F078
+    change: "Alterar agenda.customNameHint para 'Para escolher um não membro, digite o nome da pessoa e adicione como nome personalizado'"
+
+  - path: "src/i18n/locales/en.json"
+    feature: F078
+    change: "Alterar agenda.customNameHint para 'To choose a non-member, type the person's name and add as a custom name'"
+
+  - path: "src/i18n/locales/es.json"
+    feature: F078
+    change: "Alterar agenda.customNameHint para 'Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado'"
+
+  # F079
+  - path: "src/app/(tabs)/agenda.tsx"
+    feature: F079
+    change: "Adicionar viewPosition: 0.5 ao scrollToIndex no useEffect inicial. Melhorar onScrollToIndexFailed com retry + viewPosition: 0.5."
+
+  # F080
+  - path: "src/components/ActorSelector.tsx"
+    feature: F080
+    change: "Substituir prefixo texto U+2713 por checkbox unicode (U+2611 checked, U+2610 unchecked). Adicionar flexDirection:'row' e alignItems:'center' a actorNameArea. Novo estilo checkbox."
+
+  # F081
+  - path: "src/components/ActorSelector.tsx"
+    feature: F081
+    change: "Trocar t('members.deleteConfirm') por t('actors.deleteConfirm') em handleDelete."
+
+  - path: "src/i18n/locales/pt-BR.json"
+    feature: F081
+    change: "Adicionar secao 'actors' com key 'deleteConfirm' e texto especifico."
+
+  - path: "src/i18n/locales/en.json"
+    feature: F081
+    change: "Adicionar secao 'actors' com key 'deleteConfirm' e texto especifico."
+
+  - path: "src/i18n/locales/es.json"
+    feature: F081
+    change: "Adicionar secao 'actors' com key 'deleteConfirm' e texto especifico."
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  F077_status_options:
+    approach: "Expandir VALID_TRANSITIONS + remover bloqueios + dinamizar InviteActionDropdown"
+    detail: |
+      useSpeeches.ts:
+      1. Alterar VALID_TRANSITIONS (linhas 59-65):
+         assigned_not_invited: ['assigned_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+         assigned_invited: ['assigned_not_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+         assigned_confirmed: ['assigned_not_invited', 'assigned_invited', 'gave_up', 'not_assigned'],
+         gave_up: ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'not_assigned'],
+
+      SpeechSlot.tsx:
+      1. Linha 100-101: Remover '|| status === 'assigned_confirmed' || status === 'gave_up''
+         Resulta em: if (!canChangeStatus || !speech || status === 'not_assigned') return;
+      2. Linhas 157-158: Remover '|| status === 'assigned_confirmed' || status === 'gave_up''
+         Resulta em: disabled={isObserver || status === 'not_assigned'}
+
+      InviteActionDropdown.tsx:
+      1. Adicionar constante ALL_ASSIGNED_STATUSES antes do return do componente:
+           const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
+             'assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'gave_up',
+           ];
+           const statusOptions = ALL_ASSIGNED_STATUSES.filter(s => s !== speech?.status);
+      2. Substituir linhas 95-153 (3 Pressable hardcoded) por:
+           {statusOptions.map((statusOption) => (
+             <Pressable key={statusOption} style={styles.optionRow}
+               onPress={() => { if (speech) onChangeStatus(speech.id, statusOption); }}>
+               <View style={[styles.indicator, { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] }]} />
+               <Text style={[styles.optionLabel, { color: colors.text }]}>
+                 {t(`speechStatus.${statusOption}`)}
+               </Text>
+             </Pressable>
+           ))}
+
+  F078_custom_name_text:
+    approach: "Alterar valor de i18n key existente em 3 locales"
+    detail: |
+      Alterar agenda.customNameHint em:
+      - pt-BR.json (linha 227): novo texto com acentos corretos
+      - en.json (linha 227): equivalente em ingles
+      - es.json (linha 227): equivalente em espanhol
+      PrayerSelector.tsx: Nenhuma alteracao. Ja usa t('agenda.customNameHint').
+
+  F079_agenda_scroll:
+    approach: "Adicionar viewPosition: 0.5 e melhorar fallback"
+    detail: |
+      agenda.tsx:
+      1. Linha 116: Adicionar viewPosition: 0.5 ao scrollToIndex:
+         flatListRef.current?.scrollToIndex({
+           index: initialIndex, animated: false, viewPosition: 0.5,
+         });
+      2. Linhas 186-192: Melhorar onScrollToIndexFailed com retry:
+         const onScrollToIndexFailed = useCallback(
+           (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+             const offset = info.averageItemLength * info.index;
+             flatListRef.current?.scrollToOffset({ offset, animated: false });
+             setTimeout(() => {
+               flatListRef.current?.scrollToIndex({
+                 index: Math.min(info.index, listItems.length - 1),
+                 animated: false,
+                 viewPosition: 0.5,
+               });
+             }, 100);
+           },
+           [listItems.length]
+         );
+
+  F080_checkbox_visual:
+    approach: "Unicode checkbox como <Text> separado antes do nome"
+    detail: |
+      ActorSelector.tsx:
+      1. Linhas 161-165 (actorNameArea bloco):
+         - Adicionar {multiSelect && (<Text style={...}>{isSelected ? '\u2611' : '\u2610'}</Text>)}
+           ANTES do <Text> do nome
+         - Remover prefixo {isSelected ? '\u2713 ' : ''} do texto do nome
+      2. styles.actorNameArea: adicionar flexDirection: 'row', alignItems: 'center'
+      3. Novo estilo checkbox: { fontSize: 20, marginRight: 8 }
+
+  F081_actor_delete_text:
+    approach: "Nova i18n key + trocar referencia no componente"
+    detail: |
+      ActorSelector.tsx:
+      1. Linha 129: trocar t('members.deleteConfirm') por t('actors.deleteConfirm')
+
+      i18n locales:
+      1. Adicionar secao "actors" nos 3 locales com key "deleteConfirm"
+      2. Posicionar apos secao "members" (ou em qualquer posicao valida no JSON)
+      3. Textos conforme SPEC_F081 acceptance criteria
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao (11 contratos)
+  GATE-04: true  # ADRs registrados (ADR-053, ADR-054, ADR-055, ADR-056)
+  GATE-05: true  # ARCH_M022.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # 14 componentes, 5 features

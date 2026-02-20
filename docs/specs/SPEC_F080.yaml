@@ -1,0 +1,133 @@
+# =============================================================================
+# SPEC_F080.yaml
+# Feature F080 / CR-137: Checkbox-style UI for recognizing presence list
+# Batch: 11
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 11
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F080
+  name: "Checkbox-style visual for multi-select in ActorSelector (Recognizing Presence)"
+  cr_id: 137
+  type: ux_improvement
+  priority: medium
+  related_features: [F040, F067]
+
+  user_request: >
+    "A usabilidade da lista de reconhecendo a presenca nao esta clara. 1. Para
+    de-selecionar um nome a pessoa pode confundir e achar que e para clicar no
+    X. 2. Nao e claro onde eu tenho que clicar para de-selecionar, nao seria
+    melhor de-selecionar somente na marca de check? Coloca uma marca de check
+    como se fosse um checkbox mesmo, fica mais intuitivo."
+
+  description: >
+    Melhorar a usabilidade da lista de "Reconhecendo a Presenca" no ActorSelector
+    quando em modo multi-select. Problemas atuais: (1) checkmark e apenas texto
+    prefixado ao nome (U+2713), nao visualmente distinto como checkbox; (2) botao
+    X (delete/excluir ator) pode ser confundido com de-selecionar; (3) nao e claro
+    onde clicar para de-selecionar. Solucao: usar visual de checkbox (quadrado com
+    check ou vazio) e tornar a interacao de selecao/de-selecao mais intuitiva.
+
+  current_behavior: >
+    ActorSelector.tsx renderItem (linhas 143-187): em multiSelect mode, atores
+    selecionados recebem prefixo de texto '\u2713 ' (checkmark unicode) concatenado
+    ao nome (linha 163). A area do nome inteira (actorNameArea Pressable) e clicavel
+    para toggle. Icones de edicao (pencil U+270E) e exclusao (X U+2716) ficam a
+    direita em TODOS os modos (actorActions, linhas 168-181). O X de exclusao
+    pode ser confundido com de-selecionar em contexto multi-select.
+
+  expected_behavior: >
+    Em multiSelect mode: (1) Checkbox visual a esquerda do nome - checkbox marcado
+    (U+2611 ou View customizada) quando selecionado, checkbox vazio (U+2610 ou View
+    customizada) quando nao selecionado. Clicar no checkbox OU no nome faz toggle
+    da selecao. (2) Os icones de edicao/exclusao permanecem na mesma posicao
+    (direita) sem alteracao. O checkbox visual resolve a ambiguidade pois o usuario
+    entende que o checkbox e para selecao e o X e para exclusao. (3) Em single-select
+    mode, comportamento inalterado (sem checkbox, select fecha modal).
+
+  files_impacted:
+    - path: src/components/ActorSelector.tsx
+      changes:
+        - "Em multiSelect mode, renderizar checkbox visual a esquerda do nome"
+        - "Checkbox marcado para itens selecionados, vazio para nao selecionados"
+        - "Remover prefixo de texto U+2713 (linha 163)"
+        - "Manter area clicavel (checkbox + nome) para toggle"
+        - "Icones edit/delete inalterados"
+
+  acceptance_criteria:
+    - id: AC-080-01
+      description: "Checkbox visual em multi-select mode"
+      given: "ActorSelector aberto em multiSelect mode (Reconhecendo a Presenca)"
+      when: "Lista de atores renderizada"
+      then: "Cada ator tem checkbox visual a esquerda do nome"
+
+    - id: AC-080-02
+      description: "Checkbox preenchido para itens selecionados"
+      given: "Ator selecionado na lista multi-select"
+      when: "Lista renderizada"
+      then: "Checkbox do ator aparece preenchido/marcado (visual tipo checkbox checked)"
+
+    - id: AC-080-03
+      description: "Checkbox vazio para itens nao selecionados"
+      given: "Ator nao selecionado na lista multi-select"
+      when: "Lista renderizada"
+      then: "Checkbox do ator aparece vazio/desmarcado (visual tipo checkbox unchecked)"
+
+    - id: AC-080-04
+      description: "Toggle de selecao via checkbox ou nome"
+      given: "Ator na lista multi-select"
+      when: "Usuario clica no checkbox ou na area do nome"
+      then: "Selecao e toggled (adicionado se nao selecionado, removido se selecionado)"
+
+    - id: AC-080-05
+      description: "Icones edit/delete nao confundidos com selecao"
+      given: "ActorSelector em multiSelect mode"
+      when: "Lista renderizada"
+      then: "Icones de edicao e exclusao sao visualmente distintos da area de checkbox/selecao"
+
+    - id: AC-080-06
+      description: "Single-select mode inalterado"
+      given: "ActorSelector em single-select mode (presidir, dirigir, musica)"
+      when: "Lista renderizada"
+      then: "Sem checkbox, comportamento de selecao e icones como antes"
+
+    - id: AC-080-07
+      description: "Toggle logic preservado"
+      given: "AgendaForm handler de recognized_names"
+      when: "Ator selecionado/de-selecionado"
+      then: "Array recognized_names atualizado corretamente (add/remove toggle)"
+
+  edge_cases:
+    - id: EC-080-01
+      case: "Lista vazia de atores com can_recognize"
+      expected: "Mensagem 'Nenhum resultado encontrado' (comportamento existente)"
+
+    - id: EC-080-02
+      case: "Ator em modo edicao (editingId) durante multi-select"
+      expected: "Checkbox nao renderizado durante edicao (isEditing condition existente)"
+
+  implementation_notes: >
+    Em multiSelect mode, substituir o prefixo '\u2713 ' na linha 163 por um
+    checkbox visual renderizado como elemento separado a esquerda do nome.
+    Opcao 1 (Unicode): usar '\u2611' (ballot box with check, U+2611) para
+    selecionado e '\u2610' (ballot box, U+2610) para nao selecionado. Renderizar
+    como <Text> com fontSize:20 e marginRight:8 dentro do Pressable actorNameArea.
+    Opcao 2 (View customizada): View com borderWidth:2, borderRadius:4,
+    width/height:20, com View interna preenchida quando selecionado. A opcao 1
+    e mais simples e consistente com DD-25 (sem icon library). O Pressable
+    actorNameArea ja envolve checkbox + nome, mantendo a area clicavel para
+    toggle. Em single-select mode (multiSelect === false ou undefined), nenhuma
+    alteracao.
+
+  resolved_questions:
+    - id: OQ-3
+      question: "Devemos esconder os icones de edit/delete no modo multiSelect para evitar confusao, ou manter?"
+      answer: "Manter icones edit/delete visiveis. Checkbox resolve a ambiguidade."
+      decided_by: user

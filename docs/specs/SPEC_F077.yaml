@@ -1,0 +1,179 @@
+# =============================================================================
+# SPEC_F077.yaml
+# Feature F077 / CR-134: Show all status options except current and not_assigned
+# Batch: 11
+# Created: 2026-02-19
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 11
+created: "2026-02-19"
+last_updated: "2026-02-19"
+
+feature:
+  id: F077
+  name: "Show all status options except current and not_assigned in status change UI"
+  cr_id: 134
+  type: bugfix
+  regression_of: CR-129
+  priority: high
+  related_features: [F051, F062, F071]
+
+  user_request: >
+    "De novo: Tem dois lugares onde clicamos para trocar o status de um convite:
+    na sessao de convites na aba Home e dentro do card de domingos na aba
+    Discursos. Quando alguem clicar para trocar o status TEMOS que mostrar todas
+    opcoes com excecao do status atual e do status nao designado. Isso nao foi
+    resolvido no batch passado."
+
+  description: >
+    Corrigir a logica de transicao de status de discurso em DOIS locais:
+    (1) InviteActionDropdown (aba Home, secao de gerenciamento de convites) e
+    (2) StatusChangeModal via SpeechSlot (aba Discursos, LED click). Em ambos,
+    ao abrir o modal/dropdown de troca de status, TODAS as opcoes de status
+    devem ser mostradas EXCETO o status atual E 'not_assigned'. Ou seja, o
+    usuario sempre ve 3 opcoes (dos 4 status possiveis, menos o atual).
+
+  current_behavior: >
+    InviteActionDropdown.tsx: Mostra opcoes HARDCODED (assigned_confirmed,
+    assigned_not_invited, gave_up) independente do status atual. O status
+    atual NAO e filtrado das opcoes, podendo aparecer como clicavel.
+    SpeechSlot.tsx: handleStatusPress (linha 99-101) bloqueia abertura do
+    modal para assigned_confirmed e gave_up. VALID_TRANSITIONS em
+    useSpeeches.ts e restritivo: assigned_not_invited so pode ir para
+    [assigned_invited, not_assigned], assigned_confirmed so para [not_assigned],
+    gave_up so para [not_assigned]. Resultado: de assigned_not_invited, modal
+    mostra assigned_invited + not_assigned, mas com allowedStatuses filtrando
+    not_assigned, sobra 1 opcao. De assigned_confirmed e gave_up, LED nao e
+    clicavel.
+
+  expected_behavior: >
+    InviteActionDropdown.tsx: Opcoes dinamicas baseadas no status atual do
+    speech. Mostrar todos os 4 status atribuidos EXCETO o status atual E EXCETO
+    not_assigned. Exemplo: se status atual e assigned_invited, mostrar
+    assigned_not_invited, assigned_confirmed, gave_up (3 opcoes).
+    SpeechSlot.tsx: LED clicavel para QUALQUER status exceto not_assigned. Ao
+    abrir StatusChangeModal, mostrar todos os status exceto o atual e
+    not_assigned. Exemplo: de assigned_confirmed, mostrar assigned_not_invited,
+    assigned_invited, gave_up (3 opcoes).
+
+  files_impacted:
+    - path: src/components/InviteActionDropdown.tsx
+      changes:
+        - "Receber speech.status e gerar opcoes dinamicamente"
+        - "Filtrar: mostrar todos os 4 status atribuidos exceto o status atual"
+        - "Remover hardcoded options (linhas 95-153)"
+
+    - path: src/components/SpeechSlot.tsx
+      changes:
+        - "Remover condicoes que bloqueiam handleStatusPress para assigned_confirmed e gave_up (linhas 100-101)"
+        - "Remover disabled prop para assigned_confirmed e gave_up (linha 157-158)"
+
+    - path: src/hooks/useSpeeches.ts
+      changes:
+        - "Expandir VALID_TRANSITIONS para que cada status atribuido possa ir para todos os outros status atribuidos"
+        - "Remover not_assigned das transicoes UI (manter como transicao de sistema para unassign)"
+
+    - path: src/components/StatusChangeModal.tsx
+      changes:
+        - "Nenhuma alteracao de codigo; comportamento correto ja depende de getAvailableStatuses + allowedStatuses"
+
+  acceptance_criteria:
+    - id: AC-077-01
+      description: "InviteActionDropdown mostra opcoes dinamicas excluindo status atual"
+      given: "Speech com status assigned_invited no InviteActionDropdown"
+      when: "Usuario abre o dropdown"
+      then: "Mostrar 3 opcoes: assigned_not_invited, assigned_confirmed, gave_up (excluindo assigned_invited)"
+
+    - id: AC-077-02
+      description: "InviteActionDropdown exclui not_assigned das opcoes"
+      given: "Qualquer speech no InviteActionDropdown"
+      when: "Usuario abre o dropdown"
+      then: "not_assigned NUNCA aparece como opcao clicavel"
+
+    - id: AC-077-03
+      description: "StatusChangeModal mostra todas opcoes exceto atual e not_assigned"
+      given: "Speech com status assigned_not_invited na aba Discursos"
+      when: "Usuario clica no LED"
+      then: "Modal mostra 3 opcoes: assigned_invited, assigned_confirmed, gave_up"
+
+    - id: AC-077-04
+      description: "LED clicavel para assigned_confirmed"
+      given: "Speech com status assigned_confirmed"
+      when: "Usuario clica no LED"
+      then: "StatusChangeModal abre com opcoes: assigned_not_invited, assigned_invited, gave_up"
+
+    - id: AC-077-05
+      description: "LED clicavel para gave_up"
+      given: "Speech com status gave_up"
+      when: "Usuario clica no LED"
+      then: "StatusChangeModal abre com opcoes: assigned_not_invited, assigned_invited, assigned_confirmed"
+
+    - id: AC-077-06
+      description: "LED nao-clicavel para not_assigned (preservado)"
+      given: "Speech sem designacao (not_assigned)"
+      when: "Usuario tenta clicar no LED"
+      then: "Nada acontece (LED desabilitado para not_assigned)"
+
+    - id: AC-077-07
+      description: "Observer nao pode clicar LED (preservado)"
+      given: "Usuario com role observer"
+      when: "Tenta clicar no LED"
+      then: "Nada acontece"
+
+    - id: AC-077-08
+      description: "Status change persiste corretamente"
+      given: "Qualquer transicao de status valida selecionada"
+      when: "Usuario seleciona novo status"
+      then: "changeStatus.mutate e chamado com o status selecionado e persiste no banco"
+
+  edge_cases:
+    - id: EC-077-01
+      case: "InviteActionDropdown aberto quando speech e null"
+      expected: "Dropdown nao renderiza opcoes de status (safety check existente)"
+
+    - id: EC-077-02
+      case: "Dois usuarios mudam status do mesmo speech simultaneamente"
+      expected: "Last-write-wins (padrao existente do app)"
+
+  implementation_notes: >
+    Abordagem sugerida:
+    (1) Alterar VALID_TRANSITIONS em useSpeeches.ts para que cada status
+    atribuido possa ir para TODOS os outros status atribuidos. Manter
+    not_assigned -> [assigned_not_invited] para o fluxo de assign. Para os
+    4 status atribuidos, cada um pode transicionar para os outros 3 +
+    not_assigned (via unassign separado).
+    (2) Em SpeechSlot.tsx, remover as condicoes que bloqueiam handleStatusPress
+    para assigned_confirmed e gave_up (linhas 100-101 e disabled prop
+    linhas 157-158). Manter bloqueio apenas para not_assigned.
+    (3) Em InviteActionDropdown.tsx, gerar opcoes dinamicamente a partir do
+    speech.status ao inves de hardcoded. Usar array de todos os 4 status
+    atribuidos, filtrar o status atual, e renderizar.
+    (4) StatusChangeModal ja filtra via allowedStatuses + getAvailableStatuses.
+    Com VALID_TRANSITIONS expandido, mostrara as opcoes corretas.
+
+  supersedes:
+    - "F062 (CR-116): LED click shows only confirmed and gave_up - NEVER IMPLEMENTED"
+    - "F071 (CR-129): LED click shows all except not_assigned - NEVER IMPLEMENTED"
+
+  resolved_questions:
+    - id: OQ-1
+      question: "Ao mudar status para assigned_invited via InviteActionDropdown, deve enviar convite WhatsApp automaticamente?"
+      answer: "Apenas mudar o status. Sem enviar WhatsApp automaticamente."
+      decided_by: user
+
+    - id: OQ-2
+      question: "O InviteActionDropdown deve aparecer para QUALQUER speech na secao de convites, ou manter regra atual (apenas assigned_invited)?"
+      answer: "Manter regra atual. Dropdown so aparece para speeches com status assigned_invited."
+      decided_by: user
+
+  confirmed_assumptions:
+    - id: A-1
+      assumption: >
+        VALID_TRANSITIONS em useSpeeches.ts e validacao apenas frontend.
+        O backend (Supabase) aceita qualquer transicao de status. Nao ha
+        CHECK constraint ou trigger no banco que valide transicoes.
+      confirmed_by: user
+      impact: "Nenhuma alteracao de migration SQL necessaria. Apenas alterar frontend."

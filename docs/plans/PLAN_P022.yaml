@@ -1,0 +1,672 @@
+# =============================================================================
+# PLAN_P022.yaml
+# Implementation Plan for Batch 11 - Status Options Fix, Custom Name Help Text,
+#   Agenda Initial Scroll, Checkbox Visual in ActorSelector, Actor Delete Text
+# Features: F077, F078, F079, F080, F081
+# CRs: CR-134, CR-135, CR-136, CR-137, CR-138
+# Created: 2026-02-19
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  5 mudancas de UI/logic/i18n: corrigir opcoes de transicao de status para mostrar
+  todas exceto atual e not_assigned em ambos os locais - InviteActionDropdown e
+  StatusChangeModal (F077), alterar texto de ajuda de nome customizado no
+  PrayerSelector (F078), corrigir scroll inicial da aba Agenda para centralizar
+  proximo domingo (F079), adicionar checkbox visual no ActorSelector em modo
+  multi-select para Reconhecendo a Presenca (F080), e alterar texto de confirmacao
+  de exclusao de ator com nova i18n key separada (F081).
+
+strategy:
+  order: "Happy path (F077 status fix -> F078 hint text -> F079 agenda scroll -> F080 checkbox -> F081 delete text) -> Edge cases -> Tests -> Documentation"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+
+  # =========================================================================
+  # STEP-01: F077 - Expandir VALID_TRANSITIONS para full mesh (useSpeeches.ts)
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Em src/hooks/useSpeeches.ts:
+      (1) Alterar VALID_TRANSITIONS (linhas 59-65) para full mesh entre os 4
+          status atribuidos. Cada status atribuido pode transicionar para os
+          outros 3 status atribuidos + not_assigned (via unassign):
+            not_assigned: ['assigned_not_invited'],
+            assigned_not_invited: ['assigned_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+            assigned_invited: ['assigned_not_invited', 'assigned_confirmed', 'gave_up', 'not_assigned'],
+            assigned_confirmed: ['assigned_not_invited', 'assigned_invited', 'gave_up', 'not_assigned'],
+            gave_up: ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'not_assigned'],
+      (2) not_assigned -> [assigned_not_invited] permanece inalterado (fluxo de assign).
+      (3) isValidTransition e getAvailableStatuses nao precisam de mudanca (funcionam
+          automaticamente com VALID_TRANSITIONS expandido).
+    files:
+      - "src/hooks/useSpeeches.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-04", "STEP-05", "STEP-06", "STEP-07"]
+    done_when:
+      - "VALID_TRANSITIONS expandido com full mesh para os 4 status atribuidos"
+      - "not_assigned -> [assigned_not_invited] permanece inalterado"
+      - "Cada status atribuido pode ir para os outros 3 atribuidos + not_assigned"
+      - "isValidTransition retorna true para qualquer transicao entre status atribuidos"
+      - "getAvailableStatuses retorna 4 opcoes para cada status atribuido"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que getAvailableStatuses retorna 4 opcoes para assigned_not_invited"
+      - type: unit
+        description: "Verificar que getAvailableStatuses retorna 4 opcoes para assigned_confirmed"
+      - type: unit
+        description: "Verificar que getAvailableStatuses retorna 4 opcoes para gave_up"
+      - type: unit
+        description: "Verificar que isValidTransition(assigned_confirmed, assigned_invited) retorna true"
+      - type: unit
+        description: "Verificar que isValidTransition(gave_up, assigned_confirmed) retorna true"
+    covers:
+      acceptance_criteria: ["AC-077-08"]
+      edge_cases: ["EC-077-02"]
+    risks:
+      - risk: "Permite transicoes que antes eram bloqueadas (ex: gave_up -> assigned_confirmed)"
+        mitigation: "Usuario pediu explicitamente todas as opcoes. VALID_TRANSITIONS e validacao UI apenas (A-1 confirmado)."
+
+  # =========================================================================
+  # STEP-02: F077 - Remover bloqueios de LED no SpeechSlot
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Em src/components/SpeechSlot.tsx:
+      (1) Alterar handleStatusPress (linhas 99-103):
+          De:
+            if (!canChangeStatus || !speech || status === 'not_assigned' ||
+                status === 'assigned_confirmed' || status === 'gave_up') return;
+          Para:
+            if (!canChangeStatus || !speech || status === 'not_assigned') return;
+      (2) Alterar disabled prop do StatusLED (linhas 157-158):
+          De:
+            disabled={isObserver || status === 'not_assigned' ||
+                      status === 'assigned_confirmed' || status === 'gave_up'}
+          Para:
+            disabled={isObserver || status === 'not_assigned'}
+      (3) StatusChangeModal recebe allowedStatuses={ledAllowedStatuses} (ja existente)
+          que filtra not_assigned. Com VALID_TRANSITIONS expandido e allowedStatuses
+          filtrando not_assigned, modal mostrara as 3 opcoes corretas.
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "handleStatusPress bloqueia apenas not_assigned (nao assigned_confirmed nem gave_up)"
+      - "StatusLED disabled apenas para isObserver e not_assigned"
+      - "LED clicavel para assigned_confirmed"
+      - "LED clicavel para gave_up"
+      - "LED nao-clicavel para not_assigned (preservado)"
+      - "Observer nao pode clicar LED (preservado)"
+      - "StatusChangeModal abre com 3 opcoes corretas para qualquer status atribuido"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que LED e clicavel para assigned_confirmed"
+      - type: unit
+        description: "Verificar que LED e clicavel para gave_up"
+      - type: unit
+        description: "Verificar que LED e desabilitado para not_assigned"
+      - type: unit
+        description: "Verificar que LED e desabilitado para observer"
+      - type: unit
+        description: "Verificar que StatusChangeModal mostra 3 opcoes para assigned_confirmed"
+    covers:
+      acceptance_criteria: ["AC-077-03", "AC-077-04", "AC-077-05", "AC-077-06", "AC-077-07"]
+      edge_cases: []
+    risks:
+      - risk: "Remocao de bloqueios pode expor funcionalidade para usuarios que nao deveriam ter acesso"
+        mitigation: "Permissao canChangeStatus ja controla acesso. Bloqueios por status sao UX, nao seguranca."
+
+  # =========================================================================
+  # STEP-03: F077 - Dinamizar opcoes do InviteActionDropdown
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Em src/components/InviteActionDropdown.tsx:
+      (1) Definir constante ALL_ASSIGNED_STATUSES antes do return:
+            const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
+              'assigned_not_invited',
+              'assigned_invited',
+              'assigned_confirmed',
+              'gave_up',
+            ];
+      (2) Calcular opcoes dinamicas baseadas no status atual:
+            const statusOptions = ALL_ASSIGNED_STATUSES.filter(
+              (s) => s !== speech?.status
+            );
+      (3) Substituir os 3 Pressable hardcoded de status (linhas 95-153) por .map:
+            {statusOptions.map((statusOption) => (
+              <Pressable
+                key={statusOption}
+                style={styles.optionRow}
+                onPress={() => {
+                  if (speech) {
+                    onChangeStatus(speech.id, statusOption);
+                  }
+                }}
+              >
+                <View
+                  style={[
+                    styles.indicator,
+                    { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
+                  ]}
+                />
+                <Text style={[styles.optionLabel, { color: colors.text }]}>
+                  {t(`speechStatus.${statusOption}`)}
+                </Text>
+              </Pressable>
+            ))}
+      (4) Opcao WhatsApp (View conversation) permanece inalterada.
+      (5) Opcao Cancel permanece inalterada.
+    files:
+      - "src/components/InviteActionDropdown.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "ALL_ASSIGNED_STATUSES definido com os 4 status atribuidos"
+      - "statusOptions calculado filtrando status atual"
+      - "Pressable hardcoded substituidos por .map sobre statusOptions"
+      - "InviteActionDropdown mostra 3 opcoes dinamicas (excluindo status atual)"
+      - "not_assigned nunca aparece nas opcoes"
+      - "Opcoes WhatsApp e Cancel inalteradas"
+      - "STATUS_INDICATOR_COLORS e t('speechStatus.*') usados para renderizar"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que dropdown mostra 3 opcoes para assigned_invited (exclui assigned_invited)"
+      - type: unit
+        description: "Verificar que not_assigned nunca aparece nas opcoes"
+      - type: unit
+        description: "Verificar que onChangeStatus e chamado com status correto ao selecionar opcao"
+    covers:
+      acceptance_criteria: ["AC-077-01", "AC-077-02"]
+      edge_cases: ["EC-077-01"]
+    risks:
+      - risk: "Ordem das opcoes muda se ALL_ASSIGNED_STATUSES mudar"
+        mitigation: "Ordem fixa do array e suficiente para o caso de uso (ADR-054)."
+
+  # =========================================================================
+  # STEP-04: F078 - Alterar texto de ajuda de nome customizado (i18n)
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Alterar texto de ajuda (hint) do campo de nome personalizado no PrayerSelector
+      em 3 locales:
+      (1) src/i18n/locales/pt-BR.json: Alterar agenda.customNameHint de
+          "Digite um nome para usar nome personalizado" para
+          "Para escolher um nao membro, digite o nome da pessoa e adicione como nome personalizado"
+      (2) src/i18n/locales/en.json: Alterar agenda.customNameHint de
+          "Type a name to use a custom name" para
+          "To choose a non-member, type the person's name and add as a custom name"
+      (3) src/i18n/locales/es.json: Alterar agenda.customNameHint de
+          "Escriba un nombre para usar un nombre personalizado" para
+          "Para elegir un no miembro, escriba el nombre de la persona y agregue como nombre personalizado"
+      Nenhuma alteracao de codigo TypeScript. PrayerSelector.tsx ja usa
+      t('agenda.customNameHint').
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-05", "STEP-06", "STEP-07"]
+    done_when:
+      - "pt-BR.json agenda.customNameHint atualizado com novo texto"
+      - "en.json agenda.customNameHint atualizado com equivalente ingles"
+      - "es.json agenda.customNameHint atualizado com equivalente espanhol"
+      - "PrayerSelector renderiza hint com novo texto (via t('agenda.customNameHint'))"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que i18n key agenda.customNameHint retorna novo texto em pt-BR"
+      - type: unit
+        description: "Verificar que i18n key agenda.customNameHint retorna novo texto em en"
+      - type: unit
+        description: "Verificar que i18n key agenda.customNameHint retorna novo texto em es"
+    covers:
+      acceptance_criteria: ["AC-078-01", "AC-078-02", "AC-078-03", "AC-078-04"]
+      edge_cases: ["EC-078-01"]
+    risks:
+      - risk: "Texto mais longo pode quebrar layout em telas estreitas"
+        mitigation: "Text component ja faz quebra de linha automatica. Texto flui naturalmente."
+
+  # =========================================================================
+  # STEP-05: F079 - Fix scroll inicial da aba Agenda
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Em src/app/(tabs)/agenda.tsx:
+      (1) Alterar useEffect para scroll inicial (linhas 112-119), scrollToIndex na
+          linha 116:
+          De:
+            flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+          Para:
+            flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false, viewPosition: 0.5 });
+      (2) Melhorar onScrollToIndexFailed (linhas 186-192) com retry + viewPosition:
+          De:
+            const onScrollToIndexFailed = useCallback(
+              (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+                const offset = info.averageItemLength * info.index;
+                flatListRef.current?.scrollToOffset({ offset, animated: false });
+              },
+              []
+            );
+          Para:
+            const onScrollToIndexFailed = useCallback(
+              (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+                const offset = info.averageItemLength * info.index;
+                flatListRef.current?.scrollToOffset({ offset, animated: false });
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: Math.min(info.index, listItems.length - 1),
+                    animated: false,
+                    viewPosition: 0.5,
+                  });
+                }, 100);
+              },
+              [listItems.length]
+            );
+      (3) NAO alterar speeches.tsx (DD-53: apenas Agenda).
+      (4) handleToggle scroll (card expand) continua com viewPosition: 0 (no topo).
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-06", "STEP-07"]
+    done_when:
+      - "scrollToIndex no useEffect inicial tem viewPosition: 0.5"
+      - "onScrollToIndexFailed faz scrollToOffset + setTimeout retry com viewPosition: 0.5"
+      - "onScrollToIndexFailed tem [listItems.length] no array de dependencias"
+      - "Proximo domingo centralizado na tela ao abrir aba Agenda"
+      - "handleToggle scroll (card expand) inalterado (viewPosition: 0)"
+      - "Aba Discursos inalterada"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que scrollToIndex no useEffect usa viewPosition: 0.5"
+      - type: unit
+        description: "Verificar que onScrollToIndexFailed faz retry com setTimeout"
+      - type: unit
+        description: "Verificar que speeches.tsx nao foi alterado"
+    covers:
+      acceptance_criteria: ["AC-079-01", "AC-079-02", "AC-079-03", "AC-079-04"]
+      edge_cases: ["EC-079-01", "EC-079-02"]
+    risks:
+      - risk: "setTimeout retry pode causar scroll indesejado se usuario ja scrollou manualmente"
+        mitigation: "Timeout de 100ms e curto. Scroll inicial acontece antes da interacao do usuario."
+
+  # =========================================================================
+  # STEP-06: F080 - Checkbox visual no ActorSelector multi-select
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Em src/components/ActorSelector.tsx:
+      (1) Em renderItem (linhas 143-187), no bloco nao-editing (linhas 161-165):
+          De:
+            <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+              <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
+                {isSelected ? '\u2713 ' : ''}{item.name}
+              </Text>
+            </Pressable>
+          Para:
+            <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+              {multiSelect && (
+                <Text style={[styles.checkbox, { color: colors.text }]}>
+                  {isSelected ? '\u2611' : '\u2610'}
+                </Text>
+              )}
+              <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+            </Pressable>
+      (2) Alterar styles.actorNameArea (linhas 363-365):
+          De:
+            actorNameArea: {
+              flex: 1,
+            },
+          Para:
+            actorNameArea: {
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+            },
+      (3) Adicionar novo estilo checkbox:
+            checkbox: {
+              fontSize: 20,
+              marginRight: 8,
+            },
+      (4) Em single-select mode (multiSelect === false ou undefined), nenhum checkbox
+          renderizado. Condicao {multiSelect && (...)} garante backward compatibility.
+    files:
+      - "src/components/ActorSelector.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-05", "STEP-07"]
+    done_when:
+      - "Checkbox unicode renderizado a esquerda do nome em multi-select mode"
+      - "U+2611 (ballot box with check) para itens selecionados"
+      - "U+2610 (ballot box) para itens nao selecionados"
+      - "Prefixo texto '\\u2713 ' removido do nome"
+      - "actorNameArea tem flexDirection:'row' e alignItems:'center'"
+      - "Novo estilo checkbox com fontSize:20 e marginRight:8"
+      - "Single-select mode sem checkbox (comportamento inalterado)"
+      - "Toggle via Pressable (checkbox + nome) preservado"
+      - "Icones edit/delete inalterados (na direita)"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar checkbox renderizado em multi-select mode"
+      - type: unit
+        description: "Verificar U+2611 para selecionado e U+2610 para nao selecionado"
+      - type: unit
+        description: "Verificar que single-select nao tem checkbox"
+      - type: unit
+        description: "Verificar toggle ao pressionar checkbox ou nome"
+    covers:
+      acceptance_criteria: ["AC-080-01", "AC-080-02", "AC-080-03", "AC-080-04", "AC-080-05", "AC-080-06", "AC-080-07"]
+      edge_cases: ["EC-080-01", "EC-080-02"]
+    risks:
+      - risk: "Aparencia do checkbox unicode pode variar entre plataformas (Android vs iOS)"
+        mitigation: "App ja usa Unicode extensivamente (pencil, X, arrows). Tradeoff aceito (ADR-056)."
+
+  # =========================================================================
+  # STEP-07: F081 - Alterar texto de confirmacao de exclusao de ator (i18n)
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      (1) Em src/components/ActorSelector.tsx handleDelete (linha 129):
+          Trocar t('members.deleteConfirm') por t('actors.deleteConfirm')
+      (2) Em src/i18n/locales/pt-BR.json:
+          Adicionar secao "actors" com key "deleteConfirm":
+            "actors": {
+              "deleteConfirm": "Tem certeza que deseja excluir essa pessoa da lista de
+              pessoas que podem ser escolhidas para serem reconhecidas durante a
+              Reuniao Sacramental?"
+            }
+      (3) Em src/i18n/locales/en.json:
+          Adicionar secao "actors" com key "deleteConfirm":
+            "actors": {
+              "deleteConfirm": "Are you sure you want to remove this person from the
+              list of people who can be chosen to be acknowledged during Sacrament Meeting?"
+            }
+      (4) Em src/i18n/locales/es.json:
+          Adicionar secao "actors" com key "deleteConfirm":
+            "actors": {
+              "deleteConfirm": "Esta seguro de que desea eliminar a esta persona de la
+              lista de personas que pueden ser elegidas para ser reconocidas durante la
+              Reunion Sacramental?"
+            }
+      (5) members.deleteConfirm permanece inalterada em todos os locales.
+    files:
+      - "src/components/ActorSelector.tsx"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "ActorSelector handleDelete usa t('actors.deleteConfirm')"
+      - "Nova secao 'actors' com key 'deleteConfirm' em pt-BR.json"
+      - "Nova secao 'actors' com key 'deleteConfirm' em en.json"
+      - "Nova secao 'actors' com key 'deleteConfirm' em es.json"
+      - "members.deleteConfirm inalterada em todos os locales"
+      - "Texto pt-BR conforme especificado no SPEC"
+      - "Texto en conforme especificado no SPEC"
+      - "Texto es conforme especificado no SPEC"
+      - "pnpm test roda sem falha"
+    tests:
+      - type: unit
+        description: "Verificar que ActorSelector usa t('actors.deleteConfirm') no handleDelete"
+      - type: unit
+        description: "Verificar que actors.deleteConfirm existe em pt-BR com texto correto"
+      - type: unit
+        description: "Verificar que actors.deleteConfirm existe em en com texto correto"
+      - type: unit
+        description: "Verificar que actors.deleteConfirm existe em es com texto correto"
+      - type: unit
+        description: "Verificar que members.deleteConfirm permanece inalterada"
+    covers:
+      acceptance_criteria: ["AC-081-01", "AC-081-02", "AC-081-03", "AC-081-04", "AC-081-05"]
+      edge_cases: ["EC-081-01"]
+    risks:
+      - risk: "i18n key ausente em algum locale causa fallback para key name"
+        mitigation: "Key adicionada em todos os 3 locales. i18next fallback e seguro."
+
+  # =========================================================================
+  # STEP-08: Testes consolidados Batch 11 (F077-F081)
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Criar arquivo de testes src/__tests__/batch11.test.ts com testes para todas
+      as 5 features deste batch:
+      (1) F077 useSpeeches VALID_TRANSITIONS:
+          - getAvailableStatuses retorna 4 opcoes para cada status atribuido
+          - isValidTransition retorna true para qualquer transicao entre status atribuidos
+          - not_assigned -> [assigned_not_invited] preservado
+          - getAvailableStatuses para not_assigned retorna apenas 1 opcao
+      (2) F077 SpeechSlot LED:
+          - LED clicavel para assigned_confirmed
+          - LED clicavel para gave_up
+          - LED desabilitado para not_assigned
+          - LED desabilitado para observer
+          - StatusChangeModal mostra 3 opcoes corretas
+      (3) F077 InviteActionDropdown:
+          - Dropdown mostra 3 opcoes para cada status (exclui o atual)
+          - not_assigned nunca aparece nas opcoes
+          - onChangeStatus chamado com status correto
+      (4) F078 customNameHint:
+          - i18n key retorna novo texto em pt-BR, en, es
+      (5) F079 agenda scroll:
+          - scrollToIndex usa viewPosition: 0.5
+          - onScrollToIndexFailed faz retry com setTimeout
+      (6) F080 ActorSelector checkbox:
+          - Checkbox renderizado em multi-select mode
+          - U+2611 para selecionado, U+2610 para nao selecionado
+          - Single-select sem checkbox
+          - Toggle funciona ao pressionar checkbox ou nome
+      (7) F081 actor deleteConfirm:
+          - ActorSelector usa t('actors.deleteConfirm')
+          - actors.deleteConfirm existe nos 3 locales
+          - members.deleteConfirm inalterada
+    files:
+      - "src/__tests__/batch11.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "Novo arquivo batch11.test.ts criado"
+      - "Testes cobrem F077 (VALID_TRANSITIONS, SpeechSlot LED, InviteActionDropdown)"
+      - "Testes cobrem F078 (customNameHint i18n em 3 idiomas)"
+      - "Testes cobrem F079 (agenda scroll viewPosition e retry)"
+      - "Testes cobrem F080 (checkbox visual em multi-select)"
+      - "Testes cobrem F081 (actors.deleteConfirm i18n)"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Cada AC coberto por pelo menos 1 teste"
+    tests:
+      - type: unit
+        description: "Suite completa de testes para batch11 (F077-F081)"
+    covers:
+      acceptance_criteria: ["AC-077-01", "AC-077-02", "AC-077-03", "AC-077-04", "AC-077-05", "AC-077-06", "AC-077-07", "AC-077-08", "AC-078-01", "AC-078-02", "AC-078-03", "AC-078-04", "AC-079-01", "AC-079-02", "AC-079-03", "AC-079-04", "AC-080-01", "AC-080-02", "AC-080-03", "AC-080-04", "AC-080-05", "AC-080-06", "AC-080-07", "AC-081-01", "AC-081-02", "AC-081-03", "AC-081-04", "AC-081-05"]
+      edge_cases: ["EC-077-01", "EC-077-02", "EC-078-01", "EC-079-01", "EC-079-02", "EC-080-01", "EC-080-02", "EC-081-01"]
+    risks:
+      - risk: "Mocking de StatusChangeModal e InviteActionDropdown para verificar opcoes"
+        mitigation: "Seguir padrao de mocking existente nos testes batch10-phase1.test.ts e batch10-phase2.test.ts"
+
+  # =========================================================================
+  # STEP-09: Atualizar testes existentes impactados
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Verificar e atualizar testes existentes impactados pelas mudancas:
+      (1) Verificar testes que usam VALID_TRANSITIONS (assertions de transicoes restritivas).
+      (2) Verificar testes de SpeechSlot (disabled prop para assigned_confirmed/gave_up).
+      (3) Verificar testes de InviteActionDropdown (opcoes hardcoded).
+      (4) Verificar testes de ActorSelector (prefixo checkmark, actorNameArea styles).
+      (5) Verificar testes de PrayerSelector (customNameHint text).
+      (6) Ajustar snapshots ou assertions conforme necessario.
+      (7) Se nenhum teste existente e impactado, step completa sem mudancas.
+    files:
+      - "src/__tests__/batch8-phase2.test.ts"
+      - "src/__tests__/batch9-phase2.test.ts"
+      - "src/__tests__/batch9-phase3.test.ts"
+      - "src/__tests__/batch10-phase1.test.ts"
+      - "src/__tests__/batch10-phase2.test.ts"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Testes existentes verificados para impacto"
+      - "Assertions desatualizadas corrigidas (se houver)"
+      - "pnpm test roda sem falha em TODOS os testes (novos e existentes)"
+      - "Nenhum teste com falsa cobertura"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Testes existentes de InviteActionDropdown podem verificar opcoes hardcoded"
+        mitigation: "Atualizar assertions para refletir opcoes dinamicas"
+      - risk: "Testes de ActorSelector podem verificar prefixo checkmark texto"
+        mitigation: "Atualizar assertions para verificar checkbox unicode ao inves de prefixo texto"
+
+  # =========================================================================
+  # STEP-10: Documentacao do projeto
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Atualizar artefatos de documentacao do projeto:
+      (1) docs/code/CODE_LEDGER.yaml - adicionar commits de Batch 11
+          (F077-F081) com arquivos impactados.
+      (2) .devteam/project-status.yaml - atualizar fase/batch atual.
+      (3) docs/plans/PLAN_CONSOLIDATED.yaml - adicionar PLAN_P022, marcar
+          como completed apos implementacao.
+      (4) docs/tests/TEST_CONSOLIDATED.yaml - adicionar testes de F077-F081.
+    files:
+      - "docs/code/CODE_LEDGER.yaml"
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "CODE_LEDGER atualizado com commits de batch11"
+      - "project-status.yaml atualizado"
+      - "PLAN_CONSOLIDATED tem PLAN_P022 com status completed"
+      - "TEST_CONSOLIDATED atualizado com testes de F077-F081"
+    tests: []
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks: []
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- F077 ACs ---
+  - ac_id: AC-077-01
+    how_to_verify: "InviteActionDropdown mostra 3 opcoes dinamicas excluindo status atual do speech"
+    covered_by_steps: ["STEP-03", "STEP-08"]
+  - ac_id: AC-077-02
+    how_to_verify: "not_assigned NUNCA aparece como opcao clicavel no InviteActionDropdown"
+    covered_by_steps: ["STEP-03", "STEP-08"]
+  - ac_id: AC-077-03
+    how_to_verify: "StatusChangeModal mostra 3 opcoes (exceto atual e not_assigned) para assigned_not_invited"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-077-04
+    how_to_verify: "LED clicavel para assigned_confirmed, StatusChangeModal abre com 3 opcoes"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-077-05
+    how_to_verify: "LED clicavel para gave_up, StatusChangeModal abre com 3 opcoes"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-077-06
+    how_to_verify: "LED nao-clicavel para not_assigned (disabled={... || status === 'not_assigned'})"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-077-07
+    how_to_verify: "LED desabilitado para observer (disabled={isObserver || ...})"
+    covered_by_steps: ["STEP-02", "STEP-08"]
+  - ac_id: AC-077-08
+    how_to_verify: "changeStatus.mutate chamado com status selecionado e persiste no banco"
+    covered_by_steps: ["STEP-01", "STEP-08"]
+
+  # --- F078 ACs ---
+  - ac_id: AC-078-01
+    how_to_verify: "pt-BR.json agenda.customNameHint retorna novo texto em portugues"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-078-02
+    how_to_verify: "en.json agenda.customNameHint retorna novo texto em ingles"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-078-03
+    how_to_verify: "es.json agenda.customNameHint retorna novo texto em espanhol"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+  - ac_id: AC-078-04
+    how_to_verify: "PrayerSelector renderiza hint na mesma posicao (via t('agenda.customNameHint'))"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+
+  # --- F079 ACs ---
+  - ac_id: AC-079-01
+    how_to_verify: "Proximo domingo centralizado na tela ao abrir Agenda (viewPosition: 0.5)"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-079-02
+    how_to_verify: "scrollToIndex no useEffect inicial recebe viewPosition: 0.5"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-079-03
+    how_to_verify: "onScrollToIndexFailed faz scrollToOffset + setTimeout retry com viewPosition: 0.5"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+  - ac_id: AC-079-04
+    how_to_verify: "Aba Discursos nao afetada (nenhuma mudanca em speeches.tsx)"
+    covered_by_steps: ["STEP-05", "STEP-08"]
+
+  # --- F080 ACs ---
+  - ac_id: AC-080-01
+    how_to_verify: "Checkbox visual (U+2611/U+2610) renderizado a esquerda do nome em multi-select"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-02
+    how_to_verify: "Checkbox preenchido (U+2611) para itens selecionados"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-03
+    how_to_verify: "Checkbox vazio (U+2610) para itens nao selecionados"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-04
+    how_to_verify: "Toggle via Pressable (checkbox + nome) funciona para add/remove"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-05
+    how_to_verify: "Icones edit/delete visualmente distintos e inalterados"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-06
+    how_to_verify: "Single-select mode sem checkbox (condicao multiSelect && garante)"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+  - ac_id: AC-080-07
+    how_to_verify: "Array recognized_names atualizado corretamente via toggle (add/remove)"
+    covered_by_steps: ["STEP-06", "STEP-08"]
+
+  # --- F081 ACs ---
+  - ac_id: AC-081-01
+    how_to_verify: "ActorSelector handleDelete usa t('actors.deleteConfirm') (nao members.deleteConfirm)"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-081-02
+    how_to_verify: "pt-BR actors.deleteConfirm exibe texto conforme especificado"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-081-03
+    how_to_verify: "en actors.deleteConfirm exibe texto conforme especificado"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-081-04
+    how_to_verify: "es actors.deleteConfirm exibe texto conforme especificado"
+    covered_by_steps: ["STEP-07", "STEP-08"]
+  - ac_id: AC-081-05
+    how_to_verify: "members.deleteConfirm inalterada em todos os locales"
+    covered_by_steps: ["STEP-07", "STEP-08"]

@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-19"
-  total_features: 76
-  total_change_requests: 133
+  total_features: 81
+  total_change_requests: 138
   implemented_crs: 96
-  pending_crs: 37
+  pending_crs: 40
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -43,6 +43,11 @@ metadata:
     - docs/specs/SPEC_F074.yaml
     - docs/specs/SPEC_F075.yaml
     - docs/specs/SPEC_F076.yaml
+    - docs/specs/SPEC_F077.yaml
+    - docs/specs/SPEC_F078.yaml
+    - docs/specs/SPEC_F079.yaml
+    - docs/specs/SPEC_F080.yaml
+    - docs/specs/SPEC_F081.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1128,7 +1133,8 @@ features:
 
   - id: F062
     name: "LED click shows only confirmed and gave_up for invited status"
-    status: pending
+    status: superseded
+    superseded_by: F077
     rfs: []
     description: >
       Ao clicar no StatusLED no SpeechSlot quando status e assigned_invited,
@@ -1299,7 +1305,8 @@ features:
 
   - id: F071
     name: "LED click shows all status options except 'not_assigned'"
-    status: pending
+    status: superseded
+    superseded_by: F077
     rfs: []
     description: >
       Regressao do CR-116 (F062). Ao clicar no LED, mostrar todas as opcoes
@@ -2227,6 +2234,111 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
+  # --- Batch 11 (Status Options Fix, Text Changes, Scroll Fix, Checkbox UX) ---
+
+  - id: 134
+    type: bug
+    area: "InviteActionDropdown / StatusChangeModal (F051, F062)"
+    feature_id: F077
+    spec_file: "docs/specs/SPEC_F077.yaml"
+    related_crs: [106, 116, 129]
+    description: >
+      Regressao do CR-129. Em DOIS locais (InviteActionDropdown na Home e
+      StatusChangeModal na aba Discursos), ao trocar status, mostrar TODAS
+      as opcoes exceto o status atual E exceto not_assigned. Corrigir
+      opcoes hardcoded no dropdown e VALID_TRANSITIONS restritivo.
+    acceptance_criteria:
+      - "InviteActionDropdown mostra opcoes dinamicas (3 opcoes, excluindo status atual)"
+      - "not_assigned NUNCA aparece como opcao clicavel"
+      - "LED clicavel para assigned_confirmed e gave_up (antes bloqueado)"
+      - "StatusChangeModal mostra 3 opcoes (excluindo status atual e not_assigned)"
+      - "LED nao-clicavel para not_assigned (preservado)"
+      - "Observer nao pode clicar LED (preservado)"
+    supersedes: [F062, F071]
+    files_likely_impacted:
+      - src/components/InviteActionDropdown.tsx
+      - src/components/SpeechSlot.tsx
+      - src/hooks/useSpeeches.ts
+
+  - id: 135
+    type: ui
+    area: "PrayerSelector (F076)"
+    feature_id: F078
+    spec_file: "docs/specs/SPEC_F078.yaml"
+    related_crs: [124, 133]
+    description: >
+      Trocar texto de ajuda do PrayerSelector de 'Digite um nome para usar
+      nome personalizado' para 'Para escolher um nao membro, digite o nome
+      da pessoa e adicione como nome personalizado'. Alterar em 3 idiomas.
+    acceptance_criteria:
+      - "Texto pt-BR atualizado para novo texto"
+      - "Texto en atualizado para equivalente"
+      - "Texto es atualizado para equivalente"
+      - "PrayerSelector renderiza hint na mesma posicao"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 136
+    type: bug
+    area: "Agenda tab (F012)"
+    feature_id: F079
+    spec_file: "docs/specs/SPEC_F079.yaml"
+    related_crs: [132]
+    description: >
+      Scroll inicial da aba Agenda nao posiciona no proximo domingo.
+      Adicionar viewPosition: 0.5 ao scrollToIndex e implementar
+      onScrollToIndexFailed robusto.
+    acceptance_criteria:
+      - "Proximo domingo centralizado na tela ao abrir Agenda"
+      - "scrollToIndex usa viewPosition: 0.5"
+      - "Fallback de scroll funciona quando scrollToIndex falha"
+      - "Aba Discursos nao afetada"
+    files_likely_impacted:
+      - src/app/(tabs)/agenda.tsx
+
+  - id: 137
+    type: ux
+    area: "ActorSelector multi-select (F040)"
+    feature_id: F080
+    spec_file: "docs/specs/SPEC_F080.yaml"
+    related_crs: [97, 123]
+    description: >
+      Melhorar UX da lista de Reconhecendo a Presenca: substituir prefixo
+      de texto checkmark por checkbox visual (quadrado com check). Resolver
+      confusao entre X de exclusao e de-selecao.
+    acceptance_criteria:
+      - "Checkbox visual a esquerda do nome em multi-select mode"
+      - "Checkbox marcado para selecionados, vazio para nao selecionados"
+      - "Toggle via checkbox ou nome"
+      - "Icones edit/delete nao confundidos com selecao"
+      - "Single-select mode inalterado"
+    files_likely_impacted:
+      - src/components/ActorSelector.tsx
+
+  - id: 138
+    type: ui
+    area: "ActorSelector delete confirm (F040)"
+    feature_id: F081
+    spec_file: "docs/specs/SPEC_F081.yaml"
+    related_crs: [73, 97]
+    description: >
+      Trocar texto de confirmacao de exclusao de ator de generico
+      (members.deleteConfirm) para texto especifico ao contexto de
+      reconhecimento de presenca. Nova i18n key actors.deleteConfirm.
+    acceptance_criteria:
+      - "ActorSelector usa nova key actors.deleteConfirm"
+      - "Texto pt-BR conforme especificado pelo usuario"
+      - "Texto en equivalente"
+      - "Texto es equivalente"
+      - "members.deleteConfirm inalterada"
+    files_likely_impacted:
+      - src/components/ActorSelector.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -2700,6 +2812,42 @@ design_decisions:
       e aumentado de 8px para 12-16px, e o fontSize do icone X e aumentado de
       20 para 24-26px para melhorar visualizacao e toque.
 
+  - id: DD-50
+    title: "Status change via InviteActionDropdown: apenas muda status, sem enviar WhatsApp"
+    decided_in: CR-134
+    decision: >
+      Ao mudar status via InviteActionDropdown na secao de convites (Home), a
+      acao apenas muda o status no banco. NAO envia convite WhatsApp automaticamente.
+      O envio de WhatsApp continua sendo acao separada (botao WhatsApp para
+      assigned_not_invited).
+
+  - id: DD-51
+    title: "InviteActionDropdown: manter regra de visibilidade (apenas assigned_invited)"
+    decided_in: CR-134
+    decision: >
+      O botao de tres pontinhos (que abre InviteActionDropdown) continua
+      aparecendo APENAS para speeches com status assigned_invited na secao
+      de convites. O dropdown NAO e expandido para outros status. O escopo
+      do CR-134 e sobre as OPCOES dentro do dropdown, nao sobre quando ele
+      aparece.
+
+  - id: DD-52
+    title: "Checkbox visual para multi-select: manter icones edit/delete visiveis"
+    decided_in: CR-137
+    decision: >
+      No ActorSelector em modo multiSelect, os icones de edicao (pencil) e
+      exclusao (X) permanecem visiveis e na mesma posicao (direita). O checkbox
+      visual a esquerda do nome resolve a ambiguidade entre de-selecionar e
+      excluir. NAO esconder os icones no modo multi-select.
+
+  - id: DD-53
+    title: "viewPosition: 0.5 apenas na aba Agenda (nao em Discursos)"
+    decided_in: CR-136
+    decision: >
+      A correcao de viewPosition: 0.5 para centralizar o proximo domingo
+      aplica-se APENAS a aba Agenda. A aba Discursos ja funciona corretamente
+      e NAO deve ser alterada. Respeitar escopo do pedido do usuario.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -2937,6 +3085,32 @@ business_rules:
     rule: "Espaco entre LED e X no SpeechSlot >= 12px, fontSize do X >= 24"
     origin: CR-111
     notes: "Melhoria de UX para visualizacao e toque."
+
+  - id: BR-51
+    rule: "Status change UI (dropdown e modal) mostra TODAS as opcoes exceto status atual e not_assigned"
+    origin: CR-134
+    supersedes: "F062 (apenas confirmed/gave_up) e F071 (todos exceto not_assigned sem filtrar atual)"
+    notes: "Aplica-se a InviteActionDropdown (Home) e StatusChangeModal (Discursos). Sempre 3 opcoes visiveis."
+
+  - id: BR-52
+    rule: "LED clicavel para QUALQUER status exceto not_assigned (assigned_confirmed e gave_up agora clicaveis)"
+    origin: CR-134
+    supersedes: "LED desabilitado para assigned_confirmed e gave_up (comportamento anterior)"
+
+  - id: BR-53
+    rule: "InviteActionDropdown muda apenas status, NAO envia WhatsApp automaticamente"
+    origin: CR-134
+    notes: "Envio de WhatsApp continua como acao separada via botao WhatsApp para assigned_not_invited."
+
+  - id: BR-54
+    rule: "Checkbox visual em ActorSelector multiSelect mode (nao prefixo de texto)"
+    origin: CR-137
+    notes: "Checkbox marcado/vazio a esquerda do nome. Icones edit/delete permanecem visiveis a direita."
+
+  - id: BR-55
+    rule: "Confirmacao de exclusao de ator usa texto especifico (actors.deleteConfirm), nao generico"
+    origin: CR-138
+    supersedes: "Uso de members.deleteConfirm em ActorSelector (compartilhava com members/topics)"
 
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
@@ -3221,3 +3395,14 @@ cr_history:
       - "docs/specs/SPEC_F075.yaml (CR-132 - Fase 2: Auto-Scroll Fix)"
       - "docs/specs/SPEC_F076.yaml (CR-133 - Fase 2: Custom Prayer UX)"
     summary: "Fase 1 (pendente): LED flat redesign, delete speeches on type change, LED click all status options, country code display fix. Fase 2 (pendente): Topic X button outside field, hymn search field width consistency, auto-scroll fix (remove getItemLayout), custom prayer name UX (discoverability + re-editing)."
+
+  batch_11:
+    range: "CR-134 a CR-138"
+    status: "5 pendentes (134, 135, 136, 137, 138)"
+    files:
+      - "docs/specs/SPEC_F077.yaml (CR-134: Status options fix - regression of CR-129)"
+      - "docs/specs/SPEC_F078.yaml (CR-135: Custom name hint text change)"
+      - "docs/specs/SPEC_F079.yaml (CR-136: Agenda initial scroll fix)"
+      - "docs/specs/SPEC_F080.yaml (CR-137: Checkbox UX for recognizing presence)"
+      - "docs/specs/SPEC_F081.yaml (CR-138: Actor delete confirmation text)"
+    summary: "Status options regression fix (show all except current and not_assigned in both InviteActionDropdown and StatusChangeModal), custom name hint text improvement, Agenda tab initial scroll to center next sunday, checkbox-style UX for multi-select recognizing presence, actor delete confirmation text context-specific."

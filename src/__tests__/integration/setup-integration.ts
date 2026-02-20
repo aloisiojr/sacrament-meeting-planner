@@ -1,12 +1,15 @@
 /**
  * Shared integration test infrastructure.
- * Provides TestWrapper, mock factories, and Supabase mock helpers.
+ * Provides TestWrapper, renderHook, mock factories, and Supabase mock helpers.
  *
  * IMPORTANT: This file does NOT call vi.mock(). Each test file must
  * call its own vi.mock() at the top level (ADR-059).
+ *
+ * Uses react-test-renderer for renderHook (no react-native dependency).
  */
 
-import React from 'react';
+import React, { type ReactNode } from 'react';
+import TestRenderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext, type AuthContextValue } from '../../contexts/AuthContext';
 import { hasPermission as checkPermission } from '../../lib/permissions';
@@ -23,6 +26,90 @@ import type {
   Role,
   Permission,
 } from '../../types/database';
+
+// ---------------------------------------------------------------------------
+// 0. renderHook / act / waitFor (using react-test-renderer, no RN dependency)
+// ---------------------------------------------------------------------------
+
+const { act: reactAct } = TestRenderer;
+
+/**
+ * Minimal renderHook implementation using react-test-renderer.
+ * Avoids @testing-library/react-native which requires react-native runtime.
+ */
+export function renderHook<TResult>(
+  callback: () => TResult,
+  options?: {
+    wrapper?: React.ComponentType<{ children: ReactNode }>;
+  }
+): {
+  result: { current: TResult };
+  rerender: () => void;
+  unmount: () => void;
+} {
+  const resultRef = { current: undefined as unknown as TResult };
+
+  function TestComponent() {
+    resultRef.current = callback();
+    return null;
+  }
+
+  const element = options?.wrapper
+    ? React.createElement(options.wrapper, null, React.createElement(TestComponent))
+    : React.createElement(TestComponent);
+
+  let renderer: TestRenderer.ReactTestRenderer;
+  reactAct(() => {
+    renderer = TestRenderer.create(element);
+  });
+
+  return {
+    result: resultRef,
+    rerender: () => {
+      reactAct(() => {
+        renderer!.update(element);
+      });
+    },
+    unmount: () => {
+      reactAct(() => {
+        renderer!.unmount();
+      });
+    },
+  };
+}
+
+/**
+ * Wait for an assertion to pass within a timeout.
+ */
+export async function waitFor(
+  assertion: () => void | Promise<void>,
+  options?: { timeout?: number; interval?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? 5000;
+  const interval = options?.interval ?? 50;
+  const start = Date.now();
+
+  while (true) {
+    try {
+      // Flush microtasks and pending state updates
+      await reactAct(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      await assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - start >= timeout) {
+        throw error;
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+  }
+}
+
+/**
+ * Re-export act from react-test-renderer.
+ */
+export { reactAct as act };
 
 // ---------------------------------------------------------------------------
 // 1. createTestQueryClient
@@ -68,6 +155,8 @@ const MOCK_SESSION = {
   expires_at: Math.floor(Date.now() / 1000) + 3600,
   user: MOCK_USER,
 } as any;
+
+export { MOCK_SESSION, MOCK_USER };
 
 /**
  * Factory that returns an AuthContextValue with sensible defaults.
@@ -140,10 +229,6 @@ export function createWrapper(
  * Configures the mocked supabase.from() to return a chainable query builder
  * that resolves with the given response.
  *
- * Usage:
- *   mockSupabaseFrom('meeting_actors', { data: [...], error: null });
- *   // Now supabase.from('meeting_actors').select('*').eq(...) will resolve with data
- *
  * @param supabaseMock - The mocked supabase module (vi.mocked)
  * @param table - Table name to intercept
  * @param response - The { data, error } to resolve with
@@ -153,37 +238,10 @@ export function mockSupabaseFrom(
   table: string,
   response: { data: any; error: any }
 ) {
-  const createChain = () => {
-    const resolvedPromise = Promise.resolve(response);
-
-    const chain: any = new Proxy(
-      {},
-      {
-        get(_target, prop: string) {
-          // Make it thenable so `await` works on the chain directly
-          if (prop === 'then') {
-            return resolvedPromise.then.bind(resolvedPromise);
-          }
-          if (prop === 'catch') {
-            return resolvedPromise.catch.bind(resolvedPromise);
-          }
-          if (prop === 'finally') {
-            return resolvedPromise.finally.bind(resolvedPromise);
-          }
-          // All chain methods return the chain itself
-          return (..._args: any[]) => chain;
-        },
-      }
-    );
-
-    return chain;
-  };
-
   supabaseMock.from.mockImplementation((requestedTable: string) => {
     if (requestedTable === table) {
-      return createChain();
+      return createChainFor(response);
     }
-    // Default: return a chain that resolves with empty data
     return createChainWithDefault();
   });
 }

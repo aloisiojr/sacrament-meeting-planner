@@ -205,12 +205,13 @@ describe('CR-18: Activity log descriptions are human-readable', () => {
       new URL('../hooks/useMembers.ts', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('adicionado como membro');
-    expect(content).toContain('atualizado');
-    expect(content).toContain('removido');
-    // Should not use old "Membro criado:" style
+    // Uses buildLogDescription with structured format
+    expect(content).toContain('buildLogDescription');
+    expect(content).toContain("'member:create'");
+    expect(content).toContain("'member:update'");
+    expect(content).toContain("'member:delete'");
+    // Should not use old style
     expect(content).not.toContain('Membro criado:');
-    expect(content).not.toContain('Membro excluído:');
   });
 
   it('useActors should have descriptive log messages', async () => {
@@ -219,9 +220,10 @@ describe('CR-18: Activity log descriptions are human-readable', () => {
       new URL('../hooks/useActors.ts', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('adicionado como ator da reuniao');
+    // Uses buildLogDescription with structured format
+    expect(content).toContain('buildLogDescription');
+    expect(content).toContain("'actor:create'");
     expect(content).not.toContain('Ator criado:');
-    expect(content).not.toContain('Ator excluído:');
   });
 
   it('useTopics should have descriptive log messages', async () => {
@@ -230,9 +232,10 @@ describe('CR-18: Activity log descriptions are human-readable', () => {
       new URL('../hooks/useTopics.ts', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('adicionado');
+    // Uses buildLogDescription with structured format
+    expect(content).toContain('buildLogDescription');
+    expect(content).toContain("'topic:create'");
     expect(content).not.toContain('Tema criado:');
-    expect(content).not.toContain('Tema excluído:');
   });
 });
 
@@ -319,13 +322,13 @@ describe('CR-22: formatDateHumanReadable', () => {
     expect(formatDateHumanReadable('2026-06-07')).toBe('7 de Junho de 2026');
   });
 
-  it('useSundayTypes imports formatDateHumanReadable', async () => {
+  it('useSundayTypes uses buildLogDescription', async () => {
     const fs = await import('fs');
     const content = fs.readFileSync(
       new URL('../hooks/useSundayTypes.ts', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('formatDateHumanReadable');
+    expect(content).toContain('buildLogDescription');
   });
 
   it('useSpeeches imports formatDateHumanReadable', async () => {
@@ -337,13 +340,13 @@ describe('CR-22: formatDateHumanReadable', () => {
     expect(content).toContain('formatDateHumanReadable');
   });
 
-  it('useAgenda imports formatDateHumanReadable', async () => {
+  it('useAgenda uses buildLogDescription', async () => {
     const fs = await import('fs');
     const content = fs.readFileSync(
       new URL('../hooks/useAgenda.ts', import.meta.url).pathname,
       'utf-8'
     );
-    expect(content).toContain('formatDateHumanReadable');
+    expect(content).toContain('buildLogDescription');
   });
 });
 

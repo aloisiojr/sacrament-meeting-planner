@@ -7,7 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
+import { logAction, buildLogDescription } from '../lib/activityLog';
 import { formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import type {
@@ -203,7 +203,7 @@ export function useAssignSpeaker() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:assign', `${data.speaker_name} designado para ${data.position}o discurso dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'speech:assign', buildLogDescription('speech:assign', { nome: data.speaker_name ?? '', N: data.position, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()) }), userName);
       }
     },
   });
@@ -214,6 +214,7 @@ export function useAssignSpeaker() {
  * Sets topic_title, topic_link, topic_collection (all snapshots).
  */
 export function useAssignTopic() {
+  const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -232,8 +233,11 @@ export function useAssignTopic() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'speech:assign_theme', buildLogDescription('speech:assign_theme', { colecao: data.topic_collection ?? '', titulo: data.topic_title ?? '', N: data.position, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()) }), userName);
+      }
     },
   });
 }
@@ -274,7 +278,7 @@ export function useChangeStatus() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:status_change', `Status de ${data.speaker_name ?? 'N/A'} alterado para ${data.status} (${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())}, ${data.position}o discurso)`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'speech:status_change', buildLogDescription('speech:status_change', { nome: data.speaker_name ?? 'N/A', status: data.status, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()), N: data.position }), userName);
       }
     },
   });
@@ -310,7 +314,7 @@ export function useRemoveAssignment() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'speech:unassign', `Designacao de ${result.previousSpeaker} removida (${formatDateHumanReadable(result.speech.sunday_date, getCurrentLanguage())}, ${result.speech.position}o discurso)`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'speech:unassign', buildLogDescription('speech:unassign', { nome: result.previousSpeaker, data: formatDateHumanReadable(result.speech.sunday_date, getCurrentLanguage()), N: result.speech.position }), userName);
       }
     },
   });
@@ -339,7 +343,7 @@ export function useDeleteSpeechesByDate() {
         logAction(
           wardId, user.id, user.email ?? '',
           'speech_cleanup',
-          `Speeches for ${formatDateHumanReadable(sundayDate, getCurrentLanguage())} deleted on type change`,
+          buildLogDescription('speech_cleanup', { data: formatDateHumanReadable(sundayDate, getCurrentLanguage()) }),
           userName
         );
       }

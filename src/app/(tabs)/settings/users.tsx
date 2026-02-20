@@ -20,7 +20,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
-import { logAction } from '../../../lib/activityLog';
+import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import type { Role } from '../../../types/database';
 
 const ROLES: Role[] = ['bishopric', 'secretary', 'observer'];
@@ -141,13 +141,23 @@ export default function UserManagementScreen() {
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
-    mutationFn: async (targetUserId: string) => {
+    mutationFn: async ({ targetUserId, targetName, targetEmail }: { targetUserId: string; targetName: string; targetEmail: string }) => {
       return callEdgeFunction('delete-user', { targetUserId });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       Alert.alert(t('common.success'), t('users.deleteSuccess'));
       setExpandedUserId(null);
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
+      if (currentUser) {
+        logAction(
+          currentUser.app_metadata?.ward_id ?? '',
+          currentUser.id,
+          currentUser.email ?? '',
+          'user:removed',
+          buildLogDescription('user:removed', { nome: variables.targetName, email: variables.targetEmail }),
+          userName
+        );
+      }
     },
     onError: (err: any) => {
       const msg = err?.message || err?.context?.body?.error;
@@ -177,7 +187,7 @@ export default function UserManagementScreen() {
           currentUser.id,
           currentUser.email ?? '',
           'user:name-update',
-          `Name updated to "${newName.trim()}"`,
+          buildLogDescription('user:name-update', { nome: newName.trim() }),
           newName.trim()
         );
       }
@@ -233,7 +243,7 @@ export default function UserManagementScreen() {
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: () => deleteUserMutation.mutate(targetUser.id),
+          onPress: () => deleteUserMutation.mutate({ targetUserId: targetUser.id, targetName: targetUser.full_name || targetUser.email, targetEmail: targetUser.email }),
         },
       ]);
     },

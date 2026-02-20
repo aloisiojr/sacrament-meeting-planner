@@ -337,7 +337,7 @@ describe('F061 (CR-115): Confirmation dialog on sunday type change', () => {
 
     it('es has changeConfirmMessage', () => {
       const locale = readLocale('es') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas asignados');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas designados');
     });
   });
 

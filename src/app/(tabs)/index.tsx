@@ -1,6 +1,6 @@
 /**
  * Home tab: shows upcoming sundays, pending assignments, and invite management.
- * On Sundays, shows "Start Sacrament Meeting" button at the top (all roles).
+ * Shows "Start Sacrament Meeting" button at the top (all roles, all days).
  * Sections are role-gated:
  * - NextSundaysSection: all roles
  * - NextAssignmentsSection: bishopric only (when next 3 fully assigned)

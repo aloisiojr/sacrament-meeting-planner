@@ -159,3 +159,29 @@ export function useUpdateAgenda() {
     },
   });
 }
+
+/**
+ * Fetch all agendas for a date range.
+ * Used by agenda tab to show status lines on collapsed cards
+ * without requiring each card to be expanded first.
+ */
+export function useAgendaRange(startDate: string, endDate: string) {
+  const { wardId } = useAuth();
+
+  return useQuery({
+    queryKey: agendaKeys.byDateRange(wardId, startDate, endDate),
+    queryFn: async (): Promise<SundayAgenda[]> => {
+      const { data, error } = await supabase
+        .from('sunday_agendas')
+        .select('*')
+        .eq('ward_id', wardId)
+        .gte('sunday_date', startDate)
+        .lte('sunday_date', endDate)
+        .order('sunday_date');
+
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!wardId && !!startDate && !!endDate,
+  });
+}

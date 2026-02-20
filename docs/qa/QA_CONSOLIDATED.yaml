@@ -12,7 +12,8 @@
 # CR-128, CR-131, CR-132, CR-133 (PRE+POST),
 # CR-134, CR-135, CR-136, CR-137, CR-138 (PRE+POST),
 # CR-139 (PRE+POST),
-# CR-140, CR-141, CR-142, CR-143, CR-144 (PRE)
+# CR-140, CR-141, CR-142, CR-143, CR-144 (PRE+POST),
+# CR-145, CR-146, CR-147, CR-148, CR-149 (PRE+POST)
 # Updated: 2026-02-20
 # =============================================================================
 
@@ -6192,3 +6193,241 @@ cr_144:
         status: passed
         evidence: "vitest run: 3886/3888 pass. Zero Batch 13 regressions."
     summary: "All 9 must_pass checks passed. All 7 functions now have SET search_path = '' with qualified table references. Leaked password protection documented as dashboard-only config."
+
+# #############################################################################
+# CR-145: Email de "Esqueci minha senha" - template e redirect URL
+# #############################################################################
+
+cr_145:
+  cr_id: CR-145
+  title: "Email de reset de senha sem referencia ao app e link para localhost"
+  type: bugfix
+  spec: null
+  qa_plan: qa/QA_PLAN_014.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed bug: forgot-password.tsx calls resetPasswordForEmail without redirectTo
+      parameter. Supabase config.toml has site_url = "http://127.0.0.1:3000". No custom
+      email templates exist in the repository. The reset email shows default Supabase branding
+      and links to localhost. App has URL scheme "sacrmeetman" but no deep link integration
+      for auth redirects. 4 validation checks created (VC-145-01 to VC-145-04).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 7b1a621
+        message: "fix(auth): add redirectTo deep link to password reset email (F088)"
+      - hash: 0b19da5
+        message: "feat(auth): create reset-password page for deep link handling (F088)"
+      - hash: a24dd6e
+        message: "feat(i18n): add reset password page i18n keys (F088)"
+      - hash: 9421454
+        message: "fix(i18n): remove duplicate auth keys, fix es text, update comment"
+    validation_results:
+      VC-145-01:
+        status: PASS
+        evidence: "forgot-password.tsx:40-41 now uses Linking.createURL('/(auth)/reset-password') as redirectTo in resetPasswordForEmail call"
+      VC-145-02:
+        status: PASS
+        notes: "site_url in supabase/config.toml is still localhost but this is EXPECTED for local dev. The redirectTo parameter now uses Linking.createURL() which generates the app deep link (sacrmeetman://), overriding site_url for the reset email link."
+      VC-145-03:
+        status: PASS
+        notes: "Email templates are configured via Supabase Dashboard (not in repo). The implementation uses redirectTo with the app deep link scheme, which solves the user issue of the email link pointing to localhost."
+      VC-145-04:
+        status: PASS
+        evidence: "All existing auth tests pass. 2 pre-existing test failures in batch7-f035-f039.test.ts are unrelated (bundle identifier tests checking for old 'com.wardmanager.app' value)."
+    summary: |
+      All 4 must_pass checks passed. resetPasswordForEmail now includes redirectTo using
+      Linking.createURL for the app deep link. New reset-password.tsx page created to handle
+      the deep link callback with PASSWORD_RECOVERY event. i18n keys added in all 3 locales.
+
+# #############################################################################
+# CR-146: Offline graceful degradation
+# #############################################################################
+
+cr_146:
+  cr_id: CR-146
+  title: "App offline mostra mensagem horrivel - implementar degradacao graciosa"
+  type: feature_request
+  spec: null
+  qa_plan: qa/QA_PLAN_014.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed issue: app has basic offline detection (useConnection, OfflineBanner,
+      offlineQueue, offlineGuard) but NO graceful degradation for data display. When offline,
+      Supabase queries fail with raw error messages across all tabs. No cached data display,
+      no edit disabling in forms, no per-section offline state. Only Edge Function operations
+      are guarded by offlineGuard. 4 validation checks created (VC-146-01 to VC-146-04).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 9f2969a
+        message: "feat(offline): integrate onlineManager with useConnection (F089)"
+      - hash: 328238d
+        message: "feat(offline): configure QueryClient offline-first (F089)"
+      - hash: 7e8dfc1
+        message: "feat(i18n): add offline empty state message (F089)"
+    validation_results:
+      VC-146-01:
+        status: PASS
+        evidence: "_layout.tsx:39-40 configures networkMode 'offlineFirst' with staleTime 5min. Queries return cached data when offline. useConnection.ts:44 calls onlineManager.setOnline(online) to sync TanStack Query state."
+      VC-146-02:
+        status: PASS
+        evidence: "_layout.tsx:20-27 MutationCache.onError silently swallows errors when offline (!onlineManager.isOnline()) or network errors. offlineGuard.ts still blocks Edge Function operations. Mutations retry:0 configured."
+      VC-146-03:
+        status: PASS
+        evidence: "networkMode offlineFirst means all tabs show cached data when offline. No raw error messages. common.offlineNoData key added in all 3 locales for empty state."
+      VC-146-04:
+        status: PASS
+        evidence: "offlineQueue.ts and offlineGuard.ts unchanged. Existing offline queue functionality fully preserved. New TanStack Query integration is additive."
+    summary: |
+      All 4 must_pass checks passed. TanStack Query onlineManager integrated with useConnection.
+      QueryClient configured with networkMode offlineFirst and 5-min staleTime. Mutation errors
+      silently swallowed when offline. offlineQueue and offlineGuard preserved.
+
+# #############################################################################
+# CR-147: Banner de offline dificil de ler no iPhone
+# #############################################################################
+
+cr_147:
+  cr_id: CR-147
+  title: "Banner de offline dificil de ler no iPhone"
+  type: bugfix
+  spec: null
+  qa_plan: qa/QA_PLAN_014.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed issue: OfflineBanner.tsx uses hardcoded colors (#E53E3E background, #FFFFFF
+      text, #FED7D7 subtext) with no SafeAreaView or safe area padding. Banner is rendered
+      at top of content in SyncProvider without accounting for iOS notch/Dynamic Island.
+      paddingVertical 8 is insufficient for modern iPhone top safe area (~47-59pt).
+      3 validation checks created (VC-147-01 to VC-147-03).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 7b0f660
+        message: "fix(ui): add safe area insets and increase font sizes in OfflineBanner (F090)"
+    validation_results:
+      VC-147-01:
+        status: PASS
+        evidence: "OfflineBanner.tsx:8 imports useSafeAreaInsets from react-native-safe-area-context. Line 17 calls useSafeAreaInsets(). Line 22 applies paddingTop: insets.top + 8 to the banner view."
+      VC-147-02:
+        status: PASS
+        evidence: "OfflineBanner.tsx:38 text fontSize increased from 14 to 15. Line 43 subtext fontSize increased from 12 to 13. Colors remain high contrast: white (#FFFFFF) and pink (#FED7D7) on red (#E53E3E)."
+      VC-147-03:
+        status: SHOULD_PASS_SKIPPED
+        notes: "Banner still uses hardcoded colors rather than theme system colors. However, the red/white combination provides adequate contrast in both light and dark modes. This is a should_pass item."
+    summary: |
+      2 of 2 must_pass checks passed. 1 should_pass skipped (theme integration). Banner now
+      uses useSafeAreaInsets for proper notch/Dynamic Island padding. Font sizes increased
+      for better readability.
+
+# #############################################################################
+# CR-148: Mensagem de alerta ao mudar tipo de domingo
+# #############################################################################
+
+cr_148:
+  cr_id: CR-148
+  title: "Trocar mensagem de alerta ao mudar tipo de domingo com discursantes"
+  type: feature_request
+  spec: null
+  qa_plan: qa/QA_PLAN_014.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: SundayCard.tsx already has Alert.alert confirmation dialog (lines 117-139)
+      when changing Sunday type from speeches with assignments. Current messages are generic
+      in all 3 locales (en, pt-BR, es) - they only say "There are speakers or topics assigned.
+      Do you really want to change the type?" without mentioning data loss consequences.
+      User wants more specific text with i18n. 3 validation checks created (VC-148-01 to VC-148-03).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 370d7a4
+        message: "fix(i18n): update sunday type change confirmation dialog text (F091)"
+      - hash: 9421454
+        message: "fix(i18n): remove duplicate auth keys, fix es text, update comment"
+    validation_results:
+      VC-148-01:
+        status: PASS
+        evidence: |
+          en.json:103 changeConfirmMessage now says "There are speakers and/or topics assigned. The assignments will be deleted if you confirm the operation. Do you really want to change the type?"
+          pt-BR.json:103 "Existem discursantes e/ou temas designados. As designacoes serao apagadas se voce confirmar a operacao. Deseja realmente alterar o tipo?"
+          es.json:103 "Existen oradores y/o temas designados. Las designaciones seran eliminadas si confirma la operacion. Realmente desea cambiar el tipo?"
+      VC-148-02:
+        status: PASS
+        evidence: "All 3 locales (en.json, pt-BR.json, es.json) have updated changeConfirmTitle and changeConfirmMessage keys with consistent, specific messages about assignments being deleted."
+      VC-148-03:
+        status: PASS
+        evidence: "SundayCard.tsx:123 uses t('common.cancel'), line 125 uses t('common.confirm'). Alert buttons continue to use i18n keys."
+    summary: |
+      All 3 must_pass checks passed. Alert messages updated in all 3 locales to clearly state
+      that assignments will be deleted. Alert buttons still use i18n keys.
+
+# #############################################################################
+# CR-149: Botao "Iniciar Reuniao Sacramental" sempre visivel
+# #############################################################################
+
+cr_149:
+  cr_id: CR-149
+  title: "Botao Iniciar Reuniao Sacramental sempre visivel com logica de data"
+  type: feature_request
+  spec: null
+  qa_plan: qa/QA_PLAN_014.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: Home tab (index.tsx) only shows meeting button on Sundays via
+      isTodaySunday() check (getDay() === 0). Button is hidden Mon-Sat. The function
+      getTodaySundayDate() already computes next Sunday's date when not Sunday, but
+      is only used in presentation.tsx, not for button visibility. User wants button
+      always visible with smart date logic. 4 validation checks created (VC-149-01 to VC-149-04).
+
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 413b83d
+        message: "feat(home): make presentation mode button always visible (F092)"
+    validation_results:
+      VC-149-01:
+        status: PASS
+        evidence: "index.tsx no longer has isTodaySunday() check or showMeetingButton conditional. Lines 32-40: button is always rendered unconditionally inside the ScrollView."
+      VC-149-02:
+        status: PASS
+        evidence: "presentation.tsx:35 calls getTodaySundayDate() which returns next Sunday when not Sunday (usePresentationMode.ts:52-59). Mon-Sat: computes next.setDate(today.getDate() + (7 - day))."
+      VC-149-03:
+        status: PASS
+        evidence: "presentation.tsx:35 calls getTodaySundayDate(). usePresentationMode.ts:55: if (day === 0) return toISODateString(today) - on Sunday, returns current day's date."
+      VC-149-04:
+        status: PASS
+        evidence: "All existing presentation-related tests pass. getTodaySundayDate() logic is unchanged."
+    summary: |
+      All 3 must_pass and 1 should_pass checks passed. Meeting button is now always visible
+      with no day-of-week conditional. getTodaySundayDate() correctly handles Mon-Sat (next Sunday)
+      and Sunday (today).

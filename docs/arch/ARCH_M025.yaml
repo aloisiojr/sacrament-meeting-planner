@@ -1,0 +1,691 @@
+# =============================================================================
+# ARCH_M025.yaml
+# Architecture for Batch 14 Phase 1 - Password Reset Email, Offline Degradation,
+#                                       Offline Banner, Alert Message, Button Visibility
+# Features: F088, F089, F090, F091, F092
+# CRs: CR-145, CR-146, CR-147, CR-148, CR-149
+# Created: 2026-02-20
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Five changes spanning password reset email customization (F088), offline
+    graceful degradation via TanStack Query onlineManager (F089), offline banner
+    readability on iPhone (F090), sunday type change confirmation message update
+    (F091), and presentation mode button always visible (F092).
+  principles:
+    - "Minimal code change: F088 adds redirectTo param, F090 adds safe area insets, F091 updates i18n values only, F092 removes a conditional"
+    - "Framework integration: F089 uses TanStack Query onlineManager to pause/resume queries based on connection state"
+    - "Reuse existing infrastructure: F089 extends useConnection (M007) and QueryClient config (M008)"
+    - "No schema changes: all features modify only client-side code or Supabase Dashboard configuration"
+
+diagram: |
+  +-------------------------------------------------------------------------+
+  |  Batch 14 Phase 1 Changes Overview                                      |
+  |                                                                         |
+  |  F088 (Auth Module)           F089 (OfflineManager + UIShell)           |
+  |  +--------------------+      +--------------------------------------+   |
+  |  | forgot-password.tsx |      | useConnection.ts                     |   |
+  |  |  +-- add redirectTo |      |  +-- onlineManager.setOnline()      |   |
+  |  |      to resetPwd()  |      |                                      |   |
+  |  | + Supabase Dashboard|      | _layout.tsx                          |   |
+  |  |   (email template   |      |  +-- networkMode: 'offlineFirst'    |   |
+  |  |    + redirect URLs) |      |  +-- MutationCache: silence offline |   |
+  |  +--------------------+      |                                      |   |
+  |                               | i18n: common.offlineNoData (3 langs) |   |
+  |                               +--------------------------------------+   |
+  |                                                                         |
+  |  F090 (OfflineManager)       F091 (i18n only)                          |
+  |  +--------------------+      +--------------------------------------+   |
+  |  | OfflineBanner.tsx   |      | pt-BR.json / en.json / es.json      |   |
+  |  |  +-- useSafeArea    |      |  +-- sundayExceptions               |   |
+  |  |      Insets()        |      |      .changeConfirmTitle            |   |
+  |  |  +-- paddingTop:    |      |      .changeConfirmMessage          |   |
+  |  |      insets.top      |      +--------------------------------------+   |
+  |  |  +-- fontSize 14->15|                                               |
+  |  |  +-- fontSize 12->13|      F092 (UIShell)                           |
+  |  +--------------------+      +--------------------------------------+   |
+  |                               | index.tsx (Home tab)                 |   |
+  |                               |  +-- remove showMeetingButton cond. |   |
+  |                               |  +-- render button unconditionally  |   |
+  |                               |  +-- remove isTodaySunday import    |   |
+  |                               +--------------------------------------+   |
+  +-------------------------------------------------------------------------+
+
+# =============================================================================
+# F088: Password Reset Email Customization
+# =============================================================================
+
+f088_password_reset_email:
+  summary: >
+    Add redirectTo parameter to resetPasswordForEmail() call in forgot-password.tsx.
+    The rest (email template, redirect URLs) is Supabase Dashboard configuration.
+
+  components:
+    - name: "forgot-password.tsx redirectTo"
+      path: src/app/(auth)/forgot-password.tsx
+      action: modify
+      responsibility: "Pass redirectTo option to supabase.auth.resetPasswordForEmail()"
+      detail: |
+        Current code (line ~39):
+          await supabase.auth.resetPasswordForEmail(email)
+
+        New code:
+          const redirectUrl = Linking.createURL('/(auth)/reset-password')
+          await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl })
+
+        Uses expo-linking to generate the correct deep link URL.
+        The deep link scheme is already configured (sacrmeetman://).
+        Linking.createURL produces a URL like:
+          sacrmeetman:///(auth)/reset-password (native)
+          or http://localhost:8081/(auth)/reset-password (dev)
+
+        Import: import * as Linking from 'expo-linking'
+
+    - name: "Supabase Dashboard configuration"
+      path: "Supabase Dashboard (not code)"
+      action: configure
+      responsibility: "Customize email template and redirect URLs in Supabase Dashboard"
+      detail: |
+        1. Authentication > Email Templates > Reset Password:
+           - Subject: "Redefinir senha - Gerenciador da Reuniao Sacramental"
+           - Body: Replace Supabase branding with app name
+        2. Authentication > URL Configuration:
+           - Site URL: set to production URL or deep link
+           - Redirect URLs: add sacrmeetman:///(auth)/reset-password
+
+        NOTE: This is manual configuration, NOT code. The developer must
+        perform these steps in the Supabase Dashboard after deployment.
+
+  contracts:
+    - name: "resetPasswordForEmail with redirectTo"
+      component: "forgot-password.tsx"
+      methods:
+        - name: "supabase.auth.resetPasswordForEmail(email, options)"
+          input: "email: string, options: { redirectTo: string }"
+          output: "Promise<{ data, error }>"
+          notes: "redirectTo ensures the reset link points to the app deep link, not localhost"
+
+  notes: |
+    CRITICAL: F088 supersedes ADR-019 which stated "No custom email templates needed".
+    The user explicitly requested branding customization. ADR-019's decision about
+    using Supabase's built-in flow remains valid, but the template and redirect URL
+    must now be customized.
+
+    The app already has deep link support via expo-linking (sacrmeetman:// scheme,
+    configured in app.json). The redirect URL uses Linking.createURL() which
+    generates the correct URL for both development and production environments.
+
+    IMPORTANT: The reset-password route may need to be created if it doesn't exist.
+    Currently the app has forgot-password.tsx but may not have a reset-password.tsx
+    page that handles the incoming deep link with the token. This should be
+    verified during implementation. If it doesn't exist, the developer needs to
+    create a simple page that calls supabase.auth.updateUser({ password }).
+
+# =============================================================================
+# F089: Offline Graceful Degradation
+# =============================================================================
+
+f089_offline_degradation:
+  summary: >
+    Integrate TanStack Query onlineManager with useConnection to pause queries
+    when offline. Silence mutation errors when offline. Show friendly empty state
+    when no cache available. Auto-refetch on reconnect.
+
+  components:
+    - name: "useConnection.ts onlineManager integration"
+      path: src/hooks/useConnection.ts
+      action: modify
+      responsibility: "Sync device connection state with TanStack Query onlineManager"
+      detail: |
+        Import onlineManager from @tanstack/react-query.
+
+        In the existing useEffect that tracks connection state, add:
+          onlineManager.setOnline(isOnline)
+
+        This tells TanStack Query whether the device is online or offline.
+        When offline, queries with networkMode 'offlineFirst' will use cache
+        and not attempt network requests. When online again, stale queries
+        auto-refetch.
+
+        IMPORTANT: Call onlineManager.setOnline() INSIDE the existing
+        useEffect, not in a new one. The useConnection hook already
+        manages isOnline state via connectionUtils.ts.
+
+    - name: "_layout.tsx QueryClient offline configuration"
+      path: src/app/_layout.tsx
+      action: modify
+      responsibility: "Configure networkMode and silence offline mutation errors"
+      detail: |
+        Changes to QueryClient configuration:
+
+        1. defaultOptions.queries: add networkMode: 'offlineFirst'
+           This makes queries use cached data when offline and not retry.
+
+        2. MutationCache.onError: add offline check
+           Current (line ~30-35):
+             MutationCache({ onError: (error) => {
+               Alert.alert(t('errors.mutationFailed'))
+             }})
+
+           New:
+             MutationCache({ onError: (error) => {
+               const isOffline = !onlineManager.isOnline()
+               const isNetworkError = error.message?.includes('network') ||
+                                      error.message?.includes('fetch') ||
+                                      error.message?.includes('Failed to fetch')
+               if (isOffline || isNetworkError) {
+                 // Silently ignore network errors when offline
+                 return
+               }
+               Alert.alert(t('errors.mutationFailed'))
+             }})
+
+        3. defaultOptions.queries.retry: update existing retry function
+           Current: retry(failureCount, error) retries up to 2 times
+           New: also check onlineManager.isOnline(); if offline, don't retry
+             retry: (failureCount, error) => {
+               if (!onlineManager.isOnline()) return false
+               return failureCount < 2
+             }
+
+    - name: "i18n offline empty state key"
+      files:
+        - path: src/i18n/locales/pt-BR.json
+          action: modify
+        - path: src/i18n/locales/en.json
+          action: modify
+        - path: src/i18n/locales/es.json
+          action: modify
+      responsibility: "Add common.offlineNoData i18n key for friendly offline empty state"
+      detail: |
+        New key in common section:
+          pt-BR: "common.offlineNoData": "Dados indisponiveis no modo offline"
+          en:    "common.offlineNoData": "Data unavailable in offline mode"
+          es:    "common.offlineNoData": "Datos no disponibles en modo sin conexion"
+
+        This key is used by list components when offline and no cache exists.
+
+  contracts:
+    - name: "onlineManager integration contract"
+      component: "useConnection.ts"
+      methods:
+        - name: "onlineManager.setOnline(isOnline)"
+          input: "isOnline: boolean (from useConnection state)"
+          output: "void - updates TanStack Query's online state"
+          notes: "Called in existing useEffect when connection state changes"
+
+    - name: "QueryClient offline config contract"
+      component: "_layout.tsx"
+      methods:
+        - name: "networkMode: 'offlineFirst'"
+          input: "QueryClient defaultOptions.queries"
+          output: "Queries use cache when offline, fetch when online"
+          notes: "Affects all queries globally. Queries return cached data without network request when offline."
+        - name: "MutationCache.onError (offline-aware)"
+          input: "error: Error"
+          output: "void (no Alert when offline)"
+          notes: "Checks onlineManager.isOnline() before showing error Alert"
+
+  notes: |
+    INTERACTION WITH EXISTING COMPONENTS:
+    - OfflineBanner (M007): continues to work as-is. F089 does not modify it.
+    - offlineGuard.ts (M007): continues to block Edge Functions when offline.
+    - SyncProvider: continues to orchestrate connection monitoring.
+    - offlineQueue: continues to queue mutations. F089 adds suppression of
+      error Alerts, but the queue still processes on reconnect.
+
+    TanStack Query v5 networkMode options:
+    - 'online' (default): queries only fire when online
+    - 'always': queries fire regardless of network state
+    - 'offlineFirst': queries use cache first, fetch when online
+
+    'offlineFirst' is the best choice because:
+    1. Shows cached data immediately (no loading spinner)
+    2. Does not attempt network requests when offline
+    3. Auto-fetches fresh data when back online
+    4. refetchOnReconnect works automatically with onlineManager
+
+    COLD START OFFLINE: If the app starts offline with no cache,
+    queries will have no data. The existing ListEmptyComponent in
+    FlatLists will show. The offlineNoData i18n key can be used
+    in these empty components when useConnection reports offline.
+
+# =============================================================================
+# F090: Offline Banner Readability on iPhone
+# =============================================================================
+
+f090_offline_banner:
+  summary: >
+    Add safe area insets and increase font sizes in OfflineBanner.tsx to fix
+    readability on iPhones with notch/Dynamic Island.
+
+  components:
+    - name: "OfflineBanner.tsx safe area + font size"
+      path: src/components/OfflineBanner.tsx
+      action: modify
+      responsibility: "Apply safe area insets and increase font sizes for iPhone readability"
+      detail: |
+        Changes:
+
+        1. Import: import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
+        2. Inside component function:
+           const insets = useSafeAreaInsets()
+
+        3. Container style:
+           OLD: paddingVertical: 8, paddingHorizontal: 16
+           NEW: paddingTop: insets.top + 8, paddingBottom: 8, paddingHorizontal: 16
+
+        4. Text (title) style:
+           OLD: fontSize: 14
+           NEW: fontSize: 15
+
+        5. Subtext style:
+           OLD: fontSize: 12
+           NEW: fontSize: 13
+
+        react-native-safe-area-context is already installed and used elsewhere
+        (src/app/(tabs)/index.tsx:12). The SafeAreaProvider is already in the
+        provider stack (SyncProvider renders OfflineBanner inside the provider tree).
+
+  contracts:
+    - name: "OfflineBanner rendering contract"
+      component: "OfflineBanner.tsx"
+      methods:
+        - name: "OfflineBanner (functional component)"
+          input: "No props change"
+          output: "JSX.Element with safe area insets applied"
+          notes: "paddingTop: insets.top + 8 ensures banner is below notch/Dynamic Island"
+
+  notes: |
+    DEPENDENCY: react-native-safe-area-context is already installed.
+    SafeAreaProvider must wrap the component tree above OfflineBanner.
+    SyncProvider renders OfflineBanner, and SyncProvider is inside the
+    provider stack in _layout.tsx. The SafeAreaProvider should be
+    verified to be above SyncProvider in the stack.
+
+    If SafeAreaProvider is NOT in the provider stack, useSafeAreaInsets()
+    will return { top: 0, bottom: 0, left: 0, right: 0 } which is safe
+    (no padding added, same as current behavior).
+
+    CROSS-PLATFORM: On Android without notch, insets.top will be 0 or
+    the status bar height, which is appropriate. On iPhone SE (no notch),
+    insets.top will be the standard status bar height (~20px).
+
+# =============================================================================
+# F091: Sunday Type Change Confirmation Message
+# =============================================================================
+
+f091_sunday_type_alert:
+  summary: >
+    Update 2 i18n key VALUES in 3 locale files for the sunday type change
+    confirmation dialog. No TypeScript code changes.
+
+  components:
+    - name: "i18n confirmation message updates"
+      files:
+        - path: src/i18n/locales/pt-BR.json
+          action: modify
+        - path: src/i18n/locales/en.json
+          action: modify
+        - path: src/i18n/locales/es.json
+          action: modify
+      responsibility: "Update sundayExceptions.changeConfirmTitle and changeConfirmMessage values"
+      detail: |
+        Keys to update (values only, keys remain the same):
+
+        sundayExceptions.changeConfirmTitle:
+          pt-BR: "Alterar tipo de domingo?"
+          en:    "Change Sunday type?"
+          es:    "Cambiar tipo de domingo?"
+
+        sundayExceptions.changeConfirmMessage:
+          pt-BR: "Existem discursantes e/ou temas designados. As designacoes serao apagadas se voce confirmar a operacao. Deseja realmente alterar o tipo?"
+          en:    "There are speakers and/or topics assigned. The assignments will be deleted if you confirm the operation. Do you really want to change the type?"
+          es:    "Existen oradores y/o temas asignados. Las asignaciones seran eliminadas si confirma la operacion. Realmente desea cambiar el tipo?"
+
+        These keys are used in SundayCard.tsx:120-121 via:
+          Alert.alert(t('sundayExceptions.changeConfirmTitle'), t('sundayExceptions.changeConfirmMessage'))
+
+        The component SundayTypeDropdown is shared between speeches.tsx and
+        agenda.tsx (F084), so the updated message appears in both tabs.
+
+  contracts:
+    - name: "i18n confirmation dialog contract"
+      methods:
+        - name: "t('sundayExceptions.changeConfirmTitle')"
+          input: "locale context"
+          output: "'Alterar tipo de domingo?' (pt-BR) | 'Change Sunday type?' (en) | 'Cambiar tipo de domingo?' (es)"
+        - name: "t('sundayExceptions.changeConfirmMessage')"
+          input: "locale context"
+          output: "Full descriptive message about assigned speakers/topics being deleted"
+
+  notes: |
+    ZERO TYPESCRIPT CODE CHANGES. Only i18n JSON value updates.
+    The keys sundayExceptions.changeConfirmTitle and changeConfirmMessage
+    already exist in all 3 locale files. The implementation only needs to
+    replace their VALUES with the user-specified text.
+
+    The Alert.alert call in SundayCard.tsx (SundayTypeDropdown) remains
+    unchanged. The updated text appears automatically via i18n.
+
+# =============================================================================
+# F092: Presentation Mode Button Always Visible
+# =============================================================================
+
+f092_button_always_visible:
+  summary: >
+    Remove the conditional rendering of the "Start Sacrament Meeting" button
+    in index.tsx (Home tab). The button is rendered unconditionally.
+    getTodaySundayDate() already handles the date logic correctly.
+
+  components:
+    - name: "index.tsx remove showMeetingButton condition"
+      path: src/app/(tabs)/index.tsx
+      action: modify
+      responsibility: "Render the presentation mode button unconditionally"
+      detail: |
+        Changes:
+
+        1. Remove import of isTodaySunday from usePresentationMode (line ~17):
+           OLD: import { isTodaySunday } from '../hooks/usePresentationMode'
+           NEW: (remove this import line, or remove isTodaySunday from the import)
+
+        2. Remove showMeetingButton memo (line ~27):
+           OLD: const showMeetingButton = useMemo(() => isTodaySunday(), [])
+           NEW: (remove this line entirely)
+
+        3. Remove conditional rendering (line ~32):
+           OLD: {showMeetingButton && (<View>...<Title>...<Button>...</View>)}
+           NEW: <View>...<Title>...<Button>...</View>
+           (render the View with title and button unconditionally)
+
+        4. Remove useMemo import if no longer used:
+           Check if useMemo is used elsewhere in the file. If not, remove
+           from React import.
+
+        NO CHANGES to:
+        - usePresentationMode.ts (isTodaySunday and getTodaySundayDate remain)
+        - presentation.tsx (getTodaySundayDate already implements correct logic)
+
+  contracts:
+    - name: "Home tab button rendering contract"
+      component: "index.tsx"
+      methods:
+        - name: "Presentation mode button"
+          input: "None (unconditional)"
+          output: "JSX.Element - always rendered with title and button"
+          notes: "Date logic delegated to getTodaySundayDate() in presentation.tsx"
+
+  notes: |
+    MINIMAL CHANGE: Only index.tsx modified. The date logic in
+    getTodaySundayDate() already works correctly:
+    - Monday-Saturday: returns next Sunday
+    - Sunday: returns today
+
+    This means clicking the button on a weekday opens the presentation
+    mode for the upcoming Sunday. Clicking on Sunday opens for today.
+
+    isTodaySunday() function is NOT deleted from usePresentationMode.ts
+    because it may be used in tests or future features. The function
+    simply becomes unused in index.tsx.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-064
+    title: "Supersede ADR-019: customize password reset email template and redirect URL"
+    context: >
+      ADR-019 stated 'No custom email templates needed' for forgot password.
+      User reported that the email shows Supabase branding and localhost URL.
+      Options: (a) keep default template, (b) customize in Supabase Dashboard.
+    decision: >
+      Customize email template in Supabase Dashboard with app name. Add
+      redirectTo parameter using Linking.createURL() for correct deep link.
+      ADR-019 remains valid for the flow (supabase.auth.resetPasswordForEmail)
+      but its 'no template customization' clause is superseded.
+    consequences:
+      - "Email shows app name instead of Supabase branding"
+      - "Reset link points to app deep link, not localhost"
+      - "Requires manual Supabase Dashboard configuration (not automated)"
+      - "Deep link uses existing expo-linking infrastructure"
+
+  - id: ADR-065
+    title: "Integrate TanStack Query onlineManager with useConnection for offline query pausing"
+    context: >
+      F089 needs queries to stop retrying when offline. TanStack Query v5 has
+      onlineManager API. Options: (a) custom retry logic per query,
+      (b) global onlineManager integration, (c) wrapper hook.
+    decision: >
+      Use onlineManager.setOnline(isOnline) in useConnection.ts to sync
+      connection state. Configure networkMode: 'offlineFirst' globally in
+      QueryClient defaultOptions. Silence mutation errors when offline in
+      MutationCache.onError handler.
+    consequences:
+      - "All queries automatically paused when offline (no per-query config)"
+      - "Cached data displayed when offline (offlineFirst mode)"
+      - "No mutation error Alerts when offline"
+      - "Auto-refetch on reconnect via onlineManager"
+      - "Consistent with existing useConnection and OfflineBanner infrastructure"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  changes: >
+    No schema changes. No new tables or columns. All changes are client-side
+    (TypeScript, i18n JSON) or Supabase Dashboard configuration.
+  entities: []
+  notes:
+    - "F088: No DB changes. Supabase Dashboard email template is external config."
+    - "F089: No DB changes. TanStack Query config is client-side only."
+    - "F090: No DB changes. UI-only change."
+    - "F091: No DB changes. i18n value updates only."
+    - "F092: No DB changes. UI conditional rendering change."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  impact: "Neutral to positive. F088 fixes insecure localhost redirect URL."
+  notes:
+    - "F088: Fixes redirect URL from localhost to proper deep link (security improvement)"
+    - "F089: No security impact. Offline mode is read-only (no edits allowed offline)"
+    - "F090: No security impact. UI cosmetic change only."
+    - "F091: No security impact. i18n text change only."
+    - "F092: No security impact. Button was already accessible to all roles."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  impact: "Positive. F089 reduces noise from offline error logs."
+  notes:
+    - "F089: Console.error from QueryCache.onError still logs (for debugging), but Alert.alert suppressed"
+    - "F089: onlineManager state can be queried for diagnostics"
+    - "No new logging or monitoring added by other features"
+
+# =============================================================================
+# FILES IMPACTED (consolidated)
+# =============================================================================
+
+files_impacted:
+  # F088
+  - path: src/app/(auth)/forgot-password.tsx
+    action: modify
+    feature: F088
+    change: "Add redirectTo with Linking.createURL() to resetPasswordForEmail call"
+
+  # F089
+  - path: src/hooks/useConnection.ts
+    action: modify
+    feature: F089
+    change: "Add onlineManager.setOnline(isOnline) sync with TanStack Query"
+
+  - path: src/app/_layout.tsx
+    action: modify
+    feature: F089
+    change: "Add networkMode: 'offlineFirst', offline-aware retry, silence MutationCache.onError when offline"
+
+  - path: src/i18n/locales/pt-BR.json
+    action: modify
+    feature: F089, F091
+    change: "F089: Add common.offlineNoData. F091: Update sundayExceptions.changeConfirmTitle and changeConfirmMessage values"
+
+  - path: src/i18n/locales/en.json
+    action: modify
+    feature: F089, F091
+    change: "F089: Add common.offlineNoData. F091: Update sundayExceptions.changeConfirmTitle and changeConfirmMessage values"
+
+  - path: src/i18n/locales/es.json
+    action: modify
+    feature: F089, F091
+    change: "F089: Add common.offlineNoData. F091: Update sundayExceptions.changeConfirmTitle and changeConfirmMessage values"
+
+  # F090
+  - path: src/components/OfflineBanner.tsx
+    action: modify
+    feature: F090
+    change: "Add useSafeAreaInsets for paddingTop, increase font sizes (14->15, 12->13)"
+
+  # F092
+  - path: src/app/(tabs)/index.tsx
+    action: modify
+    feature: F092
+    change: "Remove showMeetingButton conditional, render button unconditionally, remove isTodaySunday import"
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  implementation_order:
+    description: "Recommended implementation order"
+    detail: |
+      1. F091 (i18n value changes) - standalone, simplest change, no dependencies
+      2. F092 (remove conditional) - standalone, minimal change, no dependencies
+      3. F090 (banner safe area) - standalone, single file change
+      4. F088 (redirectTo + Dashboard config) - standalone, 1 code file + manual config
+      5. F089 (offline degradation) - most complex, touches useConnection + _layout.tsx
+
+      F091, F092, and F090 are independent and can be implemented in parallel.
+      F088 is independent but requires manual Supabase Dashboard configuration.
+      F089 should be last as it's the most impactful change (global QueryClient config).
+
+  f088_deep_link_verification:
+    description: "Verify deep link handling for password reset"
+    detail: |
+      Before implementing F088, verify:
+      1. Does src/app/(auth)/reset-password.tsx exist?
+         If not, it needs to be created to handle the incoming deep link.
+      2. Is the deep link scheme (sacrmeetman://) configured in app.json?
+         It should be (used for invitations since CR-95).
+      3. Does the app handle the auth event 'PASSWORD_RECOVERY'?
+         Supabase emits this event when the user clicks the reset link.
+         AuthContext may need to listen for this event and navigate to
+         the reset password screen.
+
+      If reset-password.tsx doesn't exist, the developer needs to create:
+      - A simple form with password + confirm password fields
+      - Call supabase.auth.updateUser({ password: newPassword })
+      - Navigate to login on success
+
+  f089_testing_strategy:
+    description: "Testing offline degradation"
+    detail: |
+      F089 changes are testable via:
+      1. Unit tests: mock onlineManager, verify setOnline is called
+      2. Unit tests: mock MutationCache.onError, verify no Alert when offline
+      3. Integration: toggle airplane mode on device/simulator
+      4. Verify: no error Alerts appear when offline
+      5. Verify: cached data remains visible
+      6. Verify: queries auto-refetch when back online
+
+      TanStack Query's onlineManager is well-documented and stable.
+      The integration with useConnection is straightforward.
+
+  f090_safe_area_provider:
+    description: "Verify SafeAreaProvider position in provider stack"
+    detail: |
+      OfflineBanner uses useSafeAreaInsets(). This hook requires SafeAreaProvider
+      to be an ancestor in the component tree.
+
+      The provider stack in _layout.tsx is:
+        ErrorBoundary > GestureHandlerRootView > QueryClientProvider >
+        I18nextProvider > ThemeProvider > AuthProvider > SyncProvider > ...
+
+      SyncProvider renders OfflineBanner. SafeAreaProvider must be ABOVE
+      SyncProvider. If it's not in _layout.tsx, check if Expo Router
+      provides it automatically (Expo Router does wrap in SafeAreaProvider
+      by default in some configurations).
+
+      If SafeAreaProvider is missing, it needs to be added to _layout.tsx
+      above SyncProvider. This is a safe change as SafeAreaProvider is
+      already used in the app.
+
+# =============================================================================
+# DESIGN DECISIONS (from SPEC)
+# =============================================================================
+
+design_decisions:
+  - id: DD-58
+    title: "F088 uses Linking.createURL for redirect URL"
+    detail: >
+      expo-linking's Linking.createURL() generates the correct URL for both
+      development (exp://...) and production (sacrmeetman://...) environments.
+      This avoids hardcoding URLs and handles scheme differences automatically.
+
+  - id: DD-59
+    title: "F089 uses offlineFirst networkMode globally"
+    detail: >
+      networkMode: 'offlineFirst' is applied to ALL queries via defaultOptions.
+      This is safe because all queries in the app fetch from Supabase (remote).
+      When offline, queries return cache. When online, queries fetch fresh data.
+      No query in the app needs to behave differently.
+
+  - id: DD-60
+    title: "F090 uses paddingTop: insets.top + 8 (additive)"
+    detail: >
+      The original paddingTop was 8 (part of paddingVertical: 8). The new
+      paddingTop is insets.top + 8, preserving the original 8px padding
+      below the safe area. This ensures the banner text has consistent
+      spacing from the safe area boundary.
+
+  - id: DD-61
+    title: "F091 uses static message text (no interpolation)"
+    detail: >
+      The user provided exact text for the confirmation message. The message
+      is generic ("speakers and/or topics") and does not list specific names
+      or counts. This is simpler and matches the user's explicit request.
+
+  - id: DD-62
+    title: "F092 removes conditional but keeps isTodaySunday function"
+    detail: >
+      isTodaySunday() is not deleted from usePresentationMode.ts. It's
+      simply no longer imported in index.tsx. The function may be useful
+      for tests or future features. Deleting unused exports is a separate
+      cleanup concern.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos com input/output para cada integracao
+  GATE-04: true  # ADRs registrados (ADR-064, ADR-065)
+  GATE-05: true  # ARCH_M025.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido (below)
+  GATE-08: true  # Max 10 componentes por modulo respeitado (8 components total)

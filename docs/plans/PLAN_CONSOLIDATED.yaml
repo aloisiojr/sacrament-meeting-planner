@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-20"
-  version: 13
-  last_updated_by: "batch-13"
+  version: 14
+  last_updated_by: "batch-14"
   total_phases: 6
-  total_cr_plans: 31
+  total_cr_plans: 32
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -582,6 +582,29 @@ cr_plans:
       modificados), 1 migracao SQL. 3 ADRs: ADR-061 (export SundayTypeDropdown),
       ADR-062 (formato pipe-delimited), ADR-063 (search_path vazio).
 
+  - id: PLAN_P025
+    title: "Batch 14 Phase 1: Password Reset Email, Offline Degradation, Offline Banner, Alert Message, Button Visibility"
+    status: pending
+    crs_covered: [145, 146, 147, 148, 149]
+    total_steps: 10
+    plan_ref: "docs/plans/PLAN_P025.yaml"
+    summary: >
+      5 features cobrindo auth, offline UX, UI e i18n: adicionado redirectTo
+      com deep link sacrmeetman:// na chamada resetPasswordForEmail + nova pagina
+      reset-password.tsx para redefinicao de senha via deep link + 7 novas keys
+      i18n de auth (F088), integracao TanStack Query onlineManager com useConnection
+      para pausar queries offline + networkMode 'offlineFirst' + silenciamento de
+      erros de mutacao offline + nova key i18n common.offlineNoData (F089), safe area
+      insets e aumento de fontSize no OfflineBanner para legibilidade em iPhones com
+      notch/Dynamic Island (F090), atualizacao de valores i18n do dialogo de confirmacao
+      de mudanca de tipo de domingo com texto especifico do usuario mencionando
+      discursantes/temas e apagamento de designacoes (F091), e remocao do condicional
+      showMeetingButton no Home tab para botao de iniciar reuniao sempre visivel
+      (F092). 5 features, 25 ACs, 8 arquivos impactados (1 novo + 7 modificados),
+      zero migracoes de banco, zero dependencias novas. 2 ADRs: ADR-064 (supersede
+      ADR-019 para customizar email de reset), ADR-065 (onlineManager integrado com
+      useConnection).
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -773,6 +796,21 @@ pending_with_plan:
   - cr_id: 144
     plan_id: PLAN_P024
     description: "Fix search_path mutavel em 7 funcoes SQL (migracao 015)"
+  - cr_id: 145
+    plan_id: PLAN_P025
+    description: "Customizar email de reset de senha com deep link e redirect URL"
+  - cr_id: 146
+    plan_id: PLAN_P025
+    description: "Degradacao graciosa offline com TanStack Query onlineManager"
+  - cr_id: 147
+    plan_id: PLAN_P025
+    description: "Offline banner legivel no iPhone (safe area insets + fontSize)"
+  - cr_id: 148
+    plan_id: PLAN_P025
+    description: "Mensagem especifica de confirmacao ao mudar tipo de domingo"
+  - cr_id: 149
+    plan_id: PLAN_P025
+    description: "Botao Iniciar Reuniao sempre visivel (remover condicional)"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -794,6 +832,18 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 14
+    phase: "batch-14"
+    changes:
+      - "Added PLAN_P025 for Batch 14 Phase 1 (F088-F092, CRs 145/146/147/148/149)"
+      - "5 features: password reset email redirect + page, offline graceful degradation, offline banner readability, confirmation dialog text, button always visible"
+      - "10 steps, 25 ACs, 8 arquivos impactados (1 novo + 7 modificados)"
+      - "Zero migracoes de banco, zero dependencias novas"
+      - "2 ADRs: ADR-064 (supersede ADR-019 email template), ADR-065 (onlineManager com useConnection)"
+      - "F091 e F092 sao as mais simples (i18n-only e remove condicional)"
+      - "F089 e a mais complexa (onlineManager + QueryClient config + mutation silencing)"
+      - "F088 requer criacao de nova pagina reset-password.tsx + configuracao manual do Supabase Dashboard"
+      - "S01, S02, S03, S04 podem ser implementados em paralelo (independentes)"
   - version: 13
     phase: "batch-13"
     changes:

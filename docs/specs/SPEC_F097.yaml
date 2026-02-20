@@ -1,0 +1,588 @@
+# =============================================================================
+# SPEC_F097.yaml
+# Feature F097 / CR-154: Import members from church directory PDF
+# Batch: 15
+# Created: 2026-02-20
+# Status: pending
+# =============================================================================
+
+type: spec
+status: pending
+batch: 15
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F097 / CR-154: Import members from church directory PDF
+# =============================================================================
+
+features:
+
+  - id: F097
+    name: "Import members from church directory PDF"
+    cr_id: 154
+    type: feature
+    priority: medium
+    related_features: [F003, F016]
+
+    user_request: >
+      "Atualmente, para importar a lista de discursantes, o usuario precisa:
+      (1) abrir o diretorio de membros da igreja no site, (2) salvar como PDF,
+      (3) enviar o PDF para um servico de IA externo para parsear nomes e
+      telefones e resolver numeros incompletos (faltando DDI/DDD),
+      (4) receber um CSV de volta, (5) importar o CSV no app.
+      A proposta e embutir esse fluxo no app: o usuario faz upload do PDF
+      direto no app, e o app se encarrega de extrair os dados e resolver
+      os telefones incompletos automaticamente. A importacao via CSV deve
+      ser mantida como fallback caso o formato do PDF mude."
+
+    user_decisions:
+      - "UD-1: Nao e necessario passar localizacao da ala para inferir DDI/DDD. A IA deve inferir a partir dos numeros completos ja presentes no PDF."
+      - "UD-2: Usar libphonenumber-js para validar as deducoes da IA, servindo como rede de seguranca."
+      - "UD-3: Nao assumir DDI/DDD unico para toda a ala. Cada numero deve ser analisado individualmente — membros podem ter se mudado e mantido numero de outra cidade/pais."
+      - "UD-4: Usar servico de IA gratuito (Google Gemini free tier) para minimizar custos, dado que importacao e operacao esporadica."
+      - "UD-5: Usar parser de PDF deterministico (pdfjs-dist) para extracao de texto, e IA apenas para resolver telefones incompletos — reduz tokens, custo e latencia."
+      - "UD-6: Manter importacao CSV como opcao adicional (fallback), nao substituir. PDF e uma opcao a mais."
+
+    description: >
+      Adicionar opcao 'Importar PDF' na tela de Discursantes (settings/members),
+      ao lado do botao 'Importar CSV' existente. O fluxo completo:
+      (1) Usuario seleciona PDF via expo-document-picker,
+      (2) App faz upload do PDF para Supabase Storage (bucket temporario),
+      (3) App chama uma Supabase Edge Function que:
+          (a) baixa o PDF do Storage,
+          (b) extrai texto do PDF usando parser deterministico (pdfjs-dist),
+          (c) parseia nomes e telefones com logica deterministica (regex/split),
+          (d) valida cada telefone com libphonenumber-js,
+          (e) para telefones invalidos, chama IA gratuita (Google Gemini
+              free tier) passando os numeros invalidos + os numeros validos
+              como contexto para inferir DDI/DDD faltantes — sem assumir
+              padrao unico, analisando cada numero individualmente,
+          (f) revalida os telefones corrigidos pela IA com libphonenumber-js,
+          (g) retorna a lista de membros parseados com status de confianca
+              de cada telefone,
+      (4) App exibe tela de preview com os membros extraidos, destacando
+          telefones inferidos pela IA e telefones nao resolvidos,
+      (5) Usuario confirma e os membros sao importados via RPC import_members
+          (mesmo fluxo do CSV).
+
+    current_behavior: >
+      A tela de Discursantes (settings/members.tsx) tem dois botoes de acao:
+      'Importar CSV' e 'Exportar CSV', visiveis para usuarios com permissao
+      member:import. O fluxo de importacao CSV:
+      - Mostra dialogo de confirmacao (CR-86) avisando que substitui a lista
+      - Abre expo-document-picker para selecionar arquivo .csv
+      - Parseia CSV com parseCsv() de lib/csvUtils.ts (formato: Nome,Telefone)
+      - Separa country_code e phone com splitPhoneNumber()
+      - Chama RPC import_members (migracao 007) que faz DELETE ALL + INSERT
+        atomicamente
+      - Loga acao no activity_log
+      Nao existe opcao de importar PDF.
+
+    expected_behavior: >
+      A tela de Discursantes passa a ter tres botoes de acao:
+      'Importar PDF', 'Importar CSV' e 'Exportar CSV'.
+      O botao 'Importar PDF':
+      - Mostra dialogo de confirmacao (mesmo texto do CSV, CR-86)
+      - Abre expo-document-picker com filtro para PDF (application/pdf)
+      - Faz upload do PDF para Supabase Storage (bucket 'pdf-imports',
+        path: {ward_id}/{uuid}.pdf)
+      - Chama Edge Function 'parse-member-pdf' passando o storage path
+      - Edge Function retorna lista de membros com campos:
+        { full_name, phone, phone_status: 'valid'|'inferred'|'invalid' }
+      - App exibe tela/modal de preview com a lista, onde:
+        * Telefones 'valid' aparecem normalmente
+        * Telefones 'inferred' aparecem com indicador visual (icone de
+          aviso amarelo) e label "Inferido pela IA" (i18n)
+        * Telefones 'invalid' aparecem em vermelho sem numero
+      - Botao 'Confirmar Importacao' executa o mesmo fluxo do CSV:
+        splitPhoneNumber() + RPC import_members
+      - Botao 'Cancelar' descarta tudo
+      - Em ambos os casos, o PDF e deletado do Storage apos uso
+      O botao 'Importar CSV' continua funcionando exatamente como antes.
+
+    # =========================================================================
+    # Arquitetura: Supabase Storage
+    # =========================================================================
+
+    storage_design:
+      bucket: "pdf-imports"
+      access: "Privado, acesso via RLS restrito ao usuario autenticado"
+      path_pattern: "{ward_id}/{uuid}.pdf"
+      retention: "PDF deletado automaticamente apos processamento (sucesso ou erro)"
+      max_file_size: "10MB"
+      allowed_mime_types: ["application/pdf"]
+
+    # =========================================================================
+    # Arquitetura: Edge Function parse-member-pdf
+    # =========================================================================
+
+    edge_function_design:
+      name: "parse-member-pdf"
+      runtime: "Deno (Supabase Edge Functions)"
+      input:
+        method: POST
+        headers: "Authorization: Bearer {user_jwt}"
+        body:
+          storage_path: "string - caminho do PDF no Storage"
+          ward_id: "string - UUID da ala"
+      output:
+        success:
+          members: "Array<{ full_name: string, phone: string | null, phone_status: 'valid' | 'inferred' | 'invalid' }>"
+          stats:
+            total_extracted: "number"
+            phones_valid: "number"
+            phones_inferred: "number"
+            phones_invalid: "number"
+            ai_used: "boolean"
+        error:
+          message: "string"
+          code: "PDF_PARSE_ERROR | AI_ERROR | STORAGE_ERROR | INVALID_FORMAT"
+
+      processing_pipeline:
+        step_1_download:
+          description: "Baixar PDF do Supabase Storage usando service role key"
+          error_handling: "Retornar STORAGE_ERROR se arquivo nao existir"
+
+        step_2_extract_text:
+          description: "Extrair texto do PDF usando pdfjs-dist"
+          details: >
+            Usar pdfjs-dist (Mozilla PDF.js) para extrair texto de todas as
+            paginas. A biblioteca roda em Deno sem dependencias nativas.
+            Concatenar texto de todas as paginas preservando quebras de linha.
+          error_handling: "Retornar PDF_PARSE_ERROR se PDF corrompido ou protegido por senha"
+
+        step_3_parse_members:
+          description: "Parsear nomes e telefones do texto extraido com logica deterministica"
+          details: >
+            O diretorio de membros da igreja tem formato tabular previsivel:
+            nome completo seguido de telefone(s) e endereco. Usar regex e
+            heuristicas de posicao para separar nome e telefone de cada membro.
+            Ignorar linhas de cabecalho, rodape e metadados.
+          fallback: >
+            Se a extracao deterministica falhar ou retornar 0 membros,
+            enviar o texto inteiro para a IA parsear nomes e telefones.
+            Neste caso, step_5 processa TODOS os numeros, nao apenas invalidos.
+
+        step_4_validate_phones:
+          description: "Validar cada telefone com libphonenumber-js"
+          details: >
+            Para cada telefone extraido:
+            1. Tentar parsear com libphonenumber-js (parsePhoneNumber)
+            2. Se valido (isValid() === true), marcar phone_status='valid'
+            3. Se invalido, adicionar a lista para correcao pela IA
+          library: "libphonenumber-js (versao JS leve, compativel com Deno)"
+
+        step_5_ai_phone_resolution:
+          description: "Usar IA para resolver telefones incompletos"
+          condition: "SOMENTE se houver telefones invalidos apos step_4"
+          details: >
+            Enviar para a IA:
+            - Lista de telefones invalidos (com nome associado para contexto)
+            - Lista de telefones validos como referencia
+            - Instrucao explicita: "Analise cada numero individualmente. Nao
+              assuma DDI/DDD unico para todos — a pessoa pode ter mantido
+              numero de outra cidade/pais. Use os numeros validos como
+              referencia para inferir o DDI/DDD mais provavel de cada numero,
+              mas considere que pode variar entre membros."
+            A IA retorna os numeros com DDI/DDD adicionados.
+            Se nao houver telefones invalidos, este step e pulado (ai_used=false).
+          provider: "Google Gemini (free tier - gemini-2.0-flash)"
+          cost: "Gratuito dentro do free tier (15 RPM, 1M tokens/dia)"
+          api_key_storage: "Supabase Edge Function secret (GEMINI_API_KEY)"
+          error_handling: >
+            Se a IA falhar (rate limit, timeout, erro de API), os telefones
+            continuam como phone_status='invalid'. Fluxo NAO e interrompido.
+            Usuario ve os telefones invalidos no preview e pode corrigi-los
+            manualmente apos importar.
+
+        step_6_revalidate:
+          description: "Revalidar telefones corrigidos pela IA com libphonenumber-js"
+          details: >
+            Cada telefone corrigido pela IA passa por libphonenumber-js novamente:
+            - Se valido apos correcao: phone_status='inferred'
+            - Se ainda invalido: phone_status='invalid', phone=null
+            Isso impede que a IA retorne numeros absurdos.
+
+        step_7_cleanup:
+          description: "Deletar PDF do Storage"
+          details: >
+            Apos retornar resultado (sucesso ou erro), deletar o PDF do bucket.
+            Em caso de erro no cleanup, logar warning mas nao falhar o request.
+
+    # =========================================================================
+    # UI: Preview de Importacao
+    # =========================================================================
+
+    preview_ui_design:
+      type: "Modal full-screen ou tela intermediaria"
+      components:
+        header:
+          title: "Confirmar Importacao (i18n)"
+          subtitle: "{{count}} discursantes encontrados no PDF (i18n)"
+          stats_bar: "{{valid}} telefones validos | {{inferred}} inferidos | {{invalid}} sem telefone (i18n)"
+
+        member_list:
+          description: "FlatList scrollavel com cada membro extraido"
+          item_layout:
+            - "Nome completo (texto principal)"
+            - "Telefone formatado (texto secundario)"
+            - "Indicador de status do telefone:"
+            - "  'valid': nenhum indicador extra"
+            - "  'inferred': icone de aviso amarelo + label 'Inferido' (i18n)"
+            - "  'invalid': texto em vermelho 'Telefone nao identificado' (i18n)"
+
+        actions:
+          confirm_button: "Confirmar Importacao (i18n) - estilo primario"
+          cancel_button: "Cancelar (i18n) - estilo secundario"
+
+    # =========================================================================
+    # Permissoes e Seguranca
+    # =========================================================================
+
+    permissions:
+      - "Botao 'Importar PDF' visivel apenas para usuarios com permissao member:import (mesmo do CSV)"
+      - "Edge Function valida JWT do usuario e verifica que ward_id pertence ao usuario"
+      - "Bucket pdf-imports com RLS: INSERT e DELETE apenas para usuario autenticado da mesma ala"
+      - "API key do Gemini armazenada como secret da Edge Function, nunca exposta ao client"
+      - "PDF deletado imediatamente apos processamento — nenhum dado pessoal persiste no Storage"
+
+    # =========================================================================
+    # Dependencias e Bibliotecas
+    # =========================================================================
+
+    dependencies:
+      edge_function:
+        - name: "pdfjs-dist"
+          purpose: "Extrair texto de PDF sem dependencias nativas"
+          compatibility: "Deno-compatible via npm: specifier"
+        - name: "libphonenumber-js"
+          purpose: "Validar e parsear numeros de telefone"
+          compatibility: "Deno-compatible"
+        - name: "Google Gemini API (REST)"
+          purpose: "Resolver telefones incompletos via IA (free tier)"
+          endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+          auth: "API key via header"
+
+      app:
+        - name: "expo-document-picker"
+          purpose: "Selecionar PDF do dispositivo"
+          status: "Ja instalado (usado para CSV)"
+        - name: "expo-file-system"
+          purpose: "Ler conteudo do PDF para upload"
+          status: "Ja instalado"
+        - name: "@supabase/supabase-js"
+          purpose: "Upload para Storage + chamada da Edge Function"
+          status: "Ja instalado"
+
+    # =========================================================================
+    # Files Impacted
+    # =========================================================================
+
+    files_impacted:
+      - path: supabase/functions/parse-member-pdf/index.ts
+        action: create
+        changes:
+          - "Edge Function principal: recebe storage_path + ward_id"
+          - "Pipeline: download PDF -> extract text -> parse members -> validate phones -> AI resolution -> revalidate -> cleanup"
+          - "Retorna lista de membros com phone_status"
+
+      - path: supabase/migrations/016_pdf_imports_bucket.sql
+        action: create
+        changes:
+          - "Criar bucket 'pdf-imports' via INSERT INTO storage.buckets"
+          - "Configurar RLS policies para INSERT/SELECT/DELETE por usuario autenticado"
+          - "Restricoes: max 10MB, apenas application/pdf"
+
+      - path: src/app/(tabs)/settings/members.tsx
+        action: modify
+        changes:
+          - "Adicionar botao 'Importar PDF' ao lado do 'Importar CSV'"
+          - "Novo handler handleImportPdf: dialogo de confirmacao -> document picker (PDF) -> upload Storage -> chamar Edge Function -> exibir preview"
+          - "Integrar componente PdfImportPreview"
+          - "Apos confirmacao no preview, usar mesmo fluxo do CSV (splitPhoneNumber + import_members RPC)"
+          - "Cleanup: deletar PDF do Storage em caso de cancelamento"
+
+      - path: src/components/PdfImportPreview.tsx
+        action: create
+        changes:
+          - "Componente de preview: recebe lista de membros com phone_status"
+          - "FlatList com indicadores visuais por status"
+          - "Barra de stats (validos/inferidos/invalidos)"
+          - "Botoes Confirmar e Cancelar"
+          - "Suporte i18n completo (pt-BR, en, es)"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "members.importPdf: 'Importar PDF'"
+          - "members.importPdfTitle: 'Confirmar Importacao'"
+          - "members.importPdfSubtitle: '{{count}} discursantes encontrados no PDF'"
+          - "members.phoneValid: '{{count}} telefones validos'"
+          - "members.phoneInferred: '{{count}} inferidos'"
+          - "members.phoneInvalid: '{{count}} sem telefone'"
+          - "members.phoneInferredLabel: 'Inferido'"
+          - "members.phoneNotIdentified: 'Telefone nao identificado'"
+          - "members.importPdfError: 'Erro ao processar PDF'"
+          - "members.importPdfFormatError: 'Formato de PDF nao reconhecido. Use a opcao Importar CSV como alternativa.'"
+          - "members.importPdfUploading: 'Enviando PDF...'"
+          - "members.importPdfProcessing: 'Processando PDF...'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Mesmas keys traduzidas para ingles"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Mesmas keys traduzidas para espanhol"
+
+      - path: src/lib/offlineGuard.ts
+        action: modify
+        changes:
+          - "Adicionar 'import-pdf' a ONLINE_ONLY_OPERATIONS (operacao requer conexao)"
+
+    # =========================================================================
+    # Acceptance Criteria
+    # =========================================================================
+
+    acceptance_criteria:
+      - id: AC-097-01
+        description: "Botao 'Importar PDF' visivel na tela de Discursantes"
+        given: "Usuario com permissao member:import na tela de Discursantes"
+        when: "Visualizar botoes de acao"
+        then: "Tres botoes visiveis: 'Importar PDF', 'Importar CSV', 'Exportar CSV'"
+
+      - id: AC-097-02
+        description: "Botao 'Importar PDF' mostra dialogo de confirmacao"
+        given: "Usuario clica em 'Importar PDF'"
+        when: "Antes de abrir document picker"
+        then: "Mesmo dialogo de confirmacao do CSV (CR-86) avisando que substitui lista"
+
+      - id: AC-097-03
+        description: "Document picker filtra apenas PDF"
+        given: "Dialogo de confirmacao aceito"
+        when: "Document picker abre"
+        then: "Picker filtra apenas arquivos PDF (application/pdf)"
+
+      - id: AC-097-04
+        description: "PDF e enviado para Supabase Storage"
+        given: "PDF selecionado pelo usuario"
+        when: "Upload inicia"
+        then: "PDF armazenado em pdf-imports/{ward_id}/{uuid}.pdf no Supabase Storage"
+
+      - id: AC-097-05
+        description: "Edge Function extrai nomes e telefones do PDF"
+        given: "PDF do diretorio de membros da igreja no Storage"
+        when: "Edge Function parse-member-pdf executada"
+        then: "Retorna lista de membros com full_name, phone e phone_status"
+
+      - id: AC-097-06
+        description: "Telefones validos marcados como 'valid'"
+        given: "Telefone completo e valido no PDF (ex: +55 91 98888-7777)"
+        when: "libphonenumber-js valida"
+        then: "phone_status = 'valid'"
+
+      - id: AC-097-07
+        description: "Telefones incompletos corrigidos pela IA e validados"
+        given: "Telefone incompleto no PDF (ex: 98888-7777 sem DDD/DDI)"
+        when: "IA corrige e libphonenumber-js valida a correcao"
+        then: "phone_status = 'inferred', telefone completo retornado"
+
+      - id: AC-097-08
+        description: "Telefones nao resolvidos marcados como 'invalid'"
+        given: "Telefone que nem a IA conseguiu resolver corretamente"
+        when: "libphonenumber-js invalida a tentativa da IA"
+        then: "phone_status = 'invalid', phone = null"
+
+      - id: AC-097-09
+        description: "IA analisa cada numero individualmente"
+        given: "Membros com telefones de diferentes cidades/paises na mesma ala"
+        when: "IA analisa telefones incompletos"
+        then: "Cada telefone e analisado no seu contexto, sem forcar DDI/DDD unico"
+
+      - id: AC-097-10
+        description: "IA so e chamada quando necessario"
+        given: "Todos os telefones do PDF sao validos apos libphonenumber-js"
+        when: "Pipeline de processamento executa"
+        then: "Step de IA e pulado, ai_used=false no response"
+
+      - id: AC-097-11
+        description: "Preview exibido com indicadores visuais"
+        given: "Edge Function retorna lista de membros"
+        when: "Tela de preview exibida"
+        then: "Telefones 'valid' sem indicador, 'inferred' com icone amarelo, 'invalid' em vermelho"
+
+      - id: AC-097-12
+        description: "Barra de stats exibida no preview"
+        given: "Preview com membros extraidos"
+        when: "Visualizar header do preview"
+        then: "Mostra contadores: X validos, Y inferidos, Z sem telefone"
+
+      - id: AC-097-13
+        description: "Confirmar importacao salva membros no banco"
+        given: "Usuario visualizando preview"
+        when: "Clicar em 'Confirmar Importacao'"
+        then: "Membros importados via RPC import_members (mesmo fluxo atomico do CSV)"
+
+      - id: AC-097-14
+        description: "Cancelar importacao descarta dados e deleta PDF"
+        given: "Usuario visualizando preview"
+        when: "Clicar em 'Cancelar'"
+        then: "Preview fechado, dados descartados, PDF deletado do Storage"
+
+      - id: AC-097-15
+        description: "PDF deletado do Storage apos processamento"
+        given: "Edge Function processou o PDF (sucesso ou erro)"
+        when: "Response retornado ao client"
+        then: "PDF removido do bucket pdf-imports"
+
+      - id: AC-097-16
+        description: "Importacao CSV continua funcionando inalterada"
+        given: "Usuario na tela de Discursantes"
+        when: "Clicar em 'Importar CSV'"
+        then: "Fluxo de importacao CSV funciona exatamente como antes (sem regressao)"
+
+      - id: AC-097-17
+        description: "Operacao bloqueada quando offline"
+        given: "App sem conexao de rede"
+        when: "Clicar em 'Importar PDF'"
+        then: "Mensagem de erro i18n informando que operacao requer conexao"
+
+      - id: AC-097-18
+        description: "Formato de PDF nao reconhecido gera mensagem amigavel"
+        given: "PDF com formato inesperado (nao e diretorio de membros)"
+        when: "Edge Function tenta parsear"
+        then: "Retorna erro com mensagem amigavel sugerindo usar Importar CSV como alternativa"
+
+      - id: AC-097-19
+        description: "Falha na IA nao interrompe o fluxo"
+        given: "Gemini API retorna erro (rate limit, timeout)"
+        when: "Pipeline executa step de IA"
+        then: "Telefones invalidos permanecem como 'invalid', preview exibido normalmente"
+
+      - id: AC-097-20
+        description: "Activity log registra importacao via PDF"
+        given: "Importacao via PDF confirmada com sucesso"
+        when: "Visualizar historico de atividades"
+        then: "Entrada de log indicando importacao via PDF com contagem de membros"
+
+    # =========================================================================
+    # Edge Cases
+    # =========================================================================
+
+    edge_cases:
+      - id: EC-097-01
+        case: "PDF protegido por senha"
+        expected: "pdfjs-dist retorna erro; Edge Function retorna PDF_PARSE_ERROR com mensagem amigavel"
+
+      - id: EC-097-02
+        case: "PDF com imagens escaneadas (nao e texto selecionavel)"
+        expected: "pdfjs-dist nao consegue extrair texto; retorna INVALID_FORMAT sugerindo usar CSV"
+
+      - id: EC-097-03
+        case: "Formato do diretorio da igreja muda"
+        expected: >
+          Parser deterministico falha ou retorna 0 membros. Fallback envia
+          texto bruto para IA parsear nomes e telefones completos. Se IA
+          tambem falhar, retorna INVALID_FORMAT e usuario usa CSV.
+
+      - id: EC-097-04
+        case: "PDF muito grande (>10MB)"
+        expected: "Upload rejeitado pelo Supabase Storage; erro exibido ao usuario"
+
+      - id: EC-097-05
+        case: "PDF sem nenhum telefone (so nomes)"
+        expected: >
+          Membros extraidos com full_name, todos com phone=null e
+          phone_status='invalid'. Preview mostra '0 telefones validos'.
+          Usuario decide se importa assim ou cancela.
+
+      - id: EC-097-06
+        case: "Todos os telefones ja estao completos e validos"
+        expected: "IA nao e chamada (ai_used=false). Preview mostra todos como 'valid'."
+
+      - id: EC-097-07
+        case: "Gemini free tier muda ou e descontinuado"
+        expected: >
+          Provider configurado via env var da Edge Function. Trocar
+          GEMINI_API_KEY/endpoint sem mudar codigo do app. Como fallback
+          final, desabilitar IA e retornar todos invalidos como 'invalid'.
+
+      - id: EC-097-08
+        case: "Membro sem telefone no diretorio"
+        expected: "Importado com phone=null, phone_status='invalid'. Igual ao CSV quando telefone e vazio."
+
+      - id: EC-097-09
+        case: "Numeros de telefones de paises/cidades diferentes na mesma ala"
+        expected: >
+          IA analisa cada numero individualmente. libphonenumber-js testa
+          validade contra todos os paises possiveis, nao apenas um padrao.
+
+      - id: EC-097-10
+        case: "Conexao cai durante processamento na Edge Function"
+        expected: >
+          Edge Function tem timeout padrao de Supabase. PDF orfao sera
+          deletado por retention policy ou na proxima tentativa. App mostra
+          erro de conexao.
+
+      - id: EC-097-11
+        case: "Usuario seleciona arquivo que nao e PDF (apesar do filtro)"
+        expected: "pdfjs-dist falha ao parsear; Edge Function retorna PDF_PARSE_ERROR"
+
+      - id: EC-097-12
+        case: "PDF com membros duplicados (mesmo nome/telefone)"
+        expected: >
+          Preview mostra todos. Ao confirmar, RPC import_members faz INSERT
+          e a constraint UNIQUE(ward_id, country_code, phone) pode rejeitar
+          duplicatas. Tratar erro ou de-duplicar no preview.
+
+    # =========================================================================
+    # Implementation Notes
+    # =========================================================================
+
+    implementation_notes: >
+      ARQUITETURA DE 3 CAMADAS:
+      1. APP (React Native): picker + upload + preview + confirmacao
+      2. SUPABASE STORAGE: armazenamento temporario do PDF
+      3. EDGE FUNCTION: processamento (PDF parser + libphonenumber + Gemini)
+
+      PARSER DE PDF (deterministico, sem IA):
+      Usar pdfjs-dist para extrair texto. O diretorio de membros da igreja
+      tem formato tabular previsivel. Implementar regex/heuristicas para
+      separar nome e telefone. Se o formato mudar, o parser falha gracefully
+      e o fallback envia o texto para a IA parsear. Se o fallback tambem
+      falhar, o usuario usa a importacao CSV.
+
+      RESOLUCAO DE TELEFONES (hibrido: deterministico + IA):
+      Pipeline em 3 fases:
+      Fase 1: libphonenumber-js valida todos os telefones extraidos
+      Fase 2: Telefones invalidos enviados para Gemini com contexto dos validos
+      Fase 3: libphonenumber-js revalida as correcoes da IA
+      IMPORTANTE: A IA NAO deve assumir DDI/DDD unico — cada numero e analisado
+      individualmente. O contexto dos numeros validos serve como referencia
+      mas membros podem ter numeros de diferentes regioes/paises.
+
+      GEMINI FREE TIER:
+      Usar gemini-2.0-flash via REST API. Free tier: 15 RPM, 1M tokens/dia.
+      Para um diretorio de ala tipico (50-200 membros), o consumo de tokens
+      e minimo (poucos KB de texto). API key armazenada como secret da Edge
+      Function (GEMINI_API_KEY).
+
+      CSV COMO FALLBACK:
+      O botao 'Importar CSV' NAO e removido. Ambas as opcoes coexistem na UI.
+      Se o parser de PDF falhar, a mensagem de erro explicita sugere usar CSV.
+
+      PREVIEW OBRIGATORIO:
+      O usuario DEVE ver e confirmar o preview antes da importacao. Isso e
+      critico porque: (1) IA pode errar telefones, (2) parser pode interpretar
+      mal o PDF, (3) usuario precisa validar quantos membros foram encontrados
+      e se os dados estao corretos.
+
+      SEGURANCA E PRIVACIDADE:
+      O PDF contem dados pessoais (nomes, telefones, enderecos). Por isso:
+      - PDF e deletado do Storage imediatamente apos processamento
+      - Bucket tem RLS restrito ao usuario autenticado da ala
+      - API key do Gemini nunca e exposta ao client
+      - Edge Function valida JWT e ward_id antes de processar

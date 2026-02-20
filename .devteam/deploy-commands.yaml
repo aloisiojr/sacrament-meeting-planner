@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 4
-last_updated: "2026-02-18T22:30:00"
+version: 5
+last_updated: "2026-02-20T00:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -49,6 +49,12 @@ services:
         command: |
           SQL="SELECT conname, contype, pg_get_constraintdef(oid) as definition FROM pg_constraint WHERE conrelid = '<TABLE>'::regclass ORDER BY conname;"
         when: "Validar que migration de constraint foi aplicada"
+
+      - name: "Verificar search_path de funcoes"
+        command: |
+          SQL="SELECT proname, pronamespace::regnamespace AS schema, proconfig FROM pg_proc WHERE proname IN ('<FUNC1>', '<FUNC2>');"
+        when: "Validar que SET search_path foi aplicado a funcoes"
+        notes: "proconfig deve conter search_path=\"\" (vazio) para funcoes seguras"
 
       - name: "Reset completo (dev)"
         command: "supabase db reset"
@@ -138,6 +144,10 @@ troubleshooting:
     solution: "Usar python3 com raw strings (r\"\"\"...\"\"\") para gerar JSON corretamente. Evitar escaping manual de $$ em shell."
     command: "python3 -c 'import json; sql=r\"\"\"<SQL>\"\"\"; print(json.dumps({\"query\": sql}))' > /tmp/query.json && curl ... -d @/tmp/query.json"
 
+  - problem: "CREATE OR REPLACE FUNCTION em schema auth falha com 'permission denied for schema auth'"
+    solution: "Management API nao tem permissao para alterar schema auth. Se a funcao ja existe em public (verificar com pg_proc), aplicar no schema public em vez de auth."
+    notes: "Funcao auth.ward_id() foi originalmente aplicada em public schema pelo Supabase Dashboard"
+
 deploy_history:
   - date: "2026-02-18"
     action: "Migration 012_drop_members_phone_unique_constraint.sql"
@@ -170,3 +180,17 @@ deploy_history:
       - "information_schema.columns confirma 3 colunas TEXT nullable"
       - "Column comments aplicados corretamente"
       - "REST API health check: HTTP 200"
+
+  - date: "2026-02-20"
+    action: "Migration 015_fix_function_search_path.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding (2 requests: public functions + ward_id)"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - SET search_path = '' adicionado a 7 funcoes (update_updated_at_column, ward_id, list_ward_users, create_weekly_reminders, enqueue_speech_notification, delete_old_activity_log, import_members)"
+    verified: true
+    cr: "CR-144"
+    verification:
+      - "pg_proc.proconfig = [search_path=\"\"] para todas as 7 funcoes"
+      - "SECURITY DEFINER mantido em enqueue_speech_notification, list_ward_users, import_members"
+      - "Trigger speech_notification_trigger ainda ativo em INSERT e UPDATE"
+      - "REST API health check: HTTP 200"
+    notes: "ward_id() aplicada em public schema (nao auth) pois Management API nao tem permissao para schema auth. Funcao ja existia em public conforme pg_proc."

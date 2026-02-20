@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-02-19"
-  total_features: 82
-  total_change_requests: 139
+  last_updated: "2026-02-20"
+  total_features: 87
+  total_change_requests: 149
   implemented_crs: 96
-  pending_crs: 41
+  pending_crs: 51
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -49,6 +49,12 @@ metadata:
     - docs/specs/SPEC_F080.yaml
     - docs/specs/SPEC_F081.yaml
     - docs/specs/SPEC_F082.yaml
+    - docs/specs/SPEC_F083.yaml
+    - docs/specs/SPEC_F088.yaml
+    - docs/specs/SPEC_F089.yaml
+    - docs/specs/SPEC_F090.yaml
+    - docs/specs/SPEC_F091.yaml
+    - docs/specs/SPEC_F092.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1692,8 +1698,102 @@ features:
       - "1 novo arquivo SQL de migracao"
       - "Leaked Password Protection: configuracao de dashboard (nao codigo)"
 
+  # ---------------------------------------------------------------------------
+  # Batch 14 Phase 1: Email Reset, Offline UX, Alert Messages, Button Logic (F088-F092)
+  # ---------------------------------------------------------------------------
+
+  - id: F088
+    name: "Customize password reset email template and redirect URL"
+    status: pending
+    rfs: []
+    description: >
+      Email de reset de senha mostra branding "Supabase" e link aponta para
+      localhost. Criar Edge Function para envio customizado de email com
+      template traduzido (pt-BR, en, es) conforme ward.language. Redirect
+      via deep link sacrmeetman://reset-password que abre tela no app.
+      Nova tela de redefinicao de senha acessivel via deep link.
+    modified_by_crs: [145]
+    spec_file: "docs/specs/SPEC_F088.yaml"
+    notes:
+      - "CR-145: Email de reset sem referencia ao app e link para localhost"
+      - "5 acceptance criteria"
+      - "Edge Function send-reset-email com template i18n (3 idiomas)"
+      - "Deep link sacrmeetman://reset-password para abrir no app"
+      - "Nova tela reset-password.tsx acessivel via deep link"
+      - "Modifica forgot-password.tsx para chamar Edge Function"
+
+  - id: F089
+    name: "Graceful degradation when app is offline"
+    status: pending
+    rfs: []
+    description: >
+      Quando offline, mensagens de erro tecnicas aparecem em todas as tabs.
+      Integrar TanStack Query onlineManager com useConnection para pausar
+      queries, mostrar dados em cache, suprimir Alert.alert de erros de rede,
+      e re-executar queries ao reconectar. Estende F022 (Offline Support).
+    modified_by_crs: [146]
+    spec_file: "docs/specs/SPEC_F089.yaml"
+    notes:
+      - "CR-146: Degradacao graciosa quando offline"
+      - "6 acceptance criteria"
+      - "Integra onlineManager com useConnection"
+      - "Suprime erros de rede no MutationCache.onError"
+      - "Estende F022 sem quebrar comportamento existente"
+
+  - id: F090
+    name: "Improve offline banner readability on iPhone"
+    status: pending
+    rfs: []
+    description: >
+      OfflineBanner fica atras do notch/Dynamic Island do iPhone. Adicionar
+      useSafeAreaInsets para paddingTop, aumentar fontSize de 14/12 para 15/13.
+      react-native-safe-area-context ja instalado no projeto.
+    modified_by_crs: [147]
+    spec_file: "docs/specs/SPEC_F090.yaml"
+    notes:
+      - "CR-147: Banner offline dificil de ler no iPhone"
+      - "4 acceptance criteria"
+      - "1 arquivo modificado (OfflineBanner.tsx)"
+      - "Adicionar useSafeAreaInsets para paddingTop"
+
+  - id: F091
+    name: "Improve sunday type change confirmation message with specific text"
+    status: pending
+    rfs: []
+    description: >
+      Mensagem de confirmacao ao mudar tipo de domingo com designacoes
+      atualizada para texto especifico pedido pelo usuario. Atualizacao
+      apenas de valores i18n (changeConfirmTitle e changeConfirmMessage)
+      nos 3 locales. Nenhuma alteracao de codigo TypeScript.
+    modified_by_crs: [148]
+    spec_file: "docs/specs/SPEC_F091.yaml"
+    notes:
+      - "CR-148: Mensagem de alerta ao trocar tipo de domingo"
+      - "5 acceptance criteria"
+      - "3 arquivos modificados (somente locales JSON)"
+      - "Nenhuma alteracao de codigo TypeScript"
+      - "Mesmo dialogo usado na aba Discursos e Agenda (F084)"
+
+  - id: F092
+    name: "Make 'Start Sacrament Meeting' button always visible with date-based logic"
+    status: pending
+    rfs: []
+    description: >
+      Botao "Iniciar Reuniao Sacramental" na Home passa a ser visivel
+      sempre (nao apenas aos domingos). Remover condicao isTodaySunday().
+      getTodaySundayDate() ja implementa logica de data correta (seg-sab:
+      proximo domingo, domingo: hoje). Mudanca apenas em index.tsx.
+    modified_by_crs: [149]
+    spec_file: "docs/specs/SPEC_F092.yaml"
+    notes:
+      - "CR-149: Botao 'Iniciar Reuniao' visivel sempre"
+      - "5 acceptance criteria"
+      - "1 arquivo modificado (index.tsx)"
+      - "Remover condicao showMeetingButton/isTodaySunday"
+      - "getTodaySundayDate() ja tem logica de data correta"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (46 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13)
+# PENDING CHANGE REQUESTS (51 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14)
 # =============================================================================
 
 pending_crs:
@@ -2592,6 +2692,105 @@ pending_crs:
       - "Supabase Database Linter sem warnings function_search_path_mutable"
     files_likely_impacted:
       - supabase/migrations/015_fix_function_search_path.sql
+
+  # --- Batch 14 Phase 1 (Email Reset, Offline UX, Alert Messages, Button Logic) ---
+
+  - id: 145
+    type: bug
+    area: "Authentication (F001)"
+    feature_id: F088
+    spec_file: "docs/specs/SPEC_F088.yaml"
+    related_crs: [67]
+    description: >
+      Email de reset de senha mostra branding Supabase e link para localhost.
+      Edge Function com template i18n (3 idiomas) + deep link sacrmeetman://
+      + nova tela reset-password no app.
+    acceptance_criteria:
+      - "Email mostra nome do app no idioma da ala (pt-BR, en, es)"
+      - "Link usa deep link sacrmeetman://reset-password?token=..."
+      - "App tem tela de redefinicao de senha via deep link"
+      - "Fluxo completo: email -> deep link -> app -> nova senha"
+      - "Email traduzido conforme ward.language"
+    files_likely_impacted:
+      - supabase/functions/send-reset-email/index.ts
+      - src/app/(auth)/forgot-password.tsx
+      - src/app/(auth)/reset-password.tsx
+
+  - id: 146
+    type: ux
+    area: "Offline Support (F022)"
+    feature_id: F089
+    spec_file: "docs/specs/SPEC_F089.yaml"
+    related_crs: [52, 53]
+    description: >
+      Degradacao graciosa quando offline. Integrar onlineManager com
+      useConnection, suprimir erros de rede, mostrar cache, re-executar
+      queries ao reconectar.
+    acceptance_criteria:
+      - "Queries pausadas quando offline (onlineManager)"
+      - "Nenhum Alert.alert de erro quando offline"
+      - "Dados em cache visiveis quando offline"
+      - "Estado vazio amigavel quando sem cache"
+      - "Queries re-executam ao reconectar"
+    files_likely_impacted:
+      - src/app/_layout.tsx
+      - src/hooks/useConnection.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 147
+    type: ui
+    area: "Offline Support (F022)"
+    feature_id: F090
+    spec_file: "docs/specs/SPEC_F090.yaml"
+    related_crs: [146]
+    description: >
+      OfflineBanner escondido atras do notch/Dynamic Island do iPhone.
+      Adicionar useSafeAreaInsets e aumentar fontSize.
+    acceptance_criteria:
+      - "Banner abaixo da safe area (respeitando insets)"
+      - "fontSize adequado (15/13)"
+      - "Funciona em dark/light mode"
+      - "Conteudo empurrado para baixo, nao sobreposto"
+    files_likely_impacted:
+      - src/components/OfflineBanner.tsx
+
+  - id: 148
+    type: ui
+    area: "Sunday Type (F007, F061)"
+    feature_id: F091
+    spec_file: "docs/specs/SPEC_F091.yaml"
+    related_crs: [115, 127]
+    description: >
+      Mensagem de confirmacao ao mudar tipo de domingo atualizada com
+      texto especifico. Apenas atualizacao de valores i18n existentes.
+    acceptance_criteria:
+      - "Titulo: 'Alterar tipo de domingo?'"
+      - "Mensagem menciona discursantes e/ou temas designados"
+      - "Traduzido em pt-BR, en, es"
+      - "Funciona em aba Discursos e Agenda"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 149
+    type: feature
+    area: "Home Tab (F009)"
+    feature_id: F092
+    spec_file: "docs/specs/SPEC_F092.yaml"
+    related_crs: [1, 3]
+    description: >
+      Botao 'Iniciar Reuniao Sacramental' visivel sempre (nao so domingos).
+      Remover condicao isTodaySunday(). getTodaySundayDate() ja tem logica correta.
+    acceptance_criteria:
+      - "Botao visivel de segunda a sabado (mostra proximo domingo)"
+      - "Botao visivel no domingo (mostra dia atual)"
+      - "Visivel para todos os roles"
+      - "Label e estilo identicos ao atual"
+    files_likely_impacted:
+      - src/app/(tabs)/index.tsx
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
@@ -3725,3 +3924,21 @@ cr_history:
     files:
       - "docs/specs/SPEC_F082.yaml (CR-139: Integration tests)"
     summary: "Integration tests covering hooks+Supabase+ReactQuery, SyncProvider orchestration, AuthContext flow, and component-hook data flow. 30 acceptance criteria, 5 new files, 0 existing files modified."
+
+  batch_13:
+    range: "CR-140 a CR-144"
+    status: "5 pendentes (140, 141, 142, 143, 144)"
+    files:
+      - "docs/specs/SPEC_F083.yaml (CR-140 to CR-144 - Settings Rename, Agenda Sunday Type, Activity Log i18n, Query Perf, Security)"
+    summary: "Settings tab options renamed with i18n, Sunday type selector in Agenda tab, Activity log entries overhaul with structured format and i18n, Replace pg_timezone_names with static list (analysis), Fix mutable search_path in 7 PostgreSQL functions."
+
+  batch_14:
+    range: "CR-145 a CR-149"
+    status: "5 pendentes fase 1 (145, 146, 147, 148, 149)"
+    files:
+      - "docs/specs/SPEC_F088.yaml (CR-145 - Email Reset Customization)"
+      - "docs/specs/SPEC_F089.yaml (CR-146 - Offline Graceful Degradation)"
+      - "docs/specs/SPEC_F090.yaml (CR-147 - Offline Banner Readability)"
+      - "docs/specs/SPEC_F091.yaml (CR-148 - Sunday Type Change Confirmation)"
+      - "docs/specs/SPEC_F092.yaml (CR-149 - Presentation Mode Button Always Visible)"
+    summary: "Phase 1: Password reset email customization (branding + redirect URL), graceful offline degradation (suppress errors, show cache, reconnect), offline banner readability on iPhone (safe area insets), sunday type change confirmation message with specific text (i18n), presentation mode button always visible (remove Sunday-only condition)."

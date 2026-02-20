@@ -1,0 +1,615 @@
+# =============================================================================
+# PLAN_P025.yaml
+# Batch 14 Phase 1: Password Reset Email, Offline Degradation, Offline Banner,
+#                     Alert Message, Button Visibility
+# Features: F088 (CR-145), F089 (CR-146), F090 (CR-147), F091 (CR-148),
+#            F092 (CR-149)
+# Created: 2026-02-20
+# Phase: 1 of 1
+# Total ACs: 25 (F088: 5, F089: 6, F090: 4, F091: 5, F092: 5)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 14
+created: "2026-02-20"
+last_updated: "2026-02-20"
+spec_ref: "docs/specs/SPEC_F088.yaml, docs/specs/SPEC_F089.yaml, docs/specs/SPEC_F090.yaml, docs/specs/SPEC_F091.yaml, docs/specs/SPEC_F092.yaml"
+arch_ref: "docs/arch/ARCH_M025.yaml"
+
+goal: >
+  Implement 5 features: customize password reset email redirect URL (F088),
+  integrate TanStack Query onlineManager for graceful offline degradation (F089),
+  fix offline banner readability on iPhone with safe area insets (F090), update
+  sunday type change confirmation message with specific user-requested text (F091),
+  and make presentation mode button always visible (F092).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Tests created alongside or before code"
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F091 - Update sunday type change confirmation message (i18n only)
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F091: Update confirmation dialog i18n values in 3 locale files"
+    feature: F091
+    cr: 148
+    depends_on: []
+    parallelizable_with: [S02, S03, S04]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Update VALUES of 2 existing i18n keys in 3 locale files.
+          Keys remain unchanged (sundayExceptions.changeConfirmTitle,
+          sundayExceptions.changeConfirmMessage). Only values updated:
+
+          pt-BR changeConfirmTitle: "Alterar tipo de domingo" -> "Alterar tipo de domingo?"
+          pt-BR changeConfirmMessage: "Existem discursantes ou temas atribuidos.
+          Deseja realmente alterar o tipo?" -> "Existem discursantes e/ou temas
+          designados. As designacoes serao apagadas se voce confirmar a operacao.
+          Deseja realmente alterar o tipo?"
+
+          en changeConfirmTitle: "Change sunday type" -> "Change Sunday type?"
+          en changeConfirmMessage: "There are speakers or topics assigned. Do you
+          really want to change the type?" -> "There are speakers and/or topics
+          assigned. The assignments will be deleted if you confirm the operation.
+          Do you really want to change the type?"
+
+          es changeConfirmTitle: "Cambiar tipo de domingo" -> "Cambiar tipo de domingo?"
+          es changeConfirmMessage: "Hay oradores o temas asignados. Desea realmente
+          cambiar el tipo?" -> "Existen oradores y/o temas asignados. Las asignaciones
+          seran eliminadas si confirma la operacion. Realmente desea cambiar el tipo?"
+    done_when:
+      - "pt-BR.json sundayExceptions.changeConfirmTitle equals 'Alterar tipo de domingo?'"
+      - "pt-BR.json sundayExceptions.changeConfirmMessage contains 'e/ou temas designados' and 'As designacoes serao apagadas'"
+      - "en.json sundayExceptions.changeConfirmTitle equals 'Change Sunday type?'"
+      - "en.json sundayExceptions.changeConfirmMessage contains 'and/or topics assigned' and 'will be deleted'"
+      - "es.json sundayExceptions.changeConfirmTitle equals 'Cambiar tipo de domingo?'"
+      - "es.json sundayExceptions.changeConfirmMessage contains 'y/o temas asignados' and 'seran eliminadas'"
+      - "Zero TypeScript code changes"
+    tests:
+      - type: unit
+        description: >
+          Test that all 3 locale files contain the updated changeConfirmTitle
+          and changeConfirmMessage values with the specific user-requested text.
+          Verify pt-BR has question mark in title and mentions 'designacoes serao
+          apagadas'. Verify en has 'and/or' and 'will be deleted'. Verify es has
+          'y/o' and 'seran eliminadas'. Update existing tests in
+          batch9-phase2.test.ts that assert exact values.
+    covers:
+      acceptance_criteria: [AC-091-01, AC-091-02, AC-091-03, AC-091-04, AC-091-05]
+      edge_cases: [EC-091-01, EC-091-02, EC-091-03]
+    risks:
+      - risk: "Existing tests in batch9-phase2.test.ts assert old exact values for changeConfirmTitle and changeConfirmMessage"
+        mitigation: "Update existing tests to assert new values. Tests use .toBe() and .toContain() which must match new text."
+    commit_message: "fix(i18n): update sunday type change confirmation dialog text (F091, CR-148)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F092 - Make presentation mode button always visible
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F092: Remove showMeetingButton conditional in Home tab"
+    feature: F092
+    cr: 149
+    depends_on: []
+    parallelizable_with: [S01, S03, S04]
+    files:
+      - path: src/app/(tabs)/index.tsx
+        action: modify
+    changes:
+      - description: >
+          Remove conditional rendering of the "Start Sacrament Meeting" button.
+          1. Remove import of isTodaySunday from usePresentationMode (line 17)
+          2. Remove const showMeetingButton = useMemo(() => isTodaySunday(), []) (line 27)
+          3. Replace {showMeetingButton && (<View>...</View>)} with just
+             <View>...</View> - render button unconditionally (line 32-47)
+          4. Remove useMemo from React import (line 10) if not used elsewhere
+             (check: useMemo is only used for showMeetingButton, so remove it)
+    done_when:
+      - "index.tsx does NOT import isTodaySunday"
+      - "index.tsx does NOT contain 'showMeetingButton'"
+      - "index.tsx renders the <View> with title and button unconditionally"
+      - "useMemo NOT imported from react (no other usages in the file)"
+      - "usePresentationMode.ts still exports isTodaySunday (unchanged)"
+      - "presentation.tsx unchanged (getTodaySundayDate already correct)"
+    tests:
+      - type: unit
+        description: >
+          Test that index.tsx does not contain showMeetingButton conditional.
+          Test that the View with meetingButton styles is rendered without
+          any && conditional. Test that isTodaySunday is not imported.
+    covers:
+      acceptance_criteria: [AC-092-01, AC-092-02, AC-092-03, AC-092-04, AC-092-05]
+      edge_cases: [EC-092-01, EC-092-02]
+    risks:
+      - risk: "Removing useMemo import when it is used elsewhere in the file"
+        mitigation: "Search the file for all useMemo usages before removing. Current file only uses useMemo for showMeetingButton."
+    commit_message: "feat(home): make presentation mode button always visible (F092, CR-149)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F090 - Fix offline banner readability on iPhone
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F090: Add safe area insets and increase font sizes in OfflineBanner"
+    feature: F090
+    cr: 147
+    depends_on: []
+    parallelizable_with: [S01, S02, S04]
+    files:
+      - path: src/components/OfflineBanner.tsx
+        action: modify
+    changes:
+      - description: >
+          Fix readability of OfflineBanner on iPhones with notch/Dynamic Island.
+          1. Import useSafeAreaInsets from react-native-safe-area-context
+          2. Call const insets = useSafeAreaInsets() inside the component function
+          3. Replace paddingVertical: 8 with paddingTop: insets.top + 8 and
+             paddingBottom: 8 in the banner style (use inline style for paddingTop
+             since insets is dynamic)
+          4. Change fontSize of text style from 14 to 15
+          5. Change fontSize of subtext style from 12 to 13
+    done_when:
+      - "OfflineBanner.tsx imports useSafeAreaInsets from 'react-native-safe-area-context'"
+      - "Component calls useSafeAreaInsets() and applies paddingTop: insets.top + 8"
+      - "Banner paddingBottom is 8 (preserved from original paddingVertical: 8)"
+      - "Text fontSize is 15 (was 14)"
+      - "Subtext fontSize is 13 (was 12)"
+      - "Banner colors unchanged (#E53E3E background, #FFFFFF text, #FED7D7 subtext)"
+    tests:
+      - type: unit
+        description: >
+          Test that OfflineBanner.tsx imports useSafeAreaInsets.
+          Test that fontSize values are 15 and 13 (not 14 and 12).
+          Test that the component renders correctly when visible=true.
+    covers:
+      acceptance_criteria: [AC-090-01, AC-090-02, AC-090-03, AC-090-04]
+      edge_cases: [EC-090-01, EC-090-02, EC-090-03]
+    risks:
+      - risk: "SafeAreaProvider not present above OfflineBanner in provider tree"
+        mitigation: "useSafeAreaInsets returns {top:0} safely when no provider exists. Verify SafeAreaProvider is in the tree. Expo Router may provide it automatically."
+    commit_message: "fix(ui): add safe area insets and increase font sizes in OfflineBanner (F090, CR-147)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F088 - Password reset email redirect URL
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "F088: Add redirectTo parameter to resetPasswordForEmail call"
+    feature: F088
+    cr: 145
+    depends_on: []
+    parallelizable_with: [S01, S02, S03]
+    files:
+      - path: src/app/(auth)/forgot-password.tsx
+        action: modify
+    changes:
+      - description: >
+          Add redirectTo parameter to supabase.auth.resetPasswordForEmail() call.
+          1. Add import: import * as Linking from 'expo-linking'
+          2. In handleSendReset (line 39), change:
+             FROM: await supabase.auth.resetPasswordForEmail(trimmedEmail)
+             TO:   const redirectUrl = Linking.createURL('/(auth)/reset-password')
+                   await supabase.auth.resetPasswordForEmail(trimmedEmail, { redirectTo: redirectUrl })
+          This ensures the reset email link points to the app deep link
+          (sacrmeetman:///(auth)/reset-password) instead of localhost:3000.
+    done_when:
+      - "forgot-password.tsx imports expo-linking"
+      - "resetPasswordForEmail called with { redirectTo: redirectUrl } as second argument"
+      - "redirectUrl created via Linking.createURL('/(auth)/reset-password')"
+      - "No other changes to forgot-password.tsx"
+    tests:
+      - type: unit
+        description: >
+          Test that forgot-password.tsx imports Linking from expo-linking.
+          Test that resetPasswordForEmail is called with redirectTo option.
+          Test that Linking.createURL is called with '/(auth)/reset-password'.
+    covers:
+      acceptance_criteria: [AC-088-02, AC-088-04]
+      edge_cases: [EC-088-01]
+    risks:
+      - risk: "expo-linking may not be installed"
+        mitigation: "expo-linking is part of Expo SDK and already available. The app uses scheme sacrmeetman:// configured in app.json."
+    commit_message: "fix(auth): add redirectTo deep link to password reset email (F088, CR-145)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F088 - Create reset-password page
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "F088: Create reset-password.tsx page for deep link handling"
+    feature: F088
+    cr: 145
+    depends_on: [S04]
+    parallelizable_with: []
+    files:
+      - path: src/app/(auth)/reset-password.tsx
+        action: create
+    changes:
+      - description: >
+          Create new page to handle the password reset deep link.
+          1. Page receives the token/session from the deep link URL
+          2. Shows form with password + confirm password fields
+          3. Calls supabase.auth.updateUser({ password: newPassword })
+          4. Shows success message and navigates to login on success
+          5. Shows error message for expired/invalid tokens
+          6. Uses themed styles consistent with forgot-password.tsx
+          7. i18n support using existing auth keys + new keys:
+             auth.resetPasswordTitle, auth.newPassword, auth.confirmPassword,
+             auth.passwordMismatch, auth.passwordUpdated, auth.resetExpired,
+             auth.updatePassword
+    done_when:
+      - "src/app/(auth)/reset-password.tsx exists and exports default component"
+      - "Component shows password and confirm password fields"
+      - "Component calls supabase.auth.updateUser({ password }) on submit"
+      - "Shows success message and back-to-login link on success"
+      - "Shows error message for expired/invalid tokens"
+      - "Uses useTheme() and useTranslation() for styling and i18n"
+    tests:
+      - type: unit
+        description: >
+          Test that reset-password.tsx exists and exports a default component.
+          Test presence of updateUser call. Test password/confirmPassword fields.
+    covers:
+      acceptance_criteria: [AC-088-03, AC-088-04]
+      edge_cases: [EC-088-02, EC-088-03]
+    risks:
+      - risk: "Deep link routing may not automatically pass token to the page"
+        mitigation: "Supabase emits PASSWORD_RECOVERY auth event when deep link is opened. The AuthContext can listen for this event and the reset-password page can use supabase.auth.onAuthStateChange to detect the session."
+    commit_message: "feat(auth): create reset-password page for deep link handling (F088, CR-145)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: F088 - Add i18n keys for reset password + email template
+  # ---------------------------------------------------------------------------
+  - id: S06
+    title: "F088: Add i18n keys for reset password page in 3 locales"
+    feature: F088
+    cr: 145
+    depends_on: [S05]
+    parallelizable_with: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Add i18n keys for the reset-password page in all 3 locale files:
+          auth.resetPasswordTitle: "Redefinir senha" / "Reset Password" / "Restablecer contrasena"
+          auth.newPassword: "Nova senha" / "New password" / "Nueva contrasena"
+          auth.confirmPassword: "Confirmar senha" / "Confirm password" / "Confirmar contrasena"
+          auth.passwordMismatch: "As senhas nao coincidem" / "Passwords do not match" / "Las contrasenas no coinciden"
+          auth.passwordUpdated: "Senha atualizada com sucesso! Faca login com sua nova senha." / "Password updated successfully! Log in with your new password." / "Contrasena actualizada con exito! Inicie sesion con su nueva contrasena."
+          auth.resetExpired: "Link expirado. Solicite um novo email de redefinicao." / "Link expired. Request a new reset email." / "Enlace expirado. Solicite un nuevo correo de restablecimiento."
+          auth.updatePassword: "Atualizar senha" / "Update password" / "Actualizar contrasena"
+    done_when:
+      - "All 3 locale files have auth.resetPasswordTitle key"
+      - "All 3 locale files have auth.newPassword key"
+      - "All 3 locale files have auth.confirmPassword key"
+      - "All 3 locale files have auth.passwordMismatch key"
+      - "All 3 locale files have auth.passwordUpdated key"
+      - "All 3 locale files have auth.resetExpired key"
+      - "All 3 locale files have auth.updatePassword key"
+    tests:
+      - type: unit
+        description: >
+          Test that all 7 new auth keys exist in all 3 locale files.
+    covers:
+      acceptance_criteria: [AC-088-01, AC-088-03, AC-088-05]
+      edge_cases: [EC-088-04]
+    risks:
+      - risk: "Key naming conflicts with existing auth keys"
+        mitigation: "Check existing auth section keys before adding. The new keys are specific to reset password and do not overlap."
+    commit_message: "feat(i18n): add reset password page i18n keys in 3 languages (F088, CR-145)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: F089 - Integrate onlineManager with useConnection
+  # ---------------------------------------------------------------------------
+  - id: S07
+    title: "F089: Sync onlineManager with useConnection state"
+    feature: F089
+    cr: 146
+    depends_on: []
+    parallelizable_with: [S08]
+    files:
+      - path: src/hooks/useConnection.ts
+        action: modify
+    changes:
+      - description: >
+          Integrate TanStack Query's onlineManager with useConnection.
+          1. Import onlineManager from @tanstack/react-query
+          2. In the existing useEffect (line 39-66), after setIsOnline(online),
+             add: onlineManager.setOnline(online)
+          This tells TanStack Query whether the device is online or offline.
+          When offline, queries with networkMode 'offlineFirst' will use cache.
+          When online again, stale queries auto-refetch.
+    done_when:
+      - "useConnection.ts imports onlineManager from @tanstack/react-query"
+      - "onlineManager.setOnline(online) called inside existing useEffect after setIsOnline(online)"
+      - "No new useEffect created (reuses existing one)"
+      - "No other changes to useConnection.ts"
+    tests:
+      - type: unit
+        description: >
+          Test that useConnection.ts imports onlineManager.
+          Test that onlineManager.setOnline is called when connection state changes.
+    covers:
+      acceptance_criteria: [AC-089-06]
+      edge_cases: [EC-089-02]
+    risks:
+      - risk: "onlineManager.setOnline called before TanStack Query is initialized"
+        mitigation: "onlineManager is a singleton module, available immediately after import. No initialization needed."
+    commit_message: "feat(offline): integrate TanStack Query onlineManager with useConnection (F089, CR-146)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: F089 - Configure QueryClient for offline-first + silence errors
+  # ---------------------------------------------------------------------------
+  - id: S08
+    title: "F089: Configure QueryClient networkMode and silence offline mutation errors"
+    feature: F089
+    cr: 146
+    depends_on: [S07]
+    parallelizable_with: []
+    files:
+      - path: src/app/_layout.tsx
+        action: modify
+    changes:
+      - description: >
+          Configure QueryClient for offline-first behavior and silent mutation errors.
+          1. Import onlineManager from @tanstack/react-query (add to existing import)
+          2. In defaultOptions.queries, add: networkMode: 'offlineFirst'
+          3. In defaultOptions.queries.retry, add offline check:
+             if (!onlineManager.isOnline()) return false
+             (before the existing failureCount < 2 check)
+          4. In MutationCache.onError (line 21-30), add offline check:
+             const isOffline = !onlineManager.isOnline()
+             const isNetworkError = error?.message?.includes('network') ||
+                                    error?.message?.includes('fetch') ||
+                                    error?.message?.includes('Failed to fetch')
+             if (isOffline || isNetworkError) return
+             (before the existing Alert.alert call)
+    done_when:
+      - "_layout.tsx imports onlineManager from @tanstack/react-query"
+      - "defaultOptions.queries has networkMode: 'offlineFirst'"
+      - "retry function checks onlineManager.isOnline() and returns false when offline"
+      - "MutationCache.onError silently ignores errors when offline or network error"
+      - "Alert.alert still shown for non-network errors when online"
+    tests:
+      - type: unit
+        description: >
+          Test that _layout.tsx QueryClient has networkMode: 'offlineFirst'.
+          Test that retry function returns false when offline.
+          Test that MutationCache.onError does not call Alert.alert when offline.
+          Test that MutationCache.onError still calls Alert.alert for non-network errors.
+    covers:
+      acceptance_criteria: [AC-089-01, AC-089-02, AC-089-04, AC-089-05]
+      edge_cases: [EC-089-01, EC-089-03]
+    risks:
+      - risk: "networkMode 'offlineFirst' may change behavior for queries that need fresh data"
+        mitigation: "All queries in the app fetch from Supabase (remote). 'offlineFirst' returns cache when offline, fetches when online. staleTime: 5 minutes is already configured. No query needs different behavior."
+    commit_message: "feat(offline): configure QueryClient offline-first with silent mutation errors (F089, CR-146)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: F089 - Add offline empty state i18n key
+  # ---------------------------------------------------------------------------
+  - id: S09
+    title: "F089: Add common.offlineNoData i18n key in 3 locales"
+    feature: F089
+    cr: 146
+    depends_on: []
+    parallelizable_with: [S07, S08]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Add i18n key for offline empty state message in all 3 locale files.
+          New key in common section (after existing "offlineMessage"):
+          pt-BR: "offlineNoData": "Dados indisponiveis no modo offline"
+          en:    "offlineNoData": "Data unavailable in offline mode"
+          es:    "offlineNoData": "Datos no disponibles en modo sin conexion"
+    done_when:
+      - "pt-BR.json has common.offlineNoData with value 'Dados indisponiveis no modo offline'"
+      - "en.json has common.offlineNoData with value 'Data unavailable in offline mode'"
+      - "es.json has common.offlineNoData with value 'Datos no disponibles en modo sin conexion'"
+    tests:
+      - type: unit
+        description: >
+          Test that all 3 locale files have common.offlineNoData key with correct
+          value in each language.
+    covers:
+      acceptance_criteria: [AC-089-03]
+      edge_cases: [EC-089-01]
+    risks:
+      - risk: "None significant - simple i18n key addition"
+        mitigation: "N/A"
+    commit_message: "feat(i18n): add offline empty state message in 3 languages (F089, CR-146)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 10: Tests for Batch 14 Phase 1
+  # ---------------------------------------------------------------------------
+  - id: S10
+    title: "Batch 14 Phase 1 tests for F088, F089, F090, F091, F092"
+    feature: all
+    cr: [145, 146, 147, 148, 149]
+    depends_on: [S01, S02, S03, S04, S05, S06, S07, S08, S09]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch14-phase1.test.ts
+        action: create
+      - path: src/__tests__/batch9-phase2.test.ts
+        action: modify
+    changes:
+      - description: >
+          Create comprehensive test file batch14-phase1.test.ts covering all 5 features.
+          Update batch9-phase2.test.ts to match new changeConfirm values.
+
+          F091 tests:
+          - Verify changeConfirmTitle values in 3 locales (updated values with ?)
+          - Verify changeConfirmMessage values in 3 locales (new longer text)
+          - Verify SundayCard.tsx still uses the same i18n keys
+          - Update existing tests in batch9-phase2.test.ts for new values
+
+          F092 tests:
+          - Verify index.tsx does NOT contain 'showMeetingButton'
+          - Verify index.tsx does NOT import isTodaySunday
+          - Verify index.tsx does NOT import useMemo
+          - Verify index.tsx renders meetingButton unconditionally
+          - Verify usePresentationMode.ts still exports isTodaySunday and getTodaySundayDate
+
+          F090 tests:
+          - Verify OfflineBanner.tsx imports useSafeAreaInsets
+          - Verify fontSize is 15 (text) and 13 (subtext)
+          - Verify paddingTop uses insets.top
+          - Verify banner colors unchanged
+
+          F088 tests:
+          - Verify forgot-password.tsx imports expo-linking
+          - Verify resetPasswordForEmail called with redirectTo option
+          - Verify reset-password.tsx exists and exports default component
+          - Verify reset-password.tsx calls updateUser
+          - Verify all 7 new auth i18n keys exist in 3 locales
+
+          F089 tests:
+          - Verify useConnection.ts imports onlineManager
+          - Verify _layout.tsx has networkMode 'offlineFirst'
+          - Verify _layout.tsx retry checks onlineManager.isOnline()
+          - Verify MutationCache.onError has offline check
+          - Verify common.offlineNoData i18n key in 3 locales
+    done_when:
+      - "batch14-phase1.test.ts created with tests for all 5 features"
+      - "batch9-phase2.test.ts updated with new changeConfirm values"
+      - "All tests pass with vitest"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 25 ACs across 5 features"
+    covers:
+      acceptance_criteria: [AC-088-01, AC-088-02, AC-088-03, AC-088-04, AC-088-05, AC-089-01, AC-089-02, AC-089-03, AC-089-04, AC-089-05, AC-089-06, AC-090-01, AC-090-02, AC-090-03, AC-090-04, AC-091-01, AC-091-02, AC-091-03, AC-091-04, AC-091-05, AC-092-01, AC-092-02, AC-092-03, AC-092-04, AC-092-05]
+      edge_cases: [EC-088-01, EC-088-02, EC-088-03, EC-088-04, EC-089-01, EC-089-02, EC-089-03, EC-090-01, EC-090-02, EC-090-03, EC-091-01, EC-091-02, EC-091-03, EC-092-01, EC-092-02]
+    risks:
+      - risk: "Test file may be large"
+        mitigation: "Organize by feature with describe blocks. Each feature has its own describe section."
+    commit_message: "test(batch14): add tests for F088, F089, F090, F091, F092 (CR-145 to CR-149)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+  - ac_id: AC-088-01
+    how_to_verify: "Read email sent by Supabase; subject and body must reference app name, not 'Supabase'. Requires Supabase Dashboard email template config (S06 i18n keys, manual Dashboard config)."
+    covered_by_steps: [S06, S10]
+
+  - ac_id: AC-088-02
+    how_to_verify: "Read forgot-password.tsx; resetPasswordForEmail must have redirectTo using Linking.createURL('/(auth)/reset-password')."
+    covered_by_steps: [S04, S10]
+
+  - ac_id: AC-088-03
+    how_to_verify: "File src/app/(auth)/reset-password.tsx exists, exports default component, shows password fields, calls updateUser."
+    covered_by_steps: [S05, S06, S10]
+
+  - ac_id: AC-088-04
+    how_to_verify: "End-to-end: request reset -> email received -> click deep link -> app opens reset page -> enter new password -> success -> login works."
+    covered_by_steps: [S04, S05, S10]
+
+  - ac_id: AC-088-05
+    how_to_verify: "All 7 new auth i18n keys present in pt-BR.json, en.json, es.json."
+    covered_by_steps: [S06, S10]
+
+  - ac_id: AC-089-01
+    how_to_verify: "Read _layout.tsx; defaultOptions.queries.networkMode is 'offlineFirst'. retry function checks onlineManager.isOnline() and returns false when offline."
+    covered_by_steps: [S08, S10]
+
+  - ac_id: AC-089-02
+    how_to_verify: "Read _layout.tsx; MutationCache.onError checks isOffline/isNetworkError and returns before Alert.alert."
+    covered_by_steps: [S08, S10]
+
+  - ac_id: AC-089-03
+    how_to_verify: "common.offlineNoData key exists in all 3 locale files with correct translated values."
+    covered_by_steps: [S09, S10]
+
+  - ac_id: AC-089-04
+    how_to_verify: "networkMode 'offlineFirst' configured globally makes TanStack Query show cached data when offline."
+    covered_by_steps: [S08, S10]
+
+  - ac_id: AC-089-05
+    how_to_verify: "offlineGuard.ts already protects Edge Functions when offline (unchanged). MutationCache.onError now silences network errors."
+    covered_by_steps: [S08, S10]
+
+  - ac_id: AC-089-06
+    how_to_verify: "useConnection.ts calls onlineManager.setOnline(online) in the NetInfo listener. TanStack Query auto-refetches stale queries when onlineManager reports online."
+    covered_by_steps: [S07, S10]
+
+  - ac_id: AC-090-01
+    how_to_verify: "OfflineBanner.tsx uses useSafeAreaInsets and applies paddingTop: insets.top + 8."
+    covered_by_steps: [S03, S10]
+
+  - ac_id: AC-090-02
+    how_to_verify: "OfflineBanner.tsx text fontSize is 15, subtext fontSize is 13."
+    covered_by_steps: [S03, S10]
+
+  - ac_id: AC-090-03
+    how_to_verify: "Banner colors unchanged (#E53E3E background, #FFFFFF text, #FED7D7 subtext). Fixed colors work in both themes."
+    covered_by_steps: [S03, S10]
+
+  - ac_id: AC-090-04
+    how_to_verify: "Banner uses View (not absolute positioning), so content is pushed down. paddingTop ensures banner is below notch."
+    covered_by_steps: [S03, S10]
+
+  - ac_id: AC-091-01
+    how_to_verify: "changeConfirmTitle in pt-BR: 'Alterar tipo de domingo?', en: 'Change Sunday type?', es: 'Cambiar tipo de domingo?'"
+    covered_by_steps: [S01, S10]
+
+  - ac_id: AC-091-02
+    how_to_verify: "changeConfirmMessage in pt-BR contains 'discursantes e/ou temas designados' and 'As designacoes serao apagadas'."
+    covered_by_steps: [S01, S10]
+
+  - ac_id: AC-091-03
+    how_to_verify: "All 3 locale files updated with translated values. Keys unchanged."
+    covered_by_steps: [S01, S10]
+
+  - ac_id: AC-091-04
+    how_to_verify: "SundayCard.tsx:120-121 still uses same t() keys. Cancel/Confirm buttons unchanged."
+    covered_by_steps: [S01, S10]
+
+  - ac_id: AC-091-05
+    how_to_verify: "SundayTypeDropdown is shared component used in both speeches.tsx and agenda.tsx. Same i18n keys used in both."
+    covered_by_steps: [S01, S10]
+
+  - ac_id: AC-092-01
+    how_to_verify: "index.tsx renders the button <View> unconditionally (no showMeetingButton &&)."
+    covered_by_steps: [S02, S10]
+
+  - ac_id: AC-092-02
+    how_to_verify: "Same as AC-092-01 - button always visible, including Sundays."
+    covered_by_steps: [S02, S10]
+
+  - ac_id: AC-092-03
+    how_to_verify: "presentation.tsx uses getTodaySundayDate() which returns next Sunday (weekday) or today (Sunday). No change needed."
+    covered_by_steps: [S02, S10]
+
+  - ac_id: AC-092-04
+    how_to_verify: "No role check on the button. All roles can see and click it."
+    covered_by_steps: [S02, S10]
+
+  - ac_id: AC-092-05
+    how_to_verify: "Button uses same styles (meetingButton, meetingButtonText), same i18n keys (home.startMeeting, home.meetingAgendaTitle)."
+    covered_by_steps: [S02, S10]

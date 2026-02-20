@@ -1,0 +1,147 @@
+# =============================================================================
+# SPEC_F092.yaml
+# Feature F092 / CR-149: Presentation Mode Button Always Visible
+# Batch: 14 Phase 1
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 14
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F092 / CR-149: Make 'Start Sacrament Meeting' button always visible
+# =============================================================================
+
+features:
+
+  - id: F092
+    name: "Make 'Start Sacrament Meeting' button always visible with date-based logic"
+    cr_id: 149
+    type: feature
+    priority: medium
+    related_features: [F009, F012]
+
+    user_request: >
+      "Mudei de ideia sobre quando mostrar o botao de 'Iniciar reuniao
+      sacramental'. Vamos mostrar sempre. A data que sera mostrada quando
+      clicado segue a seguinte regra: Segunda a sabado: mostra o proximo
+      domingo. Domingo: mostra o do dia atual."
+
+    user_decisions:
+      - "OQ-5: Manter titulo da secao como esta (home.meetingAgendaTitle). Nao incluir data do proximo domingo no titulo."
+
+    description: >
+      O botao "Iniciar Reuniao Sacramental" na aba Home so aparece aos
+      domingos (isTodaySunday()). CR-149 pede que o botao esteja sempre
+      visivel. A logica de data ja existe em getTodaySundayDate():
+      retorna proximo domingo (seg-sab) ou hoje (domingo). A unica
+      mudanca necessaria e remover a condicao showMeetingButton que
+      esconde o botao em dias que nao sao domingo.
+
+    context: >
+      src/app/(tabs)/index.tsx:17 importa isTodaySunday de usePresentationMode.
+      Linha 27: const showMeetingButton = useMemo(() => isTodaySunday(), []).
+      Linha 32: {showMeetingButton && (<View>...</View>)} condiciona
+      renderizacao do botao e titulo.
+      src/hooks/usePresentationMode.ts:44 define isTodaySunday() e
+      linha 52 define getTodaySundayDate().
+      src/app/presentation.tsx:35 usa const sundayDate = getTodaySundayDate()
+      para determinar qual domingo exibir no modo apresentacao.
+      getTodaySundayDate() ja implementa a logica de data correta:
+      hoje se domingo, proximo domingo se nao.
+
+    current_behavior: >
+      index.tsx:27: showMeetingButton = useMemo(() => isTodaySunday(), [])
+      index.tsx:32: {showMeetingButton && (...)} - botao so aparece no domingo
+      presentation.tsx:35: sundayDate = getTodaySundayDate() - logica de data
+      ja funciona corretamente (proximo domingo ou hoje)
+      Resultado: De segunda a sabado o botao e invisivel
+
+    expected_behavior: >
+      index.tsx: Remover a condicao showMeetingButton (ou setar para true).
+      O botao e titulo sao renderizados incondicionalmente.
+      Titulo da secao permanece home.meetingAgendaTitle (sem adicionar data).
+      presentation.tsx: Nenhuma alteracao necessaria - getTodaySundayDate()
+      ja retorna a data correta.
+      Resultado: Botao visivel todos os dias. Ao clicar segunda a sabado,
+      abre modo apresentacao do proximo domingo. Ao clicar domingo, abre
+      modo apresentacao do dia atual.
+
+    files_impacted:
+      - path: src/app/(tabs)/index.tsx
+        action: modify
+        changes:
+          - "Remover import de isTodaySunday (linha 17)"
+          - "Remover const showMeetingButton = useMemo(() => isTodaySunday(), []) (linha 27)"
+          - "Remover condicao {showMeetingButton && (...)} (linha 32) - renderizar incondicionalmente"
+          - "Remover import de useMemo se nao usado em outro lugar"
+
+    acceptance_criteria:
+      - id: AC-092-01
+        description: "Botao visivel em dias de semana (Seg-Sab)"
+        given: "Dia atual e segunda a sabado"
+        when: "Usuario abre a aba Home"
+        then: >
+          Botao 'Iniciar Reuniao Sacramental' e visivel. Ao clicar,
+          abre modo apresentacao do proximo domingo.
+
+      - id: AC-092-02
+        description: "Botao visivel no domingo"
+        given: "Dia atual e domingo"
+        when: "Usuario abre a aba Home"
+        then: >
+          Botao 'Iniciar Reuniao Sacramental' e visivel. Ao clicar,
+          abre modo apresentacao do domingo atual.
+
+      - id: AC-092-03
+        description: "Data do modo apresentacao segue regra de data"
+        given: "E quarta-feira, proximo domingo e 2026-02-22"
+        when: "Usuario clica no botao"
+        then: >
+          Modo apresentacao abre com dados de 2026-02-22 (proximo domingo).
+
+      - id: AC-092-04
+        description: "Botao visivel para todos os roles"
+        given: "Usuario e bispado, secretario ou observador"
+        when: "Usuario abre a aba Home"
+        then: "Botao e visivel (todos os roles podem acessar modo apresentacao)"
+
+      - id: AC-092-05
+        description: "Label e estilo do botao mantem-se iguais"
+        given: "Botao e exibido"
+        when: "Usuario visualiza o botao"
+        then: >
+          Texto e estilo identicos ao atual: label i18n home.startMeeting,
+          titulo home.meetingAgendaTitle, estilo meetingButton.
+
+    edge_cases:
+      - id: EC-092-01
+        case: "Sabado a noite (vespera de domingo)"
+        expected: >
+          Botao mostra proximo domingo (amanha). Se usuario clicar
+          apos meia-noite, data muda para domingo atual (getTodaySundayDate
+          recalcula em cada navegacao).
+
+      - id: EC-092-02
+        case: "Nenhuma agenda criada para o proximo domingo"
+        expected: "Modo apresentacao abre com campos vazios (comportamento existente)."
+
+    implementation_notes: >
+      MUDANCA MINIMA: Apenas src/app/(tabs)/index.tsx precisa ser modificado.
+      1. Remover import { isTodaySunday } de usePresentationMode (linha 17)
+      2. Remover const showMeetingButton = useMemo(() => isTodaySunday(), [])
+         (linha 27)
+      3. Remover condicao {showMeetingButton && (...)} na linha 32 -
+         renderizar o <View> com titulo e botao incondicionalmente
+      4. Se useMemo nao for mais usado, remover do import de react (linha 10)
+      5. getTodaySundayDate() em presentation.tsx ja implementa a regra de
+         data correta (seg-sab: proximo domingo, domingo: hoje) - NENHUMA
+         alteracao necessaria no presentation.tsx
+      6. NENHUMA alteracao necessaria no usePresentationMode.ts (funcoes
+         isTodaySunday e getTodaySundayDate continuam existindo para uso
+         em testes ou outros contextos)

@@ -1,0 +1,271 @@
+# =============================================================================
+# QA_PLAN_014.yaml
+# QA Plan for Batch 14 Phase 1: CR-145, CR-146, CR-147, CR-148, CR-149
+# Features: F088, F089, F090, F091, F092
+# Created: 2026-02-20
+# =============================================================================
+
+type: qa_plan
+id: QA-014
+created_at: "2026-02-20T00:00:00Z"
+request_type: mixed
+feature_or_bug: "Batch 14 Phase 1: Email reset fix, Offline graceful degradation, Offline banner readability, Alert message i18n, Meeting button always visible"
+user_request: |
+  CR-145 (bug): Email de "Esqueci minha senha" sem referencia ao app (mostra Supabase) e link
+          aponta para localhost. Customizar template e redirect URL.
+  CR-146 (ux): App offline mostra mensagem horrivel de conexao perdida em todas as sessoes.
+          Melhorar comportamento quando sem conexao.
+  CR-147 (ui): Banner de offline dificil de ler no iPhone.
+  CR-148 (ui): Trocar mensagem de alerta ao mudar tipo de domingo com discursantes designados
+          para texto mais especifico com i18n em todas as linguas.
+  CR-149 (feature): Botao "Iniciar Reuniao Sacramental" sempre visivel. Regra de data:
+          Seg-Sab mostra proximo domingo, Domingo mostra dia atual.
+
+# =============================================================================
+# CR-145 (F088): Email de reset de senha - Baseline
+# =============================================================================
+baseline_cr145:
+  description: |
+    The forgot-password.tsx calls supabase.auth.resetPasswordForEmail(email) without
+    a redirectTo parameter. The Supabase config.toml has site_url = "http://127.0.0.1:3000".
+    No custom email templates exist in the repository (no supabase/*.html files).
+    The email sent by Supabase uses the default template which shows "Supabase" branding
+    and the reset link points to localhost:3000. No deep link handling for password reset
+    exists in the app (no redirectTo, no redirect_to usage found).
+    The app has a URL scheme "sacrmeetman" configured in app.json.
+  evidence:
+    - "src/app/(auth)/forgot-password.tsx line 39: resetPasswordForEmail(trimmedEmail) - no redirectTo option"
+    - "supabase/config.toml line 22: site_url = 'http://127.0.0.1:3000' - localhost, not production URL"
+    - "No HTML email templates found in supabase/ directory"
+    - "No redirectTo or redirect_to usage found in any .ts/.tsx files"
+    - "app.json line 10: scheme 'sacrmeetman' defined but not used for auth redirect"
+
+# =============================================================================
+# CR-146 (F089): Offline graceful degradation - Baseline
+# =============================================================================
+baseline_cr146:
+  description: |
+    The app has basic offline support: useConnection hook detects connectivity via NetInfo,
+    OfflineBanner shows a red banner at top, offlineQueue persists mutations in AsyncStorage,
+    and offlineGuard blocks Edge Function operations when offline. However, there is NO
+    graceful degradation for data display: when offline, Supabase queries fail with ugly
+    error messages. There is no cached data display, no edit disabling in forms, and no
+    specific offline state for each section. The current behavior shows raw error messages
+    across all tabs when connectivity is lost.
+  evidence:
+    - "src/hooks/useConnection.ts: detects online/offline via NetInfo, shows banner"
+    - "src/components/OfflineBanner.tsx: shows 'No connection' banner at top"
+    - "src/lib/offlineGuard.ts: blocks Edge Function operations when offline"
+    - "src/lib/offlineQueue.ts: queues mutations for later processing"
+    - "No 'disabled' or 'readOnly' props conditional on isOnline found in form components"
+    - "No cached data display logic found - queries just fail when offline"
+
+# =============================================================================
+# CR-147 (F090): Offline banner readability - Baseline
+# =============================================================================
+baseline_cr147:
+  description: |
+    The OfflineBanner component uses hardcoded colors: red background (#E53E3E),
+    white text (#FFFFFF, fontSize 14, fontWeight 700), pink subtext (#FED7D7, fontSize 12).
+    No SafeAreaView or padding for iPhone notch/dynamic island. No theme integration.
+    The banner is rendered directly at the top of the content via SyncProvider, without
+    accounting for the iOS status bar area. This makes it partially hidden behind the
+    notch/Dynamic Island on modern iPhones, making it difficult to read.
+  evidence:
+    - "src/components/OfflineBanner.tsx: hardcoded styles, no SafeArea padding"
+    - "src/providers/SyncProvider.tsx line 37-38: OfflineBanner rendered above children, no SafeAreaView"
+    - "Banner has paddingVertical 8, paddingHorizontal 16 - insufficient for notch area"
+    - "No useSafeAreaInsets or SafeAreaView used in OfflineBanner"
+
+# =============================================================================
+# CR-148 (F091): Alert message for Sunday type change - Baseline
+# =============================================================================
+baseline_cr148:
+  description: |
+    The SundayCard component already has an Alert.alert confirmation dialog when changing
+    Sunday type FROM speeches WITH assigned speakers/topics. The current messages are:
+    - en: title="Change sunday type", message="There are speakers or topics assigned.
+      Do you really want to change the type?"
+    - pt-BR: title="Alterar tipo de domingo", message="Existem discursantes ou temas
+      atribuidos. Deseja realmente alterar o tipo?"
+    - es: title="Cambiar tipo de domingo", message="Hay oradores o temas asignados.
+      Desea realmente cambiar el tipo?"
+    The user wants more specific text. The current message is generic - it does not mention
+    what will happen (data loss), does not list the speakers that will be affected, and
+    does not differentiate between the new type being selected.
+  evidence:
+    - "src/components/SundayCard.tsx lines 117-139: Alert.alert with changeConfirmTitle/changeConfirmMessage"
+    - "src/i18n/locales/en.json line 96-97: generic confirm title/message"
+    - "src/i18n/locales/pt-BR.json line 96-97: generic confirm title/message"
+    - "src/i18n/locales/es.json line 96-97: generic confirm title/message"
+    - "All 3 locales have the keys but text is generic, not specific about consequences"
+
+# =============================================================================
+# CR-149 (F092): Meeting button always visible - Baseline
+# =============================================================================
+baseline_cr149:
+  description: |
+    The "Iniciar Reuniao Sacramental" button in the Home tab is ONLY visible on Sundays.
+    The isTodaySunday() function checks if new Date().getDay() === 0. The button is
+    conditionally rendered: {showMeetingButton && (...)}. There is a getTodaySundayDate()
+    function that returns today if Sunday, or next Sunday otherwise, but this is only used
+    in presentation.tsx, not for button visibility. The user wants the button ALWAYS visible:
+    Mon-Sat shows next Sunday's data, Sunday shows current day's data.
+  evidence:
+    - "src/app/(tabs)/index.tsx line 27: const showMeetingButton = useMemo(() => isTodaySunday(), [])"
+    - "src/app/(tabs)/index.tsx line 32: {showMeetingButton && (...)}"
+    - "src/hooks/usePresentationMode.ts lines 44-46: isTodaySunday() returns getDay() === 0"
+    - "src/hooks/usePresentationMode.ts lines 52-60: getTodaySundayDate() already computes next Sunday"
+    - "Button only appears on Sundays, hidden Mon-Sat"
+
+# =============================================================================
+# Validation Checks (to be executed in POST mode)
+# =============================================================================
+validation_checks:
+
+  # --- CR-145 (F088): Email reset ---
+  - id: VC-145-01
+    description: "resetPasswordForEmail call includes redirectTo parameter with production URL or deep link"
+    type: functional
+    how_to_verify: "Grep forgot-password.tsx for redirectTo parameter in resetPasswordForEmail call"
+    expected_result: "resetPasswordForEmail(email, { redirectTo: '<production-or-deeplink-url>' })"
+    priority: must_pass
+
+  - id: VC-145-02
+    description: "Supabase config.toml site_url updated from localhost to production URL"
+    type: functional
+    how_to_verify: "Read supabase/config.toml and check site_url value"
+    expected_result: "site_url should NOT be http://127.0.0.1:3000"
+    priority: must_pass
+
+  - id: VC-145-03
+    description: "Custom email template exists or Supabase Dashboard configuration documented"
+    type: functional
+    how_to_verify: "Check for HTML email templates in supabase/ or documentation about Dashboard email template configuration"
+    expected_result: "Either custom HTML template files or clear documentation on how to configure email templates via Supabase Dashboard"
+    priority: must_pass
+
+  - id: VC-145-04
+    description: "No regression in existing auth flow"
+    type: regression
+    how_to_verify: "Run existing auth-related tests (cr004-f007-auth-fixes.test.ts)"
+    expected_result: "All existing auth tests pass"
+    priority: must_pass
+
+  # --- CR-146 (F089): Offline graceful degradation ---
+  - id: VC-146-01
+    description: "App shows cached/stale data when offline instead of error messages"
+    type: functional
+    how_to_verify: "Check TanStack Query configuration for staleTime, cacheTime, or offline behavior settings"
+    expected_result: "Queries configured to show cached data when offline rather than showing error screens"
+    priority: must_pass
+
+  - id: VC-146-02
+    description: "Edit operations are disabled or show appropriate message when offline"
+    type: functional
+    how_to_verify: "Search for isOnline checks in form components, mutation hooks, or save buttons"
+    expected_result: "Forms/buttons are disabled when offline OR mutations are queued with user feedback"
+    priority: must_pass
+
+  - id: VC-146-03
+    description: "Each tab handles offline state gracefully"
+    type: behavioral
+    how_to_verify: "Check each tab component (index, speeches, agenda, settings) for offline handling"
+    expected_result: "No raw error messages shown when offline. Each section degrades gracefully"
+    priority: must_pass
+
+  - id: VC-146-04
+    description: "Offline queue continues to work for supported operations"
+    type: regression
+    how_to_verify: "Check offlineQueue.ts and useOfflineQueueProcessor.ts are unchanged or enhanced"
+    expected_result: "Existing offline queue functionality preserved"
+    priority: must_pass
+
+  # --- CR-147 (F090): Offline banner readability ---
+  - id: VC-147-01
+    description: "OfflineBanner accounts for iPhone notch/Dynamic Island with safe area padding"
+    type: functional
+    how_to_verify: "Check OfflineBanner.tsx for SafeAreaView, useSafeAreaInsets, or top padding"
+    expected_result: "Banner content is not hidden behind notch/Dynamic Island"
+    priority: must_pass
+
+  - id: VC-147-02
+    description: "Banner text is readable with adequate font size and contrast"
+    type: functional
+    how_to_verify: "Check banner styles for font size, weight, and color contrast"
+    expected_result: "Font size >= 14, adequate color contrast (white on dark background or similar)"
+    priority: must_pass
+
+  - id: VC-147-03
+    description: "Banner integrates with theme system"
+    type: behavioral
+    how_to_verify: "Check if banner uses theme colors or has appropriate styling for both light/dark modes"
+    expected_result: "Banner is readable in both light and dark themes"
+    priority: should_pass
+
+  # --- CR-148 (F091): Alert message i18n ---
+  - id: VC-148-01
+    description: "Alert message text is more specific about consequences of changing Sunday type"
+    type: functional
+    how_to_verify: "Check changeConfirmTitle and changeConfirmMessage in all 3 locale files"
+    expected_result: "Messages clearly state that assignments/speeches will be deleted/lost"
+    priority: must_pass
+
+  - id: VC-148-02
+    description: "All 3 languages (en, pt-BR, es) have updated alert messages"
+    type: functional
+    how_to_verify: "Read en.json, pt-BR.json, es.json for changeConfirmTitle and changeConfirmMessage"
+    expected_result: "All 3 files have updated, consistent messages in their respective languages"
+    priority: must_pass
+
+  - id: VC-148-03
+    description: "Alert buttons still use common.cancel and common.confirm keys"
+    type: regression
+    how_to_verify: "Check SundayCard.tsx Alert.alert call for button text keys"
+    expected_result: "Cancel and confirm buttons use i18n keys and work in all languages"
+    priority: must_pass
+
+  # --- CR-149 (F092): Meeting button always visible ---
+  - id: VC-149-01
+    description: "Meeting button is visible on all days (Mon-Sun), not just Sundays"
+    type: functional
+    how_to_verify: "Check index.tsx for removal of isTodaySunday() conditional"
+    expected_result: "Button is always rendered, no conditional based on day of week"
+    priority: must_pass
+
+  - id: VC-149-02
+    description: "Mon-Sat: button navigates to presentation mode for NEXT Sunday"
+    type: functional
+    how_to_verify: "Check presentation.tsx or index.tsx for date logic using getTodaySundayDate() or similar"
+    expected_result: "When not Sunday, the presentation loads next Sunday's data"
+    priority: must_pass
+
+  - id: VC-149-03
+    description: "Sunday: button navigates to presentation mode for CURRENT day"
+    type: functional
+    how_to_verify: "Check that on Sunday, the presentation loads today's date"
+    expected_result: "On Sunday, presentation shows current day's agenda"
+    priority: must_pass
+
+  - id: VC-149-04
+    description: "No regression in presentation mode data loading"
+    type: regression
+    how_to_verify: "Run existing presentation mode tests"
+    expected_result: "All presentation-related tests pass"
+    priority: must_pass
+
+  # --- Cross-cutting regression ---
+  - id: VC-REGR-01
+    description: "All existing tests pass without regressions"
+    type: regression
+    how_to_verify: "Run vitest run and check pass count"
+    expected_result: "Test count >= 3886 (current baseline), zero failures in existing tests"
+    priority: must_pass
+
+# =============================================================================
+# Pass Criteria
+# =============================================================================
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.

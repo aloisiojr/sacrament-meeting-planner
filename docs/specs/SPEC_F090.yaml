@@ -1,0 +1,143 @@
+# =============================================================================
+# SPEC_F090.yaml
+# Feature F090 / CR-147: Offline Banner Readability on iPhone
+# Batch: 14 Phase 1
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 14
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F090 / CR-147: Improve offline banner readability on iPhone
+# =============================================================================
+
+features:
+
+  - id: F090
+    name: "Improve offline banner readability on iPhone"
+    cr_id: 147
+    type: ui
+    priority: medium
+    related_features: [F022, F089]
+
+    user_request: >
+      "A mensagem no topo da tela e ruim de ler no iPhone."
+
+    user_clarification: >
+      Sobre o banner de offline, esta escondido atras do notch/Dynamic Island
+      do iPhone.
+
+    user_decisions:
+      - "INC-2: F090 mantido separado de F089 (CRs distintos), mas podem compartilhar componentes."
+
+    description: >
+      O OfflineBanner atual (src/components/OfflineBanner.tsx) e dificil
+      de ler no iPhone. O banner fica escondido atras do notch/Dynamic Island
+      porque nao usa SafeAreaView nem insets do topo. Problemas:
+      (1) Sobreposicao com status bar/notch/Dynamic Island,
+      (2) Tamanho de fonte pequeno (14/12),
+      (3) Ausencia de safe area insets.
+
+    context: >
+      OfflineBanner usa backgroundColor '#E53E3E' (vermelho), texto branco
+      fontSize 14 (titulo) e '#FED7D7' fontSize 12 (subtexto).
+      Renderizado no topo via SyncProvider (src/providers/SyncProvider.tsx:38),
+      acima do conteudo principal. Nao usa SafeAreaView nem insets.
+      Em iPhones com notch/Dynamic Island, o banner fica atras da status bar.
+      O app ja tem react-native-safe-area-context instalado e usado em
+      src/app/(tabs)/index.tsx (SafeAreaView importado na linha 12).
+
+    current_behavior: >
+      OfflineBanner.tsx:
+      - Nao importa nem usa SafeAreaView ou useSafeAreaInsets
+      - Container <View> com paddingVertical: 8, paddingHorizontal: 16
+      - Text fontSize 14, fontWeight '700', cor '#FFFFFF'
+      - Subtext fontSize 12, cor '#FED7D7', marginTop 2
+      - Em iPhone com notch: texto fica oculto atras da status bar
+      - Em iPhone com Dynamic Island: pior ainda, texto totalmente coberto
+
+    expected_behavior: >
+      OfflineBanner.tsx:
+      - Importar useSafeAreaInsets de react-native-safe-area-context
+      - Aplicar paddingTop: insets.top no container do banner
+      - Aumentar fontSize do texto principal para 15
+      - Aumentar fontSize do subtexto para 13
+      - Manter cores fixas (nao dependem do tema) - vermelho/branco funciona
+        em ambos os modos
+      - Banner empurra conteudo para baixo (nao sobrepoe)
+
+    files_impacted:
+      - path: src/components/OfflineBanner.tsx
+        action: modify
+        changes:
+          - "Importar useSafeAreaInsets de react-native-safe-area-context"
+          - "Adicionar paddingTop: insets.top ao style do banner container"
+          - "Aumentar fontSize de text de 14 para 15"
+          - "Aumentar fontSize de subtext de 12 para 13"
+
+    acceptance_criteria:
+      - id: AC-090-01
+        description: "Banner nao sobrepoe status bar / notch / Dynamic Island"
+        given: "Dispositivo esta offline em iPhone com notch"
+        when: "OfflineBanner e exibido"
+        then: >
+          Banner e renderizado abaixo da safe area (respeitando
+          insets do topo). Texto totalmente visivel e legivel.
+
+      - id: AC-090-02
+        description: "Tamanho de fonte adequado para leitura"
+        given: "Dispositivo esta offline"
+        when: "OfflineBanner e exibido"
+        then: >
+          Texto principal tem fontSize minimo de 15. Subtexto tem
+          fontSize minimo de 13. Ambos com fontWeight adequado para
+          legibilidade sobre fundo vermelho.
+
+      - id: AC-090-03
+        description: "Banner funciona em dark mode e light mode"
+        given: "App esta em dark mode ou light mode"
+        when: "Dispositivo fica offline"
+        then: >
+          Banner mantem contraste adequado em ambos os modos. Cores
+          do banner sao fixas (vermelho '#E53E3E' com texto branco),
+          nao dependem do tema.
+
+      - id: AC-090-04
+        description: "Banner nao bloqueia interacao com conteudo"
+        given: "Dispositivo esta offline"
+        when: "OfflineBanner e exibido"
+        then: >
+          Conteudo abaixo do banner e empurrado para baixo (nao
+          sobreposto). Usuario consegue interagir com todos os
+          elementos da tela.
+
+    edge_cases:
+      - id: EC-090-01
+        case: "iPhone SE (tela menor, sem notch)"
+        expected: "Banner visivel e legivel, nao ocupa espaco excessivo. insets.top sera menor (status bar height)."
+
+      - id: EC-090-02
+        case: "iPad"
+        expected: "Banner centralizado e legivel em tela maior."
+
+      - id: EC-090-03
+        case: "Android (sem notch)"
+        expected: "Banner funciona normalmente. insets.top sera 0 ou status bar height, sem impacto negativo."
+
+    implementation_notes: >
+      ALTERACAO SIMPLES: Apenas OfflineBanner.tsx precisa ser modificado.
+      1. Importar useSafeAreaInsets de react-native-safe-area-context
+      2. Usar const insets = useSafeAreaInsets() dentro do componente
+      3. Aplicar paddingTop: insets.top + 8 (8 do padding original)
+      4. Aumentar fontSize: text 14->15, subtext 12->13
+      5. react-native-safe-area-context ja esta instalado (usado em
+         src/app/(tabs)/index.tsx:12)
+      6. O SyncProvider renderiza OfflineBanner dentro de
+         GestureHandlerRootView > QueryClientProvider > ... > SyncProvider,
+         que deve estar dentro de SafeAreaProvider (verificar em _layout.tsx)

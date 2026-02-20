@@ -7,11 +7,11 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-20"
-  last_updated_by: "batch-13"
+  last_updated_by: "batch-14-phase-1"
   total_modules: 8
-  total_adrs: 54
+  total_adrs: 56
   total_crs_implemented: 89
-  pending_arch: "ARCH_M024 (batch-13: CR-140 to CR-144)"
+  pending_arch: "ARCH_M025 (batch-14-phase-1: CR-145 to CR-149)"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
@@ -31,6 +31,7 @@ metadata:
     - docs/arch/ARCH_M022.yaml
     - docs/arch/ARCH_M023.yaml
     - docs/arch/ARCH_M024.yaml
+    - docs/arch/ARCH_M025.yaml
 
 # =============================================================================
 # TECH STACK
@@ -167,13 +168,14 @@ modules:
       - update-user-role
       - update-user-name
       - delete-user
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81]
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
       BUG-401 adicionou session guard e desabilitou gateway JWT verification.
       CR-81 adicionou campo full_name no registro e edicao de nome.
       CR-80 adicionou back button na tela Users.
+      CR-145/F088: forgot-password.tsx adiciona redirectTo com Linking.createURL() para deep link correto.
       AuthContext expoe: session, user, role, wardId, userName, loading, signIn, signOut, hasPermission.
 
   - id: M002
@@ -383,13 +385,15 @@ modules:
     hooks:
       - useConnection
       - useOfflineQueueProcessor
-    modified_by_crs: [52]
+    modified_by_crs: [52, 146, 147]
     notes: |
       MutationQueue persistida em AsyncStorage (max 100 entries, FIFO).
       Last-write-wins conflict resolution via updated_at timestamps.
       Edge Function operations bloqueadas offline com mensagem "Requires connection".
       OfflineBanner renderizado acima de todo conteudo (incluindo telas de auth).
       offlineQueue integration com mutation hooks DEFERRED (code existe mas nao usado).
+      CR-146/F089: useConnection integra onlineManager.setOnline() do TanStack Query para pausar queries offline.
+      CR-147/F090: OfflineBanner usa useSafeAreaInsets para paddingTop e aumenta fontSize (14->15, 12->13).
 
   - id: M008
     name: UIShell
@@ -428,11 +432,11 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
-      Presentation Mode button aparece no Home aos domingos.
+      Presentation Mode button visivel sempre na Home (CR-149/F092, anteriormente so no domingo).
       CR-82 adicionou GestureHandlerRootView wrapper no root layout.
       Tema: system detection + manual toggle (automatic/light/dark).
       i18n: ward language setting -> device locale (fallback).
@@ -454,6 +458,9 @@ modules:
       CR-122/F058: InviteManagementSection segunda linha usa t('speeches.lastSpeech') para position===3.
       CR-114/F060: NextSundaysSection wiring de onClearTopic para SpeechSlot.
       CR-115/F061: SundayCard.SundayTypeDropdown confirmacao Alert.alert ao mudar tipo com atribuicoes existentes.
+      CR-146/F089: _layout.tsx QueryClient config: networkMode 'offlineFirst', offline-aware retry, silence MutationCache.onError when offline.
+      CR-148/F091: i18n sundayExceptions.changeConfirmTitle/changeConfirmMessage atualizados com texto especifico.
+      CR-149/F092: index.tsx remove showMeetingButton condicao, botao visivel sempre. isTodaySunday nao mais importado.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1013,6 +1020,28 @@ adrs:
       - "All table references must be explicitly qualified"
       - "Matches Supabase Database Linter recommendation"
 
+  - id: ADR-064
+    title: "Supersede ADR-019: customize password reset email template and redirect URL"
+    context: "ADR-019 stated 'No custom email templates needed'. User reported Supabase branding and localhost URL in reset email."
+    decision: "Customize email template in Supabase Dashboard. Add redirectTo with Linking.createURL() for correct deep link. ADR-019 flow remains valid but template customization clause superseded."
+    decided_in: "CR-145"
+    supersedes: "ADR-019 (partial -- template customization clause only)"
+    consequences:
+      - "Email shows app name instead of Supabase branding"
+      - "Reset link points to app deep link, not localhost"
+      - "Requires manual Supabase Dashboard configuration"
+
+  - id: ADR-065
+    title: "Integrate TanStack Query onlineManager with useConnection for offline query pausing"
+    context: "F089 needs queries to stop retrying when offline. Options: per-query retry logic, global onlineManager, wrapper hook."
+    decision: "onlineManager.setOnline(isOnline) in useConnection.ts. networkMode: 'offlineFirst' globally. Silence MutationCache.onError when offline."
+    decided_in: "CR-146"
+    consequences:
+      - "All queries automatically paused when offline"
+      - "Cached data displayed via offlineFirst mode"
+      - "No mutation error Alerts when offline"
+      - "Auto-refetch on reconnect via onlineManager"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1269,7 +1298,7 @@ security:
     provider: "Supabase Auth (email/password)"
     session: "JWT with app_metadata (role, ward_id, full_name)"
     token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
-    password_reset: "Supabase built-in resetPasswordForEmail (CR-67)"
+    password_reset: "Supabase built-in resetPasswordForEmail (CR-67). CR-145/F088: adds redirectTo with deep link, supersedes ADR-019 template clause."
 
   authorization:
     rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"
@@ -1317,7 +1346,7 @@ cross_cutting:
   error_handling:
     boundary: "src/components/ErrorBoundary.tsx (root level)"
     query_errors: "src/components/QueryErrorView.tsx"
-    mutation_errors: "Global MutationCache.onError with Alert"
+    mutation_errors: "Global MutationCache.onError with Alert. CR-146/F089: silenced when offline (isOffline check)."
     edge_function_errors: "callEdgeFunction extracts server error message (ADR-022)"
 
   gestures:
@@ -1342,16 +1371,16 @@ cross_cutting:
 
 file_structure:
   "src/app/":
-    "_layout.tsx": "Root layout com providers (ErrorBoundary, GestureHandlerRootView, QueryClient, I18n, Theme, Auth, Sync)"
+    "_layout.tsx": "Root layout com providers (ErrorBoundary, GestureHandlerRootView, QueryClient, I18n, Theme, Auth, Sync). CR-146/F089: QueryClient networkMode offlineFirst, offline-aware retry, silence MutationCache when offline."
     "(auth)/":
       "_layout.tsx": "Auth group layout"
       "login.tsx": "Tela de login"
       "register.tsx": "Auto-registro (cria ala + usuario)"
-      "forgot-password.tsx": "Recuperacao de senha via email"
+      "forgot-password.tsx": "Recuperacao de senha via email. CR-145/F088: adiciona redirectTo com Linking.createURL() para deep link."
       "invite/[token].tsx": "Registro via convite (deep link)"
     "(tabs)/":
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings)"
-      "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt)"
+      "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel."
       "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry."
       "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso."
       "settings/":
@@ -1386,7 +1415,7 @@ file_structure:
     "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir."
     "useSundayList.ts": "Lista de domingos com scroll infinito"
     "useRealtimeSync.ts": "Subscricao Supabase Realtime"
-    "useConnection.ts": "Monitor de conexao (NetInfo)"
+    "useConnection.ts": "Monitor de conexao (NetInfo). CR-146/F089: integra onlineManager.setOnline() do TanStack Query."
     "useNotifications.ts": "Registro de token + handler de tap"
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
@@ -1405,7 +1434,7 @@ file_structure:
     "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix)"
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
     "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84). flex:1 defensivo no container (CR-118/F065)."
-    "OfflineBanner.tsx": "Banner vermelho de offline"
+    "OfflineBanner.tsx": "Banner vermelho de offline. CR-147/F090: useSafeAreaInsets para paddingTop, fontSize 14->15 / 12->13."
     "ErrorBoundary.tsx": "Error boundary do React"
     "QueryErrorView.tsx": "View de erro para queries"
     "ExitConfirmation.tsx": "Confirmacao ao sair do app"
@@ -1499,7 +1528,8 @@ key_flows:
 
   presentation_mode:
     steps:
-      - "No domingo, Home mostra 'Iniciar Reuniao Sacramental'"
+      - "Home tab sempre mostra 'Iniciar Reuniao Sacramental' (CR-149/F092: botao visivel todos os dias)"
+      - "Seg-Sab: abre modo apresentacao do proximo domingo. Domingo: abre do dia atual."
       - "User toca -> PresentationMode abre (full-screen, read-only)"
       - "Header mostra data formatada localizada"
       - "Accordion cards: 1 expandido por vez, Welcome aberto por padrao"
@@ -1713,6 +1743,23 @@ change_requests_history:
       - "src/__tests__/integration/auth-flow.integration.test.ts"
       - "src/__tests__/integration/components-hooks.integration.test.tsx"
 
+  batch_13:
+    crs: "CR-140, CR-141, CR-142, CR-143, CR-144"
+    scope: "Settings tab rename i18n (F083), Agenda tab SundayTypeDropdown (F084), activity log structured format with i18n (F085), pg_timezone_names investigation (F086), SQL function search_path fix (F087)"
+    doc: "ARCH_M024.yaml"
+    status: "pending implementation"
+    adrs: [ADR-061, ADR-062, ADR-063]
+    new_files:
+      - "supabase/migrations/015_fix_function_search_path.sql"
+
+  batch_14_phase_1:
+    crs: "CR-145, CR-146, CR-147, CR-148, CR-149"
+    scope: "Password reset email customization (F088), offline graceful degradation (F089), offline banner readability on iPhone (F090), sunday type change confirmation message (F091), presentation mode button always visible (F092)"
+    doc: "ARCH_M025.yaml"
+    status: "pending implementation"
+    adrs: [ADR-064, ADR-065]
+    new_files: []
+
 # =============================================================================
 # OBSERVABILITY
 # =============================================================================
@@ -1736,5 +1783,5 @@ observability:
 
   error_reporting:
     query_errors: "console.error via QueryCache.onError"
-    mutation_errors: "Alert via MutationCache.onError (suppressible per mutation)"
+    mutation_errors: "Alert via MutationCache.onError (suppressible per mutation). CR-146/F089: silenced when offline."
     edge_function_errors: "Server error extraction via error.context.json() (ADR-022)"

@@ -1,0 +1,189 @@
+# =============================================================================
+# SPEC_F088.yaml
+# Feature F088 / CR-145: Password Reset Email Customization
+# Batch: 14 Phase 1
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 14
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F088 / CR-145: Customize password reset email template and redirect URL
+# =============================================================================
+
+features:
+
+  - id: F088
+    name: "Customize password reset email template and redirect URL"
+    cr_id: 145
+    type: bug
+    priority: high
+    related_features: [F001]
+
+    user_request: >
+      "O email chega sem nenhuma referencia a qual aplicativo se trata, so vem
+      escrito que e Supabase, tem que ter um jeito de customizar. O link dentro
+      do texto e um link pra localhost que, obvio, nao vai funcionar."
+
+    user_decisions:
+      - "OQ-1: Redirect via deep link direto sacrmeetman:// que abre no app na tela de redefinir senha. App precisa estar instalado."
+      - "OQ-2: Template traduzido em 3 idiomas (pt-BR, en, es). Requer Edge Function para detectar idioma do usuario (ward.language) e enviar email no idioma correto."
+
+    description: >
+      O email de "Esqueci minha senha" enviado pelo Supabase Auth mostra
+      remetente/branding "Supabase" e o link de reset aponta para
+      http://localhost:3000. Tres correcoes necessarias:
+      (1) Criar Edge Function para envio customizado de email de reset
+      com nome do app e template traduzido no idioma da ala do usuario.
+      (2) Configurar redirect URL como deep link sacrmeetman://reset-password
+      para abrir direto no app.
+      (3) Adicionar tela de redefinicao de senha no app acessivel via deep link.
+
+    context: >
+      Atualmente, supabase.auth.resetPasswordForEmail(email) e chamado em
+      src/app/(auth)/forgot-password.tsx:39 sem passar redirectTo. O Supabase
+      usa site_url do config (http://127.0.0.1:3000) como fallback.
+      O template de email e o padrao do Supabase (branding Supabase).
+      CR-67 implementou o fluxo de forgot-password no app, mas nao
+      customizou o email nem o redirect. O app usa deep link scheme
+      sacrmeetman:// (app.json:10). A ala tem campo language que pode ser
+      pt-BR, en ou es (ward.language). Edge Functions existentes ja acessam
+      dados do usuario e da ala (ex: create-invitation, process-notifications).
+
+    current_behavior: >
+      1. Email de reset mostra subject e body com branding "Supabase"
+      2. Link no email aponta para http://localhost:3000 (site_url padrao)
+      3. resetPasswordForEmail() em forgot-password.tsx:39 nao passa redirectTo
+      4. Ao clicar no link, usuario ve erro 404 ou conexao recusada
+      5. Template de email unico (padrao Supabase), sem traducao
+
+    expected_behavior: >
+      1. Edge Function custom-reset-email envia email com nome do app
+         "Gerenciador da Reuniao Sacramental" / "Sacrament Meeting Planner" /
+         "Planificador de la Reunion Sacramental" conforme idioma da ala
+      2. Link no email usa deep link sacrmeetman://reset-password?token=...
+         que abre direto no app na tela de redefinicao de senha
+      3. forgot-password.tsx chama Edge Function ao inves de
+         supabase.auth.resetPasswordForEmail diretamente
+      4. App tem rota/tela para receber deep link de reset e permitir
+         definicao de nova senha
+      5. Fluxo completo: email -> deep link -> app -> nova senha -> sucesso
+
+    files_impacted:
+      - path: supabase/functions/send-reset-email/index.ts
+        action: create
+        changes:
+          - "Nova Edge Function que recebe email, busca usuario e ward.language"
+          - "Gera token de reset via Supabase Admin API"
+          - "Envia email com template traduzido no idioma correto"
+          - "Link no email usa sacrmeetman://reset-password?token=..."
+          - "Templates em 3 idiomas embutidos na funcao"
+
+      - path: src/app/(auth)/forgot-password.tsx
+        action: modify
+        changes:
+          - "Substituir supabase.auth.resetPasswordForEmail por chamada a Edge Function send-reset-email"
+          - "Ou manter resetPasswordForEmail com redirectTo: sacrmeetman://reset-password"
+
+      - path: src/app/(auth)/reset-password.tsx
+        action: create
+        changes:
+          - "Nova tela para redefinicao de senha acessivel via deep link"
+          - "Recebe token da URL, permite usuario definir nova senha"
+          - "Chama supabase.auth.updateUser({ password: newPassword })"
+
+      - path: Supabase Dashboard
+        action: configure
+        changes:
+          - "Authentication > URL Configuration: adicionar sacrmeetman://reset-password aos Redirect URLs"
+          - "Se usando Edge Function: configurar Auth Hook ou SMTP customizado"
+
+    acceptance_criteria:
+      - id: AC-088-01
+        description: "Email de reset usa nome do app no subject e body"
+        given: "Usuario solicitou reset de senha"
+        when: "Email de reset e enviado"
+        then: >
+          Subject contem nome do app no idioma da ala do usuario:
+          'Gerenciador da Reuniao Sacramental' (pt-BR),
+          'Sacrament Meeting Planner' (en),
+          'Planificador de la Reunion Sacramental' (es).
+          Body referencia o app, nao 'Supabase'.
+
+      - id: AC-088-02
+        description: "Link de reset no email usa deep link do app"
+        given: "Usuario clica no link de reset no email"
+        when: "Dispositivo abre a URL"
+        then: >
+          Deep link sacrmeetman://reset-password?token=... abre o app
+          diretamente na tela de redefinicao de senha.
+
+      - id: AC-088-03
+        description: "App tem tela de redefinicao de senha via deep link"
+        given: "App recebe deep link sacrmeetman://reset-password?token=..."
+        when: "App abre a tela de reset"
+        then: >
+          Tela permite usuario digitar nova senha (com confirmacao),
+          valida e atualiza a senha via Supabase Auth.
+
+      - id: AC-088-04
+        description: "Fluxo completo funcional: email -> deep link -> nova senha"
+        given: "Usuario recebeu email de reset com deep link correto"
+        when: "Usuario clica no link, app abre, usuario define nova senha"
+        then: "Senha e atualizada com sucesso e usuario consegue fazer login"
+
+      - id: AC-088-05
+        description: "Email traduzido nos 3 idiomas conforme ward.language"
+        given: "Ala do usuario tem language = 'en'"
+        when: "Email de reset e enviado"
+        then: >
+          Email e enviado em ingles: subject, body e instrucoes
+          no idioma da ala. Idem para pt-BR e es.
+
+    edge_cases:
+      - id: EC-088-01
+        case: "Usuario com email nao cadastrado solicita reset"
+        expected: "App mostra mensagem generica de sucesso (nao revela se email existe). Nenhum email enviado."
+
+      - id: EC-088-02
+        case: "Link de reset expira (padrao Supabase: 24h)"
+        expected: "App mostra mensagem de link expirado com opcao de solicitar novo email."
+
+      - id: EC-088-03
+        case: "App nao instalado no dispositivo"
+        expected: "Deep link nao abre nada. Usuario precisa ter app instalado. Considerar mensagem no email informando necessidade do app."
+
+      - id: EC-088-04
+        case: "Usuario pertence a mais de uma ala (multi-tenancy)"
+        expected: "Usar idioma da ala primaria do usuario (primeira ala encontrada)."
+
+    implementation_notes: >
+      ABORDAGEM: Duas opcoes de implementacao:
+      OPCAO A (Simples - Supabase Email Template + redirectTo):
+      1. Customizar template de email no Supabase Dashboard com nome do app
+      2. Configurar site_url e redirect_urls para sacrmeetman://reset-password
+      3. Passar redirectTo na chamada resetPasswordForEmail
+      4. Limitacao: template unico (nao i18n) - NAO atende OQ-2
+      OPCAO B (Completa - Edge Function):
+      1. Criar Edge Function send-reset-email que:
+         a. Recebe email do usuario
+         b. Busca usuario em auth.users e determina ward_id
+         c. Busca ward.language da ala do usuario
+         d. Gera OTP/token via supabase.auth.admin.generateLink({type:'recovery'})
+         e. Envia email com template traduzido usando servico de email (Resend, SendGrid, etc.)
+         f. Link no email: sacrmeetman://reset-password?token=TOKEN
+      2. forgot-password.tsx chama Edge Function ao inves de resetPasswordForEmail
+      3. Criar tela reset-password.tsx acessivel via deep link
+      DECISAO DO USUARIO: OPCAO B (Edge Function com i18n em 3 idiomas).
+      NOTA: O app usa scheme sacrmeetman:// (app.json:10). Deep links ja
+      funcionam para convites (sacrmeetman://invite/{token}). A mesma
+      infraestrutura de deep link pode ser reutilizada para reset-password.
+      NOTA 2: ward.language esta disponivel na tabela wards. O usuario esta
+      vinculado a uma ala via ward_users. A Edge Function pode fazer join
+      para obter o idioma.

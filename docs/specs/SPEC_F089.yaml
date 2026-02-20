@@ -1,0 +1,204 @@
+# =============================================================================
+# SPEC_F089.yaml
+# Feature F089 / CR-146: Offline Graceful Degradation
+# Batch: 14 Phase 1
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 14
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F089 / CR-146: Graceful degradation when app is offline
+# =============================================================================
+
+features:
+
+  - id: F089
+    name: "Graceful degradation when app is offline"
+    cr_id: 146
+    type: ux
+    priority: high
+    related_features: [F022]
+
+    user_request: >
+      "Coloquei em modo aviao e todas as sessoes do app se transformam em uma
+      mensagem horrorosa de que a conexao foi perdido, tentar de novo."
+
+    user_decisions:
+      - "Implementar degradacao graciosa - app mostra dados em cache (React Query) quando offline, desabilita edicao, mostra banner discreto. Ao reconectar, recarrega dados automaticamente. NAO permite editar offline."
+      - "OQ-3: Cold start offline (sem cache) mostra tela vazia com mensagem amigavel 'Sem conexao' e botao 'Tentar novamente'."
+      - "INC-1: F089 e extensao da infra offline existente (F022), nao feature separada."
+
+    description: >
+      Quando o app esta offline, mensagens de erro "horriveis" de conexao
+      perdida aparecem em todas as sessoes (tabs). O comportamento atual
+      mostra erros tecnicos do TanStack Query/Supabase ao usuario.
+      A melhoria deve: (1) suprimir erros de query quando offline,
+      (2) mostrar dados em cache quando disponivel, (3) mostrar
+      estado vazio amigavel com botao retry quando nao ha cache,
+      (4) desabilitar ou mostrar feedback adequado para mutacoes que
+      requerem conexao.
+
+    context: >
+      O app usa TanStack Query com retry e global error handlers
+      (src/app/_layout.tsx:14-44). QueryCache.onError loga no console.
+      MutationCache.onError mostra Alert.alert generico com i18n.t('errors.mutationFailed').
+      Quando offline, queries falham e mostram erro no ErrorBoundary
+      ou na UI de cada tab. useConnection (src/hooks/useConnection.ts)
+      ja detecta status offline e SyncProvider renderiza OfflineBanner.
+      Porem, as queries continuam tentando e falhando com erros tecnicos
+      visiveis ao usuario. TanStack Query v5 suporta onlineManager que
+      pode ser integrado com useConnection para pausar queries quando offline.
+
+    current_behavior: >
+      1. QueryClient em _layout.tsx:14 configura retry(failureCount, error) que
+         retenta queries ate 2 vezes independente de estado de conexao
+      2. QueryCache.onError loga console.error (nao visivel ao usuario, mas
+         indica query ativa)
+      3. MutationCache.onError mostra Alert.alert('Erro', 'Operacao falhou')
+         ao usuario para qualquer falha de mutacao
+      4. Quando offline, queries e mutations falham com erros de rede
+      5. ErrorBoundary captura erros nao tratados e mostra tela de erro
+      6. useConnection ja detecta offline e mostra OfflineBanner via SyncProvider
+      7. offlineGuard.ts protege chamadas a Edge Functions mas nao queries normais
+
+    expected_behavior: >
+      1. TanStack Query onlineManager integrado com useConnection para pausar
+         queries automaticamente quando offline
+      2. Queries pausadas nao disparam retry nem mostram erro - exibem dados
+         em cache se disponiveis
+      3. Quando offline sem cache, UI mostra tela vazia com mensagem amigavel
+         "Sem conexao" e botao "Tentar novamente" (i18n)
+      4. MutationCache.onError silencia erros de rede quando offline (nao mostra
+         Alert.alert para falhas de conexao)
+      5. Ao reconectar, onlineManager.setOnline(true) faz queries stale
+         re-executarem automaticamente (refetchOnReconnect)
+      6. Operacoes que requerem conexao (Edge Functions) mostram mensagem
+         amigavel via offlineGuard existente
+
+    files_impacted:
+      - path: src/app/_layout.tsx
+        action: modify
+        changes:
+          - "Configurar onlineManager do TanStack Query integrado com estado de conexao"
+          - "MutationCache.onError: verificar se erro e de rede e dispositivo esta offline; se sim, nao mostrar Alert.alert"
+          - "Considerar networkMode: 'offlineFirst' nas defaultOptions de queries"
+
+      - path: src/hooks/useConnection.ts
+        action: modify
+        changes:
+          - "Integrar onlineManager.setOnline(isOnline) quando estado de conexao muda"
+          - "Importar onlineManager de @tanstack/react-query"
+
+      - path: src/components/OfflineBanner.tsx
+        action: none
+        changes:
+          - "Banner ja existe e funciona corretamente (sera melhorado em F090)"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Adicionar common.offlineNoData: 'Sem conexao'"
+          - "Adicionar common.offlineRetry: 'Tentar novamente'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Adicionar common.offlineNoData: 'No connection'"
+          - "Adicionar common.offlineRetry: 'Try again'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Adicionar common.offlineNoData: 'Sin conexion'"
+          - "Adicionar common.offlineRetry: 'Intentar de nuevo'"
+
+    acceptance_criteria:
+      - id: AC-089-01
+        description: "Queries nao disparam retry quando offline"
+        given: "Dispositivo esta offline"
+        when: "TanStack Query tenta executar uma query"
+        then: >
+          Query nao executa retry. Se ha dados em cache, exibe dados do
+          cache. Se nao ha cache, exibe estado vazio amigavel (nao erro).
+
+      - id: AC-089-02
+        description: "Nenhum Alert.alert de erro aparece quando offline"
+        given: "Dispositivo esta offline"
+        when: "Uma operacao falha por falta de conexao"
+        then: >
+          Nenhum Alert.alert de erro e exibido. Erros de rede sao
+          silenciosamente ignorados no handler global de MutationCache.
+
+      - id: AC-089-03
+        description: "Estado vazio com retry quando sem cache e offline"
+        given: "Dispositivo esta offline e nao ha dados em cache"
+        when: "Usuario navega para uma tab"
+        then: >
+          UI mostra mensagem amigavel 'Sem conexao' (common.offlineNoData)
+          e botao 'Tentar novamente' (common.offlineRetry).
+          Sem stack trace ou mensagem tecnica.
+
+      - id: AC-089-04
+        description: "Dados em cache sao exibidos quando offline"
+        given: "Dispositivo estava online, carregou dados, e ficou offline"
+        when: "Usuario navega pelo app"
+        then: "Dados previamente carregados continuam visiveis (cache do TanStack Query)"
+
+      - id: AC-089-05
+        description: "Mutacoes online-only mostram mensagem amigavel"
+        given: "Dispositivo esta offline"
+        when: "Usuario tenta executar operacao que requer conexao (Edge Function)"
+        then: >
+          Mensagem amigavel e exibida (nao erro tecnico). Texto: chave i18n
+          existente auth.requiresConnection ou similar.
+
+      - id: AC-089-06
+        description: "Ao reconectar, queries re-executam automaticamente"
+        given: "Dispositivo estava offline e reconectou"
+        when: "Conexao e restabelecida"
+        then: "TanStack Query refaz queries stale automaticamente (refetchOnReconnect)"
+
+    edge_cases:
+      - id: EC-089-01
+        case: "App aberto pela primeira vez sem conexao (cold start offline)"
+        expected: >
+          Login nao e possivel (tela de login requer conexao). Se ha sessao
+          em cache mas sem dados, mostrar tela vazia com mensagem 'Sem conexao'
+          e botao 'Tentar novamente'. Sem crash.
+
+      - id: EC-089-02
+        case: "Conexao intermitente (online/offline/online rapidamente)"
+        expected: >
+          Banner aparece/desaparece corretamente. Queries se recuperam
+          ao reconectar. Sem acumulo de erros.
+
+      - id: EC-089-03
+        case: "Mutacao queued offline e executada ao reconectar"
+        expected: >
+          Fila de mutacoes (offlineQueue) processa pendencias ao reconectar.
+          Ja implementado em F022.
+
+    implementation_notes: >
+      ABORDAGEM TECNICA: Integrar TanStack Query onlineManager com useConnection.
+      1. Em useConnection.ts: importar onlineManager e chamar
+         onlineManager.setOnline(isOnline) quando estado muda.
+      2. Em _layout.tsx: considerar networkMode: 'offlineFirst' nas
+         defaultOptions para que queries usem cache quando offline.
+      3. Em MutationCache.onError: checar se erro.message contem 'network'
+         ou 'fetch' e se dispositivo esta offline; se sim, nao mostrar Alert.
+      4. Para estado vazio offline: componentes de lista (FlatList) ja mostram
+         ListEmptyComponent; ajustar mensagem quando offline usando isOnline
+         do useConnection. Adicionar botao 'Tentar novamente' que chama
+         queryClient.refetchQueries() ou NetInfo.fetch().
+      5. refetchOnReconnect ja pode estar habilitado por padrao no TanStack
+         Query v5; verificar e habilitar se necessario.
+      6. offlineGuard.ts ja cobre Edge Functions; nao requer alteracao.
+      CUIDADO: F089 estende F022 (Offline Support). Nao quebrar comportamento
+      existente de deteccao de conexao, OfflineBanner e fila de mutacoes.

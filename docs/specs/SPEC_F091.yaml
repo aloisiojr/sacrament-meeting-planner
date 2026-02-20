@@ -1,0 +1,171 @@
+# =============================================================================
+# SPEC_F091.yaml
+# Feature F091 / CR-148: Sunday Type Change Confirmation Message
+# Batch: 14 Phase 1
+# Created: 2026-02-20
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 14
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F091 / CR-148: Improve sunday type change confirmation message
+# =============================================================================
+
+features:
+
+  - id: F091
+    name: "Improve sunday type change confirmation message with specific text"
+    cr_id: 148
+    type: ui
+    priority: medium
+    related_features: [F061, F070, F084]
+
+    user_request: >
+      "Se um domingo com discursos for trocado para outro tipo e existirem
+      discursantes designados, a mensagem de alerta deve ser: 'Existem
+      discursantes e/ou temas designados. As designacoes serao apagadas se
+      voce confirmar a operacao. Deseja realmente alterar o tipo?'. Lembrando
+      de fazer para todas as linguas."
+
+    user_decisions:
+      - "OQ-4: Usar texto exato do pedido do usuario. Mensagem estatica sem interpolacao com nomes ou quantidades."
+      - "INC-3: F091 nao tem dependencia de F061/F070/F084, sao componentes diferentes mesmo que afetem SundayCard."
+
+    description: >
+      A mensagem de alerta ao mudar tipo de domingo com discursantes
+      designados usa texto generico via i18n keys sundayExceptions.changeConfirmTitle
+      e sundayExceptions.changeConfirmMessage. CR-148 pede texto mais especifico
+      conforme citacao do usuario. A mensagem deve informar que existem
+      discursantes e/ou temas designados e que as designacoes serao apagadas
+      se o usuario confirmar. Texto deve ser traduzido em i18n para os 3 idiomas.
+
+    context: >
+      SundayTypeDropdown em SundayCard.tsx (linha 98-145) mostra
+      Alert.alert com t('sundayExceptions.changeConfirmTitle') e
+      t('sundayExceptions.changeConfirmMessage') na linha 120-121.
+      A logica ja verifica hasAssignments na linha 117 checando
+      speaker_name e topic_title. F061 (CR-115) criou o dialogo,
+      F070 (CR-127) adicionou delete de speeches. F084 (CR-141) reusa
+      o mesmo componente SundayTypeDropdown na aba Agenda (agenda.tsx:365).
+      O componente recebe speeches[] como prop (SundayTypeDropdownProps
+      na linha 88-96).
+
+    current_behavior: >
+      SundayCard.tsx:117-121:
+      - hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title)
+      - Alert.alert(
+          t('sundayExceptions.changeConfirmTitle'),
+          t('sundayExceptions.changeConfirmMessage'),
+          [Cancel, Confirm]
+        )
+      - Mensagem e estatica/generica, nao menciona quantidade nem nomes
+
+    expected_behavior: >
+      O texto de changeConfirmTitle e changeConfirmMessage e atualizado
+      nos 3 arquivos i18n para corresponder exatamente ao texto pedido
+      pelo usuario:
+      - Title (pt-BR): "Alterar tipo de domingo?"
+      - Message (pt-BR): "Existem discursantes e/ou temas designados.
+        As designacoes serao apagadas se voce confirmar a operacao.
+        Deseja realmente alterar o tipo?"
+      - Title (en): "Change Sunday type?"
+      - Message (en): "There are speakers and/or topics assigned.
+        The assignments will be deleted if you confirm the operation.
+        Do you really want to change the type?"
+      - Title (es): "Cambiar tipo de domingo?"
+      - Message (es): "Existen oradores y/o temas designados.
+        Las designaciones seran eliminadas si confirma la operacion.
+        Desea realmente cambiar el tipo?"
+      Nenhuma alteracao de codigo TypeScript e necessaria - apenas valores
+      de chaves i18n existentes sao atualizados.
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "sundayExceptions.changeConfirmTitle: atualizar para 'Alterar tipo de domingo?'"
+          - "sundayExceptions.changeConfirmMessage: atualizar para 'Existem discursantes e/ou temas designados. As designacoes serao apagadas se voce confirmar a operacao. Deseja realmente alterar o tipo?'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "sundayExceptions.changeConfirmTitle: atualizar para 'Change Sunday type?'"
+          - "sundayExceptions.changeConfirmMessage: atualizar para 'There are speakers and/or topics assigned. The assignments will be deleted if you confirm the operation. Do you really want to change the type?'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "sundayExceptions.changeConfirmTitle: atualizar para 'Cambiar tipo de domingo?'"
+          - "sundayExceptions.changeConfirmMessage: atualizar para 'Existen oradores y/o temas designados. Las designaciones seran eliminadas si confirma la operacion. Desea realmente cambiar el tipo?'"
+
+    acceptance_criteria:
+      - id: AC-091-01
+        description: "Titulo do dialogo atualizado"
+        given: "Domingo do tipo 'speeches' com designacoes"
+        when: "Usuario muda tipo de domingo para outro"
+        then: >
+          Titulo do Alert.alert exibe 'Alterar tipo de domingo?' (pt-BR),
+          'Change Sunday type?' (en), 'Cambiar tipo de domingo?' (es).
+
+      - id: AC-091-02
+        description: "Mensagem menciona discursantes e temas designados"
+        given: "Domingo tem discursantes e/ou temas designados"
+        when: "Alert.alert de confirmacao e exibido"
+        then: >
+          Mensagem exibe em pt-BR: 'Existem discursantes e/ou temas designados.
+          As designacoes serao apagadas se voce confirmar a operacao.
+          Deseja realmente alterar o tipo?'
+
+      - id: AC-091-03
+        description: "Mensagem traduzida em pt-BR, en, es"
+        given: "App em qualquer idioma suportado"
+        when: "Dialogo de confirmacao e exibido"
+        then: >
+          Texto usa chaves i18n sundayExceptions.changeConfirmTitle e
+          sundayExceptions.changeConfirmMessage. Disponivel em pt-BR, en, es
+          com traducoes especificas para cada idioma.
+
+      - id: AC-091-04
+        description: "Botoes de Cancel e Confirm funcionam como antes"
+        given: "Dialogo de confirmacao exibido"
+        when: "Usuario clica em Cancelar ou Confirmar"
+        then: >
+          Cancelar: tipo nao muda, speeches preservados.
+          Confirmar: speeches apagados, tipo atualizado.
+          Comportamento identico ao anterior (F061/F070).
+
+      - id: AC-091-05
+        description: "Dialogo funciona na aba Discursos e na aba Agenda"
+        given: "SundayTypeDropdown renderizado em speeches.tsx ou agenda.tsx"
+        when: "Usuario tenta mudar tipo de domingo com designacoes"
+        then: >
+          Mesmo dialogo com texto atualizado exibido em ambas as abas
+          (reutilizacao do componente SundayTypeDropdown).
+
+    edge_cases:
+      - id: EC-091-01
+        case: "Apenas temas sem discursantes designados"
+        expected: "Dialogo exibido normalmente (hasAssignments checa topic_title). Mensagem generica cobre o caso ('discursantes e/ou temas')."
+
+      - id: EC-091-02
+        case: "Todos os 3 slots preenchidos com nome e tema"
+        expected: "Mesmo dialogo (mensagem e generica, nao lista nomes individualmente)."
+
+      - id: EC-091-03
+        case: "Apenas 1 slot preenchido com nome mas sem tema"
+        expected: "Dialogo exibido normalmente. Mensagem generica cobre o caso."
+
+    implementation_notes: >
+      MUDANCA SIMPLES: Apenas atualizar valores de 2 chaves i18n existentes
+      em 3 arquivos de locale JSON. NENHUMA alteracao de codigo TypeScript.
+      As chaves sundayExceptions.changeConfirmTitle e
+      sundayExceptions.changeConfirmMessage ja existem e sao usadas no
+      SundayCard.tsx:120-121. O usuario pediu texto especifico - a mensagem
+      e estatica (nao usa interpolacao com nomes ou quantidade).
+      Textos exatos para cada idioma definidos na secao expected_behavior.

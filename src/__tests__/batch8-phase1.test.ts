@@ -40,7 +40,7 @@ describe('F045 (CR-101): Hide status LEDs on non-speech Sundays', () => {
   describe('AC-F045-01: LEDs visible when type is speeches', () => {
     it('should wrap LEDs section with isSpeechesType conditional', () => {
       const content = getSundayCard();
-      expect(content).toContain('{isSpeechesType && (');
+      expect(content).toContain('isSpeechesType && (');
     });
 
     it('should have isSpeechesType flag defined', () => {
@@ -50,9 +50,10 @@ describe('F045 (CR-101): Hide status LEDs on non-speech Sundays', () => {
 
     it('should render StatusLED components inside conditional', () => {
       const content = getSundayCard();
-      // StatusLED should be inside the isSpeechesType conditional block
-      const ledsStart = content.indexOf('{isSpeechesType && (');
-      const ledsEnd = content.indexOf('</Pressable>', ledsStart);
+      // StatusLED should be inside an isSpeechesType conditional block (may include !expanded)
+      const ledsStart = content.indexOf('!expanded && isSpeechesType && (');
+      expect(ledsStart).toBeGreaterThan(-1);
+      const ledsEnd = content.indexOf('</View>', ledsStart);
       const ledsSection = content.substring(ledsStart, ledsEnd);
       expect(ledsSection).toContain('<StatusLED');
       expect(ledsSection).toContain('speechStatuses.map');

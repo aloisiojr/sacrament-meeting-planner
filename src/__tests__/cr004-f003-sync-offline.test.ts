@@ -1588,9 +1588,9 @@ describe('CR-004 F003: SyncEngine, OfflineManager & Notifications', () => {
       expect(source).toContain("import { View, Text, StyleSheet } from 'react-native'");
     });
 
-    it('should have paddingVertical and paddingHorizontal on banner', () => {
+    it('should have paddingBottom and paddingHorizontal on banner', () => {
       const source = readSourceFile('components/OfflineBanner.tsx');
-      expect(source).toContain('paddingVertical: 8');
+      expect(source).toContain('paddingBottom: 8');
       expect(source).toContain('paddingHorizontal: 16');
     });
 

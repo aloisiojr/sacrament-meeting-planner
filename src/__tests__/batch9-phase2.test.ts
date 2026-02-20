@@ -312,32 +312,32 @@ describe('F061 (CR-115): Confirmation dialog on sunday type change', () => {
   describe('AC-F061-07: Dialog texts translated in 3 languages', () => {
     it('pt-BR has changeConfirmTitle', () => {
       const locale = readLocale('pt-BR') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Alterar tipo de domingo');
+      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Alterar tipo de domingo?');
     });
 
     it('pt-BR has changeConfirmMessage', () => {
       const locale = readLocale('pt-BR') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('discursantes ou temas');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('e/ou temas designados');
     });
 
     it('en has changeConfirmTitle', () => {
       const locale = readLocale('en') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Change sunday type');
+      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Change Sunday type?');
     });
 
     it('en has changeConfirmMessage', () => {
       const locale = readLocale('en') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('speakers or topics');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('and/or topics assigned');
     });
 
     it('es has changeConfirmTitle', () => {
       const locale = readLocale('es') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Cambiar tipo de domingo');
+      expect(locale.sundayExceptions.changeConfirmTitle).toBe('Cambiar tipo de domingo?');
     });
 
     it('es has changeConfirmMessage', () => {
       const locale = readLocale('es') as { sundayExceptions: Record<string, string> };
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('oradores o temas');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas asignados');
     });
   });
 

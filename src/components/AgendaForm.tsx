@@ -226,6 +226,34 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         />
       </FieldRow>
 
+      <FieldRow label={t('agenda.pianist')} colors={colors}>
+        <SelectorField
+          value={agenda.pianist_name ?? ''}
+          placeholder={t('agenda.pianist')}
+          onPress={() => {
+            if (!isObserver) {
+              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_music' });
+            }
+          }}
+          disabled={isObserver}
+          colors={colors}
+        />
+      </FieldRow>
+
+      <FieldRow label={t('agenda.conductor')} colors={colors}>
+        <SelectorField
+          value={agenda.conductor_name ?? ''}
+          placeholder={t('agenda.conductor')}
+          onPress={() => {
+            if (!isObserver) {
+              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_music' });
+            }
+          }}
+          disabled={isObserver}
+          colors={colors}
+        />
+      </FieldRow>
+
       <FieldRow label={t('agenda.openingHymn')} colors={colors}>
         <SelectorField
           value={getHymnDisplay(agenda.opening_hymn_id, allHymns)}

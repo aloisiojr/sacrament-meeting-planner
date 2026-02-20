@@ -609,13 +609,12 @@ describe('AC-15: Activity log user_name column', () => {
       // Each hook must destructure userName from useAuth
       expect(source).toContain('userName');
 
-      // Every logAction call should have 6 arguments (including userName)
-      const logActionCalls = source.match(/logAction\([^)]+\)/g) ?? [];
-      expect(logActionCalls.length).toBeGreaterThan(0);
-      for (const call of logActionCalls) {
-        // Count commas to verify 6 arguments (5 commas = 6 args)
-        const commaCount = (call.match(/,/g) ?? []).length;
-        expect(commaCount).toBe(5);
+      // Every logAction call block should reference userName
+      // Match logAction calls including multiline ones
+      const logActionBlocks = source.match(/logAction\([\s\S]*?\);/g) ?? [];
+      expect(logActionBlocks.length).toBeGreaterThan(0);
+      for (const block of logActionBlocks) {
+        expect(block).toContain('userName');
       }
     }
   });

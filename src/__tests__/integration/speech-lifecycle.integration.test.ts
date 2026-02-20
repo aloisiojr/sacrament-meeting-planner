@@ -33,6 +33,13 @@ vi.mock('../../lib/supabase', () => ({
 
 vi.mock('../../lib/activityLog', () => ({
   logAction: vi.fn(),
+  buildLogDescription: (actionType: string, params: Record<string, string | number>) => {
+    const parts = [actionType];
+    for (const [key, value] of Object.entries(params)) {
+      parts.push(`${key}=${value}`);
+    }
+    return parts.join('|');
+  },
 }));
 
 vi.mock('../../i18n', () => ({

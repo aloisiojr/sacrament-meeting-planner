@@ -154,6 +154,24 @@ describe('F091 (CR-148): Update sunday type change confirmation message', () => 
       expect(locale.sundayExceptions.changeConfirmMessage).toContain('cambiar el tipo?');
     });
   });
+
+  // --- EC-091-03: hasAssignments checks speaker_name OR topic_title ---
+  describe('EC-091-03: hasAssignments covers speaker-only and topic-only cases', () => {
+    it('SundayCard.tsx checks speaker_name in hasAssignments', () => {
+      const content = readSourceFile('components/SundayCard.tsx');
+      expect(content).toContain('s.speaker_name');
+    });
+
+    it('SundayCard.tsx checks topic_title in hasAssignments', () => {
+      const content = readSourceFile('components/SundayCard.tsx');
+      expect(content).toContain('s.topic_title');
+    });
+
+    it('SundayCard.tsx uses OR logic for hasAssignments', () => {
+      const content = readSourceFile('components/SundayCard.tsx');
+      expect(content).toContain('speaker_name || !!s.topic_title');
+    });
+  });
 });
 
 // =============================================================================
@@ -244,6 +262,14 @@ describe('F092 (CR-149): Presentation mode button always visible', () => {
     it('index.tsx still navigates to /presentation', () => {
       const content = getIndex();
       expect(content).toContain("'/presentation'");
+    });
+  });
+
+  // --- EC-092 additional: Button rendered with Pressable (not TouchableOpacity) ---
+  describe('EC-092 additional: Button element type', () => {
+    it('index.tsx uses Pressable for the meeting button', () => {
+      const content = getIndex();
+      expect(content).toContain('Pressable');
     });
   });
 });
@@ -344,6 +370,25 @@ describe('F090 (CR-147): Offline banner readability on iPhone', () => {
     it('banner has paddingHorizontal 16', () => {
       const content = getBanner();
       expect(content).toContain('paddingHorizontal: 16');
+    });
+  });
+
+  // --- EC-090-03: Banner alignment preserved ---
+  describe('EC-090-03: Banner alignment preserved', () => {
+    it('banner has alignItems center', () => {
+      const content = getBanner();
+      const bannerIdx = content.indexOf("banner: {");
+      const bannerEnd = content.indexOf('},', bannerIdx);
+      const bannerStyle = content.substring(bannerIdx, bannerEnd);
+      expect(bannerStyle).toContain("alignItems: 'center'");
+    });
+
+    it('banner text has fontWeight 700', () => {
+      const content = getBanner();
+      const textIdx = content.indexOf("text: {");
+      const textEnd = content.indexOf('}', textIdx);
+      const textStyle = content.substring(textIdx, textEnd);
+      expect(textStyle).toContain("fontWeight: '700'");
     });
   });
 });
@@ -492,6 +537,11 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
       const content = readSourceFile('app/(auth)/reset-password.tsx');
       expect(content).toContain('onAuthStateChange');
     });
+
+    it('reset-password.tsx checks for existing session on mount', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('getSession');
+    });
   });
 
   // --- EC-088-04: i18n values are correct ---
@@ -524,6 +574,45 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
     it('es updatePassword is correct', () => {
       const locale = readLocale('es') as { auth: Record<string, string> };
       expect(locale.auth.updatePassword).toBe('Actualizar contrasena');
+    });
+  });
+
+  // --- AC-088-01: Email template i18n keys with app name references ---
+  describe('AC-088-01: resetPasswordTitle references app context', () => {
+    it('reset-password.tsx uses auth.resetPasswordTitle i18n key', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('auth.resetPasswordTitle');
+    });
+
+    it('reset-password.tsx uses useTheme for themed styling', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('useTheme');
+      expect(content).toContain('colors.background');
+    });
+
+    it('reset-password.tsx uses useTranslation for i18n', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('useTranslation');
+    });
+  });
+
+  // --- AC-088 additional: Password field security ---
+  describe('AC-088 additional: Password field security attributes', () => {
+    it('reset-password.tsx uses secureTextEntry for both fields', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      const matches = content.match(/secureTextEntry/g);
+      expect(matches).not.toBeNull();
+      expect(matches!.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('reset-password.tsx navigates to login after success', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain("/(auth)/login");
+    });
+
+    it('reset-password.tsx has password length validation', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('password.length < 6');
     });
   });
 });
@@ -668,6 +757,39 @@ describe('F089 (CR-146): Offline graceful degradation', () => {
       const content = getLayout();
       expect(content).toContain("'errors.mutationFailed'");
     });
+
+    it('_layout.tsx checks for fetch error string', () => {
+      const content = getLayout();
+      expect(content).toContain("'fetch'");
+    });
+  });
+
+  // --- AC-089 additional: Mutation retry is 0 ---
+  describe('AC-089 additional: Mutation retry disabled', () => {
+    it('_layout.tsx mutations have retry: 0', () => {
+      const content = getLayout();
+      const mutationsIdx = content.indexOf('mutations: {');
+      const mutationsEnd = content.indexOf('}', mutationsIdx);
+      const mutationsSection = content.substring(mutationsIdx, mutationsEnd);
+      expect(mutationsSection).toContain('retry: 0');
+    });
+  });
+
+  // --- AC-089 additional: QueryClient uses staleTime 5 min ---
+  describe('AC-089 additional: QueryClient staleTime preserved', () => {
+    it('_layout.tsx has staleTime configured', () => {
+      const content = getLayout();
+      expect(content).toContain('staleTime:');
+    });
+  });
+
+  // --- AC-089 additional: retry checks HTTP 4xx errors ---
+  describe('AC-089 additional: retry skips 4xx client errors', () => {
+    it('_layout.tsx retry checks error status 400-499', () => {
+      const content = getLayout();
+      expect(content).toContain('error?.status >= 400');
+      expect(content).toContain('error?.status < 500');
+    });
   });
 });
 
@@ -701,5 +823,41 @@ describe('Cross-feature: i18n key consistency (Batch 14 Phase 1)', () => {
     expect(ptBR.sundayExceptions.changeConfirmTitle).toContain('?');
     expect(en.sundayExceptions.changeConfirmTitle).toContain('?');
     expect(es.sundayExceptions.changeConfirmTitle).toContain('?');
+  });
+
+  it('all 3 locales have auth.passwordMismatch', () => {
+    const ptBR = readLocale('pt-BR') as { auth: Record<string, string> };
+    const en = readLocale('en') as { auth: Record<string, string> };
+    const es = readLocale('es') as { auth: Record<string, string> };
+    expect(ptBR.auth.passwordMismatch).toBeDefined();
+    expect(en.auth.passwordMismatch).toBeDefined();
+    expect(es.auth.passwordMismatch).toBeDefined();
+  });
+
+  it('all 3 locales have auth.resetExpired', () => {
+    const ptBR = readLocale('pt-BR') as { auth: Record<string, string> };
+    const en = readLocale('en') as { auth: Record<string, string> };
+    const es = readLocale('es') as { auth: Record<string, string> };
+    expect(ptBR.auth.resetExpired).toBeDefined();
+    expect(en.auth.resetExpired).toBeDefined();
+    expect(es.auth.resetExpired).toBeDefined();
+  });
+
+  it('all 3 locales have auth.newPassword', () => {
+    const ptBR = readLocale('pt-BR') as { auth: Record<string, string> };
+    const en = readLocale('en') as { auth: Record<string, string> };
+    const es = readLocale('es') as { auth: Record<string, string> };
+    expect(ptBR.auth.newPassword).toBeDefined();
+    expect(en.auth.newPassword).toBeDefined();
+    expect(es.auth.newPassword).toBeDefined();
+  });
+
+  it('all 3 locales have auth.confirmPassword', () => {
+    const ptBR = readLocale('pt-BR') as { auth: Record<string, string> };
+    const en = readLocale('en') as { auth: Record<string, string> };
+    const es = readLocale('es') as { auth: Record<string, string> };
+    expect(ptBR.auth.confirmPassword).toBeDefined();
+    expect(en.auth.confirmPassword).toBeDefined();
+    expect(es.auth.confirmPassword).toBeDefined();
   });
 });

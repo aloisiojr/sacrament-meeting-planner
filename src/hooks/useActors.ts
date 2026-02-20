@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
+import { logAction, buildLogDescription } from '../lib/activityLog';
 import type { MeetingActor, CreateActorInput, UpdateActorInput } from '../types/database';
 
 // --- Query Keys ---
@@ -52,6 +52,17 @@ export function sortActors(actors: MeetingActor[]): MeetingActor[] {
   return [...actors].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
   );
+}
+
+/**
+ * Get the primary role key of an actor for activity logging.
+ */
+function getPrimaryRole(actor: MeetingActor | CreateActorInput): string {
+  if (actor.can_preside) return 'can_preside';
+  if (actor.can_conduct) return 'can_conduct';
+  if (actor.can_recognize) return 'can_recognize';
+  if (actor.can_music) return 'can_music';
+  return 'can_recognize';
 }
 
 // --- Hooks ---
@@ -111,7 +122,7 @@ export function useCreateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:create', `${data.name} adicionado como ator da reuniao`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'actor:create', buildLogDescription('actor:create', { nome: data.name, funcao: getPrimaryRole(data) }), userName);
       }
     },
   });
@@ -139,7 +150,7 @@ export function useUpdateActor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:update', `${data.name} atualizado`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'actor:update', buildLogDescription('actor:update', { nome: data.name }), userName);
       }
     },
   });
@@ -162,7 +173,7 @@ export function useDeleteActor() {
     onSuccess: (actorName) => {
       queryClient.invalidateQueries({ queryKey: actorKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'actor:delete', `${actorName} removido`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'actor:delete', buildLogDescription('actor:delete', { nome: actorName }), userName);
       }
     },
   });

@@ -6,9 +6,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
-import { parseLocalDate, formatDateHumanReadable } from '../lib/dateUtils';
-import { getCurrentLanguage } from '../i18n';
+import { logAction, buildLogDescription } from '../lib/activityLog';
+import { parseLocalDate } from '../lib/dateUtils';
 import type { SundayException, SundayExceptionReason } from '../types/database';
 
 // --- Query Keys ---
@@ -42,43 +41,6 @@ export const SUNDAY_TYPE_OPTIONS = [
 ] as const;
 
 export type SundayTypeOption = (typeof SUNDAY_TYPE_OPTIONS)[number];
-
-/**
- * Human-readable sunday type names for activity log descriptions.
- */
-const SUNDAY_TYPE_LABELS: Record<string, Record<string, string>> = {
-  'pt-BR': {
-    speeches: 'Domingo com Discursos',
-    testimony_meeting: 'Reuniao de Testemunho',
-    general_conference: 'Conferencia Geral',
-    stake_conference: 'Conferencia de Estaca',
-    ward_conference: 'Conferencia da Ala',
-    primary_presentation: 'Reuniao Especial da Primaria',
-    other: 'Outro',
-  },
-  en: {
-    speeches: 'Sunday with Speeches',
-    testimony_meeting: 'Testimony Meeting',
-    general_conference: 'General Conference',
-    stake_conference: 'Stake Conference',
-    ward_conference: 'Ward Conference',
-    primary_presentation: 'Primary Special Presentation',
-    other: 'Other',
-  },
-  es: {
-    speeches: 'Domingo con Discursos',
-    testimony_meeting: 'Reunion de Testimonios',
-    general_conference: 'Conferencia General',
-    stake_conference: 'Conferencia de Estaca',
-    ward_conference: 'Conferencia de Barrio',
-    primary_presentation: 'Presentacion Especial de la Primaria',
-    other: 'Otro',
-  },
-};
-
-function getSundayTypeLabel(reason: string, language: string): string {
-  return SUNDAY_TYPE_LABELS[language]?.[reason] ?? SUNDAY_TYPE_LABELS['pt-BR'][reason] ?? reason;
-}
 
 // --- Auto-Assignment Logic ---
 
@@ -275,10 +237,7 @@ export function useSetSundayType() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
       if (user) {
-        const lang = getCurrentLanguage();
-        const dateStr = formatDateHumanReadable(variables.date, lang);
-        const typeLabel = getSundayTypeLabel(variables.reason, lang);
-        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', buildLogDescription('sunday_type:change', { data: variables.date, tipo: variables.reason }), userName);
       }
     },
     onError: () => {
@@ -326,10 +285,7 @@ export function useRemoveSundayException() {
     onSuccess: (_data, date) => {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
       if (user) {
-        const lang = getCurrentLanguage();
-        const dateStr = formatDateHumanReadable(date, lang);
-        const typeLabel = getSundayTypeLabel('speeches', lang);
-        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', `Domingo dia ${dateStr} ajustado para ${typeLabel}`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'sunday_type:change', buildLogDescription('sunday_type:change', { data: date, tipo: 'speeches' }), userName);
       }
     },
     onError: () => {

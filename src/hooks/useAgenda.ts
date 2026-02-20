@@ -7,9 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
-import { formatDateHumanReadable } from '../lib/dateUtils';
-import { getCurrentLanguage } from '../i18n';
+import { logAction, buildLogDescription } from '../lib/activityLog';
 import type { SundayAgenda } from '../types/database';
 
 // --- Query Keys ---
@@ -156,7 +154,7 @@ export function useUpdateAgenda() {
       });
       queryClient.invalidateQueries({ queryKey: agendaKeys.all });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'agenda:edit', `Agenda do dia ${formatDateHumanReadable(data.sunday_date, getCurrentLanguage())} editada`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'agenda:edit', buildLogDescription('agenda:edit', { data: data.sunday_date }), userName);
       }
     },
   });

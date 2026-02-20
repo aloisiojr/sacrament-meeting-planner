@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
+import { logAction, buildLogDescription } from '../lib/activityLog';
 import type {
   WardTopic,
   GeneralCollection,
@@ -94,7 +94,7 @@ export function useCreateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:create', `Tema "${data.title}" adicionado`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'topic:create', buildLogDescription('topic:create', { titulo: data.title }), userName);
       }
     },
   });
@@ -124,7 +124,7 @@ export function useUpdateWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:update', `Tema "${data.title}" atualizado`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'topic:update', buildLogDescription('topic:update', { titulo: data.title }), userName);
       }
     },
   });
@@ -164,7 +164,7 @@ export function useDeleteWardTopic() {
       queryClient.invalidateQueries({ queryKey: topicKeys.wardTopics(wardId) });
       queryClient.invalidateQueries({ queryKey: topicKeys.activeTopics(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'topic:delete', `Tema "${topicTitle}" removido`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'topic:delete', buildLogDescription('topic:delete', { titulo: topicTitle }), userName);
       }
     },
   });
@@ -294,10 +294,7 @@ export function useToggleCollection() {
       queryClient.invalidateQueries({ queryKey: topicKeys.all });
       if (user && result.collectionName) {
         const action = result.active ? 'collection:activate' : 'collection:deactivate';
-        const desc = result.active
-          ? `Colecao "${result.collectionName}" ativada`
-          : `Colecao "${result.collectionName}" desativada`;
-        logAction(wardId, user.id, user.email ?? '', action, desc, userName);
+        logAction(wardId, user.id, user.email ?? '', action, buildLogDescription(action, { nome: result.collectionName }), userName);
       }
     },
   });

@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logAction } from '../lib/activityLog';
+import { logAction, buildLogDescription } from '../lib/activityLog';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
 // --- Query Keys ---
@@ -102,7 +102,7 @@ export function useCreateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:create', `${data.full_name} adicionado como membro`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'member:create', buildLogDescription('member:create', { nome: data.full_name }), userName);
       }
     },
   });
@@ -131,7 +131,7 @@ export function useUpdateMember() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:update', `${data.full_name} atualizado`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
       }
     },
   });
@@ -172,7 +172,7 @@ export function useDeleteMember() {
     onSuccess: (memberName) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'member:delete', `${memberName} removido`, userName);
+        logAction(wardId, user.id, user.email ?? '', 'member:delete', buildLogDescription('member:delete', { nome: memberName }), userName);
       }
     },
   });

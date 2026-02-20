@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache, onlineManager } from '@tanstack/react-query';
 import { I18nextProvider } from 'react-i18next';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
@@ -20,6 +20,11 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
       if ((mutation as any).meta?.suppressGlobalError) return;
+      const isOffline = !onlineManager.isOnline();
+      const isNetworkError = error?.message?.includes('network') ||
+                             error?.message?.includes('fetch') ||
+                             error?.message?.includes('Failed to fetch');
+      if (isOffline || isNetworkError) return;
       if (__DEV__) {
         console.error('[MutationCache] Error:', error.message);
       }
@@ -32,7 +37,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
+      networkMode: 'offlineFirst' as const,
       retry: (failureCount: number, error: any) => {
+        if (!onlineManager.isOnline()) return false;
         if (error?.status >= 400 && error?.status < 500) return false;
         return failureCount < 2;
       },

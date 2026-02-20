@@ -92,6 +92,10 @@ export function buildPresentationCards(
     });
   }
   welcomeFields.push(
+    { label: t('agenda.pianist'), value: agenda?.pianist_name ?? '', type: 'text' },
+    { label: t('agenda.conductor'), value: agenda?.conductor_name ?? '', type: 'text' },
+  );
+  welcomeFields.push(
     { label: t('agenda.openingHymn'), value: hymnLookup(agenda?.opening_hymn_id ?? null), type: 'hymn' },
     { label: t('agenda.openingPrayer'), value: agenda?.opening_prayer_name ?? '', type: 'text' },
   );
@@ -146,7 +150,7 @@ export function buildPresentationCards(
         value: agenda?.special_presentation_description ?? '',
         type: 'text',
       });
-    } else {
+    } else if (agenda?.has_intermediate_hymn !== false) {
       speechFields.push({
         label: t('agenda.intermediateHymn', 'Intermediate Hymn'),
         value: hymnLookup(agenda?.intermediate_hymn_id ?? null),

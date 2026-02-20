@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { onlineManager } from '@tanstack/react-query';
 import { isNetInfoOnline } from '../lib/connectionUtils';
 
 // Re-export pure utility for convenience
@@ -40,6 +41,7 @@ export function useConnection(): ConnectionState {
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
       const online = isNetInfoOnline(state);
       setIsOnline(online);
+      onlineManager.setOnline(online);
 
       if (!online) {
         // Show banner immediately when going offline

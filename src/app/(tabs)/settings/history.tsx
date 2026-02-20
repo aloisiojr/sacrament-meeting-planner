@@ -13,6 +13,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchInput } from '../../../components/SearchInput';
 import { useActivityLog, useActivityLogSearch } from '../../../hooks/useActivityLog';
+import { formatLogDescription } from '../../../lib/activityLog';
 import type { ActivityLog } from '../../../types/database';
 
 /**
@@ -40,6 +41,7 @@ function ActivityLogEntry({
   item: ActivityLog;
   colors: ReturnType<typeof useTheme>['colors'];
 }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.entry, { backgroundColor: colors.card }]}>
       <View style={styles.entryHeader}>
@@ -51,7 +53,7 @@ function ActivityLogEntry({
         </Text>
       </View>
       <Text style={[styles.entryDescription, { color: colors.text }]}>
-        {item.description}
+        {formatLogDescription(item.description, t)}
       </Text>
     </View>
   );

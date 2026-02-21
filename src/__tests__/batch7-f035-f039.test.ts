@@ -3,7 +3,7 @@
  *
  * F035 (CR-91): Fix RLS policy error on notification_queue (SECURITY DEFINER)
  * F036 (CR-92): Fix duplicate key error in country dropdown
- * F037 (CR-93): Change deep link protocol to sacrmeetman://
+ * F037 (CR-93): Change deep link protocol to sacrmeetplan://
  * F038 (CR-95): Fix speech fields not hiding on sunday type change
  * F039 (CR-98): Fix prayer fields not clickable
  *
@@ -272,16 +272,16 @@ describe('F036 (CR-92): Fix duplicate key error in country dropdown', () => {
 });
 
 // =============================================================================
-// F037 (CR-93): Change deep link protocol to sacrmeetman://
+// F037 (CR-93): Change deep link protocol to sacrmeetplan://
 // =============================================================================
 
-describe('F037 (CR-93): Change deep link protocol to sacrmeetman://', () => {
+describe('F037 (CR-93): Change deep link protocol to sacrmeetplan://', () => {
 
-  describe('AC-F037-01: app.json uses scheme sacrmeetman', () => {
-    it('should have scheme set to sacrmeetman in app.json', () => {
+  describe('AC-F037-01: app.json uses scheme sacrmeetplan', () => {
+    it('should have scheme set to sacrmeetplan in app.json', () => {
       const content = readProjectFile('app.json');
       const config = JSON.parse(content);
-      expect(config.expo.scheme).toBe('sacrmeetman');
+      expect(config.expo.scheme).toBe('sacrmeetplan');
     });
 
     it('should NOT contain wardmanager as scheme', () => {
@@ -291,10 +291,10 @@ describe('F037 (CR-93): Change deep link protocol to sacrmeetman://', () => {
     });
   });
 
-  describe('AC-F037-02: Edge Function uses sacrmeetman:// deep link', () => {
-    it('should contain sacrmeetman://invite/ in create-invitation Edge Function', () => {
+  describe('AC-F037-02: Edge Function uses sacrmeetplan:// deep link', () => {
+    it('should contain sacrmeetplan://invite/ in create-invitation Edge Function', () => {
       const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetman://invite/');
+      expect(content).toContain('sacrmeetplan://invite/');
     });
 
     it('should NOT contain wardmanager:// in create-invitation Edge Function', () => {
@@ -340,9 +340,9 @@ describe('F037 (CR-93): Change deep link protocol to sacrmeetman://', () => {
   });
 
   describe('EC-F037-01: Existing wardmanager:// links will not work', () => {
-    it('should only use sacrmeetman:// protocol (old links stop working by design)', () => {
+    it('should only use sacrmeetplan:// protocol (old links stop working by design)', () => {
       const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetman://invite/');
+      expect(content).toContain('sacrmeetplan://invite/');
       expect(content).not.toContain('wardmanager://');
     });
   });

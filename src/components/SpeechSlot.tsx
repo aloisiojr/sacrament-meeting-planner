@@ -1,7 +1,7 @@
 /**
  * SpeechSlot: Single speech position within a SundayCard.
- * Shows speaker field, topic field, status LED, and remove button.
- * Labels: "1o Discurso", "2o Discurso", "Ultimo Discurso" (Unicode U+00BA for ordinals).
+ * Shows speaker field, topic field, status LED on label row, and remove button.
+ * Labels: "1o Discurso", "2o Discurso", "3o Discurso" (Unicode U+00BA for ordinals).
  *
  * Permissions:
  * - Bishopric: assign/unassign speaker, assign topic, change status
@@ -141,18 +141,27 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
-      {/* Slot label */}
-      <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-
-      <View style={styles.row}>
-        {/* LED */}
-        <StatusLED
-          status={status}
-          size={16}
+      {/* Slot label with status */}
+      <View style={styles.labelRow}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+        <Pressable
+          style={styles.statusSection}
           onPress={handleStatusPress}
           disabled={isObserver || status === 'not_assigned'}
-        />
+        >
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+            {t(`speechStatus.${status}`)}
+          </Text>
+          <StatusLED
+            status={status}
+            size={14}
+            onPress={handleStatusPress}
+            disabled={isObserver || status === 'not_assigned'}
+          />
+        </Pressable>
+      </View>
 
+      <View style={styles.row}>
         {/* Speaker field */}
         <Pressable
           style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
@@ -249,7 +258,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
+  },
+  statusSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 11,
   },
   row: {
     flexDirection: 'row',
@@ -283,7 +305,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginTop: 6,
-    marginLeft: 28,
   },
   topicField: {
     flex: 1,

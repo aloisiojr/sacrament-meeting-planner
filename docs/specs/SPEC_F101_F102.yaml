@@ -1,0 +1,464 @@
+# =============================================================================
+# SPEC_F101_F102.yaml
+# Features F101-F102 / CR-155, CR-164: Multilingual password reset email via
+# Edge Function, Test suite 100% passing
+# Batch: 15 Phase 2
+# Created: 2026-02-21
+# Status: approved
+# =============================================================================
+
+type: spec
+status: approved
+batch: 15
+phase: 2
+created: "2026-02-21"
+last_updated: "2026-02-21"
+
+# =============================================================================
+# F101 / CR-155: Multilingual password reset email via Edge Function
+# =============================================================================
+
+features:
+
+  - id: F101
+    name: "Multilingual password reset email via Edge Function"
+    cr_id: 155
+    type: feature
+    priority: high
+    related_features: [F001, F088]
+
+    user_request: >
+      "O template do Supabase Dashboard aceita apenas 1 template por tipo de
+      email. Para suporte a 3 idiomas (pt-BR/en/es), sera necessario criar uma
+      Edge Function futuramente (conforme SPEC F088). Por enquanto, o template
+      em portugues atende o caso principal. --> Nao foi o que eu pedi. Eu quero
+      o email nos 3 idiomas. Implemente do melhor jeito possivel."
+
+    user_decisions:
+      - "OQ-1 (from F088): Redirect via deep link sacrmeetman://reset-password que abre no app na tela de redefinir senha."
+      - "OQ-2 (from F088): Template traduzido em 3 idiomas (pt-BR, en, es). Requer Edge Function para detectar idioma do usuario (ward.language) e enviar email no idioma correto."
+      - "Implementar OPCAO B completa (Edge Function), conforme definido em SPEC F088."
+
+    description: >
+      O Batch 14 Phase 1 implementou apenas a Opcao A (template unico em
+      portugues no Supabase Dashboard com redirectTo). O usuario quer a Opcao B
+      completa: uma Edge Function send-reset-email que recebe o email do
+      usuario, busca o idioma da ala (ward.language), gera um token de recovery
+      via supabase.auth.admin.generateLink({type:'recovery'}), e envia um email
+      com template traduzido nos 3 idiomas (pt-BR, en, es) usando fetch() para
+      a API do Resend. O forgot-password.tsx deve chamar esta Edge Function ao
+      inves de supabase.auth.resetPasswordForEmail. O email contem deep link
+      sacrmeetman://reset-password?token=TOKEN. O reset-password.tsx ja existe
+      (330 linhas) e precisa de ajustes para aceitar o token como query param
+      e trocar a senha via verifyOtp + updateUser.
+
+    context: >
+      Estado atual: forgot-password.tsx chama supabase.auth.resetPasswordForEmail
+      com redirectTo (Opcao A do Batch 14). O Supabase envia email com template
+      padrao em portugues. reset-password.tsx ja existe e escuta PASSWORD_RECOVERY
+      event. A SPEC F088 definiu a Opcao B completa que agora sera implementada.
+      O app usa scheme sacrmeetman:// (app.json:10). 8 Edge Functions existentes
+      servem como referencia (create-invitation, process-notifications, etc.).
+      process-notifications/index.ts ja tem pattern completo de i18n com
+      ward.language para 3 idiomas. O Resend e o servico de email escolhido
+      (requer RESEND_API_KEY como env var na Edge Function).
+
+    current_behavior: >
+      1. forgot-password.tsx:41 chama supabase.auth.resetPasswordForEmail(email, { redirectTo })
+      2. Supabase envia email com template em portugues configurado no Dashboard
+      3. Link no email usa o redirect padrao do Supabase (Linking.createURL)
+      4. Email em idioma unico (portugues) independente da ala do usuario
+      5. reset-password.tsx escuta PASSWORD_RECOVERY event via onAuthStateChange
+
+    expected_behavior: >
+      1. forgot-password.tsx chama Edge Function send-reset-email passando email
+      2. Edge Function busca usuario em auth.users pelo email
+      3. Edge Function busca ward.language via ward_users -> wards
+      4. Edge Function gera token via admin.generateLink({type:'recovery'})
+      5. Edge Function envia email traduzido no idioma da ala via Resend API
+      6. Email contem deep link sacrmeetman://reset-password?token=TOKEN
+      7. App abre reset-password.tsx via deep link
+      8. reset-password.tsx extrai token, chama verifyOtp para estabelecer sessao
+      9. Usuario digita nova senha, chama updateUser, senha atualizada
+
+    files_impacted:
+      - path: supabase/functions/send-reset-email/index.ts
+        action: create
+        changes:
+          - "Nova Edge Function que recebe { email } no body"
+          - "Busca usuario em auth.users via admin.listUsers com filtro por email"
+          - "Busca ward_id via ward_users, depois ward.language via wards"
+          - "Gera recovery link via supabase.auth.admin.generateLink({type:'recovery', email})"
+          - "Extrai token (hashed_token) da URL gerada"
+          - "Monta email HTML traduzido em 3 idiomas conforme ward.language"
+          - "Envia email via Resend API (fetch POST https://api.resend.com/emails)"
+          - "Link no email: sacrmeetman://reset-password?token=HASHED_TOKEN&type=recovery"
+          - "CORS headers para chamada do app"
+          - "Retorna { success: true } ou erro apropriado"
+          - "Nao revela se email existe (retorna sucesso generico sempre)"
+
+      - path: src/app/(auth)/forgot-password.tsx
+        action: modify
+        changes:
+          - "Substituir supabase.auth.resetPasswordForEmail por supabase.functions.invoke('send-reset-email', { body: { email } })"
+          - "Remover import de Linking (nao precisa mais de redirectTo)"
+          - "Manter UX identica (loading, error, success states)"
+
+      - path: src/app/(auth)/reset-password.tsx
+        action: modify
+        changes:
+          - "Adicionar suporte a receber token via deep link query params"
+          - "Usar useLocalSearchParams() para extrair token e type da URL"
+          - "Chamar supabase.auth.verifyOtp({token_hash, type:'recovery'}) para estabelecer sessao"
+          - "Manter fluxo existente de PASSWORD_RECOVERY como fallback"
+          - "Mostrar erro especifico se token invalido/expirado"
+
+    acceptance_criteria:
+      - id: AC-101-01
+        description: "Edge Function send-reset-email exists and handles POST with email"
+        given: "Edge Function send-reset-email deployed"
+        when: "POST request with { email } body is received"
+        then: >
+          Function processes the request: looks up user, determines ward language,
+          generates recovery token, sends translated email, returns { success: true }.
+          For unknown emails, returns { success: true } without sending (no email enumeration).
+
+      - id: AC-101-02
+        description: "Email sent in ward language (pt-BR)"
+        given: "User belongs to a ward with language = 'pt-BR'"
+        when: "Password reset email is sent"
+        then: >
+          Email subject: 'Redefinir senha - Gerenciador da Reuniao Sacramental'.
+          Body in Portuguese with instructions and deep link.
+
+      - id: AC-101-03
+        description: "Email sent in ward language (en)"
+        given: "User belongs to a ward with language = 'en'"
+        when: "Password reset email is sent"
+        then: >
+          Email subject: 'Reset password - Sacrament Meeting Planner'.
+          Body in English with instructions and deep link.
+
+      - id: AC-101-04
+        description: "Email sent in ward language (es)"
+        given: "User belongs to a ward with language = 'es'"
+        when: "Password reset email is sent"
+        then: >
+          Email subject: 'Restablecer contrasena - Planificador de la Reunion Sacramental'.
+          Body in Spanish with instructions and deep link.
+
+      - id: AC-101-05
+        description: "Email contains deep link with recovery token"
+        given: "Reset email is sent"
+        when: "User reads the email"
+        then: >
+          Email body contains link: sacrmeetman://reset-password?token=HASHED_TOKEN&type=recovery.
+          Link opens the app directly on the reset-password screen.
+
+      - id: AC-101-06
+        description: "forgot-password.tsx calls Edge Function instead of resetPasswordForEmail"
+        given: "User enters email on forgot-password screen"
+        when: "User taps send reset email button"
+        then: >
+          App calls supabase.functions.invoke('send-reset-email', { body: { email } })
+          instead of supabase.auth.resetPasswordForEmail. UX remains identical
+          (loading spinner, success message, error handling).
+
+      - id: AC-101-07
+        description: "reset-password.tsx accepts token from deep link"
+        given: "User taps deep link sacrmeetman://reset-password?token=TOKEN&type=recovery"
+        when: "App opens reset-password screen"
+        then: >
+          Screen extracts token and type from URL params, calls
+          supabase.auth.verifyOtp({token_hash: token, type: 'recovery'}) to
+          establish session, then shows password form.
+
+      - id: AC-101-08
+        description: "Full flow: request -> email -> deep link -> new password"
+        given: "User requested password reset and received email"
+        when: "User taps deep link, enters new password, submits"
+        then: >
+          Password is updated via supabase.auth.updateUser({ password }).
+          Success message shown. User can log in with new password.
+
+      - id: AC-101-09
+        description: "Edge Function does not reveal whether email exists"
+        given: "POST with non-existent email"
+        when: "Edge Function processes request"
+        then: >
+          Returns { success: true } (same as for existing emails).
+          No email is sent. No error indicating email not found.
+
+      - id: AC-101-10
+        description: "Edge Function handles user without ward gracefully"
+        given: "User exists in auth.users but has no ward_users entry"
+        when: "Password reset is requested"
+        then: >
+          Falls back to default language (pt-BR) and sends email.
+          Does not fail with an error.
+
+      - id: AC-101-11
+        description: "CORS headers present for app requests"
+        given: "Edge Function receives OPTIONS or POST request"
+        when: "Response is returned"
+        then: >
+          Response includes Access-Control-Allow-Origin: *,
+          Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type.
+
+      - id: AC-101-12
+        description: "Expired token shows appropriate error"
+        given: "User taps deep link with expired token (>24h old)"
+        when: "verifyOtp is called"
+        then: >
+          Error is caught. reset-password.tsx shows t('auth.resetExpired')
+          message with option to request a new reset email.
+
+    edge_cases:
+      - id: EC-101-01
+        case: "User belongs to multiple wards"
+        expected: "Use language from first ward found via ward_users (ordered by created_at ASC)."
+
+      - id: EC-101-02
+        case: "User has no ward_users entry (orphaned auth user)"
+        expected: "Fall back to pt-BR as default language."
+
+      - id: EC-101-03
+        case: "Resend API key not configured"
+        expected: "Edge Function returns 500 error. forgot-password.tsx shows generic error."
+
+      - id: EC-101-04
+        case: "Resend API returns error (rate limit, invalid email, etc.)"
+        expected: "Edge Function returns 500 error. forgot-password.tsx shows generic error."
+
+      - id: EC-101-05
+        case: "App not installed on device"
+        expected: "Deep link sacrmeetman:// does nothing. User needs app installed."
+
+      - id: EC-101-06
+        case: "Network error during Edge Function call"
+        expected: "forgot-password.tsx shows t('auth.resetFailed') error message."
+
+    implementation_notes: >
+      APPROACH: Implement OPCAO B from SPEC F088.
+      1. Create Edge Function send-reset-email following the pattern from
+         create-invitation (CORS, auth, error handling) and process-notifications
+         (i18n pattern with ward.language lookup).
+      2. The Edge Function does NOT require JWT auth (unauthenticated users
+         requesting password reset). It uses SUPABASE_SERVICE_ROLE_KEY internally.
+      3. For email sending, use Resend API via fetch():
+         POST https://api.resend.com/emails with Authorization: Bearer RESEND_API_KEY.
+         RESEND_API_KEY stored as Supabase Edge Function secret.
+      4. The generateLink API returns a URL containing the hashed token.
+         Extract the token_hash from the URL and use it in the deep link:
+         sacrmeetman://reset-password?token=TOKEN_HASH&type=recovery.
+      5. reset-password.tsx uses useLocalSearchParams() to get token and type,
+         then calls verifyOtp({token_hash, type:'recovery'}) to establish session.
+      6. Email templates are HTML strings embedded in the Edge Function code,
+         following the same pattern as process-notifications text builders.
+      7. From address: configured via RESEND_FROM_EMAIL env var
+         (e.g., "Sacrament Meeting Planner <noreply@yourdomain.com>").
+      8. The forgot-password.tsx change is minimal: replace one function call.
+         No Linking import needed anymore.
+
+# =============================================================================
+# F102 / CR-164: Test suite 100% passing
+# =============================================================================
+
+  - id: F102
+    name: "Test suite 100% passing"
+    cr_id: 164
+    type: fix
+    priority: high
+    related_features: [F037, F101]
+
+    user_request: >
+      "Rode todos os testes (unit e integration) e garanta que tudo passa 100%
+      se nao estiver, resolva os problemas"
+
+    description: >
+      Garantir que toda a suite de testes (unit e integration) passa 100%.
+      Atualmente 4344 testes passam e 2 falham em batch7-f035-f039.test.ts
+      (linhas 329/332 e 335/338) porque esperam com.wardmanager.app mas o valor
+      real em app.json e com.sacramentmeetingmanager.app. Alem disso, as mudancas
+      da F101 (CR-155) podem quebrar testes existentes de forgot-password e
+      reset-password que precisam ser atualizados.
+
+    context: >
+      Suite atual: 4344 passando, 2 falhando.
+      Falhas pre-existentes em src/__tests__/batch7-f035-f039.test.ts:
+      - Linha 329/332: espera com.wardmanager.app (iOS bundleIdentifier)
+      - Linha 335/338: espera com.wardmanager.app (Android package)
+      - Valor real em app.json: com.sacramentmeetingmanager.app
+      Testes que podem ser afetados pela F101:
+      - Testes de forgot-password que verificam chamada a resetPasswordForEmail
+      - Testes de reset-password que verificam fluxo PASSWORD_RECOVERY
+      - Novos testes necessarios para a Edge Function send-reset-email
+
+    current_behavior: >
+      1. batch7-f035-f039.test.ts linhas 329/332: expect bundleIdentifier = 'com.wardmanager.app' FAILS
+      2. batch7-f035-f039.test.ts linhas 335/338: expect package = 'com.wardmanager.app' FAILS
+      3. Total: 4344 passing, 2 failing
+      4. Testes existentes de auth podem falhar apos mudancas da F101
+
+    expected_behavior: >
+      1. batch7-f035-f039.test.ts: expect 'com.sacramentmeetingmanager.app' (matches app.json)
+      2. Todos os testes afetados pela F101 atualizados
+      3. Total: 100% passing, 0 failing
+      4. Novos testes para Edge Function send-reset-email se aplicavel
+
+    files_impacted:
+      - path: src/__tests__/batch7-f035-f039.test.ts
+        action: modify
+        changes:
+          - "Linha 329: Alterar descricao do teste para 'com.sacramentmeetingmanager.app'"
+          - "Linha 332: Alterar expect para 'com.sacramentmeetingmanager.app'"
+          - "Linha 335: Alterar descricao do teste para 'com.sacramentmeetingmanager.app'"
+          - "Linha 338: Alterar expect para 'com.sacramentmeetingmanager.app'"
+
+      - path: src/__tests__/batch14-f088-f092.test.ts
+        action: modify
+        changes:
+          - "Atualizar testes de forgot-password para verificar chamada a Edge Function"
+          - "Atualizar testes de reset-password para verificar suporte a token via query params"
+
+    acceptance_criteria:
+      - id: AC-102-01
+        description: "bundleIdentifier test expects correct value"
+        given: "app.json has ios.bundleIdentifier = 'com.sacramentmeetingmanager.app'"
+        when: "Test batch7-f035-f039.test.ts runs AC-F037-04 iOS test"
+        then: "Test expects 'com.sacramentmeetingmanager.app' and passes."
+
+      - id: AC-102-02
+        description: "Android package test expects correct value"
+        given: "app.json has android.package = 'com.sacramentmeetingmanager.app'"
+        when: "Test batch7-f035-f039.test.ts runs AC-F037-04 Android test"
+        then: "Test expects 'com.sacramentmeetingmanager.app' and passes."
+
+      - id: AC-102-03
+        description: "forgot-password tests updated for Edge Function call"
+        given: "F101 changed forgot-password.tsx to use Edge Function"
+        when: "Tests for forgot-password run"
+        then: >
+          Tests verify that supabase.functions.invoke('send-reset-email') is
+          called instead of supabase.auth.resetPasswordForEmail.
+          All forgot-password tests pass.
+
+      - id: AC-102-04
+        description: "reset-password tests updated for token handling"
+        given: "F101 changed reset-password.tsx to accept token from deep link"
+        when: "Tests for reset-password run"
+        then: >
+          Tests verify that token is extracted from URL params and
+          verifyOtp is called. All reset-password tests pass.
+
+      - id: AC-102-05
+        description: "Full test suite passes 100%"
+        given: "All fixes applied (bundleIdentifier + F101 test updates)"
+        when: "pnpm test runs all unit and integration tests"
+        then: "All tests pass. Zero failures. Exit code 0."
+
+    edge_cases:
+      - id: EC-102-01
+        case: "New tests added by F101 implementation"
+        expected: "Include in the count and ensure they pass."
+
+    implementation_notes: >
+      1. Fix 2 pre-existing failures: change 'com.wardmanager.app' to
+         'com.sacramentmeetingmanager.app' in batch7-f035-f039.test.ts
+         (4 string changes: 2 test descriptions + 2 expect values).
+      2. After F101 implementation, identify all tests that reference
+         resetPasswordForEmail or PASSWORD_RECOVERY flow and update them.
+      3. Run full test suite (pnpm test) and fix any additional failures.
+      4. This feature should be implemented AFTER F101 to capture all
+         test breakage from the Edge Function changes.
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+  - id: OQ-F101-01
+    feature: F101
+    question: "Which email address (from) should be used for Resend?"
+    status: resolved
+    resolution: >
+      Use RESEND_FROM_EMAIL env var configured as Supabase Edge Function secret.
+      Example: 'Sacrament Meeting Planner <noreply@yourdomain.com>'.
+      The user must configure this with a verified domain in Resend.
+
+  - id: OQ-F101-02
+    feature: F101
+    question: "Should the Edge Function require authentication (JWT)?"
+    status: resolved
+    resolution: >
+      No. The forgot-password flow is for unauthenticated users. The Edge
+      Function uses SUPABASE_SERVICE_ROLE_KEY internally for admin operations
+      but does not require a user JWT.
+
+  - id: OQ-F101-03
+    feature: F101
+    question: "How to extract the hashed token from generateLink response?"
+    status: resolved
+    resolution: >
+      supabase.auth.admin.generateLink({type:'recovery', email}) returns
+      { data: { properties: { hashed_token } } }. Use this hashed_token
+      directly in the deep link URL.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+  - id: AS-F101-01
+    feature: F101
+    assumption: "Resend API is the email service for this project"
+    rationale: >
+      The process-notifications Edge Function uses Expo Push for push
+      notifications. For transactional email, Resend is a common choice with
+      a free tier (100 emails/day). The user's request implies a working email
+      service. Resend API key will be configured as a Supabase secret.
+
+  - id: AS-F101-02
+    feature: F101
+    assumption: "The Supabase admin.generateLink API is available on the current plan"
+    rationale: >
+      generateLink is part of the Supabase Auth Admin API, available on all
+      plans. It generates a recovery link without sending an email, allowing
+      custom email sending.
+
+  - id: AS-F101-03
+    feature: F101
+    assumption: "reset-password.tsx can use verifyOtp with token_hash"
+    rationale: >
+      Supabase Auth supports verifyOtp({token_hash, type:'recovery'}) which
+      establishes a session from a hashed token. This is the standard approach
+      when using custom email sending with generateLink.
+
+  - id: AS-F102-01
+    feature: F102
+    assumption: "The only pre-existing test failures are the 2 bundleIdentifier tests"
+    rationale: >
+      Team lead confirmed: 4344 passing, 2 failing, both in
+      batch7-f035-f039.test.ts with com.wardmanager.app vs
+      com.sacramentmeetingmanager.app mismatch.
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+  - id: INC-01
+    description: >
+      SPEC F088 lists reset-password.tsx as action: create, but the file already
+      exists (330 lines, implemented in Batch 14). For F101, the action is modify.
+
+  - id: INC-02
+    description: >
+      SPEC F088 implementation_notes mention both Option A and Option B. Batch 14
+      implemented Option A (Supabase Dashboard template). F101 now implements
+      Option B (Edge Function with i18n), replacing Option A's approach.
+
+  - id: INC-03
+    description: >
+      The auth_screens section in SPEC_CONSOLIDATED does not list forgot-password
+      or reset-password screens. These should be added.

@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-20"
-  version: 16
-  last_updated_by: "batch-15-phase-1"
+  last_updated: "2026-02-21"
+  version: 17
+  last_updated_by: "batch-15-phase-2"
   total_phases: 6
-  total_cr_plans: 34
+  total_cr_plans: 35
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -889,6 +889,12 @@ pending_with_plan:
   - cr_id: 163
     plan_id: PLAN_P027
     description: "Placeholder 'Selecionar Discursante' em 3 idiomas"
+  - cr_id: 155
+    plan_id: PLAN_P028
+    description: "Email multilingual de reset de senha via Edge Function send-reset-email"
+  - cr_id: 164
+    plan_id: PLAN_P028
+    description: "Fix test suite 100% passing (bundleIdentifier + Edge Function flow tests)"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -910,6 +916,18 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 17
+    phase: "batch-15-phase-2"
+    changes:
+      - "Added PLAN_P028 for Batch 15 Phase 2 (F101-F102, CRs 155/164)"
+      - "2 features: multilingual password reset email via Edge Function, test suite 100% passing"
+      - "5 steps, 17 ACs, 6 ECs, 5 arquivos impactados (2 novos + 3 modificados + 3 testes)"
+      - "Zero migracoes de banco, 2 env vars necessarias (RESEND_API_KEY, RESEND_FROM_EMAIL)"
+      - "4 ADRs: ADR-070 (EF replaces Dashboard template), ADR-071 (invoke sem session guard), ADR-072 (verifyOtp token_hash), ADR-073 (Resend via fetch)"
+      - "F101 cria nova Edge Function send-reset-email com i18n templates (pt-BR/en/es)"
+      - "F101 modifica forgot-password.tsx (remove Linking, add functions.invoke) e reset-password.tsx (add useLocalSearchParams + verifyOtp)"
+      - "F102 fixa 2 testes pre-existentes (com.wardmanager.app) e atualiza testes de auth para Edge Function flow"
+      - "S01 -> S02/S03 (parallelizable) -> S04 -> S05 (sequencial: EF primeiro, client depois, testes, validacao)"
   - version: 16
     phase: "batch-15-phase-1"
     changes:
@@ -922,6 +940,29 @@ changelog:
       - "F098 supersedes F093 posicao 3 label e F058 (speeches.lastSpeech)"
       - "F099 redesigns F093 layout (LEDs de vertical column para inline)"
       - "S01 a S05 podem ser implementados em paralelo (todos independentes)"
+
+  - id: PLAN_P028
+    title: "Batch 15 Phase 2: Multilingual Password Reset Email, Test Suite Fix"
+    status: pending
+    crs_covered: [155, 164]
+    total_steps: 5
+    plan_ref: "docs/plans/PLAN_P028.yaml"
+    summary: >
+      2 features cobrindo Edge Function multilingual e test fixes: nova Edge Function
+      send-reset-email que recebe email, busca idioma da ala (ward.language), gera
+      recovery token via admin.generateLink, e envia email traduzido (pt-BR/en/es)
+      via Resend REST API com deep link sacrmeetman://reset-password?token=TOKEN
+      (F101), forgot-password.tsx substituindo resetPasswordForEmail por
+      functions.invoke('send-reset-email'), reset-password.tsx adicionando
+      useLocalSearchParams + verifyOtp para token de deep link com PASSWORD_RECOVERY
+      como fallback. Fix de 2 testes pre-existentes em batch7-f035-f039.test.ts
+      (com.wardmanager.app -> com.sacramentmeetingmanager.app), atualizacao de testes
+      batch14-phase1.test.ts para Edge Function flow, novos testes em
+      batch15-phase2.test.ts, suite completa 100% passing (F102). 2 features,
+      17 ACs, 6 ECs, 5 arquivos impactados (2 novos + 3 modificados + 3 testes),
+      zero migracoes de banco. 4 ADRs: ADR-070 (Edge Function replaces Dashboard
+      template), ADR-071 (direct invoke sem session guard), ADR-072 (verifyOtp com
+      token_hash), ADR-073 (Resend via fetch).
   - version: 15
     phase: "batch-14-phase-2"
     changes:

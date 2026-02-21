@@ -1,0 +1,572 @@
+# =============================================================================
+# ARCH_M028.yaml
+# Architecture for Batch 15 Phase 2: CR-155, CR-164 (F101-F102)
+# Features: Multilingual password reset email via Edge Function,
+#           Test suite 100% passing
+# Created: 2026-02-21
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Replace Supabase built-in password reset email (Option A from Batch 14)
+    with a custom Edge Function (Option B from SPEC F088) that sends
+    multilingual emails via Resend API. Fix pre-existing test failures
+    and update tests affected by the new flow.
+  principles:
+    - "Follow existing Edge Function patterns (create-invitation for CORS/structure, process-notifications for i18n)"
+    - "Unauthenticated endpoint (user has no session during forgot-password)"
+    - "No email enumeration (return success regardless of whether email exists)"
+    - "Minimal client-side changes (replace one API call in forgot-password.tsx)"
+    - "Deep link via sacrmeetman:// scheme (consistent with invite flow)"
+    - "Fallback to pt-BR when user has no ward association"
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  forgot-password.tsx                                            │
+  │  [User enters email] ──► supabase.functions.invoke(             │
+  │                            'send-reset-email', { body:{email} })│
+  └──────────────────────┬──────────────────────────────────────────┘
+                         │ POST (no JWT, uses ANON key)
+                         ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Edge Function: send-reset-email                                │
+  │                                                                 │
+  │  1. Receive { email } from body                                 │
+  │  2. Lookup user in auth.users via admin.listUsers({ filter })   │
+  │  3. If not found → return { success: true } (no enumeration)    │
+  │  4. Get ward_id from user.app_metadata.ward_id                  │
+  │  5. Query wards table for language (default: 'pt-BR')           │
+  │  6. Generate recovery link via admin.generateLink({             │
+  │       type: 'recovery', email })                                │
+  │  7. Extract hashed_token from response                          │
+  │  8. Build deep link: sacrmeetman://reset-password?              │
+  │       token=HASHED_TOKEN&type=recovery                          │
+  │  9. Select email template by language (pt-BR/en/es)             │
+  │ 10. Send email via Resend API (fetch POST)                      │
+  │ 11. Return { success: true }                                    │
+  └─────────────────────────────────────────────────────────────────┘
+                         │
+                    Email sent via Resend
+                         │
+                         ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  User receives email with deep link                             │
+  │  sacrmeetman://reset-password?token=TOKEN&type=recovery         │
+  └──────────────────────┬──────────────────────────────────────────┘
+                         │ User taps link
+                         ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  reset-password.tsx                                             │
+  │                                                                 │
+  │  1. useLocalSearchParams() extracts { token, type }             │
+  │  2. If token present: call verifyOtp({token_hash: token,        │
+  │       type: 'recovery'}) to establish session                   │
+  │  3. If PASSWORD_RECOVERY event (fallback): set sessionReady     │
+  │  4. User enters new password                                    │
+  │  5. Call updateUser({ password })                               │
+  │  6. Show success / navigate to login                            │
+  └─────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F101 / CR-155: Edge Function send-reset-email ---
+
+  - name: "Edge Function: send-reset-email (CREATE)"
+    file: supabase/functions/send-reset-email/index.ts
+    responsibility: >
+      Receive email address, lookup user, determine ward language,
+      generate recovery token, send translated email via Resend API.
+    dependencies:
+      - "@supabase/supabase-js@2 (Deno import)"
+      - "Resend API (external service via fetch)"
+    pattern_references:
+      - "create-invitation/index.ts: CORS headers, Response structure, error handling"
+      - "process-notifications/index.ts: i18n text builders with ward.language lookup"
+    changes:
+      - description: "Deno.serve handler with CORS preflight"
+        detail: |
+          const corsHeaders = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          };
+          OPTIONS request returns 'ok' with corsHeaders (same pattern as create-invitation).
+
+      - description: "Create Supabase admin client (service role)"
+        detail: |
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL')!,
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+            { auth: { autoRefreshToken: false, persistSession: false } }
+          );
+          No JWT verification needed -- unauthenticated endpoint.
+
+      - description: "Extract and validate email from request body"
+        detail: |
+          const { email } = await req.json();
+          if (!email || typeof email !== 'string') return 400 error.
+          Basic email format validation (same regex as create-invitation).
+
+      - description: "Lookup user in auth.users"
+        detail: |
+          Use supabaseAdmin.auth.admin.listUsers() and filter by email.
+          NOTE: listUsers returns paginated results; filter client-side
+          since admin.getUserByEmail does not exist in supabase-js@2.
+          Alternative: use listUsers({ filter: email }) -- this does
+          substring matching, then exact-match in code.
+          If user not found: return { success: true } (no enumeration).
+
+      - description: "Get ward language"
+        detail: |
+          const wardId = user.app_metadata?.ward_id;
+          if (wardId) {
+            const { data: ward } = await supabaseAdmin
+              .from('wards')
+              .select('language')
+              .eq('id', wardId)
+              .single();
+            language = ward?.language ?? 'pt-BR';
+          } else {
+            language = 'pt-BR'; // fallback for orphaned users
+          }
+
+      - description: "Generate recovery token via admin.generateLink"
+        detail: |
+          const { data: linkData, error: linkError } =
+            await supabaseAdmin.auth.admin.generateLink({
+              type: 'recovery',
+              email: user.email,
+            });
+          Extract hashed_token from linkData.properties.hashed_token.
+          Build deep link: `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`
+
+      - description: "Email templates in 3 languages (embedded)"
+        detail: |
+          function getEmailTemplate(language, deepLink):
+            Returns { subject, html } based on language.
+          Pattern follows process-notifications text builders:
+            const templates = {
+              'pt-BR': { subject: 'Redefinir senha - ...', html: '...' },
+              en: { subject: 'Reset password - ...', html: '...' },
+              es: { subject: 'Restablecer contrasena - ...', html: '...' },
+            };
+            return templates[language] ?? templates['pt-BR'];
+          HTML is minimal: heading, instruction text, CTA button with deep link.
+
+      - description: "Send email via Resend API"
+        detail: |
+          const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+          const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
+          if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) return 500 error.
+
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+              from: RESEND_FROM_EMAIL,
+              to: [user.email],
+              subject: template.subject,
+              html: template.html,
+            }),
+          });
+          If Resend returns error: return 500 error.
+
+      - description: "Return success response"
+        detail: |
+          return new Response(
+            JSON.stringify({ success: true }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+
+  # --- F101 / CR-155: forgot-password.tsx modification ---
+
+  - name: "ForgotPasswordScreen (modified for CR-155)"
+    file: src/app/(auth)/forgot-password.tsx
+    responsibility: >
+      Replace resetPasswordForEmail call with Edge Function invoke.
+      Remove Linking import (no longer needed).
+    dependencies: []
+    changes:
+      - description: "Replace API call in handleSendReset"
+        detail: |
+          REMOVE:
+            import * as Linking from 'expo-linking';
+            const redirectUrl = Linking.createURL('/(auth)/reset-password');
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+              trimmedEmail, { redirectTo: redirectUrl }
+            );
+            if (resetError) throw resetError;
+
+          ADD:
+            const { data, error: invokeError } = await supabase.functions.invoke(
+              'send-reset-email',
+              { body: { email: trimmedEmail } }
+            );
+            if (invokeError) throw invokeError;
+
+          NOTE: No session guard needed (user is not authenticated).
+          supabase.functions.invoke sends ANON key in Authorization header
+          when no session exists. This is correct for unauthenticated EFs.
+
+  # --- F101 / CR-155: reset-password.tsx modification ---
+
+  - name: "ResetPasswordScreen (modified for CR-155)"
+    file: src/app/(auth)/reset-password.tsx
+    responsibility: >
+      Add support for receiving recovery token via deep link query params.
+      Call verifyOtp to establish session from token. Keep PASSWORD_RECOVERY
+      event listener as fallback.
+    dependencies:
+      - "expo-router (useLocalSearchParams)"
+    changes:
+      - description: "Import useLocalSearchParams"
+        detail: |
+          import { useRouter, useLocalSearchParams } from 'expo-router';
+
+      - description: "Extract token and type from deep link URL"
+        detail: |
+          const { token, type } = useLocalSearchParams<{
+            token?: string;
+            type?: string;
+          }>();
+
+      - description: "Add verifyOtp flow in useEffect"
+        detail: |
+          In the existing useEffect, add token-based verification:
+
+          useEffect(() => {
+            // New: Handle deep link token
+            if (token && type === 'recovery') {
+              supabase.auth.verifyOtp({
+                token_hash: token,
+                type: 'recovery',
+              }).then(({ error }) => {
+                if (error) {
+                  setError(t('auth.resetExpired'));
+                } else {
+                  setSessionReady(true);
+                }
+              });
+              return; // Skip onAuthStateChange listener when token is present
+            }
+
+            // Existing: Listen for PASSWORD_RECOVERY event (fallback)
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+              if (event === 'PASSWORD_RECOVERY') {
+                setSessionReady(true);
+              }
+            });
+
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (session) {
+                setSessionReady(true);
+              }
+            });
+
+            return () => { subscription.unsubscribe(); };
+          }, [token, type]);
+
+          IMPORTANT: When token is present, we skip the onAuthStateChange
+          listener since verifyOtp will establish the session directly.
+
+  # --- F102 / CR-164: Test fixes ---
+
+  - name: "batch7-f035-f039.test.ts (modified for CR-164)"
+    file: src/__tests__/batch7-f035-f039.test.ts
+    responsibility: "Fix bundleIdentifier assertions to match app.json"
+    dependencies: []
+    changes:
+      - description: "Fix 4 string occurrences"
+        detail: |
+          Lines 329, 332: Change 'com.wardmanager.app' to 'com.sacramentmeetingmanager.app'
+          Lines 335, 338: Change 'com.wardmanager.app' to 'com.sacramentmeetingmanager.app'
+          2 test descriptions + 2 expect values.
+
+  - name: "batch14-f088-f092.test.ts (modified for CR-164)"
+    file: src/__tests__/batch14-f088-f092.test.ts
+    responsibility: "Update forgot-password and reset-password tests for new Edge Function flow"
+    dependencies: []
+    changes:
+      - description: "Update forgot-password tests"
+        detail: |
+          Change mock expectations from:
+            supabase.auth.resetPasswordForEmail(email, { redirectTo })
+          To:
+            supabase.functions.invoke('send-reset-email', { body: { email } })
+
+          Remove mock for Linking.createURL if present.
+
+      - description: "Update reset-password tests"
+        detail: |
+          Add test cases for:
+          - Token received via useLocalSearchParams
+          - verifyOtp called with token_hash and type='recovery'
+          - Expired/invalid token shows error message
+          Keep existing PASSWORD_RECOVERY event tests as fallback path tests.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - name: "send-reset-email Edge Function API"
+    component: supabase/functions/send-reset-email/index.ts
+    methods:
+      - name: "POST /send-reset-email"
+        input: "{ email: string }"
+        output: "{ success: true } (200) | { error: string } (400/500)"
+        auth: "None (ANON key only, no JWT required)"
+        notes: |
+          Always returns { success: true } for valid email format,
+          even if email not found in auth.users (anti-enumeration).
+          400: missing or invalid email format.
+          500: Resend API failure or missing env vars.
+
+      - name: "OPTIONS /send-reset-email (CORS preflight)"
+        input: "none"
+        output: "'ok' with CORS headers"
+
+  - name: "forgot-password.tsx handleSendReset"
+    component: src/app/(auth)/forgot-password.tsx
+    methods:
+      - name: "handleSendReset"
+        input: "email (from state)"
+        output: "Sets success=true or error message"
+        calls: "supabase.functions.invoke('send-reset-email', { body: { email } })"
+
+  - name: "reset-password.tsx token handling"
+    component: src/app/(auth)/reset-password.tsx
+    methods:
+      - name: "useEffect (token path)"
+        input: "token: string, type: 'recovery' (from useLocalSearchParams)"
+        output: "Sets sessionReady=true or error message"
+        calls: "supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' })"
+
+      - name: "useEffect (fallback path)"
+        input: "PASSWORD_RECOVERY event from onAuthStateChange"
+        output: "Sets sessionReady=true"
+        notes: "Fallback for Supabase Dashboard template flow (if still configured)"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  migrations: []
+  notes: >
+    No database schema changes required. The Edge Function uses existing
+    tables (wards for language lookup) and Supabase Auth Admin API
+    (listUsers, generateLink). No new tables, columns, or migrations.
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+
+environment:
+  edge_function_secrets:
+    - name: RESEND_API_KEY
+      description: "API key for Resend email service"
+      required: true
+      scope: "send-reset-email Edge Function"
+
+    - name: RESEND_FROM_EMAIL
+      description: "Sender email address (must be verified domain in Resend)"
+      required: true
+      scope: "send-reset-email Edge Function"
+      example: "Sacrament Meeting Planner <noreply@yourdomain.com>"
+
+    - name: SUPABASE_URL
+      description: "Supabase project URL (auto-provided by Supabase)"
+      required: true
+      scope: "All Edge Functions"
+
+    - name: SUPABASE_SERVICE_ROLE_KEY
+      description: "Service role key for admin API access (auto-provided by Supabase)"
+      required: true
+      scope: "All Edge Functions"
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    1. UNAUTHENTICATED ENDPOINT: send-reset-email does not require JWT.
+       This is intentional -- users requesting password reset have no session.
+       Pattern consistent with register-first-user and register-invited-user
+       which also accept unauthenticated requests.
+
+    2. ANTI-ENUMERATION: The Edge Function returns { success: true } regardless
+       of whether the email exists in auth.users. This prevents attackers from
+       discovering valid email addresses.
+
+    3. SERVICE ROLE KEY: Used internally by the Edge Function for admin.listUsers
+       and admin.generateLink. Never exposed to the client.
+
+    4. RATE LIMITING: No custom rate limiting implemented. Relies on:
+       - Supabase Edge Function rate limits (per-project)
+       - Resend API rate limits (100 emails/day on free tier)
+       For production, consider adding IP-based rate limiting.
+
+    5. TOKEN SECURITY: The hashed_token from generateLink is a one-time-use
+       token that expires after 24 hours (Supabase default). It is transmitted
+       via deep link URL, not stored anywhere.
+
+    6. CORS: Wide open (Access-Control-Allow-Origin: *) since the Edge Function
+       is called from a mobile app (not a browser). Same pattern as all other EFs.
+
+# =============================================================================
+# I18N
+# =============================================================================
+
+i18n:
+  existing_keys_reused:
+    - "auth.emailRequired"
+    - "auth.resetFailed"
+    - "auth.resetEmailSent"
+    - "auth.backToLogin"
+    - "auth.resetExpired"
+    - "auth.resetPasswordTitle"
+    - "auth.passwordMinLength"
+    - "auth.passwordMismatch"
+    - "auth.passwordUpdated"
+    - "auth.updatePassword"
+    - "auth.newPassword"
+    - "auth.confirmPassword"
+
+  new_keys: []
+  notes: >
+    All required i18n keys already exist from Batch 14 (CR-145/F088).
+    No new client-side i18n keys needed.
+    Edge Function email templates use hardcoded translated strings
+    (same pattern as process-notifications text builders).
+
+  edge_function_email_subjects:
+    pt-BR: "Redefinir senha - Gerenciador da Reuniao Sacramental"
+    en: "Reset password - Sacrament Meeting Planner"
+    es: "Restablecer contrasena - Planificador de la Reunion Sacramental"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-070
+    title: "Supersede ADR-064: Edge Function replaces Supabase Dashboard email template for password reset"
+    context: >
+      ADR-064 (from CR-145/F088) customized the Supabase Dashboard email
+      template and added redirectTo with Linking.createURL(). The user wants
+      multilingual emails which requires an Edge Function (Option B from
+      SPEC F088). The Dashboard template only supports a single language.
+    decision: >
+      Create Edge Function send-reset-email that handles the entire
+      password reset email flow: user lookup, language detection,
+      token generation via admin.generateLink, and email sending via
+      Resend API. The Dashboard email template is no longer used for
+      password reset. forgot-password.tsx calls the Edge Function
+      instead of resetPasswordForEmail.
+    supersedes: "ADR-064 (full -- Edge Function replaces Dashboard template entirely)"
+    decided_in: "CR-155"
+    consequences:
+      - "Full control over email content, styling, and language"
+      - "Requires Resend API key and verified sender domain"
+      - "ADR-019 flow (resetPasswordForEmail) fully superseded"
+      - "Dashboard password reset template becomes unused (can be kept as documentation)"
+
+  - id: ADR-071
+    title: "Direct supabase.functions.invoke without session guard for unauthenticated Edge Functions"
+    context: >
+      callEdgeFunction (defined in users.tsx, ADR-024) validates session
+      before calling invoke to prevent ANON key fallback. But send-reset-email
+      is intentionally unauthenticated -- the user has no session.
+    decision: >
+      Call supabase.functions.invoke directly in forgot-password.tsx,
+      bypassing callEdgeFunction. The SDK sends the ANON key in the
+      Authorization header when no session exists, which is the correct
+      behavior for unauthenticated Edge Functions. This is the same
+      pattern used by register-first-user and register-invited-user
+      (both called from auth screens without session).
+    decided_in: "CR-155"
+    consequences:
+      - "No session guard prevents the call from succeeding"
+      - "ANON key is sufficient for Edge Function gateway access"
+      - "Edge Function uses SERVICE_ROLE_KEY internally for admin operations"
+      - "Consistent with existing auth screen patterns (register flows)"
+
+  - id: ADR-072
+    title: "verifyOtp with token_hash for deep link token-based session establishment"
+    context: >
+      reset-password.tsx currently relies on PASSWORD_RECOVERY event from
+      onAuthStateChange, which works with Supabase's built-in redirect flow.
+      With the new Edge Function approach, the email contains a deep link
+      with a hashed_token. The app needs to establish a session from this token.
+    decision: >
+      Use supabase.auth.verifyOtp({ token_hash, type: 'recovery' }) to
+      establish the session when token is present in URL params. This is
+      the standard Supabase approach for custom email flows using
+      admin.generateLink. Keep the PASSWORD_RECOVERY event listener
+      as a fallback path (in case the user somehow triggers the old flow
+      or for backward compatibility).
+    decided_in: "CR-155"
+    consequences:
+      - "Session established from token without browser redirect"
+      - "Token is one-time-use (Supabase enforced)"
+      - "Expired tokens handled gracefully (verifyOtp returns error)"
+      - "Dual-path approach ensures backward compatibility"
+
+  - id: ADR-073
+    title: "Resend API via fetch instead of SDK for Edge Function email sending"
+    context: >
+      Need to send transactional email from Deno-based Edge Function.
+      Options: (a) Resend Node SDK, (b) Resend REST API via fetch,
+      (c) SMTP via nodemailer. Deno runtime limits Node module compatibility.
+    decision: >
+      Use Resend REST API via native fetch(). POST to
+      https://api.resend.com/emails with Authorization: Bearer RESEND_API_KEY.
+      This avoids any SDK compatibility issues with Deno and keeps the
+      dependency footprint minimal (only @supabase/supabase-js import).
+    decided_in: "CR-155"
+    consequences:
+      - "Zero additional imports (fetch is built into Deno)"
+      - "Simple request/response pattern"
+      - "Error handling via HTTP status codes"
+      - "Same pattern as process-notifications sending to Expo Push API"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - Edge Function logs (console.error) for failures: user lookup errors,
+      generateLink errors, Resend API errors.
+    - Resend API provides its own delivery tracking dashboard.
+    - No client-side logging changes needed.
+    - Error states surfaced to user via existing i18n error messages.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M028.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED atualizado
+  GATE-07: true  # ARCH_SUMMARY preenchido com status correto
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (5 component entries)

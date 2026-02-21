@@ -6,12 +6,12 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-20"
-  last_updated_by: "batch-15-phase-1"
+  last_updated: "2026-02-21"
+  last_updated_by: "batch-15-phase-2"
   total_modules: 8
-  total_adrs: 60
-  total_crs_implemented: 93
-  pending_arch: "ARCH_M027 (batch-15-phase-1: CR-156 to CR-163)"
+  total_adrs: 64
+  total_crs_implemented: 95
+  pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
     - docs/arch/history/ARCH_M001.md through ARCH_M008.md
@@ -34,6 +34,7 @@ metadata:
     - docs/arch/ARCH_M025.yaml
     - docs/arch/ARCH_M026.yaml
     - docs/arch/ARCH_M027.yaml
+    - docs/arch/ARCH_M028.yaml
 
 # =============================================================================
 # TECH STACK
@@ -56,7 +57,7 @@ tech_stack:
   file_system: "expo-file-system v19 (new File/Paths API)"
   notifications: "Expo Push Notifications"
   storage: "AsyncStorage (offline queue, theme preference)"
-  deep_links: "expo-linking (sacrmeetman://invite/{token})"
+  deep_links: "expo-linking (sacrmeetman://invite/{token}, sacrmeetman://reset-password?token=...&type=recovery)"
   csv: "expo-document-picker + expo-file-system + expo-sharing"
 
 # =============================================================================
@@ -102,7 +103,7 @@ system_diagram: |
   │                     Supabase Backend                              │
   │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
   │  │   Auth   │  │ PostgREST│  │ Realtime │  │ Edge Functions │  │
-  │  │  (JWT)   │  │  (CRUD)  │  │  (WS)    │  │ 8 functions    │  │
+  │  │  (JWT)   │  │  (CRUD)  │  │  (WS)    │  │ 9 functions    │  │
   │  └──────────┘  └──────────┘  └──────────┘  │ 1 push cron    │  │
   │                                             └────────────────┘  │
   │  ┌──────────────────────────────────────────────────────────┐   │
@@ -145,11 +146,12 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023]
+    spec_features: [F001, F018, F023, F101]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
       - src/app/(auth)/forgot-password.tsx
+      - src/app/(auth)/reset-password.tsx
       - src/app/(auth)/invite/[token].tsx
       - src/app/(tabs)/settings/users.tsx
       - src/contexts/AuthContext.tsx
@@ -160,6 +162,7 @@ modules:
       - LoginScreen (login.tsx)
       - RegisterScreen (register.tsx)
       - ForgotPasswordScreen (forgot-password.tsx)
+      - ResetPasswordScreen (reset-password.tsx)
       - InviteRegistrationScreen (invite/[token].tsx)
       - UserManagementScreen (users.tsx)
     edge_functions:
@@ -170,7 +173,8 @@ modules:
       - update-user-role
       - update-user-name
       - delete-user
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145]
+      - send-reset-email
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -178,6 +182,8 @@ modules:
       CR-81 adicionou campo full_name no registro e edicao de nome.
       CR-80 adicionou back button na tela Users.
       CR-145/F088: forgot-password.tsx adiciona redirectTo com Linking.createURL() para deep link correto.
+      CR-155/F101: forgot-password.tsx chama Edge Function send-reset-email em vez de resetPasswordForEmail.
+      reset-password.tsx suporta token via deep link query params (verifyOtp) com fallback para PASSWORD_RECOVERY event.
       AuthContext expoe: session, user, role, wardId, userName, loading, signIn, signOut, hasPermission.
 
   - id: M002
@@ -1103,6 +1109,47 @@ adrs:
       - "Simpler getPositionLabel (no branching)"
       - "Context-appropriate labels: Speeches/Home tabs show '3o Discurso', Agenda shows 'Ultimo Discurso'"
 
+  - id: ADR-070
+    title: "Supersede ADR-064: Edge Function replaces Supabase Dashboard email template for password reset"
+    context: "ADR-064 customized the Supabase Dashboard email template. User wants multilingual emails requiring Edge Function (Option B from SPEC F088)."
+    decision: "Create Edge Function send-reset-email for user lookup, language detection, token generation via admin.generateLink, and email sending via Resend API. forgot-password.tsx calls Edge Function instead of resetPasswordForEmail."
+    supersedes: "ADR-064 (full -- Edge Function replaces Dashboard template entirely)"
+    decided_in: "CR-155"
+    consequences:
+      - "Full control over email content, styling, and language"
+      - "Requires Resend API key and verified sender domain"
+      - "ADR-019 flow (resetPasswordForEmail) fully superseded"
+
+  - id: ADR-071
+    title: "Direct supabase.functions.invoke without session guard for unauthenticated Edge Functions"
+    context: "callEdgeFunction (ADR-024) validates session before invoke. send-reset-email is intentionally unauthenticated."
+    decision: "Call supabase.functions.invoke directly in forgot-password.tsx. SDK sends ANON key when no session exists. Same pattern as register-first-user and register-invited-user."
+    decided_in: "CR-155"
+    consequences:
+      - "No session guard prevents the call from succeeding"
+      - "ANON key is sufficient for Edge Function gateway access"
+      - "Consistent with existing auth screen patterns (register flows)"
+
+  - id: ADR-072
+    title: "verifyOtp with token_hash for deep link token-based session establishment"
+    context: "reset-password.tsx relied on PASSWORD_RECOVERY event from onAuthStateChange. New Edge Function flow uses deep link with hashed_token."
+    decision: "Use supabase.auth.verifyOtp({ token_hash, type: 'recovery' }) when token present in URL params. Keep PASSWORD_RECOVERY event listener as fallback."
+    decided_in: "CR-155"
+    consequences:
+      - "Session established from token without browser redirect"
+      - "Token is one-time-use (Supabase enforced)"
+      - "Expired tokens handled gracefully (verifyOtp returns error)"
+      - "Dual-path approach ensures backward compatibility"
+
+  - id: ADR-073
+    title: "Resend API via fetch instead of SDK for Edge Function email sending"
+    context: "Need to send transactional email from Deno-based Edge Function. Deno runtime limits Node module compatibility."
+    decision: "Use Resend REST API via native fetch(). POST to https://api.resend.com/emails. Zero additional imports beyond @supabase/supabase-js."
+    decided_in: "CR-155"
+    consequences:
+      - "Zero additional imports (fetch is built into Deno)"
+      - "Same pattern as process-notifications sending to Expo Push API"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1307,6 +1354,13 @@ edge_functions:
     trigger: "Cron every 1 minute"
     behavior: "Processes pending notification_queue entries, groups designations by sunday, sends via Expo Push API."
 
+  - name: send-reset-email
+    auth: "None (unauthenticated, ANON key only)"
+    input: "{email}"
+    behavior: "Looks up user, determines ward language, generates recovery token via admin.generateLink, sends translated email via Resend API with deep link sacrmeetman://reset-password?token=...&type=recovery."
+    verify_jwt: false
+    added_in: "CR-155"
+
 # =============================================================================
 # ROLES AND PERMISSIONS
 # =============================================================================
@@ -1360,7 +1414,7 @@ security:
     provider: "Supabase Auth (email/password)"
     session: "JWT with app_metadata (role, ward_id, full_name)"
     token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
-    password_reset: "Supabase built-in resetPasswordForEmail (CR-67). CR-145/F088: adds redirectTo with deep link, supersedes ADR-019 template clause."
+    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API, deep link with verifyOtp token."
 
   authorization:
     rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"

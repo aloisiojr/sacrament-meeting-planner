@@ -15,7 +15,8 @@
 # CR-140, CR-141, CR-142, CR-143, CR-144 (PRE+POST),
 # CR-145, CR-146, CR-147, CR-148, CR-149 (PRE+POST),
 # CR-150, CR-151, CR-152, CR-153 (PRE+POST),
-# CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163 (PRE+POST)
+# CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163 (PRE+POST),
+# CR-155, CR-164 (PRE+POST)
 # Updated: 2026-02-21
 # =============================================================================
 
@@ -7315,3 +7316,314 @@ batch15_phase1_regression:
         rows (lines 355-387). Expanded state renders SundayTypeDropdown + children
         (lines 393-406). speeches.tsx renders SpeechSlot components as children when
         expanded (lines 312-328). All prop flows intact.
+
+# #############################################################################
+# CR-155: Multilingual password reset email via Edge Function (F101)
+# #############################################################################
+
+cr_155:
+  cr_id: CR-155
+  title: "Multilingual password reset email via Edge Function"
+  type: feature
+  spec: specs/SPEC_F101_F102.yaml
+  qa_plan: qa/QA_PLAN_017.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      All preconditions confirmed: SPEC F088 OPCAO B defined, forgot-password.tsx
+      and reset-password.tsx exist, deep link scheme configured, Edge Function
+      patterns available, i18n patterns in process-notifications. Implementable.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 73d73ab
+        message: "feat(edge-function): create send-reset-email with multilingual templates via Resend API (F101, CR-155)"
+      - hash: 7a369cc
+        message: "feat(auth): replace resetPasswordForEmail with Edge Function invoke (F101, CR-155)"
+      - hash: 6d6bb1a
+        message: "feat(auth): add deep link token handling with verifyOtp in reset-password (F101, CR-155)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 43
+    tester_tests_total: 43
+    tester_suite_passed: 4444
+    tester_suite_total: 4444
+
+    must_pass_results:
+      - id: VC-155-01
+        description: "Edge Function send-reset-email/index.ts exists"
+        status: PASSED
+        evidence: |
+          supabase/functions/send-reset-email/index.ts exists (255 lines).
+          Uses Deno.serve handler at line 85.
+
+      - id: VC-155-02
+        description: "Edge Function accepts email in request body"
+        status: PASSED
+        evidence: |
+          Line 97: const { email } = await req.json();
+          Lines 100-118: Validates email presence, type, and format.
+
+      - id: VC-155-03
+        description: "Edge Function looks up user ward and language"
+        status: PASSED
+        evidence: |
+          Line 122-126: Looks up user via admin.listUsers, finds by email.
+          Line 153: Gets wardId from user.app_metadata?.ward_id.
+          Lines 155-160: Queries wards table for language.
+          Line 152: Default language = 'pt-BR' if no ward found.
+
+      - id: VC-155-04
+        description: "Edge Function generates recovery link via admin API"
+        status: PASSED
+        evidence: |
+          Lines 164-168: supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery', email: user.email!
+          })
+          Lines 181-191: Extracts hashed_token from linkData.properties.
+
+      - id: VC-155-05
+        description: "Edge Function has email templates in 3 languages (pt-BR, en, es)"
+        status: PASSED
+        evidence: |
+          Function getEmailTemplate (lines 14-83) defines templates object
+          with keys 'pt-BR', 'en', 'es'. Each has subject and html fields.
+          Line 82: Fallback to pt-BR for unknown languages.
+
+      - id: VC-155-06
+        description: "Email subject contains app name in correct language"
+        status: PASSED
+        evidence: |
+          Line 20: pt-BR: 'Redefinir senha - Gerenciador da Reuniao Sacramental'
+          Line 40: en: 'Reset password - Sacrament Meeting Planner'
+          Lines 60-61: es: 'Restablecer contrasena - Planificador de la Reunion Sacramental'
+
+      - id: VC-155-07
+        description: "Email body contains deep link with token"
+        status: PASSED
+        evidence: |
+          Line 194: const deepLink = `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`;
+          Lines 28, 48, 69: Each template has <a href="${deepLink}"> CTA button.
+
+      - id: VC-155-08
+        description: "Edge Function sends email via external service (Resend)"
+        status: PASSED
+        evidence: |
+          Lines 215-227: fetch('https://api.resend.com/emails', { method: 'POST', ... })
+          with Authorization: Bearer ${RESEND_API_KEY}.
+          Sends from, to, subject, html fields.
+
+      - id: VC-155-09
+        description: "Edge Function has CORS headers"
+        status: PASSED
+        evidence: |
+          Lines 8-12: corsHeaders with Access-Control-Allow-Origin: '*' and
+          Access-Control-Allow-Headers: 'authorization, x-client-info, apikey, content-type'.
+          Lines 86-88: OPTIONS handler returns 'ok' with corsHeaders.
+
+      - id: VC-155-10
+        description: "Edge Function handles non-existent email gracefully"
+        status: PASSED
+        evidence: |
+          Lines 143-149: If user not found, returns { success: true } with status 200.
+          No error message reveals whether email exists (anti-enumeration).
+
+      - id: VC-155-11
+        description: "forgot-password.tsx calls send-reset-email Edge Function"
+        status: PASSED
+        evidence: |
+          src/app/(auth)/forgot-password.tsx lines 39-42:
+            const { data, error: invokeError } = await supabase.functions.invoke(
+              'send-reset-email',
+              { body: { email: trimmedEmail } }
+            );
+
+      - id: VC-155-12
+        description: "forgot-password.tsx no longer calls resetPasswordForEmail"
+        status: PASSED
+        evidence: |
+          Grep for resetPasswordForEmail in forgot-password.tsx: No matches found.
+          The file no longer imports or references resetPasswordForEmail.
+
+      - id: VC-155-14
+        description: "reset-password.tsx handles token from deep link"
+        status: PASSED
+        evidence: |
+          Line 13: import { useRouter, useLocalSearchParams } from 'expo-router';
+          Lines 22-25: const { token, type } = useLocalSearchParams<{
+            token?: string; type?: string;
+          }>();
+          Lines 36-47: if (token && type === 'recovery') {
+            supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' })
+            .then(({ error }) => { ... setSessionReady(true); });
+            return; // Skip onAuthStateChange listener
+          }
+          Lines 50-64: PASSWORD_RECOVERY fallback remains for legacy flow.
+
+      - id: VC-155-15
+        description: "Edge Function defaults to pt-BR when ward language not found"
+        status: PASSED
+        evidence: |
+          Line 152: let language = 'pt-BR'; (initial default)
+          Line 154: if (wardId) { ... } (only queries wards if wardId exists)
+          Line 160: language = ward?.language ?? 'pt-BR'; (fallback for null language)
+          Line 82: templates[language] ?? templates['pt-BR']; (fallback for unknown language)
+
+      - id: VC-155-16
+        description: "Edge Function uses SUPABASE_SERVICE_ROLE_KEY for admin operations"
+        status: PASSED
+        evidence: |
+          Lines 91-95: supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            { auth: { autoRefreshToken: false, persistSession: false } }
+          )
+
+    should_pass_results:
+      - id: VC-155-13
+        description: "forgot-password.tsx no longer needs Linking.createURL"
+        status: PASSED
+        evidence: |
+          Grep for 'Linking', 'expo-linking', 'resetPasswordForEmail' in
+          forgot-password.tsx: No matches found. The import of expo-linking
+          and usage of Linking.createURL have been removed.
+
+# #############################################################################
+# CR-164: Test suite 100% passing (F102)
+# #############################################################################
+
+cr_164:
+  cr_id: CR-164
+  title: "Test suite 100% passing"
+  type: fix
+  spec: specs/SPEC_F101_F102.yaml
+  qa_plan: qa/QA_PLAN_017.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      2 failing tests identified in batch7-f035-f039.test.ts: bundleIdentifier
+      tests expect com.wardmanager.app but actual is com.sacramentmeetingmanager.app.
+      Simple string replacement fix. Additional test updates needed from CR-155.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 8c78046
+        message: "test(batch15): fix bundleIdentifier tests and update auth tests for Edge Function flow (F102, CR-164)"
+      - hash: 565e1db
+        message: "fix(tests): update cr004-f007 forgot-password test for Edge Function flow (F102, CR-164)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 43
+    tester_tests_total: 43
+    tester_suite_passed: 4444
+    tester_suite_total: 4444
+
+    must_pass_results:
+      - id: VC-164-01
+        description: "batch7-f035-f039.test.ts bundleIdentifier test updated"
+        status: PASSED
+        evidence: |
+          Line 329: it('should have ios.bundleIdentifier as com.sacramentmeetingmanager.app')
+          Line 332: expect(config.expo.ios.bundleIdentifier).toBe('com.sacramentmeetingmanager.app');
+          Previously expected 'com.wardmanager.app'. Now matches app.json.
+
+      - id: VC-164-02
+        description: "batch7-f035-f039.test.ts android.package test updated"
+        status: PASSED
+        evidence: |
+          Line 335: it('should have android.package as com.sacramentmeetingmanager.app')
+          Line 338: expect(config.expo.android.package).toBe('com.sacramentmeetingmanager.app');
+          Previously expected 'com.wardmanager.app'. Now matches app.json.
+
+      - id: VC-164-03
+        description: "Existing tests for forgot-password updated for Edge Function"
+        status: PASSED
+        evidence: |
+          cr004-f007-auth-fixes.test.ts line 521: Updated from 'should call resetPasswordForEmail'
+          to 'should call Edge Function send-reset-email'. Now asserts:
+            expect(source).toContain("functions.invoke");
+            expect(source).toContain("'send-reset-email'");
+          batch14-phase1.test.ts AC-088-02 section updated: Tests now verify
+          functions.invoke, send-reset-email, absence of expo-linking, email in body.
+
+      - id: VC-164-04
+        description: "Existing tests for F088 updated for Edge Function approach"
+        status: PASSED
+        evidence: |
+          batch14-phase1.test.ts:
+          - AC-088-02: Updated from Linking.createURL tests to Edge Function invoke tests.
+            Verifies: functions.invoke, send-reset-email, body: { email }.
+            Tests absence of expo-linking import.
+          - EC-088-03: Added tests for useLocalSearchParams, verifyOtp, token_hash,
+            PASSWORD_RECOVERY fallback.
+
+      - id: VC-164-05
+        description: "Full test suite passes with 0 failures"
+        status: PASSED
+        evidence: |
+          vitest run output: 76 test files, 4444 tests passed, 0 failed.
+          Duration: 2.31s. Exit code: 0.
+          Previous baseline: 4344 passing, 2 failing (4346 total).
+          New total: 4444 passing (+100 net: +2 fixed + 43 tester + other updates).
+
+      - id: VC-164-06
+        description: "New tests added for Edge Function send-reset-email"
+        status: PASSED
+        evidence: |
+          src/__tests__/batch15-phase2.test.ts (673 lines, 43 tests):
+          - F101 Edge Function: 37 tests covering structure, CORS, i18n templates,
+            anti-enumeration, ward language lookup, recovery token, Resend API,
+            deep link format, error handling, email validation, client-side changes.
+          - F102 bundleIdentifier: 6 tests verifying fix and test update propagation.
+
+# #############################################################################
+# Batch 15 Phase 2 - Cross-cutting regression checks
+# #############################################################################
+
+batch15_phase2_regression:
+  regression_results:
+    - id: VC-REGR-01
+      description: "reset-password.tsx still functions correctly after changes"
+      status: PASSED
+      evidence: |
+        reset-password.tsx (349 lines):
+        - Password validation: length >= 6 (line 77), match check (line 82)
+        - supabase.auth.updateUser({ password }) at line 91
+        - Success state with auth.passwordUpdated message (line 157)
+        - Error handling with auth.resetExpired for both verifyOtp and updateUser errors
+        - Back to login navigation via router.replace('/(auth)/login') (line 108)
+        - SessionReady state controls form display (line 111)
+        - PASSWORD_RECOVERY fallback preserved (lines 50-64)
+
+    - id: VC-REGR-02
+      description: "Login screen forgot password link still navigates correctly"
+      status: PASSED
+      evidence: |
+        login.tsx line 160: onPress={() => router.push('/(auth)/forgot-password')}
+        Line 166: t('auth.forgotPassword') - translation key unchanged.
+        Lines 253, 257: forgotPasswordLink and forgotPasswordText styles present.
+
+    - id: VC-REGR-03
+      description: "No existing Edge Functions broken"
+      status: PASSED
+      evidence: |
+        git diff --stat HEAD~8..HEAD on all 8 existing Edge Functions:
+        create-invitation, process-notifications, delete-user, register-first-user,
+        register-invited-user, update-user-name, update-user-role, list-users.
+        Result: empty (no changes). Only send-reset-email is new.

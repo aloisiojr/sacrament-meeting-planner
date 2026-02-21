@@ -80,8 +80,8 @@ export function buildPresentationCards(
   if (agenda?.recognized_names?.length) {
     welcomeFields.push({
       label: t('agenda.recognizing'),
-      value: agenda.recognized_names.join(', '),
-      type: 'text',
+      value: agenda.recognized_names.join('\n'),
+      type: 'multiline',
     });
   }
   if (agenda?.announcements) {
@@ -99,7 +99,7 @@ export function buildPresentationCards(
     { label: t('agenda.openingHymn'), value: hymnLookup(agenda?.opening_hymn_id ?? null), type: 'hymn' },
     { label: t('agenda.openingPrayer'), value: agenda?.opening_prayer_name ?? '', type: 'text' },
   );
-  cards.push({ title: t('agenda.presiding'), fields: welcomeFields });
+  cards.push({ title: t('agenda.sectionWelcome'), fields: welcomeFields });
 
   // Card 2: Designations & Sacrament
   const designationFields: PresentationField[] = [];
@@ -129,7 +129,7 @@ export function buildPresentationCards(
     value: hymnLookup(agenda?.sacrament_hymn_id ?? null),
     type: 'hymn',
   });
-  cards.push({ title: t('agenda.wardBusiness'), fields: designationFields });
+  cards.push({ title: t('agenda.sectionSacrament'), fields: designationFields });
 
   if (!isSpecial) {
     // Card 3: Speeches 1+2
@@ -157,7 +157,7 @@ export function buildPresentationCards(
         type: 'hymn',
       });
     }
-    cards.push({ title: t('speeches.title'), fields: speechFields });
+    cards.push({ title: t('agenda.sectionFirstSpeeches'), fields: speechFields });
 
     // Card 4: Last Speech
     const speech3 = speeches.find((s) => s.position === 3);
@@ -167,7 +167,7 @@ export function buildPresentationCards(
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
       { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];
-    cards.push({ title: t('agenda.closingHymn'), fields: lastFields });
+    cards.push({ title: t('agenda.sectionLastSpeech'), fields: lastFields });
   } else {
     // Card 3: Special Meeting (closing)
     const specialFields: PresentationField[] = [

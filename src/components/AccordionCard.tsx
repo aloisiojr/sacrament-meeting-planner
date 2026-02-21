@@ -33,6 +33,7 @@ export interface AccordionCardConfig {
 export interface AccordionCardProps {
   cards: AccordionCardConfig[];
   initialExpanded?: number;
+  cardTitleFontSize?: number;
 }
 
 // --- Constants ---
@@ -41,7 +42,7 @@ const COLLAPSED_HEIGHT = 48;
 
 // --- Component ---
 
-export function AccordionCard({ cards, initialExpanded = 0 }: AccordionCardProps) {
+export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }: AccordionCardProps) {
   const { colors } = useTheme();
   const [expandedIndex, setExpandedIndex] = useState(initialExpanded);
 
@@ -82,20 +83,22 @@ export function AccordionCard({ cards, initialExpanded = 0 }: AccordionCardProps
               <Text
                 style={[
                   styles.cardTitle,
-                  { color: isExpanded ? colors.onPrimary : colors.text },
+                  { color: isExpanded ? colors.onPrimary : colors.text, fontSize: cardTitleFontSize ?? 16 },
                 ]}
                 numberOfLines={1}
               >
                 {card.title}
               </Text>
-              <Text
-                style={[
-                  styles.chevron,
-                  { color: isExpanded ? colors.onPrimary : colors.textSecondary },
-                ]}
-              >
-                {isExpanded ? '\u25B2' : '\u25BC'}
-              </Text>
+              {!isExpanded && (
+                <Text
+                  style={[
+                    styles.chevron,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {index < expandedIndex ? '\u25BC' : '\u25B2'}
+                </Text>
+              )}
             </Pressable>
 
             {isExpanded && (

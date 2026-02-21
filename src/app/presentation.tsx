@@ -88,8 +88,8 @@ export default function PresentationScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
         <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: colors.text, fontSize: fontSizes.headerTitle }]}>
-            {t('home.startMeeting')}
+          <Text style={[styles.headerTitle, { color: colors.text, fontSize: 19 }]}>
+            {t('presentation.title')}
           </Text>
           <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
             {dateLabel}

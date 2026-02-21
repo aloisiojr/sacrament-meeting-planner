@@ -1,0 +1,458 @@
+# =============================================================================
+# SPEC_F110_F112.yaml
+# Features F110-F112 / CR-172 to CR-174: Stake announcements in presentation,
+#   AgendaForm last speech label fix, SpeechSlot vertical alignment
+# Batch: 17
+# Created: 2026-02-21
+# Status: complete (SPEC_FINAL)
+# =============================================================================
+
+type: spec_final
+status: complete
+batch: 17
+created: "2026-02-21"
+last_updated: "2026-02-21"
+
+# =============================================================================
+# F110 / CR-172: Stake announcements card in Presentation Mode
+# =============================================================================
+
+features:
+
+  - id: F110
+    name: "Presentation mode: show Stake Sustainings and Releases card when toggle is on"
+    cr_id: 172
+    type: feature
+    priority: medium
+    related_features: [F097, F094]
+    related_crs: [172]
+
+    user_request: >
+      "Quando o toggle 'Apoios e Agradecimentos da Estaca' esta ligado, na tela
+      de Iniciar Reuniao Sacramental em que aparecer: Subtitulo: APOIOS E
+      AGRADECIMENTOS DA ESTACA, Texto: Passar palavra a Estaca. Faca isso em
+      todas as linguas."
+
+    current_behavior: >
+      In AgendaForm.tsx (line 336-342), the toggle 'Apoios e Agradecimentos da
+      Estaca' (has_stake_announcements) exists and saves to the DB. However, in
+      usePresentationMode.ts buildPresentationCards() (lines 65-186), the
+      has_stake_announcements field is never referenced. When the toggle is on,
+      no corresponding content appears in the Presentation Mode screen.
+
+      The toggle uses the i18n key t('agenda.stakeAnnouncements') which already
+      exists in all 3 locales:
+      - pt-BR: "Apoios e Agradecimentos da Estaca"
+      - en: "Stake Sustainings and Releases"
+      - es: "Apoyos y Agradecimientos de Estaca"
+
+    expected_behavior: >
+      When agenda.has_stake_announcements is true, add a new presentation field
+      to Card 2 (Designations & Sacrament) in buildPresentationCards(), AFTER
+      any baby blessing / baptism confirmation fields and BEFORE the sacrament
+      hymn field.
+
+      The field should display:
+      - Label (subtitle): t('agenda.stakeAnnouncements')
+        - pt-BR: "Apoios e Agradecimentos da Estaca"
+        - en: "Stake Sustainings and Releases"
+        - es: "Apoyos y Agradecimientos de Estaca"
+      - Value (text): t('presentation.stakeAnnouncementsText')
+        - pt-BR: "Passar palavra a Estaca"
+        - en: "Turn the time over to the Stake"
+        - es: "Ceder la palabra a la Estaca"
+
+      This requires a new i18n key 'presentation.stakeAnnouncementsText' in all
+      3 locale files.
+
+      The field type should be 'text' (single line).
+
+    i18n_keys:
+      new:
+        - key: "presentation.stakeAnnouncementsText"
+          pt_BR: "Passar palavra a Estaca"
+          en: "Turn the time over to the Stake"
+          es: "Ceder la palabra a la Estaca"
+      existing_used:
+        - key: "agenda.stakeAnnouncements"
+          pt_BR: "Apoios e Agradecimentos da Estaca"
+          en: "Stake Sustainings and Releases"
+          es: "Apoyos y Agradecimientos de Estaca"
+
+    files_impacted:
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+        changes:
+          - "In buildPresentationCards(), after the baptism_confirmation block (line ~126) and before the sacrament hymn push (line ~127), add conditional block: if (agenda?.has_stake_announcements) { designationFields.push({ label: t('agenda.stakeAnnouncements'), value: t('presentation.stakeAnnouncementsText'), type: 'text' }); }"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Add to presentation section: \"stakeAnnouncementsText\": \"Passar palavra a Estaca\""
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Add to presentation section: \"stakeAnnouncementsText\": \"Turn the time over to the Stake\""
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Add to presentation section: \"stakeAnnouncementsText\": \"Ceder la palabra a la Estaca\""
+
+    acceptance_criteria:
+      - id: AC-110-01
+        description: "Stake announcements field shown in presentation when toggle is on"
+        given: "Agenda with has_stake_announcements = true, Presentation Mode open"
+        when: "View the Designations & Sacrament card"
+        then: "A field appears with label 'Apoios e Agradecimentos da Estaca' (pt-BR) and value 'Passar palavra a Estaca'"
+
+      - id: AC-110-02
+        description: "Stake announcements field NOT shown when toggle is off"
+        given: "Agenda with has_stake_announcements = false, Presentation Mode open"
+        when: "View the Designations & Sacrament card"
+        then: "No stake announcements field appears in the card"
+
+      - id: AC-110-03
+        description: "Field position: after baptism confirmation, before sacrament hymn"
+        given: "Agenda with has_stake_announcements = true AND has_baptism_confirmation = true"
+        when: "View the Designations & Sacrament card fields"
+        then: "Order is: Ward Business, Baby Blessing (if on), Baptism Confirmation, Stake Announcements, Sacrament Hymn"
+
+      - id: AC-110-04
+        description: "English locale displays correct text"
+        given: "Ward language set to English, has_stake_announcements = true"
+        when: "View presentation mode"
+        then: "Label shows 'Stake Sustainings and Releases', value shows 'Turn the time over to the Stake'"
+
+      - id: AC-110-05
+        description: "Spanish locale displays correct text"
+        given: "Ward language set to Spanish, has_stake_announcements = true"
+        when: "View presentation mode"
+        then: "Label shows 'Apoyos y Agradecimientos de Estaca', value shows 'Ceder la palabra a la Estaca'"
+
+    edge_cases:
+      - id: EC-110-01
+        case: "Special meeting with stake announcements toggle on"
+        expected: "Stake announcements field appears in Card 2 regardless of meeting type (special or normal). Card 2 always exists."
+
+      - id: EC-110-02
+        case: "Toggle turned on then off before presentation"
+        expected: "Field does not appear. The presentation reads the current DB state."
+
+  # =============================================================================
+  # F111 / CR-173: Fix last speech label in AgendaForm
+  # =============================================================================
+
+  - id: F111
+    name: "AgendaForm: fix last speech label from 'Ultimo Discurso - Discurso' to 'Ultimo Discurso'"
+    cr_id: 173
+    type: ui
+    priority: medium
+    related_features: [F108, F098]
+    related_crs: [170, 173]
+
+    user_request: >
+      "No card de domingo para configurar a agenda, trocar o label
+      'Ultimo Discurso - Discurso' para 'Ultimo Discurso'"
+
+    current_behavior: >
+      In AgendaForm.tsx line 429, the last speaker field label is built as:
+      ```
+      label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
+      ```
+      This produces "Ultimo Discurso - Discurso" (pt-BR), where:
+      - t('speeches.lastSpeech') = "Ultimo Discurso"
+      - t('speeches.speaker') = "Discurso"
+
+      The same issue existed in Presentation Mode (usePresentationMode.ts line
+      166), which was fixed by CR-170/F108. CR-173 is the same fix but in the
+      AgendaForm component (the agenda editing view on the sunday card).
+
+    expected_behavior: >
+      Change line 429 in AgendaForm.tsx from:
+      ```
+      label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
+      ```
+      to:
+      ```
+      label={t('speeches.lastSpeech')}
+      ```
+
+      This produces "Ultimo Discurso" (pt-BR), "Final Speech" (en),
+      "Ultimo Discurso" (es) -- consistent with how CR-170/F108 fixed
+      the same label in Presentation Mode.
+
+      No new i18n keys needed. Existing keys are sufficient.
+
+    files_impacted:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Line 429: change label from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech')"
+
+    acceptance_criteria:
+      - id: AC-111-01
+        description: "Last speech label shows 'Ultimo Discurso' in pt-BR"
+        given: "AgendaForm in pt-BR locale, normal meeting expanded"
+        when: "View the last speaker field in Section 4 (Ultimo Discurso)"
+        then: "Label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+
+      - id: AC-111-02
+        description: "Last speech label in English"
+        given: "AgendaForm in en locale"
+        when: "View the last speaker field"
+        then: "Label shows 'Final Speech' (not 'Final Speech - Speech')"
+
+      - id: AC-111-03
+        description: "Last speech label in Spanish"
+        given: "AgendaForm in es locale"
+        when: "View the last speaker field"
+        then: "Label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+
+      - id: AC-111-04
+        description: "First and second speaker labels unchanged"
+        given: "AgendaForm showing speech fields for normal meeting"
+        when: "View first and second speaker labels"
+        then: "Labels still show '1o Discurso' and '2o Discurso' (using existing format `{N}o ${t('speeches.speaker')}`)"
+
+    edge_cases:
+      - id: EC-111-01
+        case: "Special meeting (no last speech section)"
+        expected: "No last speech section in special meetings. The SpeakerField for position 3 is not rendered. Change has no effect."
+
+  # =============================================================================
+  # F112 / CR-174: SpeechSlot vertical center-to-center alignment of StatusLED
+  #   and X remove button
+  # =============================================================================
+
+  - id: F112
+    name: "SpeechSlot: vertically align center of StatusLED circle with center of X remove button"
+    cr_id: 174
+    type: ui
+    priority: medium
+    related_features: [F100, F103]
+    related_crs: [162, 165, 174]
+    supersedes: "CR-165/F103 approach (paddingRight:5 on statusSection was insufficient)"
+
+    user_request: >
+      "No card de domingo dos discursos alinhar verticalmente o centro
+      circulo do status com o centro do icone de X para remover uma
+      designacao"
+
+    current_behavior: >
+      In SpeechSlot.tsx, the layout has two independent rows:
+
+      **Label row** (lines 145-162): flexDirection='row',
+      justifyContent='space-between', alignItems='center'.
+      - LEFT: label text (e.g., "1O DISCURSO")
+      - RIGHT: statusSection (Pressable, flexDirection='row',
+        alignItems='center', gap:6, paddingRight:5) containing:
+        - Status text (fontSize: 11)
+        - StatusLED (size=14, so the circle is 14px diameter)
+
+      **Speaker row** (lines 164-202): flexDirection='row',
+      alignItems='center', gap:12.
+      - Speaker field (flex:1, height:38)
+      - Remove button X (fontSize:24, fontWeight:'300',
+        paddingHorizontal:4) -- rendered only when hasSpeaker && canUnassign
+
+      **Current problem:** CR-165/F103 added paddingRight:5 to the
+      statusSection, but this does NOT achieve center-to-center vertical
+      alignment. The status LED circle center and the X character center
+      are at different horizontal offsets. The user explicitly wants the
+      CENTER of the circle aligned with the CENTER of the X icon.
+
+      **Dimension analysis:**
+      - StatusLED: 14px circle. Its center is at 7px from its left edge.
+      - X button: fontSize 24, paddingHorizontal 4. The multiply sign
+        character (\u00D7) at 24px font is approximately 14-16px wide.
+        Total width: ~24px (char) + 8px (padding) = ~32px. Center at ~16px.
+      - The gap between speaker field and X is 12px (from row style).
+      - The statusSection has gap:6 between text and LED, plus paddingRight:5.
+
+      Because the label row uses justifyContent:'space-between' and the
+      speaker row uses gap:12, the right-side elements end up at different
+      horizontal positions. The paddingRight:5 is not enough to align centers.
+
+    expected_behavior: >
+      Restructure the SpeechSlot layout so that the StatusLED circle center
+      and the X remove button center are at the same horizontal position,
+      achieving true center-to-center vertical alignment.
+
+      **Recommended approach: Fixed-width right column.**
+
+      Create a fixed-width container on the right side that spans both the
+      label row (containing the status section) and the speaker row
+      (containing the X button). Both elements are centered within this
+      same-width column, guaranteeing vertical alignment.
+
+      Implementation:
+      1. Wrap the entire SpeechSlot content in a flexDirection='row' container.
+      2. LEFT column (flex:1): contains label text, speaker field, topic field
+         stacked vertically.
+      3. RIGHT column (fixed width, e.g. 36px): contains StatusLED (centered)
+         on the label row level, X button (centered) on the speaker row level,
+         and topic X button (centered) on the topic row level. All centered
+         within the same column width.
+
+      This supersedes the CR-165/F103 approach of paddingRight:5 on
+      statusSection. The paddingRight:5 should be removed as part of this
+      restructuring.
+
+      **Alternative simpler approach:**
+      Keep the existing row structure but calculate exact paddingRight for
+      statusSection so that:
+        statusSection right edge - (LED_width / 2) = X_button right edge - (X_width / 2)
+      This is fragile across devices/fonts. The fixed-width column approach
+      is more robust. Either approach is acceptable as long as center-to-center
+      alignment is achieved.
+
+      The status text should remain visible and pressable. The status change
+      modal interaction should not be affected.
+
+    files_impacted:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Restructure layout to use a fixed-width right column for StatusLED and X buttons"
+          - "Remove paddingRight:5 from statusSection (remnant of CR-165)"
+          - "Center StatusLED within the right column on label row level"
+          - "Center X remove button within the same right column on speaker row level"
+          - "Center topic X button within the same right column on topic row level"
+          - "Ensure status text remains visible and pressable (may move to left of the right column)"
+
+    acceptance_criteria:
+      - id: AC-112-01
+        description: "StatusLED circle center vertically aligned with X button center"
+        given: "Expanded SpeechSlot with assigned speaker (X button visible)"
+        when: "View the card"
+        then: "The center of the StatusLED circle on the label row is at the same horizontal position as the center of the X button on the speaker row"
+
+      - id: AC-112-02
+        description: "Alignment works for all 3 speech positions"
+        given: "3 expanded SpeechSlots with assigned speakers"
+        when: "View all slots"
+        then: "All 3 slots have consistent center-to-center alignment between status circles and X buttons"
+
+      - id: AC-112-03
+        description: "Topic clear button also aligned"
+        given: "Expanded SpeechSlot with speaker AND topic assigned (both X buttons visible)"
+        when: "View the card"
+        then: "Topic clear X button center is also at the same horizontal position as StatusLED circle center and speaker X center"
+
+      - id: AC-112-04
+        description: "Alignment consistent when X is not visible"
+        given: "Expanded SpeechSlot without speaker assigned (no X button)"
+        when: "View the card"
+        then: "StatusLED circle position remains the same (does not shift when X button is absent)"
+
+      - id: AC-112-05
+        description: "Status text and modal interaction preserved"
+        given: "Expanded SpeechSlot with assigned speaker (bishopric or secretary role)"
+        when: "Tap the status text or LED circle"
+        then: "Status change modal opens as before"
+
+      - id: AC-112-06
+        description: "Layout does not break on narrow screens"
+        given: "Device with narrow screen width (e.g., iPhone SE)"
+        when: "View expanded SpeechSlot"
+        then: "Speaker name truncates with ellipsis. Alignment is maintained. No text overflow."
+
+    edge_cases:
+      - id: EC-112-01
+        case: "Observer role (no X button, no status press)"
+        expected: "StatusLED circle position is the same as when X is visible. Alignment column still present but X is hidden."
+
+      - id: EC-112-02
+        case: "Secretary role (no X button for assignment, status pressable)"
+        expected: "StatusLED circle aligned at same position. Status text and LED are pressable."
+
+      - id: EC-112-03
+        case: "Very long status text (e.g., 'Designado/Nao convidado')"
+        expected: "Status text truncates or wraps within its space. LED position remains fixed in the right column."
+
+      - id: EC-112-04
+        case: "Dark mode"
+        expected: "Alignment is identical in dark and light mode. Only colors change, not layout."
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: >
+      CR-172 (F110): The stake announcements field appears inside Card 2
+      (Designations & Sacrament) as a regular field, not as a separate
+      standalone card. This is consistent with how baby blessing and baptism
+      confirmation are presented (as fields within Card 2, not separate cards).
+    reason: "The user says 'subtitulo' and 'texto', which maps to a label+value field within an existing card"
+    impact_if_wrong: "Would need to create a separate PresentationCard instead of adding a field to Card 2"
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: >
+      CR-172 (F110): The i18n text for the value is a new key
+      'presentation.stakeAnnouncementsText'. The exact Portuguese text is
+      "Passar palavra a Estaca" as stated by the user. English and Spanish
+      translations are standard ecclesiastical translations of the same concept.
+    reason: "User provided exact pt-BR text. English/Spanish are standard church translations."
+    impact_if_wrong: "Translation may need adjustment if the user prefers different wording"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: >
+      CR-173 (F111): This is the exact same fix as CR-170/F108 but in a
+      different file (AgendaForm.tsx vs usePresentationMode.ts). The label
+      change is from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`
+      to just `t('speeches.lastSpeech')`. No new i18n keys needed.
+    reason: "Same pattern, same redundancy, same fix. User explicitly described the same label text."
+    impact_if_wrong: "None, the fix is straightforward and identical in nature"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: >
+      CR-174 (F112): This CR supersedes the approach taken in CR-165/F103.
+      The paddingRight:5 added by CR-165 is insufficient and should be
+      replaced by a proper layout restructuring. If CR-165 has already been
+      implemented, the paddingRight:5 should be removed as part of F112.
+      If CR-165 has not yet been implemented, F112 replaces it entirely.
+    reason: "User explicitly re-requested the alignment, indicating the previous approach was not satisfactory. QA PRE confirms paddingRight:5 is present but insufficient."
+    impact_if_wrong: "None, the previous approach is clearly insufficient"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: >
+      CR-174 (F112): The alignment requirement is center-to-center, meaning
+      the geometric center of the StatusLED circle should be at the same
+      horizontal offset as the geometric center of the X character glyph.
+      This is what "alinhar verticalmente o centro circulo do status com o
+      centro do icone de X" means.
+    reason: "User explicitly says 'centro circulo' and 'centro do icone de X'"
+    impact_if_wrong: "If the user means edge-to-edge alignment, the calculation would differ"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: I-1
+    description: >
+      CR-174 (F112) and CR-165 (F103) both address the same alignment issue
+      in SpeechSlot.tsx. CR-165 was specified in Batch 16 with a simpler
+      approach (paddingRight adjustment). CR-174 supersedes it with a more
+      robust approach (layout restructuring). If CR-165 has not been
+      implemented yet, F112 should be implemented instead of F103. If F103
+      was already implemented, F112 replaces its approach.
+    resolution: "F112 supersedes F103. The implementation should use F112's approach regardless of F103's status."
+    severity: low

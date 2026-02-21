@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-21"
-  total_features: 93
-  total_change_requests: 159
+  total_features: 100
+  total_change_requests: 166
   implemented_crs: 96
-  pending_crs: 61
+  pending_crs: 68
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -58,6 +58,7 @@ metadata:
     - docs/specs/SPEC_F093_F096.yaml
     - docs/specs/SPEC_F097_F100.yaml
     - docs/specs/SPEC_F101_F102.yaml
+    - docs/specs/SPEC_F103_F109.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1992,7 +1993,7 @@ features:
       - "Must run after F101 implementation"
 
 # =============================================================================
-# PENDING CHANGE REQUESTS (63 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15)
+# PENDING CHANGE REQUESTS (70 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16)
 # =============================================================================
 
 pending_crs:
@@ -3260,6 +3261,155 @@ pending_crs:
       - src/__tests__/batch7-f035-f039.test.ts
       - src/__tests__/batch14-f088-f092.test.ts
 
+  # --- Batch 16 (UI Polish, Accent Fixes, UX Improvements) ---
+
+  - id: 165
+    type: ui
+    area: "SpeechSlot (F100)"
+    feature_id: F103
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [119, 162]
+    description: >
+      Alinhar verticalmente o circulo de status com o botao X de remover
+      designacao no card expandido de discursos. Trazer circulo e texto do
+      status um pouco para a esquerda.
+    acceptance_criteria:
+      - "StatusLED circle vertically aligned with X remove button"
+      - "Status text and circle shifted slightly left"
+      - "Alignment works for all 3 speech positions"
+      - "Consistent regardless of X button visibility"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 166
+    type: ui
+    area: "Presentation Mode (F097)"
+    feature_id: F104
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [158]
+    description: >
+      Trocar titulo da tela de apresentacao de 'Iniciar Reuniao Sacramental'
+      para 'Reuniao Sacramental'. Titulo nao muda de tamanho com toggle de
+      fonte (font size fixo).
+    acceptance_criteria:
+      - "Title shows 'Reuniao Sacramental' in pt-BR"
+      - "Title shows 'Sacrament Meeting' in en"
+      - "Title shows 'Reunion Sacramental' in es"
+      - "Title font size does NOT change with font toggle"
+      - "Date label remains fixed size (no regression)"
+    files_likely_impacted:
+      - src/app/presentation.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 167
+    type: bug
+    area: "i18n (F097, F096)"
+    feature_id: F105
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [29, 69, 159]
+    description: >
+      Corrigir 4 secoes da agenda em pt-BR sem acentos e cedilha. Correto:
+      'Boas-Vindas, Anuncios e Reconhecimentos', 'Designacoes e Sacramento',
+      'Primeiros Discursos', 'Ultimo Discurso'.
+    acceptance_criteria:
+      - "pt-BR sectionWelcome with capital V and tilde"
+      - "pt-BR sectionSacrament with cedilla and tilde"
+      - "pt-BR sectionLastSpeech with accent"
+      - "sectionFirstSpeeches unchanged (already correct)"
+      - "Presentation Mode card titles show corrected text"
+      - "Agenda form section headers show corrected text"
+      - "es.json accents also fixed"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/es.json
+
+  - id: 168
+    type: ux
+    area: "Settings (F033)"
+    feature_id: F106
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [33]
+    description: >
+      Aumentar area clicavel do botao Voltar em todas as 8 sub-telas de
+      Configuracoes. Area atual muito pequena (sem hitSlop ou padding extra).
+    acceptance_criteria:
+      - "Back button touch area meets 44x44 minimum"
+      - "All 8 Settings sub-screens updated consistently"
+      - "Navigation still works correctly"
+      - "Visual appearance not drastically changed"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/theme.tsx
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - src/app/(tabs)/settings/about.tsx
+      - src/app/(tabs)/settings/history.tsx
+      - src/app/(tabs)/settings/timezone.tsx
+      - src/app/(tabs)/settings/members.tsx
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(tabs)/settings/topics.tsx
+
+  - id: 169
+    type: ui
+    area: "SundayCard (F099, F093)"
+    feature_id: F107
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [126, 150, 161]
+    description: >
+      Igualar tamanho visual e espacamento dos circulos de status nos cards
+      contraidos. Circulo piscante parece maior devido a animacao de opacidade.
+    acceptance_criteria:
+      - "All 3 status circles appear same size visually"
+      - "Consistent spacing between circles and text"
+      - "Animation still distinguishes assigned_not_invited"
+      - "Change applies to both Home and Speeches tabs"
+    files_likely_impacted:
+      - src/components/StatusLED.tsx
+      - src/components/SundayCard.tsx
+
+  - id: 170
+    type: ui
+    area: "Presentation Mode (F097, F098)"
+    feature_id: F108
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [122, 160]
+    description: >
+      Trocar label redundante 'Ultimo Discurso - Discurso' para 'Ultimo
+      Discurso' na tela de apresentacao.
+    acceptance_criteria:
+      - "Last speech label shows 'Ultimo Discurso' in pt-BR"
+      - "Label shows 'Final Speech' in en"
+      - "Label shows 'Ultimo Discurso' in es"
+      - "First and second speaker labels unchanged"
+    files_likely_impacted:
+      - src/hooks/usePresentationMode.ts
+
+  - id: 171
+    type: feature
+    area: "Agenda (F096, F094)"
+    feature_id: F109
+    spec_file: "docs/specs/SPEC_F103_F109.yaml"
+    related_crs: [102, 153]
+    description: >
+      Cards contraidos de agenda para testimony_meeting e primary_presentation
+      SOMENTE mostram 4 linhas de status: Falta roles, tipo em amarelo,
+      Orações Y de 2, Hinos Z de 3. Outros tipos de excecao nao afetados.
+    acceptance_criteria:
+      - "Falta line shows missing roles"
+      - "Exception type shown in yellow"
+      - "Orações count Y de 2 (new i18n key)"
+      - "Hymns count Z de 3 (always 3 for special meetings)"
+      - "Falta line hidden when all roles filled"
+      - "Green color when all items complete"
+      - "ONLY testimony_meeting and primary_presentation affected"
+      - "ward_conference, other, general_conference, stake_conference unchanged"
+      - "Status lines hidden when expanded"
+    files_likely_impacted:
+      - src/app/(tabs)/agenda.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -4423,3 +4573,10 @@ cr_history:
       - "docs/specs/SPEC_F097_F100.yaml (CR-156 to CR-163 - Presentation mode, Speech labels, Card redesign)"
       - "docs/specs/SPEC_F101_F102.yaml (CR-155, CR-164 - Multilingual reset email, Test suite fix)"
     summary: "Phase 1: Presentation mode improvements (arrows, recognized names, font size, section titles), speech label context-aware display, collapsed speech card redesign, expanded speech status circle repositioning. Phase 2: Multilingual password reset email via Edge Function (3 languages), test suite 100% passing."
+
+  batch_16:
+    range: "CR-165 a CR-171"
+    status: "7 pendentes (165, 166, 167, 168, 169, 170, 171)"
+    files:
+      - "docs/specs/SPEC_F103_F109.yaml (CR-165 to CR-171 - UI polish, accent fixes, UX improvements)"
+    summary: "Align status circle with X button in speech cards, presentation title rename + font lock, Portuguese accent/cedilla fixes in section headers, increase back button tap area in Settings, equalize status LED sizes in collapsed cards, fix last speech label redundancy, collapsed agenda cards status lines for special meetings."

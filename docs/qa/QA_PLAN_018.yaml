@@ -1,0 +1,240 @@
+type: qa_plan
+id: QA-018
+created_at: "2026-02-21T09:00:00Z"
+request_type: feature_request
+feature_or_bug: "Batch 16 - UI Polish, Presentation Fix, Status Icons, Back Button, Collapsed Cards (CR-165 to CR-171, F103-F109)"
+user_request: |
+  1. No card de domingo dos discursos alinhar verticalmente o circulo do status com o X para remover uma designacao (na pratica vai trazer o circulo e o texto do status um pouquinho pra esquerda)
+  2. Na tela de "iniciar reuniao sacramental" duas mudancas no titulo da tela. (1) Trocar para "Reuniao Sacramental" (2) O titulo nao troca de tamanho se o usuario clica no botao de aumentar a fonte.
+  3. As 4 sessoes da agenda na lingua portuguesa estao sem acentos e cedilha. Tem que ser: "Boas-Vindas, Anuncios e Reconhecimentos", "Designacoes e Sacramento", "Primeiros Discursos", "Ultimo Discurso"
+  4. Aumentar a area clicavel do botao "Voltar" que existe em todos os cards dentro do aba Configuracoes. A maioria das vezes que eu tento clicar ele nao volta, parece que a area clicavel e pequena.
+  5. Verificar tamanho e distancia entre os icones de status que ficam nos cards fechados, a impressao que da e que o circulo que pisca ele e um pouco maior ou a distancia dele para os outros circulos e um pouco maior. Deixar todos iguais.
+  6. Na tela de "iniciar reuniao sacramental", trocar o label "Ultimo Discurso - Discurso" para "Ultimo Discurso"
+  7. Nos cards de domingo da agenda quando contraidos, quando for "Reuniao de Testemunho" ou "Apresentacao Especial da Primaria" a gente tambem mostra as 4 linhas de status (Falta, tipo em amarelo, Oracoes Y/2, Hinos Z/3)
+
+# Estado atual documentado
+baseline:
+  description: |
+    Current state of the system before Batch 16 development.
+    All 7 CRs describe UI polish, label fixes, and behavioral improvements.
+  evidence:
+    - "CR-165 (F103): SpeechSlot.tsx - Status circle (StatusLED) is in labelRow (line 145-161) with alignItems: 'center'. The remove button (X) is in row (line 164-201). They are in DIFFERENT parent Views (labelRow vs row), so they are NOT vertically aligned. The status circle is to the right of the label text, while the X is to the right of the speaker field. The user wants the status circle aligned (left-shifted) with the X."
+    - "CR-166 (F104): presentation.tsx - Header title uses t('home.startMeeting') which is 'Iniciar Reuniao Sacramental'. User wants just 'Reuniao Sacramental'. Also, fontSize is fontSizes.headerTitle which changes from 19 to 24 when toggling font size. User wants title to stay FIXED size."
+    - "CR-167 (F105): pt-BR.json - Section labels missing accents: sectionWelcome='Boas-vindas, Anuncios e Reconhecimentos', sectionSacrament='Designacoes e Sacramento', sectionFirstSpeeches='Primeiros Discursos', sectionLastSpeech='Ultimo Discurso'. Should be: 'Boas-Vindas, Anuncios e Reconhecimentos', 'Designacoes e Sacramento', 'Primeiros Discursos', 'Ultimo Discurso' with proper UTF-8 accents."
+    - "CR-168 (F106): All settings sub-screens (members, topics, users, history, whatsapp, about, timezone, theme) have a back button pattern: <Pressable onPress={router.back}><Text style={backButton}>Voltar</Text></Pressable>. The backButton style is only fontSize:16, fontWeight:'600' - NO hitSlop, NO padding. The Pressable also has no hitSlop. This makes the touchable area very small."
+    - "CR-169 (F107): In SundayCard.tsx collapsed view (lines 355-386), StatusLED is rendered with size={10}. In SpeechSlot.tsx (line 157), StatusLED uses size={14}. StatusLED animation for 'assigned_not_invited' uses fading animation which might create visual size perception difference. The gap between LEDs in speechRow is 8 (line 466). All LEDs should be same size and spacing visually."
+    - "CR-170 (F108): usePresentationMode.ts line 166 - label for last speech is `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` which renders as 'Ultimo Discurso - Discurso'. User wants just 'Ultimo Discurso'."
+    - "CR-171 (F109): agenda.tsx lines 367-426 - Collapsed agenda cards show status lines ONLY when !exceptionLabel (line 367), meaning Testimony Meeting and Primary Presentation show only the exception label text, NOT the 4 status lines. User wants status lines shown for testimony_meeting and primary_presentation too."
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+
+  # === CR-165 (F103): Status circle alignment ===
+  - id: VC-01
+    description: "SpeechSlot status circle vertically aligned with remove button (X)"
+    type: functional
+    how_to_verify: |
+      1. Read SpeechSlot.tsx
+      2. Check that the status circle (StatusLED) and the remove button (X) share the same parent row container, OR are properly aligned through styling changes
+      3. Verify the status circle and its text have been moved/repositioned to align with the X button
+    expected_result: "Status circle and status text are visually aligned with the remove button X, appearing at the same vertical position"
+    priority: must_pass
+
+  - id: VC-02
+    description: "SpeechSlot still functions correctly after alignment change"
+    type: regression
+    how_to_verify: |
+      1. Read SpeechSlot.tsx
+      2. Verify all interactive elements still work: status press, speaker press, topic press, remove press
+      3. Check styles are valid React Native StyleSheet
+    expected_result: "All SpeechSlot functionality preserved, no broken layouts"
+    priority: must_pass
+
+  # === CR-166 (F104): Presentation title ===
+  - id: VC-03
+    description: "Presentation header title changed to 'Reuniao Sacramental'"
+    type: functional
+    how_to_verify: |
+      1. Read presentation.tsx
+      2. Check the header title Text component
+      3. Verify it no longer uses t('home.startMeeting') but uses a new key or t('home.meetingAgendaTitle') or a new specific key for the presentation title
+      4. Check pt-BR.json for the correct translation value
+    expected_result: "Title shows 'Reuniao Sacramental' (or equivalent proper text) instead of 'Iniciar Reuniao Sacramental'"
+    priority: must_pass
+
+  - id: VC-04
+    description: "Presentation header title does NOT change size when font toggle is pressed"
+    type: functional
+    how_to_verify: |
+      1. Read presentation.tsx
+      2. Check the fontSize property of the header title Text component
+      3. Verify it uses a FIXED fontSize (not fontSizes.headerTitle which changes with toggle)
+    expected_result: "Header title fontSize is a fixed value (e.g., 19 or similar), not dependent on fontSizeMode state"
+    priority: must_pass
+
+  - id: VC-05
+    description: "Font toggle still works for card titles and field content"
+    type: regression
+    how_to_verify: |
+      1. Read presentation.tsx
+      2. Verify that cardTitleFontSize, fieldLabel, and fieldValue still use fontSizes that change with toggle
+      3. Only the header title should be fixed
+    expected_result: "Card titles and field content still respond to font size toggle. Only header title is fixed."
+    priority: must_pass
+
+  # === CR-167 (F105): Portuguese accents ===
+  - id: VC-06
+    description: "Portuguese section labels have proper accents and cedillas"
+    type: functional
+    how_to_verify: |
+      1. Read src/i18n/locales/pt-BR.json
+      2. Check the 4 section keys: sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech
+      3. Verify proper UTF-8 accents are present
+    expected_result: |
+      sectionWelcome contains accented characters (Boas-Vindas, Anuncios with tilde, Reconhecimentos)
+      sectionSacrament contains cedilla (Designacoes with tilde and cedilla)
+      sectionLastSpeech contains accent (Ultimo with accent)
+      All 4 labels must have proper Portuguese diacritics
+    priority: must_pass
+
+  - id: VC-07
+    description: "Other Portuguese strings not broken by the change"
+    type: regression
+    how_to_verify: |
+      1. Read pt-BR.json
+      2. Verify no other keys were accidentally modified
+      3. Verify JSON is valid (no syntax errors)
+    expected_result: "pt-BR.json is valid JSON. Only the 4 section keys were changed."
+    priority: should_pass
+
+  # === CR-168 (F106): Back button touch area ===
+  - id: VC-08
+    description: "Back button in all settings sub-screens has increased touch area"
+    type: functional
+    how_to_verify: |
+      1. Read all settings sub-screen files: members.tsx, topics.tsx, users.tsx, history.tsx, whatsapp.tsx, about.tsx, timezone.tsx, theme.tsx
+      2. Check each back button Pressable for hitSlop property or increased padding
+      3. Verify the touchable area is significantly larger than before
+    expected_result: "All 8 settings sub-screens have back button with hitSlop or increased padding making touch area much larger (at least hitSlop: 16 or equivalent padding increase)"
+    priority: must_pass
+
+  - id: VC-09
+    description: "Back button still navigates correctly in all screens"
+    type: regression
+    how_to_verify: |
+      1. Read all 8 settings sub-screen files
+      2. Verify onPress still calls router.back()
+      3. Verify text still shows t('common.back')
+    expected_result: "All back buttons still navigate back correctly with same text label"
+    priority: must_pass
+
+  # === CR-169 (F107): Status icon sizes in collapsed cards ===
+  - id: VC-10
+    description: "All StatusLED icons in collapsed SundayCard have uniform size and spacing"
+    type: functional
+    how_to_verify: |
+      1. Read SundayCard.tsx collapsed view
+      2. Check all StatusLED size props are identical
+      3. Check the gap/spacing between LEDs is uniform
+      4. Verify the animated LED (assigned_not_invited) does not appear visually larger
+    expected_result: "All StatusLED instances in collapsed cards use the same size prop and have uniform spacing"
+    priority: must_pass
+
+  - id: VC-11
+    description: "StatusLED animation preserved"
+    type: regression
+    how_to_verify: |
+      1. Read StatusLED.tsx
+      2. Verify the fading animation for assigned_not_invited is still present
+      3. Check that the component API (props) is unchanged
+    expected_result: "StatusLED animation and API unchanged"
+    priority: should_pass
+
+  # === CR-170 (F108): Last speech label in presentation ===
+  - id: VC-12
+    description: "Last speech label in presentation mode changed from 'Ultimo Discurso - Discurso' to 'Ultimo Discurso'"
+    type: functional
+    how_to_verify: |
+      1. Read usePresentationMode.ts
+      2. Find the line that builds the last speech field label (around line 166)
+      3. Verify it no longer concatenates with t('speeches.speaker')
+    expected_result: "Label is just t('speeches.lastSpeech') without ' - ' + t('speeches.speaker')"
+    priority: must_pass
+
+  - id: VC-13
+    description: "Other presentation fields unchanged"
+    type: regression
+    how_to_verify: |
+      1. Read usePresentationMode.ts
+      2. Verify all other field labels in buildPresentationCards are unchanged
+      3. Check that speeches 1 and 2 still show their labels correctly
+    expected_result: "Only the last speech label changed. All other labels preserved."
+    priority: should_pass
+
+  # === CR-171 (F109): Collapsed card status lines for special meetings ===
+  - id: VC-14
+    description: "Collapsed agenda cards show status lines for Testimony Meeting and Primary Presentation"
+    type: functional
+    how_to_verify: |
+      1. Read agenda.tsx AgendaSundayCard component
+      2. Check the collapsed card rendering logic (around lines 367-426)
+      3. Verify that when exception.reason is 'testimony_meeting' or 'primary_presentation', the 4 status lines are shown IN ADDITION TO the exception label
+    expected_result: "For testimony_meeting and primary_presentation, both the exception label (in yellow/warning color) AND the 4 status lines (Missing, Speakers X/3, Prayers Y/2, Hymns Z/3) are displayed when collapsed"
+    priority: must_pass
+
+  - id: VC-15
+    description: "Other exception types still only show exception label (no status lines)"
+    type: regression
+    how_to_verify: |
+      1. Read agenda.tsx
+      2. Verify that general_conference and stake_conference still only show exception label
+      3. Verify that 'speeches' type (non-exception) still shows status lines as before
+    expected_result: "general_conference and stake_conference collapsed cards remain unchanged. speeches type unchanged."
+    priority: must_pass
+
+  - id: VC-16
+    description: "Status calculation for special meetings adapts correctly (no speakers for testimony/primary)"
+    type: functional
+    how_to_verify: |
+      1. Read agenda.tsx
+      2. Check if the status line calculation for testimony_meeting and primary_presentation adjusts the speaker count (since these meetings have no speeches/speakers)
+      3. The status should still show prayers and hymns correctly
+    expected_result: "Status lines for testimony_meeting/primary_presentation should show relevant info (prayers, hymns) and handle speakers appropriately (either show 0/0 or skip the speaker line)"
+    priority: should_pass
+
+  # === Cross-cutting ===
+  - id: VC-17
+    description: "All test suites pass after changes"
+    type: regression
+    how_to_verify: |
+      1. Run: npx vitest run
+      2. Check exit code and results
+    expected_result: "All existing tests pass. No regressions."
+    priority: must_pass
+
+  - id: VC-18
+    description: "TypeScript compilation succeeds"
+    type: regression
+    how_to_verify: |
+      1. Run: npx tsc --noEmit
+      2. Check for compilation errors
+    expected_result: "No TypeScript errors"
+    priority: must_pass
+
+  - id: VC-19
+    description: "English and Spanish locale files unchanged"
+    type: regression
+    how_to_verify: |
+      1. Read en.json and es.json
+      2. Verify no unintended changes to these files
+    expected_result: "en.json and es.json unchanged or only have equivalent fixes if needed"
+    priority: should_pass
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.
+
+  must_pass checks: VC-01, VC-02, VC-03, VC-04, VC-05, VC-06, VC-08, VC-09, VC-10, VC-12, VC-14, VC-15, VC-17, VC-18
+  should_pass checks: VC-07, VC-11, VC-13, VC-16, VC-19

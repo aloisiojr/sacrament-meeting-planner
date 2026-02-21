@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-21"
-  last_updated_by: "batch-15-phase-2"
+  last_updated_by: "batch-16"
   total_modules: 8
-  total_adrs: 64
-  total_crs_implemented: 95
+  total_adrs: 66
+  total_crs_implemented: 102
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -35,6 +35,7 @@ metadata:
     - docs/arch/ARCH_M026.yaml
     - docs/arch/ARCH_M027.yaml
     - docs/arch/ARCH_M028.yaml
+    - docs/arch/ARCH_M029.yaml
 
 # =============================================================================
 # TECH STACK
@@ -245,7 +246,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -262,7 +263,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -295,7 +296,7 @@ modules:
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -313,7 +314,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -343,6 +344,10 @@ modules:
       CR-157/F097: Recognized names join with '\n' and type 'multiline' in usePresentationMode (one name per line).
       CR-158/F097: Font size toggle in Presentation Mode header (useState: 'normal'|'large'). Normal=current+1. Large=~1.5x. Not persisted.
       CR-159/F097: Card titles in Presentation Mode use sectionXxx i18n keys (matching Agenda tab section headers).
+      CR-166/F104: presentation.tsx title changed to t('presentation.title') = 'Reunião Sacramental'. Font size fixed to 19 (no longer changes with toggle).
+      CR-167/F105: pt-BR.json section headers fixed: 'Boas-Vindas, Anúncios e Reconhecimentos', 'Designações e Sacramento', 'Último Discurso'. es.json sectionLastSpeech also fixed.
+      CR-170/F108: usePresentationMode.ts last speaker label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech').
+      CR-171/F109: agenda.tsx collapsed card: testimony_meeting and primary_presentation show 4 status lines (Falta, Type, Orações, Hinos). New i18n key agenda.statusPrayersLabel.
 
   - id: M005
     name: NotificationModule
@@ -418,7 +423,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -452,7 +457,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -489,6 +494,8 @@ modules:
       CR-160/F098: SundayCard pos 3 label '3o Discurso' (Home tab uses same SundayCard).
       CR-161/F099: SundayCard collapsed speeches redesign (LEDs inline, increased font, Home tab same).
       CR-163/F098: speeches.selectSpeaker i18n values updated in all 3 locales.
+      CR-168/F106: All 8 Settings sub-screens back button Pressable gets hitSlop={12} for 44px+ touch target.      CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below.
+      CR-169/F107: SundayCard collapsed: render Text(' ') when no speaker name to maintain consistent row height.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1149,6 +1156,25 @@ adrs:
     consequences:
       - "Zero additional imports (fetch is built into Deno)"
       - "Same pattern as process-notifications sending to Expo Push API"
+
+  - id: ADR-074
+    title: "paddingRight on statusSection for visual alignment instead of fixed-width column restructure"
+    context: "F103 needs StatusLED circle aligned with X remove button on speaker row. Options: paddingRight, fixed-width column, marginRight."
+    decision: "Add paddingRight: 5 to styles.statusSection. Simplest CSS-only adjustment, no layout restructure needed."
+    decided_in: "CR-165"
+    consequences:
+      - "Single style property change, zero layout restructuring"
+      - "Approximate alignment (pixel-perfect depends on font metrics)"
+
+  - id: ADR-075
+    title: "hitSlop={12} for back button touch area instead of padding"
+    context: "F106 needs larger back button touch area in 8 Settings screens. Current touch target ~60x20px, below 44x44 minimum."
+    decision: "Use hitSlop={12} on back button Pressable. Extends touch area without changing layout. Matches SpeechSlot removeButton pattern."
+    decided_in: "CR-168"
+    consequences:
+      - "Touch target meets 44px minimum height recommendation"
+      - "No visual or layout changes"
+      - "Applied consistently across all 8 Settings sub-screens"
 
 # =============================================================================
 # DATABASE SCHEMA

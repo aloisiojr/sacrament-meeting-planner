@@ -1,0 +1,1170 @@
+# =============================================================================
+# SPEC_F103_F109.yaml
+# Features F103-F109 / CR-165 to CR-171: UI polish, accent fixes, UX improvements
+# Batch: 16
+# Created: 2026-02-21
+# Status: complete (SPEC_FINAL)
+# =============================================================================
+
+type: spec_final
+status: complete
+batch: 16
+created: "2026-02-21"
+last_updated: "2026-02-21"
+
+# =============================================================================
+# F103 / CR-165: Align status circle with X button in expanded speech card
+# =============================================================================
+
+features:
+
+  - id: F103
+    name: "Expanded speech card: align status circle vertically with remove button"
+    cr_id: 165
+    type: ui
+    priority: medium
+    related_features: [F100, F099]
+    related_crs: [119, 162, 165]
+
+    user_request: >
+      "Card de discursos expandido: alinhar verticalmente circulo de status
+      com X de remover designacao (trazer circulo e texto do status um pouco
+      para a esquerda)"
+
+    current_behavior: >
+      In SpeechSlot.tsx (after CR-162/F100 implementation), the expanded speech
+      card layout is:
+
+      **Label row** (line 145-162): flexDirection='row',
+      justifyContent='space-between', alignItems='center'.
+      - LEFT: label text (e.g., "1O DISCURSO") with textTransform: 'uppercase'
+      - RIGHT: status section (Pressable with flexDirection='row', alignItems='center',
+        gap: 6) containing status text + StatusLED (size=14)
+      The statusSection is on the far right of the label row.
+
+      **Speaker row** (line 164-202): flexDirection='row', alignItems='center',
+      gap: 12.
+      - Speaker field (flex:1, height:38, paddingHorizontal:10)
+      - Remove button X (fontSize:24, paddingHorizontal:4) when hasSpeaker && canUnassign
+
+      **Alignment issue:** The StatusLED circle on the label row is right-aligned
+      to the card edge. The X button on the speaker row is also right-aligned
+      but with paddingHorizontal: 4 and its own font metrics. Visually, the
+      status circle and the X button are NOT vertically aligned. The user wants
+      them to be vertically aligned (same horizontal position).
+
+    expected_behavior: >
+      Adjust the horizontal positioning of the status section (status text +
+      circle) on the label row so that the StatusLED circle is vertically
+      aligned with the center of the X (remove) button below it.
+
+      **Approach:** The X button has paddingHorizontal: 4, making its total
+      width approximately 32px (24px font + 8px padding). The StatusLED circle
+      is 14px wide. To align them vertically:
+      - Option 1: Add paddingRight to the statusSection so the LED center
+        aligns with the X center. The X is at the far right of the row
+        (same gap:12 from the speaker field). The statusSection should use
+        similar right-edge positioning.
+      - Option 2: Use a fixed-width container on the right side of both
+        the label row and the speaker row, so the circle and X are centered
+        within the same-width column.
+
+      The simplest approach: give the statusSection a minWidth or
+      marginRight so the LED aligns with the X below. The exact pixel
+      adjustment depends on the X button rendering, but conceptually the
+      status circle should be shifted slightly to the LEFT (toward center)
+      to align with the X button center.
+
+      The user's wording "trazer circulo e texto do status um pouco para
+      a esquerda" confirms: shift the status section slightly leftward.
+
+    files_impacted:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Adjust statusSection positioning to align StatusLED circle vertically with the X remove button"
+          - "May need to add marginRight or adjust gap/padding on statusSection"
+          - "Alternatively, wrap both rows' right elements in a fixed-width column"
+
+    acceptance_criteria:
+      - id: AC-103-01
+        description: "StatusLED circle vertically aligned with X button"
+        given: "Expanded SpeechSlot with assigned speaker (X button visible)"
+        when: "View the card"
+        then: "The status circle on the label row is vertically aligned with the X button on the speaker row"
+
+      - id: AC-103-02
+        description: "Status text and circle shifted slightly left"
+        given: "Expanded SpeechSlot"
+        when: "Compare with previous layout"
+        then: "Status text + circle are slightly more to the left than before (closer to center of card)"
+
+      - id: AC-103-03
+        description: "Alignment works when X is not visible"
+        given: "Expanded SpeechSlot without speaker assigned (no X button)"
+        when: "View the card"
+        then: "Status section positioning remains consistent (same position regardless of X visibility)"
+
+      - id: AC-103-04
+        description: "Alignment works for all 3 positions"
+        given: "3 expanded SpeechSlots"
+        when: "View all slots"
+        then: "All 3 slots have consistent alignment between status circles and X buttons"
+
+      - id: AC-103-05
+        description: "Topic clear button also aligns"
+        given: "Expanded SpeechSlot with topic assigned (topic X button visible)"
+        when: "View the card"
+        then: "Topic clear button is also in the same vertical column as the status circle and speaker X"
+
+    edge_cases:
+      - id: EC-103-01
+        case: "Observer role (no X button, no status press)"
+        expected: "Status circle position remains the same even without X button. Visual alignment is consistent."
+
+      - id: EC-103-02
+        case: "Secretary role (no X button for assignment, but status pressable)"
+        expected: "Status circle aligned at the same position. X button absence does not shift the circle."
+
+  # =============================================================================
+  # F104 / CR-166: Presentation screen title fix and font size lock
+  # =============================================================================
+
+  - id: F104
+    name: "Presentation screen: rename title and lock title font size"
+    cr_id: 166
+    type: ui
+    priority: medium
+    related_features: [F097]
+    related_crs: [158, 166]
+
+    user_request: >
+      "Tela 'Iniciar Reuniao Sacramental': (1) trocar titulo para 'Reuniao
+      Sacramental' (2) titulo nao muda de tamanho quando usuario clica no
+      botao de aumentar fonte"
+
+    current_behavior: >
+      In presentation.tsx (line 91-93):
+      - Header title uses t('home.startMeeting') which translates to
+        "Iniciar Reuniao Sacramental" (pt-BR line 251).
+      - The title font size is dynamic: fontSize: fontSizes.headerTitle
+        (normal=19, large=24) -- it changes when the user taps the font
+        size toggle button (CR-158/F097).
+      - The date label below the title (line 94) is always fontSize: 14
+        (does NOT change with the toggle).
+
+    expected_behavior: >
+      **Title text change:**
+      - Change the title from t('home.startMeeting') = "Iniciar Reuniao
+        Sacramental" to a new i18n key or existing key that translates to
+        "Reuniao Sacramental" (remove "Iniciar").
+      - Options:
+        * Use a new i18n key: e.g., t('presentation.title') = "Reuniao Sacramental"
+        * Or use t('home.meetingTitle') if one exists
+      - The title should be "Reuniao Sacramental" in pt-BR, "Sacrament
+        Meeting" in en, "Reunion Sacramental" in es.
+
+      **Font size lock:**
+      - The header title font size should NOT change when the user toggles
+        the font size. It should always be a fixed size (e.g., 19).
+      - The font size toggle only affects the CONTENT: field labels,
+        field values, and card titles inside the accordion cards.
+      - This makes sense because the title is always visible and
+        changing it can cause layout shifts in the header.
+
+    files_impacted:
+      - path: src/app/presentation.tsx
+        action: modify
+        changes:
+          - "Change title from t('home.startMeeting') to new i18n key t('presentation.title')"
+          - "Set headerTitle fontSize to fixed value (19) instead of fontSizes.headerTitle"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Add presentation.title: 'Reuniao Sacramental' (or 'Reuniao Sacramental' with accent if we use proper accents)"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Add presentation.title: 'Sacrament Meeting'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Add presentation.title: 'Reunion Sacramental' (with accent: 'Reunion Sacramental')"
+
+    acceptance_criteria:
+      - id: AC-104-01
+        description: "Presentation screen title is 'Reuniao Sacramental' in pt-BR"
+        given: "App in pt-BR locale, Presentation Mode opened"
+        when: "View header title"
+        then: "Title shows 'Reuniao Sacramental' (not 'Iniciar Reuniao Sacramental')"
+
+      - id: AC-104-02
+        description: "Title in English is 'Sacrament Meeting'"
+        given: "App in en locale, Presentation Mode opened"
+        when: "View header title"
+        then: "Title shows 'Sacrament Meeting'"
+
+      - id: AC-104-03
+        description: "Title in Spanish is 'Reunion Sacramental'"
+        given: "App in es locale, Presentation Mode opened"
+        when: "View header title"
+        then: "Title shows 'Reunion Sacramental'"
+
+      - id: AC-104-04
+        description: "Title font size does NOT change when toggle is pressed"
+        given: "Presentation Mode in normal font size"
+        when: "Tap font size toggle button"
+        then: "Header title stays at the same font size (19). Content text changes to large."
+
+      - id: AC-104-05
+        description: "Title font size stays fixed when toggling back"
+        given: "Presentation Mode in large font size"
+        when: "Tap font size toggle button to return to normal"
+        then: "Header title remains at the same font size (19). Content text returns to normal."
+
+      - id: AC-104-06
+        description: "Date label below title also stays fixed"
+        given: "Presentation Mode"
+        when: "Toggle font size"
+        then: "Date label font size remains 14 (already fixed, no regression)"
+
+    edge_cases:
+      - id: EC-104-01
+        case: "Long title in other languages"
+        expected: "Title is short enough in all 3 languages. No truncation expected."
+
+      - id: EC-104-02
+        case: "home.startMeeting key still used elsewhere"
+        expected: >
+          The Home tab button 'Iniciar Reuniao Sacramental' still uses
+          t('home.startMeeting'). That key is NOT removed, only the
+          presentation.tsx stops using it for the header title.
+
+  # =============================================================================
+  # F105 / CR-167: Portuguese section headers missing accents and cedilla
+  # =============================================================================
+
+  - id: F105
+    name: "Fix Portuguese agenda section headers: add missing accents and cedilla"
+    cr_id: 167
+    type: bug
+    priority: high
+    related_features: [F097, F096]
+    related_crs: [29, 69, 159, 167]
+
+    user_request: >
+      "4 seções da agenda em português sem acentos e cedilha. Correto:
+      'Boas-Vindas, Anúncios e Reconhecimentos', 'Designações e Sacramento',
+      'Primeiros Discursos', 'Último Discurso'"
+
+    current_behavior: >
+      In pt-BR.json (lines 229-232), the 4 agenda section header i18n values
+      are missing proper Portuguese accents and cedilla:
+      - "sectionWelcome": "Boas-vindas, Anuncios e Reconhecimentos"
+        Missing: lowercase 'v' in 'vindas' (should be 'V'), tilde on 'u' in
+        'Anuncios' (should be 'Anúncios')
+      - "sectionSacrament": "Designacoes e Sacramento"
+        Missing: cedilla + tilde on 'Designacoes' (should be 'Designações')
+      - "sectionFirstSpeeches": "Primeiros Discursos"
+        This one is correct (no accents needed)
+      - "sectionLastSpeech": "Ultimo Discurso"
+        Missing: accent on 'U' in 'Ultimo' (should be 'Último')
+
+      Note: Other keys in pt-BR.json DO have proper accents (e.g., line 218
+      "Anúncios" with tilde, line 204 "Último Discurso" with accent).
+
+      These section headers are used in:
+      1. AgendaForm.tsx (agenda section headers when editing)
+      2. usePresentationMode.ts (card titles in Presentation Mode)
+
+      The Spanish translations (es.json lines 229-232) also appear to be
+      missing accents: "Anuncios" should be "Anuncios" with accent, "Ultimo"
+      should be "Último" with accent.
+
+    expected_behavior: >
+      Fix the pt-BR.json section header values to include proper Portuguese
+      accents and cedilla:
+      - "sectionWelcome": "Boas-Vindas, Anúncios e Reconhecimentos"
+        -> Correct accented form with capital V and tilde on u
+      - "sectionSacrament": "Designações e Sacramento"
+        -> Correct form with cedilla and tilde
+      - "sectionFirstSpeeches": "Primeiros Discursos"
+        -> No change needed
+      - "sectionLastSpeech": "Último Discurso"
+        -> Correct form with accent on U
+
+      Also fix es.json if needed:
+      - "sectionWelcome": "Bienvenida, Anuncios y Reconocimientos"
+        -> Correct form with accent on u
+      - "sectionLastSpeech": "Ultimo Discurso"
+        -> Correct form with accent on U
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "sectionWelcome: add capital V in Vindas, add tilde on Anuncios -> Anúncios"
+          - "sectionSacrament: add cedilla+tilde -> Designações"
+          - "sectionLastSpeech: add accent -> Último"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "sectionWelcome: add accent on Anuncios"
+          - "sectionLastSpeech: add accent on Último"
+
+    acceptance_criteria:
+      - id: AC-105-01
+        description: "pt-BR sectionWelcome has correct accents"
+        given: "App in pt-BR locale"
+        when: "View agenda section header or Presentation Mode card 1 title"
+        then: "Shows 'Boas-Vindas, Anúncios e Reconhecimentos' with proper tilde and capital V"
+
+      - id: AC-105-02
+        description: "pt-BR sectionSacrament has cedilla"
+        given: "App in pt-BR locale"
+        when: "View section header or card 2 title"
+        then: "Shows 'Designações e Sacramento' with proper cedilla and tilde"
+
+      - id: AC-105-03
+        description: "pt-BR sectionLastSpeech has accent"
+        given: "App in pt-BR locale"
+        when: "View section header or card 4 title"
+        then: "Shows 'Último Discurso' with accent on U"
+
+      - id: AC-105-04
+        description: "sectionFirstSpeeches unchanged"
+        given: "App in pt-BR locale"
+        when: "View section header or card 3 title"
+        then: "Shows 'Primeiros Discursos' (no change, already correct)"
+
+      - id: AC-105-05
+        description: "es.json sectionWelcome accent fixed"
+        given: "App in es locale"
+        when: "View card 1 title"
+        then: "Shows 'Bienvenida, Anuncios y Reconocimientos' with accent on u"
+
+      - id: AC-105-06
+        description: "es.json sectionLastSpeech accent fixed"
+        given: "App in es locale"
+        when: "View card 4 title"
+        then: "Shows 'Último Discurso' with accent on U"
+
+      - id: AC-105-07
+        description: "Presentation Mode card titles show corrected text"
+        given: "Presentation Mode opened in pt-BR"
+        when: "View card titles"
+        then: "All card titles show correct accented Portuguese text"
+
+      - id: AC-105-08
+        description: "Agenda form section headers show corrected text"
+        given: "Agenda tab expanded for a Sunday in pt-BR"
+        when: "View AgendaForm section headers"
+        then: "All section headers show correct accented Portuguese text"
+
+    edge_cases:
+      - id: EC-105-01
+        case: "Font rendering of accented characters"
+        expected: "React Native handles Unicode accented characters natively. No special font configuration needed."
+
+  # =============================================================================
+  # F106 / CR-168: Increase back button tap area in Settings screens
+  # =============================================================================
+
+  - id: F106
+    name: "Increase back button clickable area in Settings sub-screens"
+    cr_id: 168
+    type: ux
+    priority: medium
+    related_features: []
+    related_crs: [33, 168]
+
+    user_request: >
+      "Aumentar area clicavel do botao Voltar nos cards dentro da aba
+      Configuracoes. Area atual muito pequena, dificil de clicar"
+
+    current_behavior: >
+      All Settings sub-screens (theme.tsx, whatsapp.tsx, about.tsx, history.tsx,
+      timezone.tsx, members.tsx, users.tsx, topics.tsx) use a Pressable wrapping
+      a Text element for the back button:
+
+      ```
+      <Pressable onPress={() => router.back()} accessibilityRole="button">
+        <Text style={[styles.backButton, { color: colors.primary }]}>
+          {t('common.back')}
+        </Text>
+      </Pressable>
+      ```
+
+      The backButton style is:
+      ```
+      backButton: { fontSize: 16, fontWeight: '600' }
+      ```
+
+      The Pressable has NO hitSlop, NO padding, NO minWidth/minHeight defined.
+      The tap area is exactly the size of the text content ("Voltar" / "Back" /
+      "Volver"), which is roughly 60x20 pixels. This is below the recommended
+      44x44 minimum touch target for mobile (Apple HIG & Material Design).
+
+    expected_behavior: >
+      Increase the touch target of the back button to meet the 44x44 minimum:
+
+      **Option A (preferred):** Add hitSlop to the Pressable:
+      ```
+      <Pressable
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+      ```
+
+      **Option B:** Add padding to the Pressable or backButton style:
+      ```
+      backButton: { fontSize: 16, fontWeight: '600', paddingVertical: 12, paddingHorizontal: 8 }
+      ```
+
+      **Option C (combination):** Add moderate padding + hitSlop for best UX:
+      ```
+      <Pressable hitSlop={8} style={{ paddingVertical: 8 }} ...>
+      ```
+
+      The change must be applied consistently across ALL 8 Settings sub-screens
+      that have a back button.
+
+    files_impacted:
+      - path: src/app/(tabs)/settings/theme.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/whatsapp.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/about.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/history.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/timezone.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/members.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/users.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+      - path: src/app/(tabs)/settings/topics.tsx
+        action: modify
+        changes:
+          - "Add hitSlop and/or padding to back button Pressable"
+
+    acceptance_criteria:
+      - id: AC-106-01
+        description: "Back button touch area meets minimum 44x44 target"
+        given: "Any Settings sub-screen (e.g., Theme settings)"
+        when: "Tap the Back button area"
+        then: "Button is easy to tap. Touch area is at least 44x44 pixels."
+
+      - id: AC-106-02
+        description: "All 8 Settings sub-screens updated consistently"
+        given: "Navigate to each Settings sub-screen: Theme, WhatsApp, About, History, Timezone, Members, Users, Topics"
+        when: "Tap Back button on each screen"
+        then: "All 8 screens have the same enlarged touch area for the Back button"
+
+      - id: AC-106-03
+        description: "Back button still navigates correctly"
+        given: "Any Settings sub-screen"
+        when: "Tap the Back button"
+        then: "Navigates back to the Settings index screen (router.back())"
+
+      - id: AC-106-04
+        description: "Visual appearance not drastically changed"
+        given: "Any Settings sub-screen"
+        when: "View the Back button"
+        then: "Button text and font remain the same (fontSize:16, fontWeight:'600'). Only touch area is larger."
+
+    edge_cases:
+      - id: EC-106-01
+        case: "Back button overlaps with adjacent elements"
+        expected: >
+          hitSlop extends touch area without changing layout. If using padding,
+          verify no overlap with title or other header elements. Header has
+          flexDirection: 'row' with alignment controls.
+
+      - id: EC-106-02
+        case: "Long translation of 'Back' in some language"
+        expected: "Even with padding, the text area is compact enough. 'Voltar' (pt-BR), 'Back' (en), 'Volver' (es) are all short."
+
+  # =============================================================================
+  # F107 / CR-169: Equalize status icon sizes in collapsed speech cards
+  # =============================================================================
+
+  - id: F107
+    name: "Equalize status LED circle sizes and spacing in collapsed cards"
+    cr_id: 169
+    type: ui
+    priority: medium
+    related_features: [F099, F093]
+    related_crs: [126, 150, 161, 169]
+
+    user_request: >
+      "Igualar tamanho e distancia entre icones de status nos cards fechados
+      (Home e Discursos). Circulo piscante parece maior ou com distancia
+      diferente dos outros"
+
+      User additional hint: The unequal spacing/size may be caused by
+      presence vs absence of text next to the circle. When no speaker name
+      exists, no Text element is rendered, so the row collapses to just the
+      circle, changing row height and spacing. A possible fix: render a
+      Text with a single space character (' ') when there is no visible text,
+      to maintain uniform row height and spacing across all 3 lines.
+
+    current_behavior: >
+      In SundayCard.tsx, the collapsed card for speeches type shows 3 lines
+      (after CR-161/F099 redesign), each with a StatusLED circle (size=10)
+      before the label text.
+
+      The StatusLED component (StatusLED.tsx) creates an Animated.View with
+      exact width/height/borderRadius from the size prop. The circle for
+      'assigned_not_invited' status has a fading animation (opacity oscillates
+      between 1.0 and 0.3 over 2 seconds).
+
+      **Root cause (confirmed by code inspection):**
+      In SundayCard.tsx lines 374-382, when a speech position has no speaker
+      name, the Text component is conditionally rendered as null:
+      ```
+      {name ? (
+        <Text ...>{posLabel}: {name}</Text>
+      ) : null}
+      ```
+      This means lines WITHOUT a speaker name have NO Text element at all.
+      The speechRow style has gap: 8 and flexDirection: 'row'. When the Text
+      is absent, the row height collapses to just the LED circle height (10px),
+      while rows with text have a taller height (13px fontSize + line height).
+      This height difference causes uneven vertical spacing between circles,
+      making some appear larger or more spaced out than others.
+
+      **Secondary issue:** The fading/pulsing animation on the
+      'assigned_not_invited' circle may also contribute to the perceived
+      size difference due to visual attention bias.
+
+    expected_behavior: >
+      **Primary fix: Ensure consistent row height regardless of text presence.**
+
+      Change the conditional rendering so that when no speaker name exists,
+      a Text element with a single space character (' ') is rendered instead
+      of null. This maintains the same row height and gap behavior across
+      all 3 lines:
+
+      ```
+      {name ? (
+        <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}
+              numberOfLines={1} ellipsizeMode="tail">
+          {`${posLabel}: ${name}`}
+        </Text>
+      ) : (
+        <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+          {' '}
+        </Text>
+      )}
+      ```
+
+      This ensures:
+      1. All 3 rows have the same height (driven by Text fontSize: 13)
+      2. The gap: 8 between LED and Text is consistent on all rows
+      3. Circles are vertically equidistant from each other
+
+      **Secondary fix (optional): Reduce animation intensity.**
+      If the circles still appear unequal after the spacing fix, reduce the
+      fading animation opacity range from 0.3-1.0 to 0.5-1.0 to make the
+      pulsing less dramatic.
+
+    files_impacted:
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "Change conditional text rendering: render Text with single space ' ' instead of null when no speaker name"
+          - "This ensures consistent row height and gap across all 3 speech lines"
+
+      - path: src/components/StatusLED.tsx
+        action: modify
+        changes:
+          - "(Optional/secondary) Adjust fading animation opacity range from 0.3-1.0 to 0.5-1.0 if spacing fix alone is insufficient"
+
+    acceptance_criteria:
+      - id: AC-107-01
+        description: "All 3 status circles appear the same size visually"
+        given: "Collapsed speech card with mixed statuses (one pulsing, others static)"
+        when: "View the collapsed card"
+        then: "Pulsing circle does not appear larger than static circles"
+
+      - id: AC-107-02
+        description: "Consistent spacing between circles and text"
+        given: "Collapsed speech card with all 3 speakers assigned"
+        when: "View the 3 lines"
+        then: "Gap between circle and text is identical on all 3 lines"
+
+      - id: AC-107-03
+        description: "Spacing consistent on lines without text"
+        given: "Collapsed speech card with position 2 unassigned (circle only)"
+        when: "View the card"
+        then: "Position 2 circle is at the same horizontal position as positions 1 and 3"
+
+      - id: AC-107-04
+        description: "Animation still distinguishes assigned_not_invited"
+        given: "Speech with status 'assigned_not_invited'"
+        when: "View the StatusLED in collapsed card"
+        then: "Circle still shows a visible fading animation (just less dramatic)"
+
+      - id: AC-107-05
+        description: "Change applies to both Home and Speeches tabs"
+        given: "Collapsed speech cards in both Home (NextSundaysSection) and Speeches tab"
+        when: "View cards"
+        then: "Both tabs show consistent circle sizes and spacing"
+
+    edge_cases:
+      - id: EC-107-01
+        case: "Reduced motion accessibility enabled"
+        expected: "Animation is already disabled for reduced motion users (existing code in StatusLED.tsx). No change needed for this case."
+
+      - id: EC-107-02
+        case: "All 3 circles pulsing (all assigned_not_invited)"
+        expected: "All 3 circles pulse identically. No size difference."
+
+      - id: EC-107-03
+        case: "Dark mode vs light mode"
+        expected: "Animation perception may differ between themes. Fix should work for both."
+
+  # =============================================================================
+  # F108 / CR-170: Presentation mode last speech label fix
+  # =============================================================================
+
+  - id: F108
+    name: "Presentation mode: fix last speech label from 'Ultimo Discurso - Discurso' to 'Ultimo Discurso'"
+    cr_id: 170
+    type: ui
+    priority: medium
+    related_features: [F097, F098]
+    related_crs: [122, 160, 170]
+
+    user_request: >
+      "Tela de apresentacao: trocar label 'Ultimo Discurso - Discurso' para
+      'Ultimo Discurso'"
+
+    current_behavior: >
+      In usePresentationMode.ts line 166, the last speaker label is built as:
+      ```
+      { label: `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`, ... }
+      ```
+      This produces: "Ultimo Discurso - Discurso" (pt-BR), where:
+      - t('speeches.lastSpeech') = "Ultimo Discurso"
+      - t('speeches.speaker') = "Discurso" (the speech/topic label)
+
+      The concatenation "Ultimo Discurso - Discurso" is redundant and
+      confusing. The user wants just "Ultimo Discurso" without the
+      " - Discurso" suffix.
+
+      For comparison, speakers 1 and 2 use the format (line 143-144):
+      - `1\u00BA ${t('speeches.speaker')}` -> "1o Discurso"
+      - `2\u00BA ${t('speeches.speaker')}` -> "2o Discurso"
+
+    expected_behavior: >
+      Change line 166 from:
+      ```
+      { label: `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`, ... }
+      ```
+      to:
+      ```
+      { label: t('speeches.lastSpeech'), ... }
+      ```
+
+      This produces just "Ultimo Discurso" (pt-BR) / "Final Speech" (en) /
+      "Ultimo Discurso" (es) without the redundant " - Discurso" suffix.
+
+    files_impacted:
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+        changes:
+          - "Line 166: change label from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech')"
+
+    acceptance_criteria:
+      - id: AC-108-01
+        description: "Last speech label shows 'Ultimo Discurso' in pt-BR"
+        given: "Presentation Mode in pt-BR locale, normal meeting"
+        when: "View last speech card content"
+        then: "Label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+
+      - id: AC-108-02
+        description: "Last speech label in English"
+        given: "Presentation Mode in en locale"
+        when: "View last speech card content"
+        then: "Label shows 'Final Speech' (not 'Final Speech - Speech')"
+
+      - id: AC-108-03
+        description: "Last speech label in Spanish"
+        given: "Presentation Mode in es locale"
+        when: "View last speech card content"
+        then: "Label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+
+      - id: AC-108-04
+        description: "First and second speaker labels unchanged"
+        given: "Presentation Mode showing speech cards"
+        when: "View first and second speaker labels"
+        then: "Labels still show '1o Discurso' and '2o Discurso' (unchanged)"
+
+    edge_cases:
+      - id: EC-108-01
+        case: "Special meeting (no last speech card)"
+        expected: "No last speech card in special meetings. Change has no effect on special meetings."
+
+  # =============================================================================
+  # F109 / CR-171: Collapsed agenda cards for special meetings status lines
+  # =============================================================================
+
+  - id: F109
+    name: "Collapsed agenda cards: status lines for Testimony Meeting and Primary Presentation"
+    cr_id: 171
+    type: feature
+    priority: medium
+    related_features: [F096, F094]
+    related_crs: [102, 153, 171]
+
+    user_request: >
+      "Cards contraidos de agenda para 'Reuniao de Testemunho' e
+      'Apresentacao Especial da Primaria': mostrar 4 linhas de status
+      (Falta: Presidir|Dirigir|Pianista|Regente, tipo em amarelo,
+      Oracoes Y/2, Hinos Z/3)"
+
+    current_behavior: >
+      In agenda.tsx (AgendaSundayCard), the collapsed card behavior for
+      non-speeches exception types (lines 359-365):
+      - Shows the exception label in yellow text (e.g., "Reuniao de
+        Testemunho", "Apresentacao Especial da Primaria")
+      - Does NOT show any status lines
+
+      The status lines (Falta, Discursantes, Oracoes, Hinos) are only shown
+      for 'speeches' type cards (lines 367-426). The current code has an
+      explicit check: `!isExpanded && !exceptionLabel` meaning status lines
+      are shown ONLY when there is no exception label (i.e., speeches type).
+
+      For F096/CR-153, the spec says: "Para excecoes nao-discursos, mostrar
+      texto da excecao em amarelo. SEM linhas de status." This was correct
+      at the time because special meetings had no meaningful status to show.
+
+      Now the user wants status lines for testimony_meeting and
+      primary_presentation specifically (not for ALL non-speeches types like
+      general_conference or stake_conference which remain non-expandable).
+
+    expected_behavior: >
+      For testimony_meeting and primary_presentation ONLY, show status lines
+      similar to speeches type, adapted for special meetings:
+
+      **Line 1: "Falta: Presidir|Dirigir|Pianista|Regente"**
+      Same logic as speeches type. Show missing roles from agenda fields.
+      Only shown if at least one role is missing.
+
+      **Line 2: Exception type in yellow**
+      Show the exception type label in yellow (e.g., "Reunião de Testemunho").
+      This replaces the "Discursantes X/3" line since there are no
+      designated speakers in special meetings.
+
+      **Line 3: "Orações Y de 2"**
+      Count opening_prayer_name and closing_prayer_name. Uses new i18n key
+      t('agenda.statusPrayersLabel') = "Orações" (NOT "Oradores").
+
+      **Line 4: "Hinos Z de 3"**
+      Count hymns: opening, sacrament, closing = 3 total (no intermediate
+      hymn in special meetings). Same counting logic as speeches type.
+
+      **Order of lines in the collapsed card:**
+      1. "Falta: ..." (only if roles missing, same as speeches)
+      2. Exception type in yellow (replaces speakers line)
+      3. "Orações Y de 2"
+      4. "Hinos Z de 3"
+
+      **All other exception types (ward_conference, other, general_conference,
+      stake_conference):**
+      No change. ward_conference and other continue showing just yellow text
+      without status lines. general_conference and stake_conference remain
+      non-expandable with yellow text only.
+
+    files_impacted:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+        changes:
+          - "Change collapsed card logic: for testimony_meeting and primary_presentation ONLY, show status lines"
+          - "Line 1: Falta roles (same logic as speeches)"
+          - "Line 2: Exception type in yellow"
+          - "Line 3: Orações Y de 2 (count prayers, new i18n key)"
+          - "Line 4: Hinos Z de 3 (count hymns, total=3 for special meetings)"
+          - "Keep all other types (ward_conference, other, general_conference, stake_conference) unchanged"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Add agenda.statusPrayersLabel: 'Orações'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Add agenda.statusPrayersLabel: 'Prayers'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Add agenda.statusPrayersLabel: 'Oraciones'"
+
+    acceptance_criteria:
+      - id: AC-109-01
+        description: "Testimony meeting collapsed card shows 'Falta' line"
+        given: "Agenda card for testimony_meeting collapsed, with Dirigir and Pianista missing"
+        when: "View collapsed card"
+        then: "Line 'Falta: Dirigir | Pianista' visible"
+
+      - id: AC-109-02
+        description: "Testimony meeting collapsed card shows type in yellow"
+        given: "Agenda card for testimony_meeting collapsed"
+        when: "View collapsed card"
+        then: "Line 'Reuniao de Testemunho' in yellow text visible"
+
+      - id: AC-109-03
+        description: "Testimony meeting collapsed card shows prayers count"
+        given: "Agenda card for testimony_meeting collapsed with 1 of 2 prayers filled"
+        when: "View collapsed card"
+        then: "Line 'Orações: 1 de 2' visible in textSecondary color"
+
+      - id: AC-109-04
+        description: "Testimony meeting collapsed card shows hymns count"
+        given: "Agenda card for testimony_meeting collapsed with 2 of 3 hymns filled"
+        when: "View collapsed card"
+        then: "Line 'Hinos: 2 de 3' visible in textSecondary color"
+
+      - id: AC-109-05
+        description: "Primary presentation collapsed card shows same 4 lines"
+        given: "Agenda card for primary_presentation collapsed"
+        when: "View collapsed card"
+        then: "Same 4-line layout: Falta, type in yellow, Orações Y de 2, Hinos Z de 3"
+
+      - id: AC-109-06
+        description: "'Falta' line hidden when all roles filled"
+        given: "Testimony meeting with Presidir, Dirigir, Pianista, Regente all filled"
+        when: "View collapsed card"
+        then: "'Falta' line not shown. Only 3 lines visible: type, Orações, Hinos."
+
+      - id: AC-109-07
+        description: "Hymns total is 3 for special meetings"
+        given: "Testimony meeting collapsed card"
+        when: "View hymns count"
+        then: "Shows 'Hinos: Z de 3' (3 total: opening, sacrament, closing. No intermediate hymn.)"
+
+      - id: AC-109-08
+        description: "Green color when all items complete"
+        given: "Testimony meeting with all 2 prayers filled"
+        when: "View 'Orações: 2 de 2' line"
+        then: "Line text is green"
+
+      - id: AC-109-09
+        description: "General conference card unchanged"
+        given: "Agenda card for general_conference"
+        when: "View collapsed card"
+        then: "Shows only 'Conferencia Geral' in yellow. No status lines. Card not expandable."
+
+      - id: AC-109-10
+        description: "Stake conference card unchanged"
+        given: "Agenda card for stake_conference"
+        when: "View collapsed card"
+        then: "Shows only 'Conferencia de Estaca' in yellow. No status lines. Card not expandable."
+
+      - id: AC-109-11
+        description: "Status lines hidden when expanded"
+        given: "Testimony meeting card showing status lines"
+        when: "Expand the card"
+        then: "Status lines disappear (replaced by AgendaForm content)"
+
+    edge_cases:
+      - id: EC-109-01
+        case: "No agenda record created yet for special meeting"
+        expected: >
+          All roles count as missing. Orações 0 de 2. Hinos 0 de 3.
+          Falta line shows all 4 roles.
+
+      - id: EC-109-02
+        case: "Ward conference card"
+        expected: "NOT affected by this CR. Ward conference continues to show only yellow exception text without status lines (same as current behavior)."
+
+      - id: EC-109-03
+        case: "'Other' type with custom reason"
+        expected: "NOT affected by this CR. 'Other' continues to show only yellow custom_reason text without status lines (same as current behavior)."
+
+      - id: EC-109-04
+        case: "Past special meeting card (isPast)"
+        expected: "Status lines shown with reduced opacity (same as speeches type past cards)."
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    status: resolved
+    resolution: "Technical decision for architect/coder. Any approach that vertically aligns the circle with the X is acceptable."
+    question: >
+      CR-165 (F103): The user wants the status circle aligned with the X
+      (remove) button. Should we use hitSlop, padding, or a fixed-width
+      column approach? The fixed-width column is more robust but changes
+      the layout structure more significantly.
+    context: >
+      Current layout has label row and speaker row as independent flex rows.
+      A fixed-width right column would create a shared right-side container
+      across both rows, ensuring perfect alignment.
+    options:
+      - "A: Use padding/marginRight on statusSection to approximate alignment"
+      - "B: Restructure to use a fixed-width right column spanning both rows"
+      - "C: Just add paddingRight to statusSection to match X button width"
+    default_suggestion: "A"
+
+  - id: OQ-2
+    status: resolved
+    resolution: "Technical decision for architect/coder. Can be new 'presentation' namespace or reuse existing. Architect decides."
+    question: >
+      CR-166 (F104): For the new i18n key for the presentation title, should
+      we create a new namespace 'presentation' or add it to the existing
+      'home' namespace? Also, should the Portuguese title have proper accents
+      ('Reunião Sacramental' or 'Reuniao Sacramental')?
+    context: >
+      Currently there is no 'presentation' namespace in i18n. Adding one would
+      be cleaner for future presentation-related keys. But the 'home' namespace
+      already has related keys (home.startMeeting).
+    options:
+      - "A: New key in 'presentation' namespace: presentation.title"
+      - "B: New key in 'home' namespace: home.meetingTitle"
+    default_suggestion: "A"
+
+  - id: OQ-3
+    status: resolved
+    resolution: >
+      User confirmed exact Unicode strings:
+      sectionWelcome = "Boas-Vindas, Anúncios e Reconhecimentos"
+      sectionSacrament = "Designações e Sacramento"
+      sectionFirstSpeeches = "Primeiros Discursos" (no change)
+      sectionLastSpeech = "Último Discurso"
+    question: >
+      CR-167 (F105): The exact accented characters for the i18n fix.
+    context: >
+      The user provided the correct forms in the CR description.
+    options:
+      - "A: Follow exact CR text (confirm with user the exact Unicode strings)"
+      - "B: Use standard Portuguese orthography regardless of CR text"
+    default_suggestion: "A"
+
+  - id: OQ-4
+    status: resolved
+    resolution: "Technical decision for architect/coder. hitSlop, padding, or both - whatever guarantees 44x44px minimum touch target."
+    question: >
+      CR-168 (F106): Which approach for increasing the back button tap area?
+    context: >
+      The current header layout is a flex row with back button text, title
+      text, and sometimes other elements.
+    options:
+      - "A: hitSlop only (e.g., hitSlop={12})"
+      - "B: Padding only (paddingVertical: 12, paddingHorizontal: 8)"
+      - "C: Combination (hitSlop={8} + paddingVertical: 8)"
+    default_suggestion: "A"
+
+  - id: OQ-5
+    status: resolved
+    resolution: >
+      User confirmed: the problem is likely text presence vs absence causing
+      row height collapse. Primary fix is rendering Text with single space ' '
+      when no speaker name exists. Animation adjustment is secondary/optional,
+      investigate and implement as needed.
+    question: >
+      CR-169 (F107): Root cause identified: when no speaker name exists, the
+      Text component renders as null, collapsing the row height.
+    context: >
+      Code inspection confirms: SundayCard.tsx line 374-382 renders null when
+      name is empty, causing row height collapse.
+    options:
+      - "A: Spacing fix only (render Text with ' ' when no name)"
+      - "B: Spacing fix + reduce animation opacity range (0.5-1.0)"
+    default_suggestion: "A"
+
+  - id: OQ-6
+    status: resolved
+    resolution: >
+      User explicitly wrote "Orações: Y de 2". The label is "Orações" (prayers),
+      NOT "Oradores" (speakers/pray-ers). Create new i18n key for this label.
+    question: >
+      CR-171 (F109): Should the label use "Orações" or reuse "Oradores"?
+    context: >
+      The user's CR text explicitly says "Orações Y de 2".
+    options:
+      - "A: Reuse existing t('agenda.statusPrayers') = 'Oradores Y/2' for consistency"
+      - "B: Create new key t('agenda.statusPrayersLabel') = 'Orações Y de 2' for special meetings"
+    default_suggestion: "B"
+
+  - id: OQ-7
+    status: resolved
+    resolution: >
+      User specified ONLY "Reunião de Testemunho" and "Apresentação Especial
+      da Primária". Other exception types (ward_conference, other,
+      general_conference, stake_conference) are NOT affected.
+      Scope is testimony_meeting and primary_presentation ONLY.
+    question: >
+      CR-171 (F109): Should ward_conference and 'other' custom types also
+      get the status lines?
+    context: >
+      The CR explicitly names only 'Reunião de Testemunho' and 'Apresentação
+      Especial da Primária'.
+    options:
+      - "A: All expandable non-speeches types get status lines"
+      - "B: Only testimony_meeting and primary_presentation (as CR states)"
+    default_suggestion: "B"
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: >
+      CR-165 (F103): The alignment fix only affects the visual positioning
+      of the status section (text + circle) on the label row. It does NOT
+      change the functionality of the StatusLED or the status change modal.
+      The change is purely CSS/style adjustments.
+    reason: "CR is about visual alignment, not functional changes"
+    impact_if_wrong: "None, the CR is clearly about visual alignment"
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: >
+      CR-166 (F104): The home.startMeeting i18n key remains in use by the
+      Home tab button that navigates to Presentation Mode. Only the
+      presentation.tsx header title stops using it. The key is NOT removed.
+    reason: "Home tab button text 'Iniciar Reuniao Sacramental' is separate from the presentation header title"
+    impact_if_wrong: "If the Home button also needs to change text, that would be a separate CR"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: >
+      CR-167 (F105): The accent fix applies to the 4 agenda section header
+      i18n keys only (sectionWelcome, sectionSacrament, sectionFirstSpeeches,
+      sectionLastSpeech). Other i18n keys that might also have accent issues
+      are out of scope for this CR.
+    reason: "CR explicitly mentions '4 secoes da agenda' and lists the 4 correct values"
+    impact_if_wrong: "Other keys might need fixing in a future CR"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: >
+      CR-168 (F106): The fix applies to ALL 8 Settings sub-screens that
+      have a back button (theme, whatsapp, about, history, timezone, members,
+      users, topics). The change should be identical across all screens for
+      consistency.
+    reason: "CR says 'nos cards dentro da aba Configuracoes' (all cards in Settings tab)"
+    impact_if_wrong: "If only some screens need the fix, scope would be reduced"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: >
+      CR-170 (F108): The fix only changes the label text for the last speaker
+      in Presentation Mode content (usePresentationMode.ts line 166). It does
+      NOT affect the card TITLE "Ultimo Discurso" (which was set by F097/CR-159).
+      The card title and the field label within the card are separate things.
+    reason: "CR specifically says 'trocar label' not 'trocar titulo'. The label is the field label within the card content."
+    impact_if_wrong: "None, the distinction between card title and field label is clear"
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: >
+      CR-171 (F109): The hymn total for special meetings is 3 (opening,
+      sacrament, closing). There is no intermediate hymn in testimony meetings
+      or primary presentations. The has_intermediate_hymn field is irrelevant
+      for these types (defaulting to false/hidden per F095/CR-152).
+    reason: "Special meetings skip the speeches section entirely, so there's no intermediate hymn between speeches."
+    impact_if_wrong: "If some special meetings do have an intermediate hymn, the total would need adjustment"
+    needs_confirmation: false
+
+  - id: A-7
+    assumption: >
+      CR-171 (F109): The agenda data for special meetings is already
+      available in the collapsed card because of the useAgendaRange hook
+      added by F096/CR-153. No additional data loading is needed.
+    reason: "F096 added useAgendaRange to load agendas for the entire visible range. This applies to all cards regardless of type."
+    impact_if_wrong: "If useAgendaRange filters by type, special meeting agendas might not be loaded"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: contradiction
+    status: resolved
+    resolution: >
+      CR-171 (F109) OVERRIDES the F096 rule "SEM linhas de status" for
+      testimony_meeting and primary_presentation ONLY. F096 AC-096-09
+      has been updated in SPEC_F093_F096.yaml to reflect this change.
+      All other exception types (ward_conference, other, general_conference,
+      stake_conference) continue without status lines.
+    description: >
+      CR-171 (F109) requests status lines for collapsed non-speeches agenda
+      cards. However, F096/CR-153 explicitly states: "SEM linhas de status."
+    existing_spec: >
+      F096 AC-096-09: "Card contraido tipo 'testimony_meeting' mostra
+      'Reuniao de Testemunho' em amarelo. SEM linhas de status."
+    new_request: >
+      CR-171: Show 4 status lines for testimony_meeting and primary_presentation.
+
+  - id: INC-2
+    type: overlap
+    status: resolved
+    resolution: >
+      F097 AC-097-10 has been updated in SPEC_F097_F100.yaml to reference
+      the corrected accented values from F105. This is a natural correction
+      since F105 fixes the i18n source values that AC-097-10 references.
+    description: >
+      F105 (CR-167) fixes pt-BR accent issues. F097 AC-097-10 references
+      the old (incorrect) unaccented values.
+    existing_spec: >
+      F097 AC-097-10: "Card 1 = 'Boas-vindas, Anuncios e Reconhecimentos'"
+    new_request: >
+      F105: Fix to "Boas-Vindas, Anúncios e Reconhecimentos" (with accents)
+
+# =============================================================================
+# VALIDATION GATE (Final invocation - SPEC_FINAL)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true    # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true    # Identifiquei todas ambiguidades (OQ-1 a OQ-7)
+  GATE-03: true    # Listei TODAS open questions com IDs (OQ-1 a OQ-7)
+  GATE-04: true    # Listei TODAS assumptions com IDs (A-1 a A-7)
+  GATE-05: true    # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-1 a INC-2)
+  GATE-06: true    # Status e "complete" (SPEC_FINAL)
+  GATE-07: true    # Todas OQs resolvidas (7/7)
+  GATE-08: true    # Todas inconsistencias resolvidas (2/2)
+  GATE-09: true    # F096 AC-096-09 atualizado para refletir CR-171
+  GATE-10: true    # F097 AC-097-10 atualizado para refletir F105 accents
+  GATE-11: true    # SPEC_CONSOLIDATED atualizado com batch 16

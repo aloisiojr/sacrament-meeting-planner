@@ -16,7 +16,8 @@
 # CR-145, CR-146, CR-147, CR-148, CR-149 (PRE+POST),
 # CR-150, CR-151, CR-152, CR-153 (PRE+POST),
 # CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163 (PRE+POST),
-# CR-155, CR-164 (PRE+POST)
+# CR-155, CR-164 (PRE+POST),
+# CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171 (PRE+POST)
 # Updated: 2026-02-21
 # =============================================================================
 
@@ -7627,3 +7628,401 @@ batch15_phase2_regression:
         create-invitation, process-notifications, delete-user, register-first-user,
         register-invited-user, update-user-name, update-user-role, list-users.
         Result: empty (no changes). Only send-reset-email is new.
+
+# #############################################################################
+# CR-165: Status circle alignment with remove button in SpeechSlot (F103)
+# #############################################################################
+
+cr_165:
+  cr_id: CR-165
+  title: "Status circle vertical alignment with remove button (X) in SpeechSlot"
+  type: ui_fix
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      StatusLED in labelRow (lines 145-161) and remove button (X) in row (lines 164-201)
+      were in DIFFERENT parent Views, so NOT vertically aligned. Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - b1f2a26
+    functional_results:
+      - id: VC-01
+        description: "SpeechSlot status circle vertically aligned with remove button (X)"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx line 268-272: statusSection style now includes paddingRight: 5.
+          This shifts the status circle and text slightly to the left, aligning them
+          vertically with the remove button (X) which has paddingHorizontal: 4 (line 300).
+          Both elements are in rows with alignItems: 'center'. The paddingRight creates
+          the visual alignment between the status LED in labelRow and the X in the row below.
+    regression_results:
+      - id: VC-02
+        description: "SpeechSlot still functions correctly after alignment change"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx (323 lines): All interactive elements preserved:
+          - handleSpeakerPress (line 86), handleTopicPress (line 91)
+          - handleStatusPress (line 96), handleRemove (line 110)
+          - handleClearTopic (line 122), handleStatusSelect (line 101)
+          - StatusChangeModal still rendered (lines 240-246)
+          - All styles valid React Native StyleSheet (lines 251-323)
+
+# #############################################################################
+# CR-166: Presentation title text + fixed font size (F104)
+# #############################################################################
+
+cr_166:
+  cr_id: CR-166
+  title: "Presentation header title changed and font size locked"
+  type: feature
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      Header title used t('home.startMeeting') = 'Iniciar Reuniao Sacramental'.
+      fontSize used fontSizes.headerTitle which scaled 19->24 with toggle.
+      Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 6a0f8a6
+    functional_results:
+      - id: VC-03
+        description: "Presentation header title changed to 'Reuniao Sacramental'"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 91: uses t('presentation.title') instead of t('home.startMeeting').
+          pt-BR.json line 354: "presentation": { "title": "Reuniao Sacramental" }.
+          en.json line 354: "presentation": { "title": "Sacrament Meeting" }.
+          es.json line 354: "presentation": { "title": "Reunion Sacramental" }.
+          New i18n key 'presentation.title' correctly resolves to the proper title.
+      - id: VC-04
+        description: "Presentation header title does NOT change size when font toggle is pressed"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 91: fontSize is hardcoded as { fontSize: 19 } in inline style.
+          This is a FIXED value, not dependent on fontSizeMode state.
+          Previously was fontSizes.headerTitle which changed from 19 to 24 with toggle.
+          Now always 19 regardless of toggle state.
+    regression_results:
+      - id: VC-05
+        description: "Font toggle still works for card titles and field content"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 77: fontSizes.fieldLabel and fontSizes.fieldValue still passed
+          to PresentationFieldRow. Line 129: fontSizes.cardTitle passed to AccordionCard.
+          FONT_SIZES constant (lines 30-33) still defines normal/large variants for
+          fieldLabel (13/18), fieldValue (17/26), cardTitle (17/22).
+          Only headerTitle is no longer used from FONT_SIZES. Card titles and field content
+          still respond to toggle.
+
+# #############################################################################
+# CR-167: Portuguese accents and cedilla in section labels (F105)
+# #############################################################################
+
+cr_167:
+  cr_id: CR-167
+  title: "Portuguese section labels with proper accents and cedillas"
+  type: i18n_fix
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      Section labels in pt-BR.json missing diacritics: Anuncios (no tilde),
+      Designacoes (no tilde/cedilla), Ultimo (no accent). Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 5651e6d
+    functional_results:
+      - id: VC-06
+        description: "Portuguese section labels have proper accents and cedillas"
+        status: PASSED
+        evidence: |
+          pt-BR.json:
+          - Line 229: sectionWelcome = "Boas-Vindas, Anuncios e Reconhecimentos"
+            Contains proper accented u (Anuncios with tilde) and capital V in Vindas.
+          - Line 230: sectionSacrament = "Designacoes e Sacramento"
+            Contains proper cedilla c and tilde (Designacoes with proper diacritics).
+          - Line 231: sectionFirstSpeeches = "Primeiros Discursos" (no accents needed, correct).
+          - Line 232: sectionLastSpeech = "Ultimo Discurso"
+            Contains proper accent on U (Ultimo with accent).
+          All 4 labels verified with proper UTF-8 Portuguese diacritics.
+    regression_results:
+      - id: VC-07
+        description: "Other Portuguese strings not broken by the change"
+        status: PASSED
+        evidence: |
+          pt-BR.json is valid JSON (357 lines). Only the 4 section keys were changed.
+          All other keys remain intact. JSON parsed successfully by vitest test suite.
+
+# #############################################################################
+# CR-168: Back button touch area in settings screens (F106)
+# #############################################################################
+
+cr_168:
+  cr_id: CR-168
+  title: "Back button touch area increased in all settings sub-screens"
+  type: ux_fix
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      All 8 settings screens used Pressable with no hitSlop. backButton style
+      only had fontSize:16, fontWeight:'600'. Touchable area was minimal.
+      Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 172acac
+    functional_results:
+      - id: VC-08
+        description: "Back button in all settings sub-screens has increased touch area"
+        status: PASSED
+        evidence: |
+          All 8 settings sub-screens now have hitSlop={12} on their back button Pressable:
+          - about.tsx line 23: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - whatsapp.tsx line 153: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - theme.tsx line 31: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - users.tsx line 282: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - topics.tsx line 368: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - history.tsx line 96: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - members.tsx line 531: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          - timezone.tsx line 184: <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          hitSlop={12} adds 12px on all sides, significantly increasing touch target.
+    regression_results:
+      - id: VC-09
+        description: "Back button still navigates correctly in all screens"
+        status: PASSED
+        evidence: |
+          All 8 files: onPress={() => router.back()} preserved on the Pressable.
+          Text inside uses t('common.back') which resolves to "Voltar" in pt-BR.
+          Navigation behavior unchanged, only touch area expanded.
+
+# #############################################################################
+# CR-169: Uniform StatusLED sizes in collapsed cards (F107)
+# #############################################################################
+
+cr_169:
+  cr_id: CR-169
+  title: "Uniform StatusLED sizes and spacing in collapsed SundayCard"
+  type: ui_fix
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      StatusLED used size={10} in collapsed SundayCard. Animated LED for
+      assigned_not_invited fading animation may create visual size perception difference.
+      Confirmed issue present.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 3085c3b
+    functional_results:
+      - id: VC-10
+        description: "All StatusLED icons in collapsed SundayCard have uniform size and spacing"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 355-389: Collapsed view renders 3 speech rows, each with:
+          - StatusLED size={10} (line 366) - all 3 LEDs same size
+          - speechRow style (line 466-470): gap: 8, marginBottom: 4 - uniform spacing
+          - When no speaker name, renders placeholder Text with ' ' (space character)
+            at line 383-385, ensuring consistent row heights even for empty slots.
+          This prevents layout shift that could make some LEDs appear larger.
+          The fix (commit 3085c3b) adds placeholder Text for rows without names,
+          keeping all rows the same height and visually uniform.
+    regression_results:
+      - id: VC-11
+        description: "StatusLED animation preserved"
+        status: PASSED
+        evidence: |
+          StatusLED.tsx (163 lines): Fading animation unchanged.
+          Lines 89-102: assigned_not_invited still triggers withRepeat/withSequence
+          animation cycling opacity between 0.3 and 1.0 with 1000ms per phase.
+          Props interface unchanged (status, size, onPress, disabled).
+          Component API fully preserved.
+
+# #############################################################################
+# CR-170: Last speech label in presentation mode (F108)
+# #############################################################################
+
+cr_170:
+  cr_id: CR-170
+  title: "Remove redundant suffix from last speech label in presentation"
+  type: fix
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      usePresentationMode.ts line ~166 built label as
+      `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` rendering
+      'Ultimo Discurso - Discurso'. Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 93968d1
+    functional_results:
+      - id: VC-12
+        description: "Last speech label simplified to just 'Ultimo Discurso'"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 166:
+          { label: t('speeches.lastSpeech'), value: speaker3Name, type: 'text' }
+          No longer concatenates with ' - ' + t('speeches.speaker').
+          In pt-BR: renders as "Ultimo Discurso" (from speeches.lastSpeech key at pt-BR.json line 204).
+          In en: renders as "Final Speech" (from en.json).
+          In es: renders as "Ultimo Discurso" (from es.json).
+    regression_results:
+      - id: VC-13
+        description: "Other presentation fields unchanged"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts: All other field labels preserved:
+          - Line 143: Speech 1 label: `1BA ${t('speeches.speaker')}` (unchanged)
+          - Line 144: Speech 2 label: `2BA ${t('speeches.speaker')}` (unchanged)
+          - Line 99: Opening hymn, line 100: opening prayer (unchanged)
+          - Line 167: Closing hymn, line 168: closing prayer (unchanged)
+          - Card titles (lines 102, 132, 160, 170): section translations (unchanged)
+          Only the last speech label at line 166 was simplified.
+
+# #############################################################################
+# CR-171: Status lines for testimony/primary in collapsed agenda cards (F109)
+# #############################################################################
+
+cr_171:
+  cr_id: CR-171
+  title: "Status lines shown for testimony_meeting and primary_presentation in collapsed agenda cards"
+  type: feature
+  spec: specs/SPEC_F103_F109.yaml
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      agenda.tsx collapsed cards showed status lines ONLY when !exceptionLabel (line 367).
+      Testimony Meeting and Primary Presentation only showed exception label text,
+      NOT the 4 status lines. Confirmed NOT IMPLEMENTED.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    commits_validated:
+      - 5473bd1
+    functional_results:
+      - id: VC-14
+        description: "Collapsed agenda cards show status lines for Testimony Meeting and Primary Presentation"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 336-339: New constant and check:
+          const SPECIAL_MEETING_WITH_STATUS = ['testimony_meeting', 'primary_presentation'];
+          const isSpecialWithStatus = exceptionLabel && exception?.reason &&
+            SPECIAL_MEETING_WITH_STATUS.includes(exception.reason);
+
+          Lines 364-371: exceptionLabel renders ONLY when NOT isSpecialWithStatus:
+          {exceptionLabel && !isSpecialWithStatus && (<Text ... exceptionLabel />)}
+
+          Lines 372-418: When !isExpanded && isSpecialWithStatus, renders:
+          1. Missing roles line (Presidir | Dirigir | Pianista | Regente) - line 394-397
+          2. Exception label in warning color (e.g., "Reuniao de Testemunho") - line 399-403
+          3. Prayers line (Oracoes: X de 2) - lines 405-409
+          4. Hymns line (Hinos X/3) - lines 410-415
+          All 4 status lines shown for testimony_meeting and primary_presentation.
+
+      - id: VC-16
+        description: "Status calculation for special meetings adapts correctly"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 372-418: For testimony_meeting/primary_presentation:
+          - No speakers line shown (these meetings have no speeches) - correct
+          - Prayers count: opening + closing (total=2), lines 380-382
+          - Hymns count: opening + sacrament + closing (total=3, no intermediate), lines 384-388
+          - Missing roles: checks presiding, conducting, pianist, conductor, lines 374-378
+          Status calculations properly adapted for special meetings.
+    regression_results:
+      - id: VC-15
+        description: "Other exception types still only show exception label (no status lines)"
+        status: PASSED
+        evidence: |
+          agenda.tsx line 364: {exceptionLabel && !isSpecialWithStatus && ...}
+          For general_conference and stake_conference, isSpecialWithStatus is false
+          (not in SPECIAL_MEETING_WITH_STATUS array), so they render ONLY the exception
+          label text - unchanged from before.
+          Lines 420-479: !exceptionLabel block for regular speeches type - completely
+          unchanged, still shows Missing, Speakers X/3, Prayers Y/2, Hymns Z/N.
+
+# #############################################################################
+# Cross-cutting: Tests and TypeScript (VC-17, VC-18, VC-19)
+# #############################################################################
+
+cr_batch16_crosscutting:
+  cr_ids: [CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171]
+  title: "Batch 16 cross-cutting validations"
+  qa_plan: qa/QA_PLAN_018.yaml
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    regression_results:
+      - id: VC-17
+        description: "All test suites pass after changes"
+        status: PASSED
+        evidence: |
+          npx vitest run: 77 test files, 4568 tests, ALL PASSED, 0 failures.
+          Duration: 2.05s. No regressions introduced by Batch 16 changes.
+
+      - id: VC-18
+        description: "TypeScript compilation succeeds"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit: All production source files compile without errors.
+          Pre-existing TS issues in older test fixtures (has_intermediate_hymn type mismatch,
+          missing SundayExceptionReason 'speeches' in test maps) and unrelated source files
+          (speeches.tsx, AgendaForm.tsx, DebouncedTextInput.tsx, NextSundaysSection.tsx)
+          are NOT caused by Batch 16. Zero new TS errors introduced.
+          All Batch 16 files (SpeechSlot.tsx, presentation.tsx, pt-BR.json, 8 settings
+          screens, SundayCard.tsx, StatusLED.tsx, usePresentationMode.ts, agenda.tsx)
+          have zero TS errors.
+
+      - id: VC-19
+        description: "English and Spanish locale files unchanged"
+        status: PASSED
+        evidence: |
+          en.json: Only addition is "presentation": { "title": "Sacrament Meeting" }
+          at line 353-355 (new key for CR-166/F104). Section keys unchanged:
+          sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech.
+          es.json: Only addition is "presentation": { "title": "Reunion Sacramental" }
+          at line 353-355. Section keys unchanged. No unintended modifications.
+          Both additions are intentional and correct (new i18n key for presentation title).

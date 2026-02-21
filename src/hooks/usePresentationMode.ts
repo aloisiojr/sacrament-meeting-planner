@@ -124,6 +124,13 @@ export function buildPresentationCards(
       type: 'text',
     });
   }
+  if (agenda?.has_stake_announcements) {
+    designationFields.push({
+      label: t('agenda.stakeAnnouncements'),
+      value: t('presentation.stakeAnnouncementsText'),
+      type: 'text',
+    });
+  }
   designationFields.push({
     label: t('agenda.sacramentHymn'),
     value: hymnLookup(agenda?.sacrament_hymn_id ?? null),

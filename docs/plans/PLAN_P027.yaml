@@ -1,0 +1,902 @@
+# =============================================================================
+# PLAN_P027.yaml
+# Batch 15 Phase 1: Presentation mode improvements, Speech labels,
+#                    Collapsed speech card redesign, Expanded speech status
+# Features: F097 (CR-156,157,158,159), F098 (CR-160,163), F099 (CR-161),
+#            F100 (CR-162)
+# Created: 2026-02-20
+# Phase: 1 of 2
+# Total ACs: 44 (F097: 14, F098: 8, F099: 10, F100: 11)
+# Total ECs: 10 (F097: 4, F098: 2, F099: 3, F100: 3)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 15
+created: "2026-02-20"
+last_updated: "2026-02-20"
+spec_ref: "docs/specs/SPEC_F097_F100.yaml"
+arch_ref: "docs/arch/ARCH_M027.yaml"
+
+goal: >
+  Implement 4 features: presentation mode improvements with directional arrows,
+  multiline recognized names, font size toggle, and section titles matching
+  agenda tab (F097); context-aware speech labels removing position 3 special
+  case and speaker placeholder fix (F098); collapsed speech card redesign with
+  inline LEDs, increased font, reduced circle size (F099); expanded speech card
+  status redesign moving LED to label row with status text (F100). All changes
+  are UI-only, no DB migrations, no new files.
+
+strategy:
+  order: "i18n keys -> Hook/logic changes -> UI components -> Presentation mode -> Tests"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Tests created alongside or after code changes"
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F098 - i18n placeholder fix (CR-163)
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F098: Update speeches.selectSpeaker i18n values in 3 locales"
+    feature: F098
+    cr: 163
+    depends_on: []
+    parallelizable_with: [S02, S03, S04, S05]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          Update the speeches.selectSpeaker i18n key value in all 3 locales:
+
+          pt-BR.json line 201:
+            "selectSpeaker": "Selecionar orador" -> "Selecionar Discursante"
+
+          en.json line 201:
+            "selectSpeaker": "Select speaker" -> "Select Speaker"
+
+          es.json line 201:
+            "selectSpeaker": "Seleccionar orador" -> "Seleccionar Discursante"
+
+          No new keys needed. Only value changes to existing key.
+    done_when:
+      - "pt-BR.json speeches.selectSpeaker = 'Selecionar Discursante'"
+      - "en.json speeches.selectSpeaker = 'Select Speaker'"
+      - "es.json speeches.selectSpeaker = 'Seleccionar Discursante'"
+    tests:
+      - type: unit
+        description: >
+          Test that speeches.selectSpeaker values match expected translations
+          in all 3 locale files.
+    covers:
+      acceptance_criteria: [AC-098-05, AC-098-06, AC-098-07]
+      edge_cases: [EC-098-01]
+    risks:
+      - risk: "None - simple i18n value change"
+        mitigation: "N/A"
+    commit_message: "fix(i18n): update selectSpeaker placeholder to Discursante in 3 locales (F098, CR-163)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F098 - Remove position 3 special case (CR-160)
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F098: Remove position 3 special case from SpeechSlot and SundayCard"
+    feature: F098
+    cr: 160
+    depends_on: []
+    parallelizable_with: [S01, S03, S04, S05]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+      - path: src/components/SundayCard.tsx
+        action: modify
+    changes:
+      - description: >
+          SpeechSlot.tsx - Simplify getPositionLabel() (lines 53-59):
+
+          Current:
+            function getPositionLabel(position: number, t: ...) {
+              if (position === 3) {
+                return t('speeches.lastSpeech');
+              }
+              return t('speeches.slot', { number: `${position}\u00BA` });
+            }
+
+          New:
+            function getPositionLabel(position: number, t: ...) {
+              return t('speeches.slot', { number: `${position}\u00BA` });
+            }
+
+          Remove the if(position === 3) special case entirely. All positions
+          now use the unified format: t('speeches.slot', { number: 'N\u00BA' }).
+          Result: position 3 shows "3\u00BA Discurso" instead of "\u00DAltimo Discurso"
+          in the expanded SpeechSlot (Speeches tab and Home tab).
+
+          SundayCard.tsx - Simplify collapsed card label (lines 360-362):
+
+          Current:
+            const posLabel = pos === 3
+              ? t('speeches.lastSpeech')
+              : t('speeches.slot', { number: `${pos}\u00BA` });
+
+          New:
+            const posLabel = t('speeches.slot', { number: `${pos}\u00BA` });
+
+          Remove the ternary for position 3. All positions use same format.
+          Result: position 3 shows "3\u00BA Discurso" instead of "\u00DAltimo Discurso"
+          in the collapsed SundayCard (Speeches tab and Home tab).
+
+          Note: AgendaForm (Agenda tab) uses t('agenda.sectionLastSpeech') for its
+          section header - NOT affected by this change. Presentation mode card content
+          uses t('speeches.lastSpeech') for the last speaker label - also NOT changed
+          here (card TITLE is changed separately by F097/S05).
+    done_when:
+      - "getPositionLabel in SpeechSlot.tsx has no if(position === 3) check"
+      - "getPositionLabel returns t('speeches.slot', { number: N\u00BA }) for all positions"
+      - "SundayCard collapsed label has no ternary for pos === 3"
+      - "SundayCard collapsed label uses t('speeches.slot', { number: pos\u00BA }) for all positions"
+      - "Position 3 shows '3\u00BA Discurso' in Speeches tab (both collapsed and expanded)"
+      - "AgendaForm 'Ultimo Discurso' section header is unchanged"
+      - "Presentation mode card content label for last speaker is unchanged"
+    tests:
+      - type: unit
+        description: >
+          Test that getPositionLabel returns '3\u00BA Discurso' for position 3 (not 'Ultimo Discurso').
+          Test all 3 positions use same pattern. Test SundayCard collapsed labels.
+    covers:
+      acceptance_criteria: [AC-098-01, AC-098-02, AC-098-03, AC-098-04, AC-098-08]
+      edge_cases: [EC-098-02]
+    risks:
+      - risk: "Presentation mode may still reference speeches.lastSpeech for card content label"
+        mitigation: "Verified: presentation mode uses speeches.lastSpeech in line 166 of usePresentationMode.ts for the last speaker label within card content. This is intentional and unchanged."
+    commit_message: "feat(ui): unify speech position labels - remove position 3 special case (F098, CR-160)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F099 - Collapsed speech card redesign (CR-161)
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F099: Redesign collapsed speech card with inline LEDs, increased font, reduced circle"
+    feature: F099
+    cr: 161
+    depends_on: []
+    parallelizable_with: [S01, S02, S04, S05]
+    files:
+      - path: src/components/SundayCard.tsx
+        action: modify
+    changes:
+      - description: >
+          Restructure collapsed speeches layout in SundayCard.tsx (lines 355-394):
+
+          1. Replace the current two-section layout (headerCenter text lines +
+             ledsVertical column) with unified rows where LED is inline before text.
+
+          2. Remove the current headerCenter speaker lines (lines 355-375):
+             Current:
+               {isSpeechesType && !expanded && (
+                 <>
+                   {[1, 2, 3].map((pos) => {
+                     const speech = speeches.find((s) => s.position === pos);
+                     const name = speech?.speaker_name ?? '';
+                     const posLabel = ...;
+                     return (
+                       <Text ...>{`${posLabel}: ${name}`}</Text>
+                     );
+                   })}
+                 </>
+               )}
+
+          3. Remove the ledsVertical container (lines 378-394):
+             Current:
+               {!expanded && isSpeechesType && (
+                 <View style={styles.ledsVertical}>
+                   {speechStatuses.map((status, idx) => (
+                     <StatusLED key={idx} status={status} size={14} ... />
+                   ))}
+                 </View>
+               )}
+
+          4. Replace BOTH with a single unified block inside headerCenter:
+             {isSpeechesType && !expanded && (
+               <>
+                 {[1, 2, 3].map((pos, idx) => {
+                   const speech = speeches.find((s) => s.position === pos);
+                   const name = speech?.speaker_name ?? '';
+                   const posLabel = t('speeches.slot', { number: `${pos}\u00BA` });
+                   const status = speechStatuses[idx] ?? 'not_assigned';
+                   return (
+                     <View key={pos} style={styles.speechRow}>
+                       <StatusLED
+                         status={status}
+                         size={10}
+                         onPress={
+                           onStatusPress && speech
+                             ? () => onStatusPress(speech)
+                             : undefined
+                         }
+                         disabled={typeDisabled}
+                       />
+                       {name ? (
+                         <Text
+                           style={[styles.speakerNameLine, { color: colors.textSecondary }]}
+                           numberOfLines={1}
+                           ellipsizeMode="tail"
+                         >
+                           {`${posLabel}: ${name}`}
+                         </Text>
+                       ) : null}
+                     </View>
+                   );
+                 })}
+               </>
+             )}
+
+          5. Add new styles:
+             speechRow: {
+               flexDirection: 'row',
+               alignItems: 'center',
+               gap: 8,
+               marginBottom: 4,
+             }
+
+          6. Update speakerNameLine style:
+             fontSize: 11 -> 13
+
+          7. StatusLED size: 14 -> 10 (in the inline usage)
+
+          8. No designation (name is empty): show ONLY StatusLED circle with no
+             text. The {name ? (<Text>...</Text>) : null} conditional handles this.
+
+          Note: The posLabel here uses the unified format from S02
+          (t('speeches.slot', { number: pos\u00BA })) for all positions.
+          If S02 is applied first, the ternary is already removed.
+          If S03 runs before S02, use the same unified format directly.
+    done_when:
+      - "Collapsed speeches card shows LED circle before each label, not in separate column"
+      - "No ledsVertical View on the right side of the card"
+      - "Each line: <StatusLED size={10}> <gap 8> <Text>posLabel: name</Text>"
+      - "speakerNameLine fontSize is 13 (increased from 11)"
+      - "Each speech row has marginBottom: 4 for line spacing"
+      - "StatusLED size is 10 (reduced from 14)"
+      - "Empty speaker name shows only StatusLED circle, no text"
+      - "StatusLED onPress still fires for status changes"
+      - "Home tab cards show same new layout (shared SundayCard component)"
+    tests:
+      - type: unit
+        description: >
+          Test collapsed speeches card has inline LED+text rows. Test no
+          ledsVertical. Test font size 13. Test marginBottom 4. Test LED size 10.
+          Test empty name shows only circle. Test LED pressable.
+    covers:
+      acceptance_criteria: [AC-099-01, AC-099-02, AC-099-03, AC-099-04, AC-099-05, AC-099-06, AC-099-07, AC-099-08, AC-099-09, AC-099-10]
+      edge_cases: [EC-099-01, EC-099-02, EC-099-03]
+    risks:
+      - risk: "Interaction between S02 and S03 modifying same SundayCard lines"
+        mitigation: "S02 changes the posLabel ternary (line 360-362). S03 restructures the entire block (lines 355-394). If S02 runs first, S03 can use the already-simplified posLabel. If S03 runs first, it uses the unified format directly. No conflict."
+    commit_message: "feat(ui): redesign collapsed speech card with inline LEDs and increased font (F099, CR-161)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F100 - Expanded speech card status redesign (CR-162)
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "F100: Move StatusLED to label row with status text, remove marginLeft from topic row"
+    feature: F100
+    cr: 162
+    depends_on: []
+    parallelizable_with: [S01, S02, S03, S05]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+    changes:
+      - description: >
+          Redesign SpeechSlot.tsx layout to move StatusLED from speaker row to
+          label row with status text:
+
+          1. Redesign label row (line 148):
+
+          Current:
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+
+          New:
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+              <Pressable
+                style={styles.statusSection}
+                onPress={handleStatusPress}
+                disabled={isObserver || status === 'not_assigned'}
+              >
+                <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                  {t(`speechStatus.${status}`)}
+                </Text>
+                <StatusLED
+                  status={status}
+                  size={14}
+                  onPress={handleStatusPress}
+                  disabled={isObserver || status === 'not_assigned'}
+                />
+              </Pressable>
+            </View>
+
+          2. Remove StatusLED from speaker row (lines 152-157):
+
+          Current:
+            <View style={styles.row}>
+              <StatusLED status={status} size={16} onPress={handleStatusPress}
+                disabled={isObserver || status === 'not_assigned'} />
+              <Pressable ... >  {/* speaker field */}
+              ...
+            </View>
+
+          New:
+            <View style={styles.row}>
+              <Pressable ... >  {/* speaker field - full width now */}
+              ...
+            </View>
+
+          Remove the StatusLED element from the row View entirely. The speaker
+          field takes full width with flex:1.
+
+          3. Remove marginLeft: 28 from topicRow style (line 289):
+
+          Current:
+            topicRow: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: 6,
+              marginLeft: 28,
+            }
+
+          New:
+            topicRow: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: 6,
+            }
+
+          4. Add new styles:
+
+            labelRow: {
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 6,
+            },
+            statusSection: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+            },
+            statusText: {
+              fontSize: 11,
+            },
+
+          5. Remove marginBottom: 6 from the existing label style since the
+             new labelRow container now has marginBottom: 6.
+    done_when:
+      - "StatusLED appears on label row, right-aligned after status text"
+      - "Status text uses t(`speechStatus.${status}`) - existing i18n keys"
+      - "Both status text and LED are wrapped in Pressable with handleStatusPress"
+      - "Pressable disabled when isObserver || status === 'not_assigned'"
+      - "No StatusLED in speaker row (removed)"
+      - "Speaker field takes full width (no LED offset)"
+      - "Topic row has no marginLeft: 28"
+      - "Topic field starts at same horizontal position as speaker field"
+      - "Status text uses fontSize 11 and textSecondary color"
+    tests:
+      - type: unit
+        description: >
+          Test label row has status text and LED right-aligned. Test speaker row
+          has no StatusLED. Test topic row has no marginLeft 28. Test status text
+          uses speechStatus i18n keys. Test pressable disabled for Observer and
+          not_assigned.
+    covers:
+      acceptance_criteria: [AC-100-01, AC-100-02, AC-100-03, AC-100-04, AC-100-05, AC-100-06, AC-100-07, AC-100-08, AC-100-09, AC-100-10, AC-100-11]
+      edge_cases: [EC-100-01, EC-100-02, EC-100-03]
+    risks:
+      - risk: "Removing marginLeft: 28 from topicRow may cause visual misalignment"
+        mitigation: "Both speaker field and topic field will start at the same horizontal position (no LED offset). This is the intended behavior - fields use full width."
+    commit_message: "feat(ui): move StatusLED to label row with status text in SpeechSlot (F100, CR-162)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F097 - Presentation mode improvements (CR-156, 157, 158, 159)
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "F097: Presentation mode - directional arrows, multiline names, font size toggle, section titles"
+    feature: F097
+    cr: [156, 157, 158, 159]
+    depends_on: []
+    parallelizable_with: [S01, S02, S03, S04]
+    files:
+      - path: src/components/AccordionCard.tsx
+        action: modify
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+      - path: src/app/presentation.tsx
+        action: modify
+    changes:
+      - description: >
+          AccordionCard.tsx - Directional arrows (CR-156) + font size prop (CR-158):
+
+          1. Change AccordionCardProps interface to accept new props:
+             export interface AccordionCardProps {
+               cards: AccordionCardConfig[];
+               initialExpanded?: number;
+               cardTitleFontSize?: number;
+             }
+
+          2. Update component destructuring:
+             export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }: AccordionCardProps)
+
+          3. Change chevron logic (lines 91-98):
+
+          Current:
+            <Text style={[styles.chevron, { color: ... }]}>
+              {isExpanded ? '\u25B2' : '\u25BC'}
+            </Text>
+
+          New:
+            {!isExpanded && (
+              <Text style={[styles.chevron, { color: ... }]}>
+                {index < expandedIndex ? '\u25BC' : '\u25B2'}
+              </Text>
+            )}
+
+          - Cards above expanded (index < expandedIndex): show down-arrow U+25BC
+          - Cards below expanded (index > expandedIndex): show up-arrow U+25B2
+          - Expanded card (isExpanded): no chevron at all (conditional rendering)
+
+          4. Apply cardTitleFontSize to card title (line 84):
+          Current:
+            <Text style={[styles.cardTitle, { color: ... }]} ...>
+
+          New:
+            <Text style={[styles.cardTitle, { color: ..., fontSize: cardTitleFontSize ?? 16 }]} ...>
+
+      - description: >
+          usePresentationMode.ts - Section titles (CR-159) + multiline names (CR-157):
+
+          1. Card 1 title (line 102):
+          Current: cards.push({ title: t('agenda.presiding'), ... });
+          New: cards.push({ title: t('agenda.sectionWelcome'), ... });
+
+          2. Card 2 title (line 132):
+          Current: cards.push({ title: t('agenda.wardBusiness'), ... });
+          New: cards.push({ title: t('agenda.sectionSacrament'), ... });
+
+          3. Card 3 title - normal meeting (line 160):
+          Current: cards.push({ title: t('speeches.title'), ... });
+          New: cards.push({ title: t('agenda.sectionFirstSpeeches'), ... });
+
+          4. Card 4 title - normal meeting (line 170):
+          Current: cards.push({ title: t('agenda.closingHymn'), ... });
+          New: cards.push({ title: t('agenda.sectionLastSpeech'), ... });
+
+          5. Card 3 title - special meeting (line 182):
+          Keep: cards.push({ title: t('agenda.closingHymn'), ... });
+          No change for special meetings.
+
+          6. Recognized names (lines 82-85):
+          Current:
+            value: agenda.recognized_names.join(', '),
+            type: 'text',
+
+          New:
+            value: agenda.recognized_names.join('\n'),
+            type: 'multiline',
+
+          Join with newline instead of comma-space, and use 'multiline' type
+          so PresentationFieldRow removes numberOfLines limit (already handled:
+          field.type === 'multiline' ? undefined : 2).
+
+      - description: >
+          presentation.tsx - Font size toggle (CR-158):
+
+          1. Add useState import (already imported React from react):
+             import React, { useMemo, useCallback, useState } from 'react';
+
+          2. Add font size constants outside component:
+             const FONT_SIZES = {
+               normal: { fieldLabel: 13, fieldValue: 17, cardTitle: 17, headerTitle: 19 },
+               large: { fieldLabel: 18, fieldValue: 26, cardTitle: 22, headerTitle: 24 },
+             };
+
+          3. Add state in PresentationScreen component:
+             const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
+             const fontSizes = FONT_SIZES[fontSizeMode];
+
+          4. Add toggle button in header, before close button:
+             Current header View children:
+               <View> (title + date) </View>
+               <Pressable> (close button) </Pressable>
+
+             New header View children:
+               <View> (title + date, with dynamic headerTitle fontSize) </View>
+               <Pressable
+                 style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
+                 onPress={() => setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')}
+                 accessibilityRole="button"
+                 accessibilityLabel="Toggle font size"
+               >
+                 <Text style={[styles.fontToggleText, { color: colors.text }]}>
+                   {fontSizeMode === 'normal' ? 'Aa' : 'AA'}
+                 </Text>
+               </Pressable>
+               <Pressable> (close button, unchanged) </Pressable>
+
+          5. Update headerTitle fontSize dynamically:
+             <Text style={[styles.headerTitle, { color: colors.text, fontSize: fontSizes.headerTitle }]}>
+
+          6. Update PresentationFieldRow to accept fontSizes prop:
+
+             function PresentationFieldRow({
+               field,
+               colors,
+               fontSizes,
+             }: {
+               field: PresentationField;
+               colors: ThemeColors;
+               fontSizes?: { label: number; value: number };
+             }) {
+               return (
+                 <View style={styles.fieldRow}>
+                   <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+                     ...
+                   </Text>
+                   <Text style={[styles.fieldValue, { color: colors.text, fontSize: fontSizes?.value ?? 16 }, ...]}>
+                     ...
+                   </Text>
+                 </View>
+               );
+             }
+
+          7. Pass fontSizes to PresentationFieldRow in accordionCards memo:
+             <PresentationFieldRow
+               key={idx}
+               field={field}
+               colors={colors}
+               fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
+             />
+
+          8. Pass cardTitleFontSize to AccordionCard:
+             <AccordionCard
+               cards={accordionCards}
+               initialExpanded={0}
+               cardTitleFontSize={fontSizes.cardTitle}
+             />
+
+          9. Add fontSizes to accordionCards useMemo deps:
+             [cards, colors, fontSizes]
+
+          10. Add new styles:
+              fontToggleButton: {
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 8,
+              },
+              fontToggleText: {
+                fontSize: 16,
+                fontWeight: '600',
+              },
+    done_when:
+      - "AccordionCard: cards above expanded show U+25BC (down-arrow)"
+      - "AccordionCard: cards below expanded show U+25B2 (up-arrow)"
+      - "AccordionCard: expanded card shows no chevron at all"
+      - "AccordionCard: accepts cardTitleFontSize prop, applies to card title"
+      - "usePresentationMode: Card 1 title = t('agenda.sectionWelcome')"
+      - "usePresentationMode: Card 2 title = t('agenda.sectionSacrament')"
+      - "usePresentationMode: Card 3 (normal) title = t('agenda.sectionFirstSpeeches')"
+      - "usePresentationMode: Card 4 (normal) title = t('agenda.sectionLastSpeech')"
+      - "usePresentationMode: Card 3 (special) title = t('agenda.closingHymn') (unchanged)"
+      - "usePresentationMode: recognized_names join('\\n') with type 'multiline'"
+      - "presentation.tsx: font size toggle button visible next to close button"
+      - "presentation.tsx: toggle switches between 'normal' and 'large' font sizes"
+      - "presentation.tsx: normal mode sizes = fieldLabel:13, fieldValue:17, cardTitle:17, headerTitle:19"
+      - "presentation.tsx: large mode sizes = fieldLabel:18, fieldValue:26, cardTitle:22, headerTitle:24"
+      - "presentation.tsx: font size not persisted (useState resets on remount)"
+      - "PresentationFieldRow: accepts fontSizes prop with label and value sizes"
+    tests:
+      - type: unit
+        description: >
+          Test AccordionCard directional arrows (above=down, below=up, expanded=none).
+          Test AccordionCard cardTitleFontSize prop. Test usePresentationMode card
+          titles use section keys. Test recognized_names join with newline. Test
+          font size toggle state and constants. Test PresentationFieldRow fontSizes.
+    covers:
+      acceptance_criteria: [AC-097-01, AC-097-02, AC-097-03, AC-097-04, AC-097-05, AC-097-06, AC-097-07, AC-097-08, AC-097-09, AC-097-10, AC-097-11, AC-097-12, AC-097-13, AC-097-14]
+      edge_cases: [EC-097-01, EC-097-02, EC-097-03, EC-097-04]
+    risks:
+      - risk: "Font size toggle button may not look consistent with close button"
+        mitigation: "Uses same dimensions (36x36, borderRadius 18) and backgroundColor (surfaceVariant) as close button. Text icon 'Aa'/'AA' follows existing Unicode-text-based icon pattern."
+      - risk: "Large font mode may cause text truncation in card titles"
+        mitigation: "AccordionCard already has numberOfLines={1} on titles. Truncation with ellipsis is acceptable for large mode per EC-097-03."
+    commit_message: "feat(presentation): directional arrows, multiline names, font toggle, section titles (F097, CR-156/157/158/159)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Tests for Batch 15 Phase 1
+  # ---------------------------------------------------------------------------
+  - id: S06
+    title: "Batch 15 Phase 1 tests for F097, F098, F099, F100"
+    feature: all
+    cr: [156, 157, 158, 159, 160, 161, 162, 163]
+    depends_on: [S01, S02, S03, S04, S05]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch15-phase1.test.ts
+        action: create
+    changes:
+      - description: >
+          Create comprehensive test file batch15-phase1.test.ts covering all 4 features.
+
+          F097 tests (Presentation mode improvements):
+          - AccordionCard arrow logic:
+            * Verify expanded card renders no chevron text
+            * Verify card above expanded (index < expandedIndex) shows '\u25BC'
+            * Verify card below expanded (index > expandedIndex) shows '\u25B2'
+            * Verify first card expanded: no arrow on card 1, up-arrows on 2,3,4
+            * Verify last card expanded: down-arrows on 1,2,3, no arrow on card 4
+          - AccordionCard cardTitleFontSize:
+            * Verify cardTitleFontSize prop applied to card title style
+            * Verify default fontSize 16 when prop not provided
+          - usePresentationMode card titles:
+            * Verify buildPresentationCards source references sectionWelcome key
+            * Verify buildPresentationCards source references sectionSacrament key
+            * Verify buildPresentationCards source references sectionFirstSpeeches key
+            * Verify buildPresentationCards source references sectionLastSpeech key
+            * Verify special meeting card 3 still uses closingHymn key
+          - Recognized names multiline:
+            * Verify join('\n') used instead of join(', ')
+            * Verify type: 'multiline' for recognized names field
+          - Font size toggle:
+            * Verify FONT_SIZES constant has normal and large keys
+            * Verify normal mode values: fieldLabel=13, fieldValue=17, cardTitle=17, headerTitle=19
+            * Verify large mode values: fieldLabel=18, fieldValue=26, cardTitle=22, headerTitle=24
+            * Verify presentation.tsx has fontToggleButton in header
+            * Verify PresentationFieldRow accepts fontSizes prop
+          - Section titles i18n:
+            * Verify sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech exist in all 3 locales
+
+          F098 tests (Speech label context + placeholder):
+          - getPositionLabel:
+            * Verify SpeechSlot.tsx getPositionLabel has no if(position === 3) check
+            * Verify all positions use speeches.slot key
+          - SundayCard collapsed labels:
+            * Verify SundayCard.tsx collapsed speech lines have no pos === 3 ternary
+            * Verify all positions use speeches.slot key
+          - i18n selectSpeaker:
+            * Verify pt-BR selectSpeaker = 'Selecionar Discursante'
+            * Verify en selectSpeaker = 'Select Speaker'
+            * Verify es selectSpeaker = 'Seleccionar Discursante'
+
+          F099 tests (Collapsed speech card redesign):
+          - SundayCard collapsed layout:
+            * Verify speechRow style exists with flexDirection: 'row'
+            * Verify speechRow has gap: 8 and marginBottom: 4
+            * Verify speakerNameLine fontSize is 13 (not 11)
+            * Verify StatusLED in collapsed uses size={10} (not 14)
+            * Verify no ledsVertical usage in collapsed speeches
+            * Verify empty speaker_name shows only StatusLED (conditional text)
+
+          F100 tests (Expanded speech card status redesign):
+          - SpeechSlot label row:
+            * Verify labelRow style with flexDirection: 'row' and justifyContent: 'space-between'
+            * Verify statusSection style with flexDirection: 'row' and gap: 6
+            * Verify statusText style with fontSize: 11
+            * Verify speechStatus i18n key used for status text
+            * Verify Pressable wraps status text + LED
+            * Verify disabled when isObserver || status === 'not_assigned'
+          - Speaker row:
+            * Verify no StatusLED in speaker row
+          - Topic row:
+            * Verify topicRow style has no marginLeft: 28
+          - Status i18n keys:
+            * Verify speechStatus keys exist in all 3 locales (not_assigned, assigned_not_invited, assigned_invited, assigned_confirmed, gave_up)
+    done_when:
+      - "batch15-phase1.test.ts created with tests for all 4 features"
+      - "All tests pass with vitest"
+      - "Coverage: 44 ACs + 10 ECs across 4 features"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 44 ACs and 10 ECs across 4 features"
+    covers:
+      acceptance_criteria: [AC-097-01, AC-097-02, AC-097-03, AC-097-04, AC-097-05, AC-097-06, AC-097-07, AC-097-08, AC-097-09, AC-097-10, AC-097-11, AC-097-12, AC-097-13, AC-097-14, AC-098-01, AC-098-02, AC-098-03, AC-098-04, AC-098-05, AC-098-06, AC-098-07, AC-098-08, AC-099-01, AC-099-02, AC-099-03, AC-099-04, AC-099-05, AC-099-06, AC-099-07, AC-099-08, AC-099-09, AC-099-10, AC-100-01, AC-100-02, AC-100-03, AC-100-04, AC-100-05, AC-100-06, AC-100-07, AC-100-08, AC-100-09, AC-100-10, AC-100-11]
+      edge_cases: [EC-097-01, EC-097-02, EC-097-03, EC-097-04, EC-098-01, EC-098-02, EC-099-01, EC-099-02, EC-099-03, EC-100-01, EC-100-02, EC-100-03]
+    risks:
+      - risk: "Test file may be large"
+        mitigation: "Organize by feature with describe blocks. Each feature has its own describe section."
+    commit_message: "test(batch15): add tests for F097, F098, F099, F100 (CR-156 to CR-163)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+
+  # F097 - Presentation mode improvements
+  - ac_id: AC-097-01
+    how_to_verify: "Cards above expanded (index < expandedIndex) show U+25BC (down-arrow) in AccordionCard."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-02
+    how_to_verify: "Cards below expanded (index > expandedIndex) show U+25B2 (up-arrow) in AccordionCard."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-03
+    how_to_verify: "Expanded card (isExpanded) shows no chevron at all (conditional rendering with !isExpanded)."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-04
+    how_to_verify: "First card expanded (index 0): no arrow on card 1, all others show up-arrow (index > 0 = expandedIndex)."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-05
+    how_to_verify: "Last card expanded: all preceding cards show down-arrow (index < expandedIndex), last card no arrow."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-06
+    how_to_verify: "Recognized names field uses join('\\n') and type: 'multiline'. PresentationFieldRow renders with numberOfLines={undefined}."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-07
+    how_to_verify: "Font size toggle button visible in header next to close button with text 'Aa' (normal) or 'AA' (large)."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-08
+    how_to_verify: "Tapping toggle switches from normal to large: fieldValue 17->26, fieldLabel 13->18, cardTitle 17->22."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-09
+    how_to_verify: "Tapping toggle again switches back to normal: fieldValue 26->17, fieldLabel 18->13, cardTitle 22->17."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-10
+    how_to_verify: "Card 1 = sectionWelcome, Card 2 = sectionSacrament, Card 3 = sectionFirstSpeeches, Card 4 = sectionLastSpeech (pt-BR verified)."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-11
+    how_to_verify: "English titles match agenda tab: Welcome/Announcements/Recognitions, Assignments/Sacrament, First Speeches, Final Speech."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-12
+    how_to_verify: "Spanish titles match agenda tab: Bienvenida/Anuncios/Reconocimientos, Asignaciones/Sacramento, Primeros Discursos, Ultimo Discurso."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-13
+    how_to_verify: "Special meeting (testimony_meeting) last card title still uses t('agenda.closingHymn')."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-097-14
+    how_to_verify: "Font size state uses useState (not persisted). Re-opening Presentation Mode starts in 'normal'."
+    covered_by_steps: [S05, S06]
+
+  # F098 - Speech label context + placeholder
+  - ac_id: AC-098-01
+    how_to_verify: "SundayCard collapsed card: position 3 shows '3\u00BA Discurso' via t('speeches.slot', { number: '3\u00BA' })."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-098-02
+    how_to_verify: "SpeechSlot expanded: position 3 shows '3O DISCURSO' (uppercase from textTransform) via getPositionLabel."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-098-03
+    how_to_verify: "AgendaForm section header for last speech uses t('agenda.sectionLastSpeech') - unchanged."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-098-04
+    how_to_verify: "Home tab collapsed SundayCard shows '3\u00BA Discurso' for position 3 (shared component)."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-098-05
+    how_to_verify: "pt-BR speeches.selectSpeaker = 'Selecionar Discursante' in locale file."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-098-06
+    how_to_verify: "en speeches.selectSpeaker = 'Select Speaker' in locale file."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-098-07
+    how_to_verify: "es speeches.selectSpeaker = 'Seleccionar Discursante' in locale file."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-098-08
+    how_to_verify: "Presentation Mode card content uses t('speeches.lastSpeech') for last speaker label (line 166 of usePresentationMode.ts - unchanged)."
+    covered_by_steps: [S02, S06]
+
+  # F099 - Collapsed speech card redesign
+  - ac_id: AC-099-01
+    how_to_verify: "Each collapsed speech line shows: <StatusLED size={10}> <gap 8> <Text>'posLabel: name'</Text>."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-02
+    how_to_verify: "No ledsVertical View on the right side. LEDs are inline in speechRow containers."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-03
+    how_to_verify: "speakerNameLine fontSize is 13 (increased from 11)."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-04
+    how_to_verify: "speechRow has marginBottom: 4 for visible spacing between lines."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-05
+    how_to_verify: "StatusLED in collapsed uses size={10} (reduced from 14)."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-06
+    how_to_verify: "No speaker name: only StatusLED rendered, no Text element (conditional {name ? <Text> : null})."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-07
+    how_to_verify: "All 3 positions with speakers: 3 lines with LED + label: name format."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-08
+    how_to_verify: "Mixed assignment: position with name shows LED + text, position without shows LED only."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-09
+    how_to_verify: "StatusLED onPress still fires for status changes (callback passed to StatusLED)."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-099-10
+    how_to_verify: "Home tab NextSundaysSection uses same SundayCard component - new layout applies automatically."
+    covered_by_steps: [S03, S06]
+
+  # F100 - Expanded speech card status redesign
+  - ac_id: AC-100-01
+    how_to_verify: "Label row shows label text on left, status text + LED on right (flexDirection: 'row', justifyContent: 'space-between')."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-02
+    how_to_verify: "Status text 'Designado/Confirmado' shown next to green LED for assigned_confirmed status."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-03
+    how_to_verify: "Status text 'Nao designado' shown next to gray LED for not_assigned status."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-04
+    how_to_verify: "Speaker field in row has no StatusLED sibling. Field takes full width with flex:1."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-05
+    how_to_verify: "topicRow style has no marginLeft: 28. Topic field aligned with speaker field."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-06
+    how_to_verify: "StatusLED on label row wrapped in Pressable with handleStatusPress. Opens status modal."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-07
+    how_to_verify: "Status text also wrapped in same Pressable. Pressing text opens same status modal."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-08
+    how_to_verify: "Pressable disabled when status === 'not_assigned' (same behavior as before)."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-09
+    how_to_verify: "Pressable disabled when isObserver (role === 'observer')."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-10
+    how_to_verify: "English status text 'Assigned/Invited' shown next to yellow LED."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-100-11
+    how_to_verify: "Spanish status text 'Desistio' shown next to dark wine LED."
+    covered_by_steps: [S04, S06]

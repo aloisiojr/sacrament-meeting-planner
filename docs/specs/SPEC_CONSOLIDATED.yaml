@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-20"
-  total_features: 87
-  total_change_requests: 149
+  total_features: 91
+  total_change_requests: 157
   implemented_crs: 96
-  pending_crs: 51
+  pending_crs: 59
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -56,6 +56,7 @@ metadata:
     - docs/specs/SPEC_F091.yaml
     - docs/specs/SPEC_F092.yaml
     - docs/specs/SPEC_F093_F096.yaml
+    - docs/specs/SPEC_F097_F100.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1869,8 +1870,87 @@ features:
       - "Oradores = oracoes opening/closing prayer (decisao OQ-4)"
       - "Depende de F094 (Pianista/Regente) e F095 (toggle Hino)"
 
+  # ---------------------------------------------------------------------------
+  # Batch 15 Phase 1 (F097-F100) - Presentation mode, Speech labels, Card redesign
+  # ---------------------------------------------------------------------------
+
+  - id: F097
+    name: "Presentation mode improvements: arrows, recognized names, font size, section titles"
+    status: pending
+    rfs: []
+    description: >
+      Presentation mode UI improvements: (1) arrows based on position relative
+      to expanded card (above=down, below=up, expanded=none), (2) recognized
+      names one per line (join with newline instead of comma), (3) font size
+      toggle button (normal/large) next to close button, (4) section titles
+      matching AgendaForm section headers (sectionWelcome, sectionSacrament,
+      sectionFirstSpeeches, sectionLastSpeech).
+    modified_by_crs: [156, 157, 158, 159]
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    notes:
+      - "CR-156: Arrows based on card position relative to expanded card"
+      - "CR-157: Recognized names one per line"
+      - "CR-158: Font size toggle (normal +1 / large) with button in header"
+      - "CR-159: Section titles matching agenda card section headers"
+      - "14 acceptance criteria"
+      - "3 files modified (AccordionCard.tsx, presentation.tsx, usePresentationMode.ts)"
+
+  - id: F098
+    name: "Speech label context-aware display and speaker placeholder fix"
+    status: pending
+    rfs: []
+    description: >
+      Position 3 label shows "3o Discurso" in Speeches tab (collapsed and
+      expanded) instead of "Ultimo Discurso". Agenda tab keeps "Ultimo Discurso".
+      Speaker placeholder changed from "Selecionar orador" to "Selecionar
+      Discursante" in pt-BR and es. English keeps "Select Speaker" (capitalized).
+    modified_by_crs: [160, 163]
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    notes:
+      - "CR-160: 'Ultimo Discurso' only in Agenda tab, '3o Discurso' in Speeches tab"
+      - "CR-163: Placeholder 'Selecionar Orador' -> 'Selecionar Discursante' all languages"
+      - "8 acceptance criteria"
+      - "5 files modified (SundayCard.tsx, SpeechSlot.tsx, 3 locale files)"
+      - "Modifies F093 label for position 3 in Speeches tab context"
+
+  - id: F099
+    name: "Collapsed speech card redesign - LED before label, increased font, reduced circle"
+    status: pending
+    rfs: []
+    description: >
+      Redesign collapsed speech card: move LED circles from right side to before
+      each label text ('<circle> 1o Discurso: <nome>'). Increase font from 11
+      to 13, add line spacing, reduce circle size from 14 to 10. When no speaker
+      assigned, show only the status circle with no text.
+    modified_by_crs: [161]
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    notes:
+      - "CR-161: LED before label, increased font, reduced circle, no-assignment behavior"
+      - "10 acceptance criteria"
+      - "1 file modified (SundayCard.tsx)"
+      - "Redesigns F093 collapsed card layout"
+      - "Affects Speeches tab and Home tab (shared SundayCard component)"
+
+  - id: F100
+    name: "Expanded speech card status circle moved to label line, right-aligned"
+    status: pending
+    rfs: []
+    description: >
+      Move StatusLED from speaker field row to label row, right-aligned with
+      status text. Format: '{label}...{status text} {circle}'. Speaker and
+      topic fields now use full line width (no LED offset). Status text uses
+      speechStatus i18n keys. LED and text are pressable for status change.
+    modified_by_crs: [162]
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    notes:
+      - "CR-162: Move LED to label line with status text, right-aligned"
+      - "11 acceptance criteria"
+      - "1 file modified (SpeechSlot.tsx)"
+      - "Speaker/topic fields use full width (marginLeft:28 removed)"
+      - "Status text from speechStatus i18n keys (already exist)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (55 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14)
+# PENDING CHANGE REQUESTS (63 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15)
 # =============================================================================
 
 pending_crs:
@@ -2952,6 +3032,147 @@ pending_crs:
       - "Status lines escondidas ao expandir"
     files_likely_impacted:
       - src/app/(tabs)/agenda.tsx
+
+  # --- Batch 15 Phase 1 (Presentation mode, Speech labels, Card redesign) ---
+
+  - id: 156
+    type: ui
+    area: "Presentation Mode (F044)"
+    feature_id: F097
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: []
+    description: >
+      Arrows based on position relative to expanded card: cards above show
+      down-arrow, cards below show up-arrow, expanded card has no arrow.
+    acceptance_criteria:
+      - "Cards above expanded show down-arrow"
+      - "Cards below expanded show up-arrow"
+      - "Expanded card has no arrow"
+    files_likely_impacted:
+      - src/components/AccordionCard.tsx
+
+  - id: 157
+    type: ui
+    area: "Presentation Mode (F044)"
+    feature_id: F097
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: []
+    description: >
+      Recognized names displayed one per line in Presentation Mode.
+      Join with newline instead of comma-space.
+    acceptance_criteria:
+      - "Each recognized name on its own line"
+      - "Field type changed to multiline"
+    files_likely_impacted:
+      - src/hooks/usePresentationMode.ts
+
+  - id: 158
+    type: ui
+    area: "Presentation Mode (F044)"
+    feature_id: F097
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: []
+    description: >
+      Font size toggle button next to close button in Presentation Mode header.
+      Normal mode: current +1. Large mode: substantially bigger for visually
+      impaired users. State not persisted.
+    acceptance_criteria:
+      - "Toggle button visible in header next to close button"
+      - "Normal mode: current font sizes +1"
+      - "Large mode: substantially bigger (fieldValue=26, fieldLabel=18)"
+      - "Toggle switches between normal and large"
+    files_likely_impacted:
+      - src/app/presentation.tsx
+      - src/components/AccordionCard.tsx
+
+  - id: 159
+    type: ui
+    area: "Presentation Mode (F044)"
+    feature_id: F097
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: []
+    description: >
+      Section titles in Presentation Mode match AgendaForm section headers:
+      sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech.
+    acceptance_criteria:
+      - "Card 1 title = agenda.sectionWelcome"
+      - "Card 2 title = agenda.sectionSacrament"
+      - "Card 3 title = agenda.sectionFirstSpeeches"
+      - "Card 4 title = agenda.sectionLastSpeech"
+      - "Works in all 3 locales (pt-BR, en, es)"
+    files_likely_impacted:
+      - src/hooks/usePresentationMode.ts
+
+  - id: 160
+    type: ui
+    area: "Speeches (F008, F009)"
+    feature_id: F098
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: [150]
+    description: >
+      Position 3 label shows "3o Discurso" in Speeches tab and Home tab
+      instead of "Ultimo Discurso". Agenda tab keeps "Ultimo Discurso".
+    acceptance_criteria:
+      - "Collapsed SundayCard position 3 shows '3o Discurso'"
+      - "Expanded SpeechSlot position 3 shows '3o Discurso'"
+      - "Agenda tab keeps 'Ultimo Discurso'"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+      - src/components/SpeechSlot.tsx
+
+  - id: 161
+    type: ui
+    area: "Speeches (F008, F093)"
+    feature_id: F099
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: [150]
+    description: >
+      Collapsed speech card redesign: move LED circles before label text,
+      increase font (11->13), add line spacing, reduce circle size (14->10).
+      No designation shows only circle, no text.
+    acceptance_criteria:
+      - "LED before label: '<circle> 1o Discurso: <nome>'"
+      - "No separate LED column on right"
+      - "Font size 13, circle size 10"
+      - "No designation shows only circle"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 162
+    type: ui
+    area: "Speeches (F008, F009)"
+    feature_id: F100
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: [161]
+    description: >
+      Expanded speech card: move status circle to label line, right-aligned
+      with status text. Format: '<status text> <circle>'. Speaker/topic
+      fields use full line width.
+    acceptance_criteria:
+      - "LED on label line, right-aligned"
+      - "Status text shown next to LED"
+      - "Speaker/topic fields use full width"
+      - "LED and status text are pressable"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 163
+    type: i18n
+    area: "Speeches (F008)"
+    feature_id: F098
+    spec_file: "docs/specs/SPEC_F097_F100.yaml"
+    related_crs: []
+    description: >
+      Change speaker placeholder from "Selecionar orador" to "Selecionar
+      Discursante" in pt-BR and es. English keeps "Select Speaker" (capitalized).
+    acceptance_criteria:
+      - "pt-BR: 'Selecionar Discursante'"
+      - "en: 'Select Speaker'"
+      - "es: 'Seleccionar Discursante'"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
 
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)

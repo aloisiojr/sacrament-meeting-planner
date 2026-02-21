@@ -14,8 +14,9 @@
 # CR-139 (PRE+POST),
 # CR-140, CR-141, CR-142, CR-143, CR-144 (PRE+POST),
 # CR-145, CR-146, CR-147, CR-148, CR-149 (PRE+POST),
-# CR-150, CR-151, CR-152, CR-153 (PRE+POST)
-# Updated: 2026-02-20
+# CR-150, CR-151, CR-152, CR-153 (PRE+POST),
+# CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163 (PRE+POST)
+# Updated: 2026-02-21
 # =============================================================================
 
 # #############################################################################
@@ -6760,3 +6761,557 @@ cr_153:
           are PRE-EXISTING from commit d3a9f93 which changed the bundle ID, well before
           Phase 2 work. No Phase 2-related regressions found.
           Test file last modified: 0b2a117 (pre-Phase 2 batch).
+
+# #############################################################################
+# CR-156: Presentation mode accordion arrows (F097)
+# #############################################################################
+
+cr_156:
+  cr_id: CR-156
+  title: "Presentation mode accordion arrows based on card position"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: AccordionCard.tsx chevron logic (line 97) uses same arrow for
+      all collapsed cards. expandedIndex tracked in state. index vs expandedIndex
+      comparison needed for directional arrows. 4 validation checks created.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: acb9ebe
+        message: "feat(presentation): arrows, multiline, font toggle, titles (S05, CR-156/157/158/159)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-156-01
+        description: "Cards above expanded card show DOWN arrow"
+        status: PASSED
+        evidence: |
+          AccordionCard.tsx line 99: `{index < expandedIndex ? '\u25BC' : '\u25B2'}`
+          When index < expandedIndex, renders U+25BC (down-pointing triangle).
+          This is correct: cards above show down arrow.
+
+      - id: VC-156-02
+        description: "Cards below expanded card show UP arrow"
+        status: PASSED
+        evidence: |
+          AccordionCard.tsx line 99: When index > expandedIndex, the ternary
+          evaluates to '\u25B2' (up-pointing triangle). Cards below the expanded
+          card show up arrow. Correct.
+
+      - id: VC-156-03
+        description: "Expanded card shows NO arrow"
+        status: PASSED
+        evidence: |
+          AccordionCard.tsx line 92: `{!isExpanded && (` wraps the entire chevron
+          Text element. When isExpanded is true, no chevron is rendered at all.
+          The expanded card header has no arrow.
+
+      - id: VC-156-04
+        description: "Accordion expand/collapse still works correctly"
+        status: PASSED
+        evidence: |
+          AccordionCard.tsx lines 49-56: handlePress logic is unchanged. It checks
+          if index === expandedIndex (no-op), then calls LayoutAnimation and
+          setExpandedIndex. State transitions correct.
+
+# #############################################################################
+# CR-157: Presentation mode recognized names one per line (F098)
+# #############################################################################
+
+cr_157:
+  cr_id: CR-157
+  title: "Recognized names one per line in Presentation mode"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: recognized_names joined with comma (join(', ')) and type 'text'
+      limits to 2 lines. Need join('\n') with type 'multiline'.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: acb9ebe
+        message: "feat(presentation): arrows, multiline, font toggle, titles (S05, CR-156/157/158/159)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-157-01
+        description: "Recognized names are joined with newline instead of comma"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 83: `value: agenda.recognized_names.join('\n')`
+          Changed from join(', ') to join('\n'). Each name on its own line.
+
+      - id: VC-157-02
+        description: "Recognized names field uses multiline rendering"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 84: `type: 'multiline'`
+          Changed from 'text' to 'multiline'. In presentation.tsx line 159,
+          multiline type gets numberOfLines={undefined}, allowing unlimited lines.
+
+    should_pass_results:
+      - id: VC-157-03
+        description: "Single recognized name still renders correctly"
+        status: PASSED
+        evidence: |
+          join('\n') on a single-element array returns just the name string
+          with no trailing newline. ['John'].join('\n') === 'John'. Correct.
+
+# #############################################################################
+# CR-158: Presentation mode font size toggle (F099)
+# #############################################################################
+
+cr_158:
+  cr_id: CR-158
+  title: "Font size toggle button in Presentation mode header"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: No font size toggle exists. Font sizes hardcoded at 16px value,
+      12px label. Only close button in header.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: acb9ebe
+        message: "feat(presentation): arrows, multiline, font toggle, titles (S05, CR-156/157/158/159)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-158-01
+        description: "A font size toggle button exists next to the close button in presentation header"
+        status: PASSED
+        evidence: |
+          presentation.tsx lines 98-107: A Pressable with style fontToggleButton (36x36
+          circle, marginRight: 8) is rendered between the headerTitleContainer and the
+          closeButton. Shows 'Aa' or 'AA' text based on mode.
+
+      - id: VC-158-02
+        description: "Toggle switches between normal and large font sizes"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 40: `const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');`
+          Line 100: onPress toggles: `setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')`
+          Line 41: `const fontSizes = FONT_SIZES[fontSizeMode]` selects the active config.
+
+      - id: VC-158-03
+        description: "Normal mode uses current font size +1"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 31: FONT_SIZES.normal = { fieldLabel: 13, fieldValue: 17, ... }
+          Baseline was 12px label, 16px value. Normal mode is 13px and 17px respectively.
+          Both are baseline +1. Correct.
+
+      - id: VC-158-04
+        description: "Large mode uses significantly bigger font sizes"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 32: FONT_SIZES.large = { fieldLabel: 18, fieldValue: 26, ... }
+          fieldValue goes from 17 to 26 (large), fieldLabel from 13 to 18 (large).
+          26px is significantly bigger than 17px. Correct.
+
+    should_pass_results:
+      - id: VC-158-05
+        description: "Toggle button has accessible label"
+        status: PASSED
+        evidence: |
+          presentation.tsx line 101-102: accessibilityRole="button"
+          accessibilityLabel="Toggle font size". Properly accessible.
+
+# #############################################################################
+# CR-159: Presentation mode section titles match agenda (F100)
+# #############################################################################
+
+cr_159:
+  cr_id: CR-159
+  title: "Presentation mode section titles must match agenda tab"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: Presentation cards use different translation keys than AgendaForm
+      sections. Card 1 uses 'agenda.presiding' instead of 'agenda.sectionWelcome', etc.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: acb9ebe
+        message: "feat(presentation): arrows, multiline, font toggle, titles (S05, CR-156/157/158/159)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-159-01
+        description: "Card 1 title uses agenda.sectionWelcome"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 102: `cards.push({ title: t('agenda.sectionWelcome'), ... })`
+          Changed from t('agenda.presiding'). Now matches AgendaForm.tsx line 161.
+
+      - id: VC-159-02
+        description: "Card 2 title uses agenda.sectionSacrament"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 132: `cards.push({ title: t('agenda.sectionSacrament'), ... })`
+          Changed from t('agenda.wardBusiness'). Now matches AgendaForm.tsx line 286.
+
+      - id: VC-159-03
+        description: "Card 3 title uses agenda.sectionFirstSpeeches"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 160: `cards.push({ title: t('agenda.sectionFirstSpeeches'), ... })`
+          Changed from t('speeches.title'). Now matches AgendaForm.tsx line 362.
+
+      - id: VC-159-04
+        description: "Card 4 title uses agenda.sectionLastSpeech"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 170: `cards.push({ title: t('agenda.sectionLastSpeech'), ... })`
+          Changed from t('agenda.closingHymn'). Now matches AgendaForm.tsx line 426.
+
+# #############################################################################
+# CR-160: "Ultimo Discurso" only in Agenda, "3o Discurso" in Speeches (F101)
+# #############################################################################
+
+cr_160:
+  cr_id: CR-160
+  title: "Position 3 label split: lastSpeech in Agenda, slot format in Speeches"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: position 3 uses t('speeches.lastSpeech') in SundayCard, SpeechSlot,
+      AgendaForm, and PresentationMode. SundayCard is only used in Speeches tab.
+      AgendaSundayCard in agenda.tsx is separate.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 4169eea
+        message: "feat(ui): unify speech position labels (S02, CR-160)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-160-01
+        description: "SundayCard collapsed position 3 uses slot format (3o Discurso) not lastSpeech"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx line 360: `const posLabel = t('speeches.slot', { number: \`${pos}\u00BA\` });`
+          All 3 positions (1, 2, 3) now use the same slot format. Position 3 shows
+          "3o Discurso" not "Ultimo Discurso". The previous ternary checking pos === 3
+          is removed.
+
+      - id: VC-160-02
+        description: "SpeechSlot position 3 uses slot format (3o Discurso) not lastSpeech"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 53-56: getPositionLabel function simplified to just:
+          `return t('speeches.slot', { number: \`${position}\u00BA\` });`
+          The previous if(position === 3) return t('speeches.lastSpeech') is removed.
+          All positions use uniform slot format.
+
+      - id: VC-160-03
+        description: "AgendaForm still uses lastSpeech for position 3"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx line 429: `label={\`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}\`}`
+          Unchanged from baseline. AgendaForm (Agenda tab) still uses lastSpeech. Correct.
+
+      - id: VC-160-04
+        description: "Presentation mode still uses lastSpeech for position 3"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 166: `label: \`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}\``
+          Unchanged from baseline. Presentation mode still uses lastSpeech. Correct.
+
+# #############################################################################
+# CR-161: Collapsed speeches card layout redesign (F102)
+# #############################################################################
+
+cr_161:
+  cr_id: CR-161
+  title: "Collapsed speech card: integrated circle + label layout"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: 2-column layout (center text lines | right LED column), fontSize 11,
+      LED size 14. User wants integrated <circle> <label>: <name> format with bigger
+      font, smaller circles, circles on left.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: c49a8c7
+        message: "feat(ui): redesign collapsed speech card (S03, CR-161)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-161-01
+        description: "Status circles moved from right side to left of each speech label"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 363-384: Each speech position renders a View with
+          style speechRow (flexDirection: 'row') containing StatusLED first, then
+          the text label. The StatusLED is the first child in each row, placing
+          the circle to the left. The old separate ledsVertical column is gone.
+
+      - id: VC-161-02
+        description: "Speech label font size increased from 11px"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx line 460: styles.speakerNameLine fontSize: 13.
+          Increased from previous 11px to 13px.
+
+      - id: VC-161-03
+        description: "Status circle size reduced from 14px"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx line 366: StatusLED size={10}.
+          Reduced from previous 14px to 10px.
+
+      - id: VC-161-05
+        description: "Lines without designation show only status circle"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 374-382: `{name ? (<Text ...>{posLabel}: {name}</Text>) : null}`
+          When name is empty/falsy, only the StatusLED renders (no text).
+          The circle is always rendered but the label text is conditional.
+
+      - id: VC-161-06
+        description: "Separate ledsVertical column removed from right side"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx: The old block rendering `<View style={styles.ledsVertical}>...
+          {speechStatuses.map(...StatusLED...)}</View>` at the right side of the header
+          is completely removed. The styles.ledsVertical definition still exists (lines
+          455-458) but is unused dead CSS. No separate LED column renders.
+
+    should_pass_results:
+      - id: VC-161-04
+        description: "Line spacing between speech lines increased"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 462-467: styles.speechRow has marginBottom: 4.
+          Previously there was no margin between speech lines (they were just Text
+          elements with no spacing). Now 4px gap between each speech row.
+
+# #############################################################################
+# CR-162: Expanded card status circle to label row (F103)
+# #############################################################################
+
+cr_162:
+  cr_id: CR-162
+  title: "Expanded speech card: status circle moved to label row"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: StatusLED in speaker row alongside selector field. Label row is
+      separate. Topic row has marginLeft: 28 for LED offset.
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: b1af845
+        message: "feat(ui): move StatusLED to label row (S04, CR-162)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-162-01
+        description: "StatusLED removed from speaker selector row"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 164-202: The row View (styles.row) contains only
+          the speaker Pressable field and the remove button. No StatusLED component
+          in this row. StatusLED was removed from here.
+
+      - id: VC-162-02
+        description: "StatusLED moved to label row, aligned right"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 145-162: labelRow View (styles.labelRow) with
+          flexDirection: 'row', justifyContent: 'space-between'. Contains the label
+          Text on the left, and a Pressable statusSection on the right with
+          statusText + StatusLED. Correctly aligned right.
+
+      - id: VC-162-03
+        description: "Status text displayed next to circle in label row"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 152-154: `<Text style={styles.statusText}>
+          {t(\`speechStatus.${status}\`)}</Text>` renders the status text
+          (e.g., "Designado/Confirmado") immediately before the StatusLED circle.
+          Format is "<status text> <circle>".
+
+      - id: VC-162-04
+        description: "Speaker and topic fields occupy full card width without LED offset"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 303-308: styles.topicRow no longer has marginLeft: 28.
+          The previous offset (marginLeft: 28) that accounted for the LED is removed.
+          Topic row and speaker row both use full width (field with flex: 1).
+
+      - id: VC-162-05
+        description: "Status press functionality preserved on label row LED"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 147-161: The statusSection Pressable wraps both the
+          status text and StatusLED. Its onPress calls handleStatusPress (line 149).
+          The StatusLED also has onPress={handleStatusPress} (line 158). Both point
+          to the same handler which opens StatusChangeModal (line 98).
+
+# #############################################################################
+# CR-163: selectSpeaker placeholder rename (F104)
+# #############################################################################
+
+cr_163:
+  cr_id: CR-163
+  title: "Change selectSpeaker placeholder to Selecionar Discursante"
+  type: feature_request
+  spec: specs/SPEC_F097_F100.yaml
+  qa_plan: qa/QA_PLAN_016.yaml
+
+  pre_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    summary: |
+      Confirmed: speeches.selectSpeaker translations are "Selecionar orador" (pt-BR),
+      "Select speaker" (en), "Seleccionar orador" (es).
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: f694e87
+        message: "fix(i18n): update selectSpeaker placeholder (S01, CR-163)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-163-01
+        description: "pt-BR selectSpeaker changed to 'Selecionar Discursante'"
+        status: PASSED
+        evidence: |
+          pt-BR.json line 201: "selectSpeaker": "Selecionar Discursante"
+          Changed from "Selecionar orador".
+
+      - id: VC-163-02
+        description: "en selectSpeaker changed to 'Select Speaker'"
+        status: PASSED
+        evidence: |
+          en.json line 201: "selectSpeaker": "Select Speaker"
+          Changed from "Select speaker" (capitalized).
+
+      - id: VC-163-03
+        description: "es selectSpeaker changed to 'Seleccionar Discursante'"
+        status: PASSED
+        evidence: |
+          es.json line 201: "selectSpeaker": "Seleccionar Discursante"
+          Changed from "Seleccionar orador".
+
+    should_pass_results:
+      - id: VC-163-04
+        description: "Accessibility label also uses updated text"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx line 171: accessibilityLabel={t('speeches.selectSpeaker')}
+          Uses the same i18n key, so it automatically gets the updated translation.
+
+# #############################################################################
+# Batch 15 Phase 1 - Cross-cutting regression checks
+# #############################################################################
+
+batch15_phase1_regression:
+  regression_results:
+    - id: VC-REGR-01
+      description: "All existing tests pass without regressions"
+      status: PASSED
+      evidence: |
+        vitest run: 4344 passed, 2 failed out of 4346 total tests (75 test files).
+        The 2 failures are in batch7-f035-f039.test.ts (bundle identifier tests
+        expecting 'com.wardmanager.app' but finding 'com.sacramentmeetingmanager.app').
+        These are PRE-EXISTING from earlier batches, not caused by Phase 1.
+        Test file last modified: 0b2a117 (pre-Batch 15). All 140 new Batch 15 tests pass.
+
+    - id: VC-REGR-02
+      description: "Presentation mode still loads and renders without crashes"
+      status: PASSED
+      evidence: |
+        presentation.tsx correctly imports usePresentationData, buildPresentationCards,
+        AccordionCard. Font toggle state (line 40), fontSizes config (line 41),
+        and AccordionCard with cardTitleFontSize prop (line 129) all properly wired.
+        PresentationFieldRow receives fontSizes prop (line 77) and applies them.
+        No missing imports, no type errors, no undefined references.
+
+    - id: VC-REGR-03
+      description: "SundayCard collapsed and expanded states work in Speeches tab"
+      status: PASSED
+      evidence: |
+        SundayCard.tsx: Collapsed state renders DateBlock + headerCenter with speech
+        rows (lines 355-387). Expanded state renders SundayTypeDropdown + children
+        (lines 393-406). speeches.tsx renders SpeechSlot components as children when
+        expanded (lines 312-328). All prop flows intact.

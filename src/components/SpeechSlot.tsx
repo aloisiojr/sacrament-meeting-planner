@@ -147,16 +147,23 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       <View style={styles.outerRow}>
         {/* Left column: labels and fields */}
         <View style={styles.leftColumn}>
-          {/* Slot label with status text */}
+          {/* Slot label with status text and LED */}
           <View style={styles.labelRow}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
             <Pressable
+              style={styles.statusSection}
               onPress={handleStatusPress}
               disabled={isObserver || status === 'not_assigned'}
             >
               <Text style={[styles.statusText, { color: colors.textSecondary }]}>
                 {t(`speechStatus.${status}`)}
               </Text>
+              <StatusLED
+                status={status}
+                size={14}
+                onPress={handleStatusPress}
+                disabled={isObserver || status === 'not_assigned'}
+              />
             </Pressable>
           </View>
 
@@ -213,20 +220,9 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           </View>
         </View>
 
-        {/* Right column: LED and action buttons */}
+        {/* Right column: spacer and action buttons */}
         <View style={styles.rightColumn}>
-          <Pressable
-            style={styles.statusLedWrapper}
-            onPress={handleStatusPress}
-            disabled={isObserver || status === 'not_assigned'}
-          >
-            <StatusLED
-              status={status}
-              size={14}
-              onPress={handleStatusPress}
-              disabled={isObserver || status === 'not_assigned'}
-            />
-          </Pressable>
+          <View style={styles.statusLedPlaceholder} />
           <View style={styles.speakerActionWrapper}>
             {hasSpeaker && canUnassign && (
               <Pressable
@@ -296,9 +292,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  statusLedWrapper: {
+  statusLedPlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  statusSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statusText: {
     fontSize: 11,

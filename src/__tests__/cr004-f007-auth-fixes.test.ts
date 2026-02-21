@@ -518,9 +518,10 @@ describe('CR-004 F007: Auth Fixes', () => {
       expect(source).toContain("from '../../lib/supabase'");
     });
 
-    it('should call resetPasswordForEmail', () => {
+    it('should call Edge Function send-reset-email', () => {
       const source = readSourceFile('app/(auth)/forgot-password.tsx');
-      expect(source).toContain('supabase.auth.resetPasswordForEmail');
+      expect(source).toContain("functions.invoke");
+      expect(source).toContain("'send-reset-email'");
     });
 
     it('should trim email before sending', () => {

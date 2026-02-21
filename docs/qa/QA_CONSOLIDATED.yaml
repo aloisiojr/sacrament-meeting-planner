@@ -14,7 +14,7 @@
 # CR-139 (PRE+POST),
 # CR-140, CR-141, CR-142, CR-143, CR-144 (PRE+POST),
 # CR-145, CR-146, CR-147, CR-148, CR-149 (PRE+POST),
-# CR-150, CR-151, CR-152, CR-153 (PRE)
+# CR-150, CR-151, CR-152, CR-153 (PRE+POST)
 # Updated: 2026-02-20
 # =============================================================================
 
@@ -6441,7 +6441,7 @@ cr_150:
   cr_id: CR-150
   title: "Layout cards designacoes contraidos: nomes dos 3 discursantes com LEDs verticais"
   type: feature_request
-  spec: null
+  spec: specs/SPEC_F093_F096.yaml
   qa_plan: qa/QA_PLAN_015.yaml
 
   pre_validation:
@@ -6453,7 +6453,58 @@ cr_150:
       are only visible when expanded via SpeechSlot components. User wants collapsed cards to show
       speaker names next to vertical LEDs. 4 validation checks created (VC-150-01 to VC-150-04).
 
-  post_validation: null
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 1c940f8
+        message: "feat(ui): add speaker names and vertical LEDs to collapsed SundayCard (F093, CR-150)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 4204
+    tester_tests_total: 4206
+    tester_note: "2 failures are pre-existing batch7 bundle-identifier tests (com.wardmanager.app vs com.sacramentmeetingmanager.app), not related to Phase 2"
+
+    must_pass_results:
+      - id: VC-150-01
+        description: "Collapsed SundayCard shows speaker names next to LEDs for speeches-type sundays"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 355-375: When isSpeechesType && !expanded, renders 3 Text lines
+          in headerCenter. For each position (1, 2, 3), shows posLabel (using t('speeches.slot')
+          for positions 1-2 and t('speeches.lastSpeech') for position 3) followed by ': ' and
+          the speaker name. Line 359: const name = speech?.speaker_name ?? '';
+          Line 370: {`${posLabel}: ${name}`}
+
+      - id: VC-150-02
+        description: "LEDs are arranged vertically instead of horizontally in collapsed state"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx line 379: <View style={styles.ledsVertical}>
+          SundayCard.tsx line 460-463: ledsVertical style uses flexDirection: 'column', gap: 4.
+          The old horizontal 'leds' style (flexDirection: 'row', gap: 6) at line 456-459
+          is no longer referenced by the collapsed header rendering. LEDs are now vertical.
+
+      - id: VC-150-04
+        description: "No regression in expanded card behavior"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 398-411: Expanded state renders SundayTypeDropdown + children,
+          unchanged from baseline. The speaker names and LEDs are conditional on !expanded
+          (line 355: isSpeechesType && !expanded; line 378: !expanded && isSpeechesType),
+          so they are hidden when expanded, avoiding duplication with SpeechSlots.
+
+    should_pass_results:
+      - id: VC-150-03
+        description: "Speaker names truncate gracefully when too long"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx lines 366-368: Text component uses numberOfLines={1} and
+          ellipsizeMode="tail", ensuring long names are truncated with ellipsis.
 
 # #############################################################################
 # CR-151: Campos Pianista e Regente na agenda
@@ -6463,7 +6514,7 @@ cr_151:
   cr_id: CR-151
   title: "Campos Pianista e Regente na agenda (atores de musica)"
   type: feature_request
-  spec: null
+  spec: specs/SPEC_F093_F096.yaml
   qa_plan: qa/QA_PLAN_015.yaml
 
   pre_validation:
@@ -6476,7 +6527,66 @@ cr_151:
       ZERO references to pianist or conductor - fields are not rendered in the UI.
       5 validation checks created (VC-151-01 to VC-151-05).
 
-  post_validation: null
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 860f9c1
+        message: "feat(agenda): add pianist and conductor fields in Welcome section (F094, CR-151)"
+      - hash: b6acf6f
+        message: "feat(presentation): add pianist/conductor + conditional intermediate hymn (F094+F095)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-151-01
+        description: "Pianist field appears in AgendaForm with ActorSelector for can_music role"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 229-241: FieldRow with label t('agenda.pianist') wraps a
+          SelectorField showing agenda.pianist_name. On press, opens ActorSelector with
+          setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_music' }).
+          Positioned after Announcements, before Conductor, per SPEC AC-094-09.
+
+      - id: VC-151-02
+        description: "Conductor field appears in AgendaForm with ActorSelector for can_music role"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 243-255: FieldRow with label t('agenda.conductor') wraps a
+          SelectorField showing agenda.conductor_name. On press, opens ActorSelector with
+          setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_music' }).
+          Positioned after Pianist, before Opening Hymn.
+
+      - id: VC-151-03
+        description: "Pianist and Conductor fields save correctly to database via updateField"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 490-507: ActorSelector onSelect handler computes
+          nameField = `${selectorModal.field}_name` and idField = `${selectorModal.field}_actor_id`.
+          For field='pianist', this produces pianist_name and pianist_actor_id.
+          For field='conductor', this produces conductor_name and conductor_actor_id.
+          handleActorSelect (line 99-111) calls updateAgenda.mutate with these fields.
+
+      - id: VC-151-04
+        description: "Pianist and Conductor fields are disabled for Observer role"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx line 233: if (!isObserver) check gates the setSelectorModal call
+          for pianist. Line 248: same check for conductor. Both SelectorField components
+          receive disabled={isObserver} prop (lines 238 and 253), which prevents onPress
+          via Pressable disabled prop (SelectorField component, line 607-608).
+
+    should_pass_results:
+      - id: VC-151-05
+        description: "Pianist and Conductor appear in Presentation Mode"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts lines 94-97: welcomeFields.push includes both
+          { label: t('agenda.pianist'), value: agenda?.pianist_name ?? '', type: 'text' }
+          and { label: t('agenda.conductor'), value: agenda?.conductor_name ?? '', type: 'text' }.
+          Positioned after announcements, before openingHymn (lines 98-99), matching SPEC AC-094-08.
 
 # #############################################################################
 # CR-152: Toggle para Hino Intermediario na agenda
@@ -6486,7 +6596,7 @@ cr_152:
   cr_id: CR-152
   title: "Toggle para Hino Intermediario na agenda"
   type: feature_request
-  spec: null
+  spec: specs/SPEC_F093_F096.yaml
   qa_plan: qa/QA_PLAN_015.yaml
 
   pre_validation:
@@ -6498,7 +6608,61 @@ cr_152:
       field in DB or types. User wants ability to hide intermediate hymn independently.
       4 validation checks created (VC-152-01 to VC-152-04).
 
-  post_validation: null
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 3c09a4e
+        message: "feat(db): add has_intermediate_hymn column (F095, CR-152)"
+      - hash: dac0e09
+        message: "feat(agenda): add intermediate hymn toggle with DB persistence (F095, CR-152)"
+      - hash: b6acf6f
+        message: "feat(presentation): add pianist/conductor + conditional intermediate hymn (F094+F095)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-152-01
+        description: "A toggle control exists for the intermediate hymn, separate from the special presentation toggle"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 400-406: A ToggleField with label t('agenda.intermediateHymn')
+          controls agenda.has_intermediate_hymn. This is separate from the ToggleField for
+          has_special_presentation at lines 382-388. The intermediate hymn toggle appears
+          inside the else branch (when has_special_presentation is false), at line 399-421.
+
+      - id: VC-152-02
+        description: "When intermediate hymn toggle is OFF, the hymn selector is hidden"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx line 407: {agenda.has_intermediate_hymn && ( ... )}
+          The FieldRow with HymnSelectorModal for intermediate_hymn_id only renders when
+          has_intermediate_hymn is true. When false, the selector is completely hidden.
+
+      - id: VC-152-03
+        description: "Toggle state persists to database"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx line 403: onToggle={(val) => updateField('has_intermediate_hymn', val)}
+          This calls updateAgenda.mutate with the has_intermediate_hymn field. The field
+          is stored in the DB via migration 016_add_has_intermediate_hymn.sql:
+          ALTER TABLE sunday_agendas ADD COLUMN has_intermediate_hymn BOOLEAN NOT NULL DEFAULT true.
+          The SundayAgenda TypeScript type (database.ts line 196) includes has_intermediate_hymn: boolean.
+
+      - id: VC-152-04
+        description: "Interaction between special presentation toggle and intermediate hymn toggle is correct"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 389-423: When has_special_presentation is true (line 389),
+          the special presentation description input is shown and the entire intermediate
+          hymn section (toggle + selector) is hidden. When has_special_presentation is false
+          (line 398), the intermediate hymn toggle appears. This implements the mutually
+          exclusive behavior: special presentation ON hides intermediate hymn entirely.
+          The intermediate hymn toggle only controls visibility when special presentation is OFF.
+          Presentation mode (usePresentationMode.ts line 153) also checks
+          agenda?.has_intermediate_hymn !== false before showing the hymn.
 
 # #############################################################################
 # CR-153: Layout cards agenda contraidos com linhas de status
@@ -6508,7 +6672,7 @@ cr_153:
   cr_id: CR-153
   title: "Layout cards agenda contraidos com linhas de status de preenchimento"
   type: feature_request
-  spec: null
+  spec: specs/SPEC_F093_F096.yaml
   qa_plan: qa/QA_PLAN_015.yaml
 
   pre_validation:
@@ -6521,4 +6685,78 @@ cr_153:
       status lines of how complete the agenda is. 4 validation checks created
       (VC-153-01 to VC-153-04).
 
-  post_validation: null
+  post_validation:
+    timestamp: "2026-02-20"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: aa55dbb
+        message: "feat(hooks): add useAgendaRange hook for agenda range queries (F096, CR-153)"
+      - hash: dad8cd1
+        message: "feat(i18n): add agenda status line keys in 3 languages (F096, CR-153)"
+      - hash: 9c678ba
+        message: "feat(ui): add status lines to collapsed agenda cards (F096, CR-153)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-153-01
+        description: "Collapsed agenda card shows fill-status information"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 367-426: When !isExpanded && !exceptionLabel (i.e., collapsed
+          speeches card), computes and renders 3-4 status lines:
+          1. "Falta: Presidir | Dirigir | Pianista | Regente" (only if missing roles exist, line 401-405)
+          2. "Discursantes X/3" with speaker count (lines 406-411)
+          3. "Oracoes Y/2" with prayer count (lines 412-417)
+          4. "Hinos Z/W" with hymn count (lines 418-423)
+          Uses i18n keys agenda.statusMissing, statusSpeakers, statusPrayers, statusHymns.
+
+      - id: VC-153-02
+        description: "Status line reflects actual agenda data (not hardcoded)"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 369-395: Status computation reads from agenda prop (SundayAgenda | null)
+          passed from agendaMap, which is built from useAgendaRange query (lines 96-102).
+          - Missing roles check agenda?.presiding_name, conducting_name, pianist_name, conductor_name (lines 370-373)
+          - Speakers count checks speaker_X_override and speech.speaker_name (lines 376-381)
+          - Prayers count checks opening_prayer_name and closing_prayer_name (lines 383-385)
+          - Hymns count checks opening_hymn_id, sacrament_hymn_id, closing_hymn_id,
+            and conditionally intermediate_hymn_id (lines 387-395)
+          All values are dynamically read from actual data, not hardcoded.
+          useAgendaRange (useAgenda.ts lines 168-187) loads all agendas for the visible range.
+
+      - id: VC-153-04
+        description: "No regression in expanded agenda card behavior"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 436-455: Expanded state still renders SundayTypeDropdown +
+          ThemedErrorBoundary > AgendaForm, unchanged from baseline. Status lines only
+          render when !isExpanded (line 367 condition), so they disappear when expanded.
+
+    should_pass_results:
+      - id: VC-153-03
+        description: "Status line handles edge cases (no agenda created yet, all fields empty, all fields filled)"
+        status: PASSED
+        evidence: |
+          agenda.tsx line 287: agenda prop typed as SundayAgenda | null.
+          Line 210: agenda={agendaMap.get(date) ?? null} - returns null if no agenda exists.
+          Lines 370-395: All field checks use optional chaining (agenda?.presiding_name, etc.),
+          so when agenda is null, all fields count as empty/missing. This produces:
+          "Falta: Presidir | Dirigir | Pianista | Regente", "Discursantes 0/3",
+          "Oracoes 0/2", "Hinos 0/3". No crash when agenda is null.
+          When all filled: missingRoles.length === 0, so "Falta" line hidden (line 401).
+          Lines with filled===total get GREEN color (lines 407, 413, 419).
+
+    regression_results:
+      - id: VC-REGR-01
+        description: "All existing tests pass without regressions"
+        status: PASSED
+        evidence: |
+          vitest run: 4204 passed, 2 failed out of 4206 total tests.
+          The 2 failures are in batch7-f035-f039.test.ts (bundle identifier tests expecting
+          'com.wardmanager.app' but finding 'com.sacramentmeetingmanager.app'). These failures
+          are PRE-EXISTING from commit d3a9f93 which changed the bundle ID, well before
+          Phase 2 work. No Phase 2-related regressions found.
+          Test file last modified: 0b2a117 (pre-Phase 2 batch).

@@ -1,0 +1,499 @@
+# =============================================================================
+# PLAN_P030.yaml
+# Batch 17: Stake Announcements in Presentation, AgendaForm Last Speech Label,
+#            SpeechSlot Vertical Alignment
+# Features: F110 (CR-172), F111 (CR-173), F112 (CR-174)
+# Created: 2026-02-21
+# Phase: 1 of 1
+# Total ACs: 15 (F110: 5, F111: 4, F112: 6)
+# Total ECs: 7 (F110: 2, F111: 1, F112: 4)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 17
+created: "2026-02-21"
+last_updated: "2026-02-21"
+spec_ref: "docs/specs/SPEC_F110_F112.yaml"
+arch_ref: "docs/arch/ARCH_M030.yaml"
+
+goal: >
+  Implement 3 features: add stake announcements field to Presentation Mode
+  Card 2 when the toggle is on with i18n support in 3 locales (F110), fix
+  redundant last speech label in AgendaForm from 'Ultimo Discurso - Discurso'
+  to 'Ultimo Discurso' (F111), and restructure SpeechSlot layout to use a
+  fixed-width right column for true center-to-center alignment between
+  StatusLED circle and X remove button, superseding the paddingRight:5
+  approach from CR-165/F103 (F112). All changes are client-side: conditional
+  rendering, i18n key addition, label simplification, and CSS/style
+  restructuring. No database schema changes, no new hooks, no new components.
+
+strategy:
+  order: "Happy path (F110 presentation field, F111 label fix, F112 alignment) -> Edge cases (special meeting types, observer/secretary roles) -> Tests"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Tests created in dedicated step S04 after all code changes"
+  dependency_notes: >
+    All 3 features are fully independent with no file overlap. F110 modifies
+    usePresentationMode.ts + i18n locales. F111 modifies AgendaForm.tsx. F112
+    modifies SpeechSlot.tsx. The i18n locale files (pt-BR.json, en.json,
+    es.json) are shared between F110 (adds presentation.stakeAnnouncementsText)
+    and F111/F112 (no i18n changes), so there is no conflict. S01-S03 are
+    fully parallelizable. S04 (tests) depends on all code steps completing.
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F110 - Stake announcements in Presentation Mode (CR-172)
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F110: Add stake announcements field to Presentation Mode Card 2 when toggle is on"
+    feature: F110
+    cr: 172
+    depends_on: []
+    parallelizable_with: [S02, S03]
+    files:
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          usePresentationMode.ts - In buildPresentationCards(), after the
+          baptism_confirmation conditional block (line ~126) and BEFORE the
+          sacrament hymn push (line ~127), add a new conditional block:
+
+            if (agenda?.has_stake_announcements) {
+              designationFields.push({
+                label: t('agenda.stakeAnnouncements'),
+                value: t('presentation.stakeAnnouncementsText'),
+                type: 'text',
+              });
+            }
+
+          This follows the exact same pattern as the existing baby_blessing
+          (lines ~113-118) and baptism_confirmation (lines ~120-125) blocks:
+          conditional check on a boolean field, push a field with label and
+          value.
+
+          The label reuses the existing i18n key t('agenda.stakeAnnouncements')
+          which already exists in all 3 locales (used by the toggle in
+          AgendaForm.tsx line ~336-342).
+
+          The value uses a NEW i18n key t('presentation.stakeAnnouncementsText')
+          which must be added to all 3 locale files.
+
+          Field ordering in Card 2 after this change:
+          1. Ward Business (sustaining_releasing) - if present
+          2. Baby Blessing - if has_baby_blessing && baby_blessing_names
+          3. Baptism Confirmation - if has_baptism_confirmation && baptism_confirmation_names
+          4. Stake Announcements - if has_stake_announcements (NEW)
+          5. Sacrament Hymn (always)
+
+      - description: >
+          Add presentation.stakeAnnouncementsText i18n key in all 3 locale files:
+
+          pt-BR.json - Add to the "presentation" object:
+            "stakeAnnouncementsText": "Passar palavra a Estaca"
+
+          en.json - Add to the "presentation" object:
+            "stakeAnnouncementsText": "Turn the time over to the Stake"
+
+          es.json - Add to the "presentation" object:
+            "stakeAnnouncementsText": "Ceder la palabra a la Estaca"
+
+          The existing key agenda.stakeAnnouncements is NOT modified.
+          It is reused as-is for the field label.
+
+    done_when:
+      - "usePresentationMode.ts has conditional block checking agenda?.has_stake_announcements"
+      - "Stake announcements field pushed to designationFields when toggle is on"
+      - "Field uses label: t('agenda.stakeAnnouncements') and value: t('presentation.stakeAnnouncementsText')"
+      - "Field type is 'text'"
+      - "Field position: after baptism_confirmation, before sacrament hymn"
+      - "pt-BR.json has presentation.stakeAnnouncementsText = 'Passar palavra a Estaca'"
+      - "en.json has presentation.stakeAnnouncementsText = 'Turn the time over to the Stake'"
+      - "es.json has presentation.stakeAnnouncementsText = 'Ceder la palabra a la Estaca'"
+      - "No field appears when has_stake_announcements is false"
+      - "Existing agenda.stakeAnnouncements i18n key unchanged"
+    tests:
+      - type: unit
+        description: >
+          Test buildPresentationCards includes stake announcements field when
+          has_stake_announcements is true. Test field not included when false.
+          Test field position after baptism_confirmation. Test i18n keys in
+          all 3 locales. Test field type is 'text'.
+    covers:
+      acceptance_criteria: [AC-110-01, AC-110-02, AC-110-03, AC-110-04, AC-110-05]
+      edge_cases: [EC-110-01, EC-110-02]
+    risks:
+      - risk: "Field position may shift if other fields are added between baptism_confirmation and sacrament hymn"
+        mitigation: "The insertion point is clearly defined in buildPresentationCards(). The conditional block follows the established pattern of baby_blessing and baptism_confirmation."
+    commit_message: "feat(presentation): show stake announcements field when toggle is on (F110, CR-172)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F111 - Fix last speech label in AgendaForm (CR-173)
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F111: Remove redundant ' - Discurso' suffix from last speech label in AgendaForm"
+    feature: F111
+    cr: 173
+    depends_on: []
+    parallelizable_with: [S01, S03]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+    changes:
+      - description: >
+          AgendaForm.tsx - Change line 429 from:
+            label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
+
+          To:
+            label={t('speeches.lastSpeech')}
+
+          This is the same fix as CR-170/F108 which was applied to
+          usePresentationMode.ts (line 166). CR-173 applies the identical
+          fix to the AgendaForm component (the agenda editing view on the
+          sunday card).
+
+          Result:
+          - pt-BR: "Ultimo Discurso" (not "Ultimo Discurso - Discurso")
+          - en: "Final Speech" (not "Final Speech - Speech")
+          - es: "Ultimo Discurso" (not "Ultimo Discurso - Discurso")
+
+          No new i18n keys needed. No other labels in AgendaForm are affected.
+          The first and second speaker labels use a different format
+          (`{N}o ${t('speeches.speaker')}`) which is correct and unchanged.
+
+    done_when:
+      - "AgendaForm.tsx last speaker label uses t('speeches.lastSpeech') only"
+      - "No concatenation with ' - ' and t('speeches.speaker') in last speaker label"
+      - "pt-BR shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+      - "en shows 'Final Speech' (not 'Final Speech - Speech')"
+      - "es shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')"
+      - "First speaker label unchanged (uses `1o ${t('speeches.speaker')}` format)"
+      - "Second speaker label unchanged (uses `2o ${t('speeches.speaker')}` format)"
+    tests:
+      - type: unit
+        description: >
+          Test AgendaForm.tsx last speaker SpeakerField label is
+          t('speeches.lastSpeech') without concatenation. Test first and
+          second speaker labels unchanged. Test all 3 locales produce
+          correct label text.
+    covers:
+      acceptance_criteria: [AC-111-01, AC-111-02, AC-111-03, AC-111-04]
+      edge_cases: [EC-111-01]
+    risks:
+      - risk: "None - simple string concatenation removal, identical to CR-170/F108 fix"
+        mitigation: "N/A"
+    commit_message: "fix(agenda): remove redundant suffix from last speech label in AgendaForm (F111, CR-173)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F112 - SpeechSlot vertical center-to-center alignment (CR-174)
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F112: Restructure SpeechSlot layout to fixed-width right column for LED/X alignment"
+    feature: F112
+    cr: 174
+    depends_on: []
+    parallelizable_with: [S01, S02]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+    changes:
+      - description: >
+          Restructure the SpeechSlot layout from independent rows to a two-column
+          layout (outerRow with leftColumn + rightColumn) as specified in
+          ARCH_M030 and ADR-076, superseding ADR-074 paddingRight:5.
+
+          **Current structure (lines ~142-237):**
+          <View container>
+            <View labelRow>  (flexDirection:'row', justifyContent:'space-between')
+              <Text label />
+              <Pressable statusSection>  (row, gap:6, paddingRight:5)
+                <Text statusText />
+                <StatusLED />
+              </Pressable>
+            </View>
+            <View row>  (row, gap:12)
+              <Pressable field>  (flex:1, height:38)
+                ...speaker field...
+              </Pressable>
+              {hasSpeaker && canUnassign && <Pressable>X</Pressable>}
+            </View>
+            <View topicRow>  (row, gap:12)
+              <Pressable topicField>  (flex:1)
+                ...topic field...
+              </Pressable>
+              {topicDisplay && canAssign && <Pressable>X</Pressable>}
+            </View>
+          </View>
+
+          **New structure:**
+          <View container>
+            <View outerRow>  (flexDirection: 'row')
+              <View leftColumn>  (flex: 1)
+                <View labelRow>  (flexDirection:'row', justifyContent:'space-between', alignItems:'center')
+                  <Text label />
+                  <Pressable statusTextPressable onPress={handleStatusPress}>
+                    <Text statusText />
+                  </Pressable>
+                </View>
+                <View row>
+                  <Pressable field>  (flex:1, height:38)
+                    ...speaker field...
+                  </Pressable>
+                </View>
+                <View topicRow>
+                  <Pressable topicField>  (flex:1)
+                    ...topic field...
+                  </Pressable>
+                </View>
+              </View>
+              <View rightColumn>  (width: 36, alignItems: 'center')
+                <Pressable statusLedWrapper onPress={handleStatusPress}>
+                  <StatusLED />
+                </Pressable>
+                <View speakerActionWrapper>  (height: 38, justifyContent: 'center')
+                  {hasSpeaker && canUnassign && <Pressable removeButton>X</Pressable>}
+                </View>
+                {showTopicRow && (
+                  <View topicActionWrapper>  (height: 34, marginTop: 6, justifyContent: 'center')
+                    {topicDisplay && canAssign && <Pressable removeButton>X</Pressable>}
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+      - description: >
+          Key design decisions (from ARCH_M030/ADR-076):
+
+          1. Right column width: 36px. Both StatusLED (14px circle) and X button
+             (~32px with padding) are centered within 36px. Both centers at 18px
+             from column left edge, guaranteeing vertical alignment.
+
+          2. StatusText moves from statusSection Pressable to labelRow directly,
+             wrapped in its own Pressable with the same onPress handler (opens
+             StatusChangeModal). StatusLED moves to rightColumn wrapped in a
+             Pressable with the same onPress.
+
+          3. Speaker row and topic row no longer have gap:12 since X buttons
+             are in the right column. Fields use flex:1 within leftColumn.
+
+          4. Right column row heights match left column rows:
+             - statusLedWrapper: justifyContent:'center', height matches labelRow
+             - speakerActionWrapper: height:38 (matches field height)
+             - topicActionWrapper: height:34, marginTop:6 (matches topicField)
+
+      - description: >
+          Style changes:
+
+          NEW styles:
+            outerRow: {
+              flexDirection: 'row',
+            }
+            leftColumn: {
+              flex: 1,
+            }
+            rightColumn: {
+              width: 36,
+              alignItems: 'center',
+            }
+            statusLedWrapper: {
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+            speakerActionWrapper: {
+              height: 38,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+            topicActionWrapper: {
+              height: 34,
+              marginTop: 6,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+
+          REMOVED/MODIFIED styles:
+            statusSection: REMOVED (LED separated from status text)
+            row: remove gap:12 (X button moved to right column)
+            topicRow: remove gap:12 (X button moved to right column)
+
+          UNCHANGED styles:
+            container, label, labelRow, field, fieldText, fieldArrow,
+            removeButton, topicField, topicText
+
+    done_when:
+      - "SpeechSlot uses outerRow with leftColumn (flex:1) + rightColumn (width:36)"
+      - "StatusLED is in rightColumn, centered within 36px width"
+      - "Speaker X remove button is in rightColumn, centered within 36px width"
+      - "Topic X clear button is in rightColumn, centered within 36px width"
+      - "StatusLED circle center and X button center are at same horizontal position (18px from right edge)"
+      - "paddingRight:5 removed from old statusSection style (ADR-074 superseded)"
+      - "statusSection style removed or repurposed"
+      - "Status text remains visible and tappable in labelRow (opens StatusChangeModal)"
+      - "StatusLED in rightColumn is also tappable (opens StatusChangeModal)"
+      - "Alignment consistent when X button is not visible (no speaker assigned)"
+      - "Alignment consistent across all 3 speech positions"
+      - "Topic clear button also aligned when visible"
+      - "Layout does not break on narrow screens (speaker name truncates with ellipsis)"
+      - "gap:12 removed from speaker row and topic row styles"
+    tests:
+      - type: unit
+        description: >
+          Test SpeechSlot layout has outerRow structure. Test rightColumn width
+          is 36. Test StatusLED is in rightColumn. Test X buttons are in
+          rightColumn. Test paddingRight:5 not present. Test statusSection style
+          removed. Test status text still present and pressable. Test alignment
+          is consistent regardless of speaker assignment state.
+    covers:
+      acceptance_criteria: [AC-112-01, AC-112-02, AC-112-03, AC-112-04, AC-112-05, AC-112-06]
+      edge_cases: [EC-112-01, EC-112-02, EC-112-03, EC-112-04]
+    risks:
+      - risk: "Layout restructure may introduce visual regressions in SpeechSlot spacing"
+        mitigation: "The restructure preserves all existing heights, gaps, and visual elements. Only the container hierarchy changes. The outerRow + column approach is standard React Native layout. Visual testing on device will catch any spacing issues."
+      - risk: "Status text tappability may be affected when moved out of statusSection Pressable"
+        mitigation: "Status text is wrapped in its own Pressable with the same onPress handler. The hit area is preserved or improved since it is no longer sharing a Pressable with the LED."
+      - risk: "Right column may consume too much space on narrow screens"
+        mitigation: "36px is conservative. The left column has flex:1, so the speaker field will shrink and truncate text. This matches the existing behavior where X buttons occupy space. The 36px column is actually smaller than the previous gap:12 + X button width (~44px)."
+    commit_message: "fix(ui): restructure SpeechSlot to fixed-width right column for center alignment (F112, CR-174)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Tests for Batch 17
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "Batch 17 tests for F110-F112"
+    feature: all
+    cr: [172, 173, 174]
+    depends_on: [S01, S02, S03]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch17.test.ts
+        action: create
+    changes:
+      - description: >
+          Create comprehensive test file batch17.test.ts covering all 3 features.
+
+          F110 tests (Stake announcements in Presentation Mode):
+          - Verify usePresentationMode.ts contains 'has_stake_announcements' conditional
+          - Verify the field uses t('agenda.stakeAnnouncements') as label
+          - Verify the field uses t('presentation.stakeAnnouncementsText') as value
+          - Verify field type is 'text'
+          - Verify field is positioned after baptism_confirmation and before sacrament hymn
+          - Verify field NOT included when has_stake_announcements is false/undefined
+          - Verify pt-BR.json has presentation.stakeAnnouncementsText key
+          - Verify en.json has presentation.stakeAnnouncementsText = 'Turn the time over to the Stake'
+          - Verify es.json has presentation.stakeAnnouncementsText key
+          - Verify agenda.stakeAnnouncements key exists in all 3 locales (reused, not modified)
+
+          F111 tests (AgendaForm last speech label):
+          - Verify AgendaForm.tsx last speaker label references t('speeches.lastSpeech')
+          - Verify no concatenation with t('speeches.speaker') in last speaker label context
+          - Verify first speaker label format unchanged (uses speeches.slot or similar)
+          - Verify second speaker label format unchanged
+
+          F112 tests (SpeechSlot alignment):
+          - Verify SpeechSlot.tsx has outerRow or equivalent two-column layout
+          - Verify rightColumn width is 36
+          - Verify no paddingRight: 5 in statusSection or equivalent (ADR-074 superseded)
+          - Verify statusSection style removed or does not have paddingRight
+          - Verify speakerActionWrapper height is 38
+          - Verify topicActionWrapper height is 34 with marginTop 6
+          - Verify alignItems: 'center' on rightColumn
+          - Verify status text still rendered (visible and tappable)
+          - Verify gap:12 not present on speaker row style
+          - Verify gap:12 not present on topic row style
+
+    done_when:
+      - "batch17.test.ts created with tests for all 3 features"
+      - "All tests pass with vitest"
+      - "Coverage: 15 ACs + 7 ECs across 3 features"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 15 ACs and 8 ECs across 3 features"
+    covers:
+      acceptance_criteria: [AC-110-01, AC-110-02, AC-110-03, AC-110-04, AC-110-05, AC-111-01, AC-111-02, AC-111-03, AC-111-04, AC-112-01, AC-112-02, AC-112-03, AC-112-04, AC-112-05, AC-112-06]
+      edge_cases: [EC-110-01, EC-110-02, EC-111-01, EC-112-01, EC-112-02, EC-112-03, EC-112-04]
+    risks:
+      - risk: "None - standard test file creation following established batch test patterns"
+        mitigation: "N/A"
+    commit_message: "test(batch17): add tests for F110-F112 (CR-172 to CR-174)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+
+  # F110 - Stake announcements in Presentation Mode
+  - ac_id: AC-110-01
+    how_to_verify: "Open Presentation Mode with has_stake_announcements=true. Verify field appears in Card 2 with label 'Apoios e Agradecimentos da Estaca' and value 'Passar palavra a Estaca' (pt-BR)."
+    covered_by_steps: [S01, S04]
+
+  - ac_id: AC-110-02
+    how_to_verify: "Open Presentation Mode with has_stake_announcements=false. Verify no stake announcements field appears in Card 2."
+    covered_by_steps: [S01, S04]
+
+  - ac_id: AC-110-03
+    how_to_verify: "Open Presentation Mode with has_stake_announcements=true AND has_baptism_confirmation=true. Verify field order: Ward Business, Baby Blessing, Baptism Confirmation, Stake Announcements, Sacrament Hymn."
+    covered_by_steps: [S01, S04]
+
+  - ac_id: AC-110-04
+    how_to_verify: "Switch ward language to English. Verify label='Stake Sustainings and Releases' and value='Turn the time over to the Stake'."
+    covered_by_steps: [S01, S04]
+
+  - ac_id: AC-110-05
+    how_to_verify: "Switch ward language to Spanish. Verify label='Apoyos y Agradecimientos de Estaca' and value='Ceder la palabra a la Estaca'."
+    covered_by_steps: [S01, S04]
+
+  # F111 - AgendaForm last speech label
+  - ac_id: AC-111-01
+    how_to_verify: "Open AgendaForm in pt-BR locale for a normal meeting. Verify last speaker field label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')."
+    covered_by_steps: [S02, S04]
+
+  - ac_id: AC-111-02
+    how_to_verify: "Open AgendaForm in en locale. Verify last speaker field label shows 'Final Speech' (not 'Final Speech - Speech')."
+    covered_by_steps: [S02, S04]
+
+  - ac_id: AC-111-03
+    how_to_verify: "Open AgendaForm in es locale. Verify last speaker field label shows 'Ultimo Discurso' (not 'Ultimo Discurso - Discurso')."
+    covered_by_steps: [S02, S04]
+
+  - ac_id: AC-111-04
+    how_to_verify: "Verify first speaker label shows '1o Discurso' and second shows '2o Discurso' (unchanged format)."
+    covered_by_steps: [S02, S04]
+
+  # F112 - SpeechSlot center-to-center alignment
+  - ac_id: AC-112-01
+    how_to_verify: "Open expanded SpeechSlot with assigned speaker. Verify StatusLED circle center is at same horizontal position as X button center (both centered within 36px right column)."
+    covered_by_steps: [S03, S04]
+
+  - ac_id: AC-112-02
+    how_to_verify: "Expand all 3 SpeechSlots with assigned speakers. Verify all 3 have consistent center-to-center alignment."
+    covered_by_steps: [S03, S04]
+
+  - ac_id: AC-112-03
+    how_to_verify: "Expand SpeechSlot with both speaker AND topic assigned. Verify topic X button center is also at same horizontal position as StatusLED center and speaker X center."
+    covered_by_steps: [S03, S04]
+
+  - ac_id: AC-112-04
+    how_to_verify: "Expand SpeechSlot without speaker assigned (no X button). Verify StatusLED circle position is the same as when X is present (rightColumn always 36px wide)."
+    covered_by_steps: [S03, S04]
+
+  - ac_id: AC-112-05
+    how_to_verify: "Tap status text or LED circle on expanded SpeechSlot. Verify StatusChangeModal opens as before."
+    covered_by_steps: [S03, S04]
+
+  - ac_id: AC-112-06
+    how_to_verify: "View expanded SpeechSlot on narrow screen (iPhone SE). Verify speaker name truncates with ellipsis. Alignment maintained. No overflow."
+    covered_by_steps: [S03, S04]

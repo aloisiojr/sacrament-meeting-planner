@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-21"
-  total_features: 100
-  total_change_requests: 166
+  total_features: 103
+  total_change_requests: 169
   implemented_crs: 96
-  pending_crs: 68
+  pending_crs: 71
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -59,6 +59,7 @@ metadata:
     - docs/specs/SPEC_F097_F100.yaml
     - docs/specs/SPEC_F101_F102.yaml
     - docs/specs/SPEC_F103_F109.yaml
+    - docs/specs/SPEC_F110_F112.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1992,8 +1993,66 @@ features:
       - "Modify batch7-f035-f039.test.ts and batch14-f088-f092.test.ts"
       - "Must run after F101 implementation"
 
+  # ---------------------------------------------------------------------------
+  # Batch 17 (F110-F112) - Stake announcements in presentation, AgendaForm label, SpeechSlot alignment
+  # ---------------------------------------------------------------------------
+
+  - id: F110
+    name: "Presentation mode: show Stake Sustainings and Releases card when toggle is on"
+    status: pending
+    rfs: []
+    description: >
+      Quando toggle has_stake_announcements esta ligado, adicionar campo no
+      Card 2 (Designacoes e Sacramento) da tela de apresentacao com subtitulo
+      (label) usando i18n key agenda.stakeAnnouncements e valor (texto) usando
+      novo i18n key presentation.stakeAnnouncementsText. Posicao: apos
+      baptism_confirmation, antes do sacrament_hymn. Novo i18n key nos 3 idiomas.
+    modified_by_crs: [172]
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    notes:
+      - "CR-172: Stake announcements in presentation mode"
+      - "5 acceptance criteria"
+      - "4 files modified (usePresentationMode.ts, 3 locale files)"
+      - "New i18n key: presentation.stakeAnnouncementsText"
+      - "Existing i18n key used as label: agenda.stakeAnnouncements"
+
+  - id: F111
+    name: "AgendaForm: fix last speech label from 'Ultimo Discurso - Discurso' to 'Ultimo Discurso'"
+    status: pending
+    rfs: []
+    description: >
+      Trocar label redundante no campo do ultimo discursante na AgendaForm de
+      '${t("speeches.lastSpeech")} - ${t("speeches.speaker")}' para apenas
+      t("speeches.lastSpeech"). Mesma correcao que CR-170/F108 fez na
+      usePresentationMode.ts, agora aplicada na AgendaForm.tsx (linha 429).
+    modified_by_crs: [173]
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    notes:
+      - "CR-173: Same fix as CR-170 but in AgendaForm"
+      - "4 acceptance criteria"
+      - "1 file modified (AgendaForm.tsx)"
+      - "No new i18n keys needed"
+
+  - id: F112
+    name: "SpeechSlot: vertically align center of StatusLED with center of X remove button"
+    status: pending
+    rfs: []
+    description: >
+      Reestruturar layout do SpeechSlot para alinhar centro-a-centro o circulo
+      do StatusLED (label row) com o botao X de remover (speaker row). Abordagem
+      recomendada: coluna de largura fixa a direita compartilhada entre as rows.
+      Substitui a abordagem do CR-165/F103 (paddingRight:5 insuficiente).
+    modified_by_crs: [174]
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    notes:
+      - "CR-174: Center-to-center alignment supersedes CR-165/F103"
+      - "6 acceptance criteria"
+      - "1 file modified (SpeechSlot.tsx)"
+      - "Removes paddingRight:5 from statusSection (CR-165 remnant)"
+      - "Fixed-width right column approach recommended"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (70 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16)
+# PENDING CHANGE REQUESTS (71 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17)
 # =============================================================================
 
 pending_crs:
@@ -3410,6 +3469,68 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
+  # --- Batch 17 (Stake Announcements in Presentation, AgendaForm Label, SpeechSlot Alignment) ---
+
+  - id: 172
+    type: feature
+    area: "Presentation Mode (F097)"
+    feature_id: F110
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    related_crs: []
+    description: >
+      Quando toggle has_stake_announcements esta ligado, mostrar campo no
+      Card 2 da apresentacao com label 'Apoios e Agradecimentos da Estaca'
+      e valor 'Passar palavra a Estaca'. Novo i18n key nos 3 idiomas.
+    acceptance_criteria:
+      - "Stake field shown in presentation when toggle is on"
+      - "Stake field NOT shown when toggle is off"
+      - "Position: after baptism confirmation, before sacrament hymn"
+      - "pt-BR: label 'Apoios e Agradecimentos da Estaca', value 'Passar palavra a Estaca'"
+      - "en: label 'Stake Sustainings and Releases', value 'Turn the time over to the Stake'"
+      - "es: label 'Apoyos y Agradecimientos de Estaca', value 'Ceder la palabra a la Estaca'"
+    files_likely_impacted:
+      - src/hooks/usePresentationMode.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 173
+    type: ui
+    area: "AgendaForm (F012)"
+    feature_id: F111
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    related_crs: [170]
+    description: >
+      Trocar label redundante 'Ultimo Discurso - Discurso' para 'Ultimo
+      Discurso' no AgendaForm (mesma correcao que CR-170 na presentation).
+    acceptance_criteria:
+      - "Last speech label shows 'Ultimo Discurso' in pt-BR"
+      - "Label shows 'Final Speech' in en"
+      - "Label shows 'Ultimo Discurso' in es"
+      - "First and second speaker labels unchanged"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+
+  - id: 174
+    type: ui
+    area: "SpeechSlot (F100)"
+    feature_id: F112
+    spec_file: "docs/specs/SPEC_F110_F112.yaml"
+    related_crs: [162, 165]
+    description: >
+      Alinhar verticalmente o CENTRO do circulo do StatusLED com o CENTRO
+      do icone X de remover designacao. Substitui abordagem do CR-165
+      (paddingRight:5 insuficiente). Reestruturar layout com coluna fixa.
+    acceptance_criteria:
+      - "StatusLED circle center vertically aligned with X button center"
+      - "Alignment works for all 3 speech positions"
+      - "Topic clear button also aligned in same column"
+      - "Alignment consistent when X is not visible"
+      - "Status text and modal interaction preserved"
+      - "Layout does not break on narrow screens"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -4580,3 +4701,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F103_F109.yaml (CR-165 to CR-171 - UI polish, accent fixes, UX improvements)"
     summary: "Align status circle with X button in speech cards, presentation title rename + font lock, Portuguese accent/cedilla fixes in section headers, increase back button tap area in Settings, equalize status LED sizes in collapsed cards, fix last speech label redundancy, collapsed agenda cards status lines for special meetings."
+
+  batch_17:
+    range: "CR-172 a CR-174"
+    status: "3 pendentes (172, 173, 174)"
+    files:
+      - "docs/specs/SPEC_F110_F112.yaml (CR-172 to CR-174 - Stake announcements in presentation, AgendaForm label fix, SpeechSlot alignment)"
+    summary: "Add stake announcements card to presentation mode when toggle is on (3 languages), fix redundant last speech label in AgendaForm, restructure SpeechSlot layout for center-to-center alignment of StatusLED and X button (supersedes CR-165 approach)."

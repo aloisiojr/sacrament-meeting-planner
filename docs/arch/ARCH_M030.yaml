@@ -1,0 +1,452 @@
+# =============================================================================
+# ARCH_M030.yaml
+# Architecture for Batch 17: CR-172 to CR-174 (F110-F112)
+# Features: Stake announcements in presentation mode, last speech label fix
+#           in AgendaForm, SpeechSlot vertical center-to-center alignment
+# Created: 2026-02-21
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Add stake announcements card to Presentation Mode when toggle is on (F110),
+    fix redundant last speech label in AgendaForm (F111), and restructure
+    SpeechSlot layout for true center-to-center alignment between StatusLED
+    circle and X remove button (F112). F112 supersedes the paddingRight:5
+    approach from CR-165/F103 (ADR-074).
+  principles:
+    - "F110: Reuse existing conditional field pattern from baby_blessing/baptism_confirmation in buildPresentationCards"
+    - "F111: Same fix pattern as CR-170/F108 (remove redundant label suffix)"
+    - "F112: Fixed-width right column for robust alignment instead of fragile paddingRight"
+    - "No database schema changes, no new hooks, no new components"
+
+diagram: |
+  ┌──────────────────────────────────────────────────────────────┐
+  │  F110: usePresentationMode.ts + i18n locales                 │
+  │  [buildPresentationCards Card 2] ──add──► stake announ. field │
+  │  if (agenda?.has_stake_announcements) => push field           │
+  │  New i18n key: presentation.stakeAnnouncementsText           │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  F111: AgendaForm.tsx                                        │
+  │  [SpeakerField label] ──fix──► remove ' - ${t(speaker)}'    │
+  │  Same pattern as CR-170/F108 in usePresentationMode.ts       │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  F112: SpeechSlot.tsx                                        │
+  │  [layout restructure] ──replace──► fixed-width right column  │
+  │  Remove paddingRight:5 (ADR-074 SUPERSEDED by ADR-076)       │
+  │                                                              │
+  │  BEFORE:                                                     │
+  │  ┌─labelRow (space-between)────────────┐                     │
+  │  │ [LABEL]          [statusText] [LED] │                     │
+  │  └────────────────────────────────────-┘                     │
+  │  ┌─row (gap:12)───────────────────────-┐                     │
+  │  │ [speakerField]              [X btn] │                     │
+  │  └────────────────────────────────────-┘                     │
+  │  ┌─topicRow (gap:12)──────────────────-┐                     │
+  │  │ [topicField]                [X btn] │                     │
+  │  └────────────────────────────────────-┘                     │
+  │                                                              │
+  │  AFTER:                                                      │
+  │  ┌─outerRow (row)─────────────────────────────────────────┐  │
+  │  │ ┌─leftColumn (flex:1)──────────────┐ ┌─rightCol(36)──┐│  │
+  │  │ │ ┌─labelRow (space-between)─────┐ │ │               ││  │
+  │  │ │ │ [LABEL]        [statusText]  │ │ │  [LED 14px]   ││  │
+  │  │ │ └──────────────────────────────┘ │ │  (centered)   ││  │
+  │  │ │ ┌─row──────────────────────────┐ │ │               ││  │
+  │  │ │ │ [speakerField]              │ │ │  [X btn]      ││  │
+  │  │ │ └──────────────────────────────┘ │ │  (centered)   ││  │
+  │  │ │ ┌─topicRow─────────────────────┐ │ │               ││  │
+  │  │ │ │ [topicField]                │ │ │  [X btn]      ││  │
+  │  │ │ └──────────────────────────────┘ │ │  (centered)   ││  │
+  │  │ └──────────────────────────────────┘ └───────────────┘│  │
+  │  └───────────────────────────────────────────────────────-┘  │
+  └──────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F110 / CR-172: Stake announcements in Presentation Mode ---
+
+  - name: "usePresentationMode (modified for CR-172)"
+    file: src/hooks/usePresentationMode.ts
+    responsibility: >
+      Add stake announcements field to Card 2 (Designations & Sacrament)
+      in buildPresentationCards() when agenda.has_stake_announcements is true.
+    dependencies: []
+    changes:
+      - description: "Add conditional stake announcements field to Card 2"
+        detail: |
+          In buildPresentationCards(), after the baptism_confirmation block
+          (line 126, after the closing brace of the has_baptism_confirmation
+          conditional) and BEFORE the sacrament hymn push (line 127), add:
+
+            if (agenda?.has_stake_announcements) {
+              designationFields.push({
+                label: t('agenda.stakeAnnouncements'),
+                value: t('presentation.stakeAnnouncementsText'),
+                type: 'text',
+              });
+            }
+
+          This follows the exact same pattern as baby_blessing (lines 113-118)
+          and baptism_confirmation (lines 120-125): conditional check on a
+          boolean field, push a field with label and value.
+
+          The label reuses the existing i18n key t('agenda.stakeAnnouncements')
+          which already exists in all 3 locales (used by the toggle in
+          AgendaForm.tsx).
+
+          The value uses a NEW i18n key t('presentation.stakeAnnouncementsText')
+          which must be added to all 3 locale files.
+
+          Field ordering in Card 2 after this change:
+          1. Ward Business (sustaining_releasing) - if present
+          2. Baby Blessing - if has_baby_blessing && baby_blessing_names
+          3. Baptism Confirmation - if has_baptism_confirmation && baptism_confirmation_names
+          4. Stake Announcements - if has_stake_announcements (NEW)
+          5. Sacrament Hymn (always)
+
+  - name: "i18n locales (modified for CR-172)"
+    file: src/i18n/locales/pt-BR.json, en.json, es.json
+    responsibility: "Add presentation.stakeAnnouncementsText i18n key in all 3 locales"
+    dependencies: []
+    changes:
+      - description: "Add new i18n key to presentation namespace"
+        detail: |
+          pt-BR.json - in the "presentation" object (currently has only "title"):
+            "presentation": {
+              "title": "Reunião Sacramental",
+              "stakeAnnouncementsText": "Passar palavra à Estaca"
+            }
+
+          en.json - in the "presentation" object:
+            "presentation": {
+              "title": "Sacrament Meeting",
+              "stakeAnnouncementsText": "Turn the time over to the Stake"
+            }
+
+          es.json - in the "presentation" object:
+            "presentation": {
+              "title": "Reunión Sacramental",
+              "stakeAnnouncementsText": "Ceder la palabra a la Estaca"
+            }
+
+          The existing key agenda.stakeAnnouncements is NOT modified.
+          It is reused as-is for the field label.
+
+  # --- F111 / CR-173: Last speech label fix in AgendaForm ---
+
+  - name: "AgendaForm (modified for CR-173)"
+    file: src/components/AgendaForm.tsx
+    responsibility: >
+      Remove redundant " - Discurso" suffix from last speech label in
+      the agenda editing form (Section 4: Last Speech).
+    dependencies: []
+    changes:
+      - description: "Simplify last speaker label"
+        detail: |
+          Line 429: Change from:
+            label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
+
+          To:
+            label={t('speeches.lastSpeech')}
+
+          This is the same fix as CR-170/F108 applied to usePresentationMode.ts.
+          The label will show:
+          - pt-BR: "Último Discurso" (not "Último Discurso - Discurso")
+          - en: "Final Speech" (not "Final Speech - Speech")
+          - es: "Último Discurso" (not "Último Discurso - Discurso")
+
+          No new i18n keys needed. No other labels in AgendaForm are affected.
+          The first and second speaker labels use a different format
+          (`{N}o ${t('speeches.speaker')}`) which is correct and unchanged.
+
+  # --- F112 / CR-174: SpeechSlot center-to-center alignment ---
+
+  - name: "SpeechSlot (modified for CR-174)"
+    file: src/components/SpeechSlot.tsx
+    responsibility: >
+      Restructure layout to use a fixed-width right column that holds
+      StatusLED, speaker X button, and topic X button, all centered
+      within the same column width. This ensures true center-to-center
+      vertical alignment. Supersedes CR-165/F103 paddingRight:5 approach.
+    dependencies: []
+    changes:
+      - description: "Restructure layout to outerRow with leftColumn + rightColumn"
+        detail: |
+          **Current structure (lines 142-237):**
+          <View container>
+            <View labelRow>  (space-between)
+              <Text label />
+              <Pressable statusSection>  (row, gap:6, paddingRight:5)
+                <Text statusText />
+                <StatusLED />
+              </Pressable>
+            </View>
+            <View row>  (row, gap:12)
+              <Pressable field>  (flex:1)
+                ...speaker field...
+              </Pressable>
+              {hasSpeaker && canUnassign && <Pressable>X</Pressable>}
+            </View>
+            <View topicRow>  (row, gap:12)
+              <Pressable topicField>  (flex:1)
+                ...topic field...
+              </Pressable>
+              {topicDisplay && canAssign && <Pressable>X</Pressable>}
+            </View>
+          </View>
+
+          **New structure:**
+          <View container>
+            <View outerRow>  (flexDirection: 'row')
+              <View leftColumn>  (flex: 1)
+                <View labelRow>  (space-between)
+                  <Text label />
+                  <Text statusText />  (moved from statusSection)
+                </View>
+                <View row>
+                  <Pressable field>  (flex:1)
+                    ...speaker field...
+                  </Pressable>
+                </View>
+                <View topicRow>
+                  <Pressable topicField>  (flex:1)
+                    ...topic field...
+                  </Pressable>
+                </View>
+              </View>
+              <View rightColumn>  (width: 36, alignItems: 'center')
+                <Pressable statusLedWrapper>  (aligned to label row height)
+                  <StatusLED />
+                </Pressable>
+                <View speakerActionWrapper>  (aligned to speaker row height)
+                  {hasSpeaker && canUnassign && <Pressable>X</Pressable>}
+                </View>
+                <View topicActionWrapper>  (aligned to topic row height)
+                  {topicDisplay && canAssign && <Pressable>X</Pressable>}
+                </View>
+              </View>
+            </View>
+          </View>
+
+          **Key design decisions:**
+
+          1. Right column width: 36px. This is wide enough to hold both the
+             StatusLED (14px) and the X button (~32px with padding) centered
+             within the same column. Both elements' centers will be at 18px
+             from the column's left edge (= 36/2).
+
+          2. The statusText is moved from inside the statusSection Pressable
+             to the labelRow directly. The Pressable for status interaction
+             now wraps only the StatusLED in the right column. The statusText
+             in the labelRow should also be wrapped in a Pressable (or the
+             entire labelRow status area) to maintain tappability.
+
+             Alternative: keep statusText inside a separate Pressable in the
+             labelRow with the same onPress handler. The key requirement is
+             that both statusText and StatusLED remain tappable to open the
+             StatusChangeModal.
+
+          3. The speaker row and topic row no longer have gap:12 since the
+             X buttons are moved to the right column. The fields use flex:1
+             within the leftColumn.
+
+          4. Row heights in the right column must match the corresponding
+             rows in the left column:
+             - statusLedWrapper: height matches labelRow (driven by label
+               text height ~20px + marginBottom:6)
+             - speakerActionWrapper: height matches speaker field (38px)
+             - topicActionWrapper: height matches topic field (34px + marginTop:6)
+
+             Use justifyContent: 'center' and matching heights or flex
+             alignment to center-align vertically within each row.
+
+      - description: "Remove paddingRight:5 from statusSection"
+        detail: |
+          The styles.statusSection object currently has:
+            paddingRight: 5,
+          This was added by CR-165/F103 (ADR-074) as an approximate alignment.
+          With the fixed-width right column approach, this property is no longer
+          needed. The entire statusSection style may be removed or repurposed
+          since the LED moves to the right column and statusText moves to
+          the labelRow.
+
+      - description: "Style changes summary"
+        detail: |
+          NEW styles:
+            outerRow: {
+              flexDirection: 'row',
+            }
+            leftColumn: {
+              flex: 1,
+            }
+            rightColumn: {
+              width: 36,
+              alignItems: 'center',
+            }
+            statusLedWrapper: {
+              height: <match labelRow height>,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+            speakerActionWrapper: {
+              height: 38,  // match field height
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+            topicActionWrapper: {
+              height: 34,  // match topicField height
+              marginTop: 6,  // match topicRow marginTop
+              justifyContent: 'center',
+              alignItems: 'center',
+            }
+
+          MODIFIED styles:
+            statusSection: REMOVED (LED and status text separated)
+            row: remove gap:12 (X button moved to right column)
+            topicRow: remove gap:12 (X button moved to right column)
+
+          UNCHANGED styles:
+            container, label, labelRow (still space-between for label+statusText),
+            field, fieldText, fieldArrow, removeButton, topicField, topicText
+
+          The removeButton style remains unchanged (fontSize:24, fontWeight:'300',
+          paddingHorizontal:4). The visual appearance of the X buttons does not
+          change; only their container changes.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - name: "buildPresentationCards stake announcements field (F110)"
+    component: src/hooks/usePresentationMode.ts
+    methods:
+      - name: "buildPresentationCards (Card 2 stake announcements)"
+        input: "agenda.has_stake_announcements: boolean, t('agenda.stakeAnnouncements'), t('presentation.stakeAnnouncementsText')"
+        output: "Field { label, value, type:'text' } added to Card 2 designationFields after baptism_confirmation and before sacrament hymn"
+        notes: "Only when has_stake_announcements is true. No value from DB - uses static i18n text."
+
+  - name: "AgendaForm last speech label (F111)"
+    component: src/components/AgendaForm.tsx
+    methods:
+      - name: "SpeakerField label for position 3"
+        input: "t('speeches.lastSpeech')"
+        output: "label: 'Último Discurso' (pt-BR) without ' - Discurso' suffix"
+
+  - name: "SpeechSlot alignment layout (F112)"
+    component: src/components/SpeechSlot.tsx
+    methods:
+      - name: "outerRow + rightColumn layout"
+        input: "StatusLED, X remove buttons"
+        output: "LED circle center and X button centers at same horizontal position (rightColumn center = 18px from right edge)"
+        notes: "rightColumn width:36 holds all right-side elements centered. Supersedes paddingRight:5 approach."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  migrations: []
+  notes: >
+    No database schema changes required. F110 reads existing
+    agenda.has_stake_announcements boolean field (already in DB).
+    F111 and F112 are client-side UI changes only.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    No security implications. All changes are client-side:
+    - F110: Conditional field rendering using existing DB field
+    - F111: Label text simplification (i18n key change)
+    - F112: Layout restructuring (CSS/style changes)
+
+    No new endpoints, no new data access patterns, no permission changes.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    No observability changes needed. All features are visual/UX improvements
+    that do not introduce new error paths or logging requirements.
+
+# =============================================================================
+# I18N
+# =============================================================================
+
+i18n:
+  new_keys:
+    - key: "presentation.stakeAnnouncementsText"
+      pt-BR: "Passar palavra à Estaca"
+      en: "Turn the time over to the Stake"
+      es: "Ceder la palabra a la Estaca"
+      added_by: "CR-172/F110"
+
+  modified_keys: []
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-076
+    title: "Fixed-width right column for SpeechSlot center-to-center alignment (supersedes ADR-074)"
+    context: >
+      F112/CR-174 needs StatusLED circle center vertically aligned with X
+      remove button center. ADR-074 (CR-165/F103) used paddingRight:5 on
+      statusSection as an approximate alignment, but the user reports it is
+      insufficient. The centers are still misaligned because the label row
+      uses justifyContent:'space-between' and the speaker row uses gap:12,
+      placing right-side elements at different horizontal offsets.
+      Options: (a) adjust paddingRight value, (b) fixed-width right column
+      spanning all rows, (c) absolute positioning.
+    decision: >
+      Restructure SpeechSlot to use a fixed-width right column (width: 36px)
+      that holds StatusLED, speaker X button, and topic X button, all centered
+      within the same column. The left column (flex:1) holds label text,
+      status text, speaker field, and topic field. Both columns are children
+      of a single outerRow (flexDirection: 'row'). This guarantees that all
+      right-side elements share the exact same center point (18px from the
+      column's left edge = 18px from the card's right edge). Remove
+      paddingRight:5 from statusSection (no longer needed).
+    decided_in: "CR-174"
+    supersedes: "ADR-074 (full -- fixed-width column replaces paddingRight approach)"
+    consequences:
+      - "True center-to-center alignment regardless of font metrics or device"
+      - "Layout restructure (more complex than paddingRight but more robust)"
+      - "Alignment consistent whether X button is visible or hidden"
+      - "Status text remains in labelRow (tappable), LED moves to right column"
+      - "paddingRight:5 removed from statusSection (ADR-074 superseded)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M030.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED atualizado (pending)
+  GATE-07: true  # ARCH_SUMMARY preenchido com status correto
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (5 component entries)

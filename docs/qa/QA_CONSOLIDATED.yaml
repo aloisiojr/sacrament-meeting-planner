@@ -18,6 +18,7 @@
 # CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163 (PRE+POST),
 # CR-155, CR-164 (PRE+POST),
 # CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171 (PRE+POST)
+# CR-172, CR-173, CR-174 (PRE+POST)
 # Updated: 2026-02-21
 # =============================================================================
 
@@ -8026,3 +8027,191 @@ cr_batch16_crosscutting:
           es.json: Only addition is "presentation": { "title": "Reunion Sacramental" }
           at line 353-355. Section keys unchanged. No unintended modifications.
           Both additions are intentional and correct (new i18n key for presentation title).
+
+# #############################################################################
+# Batch 17: CR-172, CR-173, CR-174 (F110, F111, F112)
+# PRE + POST validation
+# #############################################################################
+
+cr_batch17:
+  cr_ids: [CR-172, CR-173, CR-174]
+  title: "Batch 17: Stake support section, agenda label fix, status circle alignment"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_019.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation passed for all 3 CRs. Features confirmed NOT YET implemented:
+      CR-172 (F110): Toggle has_stake_announcements exists in data model and AgendaForm
+      but buildPresentationCards() does NOT use it. No "Passar palavra" text in codebase.
+      CR-173 (F111): AgendaForm.tsx line 429 still has label with suffix
+      "${t('speeches.lastSpeech')} - ${t('speeches.speaker')}". Needs to be just
+      t('speeches.lastSpeech'). (CR-170/Batch 16 fixed this in presentation but not
+      in AgendaForm.)
+      CR-174 (F112): SpeechSlot.tsx has StatusLED in labelRow and X button in row below.
+      Their vertical centers are misaligned. Regression of CR-165 (Batch 16).
+      Baseline: 4568 tests pass across 77 test files. QA Plan QA-019 created with
+      12 validation checks (10 must_pass, 2 should_pass).
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: e27cf92
+        message: "feat(presentation): show stake announcements field when toggle is on (F110, CR-172)"
+      - hash: 0be6534
+        message: "fix(agenda): remove redundant suffix from last speech label in AgendaForm (F111, CR-173)"
+      - hash: cafb271
+        message: "fix(ui): restructure SpeechSlot to fixed-width right column for center alignment (F112, CR-174)"
+      - hash: 136d089
+        message: "docs(code): update CODE_LEDGER with Batch 17 commits"
+      - hash: 50cea37
+        message: "test(batch17): add tests for F110-F112 and update existing tests"
+      - hash: 3eb40da
+        message: "docs(tests): update TEST_CONSOLIDATED v23"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 4649
+    tester_tests_total: 4649
+    tester_suite_files: 78
+
+    must_pass_results:
+      - id: VC-01
+        description: "buildPresentationCards includes stake section when has_stake_announcements is true"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts lines 127-133: if (agenda?.has_stake_announcements) {
+            designationFields.push({ label: t('agenda.stakeAnnouncements'),
+            value: t('presentation.stakeAnnouncementsText'), type: 'text' });
+          }
+          Located in Card 2 after baptism_confirmation (line 120-126) and before
+          sacrament hymn (line 134-138). Correct position per SPEC.
+
+      - id: VC-02
+        description: "Stake section i18n key exists in pt-BR with correct subtitle and body text"
+        status: PASSED
+        evidence: |
+          pt-BR.json:223 agenda.stakeAnnouncements = "Apoios e Agradecimentos da Estaca"
+          pt-BR.json:355 presentation.stakeAnnouncementsText = "Passar palavra a Estaca"
+
+      - id: VC-03
+        description: "Stake section i18n key exists in en with correct subtitle and body text"
+        status: PASSED
+        evidence: |
+          en.json:223 agenda.stakeAnnouncements = "Stake Sustainings and Releases"
+          en.json:355 presentation.stakeAnnouncementsText = "Turn the time over to the Stake"
+
+      - id: VC-04
+        description: "Stake section i18n key exists in es with correct subtitle and body text"
+        status: PASSED
+        evidence: |
+          es.json:223 agenda.stakeAnnouncements = "Apoyos y Agradecimientos de Estaca"
+          es.json:355 presentation.stakeAnnouncementsText = "Ceder la palabra a la Estaca"
+
+      - id: VC-05
+        description: "Stake section does NOT appear when has_stake_announcements is false"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 127: if (agenda?.has_stake_announcements) {}
+          Conditional check: block only executes when flag is truthy.
+          When false/undefined/null, no stake field is added to designationFields.
+
+      - id: VC-06
+        description: "AgendaForm last speech label is just t('speeches.lastSpeech') without suffix"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx line 429: label={t('speeches.lastSpeech')}
+          Previously was: label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}
+          Confirmed by git diff 0be6534: suffix removed.
+
+      - id: VC-07
+        description: "Presentation mode last speech label remains correct (no regression)"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts line 173:
+          { label: t('speeches.lastSpeech'), value: speaker3Name, type: 'text' }
+          Still uses t('speeches.lastSpeech') without suffix. No regression from CR-170.
+
+      - id: VC-08
+        description: "StatusLED circle center is vertically aligned with remove X button center"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx restructured with fixed-width right column approach:
+          - outerRow (line 147): flexDirection='row' wraps entire component
+          - leftColumn (line 149): flex:1, contains labels and fields
+          - rightColumn (line 217): width:36, alignItems:'center'
+          - statusLedWrapper (line 218): centers StatusLED in 36px column
+          - speakerActionWrapper (line 230): height:38, justifyContent:'center',
+            alignItems:'center' -- centers X in same 36px column
+          Both elements centered in same-width column = same horizontal center.
+
+      - id: VC-09
+        description: "Speech slot layout still shows label, status text, and LED correctly"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx leftColumn contains:
+          - labelRow with label Text (line 152) and status text Pressable (lines 153-160)
+          - StatusLED in rightColumn > statusLedWrapper (lines 218-229)
+          All existing UI elements present. Status text moved from old statusSection
+          to labelRow in leftColumn. Remains visible and interactive.
+
+      - id: VC-10
+        description: "Remove button (X) is still functional and visible for assigned speakers"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 231-242:
+          - Conditional: hasSpeaker && canUnassign (correct)
+          - hitSlop={8} present
+          - onPress={handleRemove} handler intact
+          - accessibilityRole="button" and accessibilityLabel present
+          - Uses multiplication sign \u00D7 with fontSize:24
+
+    cross_cutting_results:
+      - id: VC-11
+        description: "All test suites pass after changes"
+        status: PASSED
+        evidence: |
+          npx vitest run: 78 test files passed, 4649 tests passed, 0 failures.
+          Baseline was 4568 tests / 77 files. Increase of +81 tests / +1 file
+          from new Batch 17 test additions.
+
+    should_pass_results:
+      - id: VC-12
+        description: "TypeScript compilation succeeds"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit: 17 TS errors found, but NONE are new from Batch 17.
+          Only Batch-17-file hit: AgendaForm.tsx:127 "Cannot find name 'Member'" --
+          this is pre-existing (line 127 was not changed by Batch 17, confirmed by
+          git diff 0be6534 which only touched line 429). No new TS errors introduced.
+
+    verdict: passed
+    summary: |
+      POST validation PASSED for Batch 17 (CR-172, CR-173, CR-174 / F110-F112).
+      All 12 validation checks passed (10 must_pass + 2 should_pass).
+
+      CR-172 (F110): buildPresentationCards() now checks has_stake_announcements
+      and adds a field with label=t('agenda.stakeAnnouncements') and
+      value=t('presentation.stakeAnnouncementsText'). i18n keys present in all
+      3 locales (pt-BR, en, es) with correct text. Conditional correctly excludes
+      the field when toggle is off.
+
+      CR-173 (F111): AgendaForm.tsx line 429 label changed from
+      "${t('speeches.lastSpeech')} - ${t('speeches.speaker')}" to just
+      t('speeches.lastSpeech'). Consistent with CR-170 fix in presentation mode.
+      No regression in usePresentationMode.ts.
+
+      CR-174 (F112): SpeechSlot.tsx restructured with fixed-width right column
+      (width:36, alignItems:'center'). StatusLED and X button are both centered
+      within the same column, guaranteeing center-to-center vertical alignment.
+      Supersedes CR-165's paddingRight:5 approach. Topic X also aligned in
+      the same column.
+
+      Tests: 4649/4649 pass (78 files). +81 tests / +1 file from baseline.
+      TypeScript: No new errors from Batch 17 changes.

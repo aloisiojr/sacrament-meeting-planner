@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-21"
-  last_updated_by: "batch-16"
+  last_updated_by: "batch-17"
   total_modules: 8
-  total_adrs: 66
-  total_crs_implemented: 102
+  total_adrs: 67
+  total_crs_implemented: 105
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -36,6 +36,7 @@ metadata:
     - docs/arch/ARCH_M027.yaml
     - docs/arch/ARCH_M028.yaml
     - docs/arch/ARCH_M029.yaml
+    - docs/arch/ARCH_M030.yaml
 
 # =============================================================================
 # TECH STACK
@@ -246,7 +247,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -263,7 +264,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -292,11 +293,13 @@ modules:
       CR-161/F099: SundayCard collapsed speeches redesign: LEDs moved from right column to inline before label. Size 14->10. Font 11->13. marginBottom:4 between lines. No speaker = show only circle.
       CR-162/F100: SpeechSlot LED moved from speaker row to label row (right-aligned with status text). Speaker/topic fields use full width. topicRow marginLeft:28 removed.
       CR-163/F098: speeches.selectSpeaker i18n changed to 'Selecionar Discursante' (pt-BR), 'Select Speaker' (en), 'Seleccionar Discursante' (es).
+      CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED by CR-174/F112.
+      CR-174/F112: SpeechSlot layout restructured to fixed-width right column (36px) for true center-to-center alignment of StatusLED and X buttons. Supersedes ADR-074 paddingRight:5 approach (ADR-076).
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -314,7 +317,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -348,6 +351,8 @@ modules:
       CR-167/F105: pt-BR.json section headers fixed: 'Boas-Vindas, Anúncios e Reconhecimentos', 'Designações e Sacramento', 'Último Discurso'. es.json sectionLastSpeech also fixed.
       CR-170/F108: usePresentationMode.ts last speaker label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech').
       CR-171/F109: agenda.tsx collapsed card: testimony_meeting and primary_presentation show 4 status lines (Falta, Type, Orações, Hinos). New i18n key agenda.statusPrayersLabel.
+      CR-172/F110: usePresentationMode.ts buildPresentationCards Card 2: add stake announcements field (label + text) when has_stake_announcements is true. New i18n key presentation.stakeAnnouncementsText.
+      CR-173/F111: AgendaForm.tsx last speech label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech'). Same fix as CR-170/F108 in usePresentationMode.ts.
 
   - id: M005
     name: NotificationModule
@@ -494,8 +499,9 @@ modules:
       CR-160/F098: SundayCard pos 3 label '3o Discurso' (Home tab uses same SundayCard).
       CR-161/F099: SundayCard collapsed speeches redesign (LEDs inline, increased font, Home tab same).
       CR-163/F098: speeches.selectSpeaker i18n values updated in all 3 locales.
-      CR-168/F106: All 8 Settings sub-screens back button Pressable gets hitSlop={12} for 44px+ touch target.      CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below.
+      CR-168/F106: All 8 Settings sub-screens back button Pressable gets hitSlop={12} for 44px+ touch target.      CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED by CR-174/F112.
       CR-169/F107: SundayCard collapsed: render Text(' ') when no speaker name to maintain consistent row height.
+      CR-174/F112: SpeechSlot layout restructured to fixed-width right column for center-to-center alignment (supersedes paddingRight:5, ADR-076 supersedes ADR-074).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1162,6 +1168,7 @@ adrs:
     context: "F103 needs StatusLED circle aligned with X remove button on speaker row. Options: paddingRight, fixed-width column, marginRight."
     decision: "Add paddingRight: 5 to styles.statusSection. Simplest CSS-only adjustment, no layout restructure needed."
     decided_in: "CR-165"
+    superseded_by: "ADR-076 (CR-174/F112 -- fixed-width right column replaces paddingRight approach)"
     consequences:
       - "Single style property change, zero layout restructuring"
       - "Approximate alignment (pixel-perfect depends on font metrics)"
@@ -1175,6 +1182,17 @@ adrs:
       - "Touch target meets 44px minimum height recommendation"
       - "No visual or layout changes"
       - "Applied consistently across all 8 Settings sub-screens"
+
+  - id: ADR-076
+    title: "Fixed-width right column for SpeechSlot center-to-center alignment (supersedes ADR-074)"
+    context: "F112/CR-174 needs true center-to-center alignment between StatusLED and X button. ADR-074 paddingRight:5 was insufficient."
+    decision: "Restructure SpeechSlot to outerRow with leftColumn (flex:1) + rightColumn (width:36). All right-side elements centered in same column. Remove paddingRight:5."
+    decided_in: "CR-174"
+    supersedes: "ADR-074 (full)"
+    consequences:
+      - "True center-to-center alignment regardless of font metrics"
+      - "Layout restructure (more complex but robust)"
+      - "paddingRight:5 removed (ADR-074 superseded)"
 
 # =============================================================================
 # DATABASE SCHEMA
@@ -1554,7 +1572,7 @@ file_structure:
     "useSundayTypes.ts": "Auto-assign + override tipos de domingo"
     "useHymns.ts": "Busca de hinos (read-only)"
     "useActivityLog.ts": "Log paginado com busca"
-    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys."
+    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys. CR-172/F110: stake announcements field in Card 2 when has_stake_announcements is true."
     "useSundayList.ts": "Lista de domingos com scroll infinito"
     "useRealtimeSync.ts": "Subscricao Supabase Realtime"
     "useConnection.ts": "Monitor de conexao (NetInfo). CR-146/F089: integra onlineManager.setOnline() do TanStack Query."
@@ -1562,14 +1580,14 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech')."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
     "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5)."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop."
@@ -1920,6 +1938,30 @@ change_requests_history:
     doc: "ARCH_M027.yaml"
     status: "pending implementation"
     adrs: [ADR-068, ADR-069]
+    new_files: []
+
+  batch_15_phase_2:
+    crs: "CR-155, CR-164"
+    scope: "Multilingual password reset email via Edge Function (F101), test suite 100% passing (F102)"
+    doc: "ARCH_M028.yaml"
+    status: "pending implementation"
+    adrs: [ADR-070, ADR-071, ADR-072, ADR-073]
+    new_files: ["supabase/functions/send-reset-email/index.ts"]
+
+  batch_16:
+    crs: "CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171"
+    scope: "SpeechSlot alignment (F103), presentation title (F104), Portuguese accents (F105), back button touch area (F106), collapsed card height (F107), last speech label fix (F108), collapsed card status lines for special meetings (F109)"
+    doc: "ARCH_M029.yaml"
+    status: "pending implementation"
+    adrs: [ADR-074, ADR-075]
+    new_files: []
+
+  batch_17:
+    crs: "CR-172, CR-173, CR-174"
+    scope: "Stake announcements in presentation mode (F110), AgendaForm last speech label fix (F111), SpeechSlot center-to-center alignment restructure (F112)"
+    doc: "ARCH_M030.yaml"
+    status: "pending implementation"
+    adrs: [ADR-076]
     new_files: []
 
 # =============================================================================

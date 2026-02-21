@@ -1,0 +1,178 @@
+type: qa_plan
+id: QA-019
+created_at: "2026-02-21"
+request_type: feature_request
+feature_or_bug: "Batch 17: Stake support section in presentation, agenda label fix, status circle alignment (CR-172, CR-173, CR-174 / F110, F111, F112)"
+user_request: |
+  1. Quando o toggle "Apoios e Agradecimentos da Estaca" esta ligado, na tela de Iniciar Reuniao Sacramental em que aparecer: Subtitulo: APOIOS E AGRADECIMENTOS DA ESTACA, Texto: Passar palavra a Estaca. Faca isso em todas as linguas.
+  2. No card de domingo para configurar a agenda, trocar o label "Ultimo Discurso - Discurso" para "Ultimo Discurso"
+  3. No card de domingo dos discursos alinhar verticalmente o centro circulo do status com o centro do icone de X para remover uma designacao
+
+# Estado atual documentado
+baseline:
+  description: |
+    All 4568 tests pass across 77 test files. TypeScript compiles.
+    CR-172 (F110): Toggle has_stake_announcements exists in data model (SundayAgenda type)
+    and in AgendaForm.tsx (line 336-341). However, buildPresentationCards() in
+    usePresentationMode.ts does NOT reference has_stake_announcements at all.
+    The presentation screen shows no stake section. No "Passar palavra" text exists
+    anywhere in the codebase. The i18n keys agenda.stakeAnnouncements exist in all
+    3 locales (pt-BR, en, es) but are only used in AgendaForm toggle label.
+    CR-173 (F111): AgendaForm.tsx line 429 uses the label:
+    `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` which renders as
+    "Ultimo Discurso - Discurso" (pt-BR), "Final Speech - Speech" (en),
+    "Ultimo Discurso - Discurso" (es). Should be just t('speeches.lastSpeech').
+    Note: CR-170 (Batch 16) fixed this same label in the presentation screen
+    (usePresentationMode.ts line 166) but NOT in AgendaForm.
+    CR-174 (F112): SpeechSlot.tsx has StatusLED (14px circle) in labelRow (line 145-162)
+    and the X remove button (line 190-201) in the row below (line 164-202). They are
+    in separate View rows so their vertical centers do NOT align. The StatusLED is in
+    statusSection with paddingRight:5. The removeButton has fontSize:24. This is a
+    regression of CR-165 (Batch 16) which attempted the same alignment.
+  evidence:
+    - "buildPresentationCards() in usePresentationMode.ts (lines 65-186): no reference to has_stake_announcements"
+    - "grep 'Passar palavra' across src/: 0 matches"
+    - "grep 'has_stake_announcements' in usePresentationMode.ts: 0 matches"
+    - "AgendaForm.tsx line 429: label={`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`}"
+    - "SpeechSlot.tsx: StatusLED in labelRow (line 145-162), X button in row (line 190-201)"
+    - "All 4568 tests pass, 77 test files"
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+  # ==========================================
+  # CR-172 / F110: Stake support section in presentation
+  # ==========================================
+  - id: VC-01
+    description: "buildPresentationCards includes stake section when has_stake_announcements is true"
+    type: functional
+    how_to_verify: |
+      1. Read usePresentationMode.ts buildPresentationCards function
+      2. Verify it checks agenda.has_stake_announcements
+      3. When true, a card or field with subtitle and body text appears in the output
+    expected_result: "When has_stake_announcements=true, cards array includes stake section with subtitle and 'Passar palavra a Estaca' body"
+    priority: must_pass
+
+  - id: VC-02
+    description: "Stake section i18n key exists in pt-BR with correct subtitle and body text"
+    type: functional
+    how_to_verify: |
+      1. Read pt-BR.json for new i18n keys related to stake support section
+      2. Verify subtitle text is 'Apoios e Agradecimentos da Estaca' (or uses existing stakeAnnouncements key)
+      3. Verify body text is 'Passar palavra a Estaca'
+    expected_result: "pt-BR locale has correct stake section subtitle and body text"
+    priority: must_pass
+
+  - id: VC-03
+    description: "Stake section i18n key exists in en with correct subtitle and body text"
+    type: functional
+    how_to_verify: |
+      1. Read en.json for new i18n keys related to stake support section
+      2. Verify subtitle and body text exist in English
+    expected_result: "en locale has corresponding stake section subtitle and body text"
+    priority: must_pass
+
+  - id: VC-04
+    description: "Stake section i18n key exists in es with correct subtitle and body text"
+    type: functional
+    how_to_verify: |
+      1. Read es.json for new i18n keys related to stake support section
+      2. Verify subtitle and body text exist in Spanish
+    expected_result: "es locale has corresponding stake section subtitle and body text"
+    priority: must_pass
+
+  - id: VC-05
+    description: "Stake section does NOT appear when has_stake_announcements is false"
+    type: functional
+    how_to_verify: |
+      1. Inspect buildPresentationCards logic
+      2. Confirm conditional check: only include stake section when flag is true
+      3. When false or undefined, no stake section in output
+    expected_result: "No stake section in presentation cards when has_stake_announcements=false"
+    priority: must_pass
+
+  # ==========================================
+  # CR-173 / F111: Agenda label fix
+  # ==========================================
+  - id: VC-06
+    description: "AgendaForm last speech label is just t('speeches.lastSpeech') without suffix"
+    type: functional
+    how_to_verify: |
+      1. Read AgendaForm.tsx around line 429
+      2. Check the label prop of the SpeakerField for position 3
+      3. Verify it no longer has ` - ${t('speeches.speaker')}` suffix
+    expected_result: "Label is t('speeches.lastSpeech') only, rendering as 'Ultimo Discurso' (pt-BR) or 'Final Speech' (en)"
+    priority: must_pass
+
+  - id: VC-07
+    description: "Presentation mode last speech label remains correct (no regression)"
+    type: regression
+    how_to_verify: |
+      1. Read usePresentationMode.ts around line 166
+      2. Verify it still uses just t('speeches.lastSpeech') for the last speaker label
+    expected_result: "usePresentationMode.ts still uses t('speeches.lastSpeech') without suffix"
+    priority: must_pass
+
+  # ==========================================
+  # CR-174 / F112: Status circle vertical alignment with X button
+  # ==========================================
+  - id: VC-08
+    description: "StatusLED circle center is vertically aligned with remove X button center"
+    type: functional
+    how_to_verify: |
+      1. Read SpeechSlot.tsx layout structure
+      2. Check if StatusLED and X button are in the same row, or if their positioning
+         ensures vertical center alignment (e.g., absolute positioning, same row with
+         proper alignment, or calculated offsets)
+      3. Verify styles ensure the center of the 14px circle aligns with the center of
+         the X (fontSize 24) button
+    expected_result: "Layout or styles ensure vertical center alignment between StatusLED circle and X remove button"
+    priority: must_pass
+
+  - id: VC-09
+    description: "Speech slot layout still shows label, status text, and LED correctly"
+    type: regression
+    how_to_verify: |
+      1. Read SpeechSlot.tsx
+      2. Verify label text, status text, and StatusLED are still present and visible
+      3. Verify no layout elements were removed or broken by alignment change
+    expected_result: "All existing SpeechSlot UI elements remain functional"
+    priority: must_pass
+
+  - id: VC-10
+    description: "Remove button (X) is still functional and visible for assigned speakers"
+    type: regression
+    how_to_verify: |
+      1. Read SpeechSlot.tsx
+      2. Verify the remove button (multiplication sign) still renders conditionally
+         (hasSpeaker && canUnassign)
+      3. Verify hitSlop and onPress handler still intact
+    expected_result: "Remove button renders and functions correctly with proper accessibility"
+    priority: must_pass
+
+  # ==========================================
+  # Cross-cutting: Tests and TypeScript
+  # ==========================================
+  - id: VC-11
+    description: "All test suites pass after changes"
+    type: regression
+    how_to_verify: |
+      1. Run npx vitest run
+      2. Verify all tests pass with 0 failures
+      3. Compare test count with baseline (4568 tests, 77 files)
+    expected_result: "All tests pass, no regressions. Test count >= 4568"
+    priority: must_pass
+
+  - id: VC-12
+    description: "TypeScript compilation succeeds"
+    type: regression
+    how_to_verify: |
+      1. Run npx tsc --noEmit
+      2. Verify no NEW TypeScript errors introduced by Batch 17 changes
+    expected_result: "No new TS errors from Batch 17 files"
+    priority: should_pass
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.

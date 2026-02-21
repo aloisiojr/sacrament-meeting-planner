@@ -326,16 +326,16 @@ describe('F037 (CR-93): Change deep link protocol to sacrmeetman://', () => {
   });
 
   describe('AC-F037-04: Bundle identifier and package unchanged', () => {
-    it('should have ios.bundleIdentifier as com.wardmanager.app', () => {
+    it('should have ios.bundleIdentifier as com.sacramentmeetingmanager.app', () => {
       const content = readProjectFile('app.json');
       const config = JSON.parse(content);
-      expect(config.expo.ios.bundleIdentifier).toBe('com.wardmanager.app');
+      expect(config.expo.ios.bundleIdentifier).toBe('com.sacramentmeetingmanager.app');
     });
 
-    it('should have android.package as com.wardmanager.app', () => {
+    it('should have android.package as com.sacramentmeetingmanager.app', () => {
       const content = readProjectFile('app.json');
       const config = JSON.parse(content);
-      expect(config.expo.android.package).toBe('com.wardmanager.app');
+      expect(config.expo.android.package).toBe('com.sacramentmeetingmanager.app');
     });
   });
 

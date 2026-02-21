@@ -48,8 +48,8 @@ describe('F093 (CR-150): Collapsed SundayCard with speaker names and vertical LE
       expect(sundayCardSource).toContain("t('speeches.slot'");
     });
 
-    it('uses speeches.lastSpeech i18n key for position 3', () => {
-      expect(sundayCardSource).toContain("t('speeches.lastSpeech')");
+    it('uses speeches.slot for all positions including 3 (updated by F098/CR-160)', () => {
+      expect(sundayCardSource).toContain("t('speeches.slot'");
     });
 
     it('format is posLabel: name', () => {
@@ -87,8 +87,9 @@ describe('F093 (CR-150): Collapsed SundayCard with speaker names and vertical LE
       expect(sundayCardSource).toContain('isSpeechesType && !expanded');
     });
 
-    it('LEDs conditioned on !expanded && isSpeechesType', () => {
-      expect(sundayCardSource).toContain('{!expanded && isSpeechesType && (');
+    it('LEDs are inline in speechRow (redesigned by F099/CR-161)', () => {
+      // LEDs are now inline with text in speechRow, not separate block
+      expect(sundayCardSource).toContain('styles.speechRow');
     });
   });
 
@@ -143,8 +144,8 @@ describe('F093 (CR-150): Collapsed SundayCard with speaker names and vertical LE
 
   // --- speakerNameLine style exists ---
   describe('Style: speakerNameLine', () => {
-    it('speakerNameLine style has fontSize 11', () => {
-      expect(sundayCardSource).toMatch(/speakerNameLine.*?fontSize:\s*11/s);
+    it('speakerNameLine style has fontSize 13 (updated by F099/CR-161)', () => {
+      expect(sundayCardSource).toMatch(/speakerNameLine.*?fontSize:\s*13/s);
     });
   });
 });
@@ -806,16 +807,16 @@ describe('F093 Additional Tests: i18n keys and cross-feature', () => {
     });
   });
 
-  // --- AC-093-04 strengthening: verify LEDs conditional pattern exactly ---
-  describe('AC-093-04 (additional): LEDs block uses correct condition', () => {
+  // --- AC-093-04 strengthening: LEDs inline in speechRow (redesigned by F099) ---
+  describe('AC-093-04 (additional): LEDs inline in collapsed card (updated by F099)', () => {
     const sundayCardSource = readSourceFile('components/SundayCard.tsx');
 
-    it('LEDs block starts with {!expanded && isSpeechesType && (', () => {
-      expect(sundayCardSource).toContain('{!expanded && isSpeechesType && (');
+    it('speechRow style used for inline LED + text layout', () => {
+      expect(sundayCardSource).toContain('styles.speechRow');
     });
 
-    it('LEDs View uses ledsVertical style', () => {
-      expect(sundayCardSource).toContain('style={styles.ledsVertical}');
+    it('StatusLED rendered inline in collapsed speeches', () => {
+      expect(sundayCardSource).toContain('size={10}');
     });
   });
 

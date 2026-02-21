@@ -173,7 +173,7 @@ describe('PHASE-04: buildPresentationCards detailed validation', () => {
       const welcome = cards[0];
       const recognizeField = welcome.fields.find((f) => f.label === 'agenda.recognizing');
       expect(recognizeField).toBeDefined();
-      expect(recognizeField?.value).toBe('Visitor A, Visitor B');
+      expect(recognizeField?.value).toBe('Visitor A\nVisitor B');
     });
 
     it('Card 1 excludes recognized names when null', () => {

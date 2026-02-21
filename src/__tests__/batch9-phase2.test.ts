@@ -546,31 +546,23 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
 describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () => {
   const getSpeechSlot = () => readSourceFile('components/SpeechSlot.tsx');
 
-  // --- AC-F063-01: LED positioned as first element in row ---
-  describe('AC-F063-01: LED is first element in row', () => {
-    it('StatusLED appears before speaker field inside styles.row', () => {
+  // --- AC-F063-01: LED positioned on label row (redesigned by F100/CR-162) ---
+  describe('AC-F063-01: LED is on label row (redesigned by F100)', () => {
+    it('StatusLED appears in labelRow, not in speaker row (updated by F100/CR-162)', () => {
       const content = getSpeechSlot();
-      // Find the row View
-      const rowIdx = content.indexOf('styles.row');
-      // Find the closing of the row View
-      const rowEnd = content.indexOf('</View>', rowIdx);
-      const rowSection = content.substring(rowIdx, rowEnd);
-      // LED should come before Pressable (speaker field)
-      const ledIdx = rowSection.indexOf('StatusLED');
-      const speakerFieldIdx = rowSection.indexOf('<Pressable');
-      expect(ledIdx).toBeGreaterThan(-1);
-      expect(speakerFieldIdx).toBeGreaterThan(-1);
-      expect(ledIdx).toBeLessThan(speakerFieldIdx);
+      // F100 moved StatusLED from speaker row to label row
+      expect(content).toContain('styles.labelRow');
+      expect(content).toContain('styles.statusSection');
+      expect(content).toContain('<StatusLED');
     });
 
-    it('row contains LED comment before speaker comment', () => {
+    it('label row contains status text and LED', () => {
       const content = getSpeechSlot();
-      const rowIdx = content.indexOf('styles.row');
-      const rowEnd = content.indexOf('</View>', rowIdx);
-      const rowSection = content.substring(rowIdx, rowEnd);
-      const ledCommentIdx = rowSection.indexOf('{/* LED */}');
-      const speakerCommentIdx = rowSection.indexOf('{/* Speaker field */}');
-      expect(ledCommentIdx).toBeLessThan(speakerCommentIdx);
+      const labelRowIdx = content.indexOf('styles.labelRow');
+      expect(labelRowIdx).toBeGreaterThan(-1);
+      // Status section with text + LED appears after labelRow reference
+      const statusSectionIdx = content.indexOf('statusSection', labelRowIdx);
+      expect(statusSectionIdx).toBeGreaterThan(-1);
     });
   });
 
@@ -600,22 +592,20 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
 
   // --- AC-F063-04: Topic field aligned with speaker field ---
   describe('AC-F063-04: Topic field aligned with speaker field', () => {
-    it('topicRow has marginLeft: 28 (F073 moved from topicField to topicRow)', () => {
+    it('topicRow no longer has marginLeft: 28 (removed by F100/CR-162)', () => {
       const content = getSpeechSlot();
       const topicRowIdx = content.indexOf('topicRow:');
       const topicRowEnd = content.indexOf('},', topicRowIdx);
       const section = content.substring(topicRowIdx, topicRowEnd);
-      expect(section).toContain('marginLeft: 28');
+      expect(section).not.toContain('marginLeft: 28');
     });
 
-    it('marginLeft 28 = LED size 16 + gap 12', () => {
-      // Verify the LED size and gap values
+    it('LED moved to label row, speaker and topic fields use full width (F100/CR-162)', () => {
       const content = getSpeechSlot();
-      // LED size is 16
-      expect(content).toContain('size={16}');
+      // StatusLED size is 14 in label row
+      expect(content).toContain('size={14}');
       // Row gap is 12
       expect(content).toContain('gap: 12');
-      // 16 + 12 = 28
     });
   });
 
@@ -665,16 +655,13 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
 
   // --- EC-F063-01: SpeechSlot without speaker ---
   describe('EC-F063-01: SpeechSlot without speaker', () => {
-    it('LED still renders when no speaker (status not_assigned)', () => {
+    it('LED still renders on label row when no speaker (updated by F100/CR-162)', () => {
       const content = getSpeechSlot();
-      // StatusLED is always rendered (not conditional on hasSpeaker)
-      const rowIdx = content.indexOf('styles.row');
-      const rowEnd = content.indexOf('</View>', rowIdx);
-      const rowSection = content.substring(rowIdx, rowEnd);
-      // LED is unconditional inside the row
-      expect(rowSection).toContain('<StatusLED');
-      // X button is conditional
-      expect(rowSection).toContain('hasSpeaker && canUnassign');
+      // StatusLED is in the labelRow/statusSection, always rendered
+      expect(content).toContain('styles.statusSection');
+      expect(content).toContain('<StatusLED');
+      // X button is conditional on hasSpeaker
+      expect(content).toContain('hasSpeaker && canUnassign');
     });
   });
 

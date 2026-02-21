@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
     }
 
     // Build deep link
-    const deepLink = `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`;
+    const deepLink = `https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery`;
 
     // Get email template
     const template = getEmailTemplate(language, deepLink);

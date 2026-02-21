@@ -127,9 +127,10 @@ describe('F046 (CR-102): Hide exception label for speech Sundays in Agenda', () 
       expect(content).toContain("t(`sundayExceptions.${exception.reason}`");
     });
 
-    it('should have conditional rendering {exceptionLabel && (...)}', () => {
+    it('should have conditional rendering for exception label display (F109 adds isSpecialWithStatus)', () => {
       const content = getAgenda();
-      expect(content).toContain('{exceptionLabel && (');
+      // F109 changed the rendering to: {exceptionLabel && !isSpecialWithStatus && (
+      expect(content).toContain('exceptionLabel && !isSpecialWithStatus');
     });
   });
 

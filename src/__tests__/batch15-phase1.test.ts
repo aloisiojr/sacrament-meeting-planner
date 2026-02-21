@@ -284,14 +284,14 @@ describe('F097 (CR-159): Section titles in Presentation Mode', () => {
 
   // --- AC-097-10: Verify actual pt-BR values ---
   describe('AC-097-10: pt-BR section title values', () => {
-    it('sectionWelcome = Boas-vindas, Anuncios e Reconhecimentos', () => {
+    it('sectionWelcome = Boas-Vindas, Anuncios e Reconhecimentos (with accents, F105)', () => {
       const locale = readLocale('pt-BR') as { agenda: Record<string, string> };
-      expect(locale.agenda.sectionWelcome).toBe('Boas-vindas, Anuncios e Reconhecimentos');
+      expect(locale.agenda.sectionWelcome).toBe('Boas-Vindas, An\u00FAncios e Reconhecimentos');
     });
 
-    it('sectionSacrament = Designacoes e Sacramento', () => {
+    it('sectionSacrament = Designacoes e Sacramento (with cedilla/tilde, F105)', () => {
       const locale = readLocale('pt-BR') as { agenda: Record<string, string> };
-      expect(locale.agenda.sectionSacrament).toBe('Designacoes e Sacramento');
+      expect(locale.agenda.sectionSacrament).toBe('Designa\u00E7\u00F5es e Sacramento');
     });
 
     it('sectionFirstSpeeches = Primeiros Discursos', () => {
@@ -299,9 +299,9 @@ describe('F097 (CR-159): Section titles in Presentation Mode', () => {
       expect(locale.agenda.sectionFirstSpeeches).toBe('Primeiros Discursos');
     });
 
-    it('sectionLastSpeech = Ultimo Discurso', () => {
+    it('sectionLastSpeech = Ultimo Discurso (with accent on U, F105)', () => {
       const locale = readLocale('pt-BR') as { agenda: Record<string, string> };
-      expect(locale.agenda.sectionLastSpeech).toBe('Ultimo Discurso');
+      expect(locale.agenda.sectionLastSpeech).toBe('\u00DAltimo Discurso');
     });
   });
 
@@ -345,9 +345,9 @@ describe('F097 (CR-159): Section titles in Presentation Mode', () => {
       expect(locale.agenda.sectionFirstSpeeches).toBe('Primeros Discursos');
     });
 
-    it('sectionLastSpeech = Ultimo Discurso', () => {
+    it('sectionLastSpeech = Ultimo Discurso (with accent on U, F105)', () => {
       const locale = readLocale('es') as { agenda: Record<string, string> };
-      expect(locale.agenda.sectionLastSpeech).toBe('Ultimo Discurso');
+      expect(locale.agenda.sectionLastSpeech).toBe('\u00DAltimo Discurso');
     });
   });
 
@@ -429,8 +429,10 @@ describe('F098 (CR-160): Speech label context-aware (position 3)', () => {
       expect(hookSource).toContain("t('speeches.lastSpeech')");
     });
 
-    it('last speaker label format includes lastSpeech and speaker keys', () => {
-      expect(hookSource).toContain("`${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`");
+    it('last speaker label is t(speeches.lastSpeech) only (F108 removed suffix)', () => {
+      // F108 removed the redundant " - Discurso" suffix
+      // Now it's just: { label: t('speeches.lastSpeech'), ... }
+      expect(hookSource).toContain("label: t('speeches.lastSpeech')");
     });
   });
 
@@ -547,8 +549,9 @@ describe('F099 (CR-161): Collapsed speech card redesign', () => {
       expect(sundayCardSource).toContain('{name ? (');
     });
 
-    it('renders null when name is empty', () => {
-      expect(sundayCardSource).toContain(') : null}');
+    it('renders placeholder Text with space when name is empty (F107)', () => {
+      // F107 changed from null to <Text>{' '}</Text> for consistent row height
+      expect(sundayCardSource).toContain("{' '}");
     });
   });
 

@@ -379,7 +379,11 @@ export const SundayCard = React.memo(function SundayCard({
                       >
                         {`${posLabel}: ${name}`}
                       </Text>
-                    ) : null}
+                    ) : (
+                      <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+                        {' '}
+                      </Text>
+                    )}
                   </View>
                 );
               })}

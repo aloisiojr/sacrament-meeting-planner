@@ -14,13 +14,14 @@
 # CR-140, CR-141, CR-142, CR-143, CR-144,
 # CR-145, CR-146, CR-147, CR-148, CR-149,
 # CR-150, CR-151, CR-152, CR-153,
-# CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163
-# Generated: 2026-02-20
+# CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163,
+# CR-155, CR-164
+# Generated: 2026-02-21
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -2756,3 +2757,99 @@ batch14_phase2_test_results:
         description: "Header title fontSize made dynamic via fontSizes.headerTitle"
     acs_covered: [AC-097-01, AC-097-02, AC-097-03, AC-097-04, AC-097-05, AC-097-06, AC-097-07, AC-097-08, AC-097-09, AC-097-10, AC-097-11, AC-097-12, AC-097-13, AC-097-14]
     ecs_covered: [EC-097-01, EC-097-02, EC-097-03, EC-097-04]
+
+  # =============================================================================
+  # Batch 15 Phase 2: F101-F102 (CR-155, CR-164)
+  # =============================================================================
+
+  - step: S01
+    cr: CR-155
+    plan_ref: plans/PLAN_P028.yaml
+    plan_step: S01
+    hash: 73d73ab
+    message: "feat(edge-function): create send-reset-email with multilingual templates via Resend API (F101, CR-155)"
+    files_changed:
+      - supabase/functions/send-reset-email/index.ts
+    changes:
+      - id: CHG-396
+        description: "Created Edge Function send-reset-email with CORS, email validation, user lookup via admin.listUsers, ward language lookup, generateLink recovery token, multilingual email templates (pt-BR/en/es), and Resend API integration"
+    acs_covered: [AC-101-01, AC-101-02, AC-101-03, AC-101-04, AC-101-05, AC-101-09, AC-101-10, AC-101-11]
+    ecs_covered: [EC-101-01, EC-101-02, EC-101-03, EC-101-04]
+
+  - step: S02
+    cr: CR-155
+    plan_ref: plans/PLAN_P028.yaml
+    plan_step: S02
+    hash: 7a369cc
+    message: "feat(auth): replace resetPasswordForEmail with Edge Function invoke (F101, CR-155)"
+    files_changed:
+      - src/app/(auth)/forgot-password.tsx
+    changes:
+      - id: CHG-397
+        description: "Removed expo-linking import and Linking.createURL/resetPasswordForEmail call"
+      - id: CHG-398
+        description: "Added supabase.functions.invoke('send-reset-email', { body: { email: trimmedEmail } })"
+    acs_covered: [AC-101-06]
+    ecs_covered: [EC-101-06]
+
+  - step: S03
+    cr: CR-155
+    plan_ref: plans/PLAN_P028.yaml
+    plan_step: S03
+    hash: 6d6bb1a
+    message: "feat(auth): add deep link token handling with verifyOtp in reset-password (F101, CR-155)"
+    files_changed:
+      - src/app/(auth)/reset-password.tsx
+    changes:
+      - id: CHG-399
+        description: "Imported useLocalSearchParams from expo-router and extracted token/type from URL params"
+      - id: CHG-400
+        description: "Added dual-path useEffect: verifyOtp with token_hash when token present, PASSWORD_RECOVERY fallback when no token"
+    acs_covered: [AC-101-07, AC-101-08, AC-101-12]
+    ecs_covered: [EC-101-05]
+
+  - step: S04
+    cr: CR-164
+    plan_ref: plans/PLAN_P028.yaml
+    plan_step: S04
+    hash: 8c78046
+    message: "test(batch15): fix bundleIdentifier tests and update auth tests for Edge Function flow (F102, CR-164)"
+    files_changed:
+      - src/__tests__/batch7-f035-f039.test.ts
+      - src/__tests__/batch14-phase1.test.ts
+      - src/__tests__/batch15-phase2.test.ts
+    tests_added: 52
+    changes:
+      - id: CHG-401
+        description: "Fixed 4 bundleIdentifier values from com.wardmanager.app to com.sacramentmeetingmanager.app in batch7"
+      - id: CHG-402
+        description: "Updated batch14-phase1 AC-088-02 tests for Edge Function invoke and EC-088-01 for no Linking import"
+      - id: CHG-403
+        description: "Added 3 tests to EC-088-03 for useLocalSearchParams, verifyOtp, and token extraction"
+      - id: CHG-404
+        description: "Created batch15-phase2.test.ts with 52 tests covering F101 Edge Function, client-side changes, and F102 bundleIdentifier fix"
+    acs_covered: [AC-102-01, AC-102-02, AC-102-03, AC-102-04]
+    ecs_covered: [EC-102-01]
+
+  - step: S04-fix
+    cr: CR-164
+    plan_ref: plans/PLAN_P028.yaml
+    plan_step: S04
+    hash: 565e1db
+    message: "fix(tests): update cr004-f007 forgot-password test for Edge Function flow (F102, CR-164)"
+    files_changed:
+      - src/__tests__/cr004-f007-auth-fixes.test.ts
+    changes:
+      - id: CHG-405
+        description: "Updated cr004-f007 forgot-password test from resetPasswordForEmail to functions.invoke('send-reset-email')"
+    acs_covered: [AC-102-03]
+
+batch15_phase2_test_results:
+  new_tests: 52
+  new_tests_passing: 52
+  full_suite_tests: 4401
+  full_suite_passing: 4401
+  full_suite_files: 76
+  regressions: 0
+  pre_existing_failures_fixed: 2
+  pre_existing_failure_fix_details: "batch7-f035-f039.test.ts: 2 tests fixed com.wardmanager.app -> com.sacramentmeetingmanager.app"

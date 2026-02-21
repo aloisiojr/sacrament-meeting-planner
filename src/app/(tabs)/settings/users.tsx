@@ -279,7 +279,7 @@ export default function UserManagementScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button">
+          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
             <Text style={[styles.backButton, { color: colors.primary }]}>
               {t('common.back')}
             </Text>

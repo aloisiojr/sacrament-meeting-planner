@@ -313,12 +313,13 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('StatusLED is inside the rightColumn (after leftColumn closes)', () => {
+    it('StatusLED is inside the leftColumn/labelRow (F115 supersedes F112 LED placement)', () => {
       const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
       const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED', rightColumnIdx);
-      expect(rightColumnIdx).toBeGreaterThan(leftColumnIdx);
-      expect(statusLEDIdx).toBeGreaterThan(rightColumnIdx);
+      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED');
+      expect(leftColumnIdx).toBeGreaterThan(-1);
+      expect(statusLEDIdx).toBeGreaterThan(leftColumnIdx);
+      expect(statusLEDIdx).toBeLessThan(rightColumnIdx);
     });
   });
 
@@ -397,13 +398,12 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).toContain('const handleStatusPress = useCallback');
     });
 
-    it('StatusLED wrapper in rightColumn is pressable', () => {
-      // The statusLedWrapper Pressable has onPress={handleStatusPress}
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const statusLedWrapperIdx = speechSlotSource.indexOf('statusLedWrapper', rightColumnIdx);
-      const onPressIdx = speechSlotSource.indexOf('onPress={handleStatusPress}', statusLedWrapperIdx);
-      expect(statusLedWrapperIdx).toBeGreaterThan(rightColumnIdx);
-      expect(onPressIdx).toBeGreaterThan(statusLedWrapperIdx);
+    it('StatusLED is in statusSection Pressable with handleStatusPress (F115 layout)', () => {
+      // In F115, StatusLED is inside statusSection in labelRow (leftColumn)
+      const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
+      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED', statusSectionIdx);
+      expect(statusSectionIdx).toBeGreaterThan(-1);
+      expect(statusLEDIdx).toBeGreaterThan(statusSectionIdx);
     });
   });
 
@@ -482,13 +482,13 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).not.toContain('paddingRight: 5');
     });
 
-    it('no statusSection style definition', () => {
+    it('statusSection style exists (restored by F115, superseding F112 removal)', () => {
       const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
-      expect(styleSheetBlock).not.toContain('statusSection:');
+      expect(styleSheetBlock).toContain('statusSection:');
     });
 
-    it('no styles.statusSection reference in component', () => {
-      expect(speechSlotSource).not.toContain('styles.statusSection');
+    it('styles.statusSection is referenced in component (F115 layout)', () => {
+      expect(speechSlotSource).toContain('styles.statusSection');
     });
   });
 
@@ -507,14 +507,14 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
     });
   });
 
-  // --- statusLedWrapper style ---
-  describe('statusLedWrapper style', () => {
+  // --- statusLedPlaceholder style (was statusLedWrapper, updated by F115) ---
+  describe('statusLedPlaceholder style (F115 replaces statusLedWrapper)', () => {
     it('has justifyContent center', () => {
-      expect(speechSlotSource).toMatch(/statusLedWrapper:\s*\{[^}]*justifyContent:\s*'center'/s);
+      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*justifyContent:\s*'center'/s);
     });
 
     it('has alignItems center', () => {
-      expect(speechSlotSource).toMatch(/statusLedWrapper:\s*\{[^}]*alignItems:\s*'center'/s);
+      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*alignItems:\s*'center'/s);
     });
   });
 

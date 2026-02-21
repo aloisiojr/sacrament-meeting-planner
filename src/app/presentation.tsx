@@ -2,10 +2,10 @@
  * PresentationMode: Full-screen modal for live meeting use.
  * Normal meeting: 4 accordion cards. Special meeting: 3 cards.
  * All fields read-only. Welcome section expanded by default.
- * Close button in header returns to previous screen.
+ * Close button and font size toggle in header.
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -27,10 +27,18 @@ import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import type { PresentationField } from '../hooks/usePresentationMode';
 
+const FONT_SIZES = {
+  normal: { fieldLabel: 13, fieldValue: 17, cardTitle: 17, headerTitle: 19 },
+  large: { fieldLabel: 18, fieldValue: 26, cardTitle: 22, headerTitle: 24 },
+};
+
 export default function PresentationScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+
+  const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
+  const fontSizes = FONT_SIZES[fontSizeMode];
 
   const sundayDate = getTodaySundayDate();
   const dateLabel = useMemo(
@@ -62,26 +70,41 @@ export default function PresentationScreen() {
         content: (
           <View>
             {card.fields.map((field, idx) => (
-              <PresentationFieldRow key={idx} field={field} colors={colors} />
+              <PresentationFieldRow
+                key={idx}
+                field={field}
+                colors={colors}
+                fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
+              />
             ))}
           </View>
         ),
       })),
-    [cards, colors]
+    [cards, colors, fontSizes]
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
+        <View style={styles.headerTitleContainer}>
+          <Text style={[styles.headerTitle, { color: colors.text, fontSize: fontSizes.headerTitle }]}>
             {t('home.startMeeting')}
           </Text>
           <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
             {dateLabel}
           </Text>
         </View>
+        <Pressable
+          style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
+          onPress={() => setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle font size"
+        >
+          <Text style={[styles.fontToggleText, { color: colors.text }]}>
+            {fontSizeMode === 'normal' ? 'Aa' : 'AA'}
+          </Text>
+        </Pressable>
         <Pressable
           style={[styles.closeButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.back()}
@@ -100,7 +123,11 @@ export default function PresentationScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <AccordionCard cards={accordionCards} initialExpanded={0} />
+        <AccordionCard
+          cards={accordionCards}
+          initialExpanded={0}
+          cardTitleFontSize={fontSizes.cardTitle}
+        />
       )}
     </SafeAreaView>
   );
@@ -111,19 +138,21 @@ export default function PresentationScreen() {
 function PresentationFieldRow({
   field,
   colors,
+  fontSizes,
 }: {
   field: PresentationField;
   colors: ThemeColors;
+  fontSizes?: { label: number; value: number };
 }) {
   return (
     <View style={styles.fieldRow}>
-      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+      <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
         {field.label}
       </Text>
       <Text
         style={[
           styles.fieldValue,
-          { color: colors.text },
+          { color: colors.text, fontSize: fontSizes?.value ?? 16 },
           field.type === 'hymn' && styles.hymnValue,
           !field.value && { color: colors.textTertiary },
         ]}
@@ -147,14 +176,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  headerTitleContainer: {
     flex: 1,
+  },
+  headerTitle: {
+    fontWeight: '700',
   },
   headerDate: {
     fontSize: 14,
     marginTop: 2,
+  },
+  fontToggleButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  fontToggleText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   closeButton: {
     width: 36,
@@ -176,13 +218,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fieldLabel: {
-    fontSize: 12,
     fontWeight: '600',
     marginBottom: 2,
     textTransform: 'uppercase',
   },
   fieldValue: {
-    fontSize: 16,
   },
   hymnValue: {
     fontWeight: '600',

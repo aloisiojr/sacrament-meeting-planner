@@ -139,101 +139,122 @@ export const SpeechSlot = React.memo(function SpeechSlot({
     'gave_up',
   ];
 
+  // Show topic row when there's a display value, or when can assign and speech exists
+  const showTopicRow = !!(topicDisplay || (canAssign && speech));
+
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
-      {/* Slot label with status */}
-      <View style={styles.labelRow}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-        <Pressable
-          style={styles.statusSection}
-          onPress={handleStatusPress}
-          disabled={isObserver || status === 'not_assigned'}
-        >
-          <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-            {t(`speechStatus.${status}`)}
-          </Text>
-          <StatusLED
-            status={status}
-            size={14}
+      <View style={styles.outerRow}>
+        {/* Left column: labels and fields */}
+        <View style={styles.leftColumn}>
+          {/* Slot label with status text */}
+          <View style={styles.labelRow}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+            <Pressable
+              onPress={handleStatusPress}
+              disabled={isObserver || status === 'not_assigned'}
+            >
+              <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                {t(`speechStatus.${status}`)}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.row}>
+            {/* Speaker field */}
+            <Pressable
+              style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              onPress={handleSpeakerPress}
+              disabled={!canAssign || !speech}
+              accessibilityRole="button"
+              accessibilityLabel={t('speeches.selectSpeaker')}
+            >
+              <Text
+                style={[
+                  styles.fieldText,
+                  { color: hasSpeaker ? colors.text : colors.placeholder },
+                ]}
+                numberOfLines={1}
+              >
+                {speech?.speaker_name ?? t('speeches.selectSpeaker')}
+              </Text>
+              {canAssign && (
+                <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
+                  {'\u25BC'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Topic field */}
+          <View style={styles.topicRow}>
+            <Pressable
+              style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              onPress={handleTopicPress}
+              disabled={!canAssign || !speech}
+              accessibilityRole="button"
+              accessibilityLabel={t('speeches.selectTopic')}
+            >
+              <Text
+                style={[
+                  styles.topicText,
+                  { color: topicDisplay ? colors.text : colors.placeholder },
+                ]}
+                numberOfLines={1}
+              >
+                {topicDisplay ?? t('speeches.selectTopic')}
+              </Text>
+              {canAssign && (
+                <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
+                  {'\u25BC'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Right column: LED and action buttons */}
+        <View style={styles.rightColumn}>
+          <Pressable
+            style={styles.statusLedWrapper}
             onPress={handleStatusPress}
             disabled={isObserver || status === 'not_assigned'}
-          />
-        </Pressable>
-      </View>
-
-      <View style={styles.row}>
-        {/* Speaker field */}
-        <Pressable
-          style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-          onPress={handleSpeakerPress}
-          disabled={!canAssign || !speech}
-          accessibilityRole="button"
-          accessibilityLabel={t('speeches.selectSpeaker')}
-        >
-          <Text
-            style={[
-              styles.fieldText,
-              { color: hasSpeaker ? colors.text : colors.placeholder },
-            ]}
-            numberOfLines={1}
           >
-            {speech?.speaker_name ?? t('speeches.selectSpeaker')}
-          </Text>
-          {canAssign && (
-            <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-              {'\u25BC'}
-            </Text>
-          )}
-        </Pressable>
-
-        {/* Remove button */}
-        {hasSpeaker && canUnassign && (
-          <Pressable
-            onPress={handleRemove}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('speeches.unassign')}
-          >
-            <Text style={[styles.removeButton, { color: colors.error }]}>
-              {'\u00D7'}
-            </Text>
+            <StatusLED
+              status={status}
+              size={14}
+              onPress={handleStatusPress}
+              disabled={isObserver || status === 'not_assigned'}
+            />
           </Pressable>
-        )}
-      </View>
-
-      {/* Topic field */}
-      <View style={styles.topicRow}>
-        <Pressable
-          style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-          onPress={handleTopicPress}
-          disabled={!canAssign || !speech}
-          accessibilityRole="button"
-          accessibilityLabel={t('speeches.selectTopic')}
-        >
-          <Text
-            style={[
-              styles.topicText,
-              { color: topicDisplay ? colors.text : colors.placeholder },
-            ]}
-            numberOfLines={1}
-          >
-            {topicDisplay ?? t('speeches.selectTopic')}
-          </Text>
-          {canAssign && (
-            <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-              {'\u25BC'}
-            </Text>
+          <View style={styles.speakerActionWrapper}>
+            {hasSpeaker && canUnassign && (
+              <Pressable
+                onPress={handleRemove}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('speeches.unassign')}
+              >
+                <Text style={[styles.removeButton, { color: colors.error }]}>
+                  {'\u00D7'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {showTopicRow && (
+            <View style={styles.topicActionWrapper}>
+              {topicDisplay && canAssign && (
+                <Pressable
+                  hitSlop={8}
+                  onPress={handleClearTopic}
+                  accessibilityLabel={t('common.delete')}
+                >
+                  <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
+                </Pressable>
+              )}
+            </View>
           )}
-        </Pressable>
-        {topicDisplay && canAssign && (
-          <Pressable
-            hitSlop={8}
-            onPress={handleClearTopic}
-            accessibilityLabel={t('common.delete')}
-          >
-            <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
-          </Pressable>
-        )}
+        </View>
       </View>
 
       {/* Status Change Modal */}
@@ -253,6 +274,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  outerRow: {
+    flexDirection: 'row',
+  },
+  leftColumn: {
+    flex: 1,
+  },
+  rightColumn: {
+    width: 36,
+    alignItems: 'center',
+  },
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -265,11 +296,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  statusSection: {
-    flexDirection: 'row',
+  statusLedWrapper: {
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    paddingRight: 5,
   },
   statusText: {
     fontSize: 11,
@@ -277,7 +306,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   field: {
     flex: 1,
@@ -296,6 +324,11 @@ const styles = StyleSheet.create({
     fontSize: 8,
     marginLeft: 4,
   },
+  speakerActionWrapper: {
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   removeButton: {
     fontSize: 24,
     fontWeight: '300',
@@ -304,8 +337,13 @@ const styles = StyleSheet.create({
   topicRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     marginTop: 6,
+  },
+  topicActionWrapper: {
+    height: 34,
+    marginTop: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topicField: {
     flex: 1,

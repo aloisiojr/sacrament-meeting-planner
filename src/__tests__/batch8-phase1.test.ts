@@ -48,28 +48,22 @@ describe('F045 (CR-101): Hide status LEDs on non-speech Sundays', () => {
       expect(content).toContain('const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES');
     });
 
-    it('should render StatusLED components inside conditional', () => {
+    it('should render StatusLED inline in speechRow (redesigned by F099/CR-161)', () => {
       const content = getSundayCard();
-      // StatusLED should be inside an isSpeechesType conditional block (may include !expanded)
-      const ledsStart = content.indexOf('!expanded && isSpeechesType && (');
-      expect(ledsStart).toBeGreaterThan(-1);
-      const ledsEnd = content.indexOf('</View>', ledsStart);
-      const ledsSection = content.substring(ledsStart, ledsEnd);
-      expect(ledsSection).toContain('<StatusLED');
-      expect(ledsSection).toContain('speechStatuses.map');
+      // StatusLED is now inline inside speechRow, part of isSpeechesType && !expanded block
+      expect(content).toContain('isSpeechesType && !expanded');
+      expect(content).toContain('<StatusLED');
+      expect(content).toContain('styles.speechRow');
     });
   });
 
   describe('AC-F045-02: LEDs hidden when type is NOT speeches', () => {
-    it('should NOT render LEDs unconditionally (no standalone <View style={styles.leds}>)', () => {
+    it('LEDs only rendered inside isSpeechesType conditional (redesigned by F099)', () => {
       const content = getSundayCard();
-      // The LEDs View should be wrapped in conditional, not standalone
-      // Find all occurrences of styles.leds
-      const ledsViewIdx = content.indexOf('styles.leds');
-      expect(ledsViewIdx).toBeGreaterThan(-1);
-      // The line before should be part of the conditional
-      const before = content.substring(Math.max(0, ledsViewIdx - 100), ledsViewIdx);
-      expect(before).toContain('isSpeechesType');
+      // StatusLED is inside the isSpeechesType && !expanded block
+      // The leds style may still exist but LEDs are now inline in speechRow
+      expect(content).toContain('isSpeechesType && !expanded');
+      expect(content).toContain('<StatusLED');
     });
   });
 

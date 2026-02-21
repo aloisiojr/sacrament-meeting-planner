@@ -192,12 +192,12 @@ describe('F073 (CR-128): Topic X button positioning - outside dropdown field', (
       expect(topicRowStyle).toContain('marginTop: 6');
     });
 
-    it('styles.topicRow has marginLeft: 28', () => {
+    it('styles.topicRow no longer has marginLeft: 28 (removed by F100/CR-162)', () => {
       const content = getSpeechSlot();
       const topicRowIdx = content.indexOf('topicRow:');
       const topicRowEnd = content.indexOf('},', topicRowIdx);
       const topicRowStyle = content.substring(topicRowIdx, topicRowEnd);
-      expect(topicRowStyle).toContain('marginLeft: 28');
+      expect(topicRowStyle).not.toContain('marginLeft: 28');
     });
   });
 });

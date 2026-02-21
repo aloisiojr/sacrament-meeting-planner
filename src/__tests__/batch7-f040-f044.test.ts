@@ -460,9 +460,9 @@ describe('F042 (CR-97): Multi-select for Reconhecendo a Presenca field', () => {
   });
 
   describe('AC-F042-08: Modo Apresentacao exibe multiplos nomes corretamente', () => {
-    it('should join recognized_names in presentation mode', () => {
+    it('should join recognized_names with newline in presentation mode (updated by F097/CR-157)', () => {
       const content = readSourceFile('hooks/usePresentationMode.ts');
-      expect(content).toContain("recognized_names.join(', ')");
+      expect(content).toContain("recognized_names.join('\\n')");
     });
   });
 

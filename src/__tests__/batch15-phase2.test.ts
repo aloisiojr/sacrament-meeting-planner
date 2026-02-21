@@ -130,9 +130,9 @@ describe('F101 (CR-155): Edge Function send-reset-email', () => {
 
   // --- AC-101-05: Deep link format ---
   describe('AC-101-05: Deep link format', () => {
-    it('builds sacrmeetman://reset-password deep link with token and type', () => {
+    it('builds HTTPS redirect URL for password reset deep link with token and type', () => {
       const content = getEdgeFunction();
-      expect(content).toContain('sacrmeetman://reset-password?token=');
+      expect(content).toContain('https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=');
       expect(content).toContain('&type=recovery');
     });
   });
@@ -277,7 +277,7 @@ describe('F101 (CR-155): Edge Function send-reset-email', () => {
 
   // --- EC-101-05: App not installed (deep link behavior) ---
   // NOTE: EC-101-05 (app not installed on device) is a device-level behavior.
-  // The deep link sacrmeetman:// scheme is defined in app.json and requires the
+  // The deep link sacrmeetplan:// scheme is defined in app.json and requires the
   // app to be installed. This cannot be verified in unit tests - it is a
   // runtime/device-level behavior documented as a known limitation.
 

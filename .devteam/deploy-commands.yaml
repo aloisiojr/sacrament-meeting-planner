@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 6
-last_updated: "2026-02-20T12:00:00"
+version: 7
+last_updated: "2026-02-21T06:15:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -69,6 +69,26 @@ services:
         command: "supabase functions deploy <function-name>"
         when: "Alterar apenas uma function"
 
+    secrets:
+      - name: "Listar secrets configurados"
+        command: "supabase secrets list"
+        when: "Verificar quais secrets estao configurados"
+
+      - name: "Configurar secret Resend API Key"
+        command: "supabase secrets set RESEND_API_KEY=<your-resend-api-key>"
+        when: "Configurar API key do Resend para envio de emails (Edge Function send-reset-email)"
+        notes: "Obter API key em https://resend.com/api-keys. Necessario para Edge Function send-reset-email."
+
+      - name: "Configurar secret Resend From Email"
+        command: 'supabase secrets set RESEND_FROM_EMAIL="Sacrament Meeting Planner <noreply@yourdomain.com>"'
+        when: "Configurar email remetente para emails de reset de senha"
+        notes: "Dominio deve estar verificado no Resend. Para testes, usar onboarding@resend.dev."
+
+      - name: "Configurar secrets em batch"
+        command: |
+          supabase secrets set RESEND_API_KEY=<key> RESEND_FROM_EMAIL="Sacrament Meeting Planner <noreply@yourdomain.com>"
+        when: "Configurar multiplos secrets de uma vez"
+
     logs:
       - name: "Ver logs de functions"
         command: "supabase functions logs --scroll"
@@ -110,6 +130,13 @@ env_variables:
       - PROJECT_REF
     file: ".env"
 
+  supabase_secrets:
+    required_for_send_reset_email:
+      - RESEND_API_KEY
+      - RESEND_FROM_EMAIL
+    set_via: "supabase secrets set <KEY>=<VALUE>"
+    notes: "Secrets sao variaveis de ambiente das Edge Functions, gerenciados pelo Supabase CLI"
+
   expo:
     required:
       - EXPO_PUBLIC_SUPABASE_URL
@@ -147,6 +174,13 @@ troubleshooting:
   - problem: "CREATE OR REPLACE FUNCTION em schema auth falha com 'permission denied for schema auth'"
     solution: "Management API nao tem permissao para alterar schema auth. Se a funcao ja existe em public (verificar com pg_proc), aplicar no schema public em vez de auth."
     notes: "Funcao auth.ward_id() foi originalmente aplicada em public schema pelo Supabase Dashboard"
+
+  - problem: "Edge Function send-reset-email retorna 'Email service not configured'"
+    solution: "Secrets RESEND_API_KEY e RESEND_FROM_EMAIL nao estao configurados. Executar: supabase secrets set RESEND_API_KEY=<key> RESEND_FROM_EMAIL=<email>"
+    notes: "Criar conta em https://resend.com, gerar API key, verificar dominio. Para testes usar onboarding@resend.dev como FROM."
+
+  - problem: "Resend API retorna erro 403 ou 'domain not verified'"
+    solution: "Dominio do email remetente (FROM) nao esta verificado no Resend. Ir em https://resend.com/domains e verificar o dominio, ou usar onboarding@resend.dev para testes."
 
 deploy_history:
   - date: "2026-02-18"
@@ -205,3 +239,30 @@ deploy_history:
     verification:
       - "information_schema.columns confirma coluna boolean, NOT NULL, default true"
       - "REST API health check: HTTP 200"
+
+  - date: "2026-02-21"
+    action: "Deploy Edge Function send-reset-email"
+    method: "supabase functions deploy send-reset-email (executado pelo orquestrador)"
+    reason: "Nova Edge Function para envio de emails de reset de senha multilinguais via Resend API"
+    result: "Sucesso - Function deployada e ACTIVE (version 1)"
+    verified: true
+    cr: "Batch 15 Phase 2"
+    verification:
+      - "supabase functions list mostra send-reset-email como ACTIVE"
+      - "POST com email inexistente retorna {success:true} (anti-enumeration)"
+    notes: "Function requer secrets RESEND_API_KEY e RESEND_FROM_EMAIL para envio efetivo de emails"
+
+  - date: "2026-02-21"
+    action: "Configurar secrets RESEND_API_KEY e RESEND_FROM_EMAIL"
+    method: "supabase secrets set"
+    reason: "Edge Function send-reset-email precisa de credenciais Resend para enviar emails"
+    result: "PENDENTE - Requer acao manual do usuario"
+    verified: false
+    cr: "Batch 15 Phase 2"
+    pending_actions:
+      - "Criar conta em https://resend.com (se necessario)"
+      - "Gerar API key em https://resend.com/api-keys"
+      - "Verificar dominio em https://resend.com/domains (ou usar onboarding@resend.dev para testes)"
+      - "Executar: supabase secrets set RESEND_API_KEY=<key>"
+      - 'Executar: supabase secrets set RESEND_FROM_EMAIL="Sacrament Meeting Planner <noreply@yourdomain.com>"'
+      - "Testar com email de usuario real no banco"

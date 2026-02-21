@@ -1,0 +1,550 @@
+# =============================================================================
+# QA_PLAN_016.yaml
+# QA Plan for Batch 15 Phase 1: CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163
+# Features: F097, F098, F099, F100, F101, F102, F103, F104
+# Created: 2026-02-20
+# =============================================================================
+
+type: qa_plan
+id: QA-016
+created_at: "2026-02-20T00:00:00Z"
+request_type: feature_request
+feature_or_bug: "Batch 15 Phase 1: Presentation mode arrows, recognized names one-per-line, font size toggle, section titles matching agenda, lastSpeech vs 3rd speech label split, collapsed card speech layout with status circles, expanded card status circle repositioning, selectSpeaker placeholder rename"
+user_request: |
+  CR-156 (F097): Presentation mode accordion arrows - show down arrow if card is above expanded, up arrow if below, no arrow if expanded
+  CR-157 (F098): Presentation mode recognized names one per line
+  CR-158 (F099): Presentation mode font size toggle button (normal +1 vs large)
+  CR-159 (F100): Presentation mode section titles must match agenda tab sunday card section titles
+  CR-160 (F101): Only agenda tab sunday card shows "Ultimo Discurso" for position 3; speeches tab sunday card shows "3o Discurso"
+  CR-161 (F102): Collapsed speeches card: align speech lines with status circles, increase font/spacing, reduce circle size, move circles to left of label
+  CR-162 (F103): Expanded speeches card: move status circle to label row aligned right with "<status text> <circle>" format, fields occupy full width
+  CR-163 (F104): Expanded speeches card: change "Selecionar Orador" placeholder to "Selecionar Discursante" in all 3 languages
+
+# =============================================================================
+# CR-156 (F097): Presentation mode accordion arrows
+# =============================================================================
+baseline_cr156:
+  description: |
+    The AccordionCard component (src/components/AccordionCard.tsx) renders cards where
+    exactly 1 card is expanded at a time. The chevron logic at line 91-98 currently shows:
+    - Expanded card: UP arrow (U+25B2)
+    - Collapsed card: DOWN arrow (U+25BC)
+
+    This applies the SAME chevron to ALL collapsed cards regardless of their position
+    relative to the expanded card. The user wants:
+    - Cards ABOVE the expanded card: DOWN arrow (indicating "expand downward")
+    - Cards BELOW the expanded card: UP arrow (indicating "expand upward")
+    - The expanded card itself: NO arrow
+
+    The current code at line 97: `{isExpanded ? '\u25B2' : '\u25BC'}` treats all
+    collapsed cards identically. The component tracks expandedIndex in state (line 46).
+    The map at line 59 provides the current index. The comparison `index < expandedIndex`
+    vs `index > expandedIndex` is straightforward.
+  evidence:
+    - "src/components/AccordionCard.tsx line 46: const [expandedIndex, setExpandedIndex] = useState(initialExpanded)"
+    - "src/components/AccordionCard.tsx line 59-60: cards.map((card, index) => { const isExpanded = index === expandedIndex; }"
+    - "src/components/AccordionCard.tsx line 91-98: chevron renders U+25B2 when expanded, U+25BC when collapsed - same for ALL collapsed cards"
+    - "src/components/AccordionCard.tsx line 101: expanded content only rendered when isExpanded is true"
+
+# =============================================================================
+# CR-157 (F098): Recognized names one per line in Presentation mode
+# =============================================================================
+baseline_cr157:
+  description: |
+    In usePresentationMode.ts (buildPresentationCards function, lines 80-86), the
+    recognized_names field is built by joining names with comma+space:
+      `value: agenda.recognized_names.join(', ')`
+
+    This produces a single string like "John, Mary, Peter" which is then rendered
+    as a single Text element in the PresentationFieldRow component (presentation.tsx
+    lines 111-136). The field type is 'text' which limits to numberOfLines={2}.
+
+    The user wants each recognized name on its own line. Options:
+    1. Join with '\n' instead of ', ' and use type 'multiline' (numberOfLines=undefined)
+    2. Or render them separately
+
+    The simplest approach is to change join(', ') to join('\n') and set type to 'multiline'.
+  evidence:
+    - "src/hooks/usePresentationMode.ts line 83: value: agenda.recognized_names.join(', ') - joins with comma"
+    - "src/hooks/usePresentationMode.ts line 84: type: 'text' - limits rendering to 2 lines max"
+    - "src/app/presentation.tsx line 130: numberOfLines={field.type === 'multiline' ? undefined : 2} - text type caps at 2 lines"
+    - "Recognized names are stored as string[] in agenda.recognized_names (database type)"
+
+# =============================================================================
+# CR-158 (F099): Font size toggle in Presentation mode
+# =============================================================================
+baseline_cr158:
+  description: |
+    The Presentation mode screen (src/app/presentation.tsx) has a header with:
+    - Left: title + date
+    - Right: close button (X, 36x36 circle)
+
+    There is NO font size toggle. The field value font size is hardcoded at 16px
+    (styles.fieldValue, line 186) and label at 12px (styles.fieldLabel, line 179).
+
+    The user wants: next to the close button, add a toggle button for font size.
+    Two modes: "normal" (current size +1) and "large" (significantly bigger).
+    The user says "ainda tem muito espaco sem ser utilizado na tela" (there is
+    still a lot of unused space on the screen).
+
+    Implementation will need:
+    - A state variable for font size mode (useState)
+    - A toggle button next to the close button in the header
+    - Dynamic font sizes applied to fieldValue and fieldLabel styles
+    - "Normal" = current +1 (so 17px value, 13px label)
+    - "Large" = significantly bigger (e.g., 24px+ value, 16px+ label)
+  evidence:
+    - "src/app/presentation.tsx lines 85-94: closeButton is the only button in the header right side"
+    - "src/app/presentation.tsx line 186: fieldValue fontSize: 16"
+    - "src/app/presentation.tsx line 179: fieldLabel fontSize: 12"
+    - "src/app/presentation.tsx line 153: headerTitle fontSize: 18"
+    - "No font size toggle or state exists in the component"
+
+# =============================================================================
+# CR-159 (F100): Presentation mode section titles must match agenda tab
+# =============================================================================
+baseline_cr159:
+  description: |
+    The presentation mode (usePresentationMode.ts buildPresentationCards) uses these
+    card titles:
+    - Card 1 (Welcome): t('agenda.presiding') = "Presidindo" / "Presiding" / "Presidiendo"
+    - Card 2 (Designations): t('agenda.wardBusiness') = "Apoios e Agradecimentos" / "Sustainings and Releases" / "Apoyos y Agradecimientos"
+    - Card 3 (Speeches 1+2): t('speeches.title') = "Discursos" / "Speeches" / "Discursos"
+    - Card 4 (Last Speech): t('agenda.closingHymn') = "Hino de Encerramento" / "Closing Hymn" / "Himno de Clausura"
+
+    The agenda tab (AgendaForm.tsx) uses these section headers:
+    - Section 1: t('agenda.sectionWelcome') = "Boas-vindas, Anuncios e Reconhecimentos" / "Welcome, Announcements and Recognitions" / "Bienvenida, Anuncios y Reconocimientos"
+    - Section 2: t('agenda.sectionSacrament') = "Designacoes e Sacramento" / "Assignments and Sacrament" / "Asignaciones y Sacramento"
+    - Section 3: t('agenda.sectionFirstSpeeches') = "Primeiros Discursos" / "First Speeches" / "Primeros Discursos"
+    - Section 4: t('agenda.sectionLastSpeech') = "Ultimo Discurso" / "Final Speech" / "Ultimo Discurso"
+
+    The titles DO NOT match. The user wants the presentation mode to use the same
+    section header keys as the agenda tab.
+  evidence:
+    - "src/hooks/usePresentationMode.ts line 102: cards.push({ title: t('agenda.presiding'), ... }) - uses 'presiding' instead of 'sectionWelcome'"
+    - "src/hooks/usePresentationMode.ts line 132: cards.push({ title: t('agenda.wardBusiness'), ... }) - uses 'wardBusiness' instead of 'sectionSacrament'"
+    - "src/hooks/usePresentationMode.ts line 160: cards.push({ title: t('speeches.title'), ... }) - uses 'speeches.title' instead of 'sectionFirstSpeeches'"
+    - "src/hooks/usePresentationMode.ts line 170: cards.push({ title: t('agenda.closingHymn'), ... }) - uses 'closingHymn' instead of 'sectionLastSpeech'"
+    - "src/components/AgendaForm.tsx line 161: SectionHeader title={t('agenda.sectionWelcome')}"
+    - "src/components/AgendaForm.tsx line 286: SectionHeader title={t('agenda.sectionSacrament')}"
+    - "src/components/AgendaForm.tsx line 362: SectionHeader title={t('agenda.sectionFirstSpeeches')}"
+    - "src/components/AgendaForm.tsx line 426: SectionHeader title={t('agenda.sectionLastSpeech')}"
+
+# =============================================================================
+# CR-160 (F101): "Ultimo Discurso" only in Agenda tab, "3o Discurso" in Speeches tab
+# =============================================================================
+baseline_cr160:
+  description: |
+    Currently, position 3 is labeled "Ultimo Discurso" (lastSpeech) EVERYWHERE:
+    1. SundayCard.tsx line 360-361 (collapsed card in Speeches tab):
+       `pos === 3 ? t('speeches.lastSpeech') : t('speeches.slot', { number: ... })`
+    2. SpeechSlot.tsx line 53-58 (expanded card in Speeches tab):
+       `if (position === 3) return t('speeches.lastSpeech');`
+    3. AgendaForm.tsx line 429 (expanded card in Agenda tab):
+       `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`
+    4. usePresentationMode.ts line 166 (presentation mode):
+       `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`
+
+    The user wants:
+    - Agenda tab (sunday card): position 3 shows "Ultimo Discurso" (keep as-is)
+    - Speeches tab (sunday card): position 3 shows "3o Discurso" (same format as 1o/2o)
+
+    Translation keys involved:
+    - speeches.lastSpeech: "Ultimo Discurso" / "Final Speech" / "Ultimo Discurso"
+    - speeches.slot: "{{number}} Discurso" / "{{number}} Speech" / "{{number}} Discurso"
+
+    The SundayCard is used in BOTH Speeches and Agenda tabs, but the collapsed labels
+    are only in SundayCard.tsx. The SpeechSlot is only used in Speeches tab.
+    The AgendaForm is only used in Agenda tab.
+
+    Changes needed:
+    - SundayCard.tsx collapsed: needs a prop or context to know which tab it's in, OR
+      always use "3o Discurso" since collapsed card is in Speeches tab
+    - SpeechSlot.tsx: change position 3 to use slot format like 1 and 2
+    - AgendaForm.tsx: keep using lastSpeech (it's in Agenda tab)
+    - usePresentationMode.ts: keep using lastSpeech (presentation is like Agenda)
+
+    IMPORTANT: SundayCard.tsx is only used in speeches.tsx (Speeches tab). The Agenda
+    tab uses its own AgendaSundayCard component inline in agenda.tsx. So changing
+    SundayCard.tsx collapsed labels to "3o Discurso" only affects the Speeches tab.
+  evidence:
+    - "src/components/SundayCard.tsx line 360-361: pos === 3 ? t('speeches.lastSpeech') for collapsed card"
+    - "src/components/SpeechSlot.tsx line 54-55: position === 3 returns t('speeches.lastSpeech') for expanded slot"
+    - "src/components/AgendaForm.tsx line 429: uses t('speeches.lastSpeech') for expanded agenda"
+    - "src/hooks/usePresentationMode.ts line 166: uses t('speeches.lastSpeech') for presentation"
+    - "src/app/(tabs)/speeches.tsx line 296: SundayCard used ONLY in Speeches tab"
+    - "src/app/(tabs)/agenda.tsx line 200: Agenda tab uses its OWN AgendaSundayCard, NOT SundayCard"
+
+# =============================================================================
+# CR-161 (F102): Collapsed speeches card layout changes
+# =============================================================================
+baseline_cr161:
+  description: |
+    Current collapsed SundayCard layout (src/components/SundayCard.tsx lines 355-394):
+    - Center (headerCenter): shows 3 lines of "posLabel: name" text
+      - Font: styles.speakerNameLine fontSize: 11 (line 466)
+      - Format: "{posLabel}: {name}" e.g. "1o Discurso: John"
+    - Right (ledsVertical): 3 StatusLED circles in a vertical column
+      - StatusLED size: 14 (line 384)
+      - Container gap: 4 (styles.ledsVertical, line 463)
+
+    The user wants:
+    1. Align speech lines with status circles (currently they are separate columns)
+    2. Increase font size and line spacing of labels
+    3. Reduce circle size (currently 14px)
+    4. Move circles from RIGHT of card to BEFORE the label text
+    5. New format: "<circle> 1o Discurso: <name>"
+    6. If no designation (no speaker assigned), show only the status circle
+
+    This means moving from a 2-column layout (center text | right LEDs) to an
+    integrated single-column layout where each line has: circle + label + name.
+  evidence:
+    - "src/components/SundayCard.tsx lines 355-375: headerCenter renders 3 speakerNameLine texts"
+    - "src/components/SundayCard.tsx lines 378-394: ledsVertical renders 3 StatusLEDs at size=14 on the right"
+    - "src/components/SundayCard.tsx line 466: speakerNameLine fontSize: 11"
+    - "src/components/SundayCard.tsx line 462-463: ledsVertical flexDirection: column, gap: 4"
+    - "StatusLED component at src/components/StatusLED.tsx accepts size prop, default 16"
+
+# =============================================================================
+# CR-162 (F103): Expanded speeches card - move status circle to label row
+# =============================================================================
+baseline_cr162:
+  description: |
+    Current expanded SpeechSlot layout (src/components/SpeechSlot.tsx):
+    - Line 148: label text (e.g. "1o DISCURSO") rendered above the speaker row
+    - Line 150-181: row with [StatusLED] [SelectorField for speaker] [remove button]
+    - Lines 199-231: topic row below
+
+    The LED circle is currently on the same row as the speaker selector field.
+    The user wants:
+    - Move the status circle UP to the label row, aligned RIGHT: "<label> ... <status text> <circle>"
+    - The status should be written out in text form (e.g., "Designado/Confirmado") followed by the circle
+    - With the LED removed from the speaker row, the speaker and topic fields can
+      occupy the full width of the card
+
+    Translation keys for status text:
+    - speechStatus.not_assigned / assigned_not_invited / assigned_invited / assigned_confirmed / gave_up
+    - Already exist in all 3 language files
+
+    The StatusLED is rendered in the row at line 152 with size=16. The label is rendered
+    at line 148 with styles.label (fontSize: 12, textTransform: uppercase).
+  evidence:
+    - "src/components/SpeechSlot.tsx line 148: label Text rendered as standalone line"
+    - "src/components/SpeechSlot.tsx lines 150-181: row contains StatusLED + SelectorField + remove button"
+    - "src/components/SpeechSlot.tsx line 152-157: StatusLED with size=16 in speaker row"
+    - "src/components/SpeechSlot.tsx line 259-261: row style: flexDirection: 'row', alignItems: 'center', gap: 12"
+    - "src/i18n/locales/pt-BR.json lines 87-92: speechStatus translations exist"
+
+# =============================================================================
+# CR-163 (F104): Change "Selecionar Orador" to "Selecionar Discursante"
+# =============================================================================
+baseline_cr163:
+  description: |
+    The SpeechSlot component uses the translation key 'speeches.selectSpeaker' for
+    the speaker field placeholder text. Current translations:
+    - pt-BR.json line 201: "selectSpeaker": "Selecionar orador"
+    - en.json line 201: "selectSpeaker": "Select speaker"
+    - es.json line 201: "selectSpeaker": "Seleccionar orador"
+
+    The user wants to change "orador" to "discursante" in Portuguese and Spanish:
+    - pt-BR: "Selecionar orador" -> "Selecionar Discursante"
+    - es: "Seleccionar orador" -> "Seleccionar Discursante"
+    - en: "Select speaker" -> likely stays the same or maps to "Select Speaker"
+
+    The key is used in:
+    - SpeechSlot.tsx line 165: accessibilityLabel={t('speeches.selectSpeaker')}
+    - SpeechSlot.tsx line 174: {speech?.speaker_name ?? t('speeches.selectSpeaker')}
+  evidence:
+    - "src/i18n/locales/pt-BR.json line 201: 'selectSpeaker': 'Selecionar orador'"
+    - "src/i18n/locales/en.json line 201: 'selectSpeaker': 'Select speaker'"
+    - "src/i18n/locales/es.json line 201: 'selectSpeaker': 'Seleccionar orador'"
+    - "src/components/SpeechSlot.tsx line 165: accessibilityLabel uses t('speeches.selectSpeaker')"
+    - "src/components/SpeechSlot.tsx line 174: placeholder text uses t('speeches.selectSpeaker')"
+
+# =============================================================================
+# Validation Checks (to be executed in POST mode)
+# =============================================================================
+validation_checks:
+
+  # --- CR-156 (F097): Presentation mode accordion arrows ---
+  - id: VC-156-01
+    description: "Cards above expanded card show DOWN arrow"
+    type: functional
+    how_to_verify: "Check AccordionCard.tsx chevron logic: when index < expandedIndex, render U+25BC (down arrow)"
+    expected_result: "Collapsed cards above expanded card display down arrow"
+    priority: must_pass
+
+  - id: VC-156-02
+    description: "Cards below expanded card show UP arrow"
+    type: functional
+    how_to_verify: "Check AccordionCard.tsx chevron logic: when index > expandedIndex, render U+25B2 (up arrow)"
+    expected_result: "Collapsed cards below expanded card display up arrow"
+    priority: must_pass
+
+  - id: VC-156-03
+    description: "Expanded card shows NO arrow"
+    type: functional
+    how_to_verify: "Check AccordionCard.tsx: when isExpanded, no chevron is rendered"
+    expected_result: "Expanded card header has no arrow/chevron element"
+    priority: must_pass
+
+  - id: VC-156-04
+    description: "Accordion expand/collapse still works correctly"
+    type: regression
+    how_to_verify: "Verify handlePress logic unchanged, state transitions correct"
+    expected_result: "Clicking a collapsed card expands it and collapses the previously expanded one"
+    priority: must_pass
+
+  # --- CR-157 (F098): Recognized names one per line ---
+  - id: VC-157-01
+    description: "Recognized names are joined with newline instead of comma"
+    type: functional
+    how_to_verify: "Check usePresentationMode.ts buildPresentationCards: recognized_names.join should use '\\n' not ', '"
+    expected_result: "join('\\n') or equivalent line-break mechanism"
+    priority: must_pass
+
+  - id: VC-157-02
+    description: "Recognized names field uses multiline rendering"
+    type: functional
+    how_to_verify: "Check field type for recognized_names is 'multiline' not 'text'"
+    expected_result: "type: 'multiline' so numberOfLines is unlimited"
+    priority: must_pass
+
+  - id: VC-157-03
+    description: "Single recognized name still renders correctly"
+    type: edge_case
+    how_to_verify: "Verify with 1 name in recognized_names array"
+    expected_result: "Single name displayed without trailing newline or comma"
+    priority: should_pass
+
+  # --- CR-158 (F099): Font size toggle ---
+  - id: VC-158-01
+    description: "A font size toggle button exists next to the close button in presentation header"
+    type: functional
+    how_to_verify: "Check presentation.tsx header for a new Pressable/button element beside the close button"
+    expected_result: "A toggle button is rendered in the header between the title and close button"
+    priority: must_pass
+
+  - id: VC-158-02
+    description: "Toggle switches between normal and large font sizes"
+    type: functional
+    how_to_verify: "Check useState for font size mode and that toggling changes the state"
+    expected_result: "State toggles between 'normal' and 'large' on button press"
+    priority: must_pass
+
+  - id: VC-158-03
+    description: "Normal mode uses current font size +1"
+    type: functional
+    how_to_verify: "Check fieldValue fontSize when in normal mode"
+    expected_result: "fieldValue fontSize is 17 (16+1), fieldLabel fontSize is 13 (12+1)"
+    priority: must_pass
+
+  - id: VC-158-04
+    description: "Large mode uses significantly bigger font sizes"
+    type: functional
+    how_to_verify: "Check fieldValue fontSize when in large mode"
+    expected_result: "fieldValue fontSize is notably larger (e.g., 24+), fieldLabel also increased"
+    priority: must_pass
+
+  - id: VC-158-05
+    description: "Toggle button has accessible label"
+    type: behavioral
+    how_to_verify: "Check accessibilityLabel or accessibilityRole on the toggle button"
+    expected_result: "Button has appropriate accessibility attributes"
+    priority: should_pass
+
+  # --- CR-159 (F100): Presentation section titles match agenda ---
+  - id: VC-159-01
+    description: "Card 1 title uses agenda.sectionWelcome"
+    type: functional
+    how_to_verify: "Check buildPresentationCards card 1 title uses t('agenda.sectionWelcome')"
+    expected_result: "Card 1 title is 'Boas-vindas, Anuncios e Reconhecimentos' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-159-02
+    description: "Card 2 title uses agenda.sectionSacrament"
+    type: functional
+    how_to_verify: "Check buildPresentationCards card 2 title uses t('agenda.sectionSacrament')"
+    expected_result: "Card 2 title is 'Designacoes e Sacramento' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-159-03
+    description: "Card 3 title uses agenda.sectionFirstSpeeches"
+    type: functional
+    how_to_verify: "Check buildPresentationCards card 3 title uses t('agenda.sectionFirstSpeeches')"
+    expected_result: "Card 3 title is 'Primeiros Discursos' (pt-BR)"
+    priority: must_pass
+
+  - id: VC-159-04
+    description: "Card 4 title uses agenda.sectionLastSpeech"
+    type: functional
+    how_to_verify: "Check buildPresentationCards card 4 title uses t('agenda.sectionLastSpeech')"
+    expected_result: "Card 4 title is 'Ultimo Discurso' (pt-BR)"
+    priority: must_pass
+
+  # --- CR-160 (F101): lastSpeech vs 3rd speech label ---
+  - id: VC-160-01
+    description: "SundayCard collapsed position 3 uses slot format (3o Discurso) not lastSpeech"
+    type: functional
+    how_to_verify: "Check SundayCard.tsx collapsed label for pos===3: should use t('speeches.slot', { number: '3o' })"
+    expected_result: "Position 3 in collapsed SundayCard shows '3o Discurso' not 'Ultimo Discurso'"
+    priority: must_pass
+
+  - id: VC-160-02
+    description: "SpeechSlot position 3 uses slot format (3o Discurso) not lastSpeech"
+    type: functional
+    how_to_verify: "Check SpeechSlot.tsx getPositionLabel: position===3 should use slot format"
+    expected_result: "SpeechSlot label for position 3 is '3o Discurso'"
+    priority: must_pass
+
+  - id: VC-160-03
+    description: "AgendaForm still uses lastSpeech for position 3"
+    type: regression
+    how_to_verify: "Check AgendaForm.tsx speaker label for position 3 still uses t('speeches.lastSpeech')"
+    expected_result: "AgendaForm position 3 label remains 'Ultimo Discurso - Discurso'"
+    priority: must_pass
+
+  - id: VC-160-04
+    description: "Presentation mode still uses lastSpeech for position 3"
+    type: regression
+    how_to_verify: "Check usePresentationMode.ts speech3 label still uses t('speeches.lastSpeech')"
+    expected_result: "Presentation mode position 3 label remains 'Ultimo Discurso - Discurso'"
+    priority: must_pass
+
+  # --- CR-161 (F102): Collapsed card speech layout changes ---
+  - id: VC-161-01
+    description: "Status circles moved from right side to left of each speech label"
+    type: functional
+    how_to_verify: "Check SundayCard.tsx collapsed state: circles rendered BEFORE label text in each line, not in separate right column"
+    expected_result: "Each speech line has format: <StatusLED> <posLabel>: <name>"
+    priority: must_pass
+
+  - id: VC-161-02
+    description: "Speech label font size increased from 11px"
+    type: functional
+    how_to_verify: "Check speakerNameLine or equivalent style fontSize > 11"
+    expected_result: "Font size is larger than previous 11px"
+    priority: must_pass
+
+  - id: VC-161-03
+    description: "Status circle size reduced from 14px"
+    type: functional
+    how_to_verify: "Check StatusLED size prop in collapsed card, should be < 14"
+    expected_result: "Circle size is smaller than previous 14px (e.g., 10-12px)"
+    priority: must_pass
+
+  - id: VC-161-04
+    description: "Line spacing between speech lines increased"
+    type: functional
+    how_to_verify: "Check gap or margin between speech lines > previous 0px"
+    expected_result: "Visible spacing between speech lines"
+    priority: should_pass
+
+  - id: VC-161-05
+    description: "Lines without designation show only status circle"
+    type: functional
+    how_to_verify: "Check rendering when speech.speaker_name is empty/null"
+    expected_result: "Only the status circle is shown, no label text"
+    priority: must_pass
+
+  - id: VC-161-06
+    description: "Separate ledsVertical column removed from right side"
+    type: functional
+    how_to_verify: "Check that the separate ledsVertical View is no longer rendered"
+    expected_result: "No standalone LED column on the right of collapsed card"
+    priority: must_pass
+
+  # --- CR-162 (F103): Expanded card status circle to label row ---
+  - id: VC-162-01
+    description: "StatusLED removed from speaker selector row"
+    type: functional
+    how_to_verify: "Check SpeechSlot.tsx: the row with speaker field no longer contains StatusLED"
+    expected_result: "Speaker row contains only the selector field and remove button"
+    priority: must_pass
+
+  - id: VC-162-02
+    description: "StatusLED moved to label row, aligned right"
+    type: functional
+    how_to_verify: "Check SpeechSlot.tsx: label row contains both the position label text AND StatusLED with right alignment"
+    expected_result: "Label row shows '<label> ... <status text> <circle>' with status pushed right via flex"
+    priority: must_pass
+
+  - id: VC-162-03
+    description: "Status text displayed next to circle in label row"
+    type: functional
+    how_to_verify: "Check SpeechSlot.tsx: status text from speechStatus translation rendered before the circle"
+    expected_result: "Status text like 'Designado/Confirmado' appears before the circle dot"
+    priority: must_pass
+
+  - id: VC-162-04
+    description: "Speaker and topic fields occupy full card width without LED offset"
+    type: functional
+    how_to_verify: "Check SpeechSlot.tsx: speaker row and topic row no longer have gap/margin for LED"
+    expected_result: "Fields use full width, no 28px left offset for topic row's LED space"
+    priority: must_pass
+
+  - id: VC-162-05
+    description: "Status press functionality preserved on label row LED"
+    type: functional
+    how_to_verify: "Check StatusLED onPress handler still works when LED is in the label row"
+    expected_result: "Pressing the circle in label row still opens StatusChangeModal"
+    priority: must_pass
+
+  # --- CR-163 (F104): selectSpeaker placeholder rename ---
+  - id: VC-163-01
+    description: "pt-BR selectSpeaker changed to 'Selecionar Discursante'"
+    type: functional
+    how_to_verify: "Check pt-BR.json speeches.selectSpeaker value"
+    expected_result: "Value is 'Selecionar Discursante'"
+    priority: must_pass
+
+  - id: VC-163-02
+    description: "en selectSpeaker changed to 'Select Speaker' (capitalized)"
+    type: functional
+    how_to_verify: "Check en.json speeches.selectSpeaker value"
+    expected_result: "Value is 'Select Speaker' or kept as 'Select speaker' (discuss with dev)"
+    priority: must_pass
+
+  - id: VC-163-03
+    description: "es selectSpeaker changed to 'Seleccionar Discursante'"
+    type: functional
+    how_to_verify: "Check es.json speeches.selectSpeaker value"
+    expected_result: "Value is 'Seleccionar Discursante'"
+    priority: must_pass
+
+  - id: VC-163-04
+    description: "Accessibility label also uses updated text"
+    type: behavioral
+    how_to_verify: "Check SpeechSlot.tsx accessibilityLabel for speaker field"
+    expected_result: "accessibilityLabel uses the updated translation"
+    priority: should_pass
+
+  # --- Cross-cutting regression ---
+  - id: VC-REGR-01
+    description: "All existing tests pass without regressions"
+    type: regression
+    how_to_verify: "Run vitest run and check pass count"
+    expected_result: "Zero failures in existing tests"
+    priority: must_pass
+
+  - id: VC-REGR-02
+    description: "Presentation mode still loads and renders without crashes"
+    type: regression
+    how_to_verify: "Verify presentation.tsx component renders with all card types"
+    expected_result: "No runtime errors in presentation mode"
+    priority: must_pass
+
+  - id: VC-REGR-03
+    description: "SundayCard collapsed and expanded states work in Speeches tab"
+    type: regression
+    how_to_verify: "Verify SundayCard expand/collapse, type dropdown, speech slots still functional"
+    expected_result: "No regression in Speeches tab card behavior"
+    priority: must_pass
+
+# =============================================================================
+# Pass Criteria
+# =============================================================================
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.

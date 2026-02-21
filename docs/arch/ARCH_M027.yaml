@@ -1,0 +1,393 @@
+# =============================================================================
+# ARCH_M027.yaml
+# Architecture for Batch 15 Phase 1: CR-156 to CR-163 (F097-F100)
+# Features: Presentation mode improvements (arrows, names, font size, titles),
+#           Speech label context, Collapsed speech card redesign,
+#           Expanded speech status redesign
+# Created: 2026-02-20
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Improve Presentation Mode UX (directional arrows, multiline names, font toggle, section titles), context-aware speech labels, and redesign collapsed/expanded speech card layouts"
+  principles:
+    - "Reuse existing components and patterns (AccordionCard, StatusLED, PresentationFieldRow)"
+    - "No DB schema changes (all changes are UI-only)"
+    - "No new files needed (all modifications to existing components)"
+    - "Font size toggle uses React local state (not persisted)"
+    - "i18n key reuse for section titles (already exist in AgendaForm)"
+
+diagram: |
+  [AccordionCard.tsx] -- chevron logic --> [directional arrows based on position]
+                      -- font size prop --> [dynamic fontSize from presentation.tsx]
+
+  [presentation.tsx]  -- header --> [Close button + Font size toggle (Aa/AA)]
+                      -- state  --> [fontSizeMode: 'normal' | 'large' (useState)]
+                      -- pass   --> [PresentationFieldRow receives dynamic sizes]
+
+  [usePresentationMode.ts] -- card titles --> [t('agenda.sectionWelcome'), etc.]
+                           -- recognized  --> [join('\n') + type: 'multiline']
+
+  [SundayCard.tsx] -- collapsed speeches --> [<LED> label: name (inline rows)]
+                   -- label pos 3       --> [t('speeches.slot', {number:'3o'})]
+
+  [SpeechSlot.tsx] -- label row --> [label LEFT ... status text + LED RIGHT]
+                   -- speaker row --> [no LED, full width]
+                   -- topic row   --> [no marginLeft, full width]
+                   -- pos 3 label --> [t('speeches.slot', {number:'3o'})]
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F097 / CR-156: Directional arrows in AccordionCard ---
+
+  - name: AccordionCard (modified for CR-156)
+    responsibility: "Show directional arrows based on card position relative to expanded card"
+    dependencies: []
+    changes:
+      - description: "Change chevron logic based on position relative to expanded card"
+        detail: |
+          Current: expanded shows U+25B2 (up), collapsed shows U+25BC (down)
+          New:
+          - Cards ABOVE expanded (index < expandedIndex): show U+25BC (down-arrow)
+          - Cards BELOW expanded (index > expandedIndex): show U+25B2 (up-arrow)
+          - EXPANDED card (index === expandedIndex): hide chevron completely
+          Implementation: conditional rendering of chevron Text element
+          {!isExpanded && (
+            <Text style={...}>
+              {index < expandedIndex ? '\u25BC' : '\u25B2'}
+            </Text>
+          )}
+
+  # --- F097 / CR-157: Recognized names one per line ---
+
+  - name: usePresentationMode (modified for CR-157)
+    responsibility: "Join recognized names with newline and use multiline type"
+    dependencies: []
+    changes:
+      - description: "Change recognized_names join from ', ' to '\\n' and type from 'text' to 'multiline'"
+        detail: |
+          Current (line 83): value: agenda.recognized_names.join(', '), type: 'text'
+          New: value: agenda.recognized_names.join('\n'), type: 'multiline'
+          PresentationFieldRow already handles 'multiline' type
+          (numberOfLines={undefined} instead of 2)
+
+  # --- F097 / CR-158: Font size toggle ---
+
+  - name: PresentationScreen (modified for CR-158)
+    responsibility: "Add font size toggle state and button, pass dynamic sizes to children"
+    dependencies: [AccordionCard, PresentationFieldRow]
+    changes:
+      - description: "Add fontSizeMode state"
+        detail: |
+          const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
+          Not persisted (resets to 'normal' each time Presentation Mode opens)
+      - description: "Add toggle button next to close button"
+        detail: |
+          Button style: same as closeButton (width:36, height:36, borderRadius:18,
+          backgroundColor: colors.surfaceVariant)
+          Content: fontSizeMode === 'normal' ? 'Aa' : 'AA'
+          onPress: toggle between 'normal' and 'large'
+          Position: in header, before close button (horizontal row)
+      - description: "Define font size constants"
+        detail: |
+          FONT_SIZES = {
+            normal: { fieldLabel: 13, fieldValue: 17, hymnValue: 17, cardTitle: 17, headerTitle: 19 },
+            large:  { fieldLabel: 18, fieldValue: 26, hymnValue: 26, cardTitle: 22, headerTitle: 24 },
+          }
+          Current sizes are: fieldLabel=12, fieldValue=16, cardTitle=16, headerTitle=18
+          Normal = current + 1
+          Large = substantially bigger (~1.5x normal)
+      - description: "Pass font sizes to PresentationFieldRow"
+        detail: |
+          PresentationFieldRow receives fontSizes prop
+          (or individual fontSize values for label and value)
+      - description: "Pass font sizes to AccordionCard"
+        detail: |
+          AccordionCard needs cardTitleFontSize prop (or style override)
+          to support dynamic card title font size
+
+  - name: AccordionCard (modified for CR-158)
+    responsibility: "Accept optional cardTitleFontSize prop for dynamic font sizing"
+    dependencies: []
+    changes:
+      - description: "Add optional cardTitleFontSize to AccordionCardConfig or AccordionCardProps"
+        detail: |
+          Option A: Add to AccordionCardProps: cardTitleFontSize?: number
+          Option B: Add to AccordionCardConfig per-card: titleFontSize?: number
+          Chosen: AccordionCardProps level (applies to all cards uniformly)
+          cardTitle style: fontSize: cardTitleFontSize ?? 16
+
+  - name: PresentationFieldRow (modified for CR-158)
+    responsibility: "Accept dynamic font sizes for label and value text"
+    dependencies: []
+    changes:
+      - description: "Accept fontSizes prop with label and value sizes"
+        detail: |
+          Props: fontSizes?: { label: number; value: number }
+          Apply: fieldLabel fontSize: fontSizes?.label ?? 12
+                 fieldValue fontSize: fontSizes?.value ?? 16
+          hymnValue inherits fieldValue fontSize + fontWeight: '600'
+
+  # --- F097 / CR-159: Section titles matching agenda tab ---
+
+  - name: usePresentationMode (modified for CR-159)
+    responsibility: "Use agenda section header i18n keys for card titles"
+    dependencies: []
+    changes:
+      - description: "Change card titles to use sectionXxx i18n keys"
+        detail: |
+          Card 1: t('agenda.sectionWelcome') instead of t('agenda.presiding')
+          Card 2: t('agenda.sectionSacrament') instead of t('agenda.wardBusiness')
+          Card 3 (normal): t('agenda.sectionFirstSpeeches') instead of t('speeches.title')
+          Card 4 (normal): t('agenda.sectionLastSpeech') instead of t('agenda.closingHymn')
+          Card 3 (special): keep t('agenda.closingHymn') (no change)
+
+  # --- F098 / CR-160: Speech label context-aware ---
+
+  - name: SundayCard (modified for CR-160)
+    responsibility: "Show '3o Discurso' instead of 'Ultimo Discurso' for position 3"
+    dependencies: []
+    changes:
+      - description: "Change position 3 label in collapsed card"
+        detail: |
+          Current (line 360-361): pos === 3 ? t('speeches.lastSpeech') : t('speeches.slot', ...)
+          New: always use t('speeches.slot', { number: `${pos}\u00BA` }) for all positions
+          Removes the pos === 3 special case
+          Result: position 3 shows "3o Discurso" instead of "Ultimo Discurso"
+
+  - name: SpeechSlot (modified for CR-160)
+    responsibility: "Show '3o Discurso' instead of 'Ultimo Discurso' for position 3"
+    dependencies: []
+    changes:
+      - description: "Change getPositionLabel() for position 3"
+        detail: |
+          Current (lines 53-58): if (position === 3) return t('speeches.lastSpeech')
+          New: remove the if-check; all positions use t('speeches.slot', { number: `${position}\u00BA` })
+          Result: getPositionLabel returns '3o Discurso' for position 3
+
+  # --- F098 / CR-163: Speaker placeholder fix ---
+
+  - name: "i18n locales (modified for CR-163)"
+    responsibility: "Change speeches.selectSpeaker value in all 3 locales"
+    dependencies: []
+    changes:
+      - description: "Update selectSpeaker translations"
+        detail: |
+          pt-BR.json: "Selecionar orador" -> "Selecionar Discursante"
+          en.json: "Select speaker" -> "Select Speaker"
+          es.json: "Seleccionar orador" -> "Seleccionar Discursante"
+          No new i18n keys needed; only value changes
+
+  # --- F099 / CR-161: Collapsed speech card redesign ---
+
+  - name: SundayCard (modified for CR-161)
+    responsibility: "Redesign collapsed speeches layout: LED inline before label, increased font, reduced circle"
+    dependencies: [StatusLED]
+    changes:
+      - description: "Restructure collapsed speeches from headerCenter+ledsVertical to unified rows"
+        detail: |
+          Remove: separate headerCenter text lines + ledsVertical View
+          Add: single View with 3 horizontal rows, each row:
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <StatusLED status={status} size={10} ... />
+              <View style={{ width: 8 }} />  // gap
+              {name ? (
+                <Text style={{ fontSize: 13, ... }} numberOfLines={1}>
+                  {posLabel}: {name}
+                </Text>
+              ) : null}
+            </View>
+          When speaker_name is empty: show ONLY the StatusLED circle (no text)
+      - description: "Remove ledsVertical container"
+        detail: |
+          The vertical LED column on the right (lines 378-394) is completely removed
+          LEDs are now inline within each speaker line
+      - description: "Font and spacing changes"
+        detail: |
+          speakerNameLine fontSize: 11 -> 13
+          StatusLED size: 14 -> 10
+          marginBottom: 4 between lines
+      - description: "No designation shows only circle"
+        detail: |
+          If speaker_name is empty/null: render only <StatusLED> with no Text sibling
+          The circle alone indicates the position exists but has no assignment
+
+  # --- F100 / CR-162: Expanded speech card status redesign ---
+
+  - name: SpeechSlot (modified for CR-162)
+    responsibility: "Move StatusLED from speaker row to label row, right-aligned with status text"
+    dependencies: [StatusLED]
+    changes:
+      - description: "Redesign label row to include status on the right"
+        detail: |
+          Current label row (line 148): just <Text>{label}</Text>
+          New label row:
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={styles.label}>{label}</Text>
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={handleStatusPress}
+                disabled={isObserver || status === 'not_assigned'}
+              >
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                  {t(`speechStatus.${status}`)}
+                </Text>
+                <StatusLED status={status} size={14} />
+              </Pressable>
+            </View>
+      - description: "Remove StatusLED from speaker row"
+        detail: |
+          Current speaker row (line 150-196): has <StatusLED> as first element
+          New speaker row: remove <StatusLED>, speaker field takes full width
+          gap:12 between speaker field and remove button remains
+      - description: "Remove marginLeft: 28 from topicRow"
+        detail: |
+          Current topicRow style (line 288-289): marginLeft: 28
+          New: remove marginLeft: 28 (LED no longer in speaker row, no offset needed)
+          Topic field now starts at same horizontal position as speaker field
+      - description: "StatusLED and status text are pressable together"
+        detail: |
+          Both wrapped in single Pressable with same onPress as before (handleStatusPress)
+          Disabled when: isObserver || status === 'not_assigned'
+          Status text uses t(`speechStatus.${status}`) which already exists in all 3 locales
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - name: AccordionCard props (extended)
+    component: AccordionCard.tsx
+    methods:
+      - name: "AccordionCardProps"
+        input: "{ cards: AccordionCardConfig[], initialExpanded?: number, cardTitleFontSize?: number }"
+        output: "JSX.Element"
+
+  - name: PresentationFieldRow props (extended)
+    component: presentation.tsx
+    methods:
+      - name: "PresentationFieldRow"
+        input: "{ field: PresentationField, colors: ThemeColors, fontSizes?: { label: number, value: number } }"
+        output: "JSX.Element"
+
+  - name: Font size constants
+    component: presentation.tsx
+    methods:
+      - name: "FONT_SIZES"
+        input: "'normal' | 'large'"
+        output: "{ fieldLabel: number, fieldValue: number, cardTitle: number, headerTitle: number }"
+
+  - name: SpeechSlot label row
+    component: SpeechSlot.tsx
+    methods:
+      - name: "getPositionLabel (simplified)"
+        input: "(position: number, t: TFunction)"
+        output: "string - always uses speeches.slot key (no more lastSpeech special case)"
+
+  - name: buildPresentationCards titles
+    component: usePresentationMode.ts
+    methods:
+      - name: "buildPresentationCards"
+        input: "(agenda, speeches, exception, hymnLookup, t)"
+        output: "PresentationCard[] with section header titles"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  migrations: []
+  notes: "No database schema changes required. All features are UI-only modifications."
+
+# =============================================================================
+# I18N
+# =============================================================================
+
+i18n:
+  existing_keys_reused:
+    - "agenda.sectionWelcome (pt-BR: 'Boas-vindas, Anuncios e Reconhecimentos')"
+    - "agenda.sectionSacrament (pt-BR: 'Designacoes e Sacramento')"
+    - "agenda.sectionFirstSpeeches (pt-BR: 'Primeiros Discursos')"
+    - "agenda.sectionLastSpeech (pt-BR: 'Ultimo Discurso')"
+    - "agenda.closingHymn (for special meeting last card)"
+    - "speeches.slot (with number param, for all 3 positions including pos 3)"
+    - "speechStatus.not_assigned, .assigned_not_invited, .assigned_invited, .assigned_confirmed, .gave_up"
+
+  modified_keys:
+    - key: "speeches.selectSpeaker"
+      pt_BR_old: "Selecionar orador"
+      pt_BR_new: "Selecionar Discursante"
+      en_old: "Select speaker"
+      en_new: "Select Speaker"
+      es_old: "Seleccionar orador"
+      es_new: "Seleccionar Discursante"
+
+  new_keys: []
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    No new security concerns. All features are UI-only modifications.
+    No new API endpoints, database columns, or Edge Functions.
+    Existing RLS policies cover all data access unchanged.
+    Font size toggle uses local state (useState), no data persistence.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    No new queries or API calls. All changes are rendering logic.
+    Font size toggle state is ephemeral (not persisted).
+    No impact on TanStack Query cache or Supabase Realtime.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-068
+    title: "Font size toggle as React local state (useState) instead of persisted preference"
+    context: "CR-158 adds font size toggle in Presentation Mode. Options: (a) useState (ephemeral), (b) AsyncStorage, (c) DB column on wards. User did not mention persisting preference."
+    decision: "Use useState<'normal' | 'large'>('normal'). Resets to 'normal' each time Presentation Mode opens. No storage, no DB change."
+    consequences:
+      - "Simplest implementation (zero persistence code)"
+      - "User must re-enable large font each session (acceptable for occasional use)"
+      - "Can be upgraded to AsyncStorage later if user requests persistence"
+
+  - id: ADR-069
+    title: "Unified getPositionLabel removes position 3 special case in Speeches tab"
+    context: "CR-160 wants '3o Discurso' in Speeches tab but 'Ultimo Discurso' in Agenda tab. getPositionLabel currently always returns 'Ultimo Discurso' for position 3."
+    decision: "Remove the if(position===3) special case from getPositionLabel in SpeechSlot.tsx and SundayCard.tsx. All positions use t('speeches.slot', {number: Nmo}). Agenda tab uses its own section header keys. Presentation mode card content keeps t('speeches.lastSpeech') for last speaker label."
+    consequences:
+      - "Simpler getPositionLabel (no branching)"
+      - "Context-appropriate labels: Speeches/Home tabs show '3o Discurso', Agenda shows 'Ultimo Discurso'"
+      - "Presentation mode title changed by CR-159, content label unchanged"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M027.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED atualizado (iteracao final)
+  GATE-07: true  # ARCH_SUMMARY preenchido com status correto
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (9 component entries)

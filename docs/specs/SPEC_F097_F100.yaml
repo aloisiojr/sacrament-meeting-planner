@@ -1,0 +1,994 @@
+# =============================================================================
+# SPEC_F097_F100.yaml
+# Features F097-F100 / CR-156 to CR-163: Presentation mode improvements,
+# Speech label context, Collapsed speech card redesign, Expanded speech status
+# Batch: 15 Phase 1
+# Created: 2026-02-20
+# Status: complete
+# =============================================================================
+
+type: spec
+status: complete
+batch: 15
+phase: 1
+created: "2026-02-20"
+last_updated: "2026-02-20"
+
+# =============================================================================
+# F097 / CR-156, CR-157, CR-158, CR-159: Presentation mode improvements
+# =============================================================================
+
+features:
+
+  - id: F097
+    name: "Presentation mode improvements: arrows, recognized names, font size, section titles"
+    cr_ids: [156, 157, 158, 159]
+    type: ui
+    priority: medium
+    related_features: [F012, F044, F093, F094, F095, F096]
+    related_crs: [73, 150, 151, 152, 153, 156, 157, 158, 159]
+
+    user_request: >
+      CR-156: "Na tela de apresentacao da Reuniao Sacramental, se o card estiver
+      acima do card expandido, mostre a seta pra baixo, se o card estiver abaixo
+      do card expandido, mostre a seta pra cima. Se o card estiver expandido,
+      nao mostre seta"
+      CR-157: "Na tela de apresentacao da Reuniao Sacramental, na parte de
+      reconhecendo a presenca, coloque um nome por linha"
+      CR-158: "Na tela de apresentacao da Reuniao Sacramental, do lado do botao
+      de fechar coloque um botao para alternar entre tamanho de fonte normal
+      (o tamanho atual +1) e tamanho de fonte grande (para ajudar pessoas que
+      tem problema de vista). Quando for grande, vamos colocar um bocado maior
+      mesmo, ainda tem muito espaco sem ser utilizado na tela."
+      CR-159: "Na tela de apresentacao da Reuniao Sacramental, o titulo de cada
+      sessao tem que ser igual ao card de domingo da aba agenda:
+      'Boas-Vindas, Anuncios e Reconhecimentos', etc."
+
+    current_behavior: >
+      Presentation mode (src/app/presentation.tsx + AccordionCard.tsx +
+      usePresentationMode.ts):
+
+      **Arrows (CR-156):** AccordionCard currently shows a chevron on every card:
+      expanded card shows up-arrow (U+25B2), collapsed cards always show
+      down-arrow (U+25BC), regardless of position relative to expanded card.
+
+      **Recognized names (CR-157):** buildPresentationCards in
+      usePresentationMode.ts joins recognized_names with ', ' (comma-space)
+      into a single text value. PresentationFieldRow renders it as a single
+      text block. Names are NOT shown one per line.
+
+      **Font size (CR-158):** There is no font size toggle in Presentation Mode.
+      Current font sizes: fieldLabel=12, fieldValue=16, headerTitle=18,
+      headerDate=14, cardTitle=16. No mechanism to enlarge text.
+
+      **Section titles (CR-159):** buildPresentationCards sets card titles using
+      incorrect i18n keys:
+      - Card 1: t('agenda.presiding') = "Presidindo"
+      - Card 2: t('agenda.wardBusiness') = "Apoios e Agradecimentos"
+      - Card 3: t('speeches.title') = "Discursos"
+      - Card 4: t('agenda.closingHymn') = "Hino de Encerramento"
+      These do NOT match the AgendaForm section headers which use:
+      - t('agenda.sectionWelcome') = "Boas-vindas, Anuncios e Reconhecimentos"
+      - t('agenda.sectionSacrament') = "Designacoes e Sacramento"
+      - t('agenda.sectionFirstSpeeches') = "Primeiros Discursos"
+      - t('agenda.sectionLastSpeech') = "Ultimo Discurso"
+
+    expected_behavior: >
+      **Arrows (CR-156):**
+      In AccordionCard, change chevron logic:
+      - Cards ABOVE the expanded card: show down-arrow (U+25BC) indicating
+        "tap to expand downward / this card is above"
+      - Cards BELOW the expanded card: show up-arrow (U+25B2) indicating
+        "tap to expand upward / this card is below"
+      - The EXPANDED card: NO arrow shown at all (hide chevron completely)
+      This helps the user understand the spatial relationship between cards.
+
+      **Recognized names (CR-157):**
+      In buildPresentationCards, change the recognized_names field:
+      - Instead of joining with ', ', join with '\n' (newline)
+      - Change field type from 'text' to 'multiline' so PresentationFieldRow
+        renders it without numberOfLines limit (currently 'text' fields have
+        numberOfLines={2})
+      This results in one name per line in the Presentation Mode.
+
+      **Font size toggle (CR-158):**
+      Add a font size toggle button next to the close button (X) in the
+      presentation header:
+      - Button shows text icon (e.g., "Aa" for normal, "AA" for large) or
+        a suitable Unicode glyph to indicate text size
+      - Two states: "normal" and "large"
+      - Normal mode: current font sizes + 1 (fieldLabel=13, fieldValue=17,
+        hymnValue stays bold, cardTitle=17, headerTitle=19)
+      - Large mode: significantly larger (fieldLabel=18, fieldValue=26,
+        cardTitle=22, headerTitle=24). The user explicitly said "um bocado
+        maior mesmo" (much larger), so the increase should be substantial.
+      - State stored in React local state (useState), not persisted to DB
+      - Font size adjustment applies to: PresentationFieldRow labels and
+        values, AccordionCard titles
+      - The toggle button should have similar visual style to the close button
+        (circular, same background color)
+
+      **Section titles (CR-159):**
+      In buildPresentationCards, change card titles to use the same i18n keys
+      as AgendaForm section headers:
+      - Card 1 (Welcome): t('agenda.sectionWelcome')
+      - Card 2 (Sacrament): t('agenda.sectionSacrament')
+      - Card 3 (First Speeches): t('agenda.sectionFirstSpeeches')
+      - Card 4 (Last Speech): t('agenda.sectionLastSpeech')
+      - Special meeting Card 3: keep t('agenda.closingHymn') OR use a
+        suitable section title. Since special meetings skip speeches cards,
+        the closing card can use t('agenda.sectionLastSpeech') or remain as
+        t('agenda.closingHymn'). Decision: for special meetings, the final
+        card title stays as t('agenda.closingHymn') since there is no
+        "last speech" in special meetings.
+      For testimony_meeting special card: t('agenda.sectionTestimonies')
+      For primary_presentation special card: t('agenda.sectionPrimaryPresentation')
+
+    files_impacted:
+      - path: src/components/AccordionCard.tsx
+        action: modify
+        changes:
+          - "Change chevron logic: cards above expanded show down-arrow, cards below expanded show up-arrow, expanded card hides chevron"
+          - "Accept optional fontSize prop or fontSizeMultiplier to support font size toggle for card titles"
+
+      - path: src/app/presentation.tsx
+        action: modify
+        changes:
+          - "Add font size toggle state (useState: 'normal' | 'large')"
+          - "Add toggle button next to close button in header"
+          - "Pass font size values to PresentationFieldRow and AccordionCard"
+          - "Update PresentationFieldRow to accept and use dynamic font sizes"
+          - "Adjust styles for normal (+1 from current) and large modes"
+
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+        changes:
+          - "Card 1 title: t('agenda.sectionWelcome') instead of t('agenda.presiding')"
+          - "Card 2 title: t('agenda.sectionSacrament') instead of t('agenda.wardBusiness')"
+          - "Card 3 title (normal meeting): t('agenda.sectionFirstSpeeches') instead of t('speeches.title')"
+          - "Card 4 title (normal meeting): t('agenda.sectionLastSpeech') instead of t('agenda.closingHymn')"
+          - "Special meeting card 3 title: keep t('agenda.closingHymn') for closing card"
+          - "Change recognized_names join from ', ' to '\\n' and field type to 'multiline'"
+
+    acceptance_criteria:
+      - id: AC-097-01
+        description: "Cards above expanded show down-arrow"
+        given: "Presentation mode with 4 cards, card 2 expanded"
+        when: "View card 1 (above expanded)"
+        then: "Card 1 shows down-arrow (U+25BC)"
+
+      - id: AC-097-02
+        description: "Cards below expanded show up-arrow"
+        given: "Presentation mode with 4 cards, card 2 expanded"
+        when: "View cards 3 and 4 (below expanded)"
+        then: "Cards 3 and 4 show up-arrow (U+25B2)"
+
+      - id: AC-097-03
+        description: "Expanded card has no arrow"
+        given: "Presentation mode with card 2 expanded"
+        when: "View card 2 (expanded)"
+        then: "No chevron/arrow is shown on the expanded card header"
+
+      - id: AC-097-04
+        description: "First card expanded hides its arrow, all others show up-arrow"
+        given: "Presentation mode with card 1 expanded (index 0)"
+        when: "View all cards"
+        then: "Card 1 has no arrow; cards 2, 3, 4 show up-arrow (U+25B2)"
+
+      - id: AC-097-05
+        description: "Last card expanded hides its arrow, all others show down-arrow"
+        given: "Presentation mode with card 4 expanded (last card)"
+        when: "View all cards"
+        then: "Cards 1, 2, 3 show down-arrow (U+25BC); card 4 has no arrow"
+
+      - id: AC-097-06
+        description: "Recognized names displayed one per line"
+        given: "Agenda with recognized_names = ['Joao Silva', 'Maria Santos', 'Pedro Oliveira']"
+        when: "View Welcome card in Presentation Mode"
+        then: "Recognized names field shows each name on its own line (3 separate lines)"
+
+      - id: AC-097-07
+        description: "Font size toggle button visible in header"
+        given: "Presentation Mode opened"
+        when: "View header"
+        then: "Toggle button visible next to close button (X), showing text size icon"
+
+      - id: AC-097-08
+        description: "Font size toggle switches between normal and large"
+        given: "Presentation Mode in normal font size"
+        when: "Tap font size toggle button"
+        then: "All text sizes increase to large mode values (fieldValue from 17 to 26, fieldLabel from 13 to 18, cardTitle from 17 to 22)"
+
+      - id: AC-097-09
+        description: "Tapping toggle again returns to normal font size"
+        given: "Presentation Mode in large font size"
+        when: "Tap font size toggle button again"
+        then: "All text sizes return to normal mode values"
+
+      - id: AC-097-10
+        description: "Section titles match agenda tab section headers"
+        given: "Normal meeting in Presentation Mode"
+        when: "View card titles"
+        then: "Card 1 = 'Boas-vindas, Anuncios e Reconhecimentos', Card 2 = 'Designacoes e Sacramento', Card 3 = 'Primeiros Discursos', Card 4 = 'Ultimo Discurso' (in pt-BR)"
+
+      - id: AC-097-11
+        description: "Section titles in English match agenda tab"
+        given: "Normal meeting in Presentation Mode with locale = en"
+        when: "View card titles"
+        then: "Card 1 = 'Welcome, Announcements and Recognitions', Card 2 = 'Assignments and Sacrament', Card 3 = 'First Speeches', Card 4 = 'Final Speech'"
+
+      - id: AC-097-12
+        description: "Section titles in Spanish match agenda tab"
+        given: "Normal meeting in Presentation Mode with locale = es"
+        when: "View card titles"
+        then: "Card 1 = 'Bienvenida, Anuncios y Reconocimientos', Card 2 = 'Asignaciones y Sacramento', Card 3 = 'Primeros Discursos', Card 4 = 'Ultimo Discurso'"
+
+      - id: AC-097-13
+        description: "Special meeting closing card title unchanged"
+        given: "Special meeting (testimony_meeting) in Presentation Mode"
+        when: "View last card title"
+        then: "Last card title is t('agenda.closingHymn') = 'Hino de Encerramento' (no change for special meetings)"
+
+      - id: AC-097-14
+        description: "Font size state not persisted across sessions"
+        given: "User sets large font size and closes Presentation Mode"
+        when: "Open Presentation Mode again"
+        then: "Font size is back to normal (not persisted)"
+
+    edge_cases:
+      - id: EC-097-01
+        case: "No recognized names"
+        expected: "Recognized names field is not shown at all (existing behavior from buildPresentationCards: field only added when recognized_names has entries)"
+
+      - id: EC-097-02
+        case: "Single recognized name"
+        expected: "Single name on one line, no trailing newline"
+
+      - id: EC-097-03
+        case: "Large font with long card titles"
+        expected: "Card titles may truncate with ellipsis (numberOfLines={1} already in AccordionCard). Functionality not affected."
+
+      - id: EC-097-04
+        case: "3-card special meeting (testimony/primary)"
+        expected: "Arrow logic still works correctly with 3 cards instead of 4. Cards above expanded get down-arrow, below get up-arrow."
+
+  # =============================================================================
+  # F098 / CR-160, CR-163: Speech label context + placeholder fix
+  # =============================================================================
+
+  - id: F098
+    name: "Speech label context-aware display and speaker placeholder fix"
+    cr_ids: [160, 163]
+    type: ui
+    priority: medium
+    related_features: [F008, F009, F093]
+    related_crs: [150, 160, 163]
+
+    user_request: >
+      CR-160: "Somente no card de domingo da Agenda que a gente mostra 'Ultimo
+      Discurso', no card de domingo de discursos, a gente mostra 3o Discurso."
+      CR-163: "No card de domingo para discursos expandido, trocar o placeholder
+      do campo 'Selecionar Orador' para 'Selecionar Discursante' em todas as
+      linguas"
+
+    current_behavior: >
+      **Speech label (CR-160):**
+      In SundayCard.tsx (used in Speeches tab and Home), collapsed card lines
+      355-372: position 3 uses t('speeches.lastSpeech') = "Ultimo Discurso".
+      In SpeechSlot.tsx (expanded card in Speeches tab), getPositionLabel()
+      at line 53-58: position 3 uses t('speeches.lastSpeech') = "Ultimo Discurso".
+      In AgendaForm.tsx (Agenda tab), the section header for the last speech
+      section at line 426 uses t('agenda.sectionLastSpeech') = "Ultimo Discurso".
+
+      Both tabs show "Ultimo Discurso" for position 3. The user wants "Ultimo
+      Discurso" ONLY in the Agenda tab, and "3o Discurso" in the Speeches tab.
+
+      **Speaker placeholder (CR-163):**
+      In SpeechSlot.tsx, the speaker selector field (line 174) shows
+      t('speeches.selectSpeaker') as placeholder when no speaker assigned:
+      - pt-BR: "Selecionar orador" (line 201 of pt-BR.json)
+      - en: "Select speaker" (line 201 of en.json)
+      - es: "Seleccionar orador" (line 201 of es.json)
+      The user wants to change "orador" to "discursante" in all languages.
+
+    expected_behavior: >
+      **Speech label (CR-160):**
+      - In SundayCard.tsx (collapsed card, Speeches tab): position 3 should
+        show "3o Discurso" using t('speeches.slot', { number: '3\u00BA' })
+        instead of t('speeches.lastSpeech')
+      - In SpeechSlot.tsx (expanded card, Speeches tab): position 3 should
+        show "3o Discurso" using t('speeches.slot', { number: '3\u00BA' })
+        instead of t('speeches.lastSpeech')
+      - In AgendaForm.tsx (Agenda tab): KEEP using t('agenda.sectionLastSpeech')
+        = "Ultimo Discurso" (no change)
+      - In usePresentationMode.ts (Presentation Mode): KEEP using
+        t('speeches.lastSpeech') for the last speaker label within the card
+        content. The card TITLE is changed separately by CR-159 (F097).
+
+      Note: The collapsed SundayCard is used in Speeches tab AND Home tab.
+      The change applies to both since they share the same component.
+      The Home tab should also show "3o Discurso" (same as Speeches tab).
+
+      **Speaker placeholder (CR-163):**
+      Change the i18n key speeches.selectSpeaker value in all 3 locales:
+      - pt-BR: "Selecionar orador" -> "Selecionar Discursante"
+      - en: "Select speaker" -> "Select Speaker" (capitalize, keep English term)
+      - es: "Seleccionar orador" -> "Seleccionar Discursante"
+
+      Note: The English translation "Select speaker" already uses the word
+      "speaker" which is accurate. The user request is specifically about
+      "orador" -> "discursante" in Portuguese. For English and Spanish,
+      we apply the equivalent change: "speaker" (en) is already appropriate
+      but "orador" (es) should become "Discursante". For English, since
+      "speaker" and "discursante" both translate correctly, we keep "Select
+      Speaker" (with capitalization fix to match other labels).
+
+    files_impacted:
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "Line 360-361: change position 3 label from t('speeches.lastSpeech') to t('speeches.slot', { number: '3\\u00BA' })"
+
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Lines 53-58 (getPositionLabel): change position 3 from t('speeches.lastSpeech') to t('speeches.slot', { number: '3\\u00BA' }). All positions now use the same format."
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "speeches.selectSpeaker: 'Selecionar orador' -> 'Selecionar Discursante'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "speeches.selectSpeaker: 'Select speaker' -> 'Select Speaker'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "speeches.selectSpeaker: 'Seleccionar orador' -> 'Seleccionar Discursante'"
+
+    acceptance_criteria:
+      - id: AC-098-01
+        description: "Speeches tab collapsed card shows '3o Discurso' for position 3"
+        given: "Speeches tab with collapsed SundayCard"
+        when: "View position 3 label in collapsed card"
+        then: "Shows '3o Discurso' instead of 'Ultimo Discurso'"
+
+      - id: AC-098-02
+        description: "Speeches tab expanded card shows '3o Discurso' for position 3"
+        given: "Speeches tab with expanded SundayCard"
+        when: "View SpeechSlot label for position 3"
+        then: "Shows '3O DISCURSO' (uppercase from textTransform) instead of 'ULTIMO DISCURSO'"
+
+      - id: AC-098-03
+        description: "Agenda tab keeps 'Ultimo Discurso' section header"
+        given: "Agenda tab with expanded AgendaSundayCard"
+        when: "View section header for last speech"
+        then: "Shows 'Ultimo Discurso' (unchanged, uses agenda.sectionLastSpeech)"
+
+      - id: AC-098-04
+        description: "Home tab collapsed card shows '3o Discurso' for position 3"
+        given: "Home tab with NextSundaysSection showing collapsed SundayCards"
+        when: "View position 3 label"
+        then: "Shows '3o Discurso' (same SundayCard component as Speeches tab)"
+
+      - id: AC-098-05
+        description: "Speaker placeholder in pt-BR shows 'Selecionar Discursante'"
+        given: "App in pt-BR locale, expanded SpeechSlot with no speaker assigned"
+        when: "View speaker field placeholder"
+        then: "Shows 'Selecionar Discursante'"
+
+      - id: AC-098-06
+        description: "Speaker placeholder in en shows 'Select Speaker'"
+        given: "App in en locale, expanded SpeechSlot with no speaker assigned"
+        when: "View speaker field placeholder"
+        then: "Shows 'Select Speaker'"
+
+      - id: AC-098-07
+        description: "Speaker placeholder in es shows 'Seleccionar Discursante'"
+        given: "App in es locale, expanded SpeechSlot with no speaker assigned"
+        when: "View speaker field placeholder"
+        then: "Shows 'Seleccionar Discursante'"
+
+      - id: AC-098-08
+        description: "Presentation Mode still uses 'Ultimo Discurso' for last speaker label"
+        given: "Presentation Mode showing last speech card content"
+        when: "View last speaker label"
+        then: "Label shows 'Ultimo Discurso - Discurso' (unchanged in card content, title changed by F097)"
+
+    edge_cases:
+      - id: EC-098-01
+        case: "SpeechSlot accessibility label for speaker field"
+        expected: "accessibilityLabel still uses t('speeches.selectSpeaker') which now says 'Selecionar Discursante'. Correct for accessibility."
+
+      - id: EC-098-02
+        case: "Activity log references to speech positions"
+        expected: "Activity log uses its own format ('{{N}}o discurso') which is not affected by this change"
+
+  # =============================================================================
+  # F099 / CR-161: Collapsed speech card redesign
+  # =============================================================================
+
+  - id: F099
+    name: "Collapsed speech card redesign - LED before label, increased font, reduced circle"
+    cr_id: 161
+    type: ui
+    priority: medium
+    related_features: [F008, F093]
+    related_crs: [150, 161]
+
+    user_request: >
+      "No card contraido de discursos temos que alinhar a linha que mostra o
+      discurso com o circulo com status. Aumente a fonte e espacamento entre
+      linhas dos labels e reduza o tamanho do circulo para que fique equilibrado
+      dentro do card. Alem disso vamos mover os circulos com status da direta
+      do card para logo antes do label, ficando assim:
+      '<circulo> 1o Discurso: <nome>'. Se nao tiver designacao, mostra so o
+      circulo do status."
+
+    current_behavior: >
+      In SundayCard.tsx, the collapsed card for speeches type shows:
+      - headerCenter (lines 355-374): 3 lines of text, each with format
+        '{posLabel}: {name}' where posLabel is '1o Discurso', '2o Discurso',
+        or 'Ultimo Discurso' (per F093/CR-150)
+      - ledsVertical (lines 378-394): 3 StatusLED circles (size=14) positioned
+        at the RIGHT side of the card header, in a vertical column
+      - The LEDs are separate from the text lines (different View containers)
+      - Font size for speaker name lines: fontSize=11 (speakerNameLine style)
+      - No gap/spacing between lines (just default text line height)
+
+    expected_behavior: >
+      Redesign the collapsed speech card layout:
+
+      **LED position:** Move StatusLED circles from the right side of the card
+      to BEFORE each label text, on the SAME line. New format per line:
+      '<StatusLED> {posLabel}: {name}'
+
+      **Layout per line:** Each of the 3 lines is a horizontal row:
+      - StatusLED circle (reduced size, see below)
+      - Gap (e.g., 8px)
+      - Text: '{posLabel}: {name}' or just '{posLabel}:' if no assignment
+
+      **Font size increase:** Increase font size of the speaker name lines
+      from 11 to 13 for better readability.
+
+      **Line spacing increase:** Add marginBottom (e.g., 4px) between lines
+      for better visual spacing.
+
+      **Circle size reduction:** Reduce StatusLED size from 14 to 10 to balance
+      with the text at the new font size.
+
+      **No designation behavior:** If no speaker is assigned for a position
+      (speaker_name is empty), show ONLY the status circle (no text label).
+      This means: '<StatusLED>' with no text next to it.
+      The circle alone indicates the position exists but has no assignment.
+
+      **Remove separate LED column:** The ledsVertical View on the right side
+      of the card is removed. LEDs are now inline with text.
+
+    files_impacted:
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "Restructure collapsed speeches layout: replace separate headerCenter + ledsVertical with unified rows"
+          - "Each row: <View flexDirection='row' alignItems='center'><StatusLED size={10} /><Text>{posLabel}: {name}</Text></View>"
+          - "Increase speakerNameLine fontSize from 11 to 13"
+          - "Add marginBottom: 4 to each speaker line for spacing"
+          - "Reduce StatusLED size from 14 to 10"
+          - "Remove ledsVertical View (LEDs now inline)"
+          - "When no speaker name: show only StatusLED circle, no text"
+
+    acceptance_criteria:
+      - id: AC-099-01
+        description: "LED circle appears before label text on each line"
+        given: "Collapsed SundayCard with speeches type and designated speakers"
+        when: "View collapsed card"
+        then: "Each line shows: <circle> 1o Discurso: <nome>, <circle> 2o Discurso: <nome>, <circle> 3o Discurso: <nome>"
+
+      - id: AC-099-02
+        description: "No separate LED column on the right"
+        given: "Collapsed SundayCard with speeches type"
+        when: "View collapsed card"
+        then: "No vertical LED column on the right side. LEDs are inline with text on the left/center."
+
+      - id: AC-099-03
+        description: "Font size increased to 13"
+        given: "Collapsed SundayCard with speeches type"
+        when: "View speaker name lines"
+        then: "Font size is 13 (increased from 11)"
+
+      - id: AC-099-04
+        description: "Line spacing increased"
+        given: "Collapsed SundayCard with 3 speech lines"
+        when: "View spacing between lines"
+        then: "Visible spacing between lines (marginBottom: 4)"
+
+      - id: AC-099-05
+        description: "Circle size reduced to 10"
+        given: "Collapsed SundayCard with speeches type"
+        when: "View StatusLED circles"
+        then: "Circles are 10px diameter (reduced from 14px)"
+
+      - id: AC-099-06
+        description: "No designation shows only circle"
+        given: "Position 2 has no speaker assigned (speaker_name empty)"
+        when: "View collapsed card line for position 2"
+        then: "Only the status circle is shown, no text label"
+
+      - id: AC-099-07
+        description: "All three positions with speakers show full format"
+        given: "All 3 positions have speakers assigned"
+        when: "View collapsed card"
+        then: "Three lines: '<circle> 1o Discurso: Joao', '<circle> 2o Discurso: Maria', '<circle> 3o Discurso: Pedro'"
+
+      - id: AC-099-08
+        description: "Mixed assignment shows correct format"
+        given: "Position 1 assigned, position 2 not assigned, position 3 assigned"
+        when: "View collapsed card"
+        then: "Line 1: '<circle> 1o Discurso: Joao', Line 2: '<circle>' (no text), Line 3: '<circle> 3o Discurso: Pedro'"
+
+      - id: AC-099-09
+        description: "Status LED still interactive for status changes"
+        given: "Collapsed card with assigned speeches"
+        when: "Press on a StatusLED circle"
+        then: "onStatusPress callback fires (same as before, if applicable)"
+
+      - id: AC-099-10
+        description: "Home tab cards also show new layout"
+        given: "Home tab NextSundaysSection with collapsed SundayCards"
+        when: "View collapsed cards"
+        then: "Same new layout (LEDs before labels, increased font, no separate LED column)"
+
+    edge_cases:
+      - id: EC-099-01
+        case: "All 3 positions unassigned"
+        expected: "3 lines each showing only a gray circle (not_assigned status). No text labels."
+
+      - id: EC-099-02
+        case: "Long speaker name"
+        expected: "Text truncated with ellipsis (numberOfLines={1}). Circle stays visible."
+
+      - id: EC-099-03
+        case: "Non-speeches type card"
+        expected: "No change. Exception text shown in center, no LEDs, no speech lines."
+
+  # =============================================================================
+  # F100 / CR-162: Expanded speech card status redesign
+  # =============================================================================
+
+  - id: F100
+    name: "Expanded speech card status circle moved to label line, right-aligned"
+    cr_id: 162
+    type: ui
+    priority: medium
+    related_features: [F008, F009]
+    related_crs: [161, 162]
+
+    user_request: >
+      "No card de domingo para discursos expandido, vamos mover o circulo de
+      status para a linha do label '{N}o Discurso', mas alinhado a direita do
+      card, no seguinte formato: '<status por extenso> <circulo>'. Com isso os
+      campos de discursante e tema podem ocupar toda a linha."
+
+    current_behavior: >
+      In SpeechSlot.tsx, the expanded speech slot layout (lines 146-242):
+      - Label row: text label (e.g., "1O DISCURSO") at top
+      - Speaker row (lines 150-196): StatusLED (size=16) on the LEFT,
+        then speaker field (flex:1, height:38), then optional remove button (X)
+      - Topic row (lines 199-231): topic field (flex:1), optional clear button
+        - Topic row has marginLeft: 28 to align with speaker field (offset
+          for LED width + gap)
+      The StatusLED is on the same row as the speaker field, taking horizontal
+      space and requiring the topic row to be offset by 28px.
+
+    expected_behavior: >
+      Move the StatusLED from the speaker row to the LABEL row, right-aligned:
+
+      **Label row redesign:**
+      - Current: just the label text (e.g., "1O DISCURSO")
+      - New: label text on the LEFT, status text + StatusLED on the RIGHT
+      - Format: '{label}' ...flex space... '{status text} {circle}'
+      - Status text is the human-readable status from speechStatus i18n keys:
+        * not_assigned: t('speechStatus.not_assigned') = "Nao designado"
+        * assigned_not_invited: t('speechStatus.assigned_not_invited')
+        * assigned_invited: t('speechStatus.assigned_invited')
+        * assigned_confirmed: t('speechStatus.assigned_confirmed')
+        * gave_up: t('speechStatus.gave_up')
+      - StatusLED circle stays same size (16) or slightly smaller (14)
+      - Status text should use a small font (fontSize: 11) with same color as
+        the LED color for visual consistency, or textSecondary
+
+      **Speaker row redesign:**
+      - Remove StatusLED from this row
+      - Speaker field now takes full width (flex:1) without LED offset
+      - Remove button (X) stays on the right when applicable
+
+      **Topic row redesign:**
+      - Remove marginLeft: 28 (no longer needed since LED is gone)
+      - Topic field takes full width
+
+      **Pressability:**
+      - The StatusLED on the label row should remain pressable to open the
+        status change modal (same onPress behavior as before)
+      - The status text next to the LED should also be pressable (same action)
+
+    files_impacted:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Move StatusLED from speaker row to label row, right-aligned"
+          - "Add status text next to LED: t('speechStatus.{status}')"
+          - "Label row: flexDirection='row', justifyContent='space-between'"
+          - "Right side of label row: <Pressable flexDirection='row'><Text>{status text}</Text><StatusLED /></Pressable>"
+          - "Remove StatusLED from speaker row (line 152-157)"
+          - "Remove marginLeft: 28 from topicRow style"
+          - "Speaker field and topic field now use full line width"
+
+    acceptance_criteria:
+      - id: AC-100-01
+        description: "StatusLED appears on label line, right-aligned"
+        given: "Expanded SpeechSlot for position 1"
+        when: "View the slot"
+        then: "Label line shows '1O DISCURSO' on left, status text + circle on right"
+
+      - id: AC-100-02
+        description: "Status text matches current speech status"
+        given: "Speech with status 'assigned_confirmed'"
+        when: "View label line"
+        then: "Right side shows 'Designado/Confirmado' followed by green circle"
+
+      - id: AC-100-03
+        description: "Not assigned status shows correct text"
+        given: "Speech with status 'not_assigned'"
+        when: "View label line"
+        then: "Right side shows 'Nao designado' followed by gray circle"
+
+      - id: AC-100-04
+        description: "Speaker field uses full line width"
+        given: "Expanded SpeechSlot"
+        when: "View speaker field"
+        then: "Speaker field stretches full width (no LED taking horizontal space)"
+
+      - id: AC-100-05
+        description: "Topic field uses full line width"
+        given: "Expanded SpeechSlot with topic"
+        when: "View topic field"
+        then: "Topic field starts at left edge (no marginLeft: 28 offset)"
+
+      - id: AC-100-06
+        description: "StatusLED on label line is pressable"
+        given: "Expanded SpeechSlot with assigned speaker"
+        when: "Press the StatusLED circle on the label line"
+        then: "Status change modal opens"
+
+      - id: AC-100-07
+        description: "Status text is pressable (same action as LED)"
+        given: "Expanded SpeechSlot with assigned speaker"
+        when: "Press the status text on the label line"
+        then: "Status change modal opens"
+
+      - id: AC-100-08
+        description: "Not assigned LED is not pressable"
+        given: "SpeechSlot with status 'not_assigned'"
+        when: "View LED on label line"
+        then: "LED is not pressable (disabled, same behavior as before)"
+
+      - id: AC-100-09
+        description: "Observer cannot press LED"
+        given: "User with Observer role viewing expanded SpeechSlot"
+        when: "View LED on label line"
+        then: "LED is not pressable (disabled for Observer)"
+
+      - id: AC-100-10
+        description: "Status text in English"
+        given: "App in English locale, speech with status 'assigned_invited'"
+        when: "View label line"
+        then: "Right side shows 'Assigned/Invited' followed by yellow circle"
+
+      - id: AC-100-11
+        description: "Status text in Spanish"
+        given: "App in Spanish locale, speech with status 'gave_up'"
+        when: "View label line"
+        then: "Right side shows 'Desistio' followed by dark wine circle"
+
+    edge_cases:
+      - id: EC-100-01
+        case: "Long status text combined with long position label"
+        expected: >
+          Status text may truncate with ellipsis if space is tight. The label
+          has flex:1 and status section has fixed layout. In practice, the
+          longest combination ('ULTIMO DISCURSO' + 'Designado/Nao convidado')
+          should fit on a standard phone screen.
+
+      - id: EC-100-02
+        case: "Status changes while slot is visible"
+        expected: "Both the status text and LED color update immediately (React re-render)"
+
+      - id: EC-100-03
+        case: "Gave_up status - dark wine LED"
+        expected: "Status text 'Desistiu' shown next to dark wine (#7F1D1D) circle. Text color can use textSecondary for readability."
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-156 says "se o card estiver acima do card expandido, mostre a seta
+      pra baixo". Does "seta pra baixo" mean a down-pointing arrow indicating
+      the direction to reach the expanded card, or does it indicate the visual
+      direction (pointing down because card is above)?
+    context: >
+      Current code uses U+25B2 (up triangle) for expanded and U+25BC (down
+      triangle) for collapsed. The user wants cards above expanded to show
+      down-arrow and cards below to show up-arrow.
+    options:
+      - "A: Down-arrow for cards above expanded (pointing toward expanded), up-arrow for cards below"
+      - "B: Arrows indicate expand direction (all collapsed show same arrow)"
+    resolution: >
+      Option A chosen. The user explicitly stated the directional logic:
+      cards above expanded show down-arrow, cards below show up-arrow.
+      This creates a visual "pointing toward the expanded card" effect.
+
+  - id: OQ-2
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-158 says "tamanho de fonte normal (o tamanho atual +1)" for normal mode.
+      Does this mean the CURRENT font sizes should be increased by 1 as the new
+      "normal", or does "normal" mean keeping current sizes unchanged?
+    context: >
+      The user said "tamanho de fonte normal (o tamanho atual +1)", clearly
+      indicating that the new "normal" should be current +1. Large mode should
+      be substantially bigger ("um bocado maior mesmo").
+    options:
+      - "A: Normal = current + 1, Large = substantially bigger"
+      - "B: Normal = current (unchanged), Large = bigger"
+    resolution: >
+      Option A. The user explicitly said normal is "o tamanho atual +1".
+      Normal: fieldLabel=13, fieldValue=17. Large: fieldLabel=18, fieldValue=26.
+
+  - id: OQ-3
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-160 says "Somente no card de domingo da Agenda que a gente mostra
+      'Ultimo Discurso', no card de domingo de discursos, a gente mostra 3o
+      Discurso." Does this apply to: (a) only the collapsed card labels, or
+      (b) both collapsed and expanded (SpeechSlot label)?
+    context: >
+      The SundayCard collapsed labels and SpeechSlot expanded labels both
+      currently use t('speeches.lastSpeech'). The user says "card de domingo
+      de discursos" which could mean the whole SundayCard including expanded.
+    options:
+      - "A: Change both collapsed (SundayCard) and expanded (SpeechSlot) in Speeches tab"
+      - "B: Change only collapsed (SundayCard) label"
+    resolution: >
+      Option A. The user refers to the entire "card de domingo de discursos"
+      context, meaning position 3 should show "3o Discurso" everywhere in the
+      Speeches tab (collapsed and expanded). The Agenda tab keeps "Ultimo Discurso".
+
+  - id: OQ-4
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-161 says "Se nao tiver designacao, mostra so o circulo do status."
+      Does "nao tiver designacao" mean: (a) no speaker assigned (speaker_name
+      is empty), or (b) no speech record exists at all (speech is null)?
+    context: >
+      When speech is null (not yet created), status is 'not_assigned' and
+      speaker_name is undefined. When speech exists but no speaker assigned,
+      status is 'not_assigned' and speaker_name is ''. Both cases effectively
+      mean "no designation".
+    options:
+      - "A: Both cases (no speaker_name) show only circle"
+      - "B: Distinguish between null speech and empty speaker_name"
+    resolution: >
+      Option A. Both cases mean "no designation" from user perspective.
+      If speaker_name is empty (regardless of whether speech record exists),
+      show only the status circle.
+
+  - id: OQ-5
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-159 mentions titles should match agenda card section headers. For
+      special meetings (testimony_meeting, primary_presentation), what should
+      the last card title be? There is no "last speech" in special meetings.
+    context: >
+      Currently special meetings have 3 cards, with the last card titled
+      t('agenda.closingHymn'). The agenda tab uses t('agenda.sectionTestimonies')
+      or t('agenda.sectionPrimaryPresentation') for the special section.
+    options:
+      - "A: Keep t('agenda.closingHymn') for special meeting last card in presentation mode"
+      - "B: Use t('agenda.sectionTestimonies') or t('agenda.sectionPrimaryPresentation')"
+    resolution: >
+      Option A. The special meeting last card in presentation mode contains
+      closing hymn and closing prayer. Using t('agenda.closingHymn') as title
+      is appropriate since it describes the card content. The testimonies/primary
+      section header is for the agenda form context, not presentation mode.
+
+  - id: OQ-6
+    status: resolved
+    decision: "A"
+    decided_by: extractor
+    decided_on: "2026-02-20"
+    question: >
+      CR-163 says to change "Selecionar Orador" to "Selecionar Discursante"
+      in all languages. For English, "Select speaker" is already the standard
+      term. Should we change it to "Select Discursant" (literal translation)
+      or keep "Select Speaker"?
+    context: >
+      In English, "speaker" is the correct term for someone who gives a speech
+      in church. "Discursant" is not standard English. The Portuguese change
+      from "orador" to "discursante" makes sense in that language.
+    options:
+      - "A: Keep 'Select Speaker' in English (capitalize S), change only pt-BR and es"
+      - "B: Change to 'Select Discursant' in English"
+    resolution: >
+      Option A. "Speaker" is the correct English term. The change is about
+      using the church-specific term "Discursante" in Portuguese and Spanish.
+      English "Select Speaker" is fine (with capitalization fix).
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: >
+      The font size toggle in CR-158 is a simple React state (useState) that
+      does not persist across app sessions or to the database. Each time the
+      user opens Presentation Mode, it starts in "normal" font size.
+    reason: "The user did not mention persisting the preference. Font size toggle is a session-level convenience."
+    impact_if_wrong: "Would need AsyncStorage or DB column to persist preference"
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: >
+      The font size toggle button uses a text-based icon (e.g., "Aa" / "AA")
+      rather than an icon library glyph, since the app does not use an icon
+      library (all icons are Unicode text characters like U+2715 for close).
+    reason: "Consistent with existing approach: close button uses Unicode X character, chevrons use Unicode triangles"
+    impact_if_wrong: "Might need to add an icon library, but Unicode text is simpler"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: >
+      CR-160 applies to the collapsed card in the Speeches tab AND the
+      SpeechSlot (expanded) in the Speeches tab, but NOT to the Presentation
+      Mode. The Presentation Mode last speech label keeps "Ultimo Discurso"
+      because the Presentation Mode is closer to the Agenda context (formal
+      meeting document).
+    reason: "The user said 'no card de domingo de discursos' = Speeches tab. Presentation Mode is used during the meeting and follows Agenda conventions."
+    impact_if_wrong: "Presentation Mode might also need to show '3o Discurso' instead of 'Ultimo Discurso'"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: >
+      CR-161 "Se nao tiver designacao, mostra so o circulo do status" means
+      the label text (e.g., "1o Discurso:") is also hidden, not just the
+      speaker name. The circle alone represents the unassigned position.
+    reason: "The user explicitly said 'mostra SO o circulo do status', implying nothing else is shown."
+    impact_if_wrong: "If label text should still show, format would be '<circle> 1o Discurso:' with no name"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: >
+      The font size values for "large" mode in CR-158 are:
+      fieldLabel=18, fieldValue=26, cardTitle=22, headerTitle=24.
+      The user said "um bocado maior mesmo" (much bigger) and "ainda tem
+      muito espaco sem ser utilizado na tela" (plenty of unused space on screen).
+      These values represent roughly 1.5x the normal size.
+    reason: "The user wants visually impaired users to read easily, implying a substantial increase"
+    impact_if_wrong: "Values might need adjustment after user testing, but the magnitude should be correct"
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: >
+      In F100 (CR-162), the status text uses the same i18n keys already
+      defined in speechStatus namespace (speechStatus.not_assigned,
+      speechStatus.assigned_not_invited, etc.) which already exist in all
+      3 locales. No new i18n keys needed for status text.
+    reason: "speechStatus keys verified in all 3 locale files (pt-BR.json:87-92, en.json:87-92, es.json:87-92)"
+    impact_if_wrong: "None, keys confirmed as existing"
+    needs_confirmation: false
+
+  - id: A-7
+    assumption: >
+      For F098/CR-160, the Presentation Mode (usePresentationMode.ts) keeps
+      using t('speeches.lastSpeech') for the last speaker label in the card
+      content (line 166: label for speaker 3). This is separate from the
+      card TITLE which is changed by F097/CR-159 to use section header keys.
+    reason: "Presentation Mode is a formal meeting document context, similar to Agenda. The label 'Ultimo Discurso - Discurso' within the card content stays."
+    impact_if_wrong: "Would need to change the label in buildPresentationCards to use 3o format"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: overlap
+    status: resolved
+    description: >
+      CR-160 changes position 3 label from "Ultimo Discurso" to "3o Discurso"
+      in the Speeches tab. However, F093/CR-150 (already implemented) added
+      collapsed card labels using t('speeches.lastSpeech') for position 3.
+      The new change (F098/CR-160) must modify the code introduced by F093.
+    existing_spec: >
+      F093 (SPEC_F093_F096.yaml AC-093-01): "3 linhas visiveis: '1o Discurso:
+      <nome>', '2o Discurso: <nome>', 'Ultimo Discurso: <nome>'"
+    new_request: "Position 3 shows '3o Discurso' in Speeches tab instead of 'Ultimo Discurso'"
+    resolution: >
+      F098 supersedes F093's position 3 label in the Speeches tab context.
+      The SundayCard collapsed labels will use t('speeches.slot', { number: '3\u00BA' })
+      for position 3 instead of t('speeches.lastSpeech'). This is a deliberate
+      change requested by the user. The Agenda tab and Presentation Mode still
+      use "Ultimo Discurso".
+
+  - id: INC-2
+    type: overlap
+    status: resolved
+    description: >
+      CR-161 (F099) changes the collapsed SundayCard speech layout (moving
+      LEDs before labels), while CR-150/F093 introduced the current layout
+      (LEDs on the right, text in center). F099 builds on and modifies the
+      structure introduced by F093.
+    existing_spec: >
+      F093 (SPEC_F093_F096.yaml): "3 LEDs dispostos VERTICALMENTE, alinhados
+      a direita das linhas de texto"
+    new_request: "Move LEDs from right to before label text, format '<circle> label'"
+    resolution: >
+      F099 redesigns the F093 layout. LEDs move from vertical column on right
+      to inline position before each text label. This is the user's intentional
+      redesign after seeing the F093 implementation.
+
+  - id: INC-3
+    type: overlap
+    status: resolved
+    description: >
+      CR-162 (F100) changes the expanded SpeechSlot layout by moving the LED
+      from the speaker row to the label row. This modifies existing SpeechSlot
+      structure where the LED and speaker field are on the same row with gap.
+    existing_spec: >
+      SpeechSlot.tsx has LED on speaker row (same line as speaker field).
+      Topic row has marginLeft: 28 to compensate for LED width.
+    new_request: "Move LED to label row, right-aligned with status text. Speaker/topic use full width."
+    resolution: >
+      F100 moves the LED from speaker row to label row. Speaker field and
+      topic field no longer need LED offset. marginLeft: 28 removed from
+      topic row. Status text added next to LED on label row.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true   # Identifiquei todas ambiguidades (OQ-1 a OQ-6)
+  GATE-03: true   # Listei TODAS open questions com IDs (OQ-1 a OQ-6) - TODAS RESOLVIDAS
+  GATE-04: true   # Listei TODAS assumptions com IDs (A-1 a A-7)
+  GATE-05: true   # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-1 a INC-3) - TODAS RESOLVIDAS
+  GATE-06: true   # Status e "complete"
+  GATE-07: true   # Todas OQs resolvidas
+  GATE-08: true   # SPEC atualizado com impactos das decisoes

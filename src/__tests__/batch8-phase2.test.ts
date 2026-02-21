@@ -500,10 +500,12 @@ describe('F054 (CR-111): SpeechSlot spacing and X size', () => {
 
   const getSpeechSlot = () => readSourceFile('components/SpeechSlot.tsx');
 
-  describe('AC-F054-01: Row gap is 12 (was 8)', () => {
-    it('should have gap: 12 in row style', () => {
+  describe('AC-F054-01: Row gap removed (F112 moved X buttons to rightColumn)', () => {
+    it('should NOT have gap: 12 in row style (removed by F112/CR-174 rightColumn layout)', () => {
       const content = getSpeechSlot();
-      expect(content).toContain('gap: 12');
+      const rowMatch = content.match(/\brow:\s*\{[^}]*\}/s);
+      expect(rowMatch).not.toBeNull();
+      expect(rowMatch![0]).not.toContain('gap: 12');
     });
 
     it('should NOT have gap: 8 in row style', () => {

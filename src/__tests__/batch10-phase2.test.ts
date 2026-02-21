@@ -81,12 +81,12 @@ describe('F073 (CR-128): Topic X button positioning - outside dropdown field', (
       expect(topicRowStyle).toContain("alignItems: 'center'");
     });
 
-    it('styles.topicRow has gap 12', () => {
+    it('styles.topicRow exists with flexDirection row (gap:12 removed by F112/CR-174 rightColumn layout)', () => {
       const content = getSpeechSlot();
       const topicRowIdx = content.indexOf('topicRow:');
       const topicRowEnd = content.indexOf('},', topicRowIdx);
       const topicRowStyle = content.substring(topicRowIdx, topicRowEnd);
-      expect(topicRowStyle).toContain('gap: 12');
+      expect(topicRowStyle).toContain("flexDirection: 'row'");
     });
   });
 

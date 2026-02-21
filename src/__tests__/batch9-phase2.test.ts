@@ -546,36 +546,31 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
 describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () => {
   const getSpeechSlot = () => readSourceFile('components/SpeechSlot.tsx');
 
-  // --- AC-F063-01: LED positioned on label row (redesigned by F100/CR-162) ---
-  describe('AC-F063-01: LED is on label row (redesigned by F100)', () => {
-    it('StatusLED appears in labelRow, not in speaker row (updated by F100/CR-162)', () => {
+  // --- AC-F063-01: LED positioned on label row (redesigned by F100/CR-162, restructured by F112/CR-174) ---
+  describe('AC-F063-01: LED is on label row (redesigned by F100, restructured by F112)', () => {
+    it('StatusLED appears in rightColumn (F112 moved LED to fixed-width rightColumn)', () => {
       const content = getSpeechSlot();
-      // F100 moved StatusLED from speaker row to label row
       expect(content).toContain('styles.labelRow');
-      expect(content).toContain('styles.statusSection');
+      expect(content).toContain('styles.rightColumn');
       expect(content).toContain('<StatusLED');
     });
 
-    it('label row contains status text and LED', () => {
+    it('label row contains status text in leftColumn', () => {
       const content = getSpeechSlot();
-      const labelRowIdx = content.indexOf('styles.labelRow');
-      expect(labelRowIdx).toBeGreaterThan(-1);
-      // Status section with text + LED appears after labelRow reference
-      const statusSectionIdx = content.indexOf('statusSection', labelRowIdx);
-      expect(statusSectionIdx).toBeGreaterThan(-1);
+      const leftColumnIdx = content.indexOf('styles.leftColumn');
+      expect(leftColumnIdx).toBeGreaterThan(-1);
+      const statusTextIdx = content.indexOf('styles.statusText', leftColumnIdx);
+      expect(statusTextIdx).toBeGreaterThan(-1);
     });
   });
 
-  // --- AC-F063-02: X button is last element in row ---
-  describe('AC-F063-02: X button is last element in row', () => {
-    it('Remove button appears after speaker field in row', () => {
+  // --- AC-F063-02: X button in rightColumn (F112 moved X from row to rightColumn) ---
+  describe('AC-F063-02: X button is in rightColumn (F112 restructure)', () => {
+    it('Remove button appears in rightColumn (F112 moved X buttons to rightColumn)', () => {
       const content = getSpeechSlot();
-      const rowIdx = content.indexOf('styles.row');
-      const rowEnd = content.indexOf('</View>', rowIdx);
-      const rowSection = content.substring(rowIdx, rowEnd);
-      const speakerCommentIdx = rowSection.indexOf('{/* Speaker field */}');
-      const removeCommentIdx = rowSection.indexOf('{/* Remove button */}');
-      expect(removeCommentIdx).toBeGreaterThan(speakerCommentIdx);
+      const rightColumnIdx = content.indexOf('styles.rightColumn');
+      const speakerActionIdx = content.indexOf('speakerActionWrapper', rightColumnIdx);
+      expect(speakerActionIdx).toBeGreaterThan(rightColumnIdx);
     });
   });
 
@@ -600,12 +595,12 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
       expect(section).not.toContain('marginLeft: 28');
     });
 
-    it('LED moved to label row, speaker and topic fields use full width (F100/CR-162)', () => {
+    it('LED moved to rightColumn, fields use full width in leftColumn (F112/CR-174)', () => {
       const content = getSpeechSlot();
-      // StatusLED size is 14 in label row
+      // StatusLED size is 14
       expect(content).toContain('size={14}');
-      // Row gap is 12
-      expect(content).toContain('gap: 12');
+      // rightColumn has width: 36 for center alignment
+      expect(content).toMatch(/rightColumn:\s*\{[^}]*width:\s*36/s);
     });
   });
 
@@ -655,10 +650,10 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
 
   // --- EC-F063-01: SpeechSlot without speaker ---
   describe('EC-F063-01: SpeechSlot without speaker', () => {
-    it('LED still renders on label row when no speaker (updated by F100/CR-162)', () => {
+    it('LED still renders in rightColumn when no speaker (F112 rightColumn layout)', () => {
       const content = getSpeechSlot();
-      // StatusLED is in the labelRow/statusSection, always rendered
-      expect(content).toContain('styles.statusSection');
+      // StatusLED is in the rightColumn, always rendered
+      expect(content).toContain('styles.rightColumn');
       expect(content).toContain('<StatusLED');
       // X button is conditional on hasSpeaker
       expect(content).toContain('hasSpeaker && canUnassign');

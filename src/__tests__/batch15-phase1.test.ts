@@ -701,17 +701,22 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
       expect(speechSlotSource).toContain('onPress={handleStatusPress}');
     });
 
-    it('StatusLED in label row has onPress handler', () => {
-      // StatusLED in the statusSection also has onPress
-      const statusSectionBlock = speechSlotSource.match(/statusSection[\s\S]*?StatusLED[\s\S]*?onPress/);
-      expect(statusSectionBlock).not.toBeNull();
+    it('StatusLED in rightColumn has onPress handler (F112 moved LED to rightColumn)', () => {
+      // F112 moved StatusLED to rightColumn with its own Pressable wrapper
+      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
+      const statusLedWrapperIdx = speechSlotSource.indexOf('statusLedWrapper', rightColumnIdx);
+      const onPressIdx = speechSlotSource.indexOf('onPress={handleStatusPress}', statusLedWrapperIdx);
+      expect(statusLedWrapperIdx).toBeGreaterThan(rightColumnIdx);
+      expect(onPressIdx).toBeGreaterThan(statusLedWrapperIdx);
     });
   });
 
   // --- AC-100-07: Status text is pressable ---
   describe('AC-100-07: Status text pressable', () => {
-    it('status text and LED inside same Pressable', () => {
-      expect(speechSlotSource).toContain('style={styles.statusSection}');
+    it('status text has its own Pressable with handleStatusPress (F112 separated from LED)', () => {
+      // F112 separated status text (in leftColumn) from LED (in rightColumn)
+      expect(speechSlotSource).toContain('styles.statusText');
+      expect(speechSlotSource).toContain('onPress={handleStatusPress}');
     });
   });
 
@@ -749,14 +754,14 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
     });
   });
 
-  // --- statusSection style ---
-  describe('statusSection style', () => {
-    it('has flexDirection row', () => {
-      expect(speechSlotSource).toMatch(/statusSection:[\s\S]*?flexDirection:\s*'row'/);
+  // --- statusSection superseded by F112 (rightColumn + statusLedWrapper) ---
+  describe('statusSection superseded by F112 rightColumn layout', () => {
+    it('rightColumn has alignItems center (LED centered)', () => {
+      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('has gap 6', () => {
-      expect(speechSlotSource).toMatch(/statusSection:[\s\S]*?gap:\s*6/);
+    it('statusLedWrapper has justifyContent center', () => {
+      expect(speechSlotSource).toMatch(/statusLedWrapper:\s*\{[^}]*justifyContent:\s*'center'/s);
     });
   });
 

@@ -354,42 +354,39 @@ export const SundayCard = React.memo(function SundayCard({
           )}
           {isSpeechesType && !expanded && (
             <>
-              {[1, 2, 3].map((pos) => {
+              {[1, 2, 3].map((pos, idx) => {
                 const speech = speeches.find((s) => s.position === pos);
                 const name = speech?.speaker_name ?? '';
                 const posLabel = t('speeches.slot', { number: `${pos}\u00BA` });
+                const status = speechStatuses[idx] ?? 'not_assigned';
                 return (
-                  <Text
-                    key={pos}
-                    style={[styles.speakerNameLine, { color: colors.textSecondary }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {`${posLabel}: ${name}`}
-                  </Text>
+                  <View key={pos} style={styles.speechRow}>
+                    <StatusLED
+                      status={status}
+                      size={10}
+                      onPress={
+                        onStatusPress && speech
+                          ? () => onStatusPress(speech)
+                          : undefined
+                      }
+                      disabled={typeDisabled}
+                    />
+                    {name ? (
+                      <Text
+                        style={[styles.speakerNameLine, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {`${posLabel}: ${name}`}
+                      </Text>
+                    ) : null}
+                  </View>
                 );
               })}
             </>
           )}
         </View>
 
-        {!expanded && isSpeechesType && (
-          <View style={styles.ledsVertical}>
-            {speechStatuses.map((status, idx) => (
-              <StatusLED
-                key={idx}
-                status={status}
-                size={14}
-                onPress={
-                  onStatusPress && speeches[idx]
-                    ? () => onStatusPress(speeches[idx])
-                    : undefined
-                }
-                disabled={typeDisabled}
-              />
-            ))}
-          </View>
-        )}
       </Pressable>
 
       {/* Type dropdown (shown when expanded) */}
@@ -460,7 +457,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   speakerNameLine: {
-    fontSize: 11,
+    fontSize: 13,
+  },
+  speechRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
   },
   expandedContent: {
     paddingHorizontal: 12,

@@ -357,9 +357,7 @@ export const SundayCard = React.memo(function SundayCard({
               {[1, 2, 3].map((pos) => {
                 const speech = speeches.find((s) => s.position === pos);
                 const name = speech?.speaker_name ?? '';
-                const posLabel = pos === 3
-                  ? t('speeches.lastSpeech')
-                  : t('speeches.slot', { number: `${pos}\u00BA` });
+                const posLabel = t('speeches.slot', { number: `${pos}\u00BA` });
                 return (
                   <Text
                     key={pos}

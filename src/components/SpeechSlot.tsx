@@ -51,9 +51,6 @@ export interface SpeechSlotProps {
 // --- Position Labels ---
 
 function getPositionLabel(position: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  if (position === 3) {
-    return t('speeches.lastSpeech');
-  }
   // "1o Discurso" format using Unicode U+00BA (masculine ordinal)
   return t('speeches.slot', { number: `${position}\u00BA` });
 }

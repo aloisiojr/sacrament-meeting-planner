@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-02-20"
-  total_features: 91
-  total_change_requests: 157
+  last_updated: "2026-02-21"
+  total_features: 93
+  total_change_requests: 159
   implemented_crs: 96
-  pending_crs: 59
+  pending_crs: 61
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -57,6 +57,7 @@ metadata:
     - docs/specs/SPEC_F092.yaml
     - docs/specs/SPEC_F093_F096.yaml
     - docs/specs/SPEC_F097_F100.yaml
+    - docs/specs/SPEC_F101_F102.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1949,6 +1950,47 @@ features:
       - "Speaker/topic fields use full width (marginLeft:28 removed)"
       - "Status text from speechStatus i18n keys (already exist)"
 
+  # ---------------------------------------------------------------------------
+  # Batch 15 Phase 2 (F101-F102) - Multilingual reset email, Test suite fix
+  # ---------------------------------------------------------------------------
+
+  - id: F101
+    name: "Multilingual password reset email via Edge Function"
+    status: pending
+    rfs: []
+    description: >
+      Implementar Opcao B da SPEC F088: Edge Function send-reset-email que
+      recebe email, busca ward.language, gera token via generateLink, envia
+      email traduzido nos 3 idiomas (pt-BR, en, es) via Resend API. Deep link
+      sacrmeetman://reset-password?token=TOKEN no email. forgot-password.tsx
+      chama Edge Function. reset-password.tsx aceita token via query params
+      e usa verifyOtp para estabelecer sessao.
+    modified_by_crs: [155]
+    spec_file: "docs/specs/SPEC_F101_F102.yaml"
+    notes:
+      - "CR-155: Substituir Opcao A (template unico) por Opcao B (Edge Function i18n)"
+      - "12 acceptance criteria"
+      - "1 file created (send-reset-email Edge Function), 2 files modified"
+      - "Requer RESEND_API_KEY e RESEND_FROM_EMAIL como secrets"
+      - "Modifica forgot-password.tsx e reset-password.tsx"
+
+  - id: F102
+    name: "Test suite 100% passing"
+    status: pending
+    rfs: []
+    description: >
+      Corrigir 2 testes falhando em batch7-f035-f039.test.ts que esperam
+      com.wardmanager.app mas o valor real e com.sacramentmeetingmanager.app.
+      Atualizar testes afetados pelas mudancas da F101 (forgot-password e
+      reset-password). Garantir 100% da suite passando.
+    modified_by_crs: [164]
+    spec_file: "docs/specs/SPEC_F101_F102.yaml"
+    notes:
+      - "CR-164: Fix 2 pre-existing failures + update tests for F101 changes"
+      - "5 acceptance criteria"
+      - "Modify batch7-f035-f039.test.ts and batch14-f088-f092.test.ts"
+      - "Must run after F101 implementation"
+
 # =============================================================================
 # PENDING CHANGE REQUESTS (63 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15)
 # =============================================================================
@@ -3174,6 +3216,50 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
+  # --- Batch 15 Phase 2 (Multilingual reset email, Test suite fix) ---
+
+  - id: 155
+    type: feature
+    area: "Auth (F001, F088)"
+    feature_id: F101
+    spec_file: "docs/specs/SPEC_F101_F102.yaml"
+    related_crs: [145]
+    description: >
+      Implementar Edge Function send-reset-email com email traduzido em 3
+      idiomas (pt-BR, en, es) conforme ward.language. Substituir chamada
+      resetPasswordForEmail em forgot-password.tsx por Edge Function.
+      reset-password.tsx aceita token via deep link query params.
+    acceptance_criteria:
+      - "Edge Function send-reset-email envia email traduzido"
+      - "Email com deep link sacrmeetman://reset-password?token=TOKEN"
+      - "forgot-password.tsx chama Edge Function"
+      - "reset-password.tsx aceita token via query params"
+      - "Nao revela se email existe (retorna sucesso generico)"
+    files_likely_impacted:
+      - supabase/functions/send-reset-email/index.ts
+      - src/app/(auth)/forgot-password.tsx
+      - src/app/(auth)/reset-password.tsx
+
+  - id: 164
+    type: fix
+    area: "Testing (F037, F101)"
+    feature_id: F102
+    spec_file: "docs/specs/SPEC_F101_F102.yaml"
+    related_crs: [155]
+    description: >
+      Fix 2 pre-existing test failures (com.wardmanager.app ->
+      com.sacramentmeetingmanager.app). Update tests affected by F101.
+      Ensure 100% test suite passing.
+    acceptance_criteria:
+      - "bundleIdentifier test expects com.sacramentmeetingmanager.app"
+      - "Android package test expects com.sacramentmeetingmanager.app"
+      - "forgot-password tests updated for Edge Function"
+      - "reset-password tests updated for token handling"
+      - "Full suite passes 100%"
+    files_likely_impacted:
+      - src/__tests__/batch7-f035-f039.test.ts
+      - src/__tests__/batch14-f088-f092.test.ts
+
 # =============================================================================
 # DESIGN DECISIONS (consolidadas de todos os batches)
 # =============================================================================
@@ -4162,6 +4248,10 @@ navigation:
       route: "/(auth)/register"
     - name: Register (invited)
       route: "/(auth)/register-invited"
+    - name: Forgot Password
+      route: "/(auth)/forgot-password"
+    - name: Reset Password
+      route: "/(auth)/reset-password"
 
   modal_screens:
     - name: Presentation Mode
@@ -4196,11 +4286,11 @@ in_scope:
   - "Push notifications (Expo + Edge Function)"
   - "Self-registration e convite por link"
   - "Historico de acoes (audit log, 2 anos)"
-  - "Esqueci a senha"
+  - "Esqueci a senha (email traduzido em 3 idiomas via Edge Function)"
   - "Logout"
 
 out_of_scope:
-  - "Envio direto de SMS/email (apenas push notifications e links wa.me)"
+  - "Envio direto de SMS (apenas push notifications e links wa.me; email via Edge Function para reset)"
   - "Gestao de outros aspectos da ala (frequencia, chamados, financas)"
   - "Colaboracao multi-usuario simultanea"
   - "Integracao com sistemas oficiais da Igreja SUD"
@@ -4325,3 +4415,11 @@ cr_history:
       - "docs/specs/SPEC_F092.yaml (CR-149 - Presentation Mode Button Always Visible)"
       - "docs/specs/SPEC_F093_F096.yaml (CR-150 to CR-153 - Card Layouts, Pianist/Conductor, Hymn Toggle, Status Lines)"
     summary: "Phase 1: Password reset email customization (branding + redirect URL), graceful offline degradation (suppress errors, show cache, reconnect), offline banner readability on iPhone (safe area insets), sunday type change confirmation message with specific text (i18n), presentation mode button always visible (remove Sunday-only condition). Phase 2: Collapsed card layouts with speaker names and vertical LEDs, pianist/conductor fields in agenda welcome section, toggle for intermediate hymn, collapsed agenda card status lines with completion info."
+
+  batch_15:
+    range: "CR-155 a CR-164"
+    status: "8 pendentes fase 1 (156, 157, 158, 159, 160, 161, 162, 163), 2 pendentes fase 2 (155, 164)"
+    files:
+      - "docs/specs/SPEC_F097_F100.yaml (CR-156 to CR-163 - Presentation mode, Speech labels, Card redesign)"
+      - "docs/specs/SPEC_F101_F102.yaml (CR-155, CR-164 - Multilingual reset email, Test suite fix)"
+    summary: "Phase 1: Presentation mode improvements (arrows, recognized names, font size, section titles), speech label context-aware display, collapsed speech card redesign, expanded speech status circle repositioning. Phase 2: Multilingual password reset email via Edge Function (3 languages), test suite 100% passing."

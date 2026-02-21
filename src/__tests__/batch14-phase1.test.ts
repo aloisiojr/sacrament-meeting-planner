@@ -400,26 +400,26 @@ describe('F090 (CR-147): Offline banner readability on iPhone', () => {
 describe('F088 (CR-145): Password reset email redirect URL', () => {
   const getForgotPassword = () => readSourceFile('app/(auth)/forgot-password.tsx');
 
-  // --- AC-088-02: redirectTo with Linking.createURL ---
-  describe('AC-088-02: redirectTo with Linking.createURL', () => {
-    it('forgot-password.tsx imports expo-linking', () => {
+  // --- AC-088-02: Edge Function invoke (updated from Linking.createURL) ---
+  describe('AC-088-02: Edge Function invoke for password reset', () => {
+    it('forgot-password.tsx does NOT import expo-linking', () => {
       const content = getForgotPassword();
-      expect(content).toContain("from 'expo-linking'");
+      expect(content).not.toContain("expo-linking");
     });
 
-    it('forgot-password.tsx uses Linking.createURL', () => {
+    it('forgot-password.tsx calls functions.invoke', () => {
       const content = getForgotPassword();
-      expect(content).toContain("Linking.createURL");
+      expect(content).toContain("functions.invoke");
     });
 
-    it('creates URL with /(auth)/reset-password path', () => {
+    it('forgot-password.tsx invokes send-reset-email Edge Function', () => {
       const content = getForgotPassword();
-      expect(content).toContain("'/(auth)/reset-password'");
+      expect(content).toContain("'send-reset-email'");
     });
 
-    it('passes redirectTo option to resetPasswordForEmail', () => {
+    it('forgot-password.tsx passes email in body', () => {
       const content = getForgotPassword();
-      expect(content).toContain('redirectTo: redirectUrl');
+      expect(content).toContain('body: { email');
     });
   });
 
@@ -505,11 +505,11 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
     });
   });
 
-  // --- EC-088-01: Linking import style ---
-  describe('EC-088-01: Linking imported correctly', () => {
-    it('uses * as Linking namespace import', () => {
+  // --- EC-088-01: No Linking import (Edge Function replaces Linking) ---
+  describe('EC-088-01: No Linking import needed', () => {
+    it('forgot-password.tsx does not use Linking namespace import', () => {
       const content = getForgotPassword();
-      expect(content).toContain("import * as Linking from 'expo-linking'");
+      expect(content).not.toContain("import * as Linking from 'expo-linking'");
     });
   });
 
@@ -541,6 +541,23 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
     it('reset-password.tsx checks for existing session on mount', () => {
       const content = readSourceFile('app/(auth)/reset-password.tsx');
       expect(content).toContain('getSession');
+    });
+
+    it('reset-password.tsx imports useLocalSearchParams', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('useLocalSearchParams');
+    });
+
+    it('reset-password.tsx calls verifyOtp with token_hash', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('verifyOtp');
+      expect(content).toContain('token_hash');
+    });
+
+    it('reset-password.tsx extracts token from URL params', () => {
+      const content = readSourceFile('app/(auth)/reset-password.tsx');
+      expect(content).toContain('token');
+      expect(content).toContain("type === 'recovery'");
     });
   });
 

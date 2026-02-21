@@ -38,55 +38,55 @@ function readLocale(locale: string): Record<string, unknown> {
 // F103 (CR-165): Align status circle with X button in expanded SpeechSlot
 // =============================================================================
 
-describe('F103 (CR-165): StatusLED/X button vertical alignment in SpeechSlot', () => {
+describe('F103 (CR-165): StatusLED/X button vertical alignment in SpeechSlot (superseded by F112/CR-174)', () => {
 
   const speechSlotSource = readSourceFile('components/SpeechSlot.tsx');
 
+  // NOTE: F112 (CR-174) superseded F103 (CR-165). The paddingRight:5 approach
+  // was replaced by a fixed-width right column layout. These tests now verify
+  // the F112 approach which achieves the same AC goals more robustly.
+
   // --- AC-103-01: StatusLED circle vertically aligned with X button ---
   describe('AC-103-01: StatusLED aligned with X button', () => {
-    it('statusSection style includes paddingRight: 5', () => {
-      expect(speechSlotSource).toContain('paddingRight: 5');
+    it('rightColumn has fixed width 36 for center-to-center alignment (supersedes paddingRight:5)', () => {
+      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*width:\s*36/s);
     });
 
-    it('paddingRight is in statusSection style block', () => {
-      const statusSectionMatch = speechSlotSource.match(
-        /statusSection:\s*\{[^}]*paddingRight:\s*5[^}]*\}/s
-      );
-      expect(statusSectionMatch).not.toBeNull();
+    it('rightColumn has alignItems center for centering both LED and X', () => {
+      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
     });
   });
 
   // --- AC-103-02: Status text and circle shifted slightly left ---
-  describe('AC-103-02: Status section shifted left', () => {
-    it('statusSection has paddingRight to shift content left', () => {
-      const statusSectionMatch = speechSlotSource.match(
-        /statusSection:\s*\{[^}]*\}/s
-      );
-      expect(statusSectionMatch?.[0]).toContain('paddingRight');
+  describe('AC-103-02: Status section separated into leftColumn and rightColumn', () => {
+    it('status text is in leftColumn labelRow (not in rightColumn)', () => {
+      const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
+      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
+      const statusTextIdx = speechSlotSource.indexOf('styles.statusText');
+      expect(statusTextIdx).toBeGreaterThan(leftColumnIdx);
+      expect(statusTextIdx).toBeLessThan(rightColumnIdx);
     });
   });
 
   // --- AC-103-03: Alignment works when X is not visible ---
   describe('AC-103-03: Alignment consistent without X button', () => {
-    it('paddingRight is a static style (always applied regardless of X visibility)', () => {
-      // paddingRight is in StyleSheet.create (static), not conditional
-      const styleSheetMatch = speechSlotSource.match(
-        /StyleSheet\.create\(\{[\s\S]*statusSection:\s*\{[^}]*paddingRight:\s*5[^}]*\}/s
+    it('rightColumn width is static (always 36, regardless of X visibility)', () => {
+      const rightColumnMatch = speechSlotSource.match(
+        /rightColumn:\s*\{[^}]*\}/s
       );
-      expect(styleSheetMatch).not.toBeNull();
+      expect(rightColumnMatch).not.toBeNull();
+      expect(rightColumnMatch![0]).toContain('width: 36');
     });
   });
 
   // --- AC-103-04: Alignment works for all 3 positions ---
   describe('AC-103-04: All 3 positions have consistent alignment', () => {
-    it('SpeechSlot uses shared styles.statusSection for all positions', () => {
-      // styles.statusSection is used once in the component, shared across all instances
-      expect(speechSlotSource).toContain('styles.statusSection');
+    it('SpeechSlot uses shared styles.rightColumn for all positions', () => {
+      expect(speechSlotSource).toContain('styles.rightColumn');
     });
 
-    it('statusSection style is defined in StyleSheet.create', () => {
-      // statusSection: { ... } is in StyleSheet.create
-      const styleDefMatch = speechSlotSource.match(/statusSection:\s*\{/);
+    it('rightColumn style is defined in StyleSheet.create', () => {
+      const styleDefMatch = speechSlotSource.match(/rightColumn:\s*\{/);
       expect(styleDefMatch).not.toBeNull();
     });
   });
@@ -102,30 +102,25 @@ describe('F103 (CR-165): StatusLED/X button vertical alignment in SpeechSlot', (
     });
 
     it('remove button uses same style for both speaker and topic rows', () => {
-      // Both use styles.removeButton
       expect(speechSlotSource).toContain('styles.removeButton');
     });
   });
 
   // --- EC-103-01: Observer role (no X button, no status press) ---
   describe('EC-103-01: Observer role alignment', () => {
-    it('statusSection paddingRight is static (not conditional on role)', () => {
-      // The paddingRight is in StyleSheet.create, not in inline styles
-      const styleSheetMatch = speechSlotSource.match(
-        /StyleSheet\.create\(\{[\s\S]*paddingRight:\s*5/s
-      );
-      expect(styleSheetMatch).not.toBeNull();
+    it('rightColumn width is static (not conditional on role)', () => {
+      const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
+      expect(styleSheetBlock).toContain('rightColumn:');
+      expect(styleSheetBlock).toContain('width: 36');
     });
   });
 
   // --- EC-103-02: Secretary role alignment ---
   describe('EC-103-02: Secretary role alignment', () => {
-    it('statusSection style does not depend on user role', () => {
-      // paddingRight is not wrapped in any role check
-      expect(speechSlotSource).toContain('paddingRight: 5');
-      // Verify it's in the static styles, not dynamically applied
+    it('rightColumn style does not depend on user role', () => {
       const staticStyles = speechSlotSource.split('StyleSheet.create')[1];
-      expect(staticStyles).toContain('paddingRight: 5');
+      expect(staticStyles).toContain('rightColumn:');
+      expect(staticStyles).toContain('width: 36');
     });
   });
 });

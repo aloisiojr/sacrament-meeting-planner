@@ -333,6 +333,11 @@ function AgendaSundayCard({
     onRemoveException(date);
   }, [date, onRemoveException]);
 
+  const SPECIAL_MEETING_WITH_STATUS = ['testimony_meeting', 'primary_presentation'];
+  const isSpecialWithStatus = exceptionLabel &&
+    exception?.reason &&
+    SPECIAL_MEETING_WITH_STATUS.includes(exception.reason);
+
   return (
     <View
       style={[
@@ -356,7 +361,7 @@ function AgendaSundayCard({
         </View>
 
         <View style={styles.cardCenter}>
-          {exceptionLabel && (
+          {exceptionLabel && !isSpecialWithStatus && (
             <Text
               style={[styles.exceptionText, { color: colors.warning }]}
               numberOfLines={1}
@@ -364,6 +369,54 @@ function AgendaSundayCard({
               {exceptionLabel}
             </Text>
           )}
+          {!isExpanded && isSpecialWithStatus && (() => {
+            // Compute status lines for collapsed special meeting card
+            const missingRoles: string[] = [];
+            if (!agenda?.presiding_name) missingRoles.push(t('agenda.statusPresiding'));
+            if (!agenda?.conducting_name) missingRoles.push(t('agenda.statusConducting'));
+            if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
+            if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
+
+            let prayersFilled = 0;
+            if (agenda?.opening_prayer_name) prayersFilled++;
+            if (agenda?.closing_prayer_name) prayersFilled++;
+
+            let hymnsFilled = 0;
+            const hymnsTotal = 3; // opening, sacrament, closing (no intermediate for special meetings)
+            if (agenda?.opening_hymn_id) hymnsFilled++;
+            if (agenda?.sacrament_hymn_id) hymnsFilled++;
+            if (agenda?.closing_hymn_id) hymnsFilled++;
+
+            const GREEN = '#22c55e';
+
+            return (
+              <>
+                {missingRoles.length > 0 && (
+                  <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {`${t('agenda.statusMissing')}${missingRoles.join(' | ')}`}
+                  </Text>
+                )}
+                <Text
+                  style={[styles.exceptionText, { color: colors.warning }]}
+                  numberOfLines={1}
+                >
+                  {exceptionLabel}
+                </Text>
+                <Text
+                  style={[styles.statusLine, { color: prayersFilled === 2 ? GREEN : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {`${t('agenda.statusPrayersLabel')}: ${prayersFilled} de ${2}`}
+                </Text>
+                <Text
+                  style={[styles.statusLine, { color: hymnsFilled === hymnsTotal ? GREEN : colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {t('agenda.statusHymns', { filled: hymnsFilled, total: hymnsTotal })}
+                </Text>
+              </>
+            );
+          })()}
           {!isExpanded && !exceptionLabel && (() => {
             // Compute status lines for collapsed speeches card
             const missingRoles: string[] = [];

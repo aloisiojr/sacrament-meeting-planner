@@ -701,13 +701,12 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
       expect(speechSlotSource).toContain('onPress={handleStatusPress}');
     });
 
-    it('StatusLED in rightColumn has onPress handler (F112 moved LED to rightColumn)', () => {
-      // F112 moved StatusLED to rightColumn with its own Pressable wrapper
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const statusLedWrapperIdx = speechSlotSource.indexOf('statusLedWrapper', rightColumnIdx);
-      const onPressIdx = speechSlotSource.indexOf('onPress={handleStatusPress}', statusLedWrapperIdx);
-      expect(statusLedWrapperIdx).toBeGreaterThan(rightColumnIdx);
-      expect(onPressIdx).toBeGreaterThan(statusLedWrapperIdx);
+    it('StatusLED in statusSection has onPress handler (F115 moved LED to labelRow)', () => {
+      // F115 moved StatusLED to labelRow inside statusSection Pressable
+      const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
+      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED', statusSectionIdx);
+      expect(statusSectionIdx).toBeGreaterThan(-1);
+      expect(statusLEDIdx).toBeGreaterThan(statusSectionIdx);
     });
   });
 
@@ -754,14 +753,14 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
     });
   });
 
-  // --- statusSection superseded by F112 (rightColumn + statusLedWrapper) ---
-  describe('statusSection superseded by F112 rightColumn layout', () => {
-    it('rightColumn has alignItems center (LED centered)', () => {
+  // --- statusSection restored by F115 (LED moved back to labelRow) ---
+  describe('statusSection restored by F115 (replaces F112 rightColumn LED)', () => {
+    it('rightColumn has alignItems center (X buttons centered)', () => {
       expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('statusLedWrapper has justifyContent center', () => {
-      expect(speechSlotSource).toMatch(/statusLedWrapper:\s*\{[^}]*justifyContent:\s*'center'/s);
+    it('statusLedPlaceholder has justifyContent center (empty spacer in rightColumn)', () => {
+      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*justifyContent:\s*'center'/s);
     });
   });
 

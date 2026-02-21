@@ -163,7 +163,7 @@ export function buildPresentationCards(
     const speech3 = speeches.find((s) => s.position === 3);
     const speaker3Name = agenda?.speaker_3_override ?? speech3?.speaker_name ?? '';
     const lastFields: PresentationField[] = [
-      { label: `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}`, value: speaker3Name, type: 'text' },
+      { label: t('speeches.lastSpeech'), value: speaker3Name, type: 'text' },
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
       { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];

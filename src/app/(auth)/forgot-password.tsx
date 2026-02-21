@@ -14,7 +14,6 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
-import * as Linking from 'expo-linking';
 
 export default function ForgotPasswordScreen() {
   const { t } = useTranslation();
@@ -37,9 +36,11 @@ export default function ForgotPasswordScreen() {
     setError(null);
 
     try {
-      const redirectUrl = Linking.createURL('/(auth)/reset-password');
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, { redirectTo: redirectUrl });
-      if (resetError) throw resetError;
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'send-reset-email',
+        { body: { email: trimmedEmail } }
+      );
+      if (invokeError) throw invokeError;
       setSuccess(true);
     } catch {
       setError(t('auth.resetFailed'));

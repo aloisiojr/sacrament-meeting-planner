@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -19,6 +19,10 @@ export default function ResetPasswordScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const { token, type } = useLocalSearchParams<{
+    token?: string;
+    type?: string;
+  }>();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +32,22 @@ export default function ResetPasswordScreen() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // Listen for PASSWORD_RECOVERY event from Supabase deep link
+    // New: Handle deep link token (primary path)
+    if (token && type === 'recovery') {
+      supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'recovery',
+      }).then(({ error }) => {
+        if (error) {
+          setError(t('auth.resetExpired'));
+        } else {
+          setSessionReady(true);
+        }
+      });
+      return; // Skip onAuthStateChange listener when token is present
+    }
+
+    // Existing: Listen for PASSWORD_RECOVERY event (fallback path)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
@@ -47,7 +66,7 @@ export default function ResetPasswordScreen() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [token, type]);
 
   const handleUpdatePassword = async () => {
     if (!password.trim()) {

@@ -13,7 +13,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -36,11 +36,12 @@ export default function PresentationScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{ date?: string }>();
 
   const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
   const fontSizes = FONT_SIZES[fontSizeMode];
 
-  const sundayDate = getTodaySundayDate();
+  const sundayDate = params.date ?? getTodaySundayDate();
   const dateLabel = useMemo(
     () => formatFullDate(sundayDate, getCurrentLanguage()),
     [sundayDate]
@@ -95,6 +96,16 @@ export default function PresentationScreen() {
             {dateLabel}
           </Text>
         </View>
+        <Pressable
+          style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
+          onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
+          accessibilityRole="button"
+          accessibilityLabel="Edit agenda"
+        >
+          <Text style={[styles.pencilText, { color: colors.text }]}>
+            {'\u270F'}
+          </Text>
+        </Pressable>
         <Pressable
           style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')}
@@ -185,6 +196,18 @@ const styles = StyleSheet.create({
   headerDate: {
     fontSize: 14,
     marginTop: 2,
+  },
+  pencilButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  pencilText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   fontToggleButton: {
     width: 36,

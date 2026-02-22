@@ -55,6 +55,8 @@ export interface SundayCardProps {
   onDeleteSpeeches?: (date: string) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
+  /** Optional render function for right side of header (e.g., pencil button). */
+  renderHeaderRight?: () => React.ReactNode;
   /** Children to render when expanded (speech slots, etc.). */
   children?: React.ReactNode;
 }
@@ -295,6 +297,7 @@ export const SundayCard = React.memo(function SundayCard({
   onRemoveException,
   onDeleteSpeeches,
   typeDisabled = false,
+  renderHeaderRight,
   children,
 }: SundayCardProps) {
   const { colors } = useTheme();
@@ -397,6 +400,7 @@ export const SundayCard = React.memo(function SundayCard({
           )}
         </View>
 
+        {!onToggle && renderHeaderRight && renderHeaderRight()}
       </Pressable>
 
       {/* Type dropdown (shown when expanded) */}

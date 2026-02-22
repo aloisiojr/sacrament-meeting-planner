@@ -1,0 +1,429 @@
+# =============================================================================
+# SPEC_F138_F139.yaml
+# Batch 22: Password Reset Web Page, Invitation Acceptance Web Page
+# (CR-202, CR-203)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 22
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: feature
+
+# =============================================================================
+# F138: Password Reset Web Page (CR-202)
+# =============================================================================
+
+features:
+
+  - id: F138
+    name: "Rewrite reset-redirect Edge Function to serve a complete password reset web page"
+    cr_id: 202
+    type: enhancement
+    related_crs: [67, 155, 176, 191, 197, 198]
+    related_features: [F001, F088, F101, F114, F115, F119, F133, F134]
+    description: >
+      The current reset-redirect Edge Function (supabase/functions/reset-redirect/index.ts)
+      serves an HTML page that attempts to redirect to a deep link (sacrmeetplan://reset-password).
+      This deep link does not work: the browser shows the static HTML with "Redirecionando para
+      o aplicativo..." text instead of opening the app. The user sees raw HTML and cannot reset
+      their password.
+
+      Solution: Rewrite reset-redirect to serve a complete, self-contained web page with a
+      password reset form. The page uses the Supabase JS client (loaded via CDN) to call
+      verifyOtp (with the token from the URL) and then updateUser (with the new password)
+      directly in the browser. No deep link needed. No app interaction required.
+
+      Key design decisions:
+        - Reuse the existing reset-redirect endpoint URL so that password reset emails already
+          sent continue to work (the link in those emails points to reset-redirect with
+          token and type query params).
+        - send-reset-email does NOT need to change. It already generates the correct URL
+          pointing to reset-redirect with hashed_token and type=recovery.
+        - The web page is fully self-contained: HTML + inline CSS + inline JS. No external
+          CSS frameworks. Supabase JS loaded from CDN (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2).
+        - The page is multilingual: detects browser language (navigator.language) and shows
+          labels in pt-BR (default), en, or es. Same 3 languages supported by the app.
+        - The Supabase anon key and project URL are embedded in the HTML. These are public
+          values (the anon key is already used client-side in the mobile app).
+        - The app screen src/app/(auth)/reset-password.tsx is NOT modified. It remains as a
+          fallback for any edge case where the deep link actually works (e.g., future OS support).
+
+      Flow:
+        1. User clicks "Redefinir senha" button in email.
+        2. Browser opens https://<project>.supabase.co/functions/v1/reset-redirect?token=<hash>&type=recovery
+        3. Edge Function serves HTML page with password reset form.
+        4. Page JS calls supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' }).
+        5. If verifyOtp succeeds, form becomes active (password + confirm password fields).
+        6. User enters new password and clicks submit button.
+        7. Page JS calls supabase.auth.updateUser({ password: newPassword }).
+        8. On success, shows success message with "Senha atualizada com sucesso" text.
+        9. On error at any step, shows localized error message.
+
+      HTML page structure:
+        - Centered card layout (max-width 400px, responsive).
+        - App title "Planejador de Reuniao Sacramental" at top.
+        - Loading spinner while verifyOtp is in progress.
+        - Error state: shows error message if token is invalid/expired.
+        - Form state: two password fields (nova senha, confirmar senha) + submit button.
+        - Success state: shows success message.
+        - All text uses i18n based on navigator.language.
+        - Styling matches existing app colors: primary #4F46E5, background #f5f5f5.
+
+    acceptance_criteria:
+      - id: AC-138-01
+        description: "reset-redirect serves a full HTML page with password reset form instead of deep link redirect"
+        given: "User clicks password reset link in email"
+        when: "Browser navigates to reset-redirect?token=<hash>&type=recovery"
+        then: "A complete HTML page is rendered with a password reset form. No deep link redirect. No meta refresh tag. No 'Redirecionando para o aplicativo' text."
+        status: pending
+
+      - id: AC-138-02
+        description: "Page verifies OTP token on load using Supabase JS client"
+        given: "Page loads with valid token and type=recovery in URL query params"
+        when: "Page JavaScript executes"
+        then: "supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' }) is called. On success, the password form fields become active. On failure, an error message is displayed."
+        status: pending
+
+      - id: AC-138-03
+        description: "Password form validates matching passwords and minimum length"
+        given: "User has a valid session after verifyOtp"
+        when: "User fills password fields and clicks submit"
+        then: "Client-side validation checks: password >= 6 characters, password === confirmPassword. If validation fails, error message is shown without calling updateUser."
+        status: pending
+
+      - id: AC-138-04
+        description: "Submit calls supabase.auth.updateUser with new password"
+        given: "User enters valid matching passwords (>= 6 chars)"
+        when: "User clicks the submit button"
+        then: "supabase.auth.updateUser({ password: newPassword }) is called. On success, success message is displayed. On error, error message is displayed."
+        status: pending
+
+      - id: AC-138-05
+        description: "Page detects browser language and shows text in pt-BR, en, or es"
+        given: "User's browser has navigator.language set"
+        when: "Page renders"
+        then: "All labels, placeholders, button text, and messages are shown in the detected language. If navigator.language starts with 'en', use English. If starts with 'es', use Spanish. Otherwise, default to pt-BR."
+        status: pending
+
+      - id: AC-138-06
+        description: "Supabase JS client is loaded from CDN"
+        given: "Page HTML source"
+        when: "Checking script tags"
+        then: "A script tag loads @supabase/supabase-js@2 from https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2. The Supabase client is initialized with the project URL and anon key (public values)."
+        status: pending
+
+      - id: AC-138-07
+        description: "Existing reset emails continue to work without changes to send-reset-email"
+        given: "A password reset email was sent before F138 deployment"
+        when: "User clicks the reset link in that old email"
+        then: "The link still points to reset-redirect?token=<hash>&type=recovery and the new page works correctly. send-reset-email function is NOT modified."
+        status: pending
+
+      - id: AC-138-08
+        description: "Page returns 400 if token or type query params are missing"
+        given: "User navigates to reset-redirect without token or type params"
+        when: "Edge Function processes the request"
+        then: "Returns JSON { error: 'Missing required parameters: token and type' } with status 400. Same behavior as current implementation."
+        status: pending
+
+      - id: AC-138-09
+        description: "Success state shows confirmation message"
+        given: "User successfully resets password"
+        when: "updateUser returns success"
+        then: "Form is replaced with success message: 'Senha atualizada com sucesso! Voce ja pode fechar esta pagina e fazer login no aplicativo.' (or equivalent in detected language)."
+        status: pending
+
+      - id: AC-138-10
+        description: "Loading state shown during verifyOtp"
+        given: "Page has just loaded with token params"
+        when: "verifyOtp is in progress"
+        then: "A loading spinner is displayed. Form fields are not yet visible."
+        status: pending
+
+      - id: AC-138-11
+        description: "CORS headers are maintained"
+        given: "Request to reset-redirect endpoint"
+        when: "Checking response headers"
+        then: "CORS headers (Access-Control-Allow-Origin: *, Access-Control-Allow-Headers) are present. OPTIONS preflight returns 'ok' with CORS headers."
+        status: pending
+
+      - id: AC-138-12
+        description: "Content-Type is text/html with charset utf-8"
+        given: "GET request to reset-redirect with valid params"
+        when: "Checking response headers"
+        then: "Content-Type header is 'text/html; charset=utf-8'. Cache-Control is 'no-cache, no-store, must-revalidate'."
+        status: pending
+
+    edge_cases:
+      - id: EC-138-01
+        case: "Token is expired (verifyOtp returns error)"
+        expected: "Page shows localized error message (pt-BR: 'Link expirado ou invalido. Solicite um novo link de redefinicao de senha.', en: 'Link expired or invalid. Please request a new password reset link.', es: 'Enlace expirado o invalido. Solicite un nuevo enlace de restablecimiento.')."
+        status: pending
+
+      - id: EC-138-02
+        case: "Token was already used (verifyOtp returns error)"
+        expected: "Same error message as EC-138-01 since Supabase does not distinguish expired from already-used tokens in verifyOtp error."
+        status: pending
+
+      - id: EC-138-03
+        case: "CDN fails to load Supabase JS"
+        expected: "Page shows a generic error message: 'Erro ao carregar a pagina. Tente novamente.' (or localized equivalent). The script tag should have an onerror handler or the code should check if window.supabase exists before proceeding."
+        status: pending
+
+      - id: EC-138-04
+        case: "User submits form with password shorter than 6 characters"
+        expected: "Client-side validation shows error: 'A senha deve ter pelo menos 6 caracteres' (or localized equivalent). updateUser is not called."
+        status: pending
+
+      - id: EC-138-05
+        case: "User submits form with non-matching passwords"
+        expected: "Client-side validation shows error: 'As senhas nao coincidem' (or localized equivalent). updateUser is not called."
+        status: pending
+
+    files_impacted:
+      - supabase/functions/reset-redirect/index.ts
+
+    files_not_modified:
+      - supabase/functions/send-reset-email/index.ts
+      - src/app/(auth)/reset-password.tsx
+
+# =============================================================================
+# F139: Invitation Acceptance Web Page (CR-203)
+# =============================================================================
+
+  - id: F139
+    name: "Create invite-redirect Edge Function to serve a complete invitation acceptance web page"
+    cr_id: 203
+    type: feature
+    related_crs: [67]
+    related_features: [F001]
+    description: >
+      The current invitation flow uses a deep link (sacrmeetplan://invite/<token>) that does not
+      work in practice. When the invited user receives the link (e.g., via WhatsApp or email),
+      clicking it does nothing because the app is not installed and browsers cannot handle custom
+      URL schemes from external apps.
+
+      Solution: Create a new Edge Function (invite-redirect) that serves a complete, self-contained
+      web page with an invitation acceptance form. The page validates the invitation token, displays
+      the invitation details (ward, stake, role, email as read-only), and provides a form for the
+      user to enter their full name and password.
+
+      Additionally, create-invitation must be updated to generate an HTTPS URL pointing to the
+      new invite-redirect Edge Function instead of the sacrmeetplan:// deep link.
+
+      Key design decisions:
+        - New Edge Function: supabase/functions/invite-redirect/index.ts
+        - URL pattern: https://<project>.supabase.co/functions/v1/invite-redirect?token=<uuid>
+        - The page calls register-invited-user via fetch from the browser (same API contract,
+          no changes to register-invited-user needed).
+        - create-invitation must change the deepLink from sacrmeetplan://invite/<token> to
+          https://<project>.supabase.co/functions/v1/invite-redirect?token=<token>.
+        - The page is fully self-contained: HTML + inline CSS + inline JS. No external CSS
+          frameworks. No Supabase JS CDN needed (uses fetch directly to call Edge Functions).
+        - The page is multilingual: detects browser language (navigator.language) and shows
+          labels in pt-BR (default), en, or es.
+        - The app screen src/app/(auth)/invite/[token].tsx is NOT modified. It remains as a
+          fallback.
+
+      Flow:
+        1. Bishopric/Secretary creates invitation in the app (create-invitation).
+        2. create-invitation returns an HTTPS URL (new) instead of deep link.
+        3. The inviter shares the URL with the invited user (via WhatsApp, email, etc.).
+        4. Invited user opens the URL in their browser.
+        5. invite-redirect Edge Function serves the HTML page.
+        6. Page JS calls register-invited-user with { token } (validate-only mode) via fetch.
+        7. If token is valid, page shows invitation details (ward, stake, role, email) as
+           read-only fields, plus editable fields for full name and password.
+        8. User fills in full name, password, confirm password, and clicks submit.
+        9. Page JS calls register-invited-user with { token, password, fullName } via fetch.
+        10. On success, shows success message.
+        11. On error, shows localized error message.
+
+      HTML page structure:
+        - Centered card layout (max-width 400px, responsive).
+        - App title "Planejador de Reuniao Sacramental" at top.
+        - Loading spinner while token validation is in progress.
+        - Error state: shows error message if token is invalid/expired/used.
+        - Form state:
+          - Read-only fields: Estaca (stake), Ala (ward), Funcao (role), Email.
+          - Editable fields: Nome Completo, Senha, Confirmar Senha.
+          - Submit button "Criar Conta".
+        - Success state: shows success message with instruction to download/open the app.
+        - All text uses i18n based on navigator.language.
+        - Styling matches existing app colors: primary #4F46E5, background #f5f5f5.
+
+    acceptance_criteria:
+      - id: AC-139-01
+        description: "New invite-redirect Edge Function serves a complete HTML page with invitation acceptance form"
+        given: "Invited user clicks the invitation link"
+        when: "Browser navigates to invite-redirect?token=<uuid>"
+        then: "A complete HTML page is rendered. Token validation happens via fetch to register-invited-user. On success, invitation details + registration form are shown."
+        status: pending
+
+      - id: AC-139-02
+        description: "Page validates token on load by calling register-invited-user validate-only mode"
+        given: "Page loads with token query param"
+        when: "Page JavaScript executes"
+        then: "fetch('register-invited-user', { body: { token } }) is called (validate-only mode: token present, no password). On success response with invitation data, form is populated with read-only fields. On error, appropriate error message is shown."
+        status: pending
+
+      - id: AC-139-03
+        description: "Read-only fields display invitation data correctly"
+        given: "Token validation succeeds and returns invitation data"
+        when: "Form renders"
+        then: "Estaca (stakeName), Ala (wardName), Funcao (role translated via i18n), and Email fields are displayed as read-only (disabled inputs with distinct styling)."
+        status: pending
+
+      - id: AC-139-04
+        description: "Registration form validates fullName, password length, and password match"
+        given: "User fills in the registration form"
+        when: "User clicks submit"
+        then: "Client-side validation checks: fullName is not empty, password >= 6 characters, password === confirmPassword. If validation fails, localized error message is shown without calling register-invited-user."
+        status: pending
+
+      - id: AC-139-05
+        description: "Submit calls register-invited-user with token, password, and fullName"
+        given: "User enters valid fullName and matching passwords (>= 6 chars)"
+        when: "User clicks the submit button"
+        then: "fetch('register-invited-user', { body: { token, password, fullName } }) is called. On success (status 201), success message is displayed. On error, localized error message is displayed."
+        status: pending
+
+      - id: AC-139-06
+        description: "create-invitation generates HTTPS URL instead of deep link"
+        given: "Bishopric/Secretary creates an invitation via create-invitation Edge Function"
+        when: "Invitation is created successfully"
+        then: "Response deepLink field contains 'https://<project>.supabase.co/functions/v1/invite-redirect?token=<uuid>' instead of 'sacrmeetplan://invite/<uuid>'."
+        status: pending
+
+      - id: AC-139-07
+        description: "Page detects browser language and shows text in pt-BR, en, or es"
+        given: "User's browser has navigator.language set"
+        when: "Page renders"
+        then: "All labels, placeholders, button text, and messages are shown in the detected language. If navigator.language starts with 'en', use English. If starts with 'es', use Spanish. Otherwise, default to pt-BR."
+        status: pending
+
+      - id: AC-139-08
+        description: "Page returns 400 if token query param is missing"
+        given: "User navigates to invite-redirect without token param"
+        when: "Edge Function processes the request"
+        then: "Returns JSON { error: 'Missing required parameter: token' } with status 400."
+        status: pending
+
+      - id: AC-139-09
+        description: "Success state shows confirmation message"
+        given: "User successfully registers via the form"
+        when: "register-invited-user returns status 201"
+        then: "Form is replaced with success message: 'Conta criada com sucesso! Voce ja pode abrir o aplicativo e fazer login com seu email e senha.' (or equivalent in detected language)."
+        status: pending
+
+      - id: AC-139-10
+        description: "Role is displayed translated in the form"
+        given: "Invitation has role 'bishopric', 'secretary', or 'observer'"
+        when: "Form renders read-only role field"
+        then: "Role is displayed translated: pt-BR (Bispado/Secretario/Observador), en (Bishopric/Secretary/Observer), es (Obispado/Secretario/Observador)."
+        status: pending
+
+      - id: AC-139-11
+        description: "CORS headers are present in responses"
+        given: "Request to invite-redirect endpoint"
+        when: "Checking response headers"
+        then: "CORS headers (Access-Control-Allow-Origin: *, Access-Control-Allow-Headers) are present. OPTIONS preflight returns 'ok' with CORS headers."
+        status: pending
+
+      - id: AC-139-12
+        description: "Content-Type is text/html with charset utf-8 for HTML responses"
+        given: "GET request to invite-redirect with valid token param"
+        when: "Checking response headers"
+        then: "Content-Type header is 'text/html; charset=utf-8'. Cache-Control is 'no-cache, no-store, must-revalidate'."
+        status: pending
+
+      - id: AC-139-13
+        description: "register-invited-user is NOT modified"
+        given: "F139 implementation"
+        when: "Checking register-invited-user/index.ts"
+        then: "File is unchanged. The web page calls it via fetch with the same API contract (validate-only mode with { token } and registration mode with { token, password, fullName })."
+        status: pending
+
+    edge_cases:
+      - id: EC-139-01
+        case: "Token is invalid (register-invited-user returns token_invalid)"
+        expected: "Page shows localized error message (pt-BR: 'Convite invalido. Solicite um novo convite ao lider da ala.', en: 'Invalid invitation. Please request a new invite from your ward leader.', es: 'Invitacion invalida. Solicite una nueva invitacion a su lider de barrio.')."
+        status: pending
+
+      - id: EC-139-02
+        case: "Token was already used (register-invited-user returns token_used)"
+        expected: "Page shows localized error message (pt-BR: 'Este convite ja foi utilizado.', en: 'This invitation has already been used.', es: 'Esta invitacion ya fue utilizada.')."
+        status: pending
+
+      - id: EC-139-03
+        case: "Token is expired (register-invited-user returns token_expired)"
+        expected: "Page shows localized error message (pt-BR: 'Este convite expirou. Solicite um novo convite.', en: 'This invitation has expired. Please request a new invite.', es: 'Esta invitacion ha expirado. Solicite una nueva invitacion.')."
+        status: pending
+
+      - id: EC-139-04
+        case: "User submits form with empty fullName"
+        expected: "Client-side validation shows error: 'Nome completo e obrigatorio' (or localized equivalent). register-invited-user is not called."
+        status: pending
+
+      - id: EC-139-05
+        case: "User submits form with password shorter than 6 characters"
+        expected: "Client-side validation shows error: 'A senha deve ter pelo menos 6 caracteres' (or localized equivalent). register-invited-user is not called."
+        status: pending
+
+      - id: EC-139-06
+        case: "User submits form with non-matching passwords"
+        expected: "Client-side validation shows error: 'As senhas nao coincidem' (or localized equivalent). register-invited-user is not called."
+        status: pending
+
+      - id: EC-139-07
+        case: "register-invited-user returns 'Failed to create user' (email already registered)"
+        expected: "Page shows localized error message (pt-BR: 'Nao foi possivel criar a conta. Este email pode ja estar registrado.', en: 'Could not create account. This email may already be registered.', es: 'No se pudo crear la cuenta. Este correo puede ya estar registrado.')."
+        status: pending
+
+    files_impacted:
+      - supabase/functions/invite-redirect/index.ts (NEW)
+      - supabase/functions/create-invitation/index.ts
+
+    files_not_modified:
+      - supabase/functions/register-invited-user/index.ts
+      - src/app/(auth)/invite/[token].tsx
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+  assumptions:
+    - id: A-01
+      text: >
+        The Supabase anon key and project URL are safe to embed in the HTML page served
+        by reset-redirect, since they are public values already used client-side in the
+        mobile app. Row-Level Security (RLS) protects the data.
+    - id: A-02
+      text: >
+        navigator.language is available in all modern browsers that users will use to
+        open these links. Falls back to pt-BR if detection fails or language is not
+        supported.
+    - id: A-03
+      text: >
+        The CDN https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2 is reliable and
+        accessible to all users. If it fails, an error message is shown (EC-138-03).
+    - id: A-04
+      text: >
+        register-invited-user's validate-only mode (POST with { token } only) can be
+        called via fetch from the browser with the Supabase anon key in the Authorization
+        header (or apikey header). The function does not require a user JWT for the
+        validate-only call.
+    - id: A-05
+      text: >
+        Old invitation links with sacrmeetplan://invite/<token> deep links will stop
+        working for users who don't have the app installed (same as today). Only newly
+        created invitations will use the HTTPS URL. This is acceptable because the deep
+        links never worked properly anyway.
+  inconsistencies: []

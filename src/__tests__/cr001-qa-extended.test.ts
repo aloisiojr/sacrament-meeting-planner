@@ -357,18 +357,15 @@ describe('CR-07: Hide speeches for non-speech sundays (structural)', () => {
   describe('NextSundaysSection correctly hides speech slots for all exceptions', () => {
     const nextSundaysContent = readFile('components', 'NextSundaysSection.tsx');
 
-    it('renders SpeechSlot only when no exception exists', () => {
-      expect(nextSundaysContent).toContain('!entry.exception');
+    it('does not render SpeechSlot at all (F129 removed expand/edit functionality)', () => {
+      // F129 (CR-188) removed all SpeechSlot rendering from NextSundaysSection.
+      // Cards are now non-expandable with pencil navigation to Speeches tab.
+      expect(nextSundaysContent).not.toContain('SpeechSlot');
     });
 
-    it('does NOT use isExcludedFromAgenda for children rendering', () => {
-      // NextSundaysSection should use !entry.exception (correct)
-      // not isExcludedFromAgenda (too narrow)
-      const childrenSection = nextSundaysContent.substring(
-        nextSundaysContent.indexOf('SpeechSlot')
-      );
-      // SpeechSlot should only render under !entry.exception condition
-      expect(nextSundaysContent).toContain('!entry.exception');
+    it('uses pencil navigation to Speeches tab instead of inline editing', () => {
+      expect(nextSundaysContent).toContain("pathname: '/(tabs)/speeches'");
+      expect(nextSundaysContent).toContain('expandDate');
     });
   });
 

@@ -444,56 +444,53 @@ describe('F049 (CR-109): Fix speech slots in NextSundaysSection', () => {
 
   const getNextSundaysSection = () => readSourceFile('components/NextSundaysSection.tsx');
 
-  describe('AC-F049-01: SpeechSlots rendered when type is speeches', () => {
-    it('should check for speeches reason in condition', () => {
+  // NOTE: F129 (CR-188) removed all SpeechSlot rendering from NextSundaysSection.
+  // Cards are now non-expandable with pencil navigation to Speeches tab.
+  // The original F049 fix is now superseded by F129.
+
+  describe('AC-F049-01: SpeechSlots no longer in NextSundaysSection (superseded by F129)', () => {
+    it('NextSundaysSection no longer imports or renders SpeechSlot', () => {
       const content = getNextSundaysSection();
-      expect(content).toContain("entry.exception.reason === 'speeches'");
+      expect(content).not.toContain('SpeechSlot');
     });
 
-    it('should allow SpeechSlots when exception reason is speeches', () => {
+    it('cards navigate to Speeches tab via pencil button instead', () => {
       const content = getNextSundaysSection();
-      expect(content).toContain("(!entry.exception || entry.exception.reason === 'speeches')");
+      expect(content).toContain("pathname: '/(tabs)/speeches'");
     });
   });
 
   describe('AC-F049-02: SpeechSlots NOT rendered for non-speeches types', () => {
-    it('should block SpeechSlots when exception reason is not speeches', () => {
+    it('no SpeechSlots rendered for any type (F129 removed expand functionality)', () => {
       const content = getNextSundaysSection();
-      // The condition should not simply be !entry.exception (which blocks everything)
-      expect(content).not.toMatch(/\bexpandedDate === entry\.date\s*&&\s*\n?\s*!entry\.exception\s*&&\s*\n?\s*\[1, 2, 3\]/);
+      expect(content).not.toContain('<SpeechSlot');
     });
   });
 
   describe('AC-F049-03: Consistency with Speeches tab', () => {
-    it('should use same pattern as speeches.tsx', () => {
-      const speechesContent = readSourceFile('app/(tabs)/speeches.tsx');
+    it('should use same pattern as speeches.tsx for expandDate navigation', () => {
       const nextSundaysContent = getNextSundaysSection();
-
-      // Both should check for exception.reason === 'speeches'
-      expect(speechesContent).toContain("exception.reason === 'speeches'");
-      expect(nextSundaysContent).toContain("entry.exception.reason === 'speeches'");
+      // NextSundaysSection navigates to Speeches tab with expandDate
+      expect(nextSundaysContent).toContain('expandDate');
     });
   });
 
   describe('EC-F049-01: Sunday without exception (pre-CR-56 data)', () => {
-    it('should handle null exception with !entry.exception check', () => {
+    it('exceptions still passed to SundayCard for display', () => {
       const content = getNextSundaysSection();
-      // !entry.exception should still be the first part of the OR condition
-      expect(content).toContain('!entry.exception ||');
+      expect(content).toContain('exception={entry.exception}');
     });
   });
 
   describe('EC-F049-02: Type changed while card expanded', () => {
-    it('should render SpeechSlot components for each position', () => {
+    it('no expand functionality remains (F129 removed it)', () => {
       const content = getNextSundaysSection();
-      expect(content).toContain('<SpeechSlot');
-      expect(content).toContain('[1, 2, 3].map');
+      expect(content).not.toContain('expandedDate');
     });
 
-    it('should use SpeechSlot import', () => {
+    it('uses SundayCard without onToggle (non-expandable)', () => {
       const content = getNextSundaysSection();
-      expect(content).toContain("import");
-      expect(content).toContain("SpeechSlot");
+      expect(content).not.toContain('onToggle');
     });
   });
 });

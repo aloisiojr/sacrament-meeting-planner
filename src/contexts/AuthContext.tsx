@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import { hasPermission as checkPermission } from '../lib/permissions';
-import { changeLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
+import { changeLanguage, getCurrentLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Role, Permission } from '../types/database';
 
@@ -20,10 +20,12 @@ export interface AuthContextValue {
   role: Role;
   wardId: string;
   userName: string;
+  wardLanguage: string;
   loading: boolean;
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   hasPermission(perm: Permission): boolean;
+  updateAppLanguage(lang: string): Promise<void>;
 }
 
 // --- Context ---
@@ -69,6 +71,7 @@ function extractUserName(user: User | null): string {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [wardLanguage, setWardLanguage] = useState<string>('pt-BR');
 
   // Derive user, role, wardId, and userName from session
   const user = session?.user ?? null;
@@ -97,9 +100,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  // CR-11: Apply ward language after auth loads
+  // F116 (CR-178): App language from user_metadata, ward language stored separately
+  // Language priority: user_metadata.language -> device locale -> ward language fallback
   useEffect(() => {
     if (!wardId) return;
+
+    // Fetch ward language and store it (for ward-level features like collections)
     supabase
       .from('wards')
       .select('language')
@@ -108,12 +114,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
       .then(({ data }) => {
         const lang = data?.language;
         if (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
-          changeLanguage(lang as SupportedLanguage);
+          setWardLanguage(lang);
         } else {
-          changeLanguage('pt-BR');
+          setWardLanguage('pt-BR');
+        }
+
+        // Determine app language: user_metadata > device locale > ward language
+        const userLang = user?.user_metadata?.language as string | undefined;
+        if (userLang && SUPPORTED_LANGUAGES.includes(userLang as SupportedLanguage)) {
+          // User has explicit app language preference
+          changeLanguage(userLang as SupportedLanguage);
+        }
+        // If no user_metadata language, keep i18n's device locale detection (from i18n/index.ts init)
+        // which already ran at module load. If device locale is not supported, fallback to ward language.
+        else {
+          const currentLang = getCurrentLanguage();
+          // getCurrentLanguage returns whatever i18n detected at init (device locale or pt-BR fallback)
+          // If device locale was detected and is supported, keep it. Otherwise use ward language.
+          if (!SUPPORTED_LANGUAGES.includes(currentLang as SupportedLanguage)) {
+            const wardLangSafe = (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage))
+              ? lang as SupportedLanguage
+              : 'pt-BR';
+            changeLanguage(wardLangSafe);
+          }
         }
       });
-  }, [wardId]);
+  }, [wardId, user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -139,6 +165,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [role]
   );
 
+  // F116: Update app language in user_metadata and i18n
+  const updateAppLanguage = useCallback(async (lang: string) => {
+    const { error } = await supabase.auth.updateUser({
+      data: { language: lang },
+    });
+    if (error) throw error;
+    changeLanguage(lang as SupportedLanguage);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -146,12 +181,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       role,
       wardId,
       userName,
+      wardLanguage,
       loading,
       signIn,
       signOut,
       hasPermission,
+      updateAppLanguage,
     }),
-    [session, user, role, wardId, userName, loading, signIn, signOut, hasPermission]
+    [session, user, role, wardId, userName, wardLanguage, loading, signIn, signOut, hasPermission, updateAppLanguage]
   );
 
   return (

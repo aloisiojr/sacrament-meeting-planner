@@ -1,28 +1,30 @@
 project:
-  name: "Batch 21 - Web pages for password reset and invitation acceptance"
-  type: feature_request
+  name: "Batch 22 - Critical bug fixes (redirect, invite, language, WhatsApp)"
+  type: bugfix
   created_at: "2026-02-22"
   user_request: |
-    Criar paginas web no Supabase (Edge Functions) para reset de senha e aceitar convite.
-    O redirecionamento atual via deep link (sacrmeetplan://) nao funciona - mostra codigo HTML estatico.
-    Solucao: paginas web completas com formularios que resolvem tudo direto no browser,
-    sem depender de deep links.
-    CR-202: Pagina de reset de senha (formulario nova senha, chama verifyOtp + updateUser)
-    CR-203: Pagina de aceitar convite (formulario registro nome/senha, chama register-invited-user)
+    4 bugs criticos:
+    1. CR-204: Reset de senha e convite - pagina web da Edge Function mostra codigo HTML como texto no browser. Supabase override Content-Type para text/plain por seguranca.
+    2. CR-205: Botao 'Convidar Usuario' retorna erro: Edge Function returned a non-2xx status code.
+    3. CR-206: Troca de idioma da ala faz sumir TODAS as colecoes na tela de Temas. Causa: mismatch en vs en-US, es vs es-ES.
+    4. CR-207: Tela de Template WhatsApp desconectada do envio real.
 
 phases:
-  total: 1
+  total: 2
   current: 1
   summary:
     - phase: 1
-      description: "Web pages: password reset form and invitation acceptance form as Edge Functions (CR-202, CR-203)"
+      description: "Fixes for CR-205 (invite error), CR-206 (language code mismatch toDbLocale), CR-207 (WhatsApp template disconnect)"
       status: completed
+    - phase: 2
+      description: "CR-204 deep investigation + fix for HTML rendering issue in Edge Functions (Supabase text/plain override)"
+      status: pending
 
 current_phase:
   id: 1
   started_at: "2026-02-22"
-  features: [F138, F139]
-  change_requests: [CR-202, CR-203]
+  features: [F140, F141, F142]
+  change_requests: [CR-205, CR-206, CR-207]
   current_agent: "none"
   current_step: "Phase 1 DONE"
 
@@ -36,18 +38,4 @@ artifacts:
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
 pending_deploys: []
-
-completed_deploys:
-  - type: "edge_function"
-    description: "Deploy rewritten reset-redirect (F138)"
-    instructions: "supabase functions deploy reset-redirect --no-verify-jwt"
-    result: "ACTIVE v4"
-  - type: "edge_function"
-    description: "Deploy new invite-redirect (F139)"
-    instructions: "supabase functions deploy invite-redirect --no-verify-jwt"
-    result: "ACTIVE v1"
-  - type: "edge_function"
-    description: "Redeploy create-invitation with HTTPS URL (F139)"
-    instructions: "supabase functions deploy create-invitation"
-    result: "ACTIVE v9"
 last_updated: "2026-02-22"

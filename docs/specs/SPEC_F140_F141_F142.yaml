@@ -1,0 +1,395 @@
+# =============================================================================
+# SPEC_F140_F141_F142.yaml
+# Batch 23: Invite Error Handling, Language Switch Collections/Template, WhatsApp Template Disconnect
+# (CR-205, CR-206, CR-207)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: bugfix
+
+# =============================================================================
+# F140: Improve invite user error handling (CR-205)
+# =============================================================================
+
+features:
+
+  - id: F140
+    name: "Improve invite user error handling to show server error message"
+    cr_id: 205
+    type: bugfix
+    related_crs: [67]
+    related_features: [F001]
+    description: >
+      When clicking 'Invite User', the user receives a generic error:
+      "ERROR [MutationCache] Error: Edge Function returned a non-2xx status code".
+      The actual server error message (e.g., "User already exists", "Invalid email")
+      is lost because the inviteMutation.onError callback at
+      src/app/(tabs)/settings/users.tsx:108 discards the error object and always
+      shows a generic i18n string t('users.inviteFailed').
+
+      Root causes:
+        1. callEdgeFunction() (users.tsx:54-64) attempts to extract the server error
+           message via error.context.json() but this can fail silently. The extraction
+           logic itself is actually functional but fragile.
+        2. inviteMutation.onError (line 108) receives the error from callEdgeFunction
+           but ignores it completely, showing only t('users.inviteFailed') instead
+           of the actual err.message which already contains the server-extracted
+           message.
+        3. The global MutationCache onError in _layout.tsx:21-35 also fires and
+           shows a generic 'errors.mutationFailed' alert, causing a double error
+           alert (one from inviteMutation.onError and one from MutationCache).
+
+      Fix strategy:
+        - Update inviteMutation.onError to show err.message (which already contains
+          the server error extracted by callEdgeFunction) instead of the generic
+          t('users.inviteFailed') string.
+        - Add meta: { suppressGlobalError: true } to inviteMutation so that the
+          global MutationCache onError handler does not fire a duplicate alert.
+          The MutationCache already checks for this flag (line 22).
+
+    acceptance_criteria:
+      - id: AC-140-01
+        description: "inviteMutation.onError shows the actual error message from the server"
+        given: "User clicks 'Invite User' and the Edge Function returns an error"
+        when: "inviteMutation.onError fires"
+        then: "Alert.alert shows the error message from err.message (which contains the server-extracted error from callEdgeFunction). The generic t('users.inviteFailed') is used only as fallback if err.message is empty or undefined."
+        status: pending
+
+      - id: AC-140-02
+        description: "inviteMutation suppresses the global MutationCache error alert"
+        given: "inviteMutation fails with an error"
+        when: "MutationCache.onError fires"
+        then: "The global MutationCache.onError handler (in _layout.tsx) does NOT show a duplicate error alert because inviteMutation has meta: { suppressGlobalError: true }."
+        status: pending
+
+      - id: AC-140-03
+        description: "callEdgeFunction error extraction continues to work robustly"
+        given: "Edge Function returns a non-2xx status code with a JSON body containing an 'error' field"
+        when: "callEdgeFunction processes the error"
+        then: "The serverMessage is extracted from error.context.json().error and the thrown Error has that message. If error.context.json() fails or returns no error field, the Error falls back to error.message."
+        status: pending
+
+      - id: AC-140-04
+        description: "Successful invite still works without changes"
+        given: "User clicks 'Invite User' with a valid email and role"
+        when: "Edge Function returns success (2xx)"
+        then: "onSuccess fires, inviteResult is set with the deepLink, and the success view is shown. No regression."
+        status: pending
+
+    edge_cases:
+      - id: EC-140-01
+        case: "Edge Function returns error with no JSON body (e.g., network error)"
+        expected: "callEdgeFunction falls through to error.message (generic Supabase error). inviteMutation.onError shows that generic message. No crash."
+        status: pending
+
+      - id: EC-140-02
+        case: "Edge Function returns error with JSON body but no 'error' field"
+        expected: "serverMessage is undefined, callEdgeFunction throws with error.message (generic). inviteMutation.onError shows the generic message."
+        status: pending
+
+      - id: EC-140-03
+        case: "err.message is empty string in onError"
+        expected: "Alert.alert shows t('users.inviteFailed') as fallback."
+        status: pending
+
+    files_impacted:
+      - src/app/(tabs)/settings/users.tsx
+
+    files_not_modified:
+      - src/app/_layout.tsx
+      - supabase/functions/create-invitation/index.ts
+
+# =============================================================================
+# F141: Fix language switch breaking collections and WhatsApp template (CR-206)
+# =============================================================================
+
+  - id: F141
+    name: "Fix language switch: seed general_collections for en/es and reset whatsapp_template"
+    cr_id: 206
+    type: bugfix
+    related_crs: [67, 155]
+    related_features: [F001, F116, F131]
+    description: >
+      When the ward language is changed (e.g., from pt-BR to en or es), two things
+      break:
+
+      1. COLLECTIONS DISAPPEAR: The Topics screen (Settings > Temas) shows zero
+         collections. Root cause: the general_collections table has NO rows for
+         languages 'en' or 'es'. There are no seed data in any migration. The
+         useCollections(language) hook queries general_collections WHERE language =
+         newLanguage and correctly returns an empty array because no rows exist.
+
+      2. WHATSAPP TEMPLATE DOES NOT UPDATE: After switching ward language, the
+         WhatsApp template screen still shows the old language template. Root cause:
+         whatsapp.tsx:86-103 uses an 'initialized' flag that is set to true on first
+         load and never reset. When wardLanguage changes, the useEffect does not
+         re-evaluate because initialized is already true. Additionally,
+         wardLanguageChangeMutation in settings/index.tsx:56-108 does NOT reset the
+         whatsapp_template field in the wards table, so the old template persists in
+         the database even after the language switch.
+
+      Fix strategy:
+
+      Part A - Collections seed data:
+        - Create a new migration (019_seed_en_es_collections.sql) that INSERTs
+          general_collections and general_topics rows for 'en' and 'es' languages.
+        - The 'en' collections should mirror the pt-BR structure with English titles.
+        - The 'es' collections should mirror the pt-BR structure with Spanish titles.
+        - Use UUID generation (uuid_generate_v4()) for all IDs.
+        - This is seed data only; existing pt-BR data is NOT modified.
+
+      Part B - WhatsApp template reset on language switch:
+        - In wardLanguageChangeMutation (settings/index.tsx:56-108), after updating
+          ward.language, also set whatsapp_template to NULL. This forces the template
+          screen to show the new language's default template on next load.
+        - In whatsapp.tsx, reset the 'initialized' flag when wardLanguage changes so
+          the useEffect re-runs and picks up the new default template.
+        - Invalidate the ward query cache after language change so whatsapp.tsx
+          refetches the updated ward record.
+
+    acceptance_criteria:
+      - id: AC-141-01
+        description: "general_collections table has seed data for 'en' language"
+        given: "Database after migration 019_seed_en_es_collections.sql is applied"
+        when: "Querying general_collections WHERE language = 'en'"
+        then: "At least one collection is returned. Collections have English names. Each collection has associated general_topics with English titles."
+        status: pending
+
+      - id: AC-141-02
+        description: "general_collections table has seed data for 'es' language"
+        given: "Database after migration 019_seed_en_es_collections.sql is applied"
+        when: "Querying general_collections WHERE language = 'es'"
+        then: "At least one collection is returned. Collections have Spanish names. Each collection has associated general_topics with Spanish titles."
+        status: pending
+
+      - id: AC-141-03
+        description: "Topics screen shows collections after switching ward language to 'en'"
+        given: "Ward language was 'pt-BR' and user changes to 'en'"
+        when: "User navigates to Settings > Topics"
+        then: "The 'Collections' section shows the 'en' collections from general_collections. Switch/toggle UI works for activating/deactivating them."
+        status: pending
+
+      - id: AC-141-04
+        description: "Topics screen shows collections after switching ward language to 'es'"
+        given: "Ward language was 'pt-BR' and user changes to 'es'"
+        when: "User navigates to Settings > Topics"
+        then: "The 'Collections' section shows the 'es' collections from general_collections. Switch/toggle UI works for activating/deactivating them."
+        status: pending
+
+      - id: AC-141-05
+        description: "wardLanguageChangeMutation resets whatsapp_template to NULL"
+        given: "User changes ward language from any language to another"
+        when: "wardLanguageChangeMutation executes successfully"
+        then: "The wards row for this ward has whatsapp_template set to NULL in the database. This causes the WhatsApp template screen to show the default template for the new language."
+        status: pending
+
+      - id: AC-141-06
+        description: "WhatsApp template screen shows new language default after language switch"
+        given: "User changed ward language from pt-BR to en and whatsapp_template was reset to NULL"
+        when: "User navigates to Settings > WhatsApp Template"
+        then: "The template editor shows the English default template (DEFAULT_TEMPLATE_EN from whatsappUtils.ts). Not the old pt-BR template."
+        status: pending
+
+      - id: AC-141-07
+        description: "WhatsApp template 'initialized' flag resets when wardLanguage changes"
+        given: "User is on the WhatsApp template screen and wardLanguage changes"
+        when: "The wardLanguage value in AuthContext updates"
+        then: "The 'initialized' state in whatsapp.tsx resets to false, causing the useEffect to re-evaluate and load the correct template for the new language."
+        status: pending
+
+      - id: AC-141-08
+        description: "Ward query cache is invalidated after language change"
+        given: "wardLanguageChangeMutation completes successfully"
+        when: "onSuccess callback fires"
+        then: "queryClient.invalidateQueries({ queryKey: ['ward', wardId] }) is called so that whatsapp.tsx refetches the updated ward record (with whatsapp_template = NULL)."
+        status: pending
+
+      - id: AC-141-09
+        description: "Existing pt-BR collections and data are not modified"
+        given: "Migration 019_seed_en_es_collections.sql is applied"
+        when: "Querying general_collections WHERE language = 'pt-BR'"
+        then: "Existing pt-BR collections and their topics are unchanged. No DELETE, UPDATE, or TRUNCATE on existing rows."
+        status: pending
+
+      - id: AC-141-10
+        description: "Migration is idempotent (safe to re-run)"
+        given: "Migration 019_seed_en_es_collections.sql has already been applied"
+        when: "Migration is run again"
+        then: "No duplicate rows are created. Uses INSERT with UUID generation so re-running is safe (new UUIDs each time, but existing data is not duplicated because language + name combination is unique in practice)."
+        status: pending
+
+    edge_cases:
+      - id: EC-141-01
+        case: "User switches from en to es (non-pt-BR to non-pt-BR)"
+        expected: "Old en collections are deactivated, new es collections appear. whatsapp_template is reset to NULL. Template screen shows Spanish default."
+        status: pending
+
+      - id: EC-141-02
+        case: "User switches back to pt-BR after being on en"
+        expected: "en collections are deactivated, pt-BR collections become available again. whatsapp_template is reset to NULL. Template screen shows pt-BR default."
+        status: pending
+
+      - id: EC-141-03
+        case: "Ward had a custom whatsapp_template before language switch"
+        expected: "Custom template is lost (reset to NULL). User sees the default template for the new language. This is intentional because the old template was in the old language."
+        status: pending
+
+      - id: EC-141-04
+        case: "User manually clears whatsapp_template (sets to empty string) then switches language"
+        expected: "whatsapp_template is reset to NULL (not empty string). Template screen shows the new language default. The user's intentional empty is overridden by the language switch, which is correct behavior."
+        status: pending
+
+    files_impacted:
+      - supabase/migrations/019_seed_en_es_collections.sql (NEW)
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/whatsapp.tsx
+
+    files_not_modified:
+      - src/hooks/useTopics.ts
+      - src/app/(tabs)/settings/topics.tsx
+
+# =============================================================================
+# F142: Fix WhatsApp template screen disconnected from actual send (CR-207)
+# =============================================================================
+
+  - id: F142
+    name: "Fix WhatsApp send to use ward template instead of hardcoded empty string"
+    cr_id: 207
+    type: bugfix
+    related_crs: [67, 155]
+    related_features: [F001, F116]
+    description: >
+      The WhatsApp template screen in Settings allows the user to edit and preview
+      a WhatsApp message template. However, this template is never used when actually
+      sending a WhatsApp message. The InviteManagementSection (Home screen) always
+      sends the default template, ignoring any customization made in Settings.
+
+      Root causes:
+
+      1. InviteManagementSection.tsx:96-99 calls buildWhatsAppUrl() with template=''
+         (empty string, hardcoded). It NEVER fetches wards.whatsapp_template from the
+         database. Since '' is falsy, buildWhatsAppUrl (whatsappUtils.ts:90) does
+         template || getDefaultTemplate(language), which ALWAYS uses the default.
+
+      2. InviteManagementSection.tsx:53 uses getCurrentLanguage() (which returns the
+         APP language from i18n, e.g., the user's personal display language) instead
+         of wardLanguage from useAuth(). The ward language determines the template
+         language, not the app display language. If a user has their app in English
+         but the ward is Portuguese, the WhatsApp message should be in Portuguese.
+
+      Fix strategy:
+        - Fetch wards.whatsapp_template via useAuth() context (wardId is already
+          available). The most efficient approach is to create a simple useQuery
+          hook that fetches the ward's whatsapp_template, or reuse the existing
+          ['ward', wardId] query if available.
+        - Pass the fetched whatsapp_template to buildWhatsAppUrl() instead of ''.
+        - Use wardLanguage from useAuth() instead of getCurrentLanguage() for the
+          language parameter in buildWhatsAppUrl() and formatDateHumanReadable().
+
+    acceptance_criteria:
+      - id: AC-142-01
+        description: "InviteManagementSection fetches wards.whatsapp_template from the database"
+        given: "InviteManagementSection renders on the Home screen"
+        when: "Component mounts"
+        then: "A query fetches wards.whatsapp_template for the current wardId. The template value is available for use in handleNotInvitedAction."
+        status: pending
+
+      - id: AC-142-02
+        description: "buildWhatsAppUrl receives the ward's custom template instead of empty string"
+        given: "User has a custom whatsapp_template saved in the wards table (not null, not empty)"
+        when: "handleNotInvitedAction calls buildWhatsAppUrl()"
+        then: "The template parameter is the ward's custom whatsapp_template value. The WhatsApp message uses the custom template with placeholders resolved."
+        status: pending
+
+      - id: AC-142-03
+        description: "buildWhatsAppUrl uses default template when ward template is null"
+        given: "Ward's whatsapp_template is NULL in the database"
+        when: "handleNotInvitedAction calls buildWhatsAppUrl()"
+        then: "The template parameter is '' (or null/undefined), causing buildWhatsAppUrl to fall back to getDefaultTemplate(wardLanguage). The correct language-specific default template is used."
+        status: pending
+
+      - id: AC-142-04
+        description: "Ward language is used instead of app language for WhatsApp messages"
+        given: "Ward language is 'pt-BR' but user's app language is 'en'"
+        when: "handleNotInvitedAction calls buildWhatsAppUrl()"
+        then: "The language parameter is wardLanguage ('pt-BR'), not getCurrentLanguage() ('en'). The message template and date formatting use the ward's language."
+        status: pending
+
+      - id: AC-142-05
+        description: "formatDateHumanReadable uses wardLanguage for date formatting"
+        given: "Ward language is 'es' but user's app language is 'en'"
+        when: "handleNotInvitedAction formats the speech date"
+        then: "formatDateHumanReadable is called with wardLanguage ('es') so the date appears in Spanish in the WhatsApp message."
+        status: pending
+
+      - id: AC-142-06
+        description: "WhatsApp message sent matches what is previewed in Settings > WhatsApp Template"
+        given: "User has customized the whatsapp_template in Settings"
+        when: "User clicks the WhatsApp button on an invite item on the Home screen"
+        then: "The WhatsApp message opened in wa.me uses the same template that is displayed in the Settings > WhatsApp Template screen (with placeholders resolved with actual speech data)."
+        status: pending
+
+    edge_cases:
+      - id: EC-142-01
+        case: "Ward's whatsapp_template is empty string (user intentionally cleared it)"
+        expected: "buildWhatsAppUrl receives '' which is falsy, so it falls back to getDefaultTemplate(wardLanguage). This matches the behavior of the WhatsApp template screen when DB value is empty string (whatsapp.tsx:94-95 shows empty template in that case). Note: This is a minor inconsistency but acceptable - the Settings screen shows empty while the send uses default. A future CR could address this."
+        status: pending
+
+      - id: EC-142-02
+        case: "Ward template query is still loading when user clicks WhatsApp button"
+        expected: "Template is undefined/null, buildWhatsAppUrl falls back to default template. The message is sent with the default template. No crash or block."
+        status: pending
+
+      - id: EC-142-03
+        case: "Speaker has no phone number"
+        expected: "handleNotInvitedAction skips the buildWhatsAppUrl/openWhatsApp call (existing guard: if speech.speaker_phone). Status change to assigned_invited still occurs. No regression."
+        status: pending
+
+    files_impacted:
+      - src/components/InviteManagementSection.tsx
+
+    files_not_modified:
+      - src/lib/whatsappUtils.ts
+      - src/lib/whatsapp.ts
+      - src/app/(tabs)/settings/whatsapp.tsx
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+  assumptions:
+    - id: A-01
+      text: >
+        The en and es general_collections seed data will mirror the pt-BR collection
+        structure (same number of collections and topics). The exact topic titles and
+        links will be translated equivalents. Since we do not have access to the
+        actual pt-BR seed data (it was inserted outside of migrations), the migration
+        will create a reasonable set of collections and topics for en and es based on
+        LDS/Church of Jesus Christ sacrament meeting topic themes.
+    - id: A-02
+      text: >
+        Resetting whatsapp_template to NULL when switching ward language is acceptable
+        behavior. Users who had custom templates will need to re-create them in the
+        new language. This is intentional because a Portuguese template is not useful
+        for an English-speaking ward.
+    - id: A-03
+      text: >
+        The InviteManagementSection can fetch the ward's whatsapp_template using a
+        simple query on the wards table. The wardId is already available from
+        useAuth(). RLS policies allow reading the wards row for authenticated users
+        in that ward.
+    - id: A-04
+      text: >
+        The global MutationCache.onError handler in _layout.tsx already checks for
+        mutation.meta?.suppressGlobalError (line 22), so adding this meta flag to
+        inviteMutation is the intended pattern for suppressing duplicate alerts.
+  inconsistencies: []

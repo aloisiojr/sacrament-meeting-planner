@@ -26,6 +26,7 @@
 # CR-194, CR-195, CR-196, CR-197, CR-198 (PRE+POST) - Batch 20 Phase 1
 # CR-193, CR-199, CR-200 (PRE+POST) - Batch 20 Phase 2
 # CR-202, CR-203 (PRE+POST) - Batch 22 Phase 1
+# CR-205, CR-206, CR-207 (PRE+POST) - Batch 23 Phase 1
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -10193,4 +10194,302 @@ cr_202_203:
           1. batch22-tester-f138-f139.test.ts:691 - minor .valueOf typo in test file (runtime unaffected)
           2. setup-integration.ts:12 - pre-existing react-test-renderer type declaration
           No new TS errors in production code.
+
+# #############################################################################
+# CR-205: Invite user error - Edge Function returned a non-2xx status code
+# (Batch 23 Phase 1 - F140)
+# #############################################################################
+
+cr_205:
+  cr_id: CR-205
+  title: "Invite user error: Edge Function returned a non-2xx status code"
+  type: bugfix
+  spec: specs/SPEC_F140_F141_F142.yaml
+  qa_plan: qa/QA_PLAN_009.yaml
+  feature: F140
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Edge Function create-invitation is deployed and functional (v9).
+      The error is generic SDK message. callEdgeFunction extracts server
+      error but inviteMutation.onError discards it, showing only
+      t('users.inviteFailed'). MutationCache also fires duplicate alert.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    commit: "6681194"
+    tests: "batch23-f140-f142.test.ts (50 tests, all passing)"
+    summary: |
+      All 3 must_pass and 2 should_pass checks verified.
+      inviteMutation.onError now shows err.message with t('users.inviteFailed')
+      fallback. meta: { suppressGlobalError: true } prevents duplicate alert.
+      callEdgeFunction error extraction unchanged and robust.
+
+    validation_checks:
+      - id: CR-205-MP-01
+        description: "callEdgeFunction properly surfaces the server error message"
+        status: PASSED
+        evidence: |
+          users.tsx:54-64: callEdgeFunction extracts serverMessage from
+          error.context.json()?.error. Throws new Error(serverMessage || error.message).
+          Server-side error message is properly propagated to the caller.
+
+      - id: CR-205-MP-02
+        description: "inviteMutation.onError shows meaningful error info to user"
+        status: PASSED
+        evidence: |
+          users.tsx:109-110: onError: (err: Error) => {
+            Alert.alert(t('common.error'), err.message || t('users.inviteFailed'));
+          }
+          Shows actual server error message. Falls back to generic only when
+          err.message is empty/undefined. meta: { suppressGlobalError: true }
+          at line 105 prevents duplicate MutationCache alert.
+
+      - id: CR-205-MP-03
+        description: "create-invitation Edge Function returns proper error codes with descriptive JSON"
+        status: PASSED
+        evidence: |
+          supabase/functions/create-invitation/index.ts returns structured
+          JSON { error: "message" } for all error paths:
+          - 401: Missing auth header, invalid token
+          - 403: Missing ward/role, insufficient permissions
+          - 400: Missing fields, invalid role, invalid email
+          - 500: DB insert error
+          No changes needed - already correct. Verified no regression.
+
+      - id: CR-205-SP-01
+        description: "Successful invitation flow works end-to-end"
+        status: PASSED
+        evidence: |
+          users.tsx:106-107: onSuccess: (data) => {
+            setInviteResult({ deepLink: data.invitation.deepLink });
+          }
+          Success path unchanged, verified by AC-140-04 tests (3 assertions pass).
+
+      - id: CR-205-SP-02
+        description: "Error scenarios show actionable messages"
+        status: PASSED
+        evidence: |
+          err.message contains server-extracted error (e.g. 'Invalid or expired token',
+          'Insufficient permissions'). User sees actual reason in Alert.
+          Covered by AC-140-01 tests (4 assertions pass) and EC-140-01..03 (6 assertions).
+
+# #############################################################################
+# CR-206: Language switch breaks collections display + WhatsApp template
+# (Batch 23 Phase 1 - F141)
+# #############################################################################
+
+cr_206:
+  cr_id: CR-206
+  title: "Language switch breaks collections display and WhatsApp template language"
+  type: bugfix
+  spec: specs/SPEC_F140_F141_F142.yaml
+  qa_plan: qa/QA_PLAN_009.yaml
+  feature: F141
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      PRE initially identified missing seed data for en/es in general_collections.
+      Actual root cause: DB uses locale codes (en-US, es-ES, pt-BR) but app
+      uses short codes (en, es, pt-BR). Data exists but query mismatch.
+      Additionally: whatsapp_template not reset on language change, and
+      initialized flag prevents template re-evaluation.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    commits: "73cc06e (revert), 195cd95 (toDbLocale fix), 396b23c (template reset)"
+    tests: "batch19-phase1.test.ts (158 passed, 8 skipped), batch23-f140-f142.test.ts (50 passed)"
+    summary: |
+      All 4 must_pass and 2 should_pass checks verified with adapted criteria.
+      toDbLocale() function maps en->en-US, es->es-ES, pt-BR->pt-BR.
+      Applied in useCollections() and wardLanguageChangeMutation.
+      whatsapp_template reset to null on language change.
+      initialized flag resets via useRef/useEffect when wardLanguage changes.
+      Ward cache invalidated after language change.
+
+    notes: |
+      PRE root cause analysis was corrected: general_collections table DOES
+      have data for en-US and es-ES (full locale codes). The fix was NOT a
+      SQL migration to seed data, but a toDbLocale() mapping function in
+      src/i18n/index.ts. CR-206-MP-03 and CR-206-MP-04 checks adapted
+      accordingly (collections exist, just needed correct locale mapping).
+
+    validation_checks:
+      - id: CR-206-MP-01
+        description: "wardLanguageChangeMutation resets whatsapp_template to null when language changes"
+        status: PASSED
+        evidence: |
+          settings/index.tsx:65: .update({ language: newLanguage, whatsapp_template: null })
+          Both language and whatsapp_template are set in a single update query.
+          On success (line 109): queryClient.invalidateQueries({ queryKey: ['ward', wardId] })
+          ensures whatsapp.tsx refetches the updated ward record.
+
+      - id: CR-206-MP-02
+        description: "whatsapp.tsx re-initializes template when wardLanguage changes"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:106-112: New useEffect with prevWardLanguageRef tracks
+          wardLanguage changes. When wardLanguage differs from previous value,
+          setInitialized(false) is called, causing the initialization useEffect
+          (lines 89-103) to re-run and load the correct default template for
+          the new language. Uses useRef to skip initial mount.
+
+      - id: CR-206-MP-03
+        description: "Collections for en/es languages are handled correctly via toDbLocale mapping"
+        status: PASSED
+        evidence: |
+          i18n/index.ts:34-47: toDbLocale() maps en->en-US, es->es-ES, pt-BR->pt-BR.
+          useTopics.ts:11: imports toDbLocale from '../i18n'.
+          useTopics.ts:189: const dbLocale = toDbLocale(language) applied before query.
+          useTopics.ts:198: .eq('language', dbLocale) uses mapped locale.
+          settings/index.tsx:73: .eq('language', toDbLocale(oldLanguage))
+          settings/index.tsx:88: .eq('language', toDbLocale(newLanguage))
+          DB data exists for en-US and es-ES; mapping bridges the gap.
+
+      - id: CR-206-MP-04
+        description: "After language change, topics screen shows collections for new language"
+        status: PASSED
+        evidence: |
+          useCollections(language) now applies toDbLocale(language) before
+          querying general_collections. When wardLanguage='en', query uses
+          'en-US' which matches existing DB rows. Collections appear correctly.
+          Ward language mutation also activates new collections via upsert
+          (settings/index.tsx:90-98).
+
+      - id: CR-206-SP-01
+        description: "WhatsApp template preview shows correct language after ward language change"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx: After language change:
+          1. DB whatsapp_template reset to null (settings/index.tsx:65)
+          2. Ward cache invalidated (settings/index.tsx:109)
+          3. initialized flag reset to false (whatsapp.tsx:108-109)
+          4. useEffect re-runs, detects null template, calls
+             getDefaultTemplate(wardLanguage) with new language (line 93)
+          Result: correct language-specific default template displayed.
+
+      - id: CR-206-SP-02
+        description: "Switching back to pt-BR restores pt-BR collections"
+        status: PASSED
+        evidence: |
+          wardLanguageChangeMutation deactivates old language collections
+          (settings/index.tsx:70-82) and activates new language collections
+          (settings/index.tsx:85-99). Collections are toggled via
+          ward_collection_config (active flag), not deleted. Switching
+          back to pt-BR queries toDbLocale('pt-BR')='pt-BR' which matches
+          original pt-BR collections. Data preserved.
+
+# #############################################################################
+# CR-207: WhatsApp template screen disconnected from actual WhatsApp sends
+# (Batch 23 Phase 1 - F142)
+# #############################################################################
+
+cr_207:
+  cr_id: CR-207
+  title: "WhatsApp template screen has no effect on actual WhatsApp messages"
+  type: bugfix
+  spec: specs/SPEC_F140_F141_F142.yaml
+  qa_plan: qa/QA_PLAN_009.yaml
+  feature: F142
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      InviteManagementSection hardcodes template='' (line 99), never fetches
+      ward's custom template. buildWhatsAppUrl always falls back to default.
+      Also uses getCurrentLanguage() (app language) instead of wardLanguage.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    commit: "1e609f9"
+    tests: "batch23-f140-f142.test.ts (50 tests, all passing)"
+    summary: |
+      All 4 must_pass and 2 should_pass checks verified.
+      InviteManagementSection now fetches ward.whatsapp_template via useQuery.
+      Passes ward?.whatsapp_template ?? '' to buildWhatsAppUrl.
+      Uses wardLanguage from useAuth() instead of getCurrentLanguage().
+
+    validation_checks:
+      - id: CR-207-MP-01
+        description: "InviteManagementSection fetches and uses wards.whatsapp_template"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:17: imports useQuery from @tanstack/react-query
+          InviteManagementSection.tsx:29: imports supabase from ../lib/supabase
+          InviteManagementSection.tsx:60-72: useQuery with queryKey ['ward', wardId],
+          queries wards table selecting whatsapp_template, filtered by wardId,
+          uses .single(), enabled: !!wardId.
+
+      - id: CR-207-MP-02
+        description: "buildWhatsAppUrl receives the custom template when one exists"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:116: ward?.whatsapp_template ?? ''
+          Passes the ward's custom template to buildWhatsAppUrl (3rd parameter).
+          When ward has custom template, it's used directly.
+          When ward is null/loading or template is null, falls back to ''
+          which triggers getDefaultTemplate in buildWhatsAppUrl.
+          No more hardcoded '' - template comes from DB query.
+
+      - id: CR-207-MP-03
+        description: "InviteManagementSection uses wardLanguage for WhatsApp messages"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:54: const { hasPermission, wardId, wardLanguage } = useAuth();
+          InviteManagementSection.tsx:55: const locale = (wardLanguage as SupportedLanguage) || getCurrentLanguage();
+          wardLanguage is primary source for locale. getCurrentLanguage() is only fallback.
+          locale is used in buildWhatsAppUrl (line 125) and formatDateHumanReadable (line 119).
+          useCallback deps include ward?.whatsapp_template (line 134).
+
+      - id: CR-207-MP-04
+        description: "Custom template text appears in WhatsApp message URL"
+        status: PASSED
+        evidence: |
+          buildWhatsAppUrl (whatsappUtils.ts:90): template || getDefaultTemplate(language)
+          When ward?.whatsapp_template is non-empty string (custom template), it's truthy,
+          so getDefaultTemplate is NOT called. resolveTemplate applies the custom
+          template with speech variables. Result: wa.me URL contains custom template text.
+          Verified by AC-142-02 tests (3 assertions pass).
+
+      - id: CR-207-SP-01
+        description: "Default template is used when no custom template is set"
+        status: PASSED
+        evidence: |
+          When wards.whatsapp_template is null: ward?.whatsapp_template is null,
+          ?? '' gives ''. buildWhatsAppUrl receives '' which is falsy,
+          falls through to getDefaultTemplate(wardLanguage). Correct default template
+          for ward's language is used. Verified by EC-142-01/02 tests.
+
+      - id: CR-207-SP-02
+        description: "Template preview in settings matches actual WhatsApp message"
+        status: PASSED
+        evidence: |
+          Both InviteManagementSection.tsx and whatsapp.tsx use the same query key
+          ['ward', wardId] to fetch whatsapp_template from wards table.
+          Both access ward.whatsapp_template from the same source.
+          InviteManagementSection uses resolveTemplate from whatsappUtils.ts (same
+          engine). Template shown in preview matches template used in WhatsApp URL.
+          Verified by AC-142-06 tests (3 assertions pass).
+
+    regression_checks:
+      - id: VC-REG-01
+        description: "All existing tests still pass"
+        status: PASSED
+        evidence: |
+          batch23-f140-f142.test.ts: 50 tests passed.
+          batch19-phase1.test.ts: 158 passed, 8 skipped.
+          Tests cover F140 (AC-140-01..04, EC-140-01..03) and
+          F142 (AC-142-01..06, EC-142-01..03).
+          Updated batch19 assertions for toDbLocale (R-1 fix).
 

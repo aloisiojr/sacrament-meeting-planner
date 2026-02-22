@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 26
-  last_updated_by: "batch-22-phase-1"
+  version: 27
+  last_updated_by: "batch-23-phase-1"
   total_phases: 6
-  total_cr_plans: 43
+  total_cr_plans: 44
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -839,6 +839,30 @@ cr_plans:
       deep link), ADR-090 (invite page substitui deep link). S01, S03, S04 parallelizaveis,
       S02+S05 dependem de S01, S06 depende de S03, S07 depende de todos.
 
+  - id: PLAN_P038
+    title: "Batch 23 Phase 1: Invite Error Handling, Language Switch Collections/Template, WhatsApp Template Disconnect"
+    status: pending
+    crs_covered: [205, 206, 207]
+    total_steps: 7
+    plan_ref: "docs/plans/PLAN_P038.yaml"
+    summary: >
+      3 bug fixes criticos: fix do invite mutation error handling para mostrar err.message
+      do servidor ao inves de texto generico t('users.inviteFailed') + meta suppressGlobalError
+      para evitar alerta duplicado do MutationCache (F140). Fix do language switch que quebra
+      colecoes (Topics vazio) e template WhatsApp: nova migracao 019_seed_en_es_collections.sql
+      com seed data de general_collections e general_topics para idiomas 'en' e 'es', reset de
+      whatsapp_template para NULL no wardLanguageChangeMutation com invalidacao de cache
+      ['ward', wardId], e reset do flag initialized em whatsapp.tsx via useEffect com ref para
+      recarregar template default do novo idioma (F141). Fix do WhatsApp send que ignora
+      template customizado: useQuery(['ward', wardId]) no InviteManagementSection para buscar
+      whatsapp_template do banco, wardLanguage do useAuth() ao inves de getCurrentLanguage()
+      para locale de formatacao e idioma do template (F142). 3 features, 20 ACs, 10 ECs,
+      5 arquivos impactados (1 novo + 4 modificados + 1 teste), 1 migracao SQL, zero
+      dependencias novas. 3 ADRs: ADR-091 (err.message + suppressGlobalError), ADR-092
+      (reset whatsapp_template + initialized flag), ADR-093 (useQuery ward template +
+      wardLanguage). S01, S02, S03, S04, S05 parallelizaveis (todos independentes),
+      S06 depende de S02, S07 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1198,6 +1222,15 @@ pending_with_plan:
   - cr_id: 203
     plan_id: PLAN_P037
     description: "Nova Edge Function invite-redirect com pagina web de aceite de convite + create-invitation com URL HTTPS"
+  - cr_id: 205
+    plan_id: PLAN_P038
+    description: "Fix invite mutation error handling: mostrar err.message do servidor + suppressGlobalError"
+  - cr_id: 206
+    plan_id: PLAN_P038
+    description: "Fix language switch: seed en/es collections + reset whatsapp_template + reset initialized flag"
+  - cr_id: 207
+    plan_id: PLAN_P038
+    description: "Fix WhatsApp send: useQuery ward template + wardLanguage ao inves de app language"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1219,6 +1252,18 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 27
+    phase: "batch-23-phase-1"
+    changes:
+      - "Added PLAN_P038 for Batch 23 Phase 1 (F140-F142, CRs 205/206/207)"
+      - "3 bug fixes: invite error handling, language switch collections/template, WhatsApp template disconnect"
+      - "7 steps, 20 ACs, 10 ECs, 5 arquivos impactados (1 novo + 4 modificados + 1 teste)"
+      - "1 migracao SQL (019_seed_en_es_collections.sql), zero dependencias novas"
+      - "3 ADRs: ADR-091 (err.message + suppressGlobalError), ADR-092 (reset whatsapp_template + initialized), ADR-093 (useQuery ward template + wardLanguage)"
+      - "F140 is a 2-line fix in users.tsx (onError err.message + meta suppressGlobalError)"
+      - "F141 has 3 parts: migration seed data (019), reset template in settings/index.tsx, reset initialized in whatsapp.tsx"
+      - "F142 adds useQuery + wardLanguage in InviteManagementSection.tsx to use actual ward template"
+      - "S01, S02, S03, S04, S05 parallelizaveis (todos independentes), S06 depende de S02, S07 depende de todos"
   - version: 26
     phase: "batch-22-phase-1"
     changes:

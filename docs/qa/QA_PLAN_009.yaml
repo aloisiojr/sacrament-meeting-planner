@@ -1,0 +1,435 @@
+# =============================================================================
+# QA_PLAN_009.yaml
+# PRE-validation plan for CR-205, CR-206, CR-207 (Bugfix batch)
+# Generated: 2026-02-22
+# =============================================================================
+
+plan_id: QA_PLAN_009
+type: bugfix
+mode: PRE
+crs: [CR-205, CR-206, CR-207]
+status: validated
+
+# =============================================================================
+# CR-205: Invite user returns "Edge Function returned a non-2xx status code"
+# =============================================================================
+
+cr_205:
+  cr_id: CR-205
+  title: "Invite user error: Edge Function returned a non-2xx status code"
+  type: bugfix
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    validated: true
+
+    evidence:
+      - path: "src/app/(tabs)/settings/users.tsx"
+        lines: "41-67"
+        finding: |
+          callEdgeFunction() at line 51 calls supabase.functions.invoke().
+          Error handling at lines 54-64 attempts to parse error.context.json()
+          for the server message but falls back to error.message.
+          The "Edge Function returned a non-2xx status code" is the default
+          Supabase JS SDK message when the Edge Function returns 4xx/5xx.
+
+      - path: "src/app/(tabs)/settings/users.tsx"
+        lines: "101-111"
+        finding: |
+          inviteMutation at line 103 calls callEdgeFunction('create-invitation', { email, role }).
+          onError at line 108 shows only t('users.inviteFailed') - the actual
+          server error message is lost. The MutationCache global handler at
+          _layout.tsx:29 logs error.message in __DEV__ but user-facing is generic.
+
+      - path: "supabase/functions/create-invitation/index.ts"
+        lines: "1-193"
+        finding: |
+          Edge Function code is syntactically correct. Returns proper JSON error
+          responses with status codes (401, 403, 400, 500). Function was last
+          deployed as version 9 (deploy-commands.yaml line 493).
+          Possible 4xx/5xx causes:
+          - 401: Missing/invalid auth header, expired JWT token
+          - 403: User missing ward/role metadata, or role not in ALLOWED_ROLES
+          - 400: Missing email/role, invalid role, invalid email format
+          - 500: Database insert error (e.g. RLS policy blocking insert)
+
+      - path: ".devteam/deploy-commands.yaml"
+        lines: "488-497"
+        finding: |
+          create-invitation was successfully deployed as ACTIVE version 9.
+          Last deploy was for CR-203 (invite-redirect HTTPS URL change).
+          Deployment verified with REST API health check HTTP 200.
+
+    root_cause_analysis: |
+      The error "Edge Function returned a non-2xx status code" is the generic
+      Supabase JS SDK error when invoke() receives a non-2xx response.
+      The REAL server error is buried inside error.context (a Response object).
+
+      The callEdgeFunction() helper (users.tsx:54-64) tries to extract the
+      server message via error.context.json() but this can fail if:
+      1. error.context is undefined (network error, function not found)
+      2. error.context.json() throws (malformed response body)
+
+      Additionally, inviteMutation.onError (line 108) discards the error object
+      entirely and shows a generic t('users.inviteFailed') message.
+
+      The actual root cause of the 4xx/5xx is NOT in the code but likely:
+      - Session token expired (JWT expiry)
+      - User app_metadata missing ward_id or role
+      - RLS policy on invitations table blocking insert
+
+      CODE FIX NEEDED: Improve error surfacing in callEdgeFunction and/or
+      inviteMutation.onError to show the actual server error message, so
+      the user (and developers) can diagnose what specific 4xx/5xx occurred.
+
+    reproduction_steps:
+      - "1. Log in as bishopric or secretary role user"
+      - "2. Go to Settings > Users (Usuarios)"
+      - "3. Tap 'Convidar Usuario' (Invite User) button"
+      - "4. Enter a valid email and select a role"
+      - "5. Tap 'Convidar Usuario' (Invite) to submit"
+      - "6. Observe error: 'Edge Function returned a non-2xx status code' in console"
+      - "7. User sees generic 'Falha ao convidar usuario' Alert"
+
+  validation_checks:
+    must_pass:
+      - id: "CR-205-MP-01"
+        type: static
+        description: "callEdgeFunction properly surfaces the server error message from the Edge Function response"
+        check: |
+          The error thrown by callEdgeFunction should include the actual
+          server-side error message (e.g. 'Invalid or expired token',
+          'Insufficient permissions') rather than the generic SDK message.
+
+      - id: "CR-205-MP-02"
+        type: static
+        description: "inviteMutation.onError shows meaningful error info to user"
+        check: |
+          The onError handler should display the actual error reason instead
+          of only t('users.inviteFailed'). Could show err.message which now
+          contains the server error from callEdgeFunction.
+
+      - id: "CR-205-MP-03"
+        type: runtime
+        description: "create-invitation Edge Function returns proper error codes with descriptive JSON"
+        check: |
+          Edge Function must return structured JSON error with descriptive
+          message for all error paths (401, 403, 400, 500). Already confirmed
+          in code review - this check validates no regression.
+
+    should_pass:
+      - id: "CR-205-SP-01"
+        type: manual
+        description: "Successful invitation flow works end-to-end"
+        check: |
+          After fix, inviting a user with valid email and role should
+          succeed (201 response) and show the deep link.
+
+      - id: "CR-205-SP-02"
+        type: manual
+        description: "Error scenarios show actionable messages"
+        check: |
+          When invitation fails (expired session, wrong role), user sees
+          a meaningful error message instead of generic text.
+
+# =============================================================================
+# CR-206: Language switch breaks collections display + WhatsApp template
+# =============================================================================
+
+cr_206:
+  cr_id: CR-206
+  title: "Language switch breaks collections display and WhatsApp template language"
+  type: bugfix
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    validated: true
+
+    evidence:
+      - path: "src/app/(tabs)/settings/index.tsx"
+        lines: "56-108"
+        finding: |
+          wardLanguageChangeMutation does the following:
+          1. Updates wards.language to newLanguage (line 64)
+          2. Deactivates old language collections (lines 69-81)
+          3. Activates new language collections (lines 83-98)
+          4. On success: calls setWardLanguage(newLanguage) and invalidates topic caches
+
+          PROBLEM: Step 3 fetches general_collections for the new language.
+          If no rows exist in general_collections table for 'en' or 'es',
+          newCollections will be empty and NO collections will be available.
+          The general_collections table has NO seed data (confirmed: no INSERT
+          statements found in any migration or seed files).
+
+      - path: "src/hooks/useTopics.ts"
+        lines: "186-227"
+        finding: |
+          useCollections(language) queries general_collections WHERE language = language.
+          If the table has no rows for 'en' or 'es', it returns an empty array.
+          topics.tsx line 288 calls useCollections(language) with wardLanguage.
+          When language is 'en' or 'es' and no collections exist, the UI shows
+          "No results" correctly (line 472-478) - but user expects collections.
+
+      - path: "src/app/(tabs)/settings/topics.tsx"
+        lines: "267-288"
+        finding: |
+          Line 270: language = wardLanguage (uses ward language, not app language).
+          Line 288: useCollections(language) - fetches collections for ward language.
+          When wardLanguage changes to 'en'/'es', the query fires correctly but
+          returns empty because general_collections table has no en/es rows.
+
+      - path: "src/app/(tabs)/settings/whatsapp.tsx"
+        lines: "86-103"
+        finding: |
+          PROBLEM: The initialized flag (line 86) prevents re-evaluation when
+          wardLanguage changes. useEffect at line 89 only runs when ward data
+          loads AND initialized is false. After initial load, changing ward
+          language does NOT reset initialized, so the template stays stale.
+
+          Even if user navigates away and back, React component state persists
+          if the screen is still in the navigation stack.
+
+      - path: "src/app/(tabs)/settings/index.tsx"
+        lines: "56-108"
+        finding: |
+          wardLanguageChangeMutation does NOT reset/update whatsapp_template
+          in the database when language changes. The ward's whatsapp_template
+          column keeps the old language template (or null).
+
+    root_cause_analysis: |
+      TWO separate issues:
+
+      1. COLLECTIONS EMPTY: The general_collections table has no seed data
+         for 'en' or 'es' languages. The table is populated via Supabase
+         Dashboard or manual SQL inserts, not via migrations. When ward
+         language changes to en/es, useCollections returns empty array.
+         FIX: Either seed general_collections with en/es data, or show a
+         clear message that collections are only available in pt-BR, or
+         create en/es collections.
+
+      2. WHATSAPP TEMPLATE NOT UPDATING: Two sub-issues:
+         a) whatsapp.tsx uses `initialized` flag that prevents re-evaluation
+            when wardLanguage changes (line 89-103). Once set to true, the
+            template stays fixed even if language changes.
+         b) wardLanguageChangeMutation (settings/index.tsx:56-108) does NOT
+            reset wards.whatsapp_template to null when language changes.
+            If template was customized in pt-BR, it stays in pt-BR even
+            after switching to en/es.
+         FIX:
+         - Reset whatsapp_template to null in wardLanguageChangeMutation
+         - Reset initialized flag when wardLanguage changes in whatsapp.tsx
+
+    reproduction_steps:
+      - "1. Log in with a ward configured in pt-BR"
+      - "2. Go to Settings > Ward Language"
+      - "3. Change ward language from pt-BR to English"
+      - "4. Go to Settings > Topics (Temas)"
+      - "5. Observe: General Collections section shows no collections"
+      - "6. Go to Settings > WhatsApp Template"
+      - "7. Observe: Template still shows pt-BR text (not updated to English)"
+
+  validation_checks:
+    must_pass:
+      - id: "CR-206-MP-01"
+        type: static
+        description: "wardLanguageChangeMutation resets whatsapp_template to null when language changes"
+        check: |
+          In src/app/(tabs)/settings/index.tsx, the wardLanguageChangeMutation
+          must set whatsapp_template = null in the wards update query so the
+          WhatsApp template screen shows the default template for the new language.
+
+      - id: "CR-206-MP-02"
+        type: static
+        description: "whatsapp.tsx re-initializes template when wardLanguage changes"
+        check: |
+          The initialized flag must be reset when wardLanguage changes, or the
+          useEffect dependency must include wardLanguage properly to re-derive
+          the template from the new language default.
+
+      - id: "CR-206-MP-03"
+        type: static
+        description: "Collections for en/es languages exist or are handled gracefully"
+        check: |
+          Either general_collections table is seeded with en/es data, OR the
+          UI clearly communicates that collections are unavailable in the
+          selected language, OR the ward language change mutation creates/seeds
+          collections for the new language.
+
+      - id: "CR-206-MP-04"
+        type: runtime
+        description: "After language change, topics screen shows collections for new language"
+        check: |
+          useCollections(language) returns non-empty results after language
+          change (requires en/es seed data or dynamic creation).
+
+    should_pass:
+      - id: "CR-206-SP-01"
+        type: manual
+        description: "WhatsApp template preview shows correct language after ward language change"
+        check: |
+          After changing ward language from pt-BR to en, the WhatsApp template
+          screen should show the English default template (or reset to default).
+
+      - id: "CR-206-SP-02"
+        type: manual
+        description: "Switching back to pt-BR restores pt-BR collections"
+        check: |
+          After changing language to en and back to pt-BR, the pt-BR
+          collections should appear again (were deactivated, not deleted).
+
+# =============================================================================
+# CR-207: WhatsApp template screen disconnected from actual WhatsApp sends
+# =============================================================================
+
+cr_207:
+  cr_id: CR-207
+  title: "WhatsApp template screen has no effect on actual WhatsApp messages"
+  type: bugfix
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    validated: true
+
+    evidence:
+      - path: "src/app/(tabs)/settings/whatsapp.tsx"
+        lines: "85-120"
+        finding: |
+          The WhatsApp template screen reads/writes wards.whatsapp_template.
+          Template is auto-saved to DB on change (debounced 1s).
+          This correctly persists the user's custom template in the DB.
+
+      - path: "src/components/InviteManagementSection.tsx"
+        lines: "92-118"
+        finding: |
+          CRITICAL BUG: handleNotInvitedAction at line 96-109 calls
+          buildWhatsAppUrl() with template='' (empty string, line 99).
+
+          Line 99: '' // Will use default template for language
+
+          The comment says "Will use default template" but the actual behavior
+          in buildWhatsAppUrl is: template || getDefaultTemplate(language).
+          Since '' is falsy in JS, it ALWAYS falls through to getDefaultTemplate.
+
+          The user's custom template from wards.whatsapp_template is NEVER
+          fetched or passed to buildWhatsAppUrl.
+
+      - path: "src/lib/whatsappUtils.ts"
+        lines: "70-95"
+        finding: |
+          buildWhatsAppUrl at line 90:
+          const messageTemplate = template || getDefaultTemplate(language);
+
+          Since template is always '' (from InviteManagementSection line 99),
+          this always resolves to getDefaultTemplate(language).
+          The custom template saved in wards.whatsapp_template is never used.
+
+      - path: "src/components/InviteManagementSection.tsx"
+        lines: "53,108"
+        finding: |
+          SECONDARY BUG: Line 53 uses getCurrentLanguage() (app language from
+          i18n) for the locale, and passes this as the language param to
+          buildWhatsAppUrl at line 108.
+
+          The WhatsApp message should use wardLanguage (the ward's configured
+          language), not the app's UI language. A user with app in English
+          but ward in Portuguese would get an English default template
+          instead of Portuguese.
+
+      - path: "src/lib/whatsappUtils.ts"
+        lines: "70-95"
+        finding: |
+          buildWhatsAppUrl accepts language parameter (default 'pt-BR').
+          This is used for getDefaultTemplate fallback. When the custom
+          template is actually used, language doesn't matter for the template
+          content, but it would matter for the fallback.
+
+    root_cause_analysis: |
+      The WhatsApp template settings screen (whatsapp.tsx) correctly saves the
+      custom template to wards.whatsapp_template in the database. However, the
+      InviteManagementSection component that actually builds the WhatsApp URL
+      NEVER reads this value.
+
+      Three specific issues:
+
+      1. TEMPLATE NOT FETCHED: InviteManagementSection does not query
+         wards.whatsapp_template from the database. It hardcodes '' as the
+         template parameter (line 99).
+
+      2. EMPTY STRING FALLBACK: buildWhatsAppUrl receives template='' which
+         is falsy, so line 90 always falls through to getDefaultTemplate().
+         User's custom template is completely ignored.
+
+      3. WRONG LANGUAGE: getCurrentLanguage() returns the app's UI language
+         (from i18n.language), not the ward's configured language. The
+         WhatsApp message language should match the ward language since it's
+         communication about ward business.
+
+      FIX:
+      - Fetch wards.whatsapp_template in InviteManagementSection (or via
+        a shared ward query/hook)
+      - Pass the fetched template to buildWhatsAppUrl instead of ''
+      - Use wardLanguage from useAuth() instead of getCurrentLanguage()
+
+    reproduction_steps:
+      - "1. Go to Settings > WhatsApp Template"
+      - "2. Customize the template text (e.g., add 'Irmao(a) {nome}' prefix)"
+      - "3. Wait for auto-save (1 second debounce)"
+      - "4. Verify template is saved in DB (can check via preview on screen)"
+      - "5. Go to Home screen > Invite Management section"
+      - "6. Tap the WhatsApp button for a speech with status 'assigned_not_invited'"
+      - "7. Observe: WhatsApp opens with DEFAULT template, NOT the custom one"
+      - "8. Compare message text with what's shown in Settings > WhatsApp Template"
+      - "9. They are different - the settings screen template has no effect"
+
+  validation_checks:
+    must_pass:
+      - id: "CR-207-MP-01"
+        type: static
+        description: "InviteManagementSection fetches and uses wards.whatsapp_template"
+        check: |
+          InviteManagementSection must query the ward's whatsapp_template
+          from the database and pass it to buildWhatsAppUrl instead of ''.
+
+      - id: "CR-207-MP-02"
+        type: static
+        description: "buildWhatsAppUrl receives the custom template when one exists"
+        check: |
+          The template parameter passed to buildWhatsAppUrl should be the
+          ward's custom template (from DB), or null/undefined for default.
+          Must NOT be hardcoded ''.
+
+      - id: "CR-207-MP-03"
+        type: static
+        description: "InviteManagementSection uses wardLanguage for WhatsApp messages"
+        check: |
+          Replace getCurrentLanguage() (app language) with wardLanguage from
+          useAuth() for the language parameter passed to buildWhatsAppUrl
+          and formatDateHumanReadable.
+
+      - id: "CR-207-MP-04"
+        type: runtime
+        description: "Custom template text appears in WhatsApp message URL"
+        check: |
+          After setting a custom template in Settings > WhatsApp Template,
+          tapping the WhatsApp button should produce a wa.me URL containing
+          the custom template text (with placeholders resolved), not the
+          default template.
+
+    should_pass:
+      - id: "CR-207-SP-01"
+        type: manual
+        description: "Default template is used when no custom template is set"
+        check: |
+          When wards.whatsapp_template is null (no customization), the
+          WhatsApp button should use getDefaultTemplate(wardLanguage).
+
+      - id: "CR-207-SP-02"
+        type: manual
+        description: "Template preview in settings matches actual WhatsApp message"
+        check: |
+          The preview shown in Settings > WhatsApp Template should match
+          the message that actually opens in WhatsApp (same template,
+          different variable values).

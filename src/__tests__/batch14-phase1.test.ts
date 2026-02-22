@@ -249,11 +249,11 @@ describe('F092 (CR-149): Presentation mode button always visible', () => {
     });
   });
 
-  // --- EC-092-01: useMemo removed from React import ---
-  describe('EC-092-01: useMemo removed from React import', () => {
-    it('index.tsx does NOT import useMemo', () => {
+  // --- EC-092-01: useMemo in index.tsx ---
+  describe('EC-092-01: useMemo usage in index.tsx', () => {
+    it('index.tsx imports useMemo (F128 added preview card with computed status lines)', () => {
       const content = getIndex();
-      expect(content).not.toContain('useMemo');
+      expect(content).toContain('useMemo');
     });
   });
 

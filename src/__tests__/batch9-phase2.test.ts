@@ -96,11 +96,11 @@ describe('F060 (CR-114): Add X button to remove topic assignment', () => {
       expect(content).toContain('topicLink: null');
     });
 
-    it('NextSundaysSection should wire onClearTopic with assignTopic.mutate setting null', () => {
+    it('NextSundaysSection no longer has inline editing (F129 removed expand/edit)', () => {
       const content = readSourceFile('components/NextSundaysSection.tsx');
-      expect(content).toContain('handleClearTopic');
-      expect(content).toContain('topicTitle: null');
-      expect(content).toContain('topicLink: null');
+      // F129 removed all mutation hooks and inline editing from NextSundaysSection
+      expect(content).not.toContain('handleClearTopic');
+      expect(content).not.toContain('SpeechSlot');
     });
   });
 

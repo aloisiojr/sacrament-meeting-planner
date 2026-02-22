@@ -1,0 +1,631 @@
+# =============================================================================
+# SPEC_F113_F115.yaml
+# Features F113-F115 / CR-175 to CR-177: Deep link scheme fix,
+#   Email reset HTTPS redirect, Status circle right-alignment
+# Batch: 18
+# Created: 2026-02-21
+# Status: complete (SPEC_FINAL)
+# =============================================================================
+
+type: spec_final
+status: complete
+batch: 18
+created: "2026-02-21"
+last_updated: "2026-02-21"
+
+# =============================================================================
+# F113 / CR-175: Change deep link scheme from sacrmeetman:// to sacrmeetplan://
+# =============================================================================
+
+features:
+
+  - id: F113
+    name: "Change deep link scheme from sacrmeetman:// to sacrmeetplan://"
+    cr_id: 175
+    type: bug
+    priority: high
+    related_features: [F037, F001, F101]
+    related_crs: [93, 175]
+
+    user_request: >
+      "Convite para adicionar usuario esta vindo com o dominio wardmanager://
+      tem que ser sacrmeetplan:// Verifique todo o codigo e toda configuracao
+      do supabase e toda a configuracao dos pacotes iOS e Android. Lembrando
+      que esse dominio tambem e usado na recuperacao de senha."
+
+    current_behavior: >
+      The deep link scheme was changed from wardmanager:// to sacrmeetman:// in
+      CR-93/F037. Currently, the scheme "sacrmeetman" is used in 3 locations:
+
+      1. app.json line 10: "scheme": "sacrmeetman"
+         This is the Expo URL scheme that registers the app to handle
+         sacrmeetman:// deep links on iOS and Android.
+
+      2. supabase/functions/create-invitation/index.ts line 170:
+         ```
+         const deepLink = `sacrmeetman://invite/${invitationToken}`;
+         ```
+         This generates the invitation deep link sent to new users.
+
+      3. supabase/functions/send-reset-email/index.ts line 194:
+         ```
+         const deepLink = `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`;
+         ```
+         This generates the password reset deep link in the email.
+
+      The user reports the scheme as "wardmanager://" in their request, but
+      inspection shows the code already uses "sacrmeetman://". The user wants
+      the final scheme to be "sacrmeetplan://".
+
+      Additional locations that reference the scheme (non-code, need awareness):
+      - supabase/config.toml: Does NOT reference the scheme (no change needed).
+      - No Info.plist or AndroidManifest.xml files exist (Expo managed workflow;
+        the scheme is configured entirely through app.json).
+      - iOS bundleIdentifier (com.sacramentmeetingmanager.app) and Android
+        package (com.sacramentmeetingmanager.app) are NOT the URL scheme and
+        must NOT be changed.
+
+      Supabase Dashboard configuration:
+      - Authentication > URL Configuration > Redirect URLs must include
+        sacrmeetplan:// URLs. This is a manual configuration step outside the
+        codebase.
+
+      Existing tests that assert "sacrmeetman":
+      - src/__tests__/batch7-f035-f039.test.ts: 10 tests assert scheme is
+        "sacrmeetman" and deep link uses sacrmeetman://
+      - src/__tests__/batch15-phase2.test.ts: tests assert
+        sacrmeetman://reset-password deep link format
+
+    expected_behavior: >
+      Change the deep link scheme from "sacrmeetman" to "sacrmeetplan" in all
+      3 source code locations:
+
+      1. app.json line 10: Change "scheme" from "sacrmeetman" to "sacrmeetplan".
+
+      2. supabase/functions/create-invitation/index.ts line 170: Change
+         `sacrmeetman://invite/${invitationToken}` to
+         `sacrmeetplan://invite/${invitationToken}`.
+
+      3. supabase/functions/send-reset-email/index.ts line 194: Change
+         `sacrmeetman://reset-password?token=${hashed_token}&type=recovery` to
+         `sacrmeetplan://reset-password?token=${hashed_token}&type=recovery`.
+
+      Do NOT change:
+      - iOS bundleIdentifier (com.sacramentmeetingmanager.app)
+      - Android package (com.sacramentmeetingmanager.app)
+      - supabase/config.toml (does not reference the scheme)
+
+      Manual step (outside codebase):
+      - Update Supabase Dashboard > Authentication > URL Configuration >
+        Redirect URLs to include sacrmeetplan:// URLs.
+
+    files_impacted:
+      - path: app.json
+        action: modify
+        changes:
+          - "Line 10: change \"scheme\": \"sacrmeetman\" to \"scheme\": \"sacrmeetplan\""
+
+      - path: supabase/functions/create-invitation/index.ts
+        action: modify
+        changes:
+          - "Line 170: change sacrmeetman://invite/ to sacrmeetplan://invite/"
+
+      - path: supabase/functions/send-reset-email/index.ts
+        action: modify
+        changes:
+          - "Line 194: change sacrmeetman://reset-password to sacrmeetplan://reset-password"
+
+    manual_steps:
+      - step: "Update Supabase Dashboard Redirect URLs"
+        description: >
+          Go to Supabase Dashboard > Authentication > URL Configuration >
+          Redirect URLs. Remove any sacrmeetman:// entries. Add:
+          - sacrmeetplan://invite/*
+          - sacrmeetplan://reset-password
+        responsibility: "Developer (manual, outside codebase)"
+
+    acceptance_criteria:
+      - id: AC-113-01
+        description: "app.json scheme is 'sacrmeetplan'"
+        given: "app.json file"
+        when: "Read expo.scheme value"
+        then: "The value is 'sacrmeetplan'"
+
+      - id: AC-113-02
+        description: "create-invitation Edge Function uses sacrmeetplan:// in deep link"
+        given: "create-invitation/index.ts source code"
+        when: "Read the deep link construction"
+        then: "Deep link is sacrmeetplan://invite/${invitationToken}"
+
+      - id: AC-113-03
+        description: "send-reset-email Edge Function uses sacrmeetplan:// in deep link"
+        given: "send-reset-email/index.ts source code"
+        when: "Read the deep link construction"
+        then: "Deep link is sacrmeetplan://reset-password?token=${hashed_token}&type=recovery"
+
+      - id: AC-113-04
+        description: "No remaining references to sacrmeetman:// or wardmanager:// in production code"
+        given: "All files in src/ and supabase/ directories"
+        when: "Search for sacrmeetman:// and wardmanager://"
+        then: "Zero matches in production source code (test description strings and docs are acceptable)"
+
+      - id: AC-113-05
+        description: "iOS bundleIdentifier unchanged"
+        given: "app.json file"
+        when: "Read expo.ios.bundleIdentifier"
+        then: "Value remains 'com.sacramentmeetingmanager.app'"
+
+      - id: AC-113-06
+        description: "Android package unchanged"
+        given: "app.json file"
+        when: "Read expo.android.package"
+        then: "Value remains 'com.sacramentmeetingmanager.app'"
+
+    edge_cases:
+      - id: EC-113-01
+        case: "Existing invitation links with sacrmeetman:// generated before this change"
+        expected: "Old links will stop working. This is acceptable and expected. New invitations will use sacrmeetplan://. Pending invitations need to be re-sent."
+
+      - id: EC-113-02
+        case: "Password reset emails sent before this change"
+        expected: "Old reset links with sacrmeetman:// will not open the app. User must request a new password reset email."
+
+      - id: EC-113-03
+        case: "App not installed on device"
+        expected: "Deep link sacrmeetplan:// does nothing if app is not installed. This is expected behavior for custom URL schemes."
+
+  # =============================================================================
+  # F114 / CR-176: HTTPS redirect Edge Function for password reset email
+  # =============================================================================
+
+  - id: F114
+    name: "Email reset: HTTPS redirect Edge Function to make reset button clickable"
+    cr_id: 176
+    type: bug
+    priority: high
+    related_features: [F101, F088]
+    related_crs: [67, 145, 155, 176]
+
+    user_request: >
+      "O email de recuperacao de senha vem com o link montado, mas o botao
+      nao e clicavel, eu tive que abrir o codigo HTML para achar o link la
+      dentro."
+
+    current_behavior: >
+      The send-reset-email Edge Function (supabase/functions/send-reset-email/
+      index.ts) builds an HTML email template with a CTA button that links
+      directly to a custom URL scheme:
+
+      ```html
+      <a href="sacrmeetman://reset-password?token=TOKEN&type=recovery"
+         style="display: inline-block; background-color: #4F46E5; ...">
+        Redefinir senha
+      </a>
+      ```
+
+      Email clients (Gmail, Outlook, Apple Mail, etc.) block or strip custom
+      URL schemes (sacrmeetman://, sacrmeetplan://, etc.) from <a href> tags
+      for security reasons. This makes the button non-clickable. The user
+      had to open the HTML source to find the link.
+
+      The email templates exist in 3 languages (pt-BR, en, es), all using the
+      same pattern with the custom scheme directly in the href.
+
+      The Supabase project URL is:
+      https://poizgglzdjqwrhsnhkke.supabase.co
+
+    expected_behavior: >
+      Create a new HTTPS Edge Function "reset-redirect" that serves as an
+      intermediary between the email link and the app deep link.
+
+      **Changes to send-reset-email Edge Function:**
+      Instead of building the deep link directly in the email href, build an
+      HTTPS URL pointing to the new reset-redirect Edge Function:
+
+      ```
+      https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery
+      ```
+
+      This HTTPS URL will be clickable in all email clients because it uses
+      the standard https:// scheme.
+
+      **New Edge Function: reset-redirect**
+      - Path: supabase/functions/reset-redirect/index.ts
+      - Method: GET
+      - Query params: token (required), type (required)
+      - No authentication required (public endpoint)
+      - Response: HTML page that auto-redirects to the app deep link
+
+      The HTML page served by reset-redirect should:
+      1. Auto-redirect via JavaScript: window.location.href =
+         'sacrmeetplan://reset-password?token=TOKEN&type=recovery'
+      2. Show a fallback button in case auto-redirect does not work (e.g.,
+         desktop browser where the app is not installed)
+      3. The fallback button text should be in Portuguese (pt-BR) as the
+         default, since we cannot determine the user's language from the
+         redirect URL alone
+
+      **HTML template for reset-redirect response:**
+      The HTML should include:
+      - A meta refresh tag as a secondary redirect mechanism
+      - JavaScript window.location.href for immediate redirect
+      - A visible "Abrir no aplicativo" / "Open in app" button as fallback
+      - Basic styling (centered, clean design)
+
+      **Deep link scheme note:**
+      The deep link in the reset-redirect function must use sacrmeetplan://
+      (the new scheme from CR-175/F113), NOT sacrmeetman://.
+
+    files_impacted:
+      - path: supabase/functions/send-reset-email/index.ts
+        action: modify
+        changes:
+          - "Change deepLink construction (line 194) from custom scheme URL to HTTPS URL: https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery"
+          - "The email template href now points to the HTTPS redirect URL instead of the custom scheme directly"
+
+      - path: supabase/functions/reset-redirect/index.ts
+        action: create
+        changes:
+          - "New Edge Function that accepts GET requests with token and type query params"
+          - "Returns HTML page with auto-redirect to sacrmeetplan://reset-password?token=TOKEN&type=recovery"
+          - "Includes fallback button for manual redirect"
+          - "CORS headers for cross-origin access"
+          - "Validates token and type params are present"
+
+    acceptance_criteria:
+      - id: AC-114-01
+        description: "Email contains HTTPS link instead of custom scheme"
+        given: "send-reset-email Edge Function source code"
+        when: "Read the deep link construction and email template"
+        then: "The <a href> in all 3 language templates points to https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery"
+
+      - id: AC-114-02
+        description: "reset-redirect Edge Function exists"
+        given: "supabase/functions/ directory"
+        when: "List files"
+        then: "reset-redirect/index.ts exists"
+
+      - id: AC-114-03
+        description: "reset-redirect returns HTML with auto-redirect"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the response body"
+        then: "Response is HTML with Content-Type text/html, contains window.location.href redirect to sacrmeetplan://reset-password?token=TOKEN&type=recovery"
+
+      - id: AC-114-04
+        description: "reset-redirect includes fallback button"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the HTML response body"
+        then: "HTML contains a visible <a> button with href to sacrmeetplan://reset-password?token=TOKEN&type=recovery for manual redirect"
+
+      - id: AC-114-05
+        description: "reset-redirect validates required params"
+        given: "reset-redirect Edge Function"
+        when: "Called without token or type query params"
+        then: "Returns error response (400 or similar) with appropriate error message"
+
+      - id: AC-114-06
+        description: "reset-redirect handles CORS preflight"
+        given: "reset-redirect Edge Function"
+        when: "OPTIONS request is sent"
+        then: "Returns 200 with CORS headers"
+
+      - id: AC-114-07
+        description: "Email CTA button is clickable in email clients"
+        given: "Password reset email received in Gmail/Outlook/Apple Mail"
+        when: "User clicks the reset password button"
+        then: "Browser opens the HTTPS redirect URL, which auto-redirects to the app via deep link"
+
+      - id: AC-114-08
+        description: "Deep link uses sacrmeetplan:// scheme (not sacrmeetman://)"
+        given: "reset-redirect Edge Function source code"
+        when: "Read the redirect target URL"
+        then: "Uses sacrmeetplan://reset-password (consistent with F113 scheme change)"
+
+    edge_cases:
+      - id: EC-114-01
+        case: "User opens HTTPS redirect URL on desktop browser (app not installed)"
+        expected: "Browser shows the HTML page with the fallback button. Clicking the button attempts to open the deep link. If the app is not installed, nothing happens (OS-level behavior)."
+
+      - id: EC-114-02
+        case: "Token is expired or invalid"
+        expected: "The reset-redirect function does NOT validate the token against the database. It simply passes the token through to the deep link. Token validation happens in the app's reset-password screen (existing behavior)."
+
+      - id: EC-114-03
+        case: "Auto-redirect blocked by browser"
+        expected: "The fallback button is visible. User can manually tap it to trigger the deep link."
+
+      - id: EC-114-04
+        case: "Email client renders HTML but strips JavaScript"
+        expected: "The email only contains the HTTPS link. JavaScript execution happens in the browser after clicking the link, not in the email client."
+
+  # =============================================================================
+  # F115 / CR-177: Align right edge of StatusLED circle with right edge of
+  #   speaker name field
+  # =============================================================================
+
+  - id: F115
+    name: "SpeechSlot: align right edge of status circle with right edge of speaker name field"
+    cr_id: 177
+    type: ui
+    priority: medium
+    related_features: [F100, F103, F112]
+    related_crs: [119, 162, 165, 174, 177]
+    supersedes: "CR-174/F112 approach (fixed-width right column for center-to-center alignment of LED with X button)"
+
+    user_request: >
+      "No card expandido de domingo para designacao de discursos, alinhar a
+      direita do circulo de status com a direita do campo do nome do discursante"
+
+    current_behavior: >
+      The current SpeechSlot.tsx layout (after F112/CR-174) uses a two-column
+      structure:
+
+      - outerRow: flexDirection 'row'
+        - leftColumn (flex: 1): contains labelRow, speaker field row, topic row
+          - labelRow: label text + status text (Pressable)
+        - rightColumn (width: 36, alignItems: 'center'):
+          - statusLedWrapper: StatusLED (14px circle, centered in 36px column)
+          - speakerActionWrapper: X remove button (centered in 36px column)
+          - topicActionWrapper: topic X button (centered in 36px column)
+
+      The StatusLED circle (14px) is centered within the 36px right column.
+      This means the right edge of the LED is at 36/2 + 14/2 = 25px from the
+      left edge of the right column, which places it 36 - 25 = 11px from the
+      right edge of the right column.
+
+      Meanwhile, the speaker name field (in the leftColumn) ends at the left
+      edge of the rightColumn. The rightColumn adds 36px beyond the field's
+      right edge.
+
+      Result: the StatusLED circle's right edge is approximately 25px beyond
+      the right edge of the speaker name field. The user wants them aligned.
+
+    expected_behavior: >
+      Move the StatusLED from the rightColumn back into the leftColumn,
+      specifically placing it inside the labelRow alongside the status text.
+      This way, the LED sits within the same horizontal bounds as the speaker
+      field below it.
+
+      **Implementation approach: StatusLED inside labelRow (leftColumn)**
+
+      1. Remove the statusLedWrapper from the rightColumn.
+      2. Place the StatusLED at the end of the labelRow (after the status text),
+         inside the leftColumn.
+      3. The labelRow layout becomes:
+         - LEFT: label text (e.g., "1O DISCURSO")
+         - RIGHT: status text + StatusLED (gap between them, e.g., 6px)
+         This can be achieved with the existing flexDirection: 'row',
+         justifyContent: 'space-between' on the labelRow, plus a wrapper
+         View for (status text + LED) on the right side.
+
+      4. The rightColumn continues to hold only the X remove button and the
+         topic X button. Alternatively, if the rightColumn becomes empty on
+         the label row level, it can still hold the action buttons for the
+         speaker and topic rows.
+
+      **Result:** The right edge of the StatusLED circle aligns with (or is
+      very close to) the right edge of the speaker name field, because both
+      are within the leftColumn which has flex: 1.
+
+      The status text remains visible and pressable. The StatusLED and status
+      text together form a pressable area for changing status. The status
+      change modal interaction is unchanged.
+
+      The X remove button and topic X button remain in the rightColumn, which
+      is acceptable since the user's request specifically asks for the status
+      circle to align with the field's right edge.
+
+    files_impacted:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Move StatusLED from rightColumn into labelRow (leftColumn), next to status text"
+          - "Create a wrapper View in labelRow for status text + StatusLED with flexDirection: 'row', alignItems: 'center', gap: 6"
+          - "StatusLED right edge now aligns with speaker field right edge (both in leftColumn)"
+          - "rightColumn retains only the X remove button and topic X button"
+          - "Remove statusLedWrapper from rightColumn"
+
+    acceptance_criteria:
+      - id: AC-115-01
+        description: "StatusLED circle right edge aligned with speaker name field right edge"
+        given: "Expanded SpeechSlot with assigned speaker"
+        when: "View the card"
+        then: "The right edge of the StatusLED circle on the label row is aligned with the right edge of the speaker name field below it"
+
+      - id: AC-115-02
+        description: "Alignment works for all 3 speech positions"
+        given: "3 expanded SpeechSlots with assigned speakers"
+        when: "View all slots"
+        then: "All 3 slots have consistent right-edge alignment between status circles and speaker fields"
+
+      - id: AC-115-03
+        description: "Status text visible and pressable"
+        given: "Expanded SpeechSlot with assigned speaker (bishopric or secretary role)"
+        when: "View the label row"
+        then: "Status text (e.g., 'Designado/Nao convidado') is visible next to the StatusLED"
+
+      - id: AC-115-04
+        description: "Status change modal still opens on press"
+        given: "Expanded SpeechSlot with assigned speaker (bishopric or secretary role)"
+        when: "Tap the status text or StatusLED circle"
+        then: "Status change modal opens as before"
+
+      - id: AC-115-05
+        description: "X remove button still functional"
+        given: "Expanded SpeechSlot with assigned speaker (bishopric role)"
+        when: "Tap the X remove button"
+        then: "Confirmation alert appears, and on confirm the assignment is removed"
+
+      - id: AC-115-06
+        description: "Topic clear button still functional"
+        given: "Expanded SpeechSlot with assigned speaker and topic (bishopric role)"
+        when: "Tap the topic X clear button"
+        then: "Topic assignment is cleared"
+
+      - id: AC-115-07
+        description: "Layout does not break on narrow screens"
+        given: "Device with narrow screen width (e.g., iPhone SE)"
+        when: "View expanded SpeechSlot"
+        then: "Speaker name truncates with ellipsis. Status text may truncate. Alignment is maintained. No text overflow."
+
+      - id: AC-115-08
+        description: "Alignment consistent when X is not visible"
+        given: "Expanded SpeechSlot without speaker assigned (no X button) or observer role"
+        when: "View the card"
+        then: "StatusLED circle position remains the same regardless of X button visibility"
+
+    edge_cases:
+      - id: EC-115-01
+        case: "Observer role (no X button, no status press)"
+        expected: "StatusLED circle right edge still aligned with speaker field right edge. LED is not pressable for observer."
+
+      - id: EC-115-02
+        case: "Secretary role (no X button for assignment, status pressable)"
+        expected: "StatusLED circle right edge aligned with field right edge. Status text and LED are pressable."
+
+      - id: EC-115-03
+        case: "Very long status text (e.g., 'Designado/Nao convidado')"
+        expected: "Status text may need to truncate or use a smaller font to fit in the available space between the label and the LED. The LED position remains at the right edge."
+
+      - id: EC-115-04
+        case: "Dark mode"
+        expected: "Alignment is identical in dark and light mode. Only colors change, not layout."
+
+      - id: EC-115-05
+        case: "Not assigned status (no LED interaction)"
+        expected: "StatusLED shows 'not_assigned' state. Position is the same as other statuses. Not pressable."
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: >
+      CR-175 (F113): The user's mention of "wardmanager://" in the request
+      refers to the current scheme name being wrong. Inspection shows the
+      code currently uses "sacrmeetman://" (changed from wardmanager:// in
+      CR-93). The user wants the final scheme to be "sacrmeetplan://".
+      The change is from sacrmeetman:// to sacrmeetplan:// in the codebase.
+    reason: "Code inspection confirms sacrmeetman://, not wardmanager://. CR-175 description in CHANGE_REQUESTS.yaml explicitly says sacrmeetman -> sacrmeetplan."
+    impact_if_wrong: "None. The change direction is unambiguous from the CR description."
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: >
+      CR-175 (F113): The iOS bundleIdentifier and Android package
+      (com.sacramentmeetingmanager.app) must NOT be changed. These are the
+      app store identifiers, not the URL scheme. The user's request to check
+      iOS and Android configuration is about the URL scheme only.
+    reason: "bundleIdentifier and package are separate from URL scheme. Changing them would break app store listings and updates."
+    impact_if_wrong: "Would require app store re-submission with a new identity, which is extremely unlikely to be intended."
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: >
+      CR-175 (F113): supabase/config.toml does not need changes because it
+      does not reference the deep link scheme. The config.toml only has
+      database and auth settings. The Supabase Dashboard Redirect URLs are
+      a manual configuration step.
+    reason: "Inspection of config.toml confirms no scheme reference. Redirect URLs are configured in the Supabase Dashboard UI."
+    impact_if_wrong: "None. config.toml genuinely does not reference the scheme."
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: >
+      CR-176 (F114): The reset-redirect Edge Function does NOT validate
+      the token against the database. It simply passes the token through to
+      the deep link URL. Token validation is handled by the app's
+      reset-password screen via verifyOtp (existing behavior unchanged).
+    reason: "The function is a simple HTTP-to-deep-link redirect. Adding DB validation would introduce unnecessary complexity and latency. The app already handles invalid/expired tokens."
+    impact_if_wrong: "Would need to add Supabase client initialization and token lookup, significantly increasing complexity."
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: >
+      CR-176 (F114): The fallback text in the reset-redirect HTML page
+      uses Portuguese (pt-BR) as default language since we cannot determine
+      the user's preferred language from the redirect URL parameters. The
+      redirect URL only carries token and type params. Adding a language
+      param to the redirect URL would increase complexity without
+      significant benefit (the auto-redirect should work in most cases).
+    reason: "The primary user base uses pt-BR. The auto-redirect is the main mechanism; the fallback is for edge cases only."
+    impact_if_wrong: "Could add a 'lang' query param to the redirect URL if multi-language fallback is needed. Low priority."
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: >
+      CR-177 (F115): This CR supersedes CR-174/F112's alignment requirement.
+      CR-174 asked for center-to-center alignment of StatusLED with the X
+      button. CR-177 asks for right-edge alignment of StatusLED with the
+      speaker field. These are different requirements. F115 implements
+      CR-177's request (right edge of circle = right edge of field).
+    reason: "The user explicitly asks 'alinhar a direita do circulo de status com a direita do campo do nome'. This means right-edge alignment, not center-to-center."
+    impact_if_wrong: "Would need to revert to center-to-center alignment approach from F112."
+    needs_confirmation: false
+
+  - id: A-7
+    assumption: >
+      CR-177 (F115): Moving the StatusLED into the labelRow (leftColumn)
+      is the recommended approach. This naturally aligns the LED's right
+      edge with the field's right edge because both elements are within
+      the same flex:1 column. The rightColumn remains for the X buttons
+      only.
+    reason: "The simplest way to achieve right-edge alignment is to place both elements in the same container. The rightColumn offset is what causes the misalignment."
+    impact_if_wrong: "Alternative approach: keep LED in rightColumn but reduce column width and add negative margin. More fragile."
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: I-1
+    description: >
+      CR-177 (F115) and CR-174 (F112) describe different alignment goals for
+      the same SpeechSlot component. F112 (Batch 17) asks for center-to-center
+      alignment of StatusLED with the X remove button. F115 (Batch 18) asks
+      for right-edge alignment of StatusLED with the speaker name field.
+      F112's layout restructuring (fixed-width right column) was the
+      implementation that created the current layout. F115 now modifies it
+      further by moving the LED out of the right column and into the label
+      row.
+    resolution: >
+      F115 supersedes F112's alignment approach. The implementation should
+      move the StatusLED from the rightColumn to the labelRow. The right
+      column remains for action buttons only. If F112 has been implemented,
+      its layout will be modified by F115. If F112 has not been implemented,
+      F115's approach should be used directly.
+    severity: low
+
+  - id: I-2
+    description: >
+      The user's request for CR-175 mentions "wardmanager://" but the code
+      currently uses "sacrmeetman://" (changed in CR-93). The target scheme
+      is "sacrmeetplan://". The CHANGE_REQUESTS.yaml correctly states the
+      change is from sacrmeetman:// to sacrmeetplan://.
+    resolution: >
+      Follow CHANGE_REQUESTS.yaml: change from sacrmeetman:// to
+      sacrmeetplan://. The user's reference to "wardmanager://" is either
+      outdated terminology or refers to the original scheme name.
+    severity: low
+
+  - id: I-3
+    description: >
+      F001 description in SPEC_CONSOLIDATED.yaml still references
+      "wardmanager://invite/{token}" in the description text. This should
+      be updated to reflect the current scheme after F113 is implemented.
+    resolution: >
+      Update F001 description in SPEC_CONSOLIDATED.yaml to use
+      sacrmeetplan://invite/{token} after F113 is implemented. Also update
+      F037 description to note the scheme was further changed to
+      sacrmeetplan:// in CR-175.
+    severity: low

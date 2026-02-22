@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-21"
-  total_features: 103
-  total_change_requests: 169
+  total_features: 106
+  total_change_requests: 172
   implemented_crs: 96
-  pending_crs: 71
+  pending_crs: 74
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -60,6 +60,7 @@ metadata:
     - docs/specs/SPEC_F101_F102.yaml
     - docs/specs/SPEC_F103_F109.yaml
     - docs/specs/SPEC_F110_F112.yaml
+    - docs/specs/SPEC_F113_F115.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -258,7 +259,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 106 CRs, 95 implementados)
+# FEATURES (estado atual apos 106 features, 172 CRs, 96 implementados)
 # =============================================================================
 
 features:
@@ -2051,8 +2052,65 @@ features:
       - "Removes paddingRight:5 from statusSection (CR-165 remnant)"
       - "Fixed-width right column approach recommended"
 
+  - id: F113
+    name: "Change deep link scheme from sacrmeetman:// to sacrmeetplan://"
+    status: pending
+    rfs: []
+    description: >
+      Alterar scheme de deep link de sacrmeetman:// para sacrmeetplan:// em
+      3 locais: app.json (scheme), create-invitation Edge Function (deep link
+      de convite), send-reset-email Edge Function (deep link de reset de
+      senha). Nao alterar bundleIdentifier ou package do app. Atualizar
+      Redirect URLs no Supabase Dashboard (manual).
+    modified_by_crs: [175]
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    notes:
+      - "CR-175: Scheme sacrmeetman:// deve ser sacrmeetplan://"
+      - "3 arquivos de codigo fonte impactados"
+      - "6 acceptance criteria"
+      - "Requer atualizacao manual das Redirect URLs no Supabase Dashboard"
+      - "Supersede parcial do CR-93/F037 (que mudou wardmanager -> sacrmeetman)"
+
+  - id: F114
+    name: "Email reset: HTTPS redirect Edge Function to make reset button clickable"
+    status: pending
+    rfs: []
+    description: >
+      Email de recuperacao de senha usa custom URL scheme no href do botao,
+      que email clients bloqueiam. Criar Edge Function HTTPS intermediaria
+      (reset-redirect) que recebe token via query params e serve pagina HTML
+      com auto-redirect para sacrmeetplan://reset-password. Alterar
+      send-reset-email para usar URL HTTPS no email ao inves do scheme custom.
+    modified_by_crs: [176]
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    notes:
+      - "CR-176: Botao do email nao clicavel por bloqueio de custom schemes"
+      - "1 arquivo criado (reset-redirect Edge Function), 1 modificado (send-reset-email)"
+      - "8 acceptance criteria"
+      - "URL HTTPS: https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery"
+      - "Fallback button na pagina HTML para redirect manual"
+
+  - id: F115
+    name: "SpeechSlot: align right edge of status circle with right edge of speaker name field"
+    status: pending
+    rfs: []
+    description: >
+      Mover StatusLED do rightColumn para o labelRow (leftColumn), ao lado
+      do texto de status. Isso alinha a borda direita do circulo com a borda
+      direita do campo do discursante. rightColumn permanece apenas para
+      botoes X. Supersede a abordagem de alinhamento centro-a-centro do
+      CR-174/F112.
+    modified_by_crs: [177]
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    notes:
+      - "CR-177: Alinhar direita do circulo com direita do campo do nome"
+      - "Supersede CR-174/F112 (alinhamento centro-a-centro)"
+      - "8 acceptance criteria"
+      - "1 arquivo modificado (SpeechSlot.tsx)"
+      - "Move StatusLED de rightColumn para labelRow"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (71 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17)
+# PENDING CHANGE REQUESTS (74 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18)
 # =============================================================================
 
 pending_crs:
@@ -3531,8 +3589,75 @@ pending_crs:
     files_likely_impacted:
       - src/components/SpeechSlot.tsx
 
-# =============================================================================
-# DESIGN DECISIONS (consolidadas de todos os batches)
+  # --- Batch 18 (Deep link scheme fix, Email reset redirect, Status circle alignment) ---
+
+  - id: 175
+    type: bug
+    area: "Deep Links (F037, F001, F101)"
+    feature_id: F113
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    related_crs: [93]
+    description: >
+      Deep link scheme deve ser sacrmeetplan:// em vez de sacrmeetman://.
+      Trocar em app.json, create-invitation Edge Function e send-reset-email
+      Edge Function. Atualizar Redirect URLs no Supabase Dashboard (manual).
+    acceptance_criteria:
+      - "app.json scheme is 'sacrmeetplan'"
+      - "create-invitation uses sacrmeetplan://invite/"
+      - "send-reset-email uses sacrmeetplan://reset-password"
+      - "No sacrmeetman:// or wardmanager:// in production code"
+      - "bundleIdentifier and package unchanged"
+    files_likely_impacted:
+      - app.json
+      - supabase/functions/create-invitation/index.ts
+      - supabase/functions/send-reset-email/index.ts
+
+  - id: 176
+    type: bug
+    area: "Password Reset (F101, F088)"
+    feature_id: F114
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    related_crs: [67, 145, 155]
+    description: >
+      Email de recuperacao de senha tem botao nao clicavel porque email
+      clients bloqueiam custom URL schemes. Criar Edge Function HTTPS
+      intermediaria (reset-redirect) que serve HTML com auto-redirect
+      para sacrmeetplan://reset-password. Alterar send-reset-email para
+      usar URL HTTPS no email.
+    acceptance_criteria:
+      - "Email href uses HTTPS URL (not custom scheme)"
+      - "reset-redirect Edge Function exists"
+      - "reset-redirect returns HTML with auto-redirect to sacrmeetplan://"
+      - "Fallback button included in HTML"
+      - "Required params (token, type) validated"
+      - "CORS preflight handled"
+      - "Deep link uses sacrmeetplan:// (not sacrmeetman://)"
+    files_likely_impacted:
+      - supabase/functions/send-reset-email/index.ts
+      - supabase/functions/reset-redirect/index.ts (new)
+
+  - id: 177
+    type: ui
+    area: "SpeechSlot (F100, F112)"
+    feature_id: F115
+    spec_file: "docs/specs/SPEC_F113_F115.yaml"
+    related_crs: [119, 162, 165, 174]
+    description: >
+      Alinhar direita do circulo de status com direita do campo do nome
+      do discursante. Mover StatusLED do rightColumn para labelRow
+      (leftColumn). Supersede alinhamento centro-a-centro do CR-174/F112.
+    acceptance_criteria:
+      - "StatusLED right edge aligned with speaker field right edge"
+      - "Alignment works for all 3 speech positions"
+      - "Status text visible and pressable"
+      - "Status change modal still opens"
+      - "X remove button still functional"
+      - "Topic clear button still functional"
+      - "Layout does not break on narrow screens"
+      - "Alignment consistent when X is not visible"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
 # =============================================================================
 
 design_decisions:
@@ -4708,3 +4833,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F110_F112.yaml (CR-172 to CR-174 - Stake announcements in presentation, AgendaForm label fix, SpeechSlot alignment)"
     summary: "Add stake announcements card to presentation mode when toggle is on (3 languages), fix redundant last speech label in AgendaForm, restructure SpeechSlot layout for center-to-center alignment of StatusLED and X button (supersedes CR-165 approach)."
+
+  batch_18:
+    range: "CR-175 a CR-177"
+    status: "3 pendentes (175, 176, 177)"
+    files:
+      - "docs/specs/SPEC_F113_F115.yaml (CR-175 to CR-177 - Deep link scheme fix, Email reset HTTPS redirect, Status circle right-alignment)"
+    summary: "Change deep link scheme from sacrmeetman:// to sacrmeetplan:// in 3 files, create HTTPS redirect Edge Function (reset-redirect) so email reset button is clickable in email clients, align right edge of StatusLED circle with right edge of speaker name field (supersedes F112 center-to-center approach)."

@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-21"
-  last_updated_by: "batch-17"
+  last_updated_by: "batch-18"
   total_modules: 8
-  total_adrs: 67
-  total_crs_implemented: 105
+  total_adrs: 69
+  total_crs_implemented: 108
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -37,6 +37,7 @@ metadata:
     - docs/arch/ARCH_M028.yaml
     - docs/arch/ARCH_M029.yaml
     - docs/arch/ARCH_M030.yaml
+    - docs/arch/ARCH_M031.yaml
 
 # =============================================================================
 # TECH STACK
@@ -59,7 +60,7 @@ tech_stack:
   file_system: "expo-file-system v19 (new File/Paths API)"
   notifications: "Expo Push Notifications"
   storage: "AsyncStorage (offline queue, theme preference)"
-  deep_links: "expo-linking (sacrmeetman://invite/{token}, sacrmeetman://reset-password?token=...&type=recovery)"
+  deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Changed from sacrmeetman:// to sacrmeetplan:// in CR-175/F113."
   csv: "expo-document-picker + expo-file-system + expo-sharing"
 
 # =============================================================================
@@ -105,7 +106,7 @@ system_diagram: |
   │                     Supabase Backend                              │
   │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
   │  │   Auth   │  │ PostgREST│  │ Realtime │  │ Edge Functions │  │
-  │  │  (JWT)   │  │  (CRUD)  │  │  (WS)    │  │ 9 functions    │  │
+  │  │  (JWT)   │  │  (CRUD)  │  │  (WS)    │  │ 10 functions   │  │
   │  └──────────┘  └──────────┘  └──────────┘  │ 1 push cron    │  │
   │                                             └────────────────┘  │
   │  ┌──────────────────────────────────────────────────────────┐   │
@@ -148,7 +149,7 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023, F101]
+    spec_features: [F001, F018, F023, F101, F113, F114]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
@@ -176,7 +177,8 @@ modules:
       - update-user-name
       - delete-user
       - send-reset-email
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155]
+      - reset-redirect
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -187,6 +189,8 @@ modules:
       CR-155/F101: forgot-password.tsx chama Edge Function send-reset-email em vez de resetPasswordForEmail.
       reset-password.tsx suporta token via deep link query params (verifyOtp) com fallback para PASSWORD_RECOVERY event.
       AuthContext expoe: session, user, role, wardId, userName, loading, signIn, signOut, hasPermission.
+      CR-175/F113: Deep link scheme changed from sacrmeetman:// to sacrmeetplan:// in app.json, create-invitation, and send-reset-email.
+      CR-176/F114: send-reset-email now uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme in email href. New reset-redirect Edge Function serves HTML with auto-redirect to sacrmeetplan://reset-password deep link.
 
   - id: M002
     name: WardDataModule
@@ -247,7 +251,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -264,7 +268,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -295,6 +299,7 @@ modules:
       CR-163/F098: speeches.selectSpeaker i18n changed to 'Selecionar Discursante' (pt-BR), 'Select Speaker' (en), 'Seleccionar Discursante' (es).
       CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED by CR-174/F112.
       CR-174/F112: SpeechSlot layout restructured to fixed-width right column (36px) for true center-to-center alignment of StatusLED and X buttons. Supersedes ADR-074 paddingRight:5 approach (ADR-076).
+      CR-177/F115: SpeechSlot StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only. Supersedes ADR-076 LED placement (ADR-078).
 
   - id: M004
     name: AgendaModule
@@ -462,7 +467,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -502,6 +507,7 @@ modules:
       CR-168/F106: All 8 Settings sub-screens back button Pressable gets hitSlop={12} for 44px+ touch target.      CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED by CR-174/F112.
       CR-169/F107: SundayCard collapsed: render Text(' ') when no speaker name to maintain consistent row height.
       CR-174/F112: SpeechSlot layout restructured to fixed-width right column for center-to-center alignment (supersedes paddingRight:5, ADR-076 supersedes ADR-074).
+      CR-175/F113: app.json scheme changed from sacrmeetman to sacrmeetplan. Deep link scheme updated globally.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -623,7 +629,7 @@ adrs:
     decided_in: "M008"
     consequences:
       - "Convention over configuration for routes"
-      - "Deep link support built-in for sacrmeetman://invite/{token} (changed from wardmanager:// in CR-93)"
+      - "Deep link support built-in for sacrmeetplan://invite/{token} (changed from wardmanager:// in CR-93, then to sacrmeetplan:// in CR-175)"
 
   - id: ADR-010
     title: "Replace sunday type enum with corrected list"
@@ -1194,6 +1200,27 @@ adrs:
       - "Layout restructure (more complex but robust)"
       - "paddingRight:5 removed (ADR-074 superseded)"
 
+  - id: ADR-077
+    title: "HTTPS redirect Edge Function as email-to-deep-link bridge for password reset"
+    context: "Email clients block custom URL schemes in <a href>. Password reset button not clickable."
+    decision: "New Edge Function reset-redirect accepts GET with token+type params, returns HTML with auto-redirect to sacrmeetplan://reset-password. send-reset-email uses HTTPS URL pointing to reset-redirect."
+    decided_in: "CR-176"
+    consequences:
+      - "Email CTA button clickable in all email clients (HTTPS scheme)"
+      - "New Edge Function to deploy (minimal: ~50 lines, no DB access)"
+      - "Adds one extra HTTP hop (email -> browser -> redirect -> app)"
+
+  - id: ADR-078
+    title: "StatusLED moved to labelRow for right-edge alignment with speaker field (supersedes ADR-076 LED placement)"
+    context: "CR-177/F115 requires right edge of StatusLED to align with right edge of speaker field. ADR-076 places LED in rightColumn (36px) which extends beyond the field."
+    decision: "Move StatusLED from rightColumn back into labelRow (leftColumn flex:1), grouped with statusText in a Pressable. rightColumn retains X buttons only."
+    decided_in: "CR-177"
+    supersedes: "ADR-076 (partial -- LED placement only; rightColumn for X buttons retained)"
+    consequences:
+      - "LED right edge aligns with field right edge (same flex container)"
+      - "StatusText and LED remain grouped and tappable"
+      - "X buttons still in rightColumn (unchanged)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1401,9 +1428,17 @@ edge_functions:
   - name: send-reset-email
     auth: "None (unauthenticated, ANON key only)"
     input: "{email}"
-    behavior: "Looks up user, determines ward language, generates recovery token via admin.generateLink, sends translated email via Resend API with deep link sacrmeetman://reset-password?token=...&type=recovery."
+    behavior: "Looks up user, determines ward language, generates recovery token via admin.generateLink, sends translated email via Resend API with HTTPS redirect URL (https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery). CR-175 changed scheme to sacrmeetplan://. CR-176 changed deepLink from custom scheme to HTTPS redirect URL."
     verify_jwt: false
     added_in: "CR-155"
+    modified_by_crs: [175, 176]
+
+  - name: reset-redirect
+    auth: "None (public endpoint, no JWT required)"
+    input: "GET query params: token (required), type (required)"
+    behavior: "Returns HTML page with auto-redirect (meta refresh + JavaScript) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only)."
+    verify_jwt: false
+    added_in: "CR-176"
 
 # =============================================================================
 # ROLES AND PERMISSIONS
@@ -1458,7 +1493,7 @@ security:
     provider: "Supabase Auth (email/password)"
     session: "JWT with app_metadata (role, ward_id, full_name)"
     token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
-    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API, deep link with verifyOtp token."
+    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. CR-176/F114: email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). CR-175/F113: deep link scheme changed to sacrmeetplan://."
 
   authorization:
     rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"
@@ -1515,9 +1550,12 @@ cross_cutting:
     animations: "react-native-reanimated for accordion, LED, presentation transitions"
 
   deep_links:
-    scheme: "sacrmeetman://invite/{token}"
+    scheme: "sacrmeetplan://invite/{token}"
+    reset_scheme: "sacrmeetplan://reset-password?token=...&type=recovery"
     handler: "expo-linking routes to (auth)/invite/[token].tsx"
-    notes: "Changed from wardmanager:// to sacrmeetman:// (CR-93, ADR-009 updated)"
+    reset_handler: "expo-linking routes to (auth)/reset-password.tsx"
+    redirect: "send-reset-email uses HTTPS redirect URL (reset-redirect EF) so email buttons are clickable"
+    notes: "Changed from wardmanager:// to sacrmeetman:// (CR-93), then to sacrmeetplan:// (CR-175/F113). ADR-009 updated."
 
   activity_logging:
     utility: "src/lib/activityLog.ts"
@@ -1587,7 +1625,7 @@ file_structure:
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
     "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5)."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078)."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop."
@@ -1641,6 +1679,8 @@ file_structure:
       "update-user-name/": "Auto-edicao de nome (CR-81)"
       "delete-user/": "Remove usuario"
       "process-notifications/": "Cron: processa fila de push"
+      "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL."
+      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com fallback button. Sem auth, sem DB. (CR-176/F114)"
 
   "scripts/":
     "import-hymns.ts": "CLI script para importar hinos de CSV (CR-51)"
@@ -1663,14 +1703,25 @@ key_flows:
 
   invite_registration:
     steps:
-      - "User abre deep link sacrmeetman://invite/{token}"
+      - "User abre deep link sacrmeetplan://invite/{token}"
       - "Expo Router rota para (auth)/invite/[token].tsx"
       - "Screen valida token via EF, mostra campos read-only (stake, ward, role)"
       - "User preenche Nome e Password"
       - "Client chama register-invited-user EF"
       - "EF cria user, marca invitation used, retorna session"
 
-  speech_assignment:
+  password_reset:
+    steps:
+      - "User toca 'Esqueci minha senha' na tela de login"
+      - "forgot-password.tsx chama Edge Function send-reset-email com {email}"
+      - "send-reset-email EF: lookup user, get ward language, generateLink(recovery)"
+      - "send-reset-email EF: builds HTTPS redirect URL (https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery)"
+      - "send-reset-email EF: sends email via Resend API with HTTPS URL in <a href>"
+      - "User clica botao no email -> browser abre HTTPS redirect URL"
+      - "reset-redirect EF: retorna HTML com auto-redirect (meta refresh + JS) para sacrmeetplan://reset-password?token=TOKEN&type=recovery"
+      - "App abre reset-password.tsx com token via deep link query params"
+      - "reset-password.tsx: verifyOtp({ token_hash, type: 'recovery' }) estabelece sessao"
+      - "User define nova senha -> updateUser({ password }) -> sucesso"
     steps:
       - "Bishopric expande SundayCard -> lazy creation de 3 speech records"
       - "Seleciona Speaker via MemberSelectorModal -> mutation seta member_id, snapshot name/phone, status=assigned_not_invited"
@@ -1963,6 +2014,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-076]
     new_files: []
+
+  batch_18:
+    crs: "CR-175, CR-176, CR-177"
+    scope: "Deep link scheme change sacrmeetman -> sacrmeetplan (F113), HTTPS redirect Edge Function for password reset email (F114), SpeechSlot status circle right-edge alignment with speaker field (F115)"
+    doc: "ARCH_M031.yaml"
+    status: "pending implementation"
+    adrs: [ADR-077, ADR-078]
+    new_files: ["supabase/functions/reset-redirect/index.ts"]
 
 # =============================================================================
 # OBSERVABILITY

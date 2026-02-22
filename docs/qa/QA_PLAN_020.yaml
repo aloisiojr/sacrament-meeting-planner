@@ -1,0 +1,211 @@
+type: qa_plan
+id: QA-020
+created_at: "2026-02-21"
+request_type: bugfix
+feature_or_bug: "Batch 18: Deep link scheme fix (sacrmeetman -> sacrmeetplan), Email reset HTTPS redirect, Status circle right-alignment (CR-175, CR-176, CR-177 / F113, F114, F115)"
+user_request: |
+  1. Convite para adicionar usuario esta vindo com o dominio wardmanager:// tem que ser sacrmeetplan:// Verifique todo o codigo e toda configuracao do supabase e toda a configuracao dos pacotes iOS e Android. Lembrando que esse dominio tambem e usado na recuperacao de senha.
+  2. O email de recuperacao de senha vem com o link montado, mas o botao nao e clicavel, eu tive que abrir o codigo HTML para achar o link la dentro.
+  3. No card expandido de domingo para designacao de discursos, alinhar a direita do circulo de status com a direita do campo do nome do discursante
+
+# Estado atual documentado
+baseline:
+  description: |
+    All 4649 tests pass across 78 test files. TypeScript compiles (17 pre-existing errors, none new).
+
+    CR-175 (F113): Deep link scheme is currently "sacrmeetman" (not "sacrmeetplan").
+    - app.json line 10: "scheme": "sacrmeetman"
+    - create-invitation/index.ts line 170: sacrmeetman://invite/${invitationToken}
+    - send-reset-email/index.ts line 194: sacrmeetman://reset-password?token=${hashed_token}&type=recovery
+    - iOS bundleIdentifier: com.sacramentmeetingmanager.app (app.json line 18)
+    - Android package: com.sacramentmeetingmanager.app (app.json line 29)
+    - supabase/config.toml: site_url is http://127.0.0.1:3000 (local dev, no redirect_urls configured in toml)
+    - Supabase Dashboard: needs Redirect URLs update (not in code, manual config)
+    - Tests in batch7-f035-f039.test.ts assert scheme is "sacrmeetman" (will need update)
+    - Tests in batch15-phase2.test.ts assert sacrmeetman://reset-password (will need update)
+    User reported scheme is still "wardmanager://" which contradicts code. The code shows
+    "sacrmeetman" but user says "wardmanager". The CR description in CHANGE_REQUESTS.yaml
+    says to change from sacrmeetman:// to sacrmeetplan://. The user_request mentions
+    wardmanager:// but that was already changed to sacrmeetman:// in CR-93. The user likely
+    wants sacrmeetplan:// as the final scheme name (per CR-175 description).
+
+    CR-176 (F114): Password reset email button not clickable.
+    - send-reset-email/index.ts builds deep link as sacrmeetman://reset-password?token=...
+    - The <a href="sacrmeetman://..."> in the HTML email template uses a custom URL scheme.
+    - Most email clients (Gmail, Outlook, Yahoo) strip or block custom URL schemes in href
+      attributes, rendering the button non-clickable. Only the raw HTML shows the link.
+    - Solution per CR description: Create an HTTPS intermediary Edge Function (reset-redirect)
+      that redirects to the app deep link. The email would use an HTTPS URL that email
+      clients will render as a clickable link.
+
+    CR-177 (F115): Status circle right-alignment in expanded speech card.
+    - SpeechSlot.tsx uses a two-column layout: leftColumn (flex:1) + rightColumn (width:36, alignItems:'center').
+    - The StatusLED (size=14) is centered in the 36px rightColumn.
+    - The speaker name field is in leftColumn with flex:1.
+    - Currently the LED center is aligned with the X button center (CR-174 fix).
+    - User wants: the RIGHT edge of the status circle aligned with the RIGHT edge of the speaker name field.
+    - The right edge of the speaker name field = left edge of rightColumn = end of leftColumn.
+    - The LED circle (14px) is centered in the 36px column, so its right edge is at ~25px from left of rightColumn.
+    - These do NOT align. The LED is 25px to the right of the field's right edge.
+    - To align: the LED's right edge must coincide with the field's right edge, meaning
+      the LED should be positioned so its right edge is at position 0 of the rightColumn
+      (or the rightColumn should be eliminated and LED placed differently).
+
+  evidence:
+    - "app.json:10 -> scheme: sacrmeetman (NOT sacrmeetplan)"
+    - "create-invitation/index.ts:170 -> sacrmeetman://invite/${invitationToken}"
+    - "send-reset-email/index.ts:194 -> sacrmeetman://reset-password?token=${hashed_token}&type=recovery"
+    - "send-reset-email/index.ts:28-31 -> <a href='${deepLink}'> custom scheme in email HTML"
+    - "SpeechSlot.tsx rightColumn width:36, alignItems:center -> LED centered, not right-aligned with field"
+    - "batch7-f035-f039.test.ts -> 10 tests assert sacrmeetman scheme"
+    - "batch15-phase2.test.ts -> tests assert sacrmeetman://reset-password"
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+  # ============================
+  # CR-175 (F113): Deep link scheme fix
+  # ============================
+  - id: VC-01
+    description: "app.json scheme is sacrmeetplan (not sacrmeetman or wardmanager)"
+    type: functional
+    how_to_verify: "Read app.json, check expo.scheme value"
+    expected_result: "scheme: sacrmeetplan"
+    priority: must_pass
+
+  - id: VC-02
+    description: "create-invitation Edge Function uses sacrmeetplan:// in deep link"
+    type: functional
+    how_to_verify: "Read supabase/functions/create-invitation/index.ts, find deepLink variable"
+    expected_result: "sacrmeetplan://invite/${invitationToken}"
+    priority: must_pass
+
+  - id: VC-03
+    description: "send-reset-email Edge Function uses sacrmeetplan:// in deep link"
+    type: functional
+    how_to_verify: "Read supabase/functions/send-reset-email/index.ts, find deepLink variable"
+    expected_result: "sacrmeetplan://reset-password?token=${hashed_token}&type=recovery"
+    priority: must_pass
+
+  - id: VC-04
+    description: "No remaining references to sacrmeetman:// or wardmanager:// in source code (excluding test descriptions and docs)"
+    type: regression
+    how_to_verify: "Grep src/ and supabase/ directories for sacrmeetman:// and wardmanager://. Exclude test description strings and documentation."
+    expected_result: "Zero references to sacrmeetman:// or wardmanager:// in production code"
+    priority: must_pass
+
+  - id: VC-05
+    description: "iOS bundleIdentifier and Android package remain unchanged"
+    type: regression
+    how_to_verify: "Read app.json, check ios.bundleIdentifier and android.package"
+    expected_result: "Both remain com.sacramentmeetingmanager.app"
+    priority: must_pass
+
+  # ============================
+  # CR-176 (F114): Email reset HTTPS redirect
+  # ============================
+  - id: VC-06
+    description: "New Edge Function reset-redirect exists and performs HTTPS redirect"
+    type: functional
+    how_to_verify: "Check supabase/functions/reset-redirect/index.ts exists and contains redirect logic"
+    expected_result: "Edge Function that takes token parameter and redirects to app deep link"
+    priority: must_pass
+
+  - id: VC-07
+    description: "send-reset-email uses HTTPS URL (not custom scheme) in email template href"
+    type: functional
+    how_to_verify: "Read send-reset-email/index.ts, check the <a href> in email templates"
+    expected_result: "href uses https:// URL pointing to reset-redirect Edge Function"
+    priority: must_pass
+
+  - id: VC-08
+    description: "HTTPS redirect URL includes token and type parameters"
+    type: functional
+    how_to_verify: "Verify the HTTPS URL in email template includes necessary parameters for the redirect function"
+    expected_result: "URL includes token and type=recovery parameters"
+    priority: must_pass
+
+  - id: VC-09
+    description: "Reset-redirect Edge Function redirects to correct app deep link scheme (sacrmeetplan://)"
+    type: functional
+    how_to_verify: "Read reset-redirect Edge Function, verify it builds deep link with sacrmeetplan://"
+    expected_result: "Redirect target uses sacrmeetplan://reset-password?token=...&type=recovery"
+    priority: must_pass
+
+  # ============================
+  # CR-177 (F115): Status circle right-alignment
+  # ============================
+  - id: VC-10
+    description: "StatusLED right edge aligns with speaker name field right edge"
+    type: functional
+    how_to_verify: "Read SpeechSlot.tsx, analyze layout structure. The right edge of the LED must coincide with the right edge of the speaker name input field."
+    expected_result: "LED positioned so its right edge is flush with the right edge of the speaker field"
+    priority: must_pass
+
+  - id: VC-11
+    description: "Speaker name field still functional and displays correctly"
+    type: regression
+    how_to_verify: "Check SpeechSlot.tsx speaker Pressable field still has correct styling, onPress, accessibility"
+    expected_result: "Speaker field unchanged in functionality"
+    priority: must_pass
+
+  - id: VC-12
+    description: "Remove X button still functional and visible"
+    type: regression
+    how_to_verify: "Check SpeechSlot.tsx remove button Pressable still present with hitSlop, onPress, accessibilityLabel"
+    expected_result: "Remove button unchanged in functionality"
+    priority: must_pass
+
+  - id: VC-13
+    description: "Topic field and topic X button still work correctly"
+    type: regression
+    how_to_verify: "Check SpeechSlot.tsx topic Pressable and topic clear button"
+    expected_result: "Topic row functionality unchanged"
+    priority: must_pass
+
+  # ============================
+  # Cross-cutting
+  # ============================
+  - id: VC-14
+    description: "All test suites pass after changes"
+    type: regression
+    how_to_verify: "Run npx vitest run, verify all tests pass"
+    expected_result: "All tests pass with 0 failures"
+    priority: must_pass
+
+  - id: VC-15
+    description: "TypeScript compilation succeeds (no new errors)"
+    type: regression
+    how_to_verify: "Run npx tsc --noEmit, compare errors with baseline (17 pre-existing)"
+    expected_result: "No new TypeScript errors introduced"
+    priority: should_pass
+
+# Para bugfix: passos exatos de reproducao
+reproduction_steps:
+  # CR-175
+  - step: "Check app.json scheme value"
+    expected: "sacrmeetplan"
+    actual: "sacrmeetman (wrong scheme name)"
+
+  - step: "Check create-invitation Edge Function deep link"
+    expected: "sacrmeetplan://invite/${token}"
+    actual: "sacrmeetman://invite/${invitationToken} (wrong scheme)"
+
+  - step: "Check send-reset-email Edge Function deep link"
+    expected: "sacrmeetplan://reset-password?token=...&type=recovery"
+    actual: "sacrmeetman://reset-password?token=...&type=recovery (wrong scheme)"
+
+  # CR-176
+  - step: "Examine email HTML template <a href> in send-reset-email"
+    expected: "HTTPS URL that email clients will render as clickable"
+    actual: "Custom scheme sacrmeetman://... which email clients block/strip, making button non-clickable"
+
+  # CR-177
+  - step: "Examine SpeechSlot.tsx layout - check if LED right edge aligns with field right edge"
+    expected: "LED right edge flush with speaker field right edge"
+    actual: "LED centered in 36px rightColumn, right edge is ~25px past the field's right edge"
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.

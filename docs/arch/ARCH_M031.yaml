@@ -1,0 +1,474 @@
+# =============================================================================
+# ARCH_M031.yaml
+# Architecture for Batch 18: CR-175 to CR-177 (F113-F115)
+# Features: Deep link scheme fix (sacrmeetman -> sacrmeetplan),
+#           HTTPS redirect Edge Function for password reset email,
+#           SpeechSlot status circle right-edge alignment with speaker field
+# Created: 2026-02-21
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Change deep link scheme from sacrmeetman:// to sacrmeetplan:// across all
+    code locations (F113), create a new HTTPS redirect Edge Function so
+    password reset email buttons are clickable in email clients (F114), and
+    move StatusLED from the rightColumn back into the labelRow to align its
+    right edge with the speaker name field right edge (F115). F115 supersedes
+    the fixed-width right column approach from CR-174/F112 (ADR-076).
+  principles:
+    - "F113: Simple find-and-replace of scheme string in 3 locations (app.json, create-invitation, send-reset-email)"
+    - "F114: New Edge Function serves HTML page with auto-redirect to deep link; email href uses HTTPS URL"
+    - "F114: No token validation in redirect function (pass-through only, token validated in app)"
+    - "F115: Move LED into leftColumn/labelRow to naturally align right edges within same flex container"
+    - "No database schema changes, no new migrations"
+
+diagram: |
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F113: Deep link scheme change (3 locations)                     │
+  │                                                                  │
+  │  [app.json]         scheme: "sacrmeetman" -> "sacrmeetplan"      │
+  │  [create-invitation] sacrmeetman://invite/ -> sacrmeetplan://    │
+  │  [send-reset-email]  sacrmeetman://reset-password -> sacrmeetplan│
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F114: HTTPS redirect Edge Function for password reset           │
+  │                                                                  │
+  │  [Email Client]                                                  │
+  │       │ click HTTPS link                                         │
+  │       v                                                          │
+  │  [Browser] GET https://.../functions/v1/reset-redirect?token=T   │
+  │       │                                                          │
+  │       v                                                          │
+  │  [reset-redirect EF] ──returns──> HTML page                      │
+  │       │                                                          │
+  │       │  1. meta refresh -> sacrmeetplan://reset-password?token=T │
+  │       │  2. JS window.location.href redirect                     │
+  │       │  3. Fallback <a> button "Abrir no aplicativo"            │
+  │       v                                                          │
+  │  [App] sacrmeetplan://reset-password?token=T&type=recovery       │
+  │                                                                  │
+  │  [send-reset-email] deepLink now = HTTPS redirect URL            │
+  │    href="https://...supabase.co/functions/v1/reset-redirect?..." │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F115: SpeechSlot StatusLED right-edge alignment                 │
+  │                                                                  │
+  │  BEFORE (F112 layout, rightColumn approach):                     │
+  │  ┌─outerRow (row)─────────────────────────────────────────────┐  │
+  │  │ ┌─leftColumn (flex:1)──────────────┐ ┌─rightCol(36px)───┐ │  │
+  │  │ │ [LABEL]       [statusText]       │ │     [LED]        │ │  │
+  │  │ │ [speakerField]                   │ │     [X btn]      │ │  │
+  │  │ │ [topicField]                     │ │     [X btn]      │ │  │
+  │  │ └──────────────────────────────────┘ └──────────────────┘ │  │
+  │  └───────────────────────────────────────────────────────────┘  │
+  │  LED right edge is 25px beyond speaker field right edge.        │
+  │                                                                  │
+  │  AFTER (F115 layout, LED inside labelRow):                       │
+  │  ┌─outerRow (row)─────────────────────────────────────────────┐  │
+  │  │ ┌─leftColumn (flex:1)──────────────────┐ ┌─rightCol(36)─┐ │  │
+  │  │ │ [LABEL]    [statusText] [LED 14px]   │ │              │ │  │
+  │  │ │ [speakerField]                       │ │   [X btn]    │ │  │
+  │  │ │ [topicField]                         │ │   [X btn]    │ │  │
+  │  │ └──────────────────────────────────────┘ └──────────────┘ │  │
+  │  └───────────────────────────────────────────────────────────┘  │
+  │  LED right edge aligned with speaker field right edge            │
+  │  (both within leftColumn flex:1).                                │
+  └──────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F113 / CR-175: Deep link scheme change ---
+
+  - name: "app.json (modified for CR-175)"
+    file: app.json
+    responsibility: >
+      Change the Expo URL scheme from "sacrmeetman" to "sacrmeetplan" so the
+      app registers to handle sacrmeetplan:// deep links on iOS and Android.
+    dependencies: []
+    changes:
+      - description: "Change scheme value"
+        detail: |
+          Line 10: Change from:
+            "scheme": "sacrmeetman"
+          To:
+            "scheme": "sacrmeetplan"
+
+          iOS bundleIdentifier (com.sacramentmeetingmanager.app) and Android
+          package (com.sacramentmeetingmanager.app) must NOT be changed.
+
+  - name: "create-invitation Edge Function (modified for CR-175)"
+    file: supabase/functions/create-invitation/index.ts
+    responsibility: >
+      Change the deep link in invitation emails from sacrmeetman://invite/
+      to sacrmeetplan://invite/.
+    dependencies: []
+    changes:
+      - description: "Update deep link scheme"
+        detail: |
+          Line 170: Change from:
+            const deepLink = `sacrmeetman://invite/${invitationToken}`;
+          To:
+            const deepLink = `sacrmeetplan://invite/${invitationToken}`;
+
+  - name: "send-reset-email Edge Function (modified for CR-175 and CR-176)"
+    file: supabase/functions/send-reset-email/index.ts
+    responsibility: >
+      CR-175: Change the deep link scheme from sacrmeetman:// to sacrmeetplan://.
+      CR-176: Change the deepLink variable from a custom scheme URL to an HTTPS
+      redirect URL pointing to the new reset-redirect Edge Function. The email
+      templates' <a href> tags will now point to the HTTPS URL instead of the
+      custom scheme directly.
+    dependencies: ["reset-redirect Edge Function (F114)"]
+    changes:
+      - description: "CR-175 + CR-176: Change deepLink construction"
+        detail: |
+          Line 194: Change from:
+            const deepLink = `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`;
+          To:
+            const deepLink = `https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery`;
+
+          This single change addresses both CR-175 (no more sacrmeetman://) and
+          CR-176 (HTTPS URL is clickable in email clients). The email templates
+          do NOT need changes because they use the deepLink variable in their
+          <a href="${deepLink}"> tags. The redirect-to-deep-link happens in the
+          new reset-redirect Edge Function.
+
+  # --- F114 / CR-176: HTTPS redirect Edge Function ---
+
+  - name: "reset-redirect Edge Function (new for CR-176)"
+    file: supabase/functions/reset-redirect/index.ts
+    responsibility: >
+      New Edge Function that accepts GET requests with token and type query
+      params and returns an HTML page that auto-redirects to the app via
+      sacrmeetplan://reset-password?token=TOKEN&type=recovery deep link.
+      Serves as an HTTPS intermediary so email clients can render clickable
+      links (custom scheme URLs are blocked by email clients).
+    dependencies: []
+    changes:
+      - description: "New Edge Function implementation"
+        detail: |
+          Method: GET (primary), OPTIONS (CORS preflight)
+          Query params: token (required), type (required)
+          Auth: None (public endpoint, no JWT required)
+          verify_jwt: false
+
+          Implementation:
+          1. Parse URL query params (token, type)
+          2. Validate both params are present; return 400 if missing
+          3. Build deep link: sacrmeetplan://reset-password?token=${token}&type=${type}
+          4. Return HTML response (Content-Type: text/html) with:
+             a. <meta http-equiv="refresh" content="0;url=DEEP_LINK"> for
+                browsers that block JavaScript
+             b. <script>window.location.href = 'DEEP_LINK';</script> for
+                immediate redirect
+             c. Visible fallback button: <a href="DEEP_LINK"> styled as
+                a button with text "Abrir no aplicativo" (Portuguese default)
+             d. Basic centered styling with app branding text
+
+          CORS headers: same pattern as all other Edge Functions.
+          No database access. No token validation (pass-through only).
+          Token validation happens in the app (reset-password.tsx via verifyOtp).
+
+  # --- F115 / CR-177: SpeechSlot status circle right-edge alignment ---
+
+  - name: "SpeechSlot (modified for CR-177)"
+    file: src/components/SpeechSlot.tsx
+    responsibility: >
+      Move the StatusLED from the rightColumn back into the labelRow (inside
+      the leftColumn), placing it after the status text. This aligns the LED's
+      right edge with the speaker name field's right edge because both elements
+      are within the same flex:1 leftColumn. The rightColumn retains only the
+      X remove button and topic X button.
+    dependencies: []
+    changes:
+      - description: "Move StatusLED from rightColumn to labelRow"
+        detail: |
+          **Current structure (F112 layout):**
+          <View outerRow>
+            <View leftColumn (flex:1)>
+              <View labelRow>
+                <Text label />
+                <Pressable statusText onPress={handleStatusPress} />
+              </View>
+              <View row>
+                <Pressable field (flex:1)>...speaker...</Pressable>
+              </View>
+              <View topicRow>
+                <Pressable topicField (flex:1)>...topic...</Pressable>
+              </View>
+            </View>
+            <View rightColumn (width:36)>
+              <Pressable statusLedWrapper>
+                <StatusLED />         <-- MOVE THIS OUT
+              </Pressable>
+              <View speakerActionWrapper>
+                {X button}
+              </View>
+              <View topicActionWrapper>
+                {X button}
+              </View>
+            </View>
+          </View>
+
+          **New structure:**
+          <View outerRow>
+            <View leftColumn (flex:1)>
+              <View labelRow>
+                <Text label />
+                <Pressable statusSection onPress={handleStatusPress}>
+                  <Text statusText />
+                  <StatusLED />       <-- MOVED HERE (inside labelRow)
+                </Pressable>
+              </View>
+              <View row>
+                <Pressable field (flex:1)>...speaker...</Pressable>
+              </View>
+              <View topicRow>
+                <Pressable topicField (flex:1)>...topic...</Pressable>
+              </View>
+            </View>
+            <View rightColumn (width:36)>
+              <View statusLedPlaceholder />   <-- empty spacer for row alignment
+              <View speakerActionWrapper>
+                {X button}
+              </View>
+              <View topicActionWrapper>
+                {X button}
+              </View>
+            </View>
+          </View>
+
+          **Key design decisions:**
+
+          1. The StatusLED and statusText are grouped inside a Pressable
+             (statusSection) with flexDirection:'row', alignItems:'center',
+             and gap:6. This keeps both elements tappable to open the
+             StatusChangeModal.
+
+          2. The Pressable statusLedWrapper in the rightColumn is replaced
+             by an empty spacer View to maintain row height alignment between
+             the labelRow in leftColumn and the first slot in rightColumn.
+             This ensures speakerActionWrapper still aligns with the speaker
+             row.
+
+          3. The rightColumn width (36px) is preserved to hold the X buttons.
+             The rightColumn no longer holds the LED, but its width remains
+             so the X buttons stay in the same position.
+
+          4. Because both the StatusLED (in labelRow) and the speakerField
+             are children of leftColumn (flex:1), the LED's right edge
+             naturally aligns with the field's right edge. No padding or
+             margin adjustments needed.
+
+      - description: "Style changes summary"
+        detail: |
+          NEW/RESTORED styles:
+            statusSection: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+            }
+
+          MODIFIED styles:
+            statusLedWrapper: renamed/repurposed to empty spacer in rightColumn
+              (remove Pressable, keep as View with same height for alignment)
+
+          UNCHANGED styles:
+            outerRow, leftColumn, rightColumn (width:36 kept for X buttons),
+            labelRow (space-between), row, field, speakerActionWrapper,
+            topicRow, topicActionWrapper, topicField, removeButton,
+            label, statusText, fieldText, fieldArrow, topicText, container
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - name: "Deep link scheme (F113)"
+    component: "app.json, create-invitation/index.ts, send-reset-email/index.ts"
+    methods:
+      - name: "expo.scheme"
+        input: "N/A (configuration value)"
+        output: "'sacrmeetplan' (was 'sacrmeetman')"
+      - name: "create-invitation deepLink"
+        input: "invitationToken: string"
+        output: "'sacrmeetplan://invite/${invitationToken}'"
+      - name: "send-reset-email deepLink"
+        input: "hashed_token: string"
+        output: "'https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery' (HTTPS redirect URL, not direct deep link)"
+
+  - name: "reset-redirect Edge Function (F114)"
+    component: supabase/functions/reset-redirect/index.ts
+    methods:
+      - name: "GET /functions/v1/reset-redirect"
+        input: "query params: token (string, required), type (string, required)"
+        output: "HTML page (Content-Type: text/html) with auto-redirect to sacrmeetplan://reset-password?token=TOKEN&type=TYPE"
+        notes: "No authentication. No token validation. Returns 400 if params missing."
+      - name: "OPTIONS /functions/v1/reset-redirect"
+        input: "CORS preflight request"
+        output: "200 with CORS headers"
+
+  - name: "SpeechSlot LED alignment (F115)"
+    component: src/components/SpeechSlot.tsx
+    methods:
+      - name: "labelRow layout"
+        input: "StatusLED (14px circle), statusText"
+        output: "LED and statusText grouped inside Pressable (statusSection) at right end of labelRow; LED right edge aligned with speakerField right edge below"
+        notes: "Both elements are within leftColumn (flex:1). rightColumn retains X buttons only."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  migrations: []
+  notes: >
+    No database schema changes required. F113, F114, and F115 are all
+    code-level changes (Edge Functions, app configuration, UI component).
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    F113: Scheme change has no security impact. Deep link handling unchanged.
+
+    F114: The reset-redirect Edge Function is a public endpoint (no JWT).
+    It does NOT validate the token against the database. It simply passes
+    the token through to the deep link URL. This is intentional:
+    - Token validation happens in the app's reset-password screen (verifyOtp)
+    - The redirect function is a simple HTTP-to-deep-link bridge
+    - No sensitive data is exposed (token is already in the email)
+    - verify_jwt must be set to false in Edge Function config
+
+    F115: Client-side UI layout change. No security implications.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    F114: The reset-redirect Edge Function should log to console.error when
+    required params are missing (400 response). Standard Supabase Edge Function
+    logging applies. No custom metrics or alerting needed.
+
+    F113, F115: No observability changes needed.
+
+# =============================================================================
+# I18N
+# =============================================================================
+
+i18n:
+  new_keys: []
+  modified_keys: []
+  notes: >
+    No i18n changes. F113 is a scheme rename. F114's reset-redirect HTML uses
+    hardcoded Portuguese text for the fallback button ("Abrir no aplicativo")
+    since the user's language cannot be determined from the redirect URL.
+    F115 is a layout change with no text changes.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-077
+    title: "HTTPS redirect Edge Function as email-to-deep-link bridge for password reset"
+    context: >
+      Email clients (Gmail, Outlook, Apple Mail) block custom URL schemes
+      (sacrmeetplan://) in <a href> tags for security. The password reset
+      email button is not clickable because the href points directly to the
+      custom scheme. The user had to open the HTML source to find the link.
+      Options: (a) use Universal Links / App Links with HTTPS domain, (b)
+      create an HTTPS redirect page that bridges to the deep link, (c)
+      instruct users to copy the link manually.
+    decision: >
+      Create a new Edge Function "reset-redirect" that accepts GET requests
+      with token and type query params and returns an HTML page with
+      auto-redirect to sacrmeetplan://reset-password. The send-reset-email
+      Edge Function now builds an HTTPS URL pointing to reset-redirect instead
+      of the custom scheme directly. The HTTPS URL is clickable in all email
+      clients. The HTML page uses meta refresh + JavaScript redirect with a
+      visible fallback button.
+    decided_in: "CR-176"
+    consequences:
+      - "Email CTA button is clickable in all email clients (HTTPS scheme)"
+      - "Zero client-side code changes (redirect happens in browser before app)"
+      - "New Edge Function to deploy and maintain (minimal: ~50 lines)"
+      - "Adds one extra HTTP hop (email -> browser -> redirect -> app)"
+      - "Fallback button covers cases where auto-redirect fails (desktop, no app)"
+
+  - id: ADR-078
+    title: "StatusLED moved to labelRow for right-edge alignment with speaker field (supersedes ADR-076)"
+    context: >
+      CR-177/F115 requires the right edge of the StatusLED circle to align
+      with the right edge of the speaker name field. The current layout
+      (CR-174/F112, ADR-076) places the LED in a fixed-width rightColumn
+      (36px) which extends beyond the speaker field. The LED's right edge is
+      approximately 25px beyond the field's right edge. Moving the LED back
+      into the labelRow (inside leftColumn flex:1) naturally aligns the right
+      edges because both elements are within the same flex container.
+    decision: >
+      Move the StatusLED from the rightColumn back into the labelRow, grouped
+      with the statusText inside a Pressable (statusSection) with
+      flexDirection:'row', alignItems:'center', gap:6. The rightColumn retains
+      only the X remove button and topic X button. The rightColumn width (36px)
+      is preserved for the action buttons. The statusLedWrapper in the
+      rightColumn becomes an empty spacer for row alignment.
+    decided_in: "CR-177"
+    supersedes: "ADR-076 (partial -- LED placement only; rightColumn for X buttons retained)"
+    consequences:
+      - "StatusLED right edge aligns with speaker field right edge (same flex container)"
+      - "Simpler than rightColumn approach for LED positioning"
+      - "StatusText and LED remain grouped and tappable as a unit"
+      - "X buttons still in rightColumn (unchanged position and behavior)"
+      - "rightColumn has empty spacer in first row (minimal visual impact)"
+
+# =============================================================================
+# MANUAL STEPS
+# =============================================================================
+
+manual_steps:
+  - step: "Update Supabase Dashboard Redirect URLs (F113)"
+    description: >
+      Go to Supabase Dashboard > Authentication > URL Configuration >
+      Redirect URLs. Remove any sacrmeetman:// entries. Add:
+      - sacrmeetplan://invite/*
+      - sacrmeetplan://reset-password
+    responsibility: "Developer (manual, outside codebase)"
+
+  - step: "Deploy reset-redirect Edge Function (F114)"
+    description: >
+      After creating supabase/functions/reset-redirect/index.ts, deploy it
+      via supabase functions deploy reset-redirect. Ensure verify_jwt is
+      set to false for this function (it is a public endpoint).
+    responsibility: "Developer (deployment step)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M031.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED atualizado (pending - will be updated next)
+  GATE-07: true  # ARCH_SUMMARY preenchido com status correto
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (5 component entries)

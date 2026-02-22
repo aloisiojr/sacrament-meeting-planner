@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-21"
-  version: 19
-  last_updated_by: "batch-17"
+  version: 20
+  last_updated_by: "batch-18"
   total_phases: 6
-  total_cr_plans: 36
+  total_cr_plans: 37
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -691,6 +691,29 @@ cr_plans:
       ADR-074). S01-S03 totalmente parallelizaveis (todos independentes), S04 (testes)
       depende de todos.
 
+  - id: PLAN_P031
+    title: "Batch 18: Deep Link Scheme Fix, HTTPS Email Redirect, Status Circle Alignment"
+    status: pending
+    crs_covered: [175, 176, 177]
+    total_steps: 5
+    plan_ref: "docs/plans/PLAN_P031.yaml"
+    summary: >
+      3 features cobrindo deep link, Edge Function e UI: mudanca do scheme de deep link
+      de sacrmeetman:// para sacrmeetplan:// em 3 locais (app.json, create-invitation,
+      send-reset-email) com atualizacao de testes existentes que assertam o scheme antigo
+      (F113), nova Edge Function reset-redirect como bridge HTTPS->deep link que serve
+      HTML com meta refresh + JS redirect + fallback button para tornar botao de reset de
+      senha clicavel em email clients + alteracao do deepLink em send-reset-email para URL
+      HTTPS apontando para reset-redirect (F114), e movimentacao do StatusLED do rightColumn
+      de volta para o labelRow (leftColumn) agrupado com statusText em Pressable
+      (statusSection) com flexDirection:'row', alignItems:'center', gap:6 para alinhar
+      borda direita do circulo com borda direita do campo de nome do discursante,
+      supersedendo abordagem ADR-076 pelo ADR-078 (F115). 3 features, 22 ACs, 12 ECs,
+      6 arquivos impactados (1 novo + 5 modificados + 2 testes atualizados), zero
+      migracoes de banco, zero dependencias novas. 2 ADRs: ADR-077 (HTTPS redirect
+      Edge Function), ADR-078 (StatusLED no labelRow supersedes ADR-076). S01, S02, S03
+      parallelizaveis (S04 pode paralelizar com S03), S05 (testes novos) depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -969,6 +992,15 @@ pending_with_plan:
   - cr_id: 174
     plan_id: PLAN_P030
     description: "Reestruturar SpeechSlot com coluna direita fixa para alinhamento centro-a-centro LED/X"
+  - cr_id: 175
+    plan_id: PLAN_P031
+    description: "Mudar scheme de deep link de sacrmeetman:// para sacrmeetplan:// em 3 locais"
+  - cr_id: 176
+    plan_id: PLAN_P031
+    description: "Nova Edge Function reset-redirect HTTPS para tornar botao de reset clicavel em emails"
+  - cr_id: 177
+    plan_id: PLAN_P031
+    description: "Alinhar borda direita do circulo de status com borda direita do campo de nome"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -990,6 +1022,19 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 20
+    phase: "batch-18"
+    changes:
+      - "Added PLAN_P031 for Batch 18 (F113-F115, CRs 175/176/177)"
+      - "3 features: deep link scheme change sacrmeetman->sacrmeetplan, HTTPS redirect Edge Function for email reset, StatusLED right-edge alignment with speaker field"
+      - "5 steps, 22 ACs, 12 ECs, 6 arquivos impactados (1 novo + 5 modificados + 2 testes atualizados)"
+      - "Zero migracoes de banco, zero dependencias novas"
+      - "2 ADRs: ADR-077 (HTTPS redirect Edge Function as email bridge), ADR-078 (StatusLED no labelRow supersedes ADR-076)"
+      - "F113 e substituicao simples de scheme em 3 locais (app.json, create-invitation, send-reset-email)"
+      - "F114 cria nova Edge Function reset-redirect como bridge HTTPS->deep link, altera send-reset-email para URL HTTPS"
+      - "F115 supersedes F112/ADR-076 (move LED de rightColumn para labelRow no leftColumn)"
+      - "S01, S02, S03 parallelizaveis (S04 pode paralelizar com S03), S05 depende de todos"
+      - "S04 atualiza testes existentes em batch7-f035-f039.test.ts e batch15-phase2.test.ts"
   - version: 19
     phase: "batch-17"
     changes:

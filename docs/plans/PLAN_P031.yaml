@@ -1,0 +1,575 @@
+# =============================================================================
+# PLAN_P031.yaml
+# Batch 18: Deep link scheme fix, HTTPS email redirect, Status circle alignment
+# Features: F113 (CR-175), F114 (CR-176), F115 (CR-177)
+# Created: 2026-02-21
+# Phase: 1 of 1
+# Total ACs: 22 (F113: 6, F114: 8, F115: 8)
+# Total ECs: 12 (F113: 3, F114: 4, F115: 5)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 18
+created: "2026-02-21"
+last_updated: "2026-02-21"
+spec_ref: "docs/specs/SPEC_F113_F115.yaml"
+arch_ref: "docs/arch/ARCH_M031.yaml"
+
+goal: >
+  Implement 3 features: change the deep link scheme from sacrmeetman:// to
+  sacrmeetplan:// in 3 source code locations (F113), create a new HTTPS
+  redirect Edge Function "reset-redirect" so that password reset email
+  buttons are clickable in all email clients and update send-reset-email to
+  use the HTTPS redirect URL instead of the custom scheme directly (F114),
+  and move the StatusLED from the rightColumn back into the labelRow
+  (leftColumn) to align its right edge with the speaker name field right
+  edge, superseding the fixed-width right column LED placement from
+  CR-174/F112 (F115). Changes span app configuration, 2 Edge Functions
+  (1 modified + 1 new), and 1 UI component. No database schema changes.
+
+strategy:
+  order: "Code changes (F113 scheme rename, F114 Edge Functions, F115 UI layout) -> Existing test updates -> New batch tests"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "S04 updates existing tests that assert old scheme, S05 creates new batch test file"
+  dependency_notes: >
+    F113 and F114 share the send-reset-email/index.ts file. F113 changes the
+    scheme in the deepLink variable, while F114 changes the entire deepLink
+    URL to an HTTPS redirect. Since F114's change fully replaces the line
+    F113 modifies, F113 and F114 must be coordinated on this file. The
+    approach is: S01 (F113) changes app.json and create-invitation only.
+    S02 (F114) changes send-reset-email AND creates reset-redirect, applying
+    both the scheme change and the HTTPS redirect in one step for
+    send-reset-email. This avoids conflicts. S03 (F115) is fully independent
+    (SpeechSlot.tsx only). S04 (test updates) depends on S01 and S02. S05
+    (new tests) depends on all code steps.
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F113 - Deep link scheme change in app.json and create-invitation
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F113: Change deep link scheme from sacrmeetman to sacrmeetplan in app.json and create-invitation"
+    feature: F113
+    cr: 175
+    depends_on: []
+    parallelizable_with: [S02, S03]
+    files:
+      - path: app.json
+        action: modify
+      - path: supabase/functions/create-invitation/index.ts
+        action: modify
+    changes:
+      - description: >
+          app.json - Change line 10 from:
+            "scheme": "sacrmeetman"
+          To:
+            "scheme": "sacrmeetplan"
+
+          This changes the Expo URL scheme that registers the app to handle
+          deep links on iOS and Android. The app will now respond to
+          sacrmeetplan:// URLs instead of sacrmeetman:// URLs.
+
+          Do NOT change:
+          - expo.ios.bundleIdentifier: "com.sacramentmeetingmanager.app"
+          - expo.android.package: "com.sacramentmeetingmanager.app"
+          These are app store identifiers, not URL schemes.
+
+      - description: >
+          supabase/functions/create-invitation/index.ts - Change line 170 from:
+            const deepLink = `sacrmeetman://invite/${invitationToken}`;
+          To:
+            const deepLink = `sacrmeetplan://invite/${invitationToken}`;
+
+          This updates the invitation deep link sent to new users. The
+          send-reset-email change is handled in S02 (F114) since F114
+          replaces the entire deepLink URL for that function.
+
+    done_when:
+      - "app.json expo.scheme is 'sacrmeetplan'"
+      - "app.json expo.ios.bundleIdentifier unchanged as 'com.sacramentmeetingmanager.app'"
+      - "app.json expo.android.package unchanged as 'com.sacramentmeetingmanager.app'"
+      - "create-invitation/index.ts deepLink uses sacrmeetplan://invite/"
+      - "No remaining references to 'sacrmeetman' in app.json"
+      - "No remaining references to 'sacrmeetman' in create-invitation/index.ts"
+    tests:
+      - type: unit
+        description: >
+          Test app.json scheme is 'sacrmeetplan'. Test bundleIdentifier and
+          package unchanged. Test create-invitation deepLink uses sacrmeetplan.
+    covers:
+      acceptance_criteria: [AC-113-01, AC-113-02, AC-113-05, AC-113-06]
+      edge_cases: [EC-113-01]
+    risks:
+      - risk: "Existing sacrmeetman:// invitation links stop working"
+        mitigation: "Expected behavior per EC-113-01. Old invitations need to be re-sent."
+    commit_message: "fix(deeplink): change scheme from sacrmeetman to sacrmeetplan in app.json and create-invitation (F113, CR-175)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F114 - HTTPS redirect Edge Function + send-reset-email update
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F114: Create reset-redirect Edge Function and update send-reset-email to use HTTPS redirect URL"
+    feature: F114
+    cr: 176
+    depends_on: []
+    parallelizable_with: [S01, S03]
+    files:
+      - path: supabase/functions/reset-redirect/index.ts
+        action: create
+      - path: supabase/functions/send-reset-email/index.ts
+        action: modify
+    changes:
+      - description: >
+          Create new Edge Function supabase/functions/reset-redirect/index.ts.
+
+          Implementation:
+          1. Handle OPTIONS requests with CORS headers (same pattern as
+             other Edge Functions in the project).
+          2. Handle GET requests:
+             a. Parse URL query params: token (required), type (required)
+             b. If either param missing, return 400 with JSON error message
+             c. Build deep link: sacrmeetplan://reset-password?token=${token}&type=${type}
+             d. Return HTML response (Content-Type: text/html) containing:
+                - <meta http-equiv="refresh" content="0;url=DEEP_LINK">
+                  for browsers that block JavaScript
+                - <script>window.location.href = 'DEEP_LINK';</script>
+                  for immediate redirect
+                - Visible fallback <a> button styled as CTA with text
+                  "Abrir no aplicativo" (Portuguese default, per A-5)
+                - Basic centered styling with app branding text
+                  "Planejador de Reuniao Sacramental"
+          3. No JWT verification (public endpoint, verify_jwt: false)
+          4. No token validation against database (pass-through only per A-4)
+
+          CORS headers pattern (same as other Edge Functions):
+            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+
+      - description: >
+          supabase/functions/send-reset-email/index.ts - Change the deepLink
+          construction (line 194) from:
+            const deepLink = `sacrmeetman://reset-password?token=${hashed_token}&type=recovery`;
+          To:
+            const deepLink = `https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery`;
+
+          This single change addresses both:
+          - CR-175/F113: No more sacrmeetman:// in send-reset-email (the
+            scheme is now only used in the reset-redirect function which
+            uses sacrmeetplan://)
+          - CR-176/F114: HTTPS URL is clickable in email clients
+
+          The email HTML templates do NOT need changes because they reference
+          the deepLink variable via ${deepLink} in their <a href> tags.
+          The redirect-to-app happens in the new reset-redirect function.
+
+    done_when:
+      - "supabase/functions/reset-redirect/index.ts exists"
+      - "reset-redirect handles OPTIONS with CORS headers"
+      - "reset-redirect handles GET with token and type query params"
+      - "reset-redirect returns 400 when token or type missing"
+      - "reset-redirect returns HTML (Content-Type: text/html)"
+      - "HTML contains meta refresh tag with sacrmeetplan://reset-password deep link"
+      - "HTML contains window.location.href redirect to sacrmeetplan:// deep link"
+      - "HTML contains fallback <a> button with href to sacrmeetplan:// deep link"
+      - "Fallback button text is 'Abrir no aplicativo' (Portuguese)"
+      - "Deep link in reset-redirect uses sacrmeetplan:// (not sacrmeetman://)"
+      - "send-reset-email deepLink changed to HTTPS redirect URL"
+      - "send-reset-email no longer references sacrmeetman://"
+      - "No JWT verification on reset-redirect"
+    tests:
+      - type: unit
+        description: >
+          Test reset-redirect exists. Test CORS handling. Test GET with valid
+          params returns HTML. Test HTML contains meta refresh, JS redirect,
+          and fallback button all using sacrmeetplan:// deep link. Test 400
+          on missing params. Test send-reset-email uses HTTPS URL.
+    covers:
+      acceptance_criteria: [AC-113-03, AC-113-04, AC-114-01, AC-114-02, AC-114-03, AC-114-04, AC-114-05, AC-114-06, AC-114-07, AC-114-08]
+      edge_cases: [EC-113-02, EC-114-01, EC-114-02, EC-114-03, EC-114-04]
+    risks:
+      - risk: "reset-redirect function not deployed (requires manual deployment step)"
+        mitigation: "Manual step documented in ARCH_M031 and SPEC_F113_F115. Developer must run 'supabase functions deploy reset-redirect' after code merge."
+      - risk: "Existing password reset emails with sacrmeetman:// stop working"
+        mitigation: "Expected per EC-113-02. Users must request a new password reset email."
+    commit_message: "feat(edge): create reset-redirect Edge Function and update send-reset-email to use HTTPS redirect (F114, CR-176)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F115 - StatusLED right-edge alignment with speaker field
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F115: Move StatusLED from rightColumn to labelRow for right-edge alignment with speaker field"
+    feature: F115
+    cr: 177
+    depends_on: []
+    parallelizable_with: [S01, S02]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+    changes:
+      - description: >
+          Move the StatusLED from the rightColumn back into the labelRow
+          (inside leftColumn), grouping it with the statusText inside a
+          Pressable (statusSection). This supersedes ADR-076's LED placement
+          in the rightColumn (F112/CR-174) per ADR-078.
+
+          **Current structure (F112 layout):**
+          <View outerRow (row)>
+            <View leftColumn (flex:1)>
+              <View labelRow>
+                <Text label />
+                <Pressable statusText onPress={handleStatusPress}>
+                  <Text statusText />
+                </Pressable>
+              </View>
+              <View row>
+                <Pressable field (flex:1)>...speaker...</Pressable>
+              </View>
+              <View topicRow>
+                <Pressable topicField (flex:1)>...topic...</Pressable>
+              </View>
+            </View>
+            <View rightColumn (width:36)>
+              <Pressable statusLedWrapper onPress={handleStatusPress}>
+                <StatusLED />
+              </Pressable>
+              <View speakerActionWrapper>
+                {X button}
+              </View>
+              <View topicActionWrapper>
+                {X button}
+              </View>
+            </View>
+          </View>
+
+          **New structure (F115 layout, per ADR-078):**
+          <View outerRow (row)>
+            <View leftColumn (flex:1)>
+              <View labelRow>
+                <Text label />
+                <Pressable statusSection onPress={handleStatusPress}
+                  style={statusSection: flexDirection:'row', alignItems:'center', gap:6}>
+                  <Text statusText />
+                  <StatusLED />                    <-- MOVED HERE
+                </Pressable>
+              </View>
+              <View row>
+                <Pressable field (flex:1)>...speaker...</Pressable>
+              </View>
+              <View topicRow>
+                <Pressable topicField (flex:1)>...topic...</Pressable>
+              </View>
+            </View>
+            <View rightColumn (width:36)>
+              <View statusLedPlaceholder />         <-- empty spacer
+              <View speakerActionWrapper>
+                {X button}
+              </View>
+              {showTopicRow && (
+                <View topicActionWrapper>
+                  {X button}
+                </View>
+              )}
+            </View>
+          </View>
+
+      - description: >
+          Key design decisions (from ARCH_M031/ADR-078):
+
+          1. StatusLED and statusText grouped inside a Pressable
+             (statusSection) with flexDirection:'row', alignItems:'center',
+             gap:6. This keeps both tappable to open StatusChangeModal.
+
+          2. The Pressable statusLedWrapper in the rightColumn is replaced
+             by an empty spacer View (statusLedPlaceholder) to maintain row
+             height alignment. This ensures speakerActionWrapper aligns with
+             the speaker row.
+
+          3. The rightColumn width (36px) is preserved for the X action
+             buttons. Only the LED is removed from it.
+
+          4. Because both the StatusLED (in labelRow) and the speakerField
+             are children of leftColumn (flex:1), the LED's right edge
+             naturally aligns with the field's right edge.
+
+      - description: >
+          Style changes:
+
+          NEW/RESTORED styles:
+            statusSection: {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+            }
+
+          MODIFIED styles:
+            statusLedWrapper -> statusLedPlaceholder:
+              Removed Pressable, changed to plain View as empty spacer.
+              Keep same height for row alignment with labelRow.
+
+          UNCHANGED styles:
+            outerRow, leftColumn, rightColumn (width:36 kept for X buttons),
+            labelRow (space-between), row, field, speakerActionWrapper,
+            topicRow, topicActionWrapper, topicField, removeButton,
+            label, statusText, fieldText, fieldArrow, topicText, container
+
+    done_when:
+      - "StatusLED is inside labelRow within leftColumn (inside statusSection Pressable)"
+      - "statusSection has flexDirection:'row', alignItems:'center', gap:6"
+      - "StatusLED and statusText are children of the same Pressable (statusSection)"
+      - "statusSection Pressable has onPress={handleStatusPress}"
+      - "rightColumn no longer contains StatusLED"
+      - "rightColumn has empty spacer View where statusLedWrapper was"
+      - "rightColumn retains speakerActionWrapper and topicActionWrapper with X buttons"
+      - "rightColumn width remains 36"
+      - "StatusLED right edge aligns with speaker field right edge (both in leftColumn flex:1)"
+      - "Status text visible and pressable in labelRow"
+      - "StatusChangeModal still opens on press of status section"
+      - "X remove button still functional in rightColumn"
+      - "Topic X button still functional in rightColumn"
+      - "Layout consistent across all 3 speech positions"
+      - "Layout does not break on narrow screens (text truncates, alignment maintained)"
+    tests:
+      - type: unit
+        description: >
+          Test StatusLED is in labelRow (leftColumn). Test statusSection has
+          correct styles. Test rightColumn no longer has StatusLED. Test
+          rightColumn has empty spacer. Test rightColumn width is 36.
+          Test status text visible. Test alignment consistent across
+          positions. Test narrow screen behavior.
+    covers:
+      acceptance_criteria: [AC-115-01, AC-115-02, AC-115-03, AC-115-04, AC-115-05, AC-115-06, AC-115-07, AC-115-08]
+      edge_cases: [EC-115-01, EC-115-02, EC-115-03, EC-115-04, EC-115-05]
+    risks:
+      - risk: "Moving LED back to labelRow reverses F112's approach and may introduce visual regressions"
+        mitigation: "F115 explicitly supersedes F112's LED placement per ADR-078. The statusSection pattern (flexDirection:'row', gap:6) was used before F112 and is proven. The rightColumn retains X buttons so their position is unchanged."
+      - risk: "Empty spacer in rightColumn may cause height mismatch"
+        mitigation: "The spacer View inherits the same height as the labelRow via the outerRow flexDirection:'row' alignment. No explicit height needed if the leftColumn labelRow sets the row height."
+    commit_message: "fix(ui): move StatusLED to labelRow for right-edge alignment with speaker field (F115, CR-177)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Update existing tests that assert old scheme
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "Update existing tests asserting sacrmeetman:// to sacrmeetplan://"
+    feature: F113
+    cr: 175
+    depends_on: [S01, S02]
+    parallelizable_with: [S03]
+    files:
+      - path: src/__tests__/batch7-f035-f039.test.ts
+        action: modify
+      - path: src/__tests__/batch15-phase2.test.ts
+        action: modify
+    changes:
+      - description: >
+          batch7-f035-f039.test.ts - Update 10 tests that assert
+          "sacrmeetman" scheme to assert "sacrmeetplan" instead.
+
+          These tests were written for CR-93/F037 which changed the scheme
+          from wardmanager:// to sacrmeetman://. Now with CR-175/F113,
+          the scheme changes to sacrmeetplan://.
+
+          Changes:
+          - All string literals containing "sacrmeetman" -> "sacrmeetplan"
+          - All assertions checking scheme is "sacrmeetman" -> "sacrmeetplan"
+          - All deep link URLs sacrmeetman://invite/ -> sacrmeetplan://invite/
+          - Description strings in test names may reference the old scheme
+            for historical context but assertions must use sacrmeetplan
+
+      - description: >
+          batch15-phase2.test.ts - Update tests that assert
+          sacrmeetman://reset-password deep link format.
+
+          Changes:
+          - Deep link assertions sacrmeetman://reset-password ->
+            sacrmeetplan://reset-password (for tests that verify the
+            deep link scheme directly)
+          - If tests assert the send-reset-email deepLink URL, update to
+            assert the HTTPS redirect URL instead (since F114 changes the
+            deepLink to https://...supabase.co/functions/v1/reset-redirect)
+          - Any string literals "sacrmeetman" -> "sacrmeetplan"
+
+    done_when:
+      - "batch7-f035-f039.test.ts has no remaining assertions for 'sacrmeetman'"
+      - "batch7-f035-f039.test.ts asserts 'sacrmeetplan' in all scheme checks"
+      - "batch15-phase2.test.ts has no remaining assertions for 'sacrmeetman'"
+      - "batch15-phase2.test.ts asserts sacrmeetplan:// or HTTPS redirect URL"
+      - "All updated tests pass with vitest"
+    tests:
+      - type: unit
+        description: "Self-referencing: this step IS the test update step"
+    covers:
+      acceptance_criteria: [AC-113-04]
+      edge_cases: []
+    risks:
+      - risk: "Test descriptions referencing old scheme may cause confusion"
+        mitigation: "Update both assertion values AND description strings where they reference the scheme name."
+    commit_message: "test(batch18): update existing tests from sacrmeetman to sacrmeetplan scheme (F113, CR-175)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: New batch tests for F113-F115
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "Batch 18 tests for F113-F115"
+    feature: all
+    cr: [175, 176, 177]
+    depends_on: [S01, S02, S03, S04]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch18.test.ts
+        action: create
+    changes:
+      - description: >
+          Create comprehensive test file batch18.test.ts covering all 3 features.
+
+          F113 tests (Deep link scheme change):
+          - Verify app.json scheme is 'sacrmeetplan' (not 'sacrmeetman' or 'wardmanager')
+          - Verify app.json bundleIdentifier is 'com.sacramentmeetingmanager.app' (unchanged)
+          - Verify app.json Android package is 'com.sacramentmeetingmanager.app' (unchanged)
+          - Verify create-invitation/index.ts contains 'sacrmeetplan://invite/'
+          - Verify create-invitation/index.ts does NOT contain 'sacrmeetman'
+          - Verify send-reset-email/index.ts does NOT contain 'sacrmeetman'
+          - Verify no production code files in src/ or supabase/ contain 'sacrmeetman://'
+            (search for sacrmeetman:// and wardmanager:// with zero matches)
+
+          F114 tests (HTTPS redirect Edge Function):
+          - Verify supabase/functions/reset-redirect/index.ts exists
+          - Verify reset-redirect contains CORS headers pattern
+          - Verify reset-redirect validates token and type params (returns 400 if missing)
+          - Verify reset-redirect returns Content-Type text/html
+          - Verify HTML response contains meta refresh with sacrmeetplan:// deep link
+          - Verify HTML response contains window.location.href redirect
+          - Verify HTML response contains fallback <a> button with sacrmeetplan:// href
+          - Verify fallback button text is 'Abrir no aplicativo'
+          - Verify reset-redirect deep link uses sacrmeetplan:// (not sacrmeetman://)
+          - Verify send-reset-email/index.ts deepLink uses HTTPS URL
+            (https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect)
+
+          F115 tests (StatusLED right-edge alignment):
+          - Verify SpeechSlot.tsx has StatusLED inside labelRow/leftColumn (not rightColumn)
+          - Verify statusSection style has flexDirection:'row', alignItems:'center', gap:6
+          - Verify rightColumn does NOT contain StatusLED component
+          - Verify rightColumn has empty spacer/placeholder where LED was
+          - Verify rightColumn width is 36
+          - Verify rightColumn retains speakerActionWrapper and topicActionWrapper
+          - Verify status text visible in labelRow
+          - Verify statusSection Pressable has onPress handler
+
+    done_when:
+      - "batch18.test.ts created with tests for all 3 features"
+      - "All tests pass with vitest"
+      - "Coverage: 22 ACs + 12 ECs across 3 features"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 22 ACs and 12 ECs across 3 features"
+    covers:
+      acceptance_criteria: [AC-113-01, AC-113-02, AC-113-03, AC-113-04, AC-113-05, AC-113-06, AC-114-01, AC-114-02, AC-114-03, AC-114-04, AC-114-05, AC-114-06, AC-114-07, AC-114-08, AC-115-01, AC-115-02, AC-115-03, AC-115-04, AC-115-05, AC-115-06, AC-115-07, AC-115-08]
+      edge_cases: [EC-113-01, EC-113-02, EC-113-03, EC-114-01, EC-114-02, EC-114-03, EC-114-04, EC-115-01, EC-115-02, EC-115-03, EC-115-04, EC-115-05]
+    risks:
+      - risk: "None - standard test file creation following established batch test patterns"
+        mitigation: "N/A"
+    commit_message: "test(batch18): add tests for F113-F115 and update existing tests for scheme change (CR-175 to CR-177)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+
+  # F113 - Deep link scheme change
+  - ac_id: AC-113-01
+    how_to_verify: "Read app.json and verify expo.scheme is 'sacrmeetplan'."
+    covered_by_steps: [S01, S05]
+
+  - ac_id: AC-113-02
+    how_to_verify: "Read create-invitation/index.ts and verify deepLink uses sacrmeetplan://invite/."
+    covered_by_steps: [S01, S05]
+
+  - ac_id: AC-113-03
+    how_to_verify: "Read send-reset-email/index.ts and verify deepLink uses HTTPS redirect URL (sacrmeetman:// removed)."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-113-04
+    how_to_verify: "Search all files in src/ and supabase/ for 'sacrmeetman://' and 'wardmanager://'. Zero matches in production code."
+    covered_by_steps: [S01, S02, S04, S05]
+
+  - ac_id: AC-113-05
+    how_to_verify: "Read app.json and verify expo.ios.bundleIdentifier is 'com.sacramentmeetingmanager.app'."
+    covered_by_steps: [S01, S05]
+
+  - ac_id: AC-113-06
+    how_to_verify: "Read app.json and verify expo.android.package is 'com.sacramentmeetingmanager.app'."
+    covered_by_steps: [S01, S05]
+
+  # F114 - HTTPS redirect Edge Function
+  - ac_id: AC-114-01
+    how_to_verify: "Read send-reset-email/index.ts and verify <a href> points to https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-02
+    how_to_verify: "Verify supabase/functions/reset-redirect/index.ts exists."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-03
+    how_to_verify: "Read reset-redirect/index.ts and verify HTML response contains window.location.href redirect to sacrmeetplan://reset-password?token=TOKEN&type=recovery."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-04
+    how_to_verify: "Read reset-redirect/index.ts and verify HTML contains <a> button with href to sacrmeetplan://reset-password deep link."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-05
+    how_to_verify: "Read reset-redirect/index.ts and verify missing token or type returns 400 error response."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-06
+    how_to_verify: "Read reset-redirect/index.ts and verify OPTIONS handling returns 200 with CORS headers."
+    covered_by_steps: [S02, S05]
+
+  - ac_id: AC-114-07
+    how_to_verify: "Manual test: send password reset email, click button in Gmail/Outlook. Browser opens HTTPS URL, auto-redirects to app."
+    covered_by_steps: [S02]
+
+  - ac_id: AC-114-08
+    how_to_verify: "Read reset-redirect/index.ts and verify deep link uses sacrmeetplan:// (not sacrmeetman://)."
+    covered_by_steps: [S02, S05]
+
+  # F115 - StatusLED right-edge alignment
+  - ac_id: AC-115-01
+    how_to_verify: "Open expanded SpeechSlot with assigned speaker. Verify StatusLED right edge aligns with speaker field right edge (both in leftColumn)."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-02
+    how_to_verify: "Expand all 3 SpeechSlots. Verify consistent right-edge alignment across all positions."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-03
+    how_to_verify: "View expanded SpeechSlot. Verify status text (e.g., 'Designado') visible next to StatusLED in labelRow."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-04
+    how_to_verify: "Tap status text or LED circle. Verify StatusChangeModal opens."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-05
+    how_to_verify: "Tap X remove button. Verify confirmation alert appears and assignment is removed."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-06
+    how_to_verify: "Tap topic X button. Verify topic assignment is cleared."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-07
+    how_to_verify: "View expanded SpeechSlot on narrow screen (iPhone SE). Verify speaker name truncates. Status text may truncate. Alignment maintained."
+    covered_by_steps: [S03, S05]
+
+  - ac_id: AC-115-08
+    how_to_verify: "View expanded SpeechSlot without speaker assigned or with observer role. Verify StatusLED position unchanged regardless of X button visibility."
+    covered_by_steps: [S03, S05]

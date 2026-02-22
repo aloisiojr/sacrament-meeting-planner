@@ -4,6 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
@@ -327,6 +328,7 @@ export async function checkCollectionFutureSpeeches(
  */
 export function useActiveTopics() {
   const { wardId } = useAuth();
+  const { t } = useTranslation();
 
   return useQuery({
     queryKey: topicKeys.activeTopics(wardId),
@@ -341,7 +343,7 @@ export function useActiveTopics() {
 
       if (wtErr) throw wtErr;
 
-      const wardTopicLabel = 'Temas da Ala'; // Will be i18n later
+      const wardTopicLabel = t('topics.wardTopics');
       (wardTopics ?? []).forEach((t) => {
         results.push({
           id: t.id,

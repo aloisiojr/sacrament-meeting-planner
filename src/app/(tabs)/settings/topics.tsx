@@ -33,7 +33,6 @@ import {
   useToggleCollection,
   useCollectionTopics,
 } from '../../../hooks/useTopics';
-import { getCurrentLanguage } from '../../../i18n';
 import type { WardTopic } from '../../../types/database';
 
 // --- Topic Editor ---
@@ -265,9 +264,10 @@ function CollectionTopicsList({ collectionId, colors }: CollectionTopicsListProp
 export default function TopicsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission } = useAuth();
+  const { hasPermission, wardLanguage } = useAuth();
   const router = useRouter();
-  const language = getCurrentLanguage();
+  // F116: Use ward language for collection listing (not app language)
+  const language = wardLanguage;
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);

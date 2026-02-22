@@ -11,6 +11,7 @@ import {
   SUPPORTED_LANGUAGES,
   LANGUAGE_LABELS,
   getCurrentLanguage,
+  toDbLocale,
 } from '../../../i18n';
 import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
@@ -69,7 +70,7 @@ export default function SettingsScreen() {
       const { data: oldCollections } = await supabase
         .from('general_collections')
         .select('id')
-        .eq('language', oldLanguage);
+        .eq('language', toDbLocale(oldLanguage));
 
       if (oldCollections && oldCollections.length > 0) {
         const oldCollectionIds = oldCollections.map((c) => c.id);
@@ -84,7 +85,7 @@ export default function SettingsScreen() {
       const { data: newCollections } = await supabase
         .from('general_collections')
         .select('id')
-        .eq('language', newLanguage);
+        .eq('language', toDbLocale(newLanguage));
 
       if (newCollections && newCollections.length > 0) {
         const upsertRows = newCollections.map((col) => ({

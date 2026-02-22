@@ -26,6 +26,26 @@ export const DEFAULT_TIMEZONES: Record<SupportedLanguage, string> = {
   es: 'America/Mexico_City',
 };
 
+/**
+ * Map i18n language codes to database locale codes used in general_collections.
+ * The DB uses full locale codes (en-US, es-ES, pt-BR) while the app uses
+ * short codes (en, es, pt-BR). This mapping bridges the gap.
+ */
+const DB_LOCALE_MAP: Record<SupportedLanguage, string> = {
+  'pt-BR': 'pt-BR',
+  en: 'en-US',
+  es: 'es-ES',
+};
+
+/**
+ * Convert an i18n language code to the database locale code used in general_collections.
+ * E.g., 'en' -> 'en-US', 'es' -> 'es-ES', 'pt-BR' -> 'pt-BR'.
+ * Returns the input unchanged if not a recognized SupportedLanguage.
+ */
+export function toDbLocale(language: string): string {
+  return DB_LOCALE_MAP[language as SupportedLanguage] ?? language;
+}
+
 const resources = {
   'pt-BR': { translation: ptBR },
   en: { translation: en },

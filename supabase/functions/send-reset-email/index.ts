@@ -148,16 +148,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get ward language
+    // Get language for email template
+    // Priority: user_metadata.language > ward.language > 'pt-BR'
     let language = 'pt-BR';
-    const wardId = user.app_metadata?.ward_id;
-    if (wardId) {
-      const { data: ward } = await supabaseAdmin
-        .from('wards')
-        .select('language')
-        .eq('id', wardId)
-        .single();
-      language = ward?.language ?? 'pt-BR';
+    const userMetaLanguage = user.user_metadata?.language;
+    if (userMetaLanguage && typeof userMetaLanguage === 'string') {
+      language = userMetaLanguage;
+    } else {
+      const wardId = user.app_metadata?.ward_id;
+      if (wardId) {
+        const { data: ward } = await supabaseAdmin
+          .from('wards')
+          .select('language')
+          .eq('id', wardId)
+          .single();
+        language = ward?.language ?? 'pt-BR';
+      }
     }
 
     // Generate recovery token

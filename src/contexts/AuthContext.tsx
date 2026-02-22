@@ -26,6 +26,7 @@ export interface AuthContextValue {
   signOut(): Promise<void>;
   hasPermission(perm: Permission): boolean;
   updateAppLanguage(lang: string): Promise<void>;
+  setWardLanguage(lang: string): void;
 }
 
 // --- Context ---
@@ -187,6 +188,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signOut,
       hasPermission,
       updateAppLanguage,
+      setWardLanguage,
     }),
     [session, user, role, wardId, userName, wardLanguage, loading, signIn, signOut, hasPermission, updateAppLanguage]
   );

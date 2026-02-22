@@ -43,7 +43,7 @@ const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, c
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage } = useAuth();
+  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage, setWardLanguage } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [appLanguageModalVisible, setAppLanguageModalVisible] = useState(false);
@@ -96,8 +96,12 @@ export default function SettingsScreen() {
           .from('ward_collection_config')
           .upsert(upsertRows, { onConflict: 'ward_id,collection_id' });
       }
+
+      return newLanguage;
     },
-    onSuccess: () => {
+    onSuccess: (_data, newLanguage) => {
+      // F131: Update AuthContext state immediately
+      setWardLanguage(newLanguage);
       // Invalidate topic/collection caches
       queryClient.invalidateQueries({ queryKey: topicKeys.all });
     },

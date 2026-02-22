@@ -17,7 +17,18 @@ import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { getDefaultTemplate } from '../../../lib/whatsappUtils';
 
-const PLACEHOLDERS = [
+// F116: Placeholder keys mapped to i18n keys for app-language-aware display
+const PLACEHOLDER_I18N_KEYS = [
+  'whatsapp.placeholderName',
+  'whatsapp.placeholderDate',
+  'whatsapp.placeholderPosition',
+  'whatsapp.placeholderCollection',
+  'whatsapp.placeholderTitle',
+  'whatsapp.placeholderLink',
+] as const;
+
+// Actual placeholder tokens used in the template (language-neutral)
+const PLACEHOLDER_TOKENS = [
   '{nome}',
   '{data}',
   '{posicao}',
@@ -47,11 +58,14 @@ function resolveTemplate(template: string): string {
 export default function WhatsAppTemplateScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { wardId, user, userName } = useAuth();
+  const { wardId, wardLanguage, user, userName } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
+
+  // F116: Build translated placeholder display labels
+  const placeholderLabels = PLACEHOLDER_I18N_KEYS.map((key) => t(key));
 
   // Fetch ward to get current template
   const { data: ward } = useQuery({
@@ -71,12 +85,12 @@ export default function WhatsAppTemplateScreen() {
   const [template, setTemplate] = useState('');
   const [initialized, setInitialized] = useState(false);
 
-  // Initialize template from DB
+  // Initialize template from DB - use wardLanguage for default template
   useEffect(() => {
     if (ward && !initialized) {
       if (ward.whatsapp_template === null || ward.whatsapp_template === undefined) {
         // DB is null: show default template for ward language
-        setTemplate(getDefaultTemplate(ward.language ?? 'pt-BR'));
+        setTemplate(getDefaultTemplate(wardLanguage ?? 'pt-BR'));
       } else if (ward.whatsapp_template === '') {
         // DB is empty string: user intentionally cleared, respect it
         setTemplate('');
@@ -86,7 +100,7 @@ export default function WhatsAppTemplateScreen() {
       }
       setInitialized(true);
     }
-  }, [ward, initialized]);
+  }, [ward, initialized, wardLanguage]);
 
   // Auto-save mutation
   const saveMutation = useMutation({
@@ -161,27 +175,29 @@ export default function WhatsAppTemplateScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* Placeholder list */}
+        {/* Placeholder list - F116: use translated labels */}
         <View style={styles.placeholderSection}>
           <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            Placeholders:
+            {t('settings.whatsapp.placeholders')}
           </Text>
           <View style={styles.placeholderList}>
-            {PLACEHOLDERS.map((p) => (
+            {PLACEHOLDER_TOKENS.map((token, idx) => (
               <Pressable
-                key={p}
+                key={token}
                 style={[styles.placeholderChip, { backgroundColor: colors.surfaceVariant }]}
-                onPress={() => insertPlaceholder(p)}
+                onPress={() => insertPlaceholder(token)}
               >
-                <Text style={[styles.placeholderText, { color: colors.text }]}>{p}</Text>
+                <Text style={[styles.placeholderText, { color: colors.text }]}>
+                  {placeholderLabels[idx]}
+                </Text>
               </Pressable>
             ))}
           </View>
         </View>
 
-        {/* Template editor */}
+        {/* Template editor - F116: use translated label */}
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-          Template:
+          {t('settings.whatsapp.template')}
         </Text>
         <TextInput
           style={[
@@ -202,9 +218,9 @@ export default function WhatsAppTemplateScreen() {
           autoCorrect={false}
         />
 
-        {/* Preview */}
+        {/* Preview - F116: use translated label */}
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-          Preview:
+          {t('settings.whatsapp.preview')}
         </Text>
         <View style={[styles.previewCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.previewText, { color: colors.text }]}>
@@ -214,7 +230,7 @@ export default function WhatsAppTemplateScreen() {
 
         {saveMutation.isPending && (
           <Text style={[styles.savingText, { color: colors.textSecondary }]}>
-            Saving...
+            {t('common.loading')}
           </Text>
         )}
       </ScrollView>

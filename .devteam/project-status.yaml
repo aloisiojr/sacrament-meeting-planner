@@ -1,45 +1,29 @@
 project:
-  name: "Batch 20 - Settings reorganization, Actor roles fix, Language switch fix, 2nd speech bugs, Password reset fixes, UI alignment & play icon"
+  name: "Deploy pendente - Batches 19 e 20"
   type: feature_request
   created_at: "2026-02-22"
   user_request: |
-    8 pedidos agrupados:
-    1. Reorganizar aba Configurações em 2 grupos: "Configurações da Ala" (Discursantes, Biblioteca de Temas, Modelo de Convite pelo WhatsApp, Idioma da Ala, Fuso Horário) e "Configurações do App" (Usuários do App, Histórico de Uso, Idioma do App, Tema Claro/Escuro, Sobre). Label com nome de cada grupo antes dos cards.
-    2. Revisão geral dos papéis dos atores, principalmente nos testes. Problemas de TS, testes não passando, inconsistência "can_conduct" vs "can_conductor" no código.
-    3. Botão de troca de idioma da Ala não funciona. Ao clicar e confirmar, não troca seleção, não troca idioma das coleções nem do modelo do WhatsApp.
-    4. Funcionalidade de 2º Discurso opcional com múltiplos erros: (4.1) toggle desligado apaga só discursante, deveria apagar tema também; (4.2) aba Discursos card expandido toggle desligado troca campos por mensagem de aviso ao invés de só desativar; (4.3) aba Agendas card expandido sem 2º discurso mostra texto no campo desabilitado; (4.4) card contraído agenda com 2º discurso desabilitado deve mostrar X/2 ao invés de X/3.
-    5. Email de recuperação de senha deve usar idioma do app, não da ala.
-    6. Botão de reset de senha no email resulta em HTML estático. Erro sandbox: allow-scripts permission not set. Edge Function reset-redirect precisa redirecionar sem scripts.
-    7. Card expandido de discursos: alinhar direita do círculo de status com direita do campo do discursante sem mexer posição do X.
-    8. Trocar botão de play (Iniciar Reunião e card de agenda) por ícone bem maior (altura da fonte). Atual muito pequeno e colado na seta.
+    Deploy pendente dos ultimos 2 batches:
+    1. push-notification Edge Function (Batch 19 Phase 2, F125 projectId fix)
+    2. send-reset-email Edge Function (Batch 20 Phase 1, F133 language priority change)
+    3. reset-redirect Edge Function (Batch 20 Phase 1, F134 script tag removal)
 
 phases:
-  total: 2
-  current: 2
+  total: 1
+  current: 1
   summary:
     - phase: 1
-      description: "Bug fixes: actor roles, language switch, 2nd speech, password reset email language, password reset HTML sandbox (CR-194, CR-195, CR-196, CR-197, CR-198)"
-      status: completed
-    - phase: 2
-      description: "UI improvements: settings reorganization, status circle alignment, play icon resize (CR-193, CR-199, CR-200)"
+      description: "Deploy all pending Edge Functions from Batches 19 and 20"
       status: completed
 
 current_phase:
-  id: 2
+  id: 1
   started_at: "2026-02-22"
-  features: [F135, F136, F137]
-  change_requests: [CR-193, CR-199, CR-200]
-  current_agent: "none"
-  current_step: "Phase 2 DONE"
-  completed_steps:
-    - "QA PRE validation (validated=true, QA_PLAN_batch20_phase2, 19 checks, 14 must_pass)"
-    - "Requirements extraction (F135-F137, 24 ACs, 8 ECs, 0 OQs, status=complete)"
-    - "Architecture definition (ARCH_M036, ADR-087/088, 4 components, 7 files, 0 new components)"
-    - "Implementation plan (PLAN_P036, 5 steps, 24 ACs, 8 ECs, 100% coverage)"
-    - "Code implementation (6 commits, 50 new tests, 5174/5174 passing, S01-S05 complete)"
-    - "Testing (102 tests, 24/24 ACs, 8/8 ECs, verdict approved, 5226/5226 passing)"
-    - "Code review (verdict: approved, 0 P0, 0 P1, 0 P2, chain intact, no deploys)"
-    - "QA POST validation (verdict: passed, 14/14 must_pass, 5/5 should_pass)"
+  completed_at: "2026-02-22"
+  features: [F125, F133, F134]
+  change_requests: [CR-201]
+  current_agent: "deployer"
+  current_step: "Completed"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -50,11 +34,21 @@ artifacts:
   review_consolidated: "docs/reviews/REVIEW_CONSOLIDATED.yaml"
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
-pending_deploys:
+pending_deploys: []
+
+completed_deploys:
+  - type: "client_side_fix"
+    description: "F125 projectId fix is client-side only (useNotifications.ts). No edge function deployment needed."
+    source: "Batch 19 Phase 2 reviewer"
+    notes: "process-notifications Edge Function was NOT modified (confirmed by AC-125-07)"
   - type: "edge_function"
-    description: "Deploy send-reset-email Edge Function (F133)"
-    instructions: "supabase functions deploy send-reset-email --project-ref <ref>"
+    description: "Redeploy send-reset-email Edge Function (F133 language priority change)"
+    instructions: "supabase functions deploy send-reset-email --no-verify-jwt"
+    source: "Batch 20 Phase 1 reviewer"
+    result: "ACTIVE v6"
   - type: "edge_function"
-    description: "Deploy reset-redirect Edge Function (F134)"
-    instructions: "supabase functions deploy reset-redirect --project-ref <ref>"
+    description: "Redeploy reset-redirect Edge Function (F134 script tag removal)"
+    instructions: "supabase functions deploy reset-redirect --no-verify-jwt"
+    source: "Batch 20 Phase 1 reviewer"
+    result: "ACTIVE v3"
 last_updated: "2026-02-22"

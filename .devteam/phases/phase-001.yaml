@@ -1,44 +1,37 @@
 phase_id: 1
-description: "Bug fixes & quick UI: Ver Conversa, dialog title, country code, label change, closing prayer bug"
+description: "Fixes for CR-205 (invite error handling), CR-206 (language code mismatch toDbLocale), CR-207 (WhatsApp template disconnect)"
 status: completed
 features:
-  - id: F055
-    name: "Fix Ver Conversa to open WhatsApp without resending invite"
-    cr: CR-112
+  - id: F140
+    name: "Invite mutation error handling fix"
+    cr: CR-205
     status: completed
-  - id: F056
-    name: "Change invite status dialog title to 'Alterar status' with i18n"
-    cr: CR-113
+  - id: F141
+    name: "Language code mismatch fix (toDbLocale) + WhatsApp template reset"
+    cr: CR-206
     status: completed
-  - id: F057
-    name: "Fix +1 country code showing Canada instead of USA"
-    cr: CR-117
-    status: completed
-  - id: F058
-    name: "Change '3o Discurso' label to 'Último Discurso' in agenda"
-    cr: CR-122
-    status: completed
-  - id: F059
-    name: "Fix closing prayer field duplication bug"
-    cr: CR-125
+  - id: F142
+    name: "WhatsApp template disconnect fix"
+    cr: CR-207
     status: completed
 artifacts_produced:
-  - "docs/specs/SPEC_F055_F059.yaml"
-  - "docs/arch/ARCH_M017.yaml"
-  - "docs/plans/PLAN_P017.yaml"
-  - "docs/qa/QA_PLAN_batch9_phase1.yaml"
+  - docs/specs/SPEC_F140_F141_F142.yaml
+  - docs/arch/ARCH_M038.yaml
+  - docs/plans/PLAN_P038.yaml
+  - docs/qa/QA_PLAN_009.yaml
 commits:
-  - {hash: "cf1c8cf", message: "fix(invite): change dropdown title to i18n changeStatus (CR-113)"}
-  - {hash: "3160210", message: "feat(whatsapp): add buildWhatsAppConversationUrl function (CR-112)"}
-  - {hash: "6ff6d4c", message: "fix(invite): use conversation-only URL for View Conversation (CR-112)"}
-  - {hash: "0005ea6", message: "feat(i18n): add lastSpeech label for position 3 (CR-122)"}
-  - {hash: "017b7a5", message: "fix(country): reorder USA before Canada and add getCountryByLabel (CR-117)"}
-  - {hash: "fe1bfba", message: "fix(members): highlight country by label instead of code (CR-117)"}
-  - {hash: "d3ec6a6", message: "feat(prayer): add modalOnly prop to PrayerSelector (CR-125)"}
-  - {hash: "abfda79", message: "fix(agenda): pass modalOnly to PrayerSelector to prevent duplication (CR-125)"}
-  - {hash: "8124f5f", message: "test(batch9): update existing tests for behavior changes"}
-  - {hash: "006ee85", message: "test(batch9-phase1): add tests for F055, F056, F057, F058, F059"}
+  - {hash: "6681194", message: "fix(invite): show server error message and suppress duplicate alert (CR-205)"}
+  - {hash: "73cc06e", message: "revert: remove CR-206 (F141) changes from Phase 1 - moved to Phase 2"}
+  - {hash: "195cd95", message: "fix(i18n): add toDbLocale mapping to fix language code mismatch in collections (CR-206)"}
+  - {hash: "396b23c", message: "fix(settings): reset whatsapp_template on language switch and initialized flag (CR-206)"}
+  - {hash: "1e609f9", message: "fix(invite): use ward template and wardLanguage in InviteManagementSection (CR-207)"}
+  - {hash: "ea0461f", message: "docs(code): update CODE_LEDGER with Batch 23 Phase 1 commits"}
+  - {hash: "ca8915d", message: "docs(code): update CODE_LEDGER with corrected CR-206 commits"}
+  - {hash: "151b245", message: "test(batch23): add tests for F140 and F142 (50 tests)"}
+  - {hash: "f8b2194", message: "test(batch23): update TEST_CONSOLIDATED"}
+  - {hash: "17feed7", message: "fix(test): update batch19 assertions to match toDbLocale() (R-1)"}
+  - {hash: "9b52184", message: "docs(code): update CODE_LEDGER hash for R-1 test fix"}
 decisions:
-  - "ADR-042: buildWhatsAppConversationUrl separate from buildWhatsAppUrl"
-  - "ADR-043: Country label as selection key for +1 disambiguation"
-handoff_notes: "Phase 1 complete. All 5 bug fixes and UI changes implemented. 3128 tests passing."
+  - "CR-206: toDbLocale() mapping instead of seed migration (data already exists with en-US/es-ES)"
+  - "CR-207: useQuery ['ward', wardId] shares cache with whatsapp.tsx"
+handoff_notes: "Phase 2 pending: CR-204 (Supabase Edge Function HTML rendering - text/plain override)"

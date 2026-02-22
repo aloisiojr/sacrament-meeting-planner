@@ -1,0 +1,466 @@
+# =============================================================================
+# PLAN_P038.yaml
+# Batch 23 Phase 1: Invite Error Handling (F140), Language Switch Collections/
+# Template (F141), WhatsApp Template Disconnect (F142)
+# CR-205, CR-206, CR-207
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Fix three critical bugs: (1) invite user error messages are swallowed and show
+  generic text instead of the actual server error (CR-205/F140), (2) switching
+  ward language breaks the Topics screen (no collections for en/es) and leaves
+  the WhatsApp template stuck on the old language (CR-206/F141), (3) the WhatsApp
+  send button on the Home screen ignores the custom template configured in Settings
+  and always uses the default (CR-207/F142).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # -------------------------------------------------------------------------
+  # STEP-01: F140 - Fix invite mutation error handling
+  # -------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Fix the invite mutation error handling in src/app/(tabs)/settings/users.tsx.
+      Two changes:
+
+      1. inviteMutation.onError (line 108): Change from `() =>` to `(err: Error) =>`
+         and update Alert.alert to show `err.message || t('users.inviteFailed')`
+         instead of always showing the generic t('users.inviteFailed'). The err.message
+         already contains the server error extracted by callEdgeFunction (lines 54-64)
+         which parses error.context.json().error. The t('users.inviteFailed') is kept
+         as fallback for cases where err.message is empty/undefined.
+
+      2. Add `meta: { suppressGlobalError: true }` to inviteMutation's useMutation
+         options object. This prevents the global MutationCache.onError handler in
+         _layout.tsx (line 22) from firing a duplicate error alert. The MutationCache
+         already checks for this flag: `if ((mutation as any).meta?.suppressGlobalError) return;`
+
+      No changes to callEdgeFunction, _layout.tsx, or the Edge Function.
+    files:
+      - src/app/(tabs)/settings/users.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "inviteMutation.onError signature is `(err: Error) =>` instead of `() =>`"
+      - "Alert.alert shows `err.message || t('users.inviteFailed')` as the message body"
+      - "inviteMutation has `meta: { suppressGlobalError: true }` in useMutation options"
+      - "callEdgeFunction is NOT modified"
+      - "_layout.tsx is NOT modified"
+      - "supabase/functions/create-invitation/index.ts is NOT modified"
+    tests:
+      - type: unit
+        description: "Verify users.tsx inviteMutation.onError uses err.message with fallback; verify meta.suppressGlobalError is set"
+    covers:
+      acceptance_criteria: [AC-140-01, AC-140-02, AC-140-03, AC-140-04]
+      edge_cases: [EC-140-01, EC-140-02, EC-140-03]
+    risks:
+      - risk: "err.message may contain raw Supabase error strings (e.g., 'FunctionsHttpError')"
+        mitigation: "callEdgeFunction already extracts the server message from error.context.json().error and throws Error(serverMessage || error.message). The raw Supabase error is the fallback, which is still better than the generic 'Invite failed' text."
+
+  # -------------------------------------------------------------------------
+  # STEP-02: F141 Part A - Seed en/es collections migration
+  # -------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Create new migration file: supabase/migrations/019_seed_en_es_collections.sql
+
+      This migration INSERTs seed data for general_collections and general_topics
+      for languages 'en' and 'es', mirroring the pt-BR collection structure.
+
+      Structure (using DO $$ block with variables):
+        - For each language ('en', 'es'):
+          - INSERT collections into general_collections with language and name
+          - INSERT topics into general_topics linking to the parent collection
+        - Use uuid_generate_v4() for IDs (auto-generated via DEFAULT)
+        - DO $$ block with DECLARE variables to capture inserted collection IDs
+          for linking topics to their parent collection
+        - Topics cover LDS/Church sacrament meeting themes: Faith, Repentance,
+          Service, Family, Charity, Obedience, Scriptures, Prayer, Temples,
+          Missionary Work, etc.
+        - EN collections with English names and titles
+        - ES collections with Spanish names and titles
+        - Each collection has 3-5 topics with titles and optional links
+
+      Existing pt-BR data is NOT modified (INSERT only, no DELETE/UPDATE/TRUNCATE).
+      The migration is safe to re-run since each INSERT creates new rows with
+      auto-generated UUIDs (no ON CONFLICT needed for the INSERT itself, though
+      the DO block can use IF NOT EXISTS checks on language to be idempotent).
+    files:
+      - supabase/migrations/019_seed_en_es_collections.sql
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "supabase/migrations/019_seed_en_es_collections.sql exists"
+      - "Migration INSERTs general_collections rows for language = 'en' with English names"
+      - "Migration INSERTs general_collections rows for language = 'es' with Spanish names"
+      - "Migration INSERTs general_topics rows for each 'en' collection with English titles"
+      - "Migration INSERTs general_topics rows for each 'es' collection with Spanish titles"
+      - "Uses DO $$ block to capture collection IDs for topic linking"
+      - "Uses IF NOT EXISTS check (SELECT count FROM general_collections WHERE language) for idempotency"
+      - "Existing pt-BR data is NOT modified (no DELETE, UPDATE, or TRUNCATE)"
+      - "No schema changes (no ALTER TABLE, no new columns)"
+    tests:
+      - type: unit
+        description: "Verify migration file exists, contains INSERT for en and es collections and topics, uses DO $$ block, does not DELETE/UPDATE/TRUNCATE, has idempotency guard"
+    covers:
+      acceptance_criteria: [AC-141-01, AC-141-02, AC-141-09, AC-141-10]
+      edge_cases: []
+    risks:
+      - risk: "Re-running migration without idempotency check could create duplicate collections"
+        mitigation: "DO $$ block checks IF NOT EXISTS (SELECT 1 FROM general_collections WHERE language = 'en') before inserting"
+
+  # -------------------------------------------------------------------------
+  # STEP-03: F141 Part B - Reset whatsapp_template on language switch
+  # -------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Two changes in src/app/(tabs)/settings/index.tsx:
+
+      1. wardLanguageChangeMutation.mutationFn (line 63-64): Change the wards
+         update from `.update({ language: newLanguage })` to
+         `.update({ language: newLanguage, whatsapp_template: null })`.
+         This resets the old language template so the WhatsApp template screen
+         shows the new language's default on next load.
+
+      2. wardLanguageChangeMutation.onSuccess (line 102-107): Add
+         `queryClient.invalidateQueries({ queryKey: ['ward', wardId] })` after
+         the existing `setWardLanguage(newLanguage)` and
+         `queryClient.invalidateQueries({ queryKey: topicKeys.all })` calls.
+         This ensures whatsapp.tsx refetches the ward record and sees the
+         NULL template, triggering the default template for the new language.
+    files:
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "wardLanguageChangeMutation.mutationFn passes { language: newLanguage, whatsapp_template: null } to .update()"
+      - "wardLanguageChangeMutation.onSuccess calls queryClient.invalidateQueries({ queryKey: ['ward', wardId] })"
+      - "Existing setWardLanguage and topicKeys.all invalidation remain unchanged"
+      - "No other changes to settings/index.tsx"
+    tests:
+      - type: unit
+        description: "Verify settings/index.tsx wardLanguageChangeMutation updates whatsapp_template to null and invalidates ['ward', wardId] query"
+    covers:
+      acceptance_criteria: [AC-141-05, AC-141-08]
+      edge_cases: [EC-141-01, EC-141-02, EC-141-03]
+    risks:
+      - risk: "Setting whatsapp_template to null loses custom templates permanently"
+        mitigation: "This is intentional per ADR-092: old language templates are not useful for the new language. Users must re-create templates in the new language."
+
+  # -------------------------------------------------------------------------
+  # STEP-04: F141 Part C - Reset initialized flag on wardLanguage change
+  # -------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Add a new useEffect in src/app/(tabs)/settings/whatsapp.tsx that watches
+      wardLanguage and resets the `initialized` state to false when wardLanguage
+      changes. This causes the existing useEffect (line 89-103) to re-run and
+      load the correct default template for the new language.
+
+      Implementation:
+        - Add a useRef to track previous wardLanguage (prevWardLanguageRef)
+        - Add useEffect with [wardLanguage] dependency
+        - Inside: if prevWardLanguageRef.current exists AND differs from
+          wardLanguage, set initialized(false)
+        - Update prevWardLanguageRef.current = wardLanguage at the end
+        - The ref prevents resetting on initial mount (when prevWardLanguageRef
+          is undefined)
+
+      This works in conjunction with STEP-03: after language switch, the ward
+      query is invalidated -> ward refetches with whatsapp_template=null ->
+      initialized is reset to false -> existing useEffect runs -> ward.whatsapp_template
+      is null -> getDefaultTemplate(wardLanguage) is called with the new language.
+    files:
+      - src/app/(tabs)/settings/whatsapp.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "whatsapp.tsx has a new useRef for tracking previous wardLanguage"
+      - "whatsapp.tsx has a new useEffect with [wardLanguage] dependency"
+      - "useEffect resets initialized to false when wardLanguage changes (not on initial mount)"
+      - "prevWardLanguageRef is updated to current wardLanguage at the end of the effect"
+      - "Existing useEffect [ward, initialized, wardLanguage] is NOT modified"
+    tests:
+      - type: unit
+        description: "Verify whatsapp.tsx has useEffect watching wardLanguage that resets initialized to false, using ref to skip initial mount"
+    covers:
+      acceptance_criteria: [AC-141-06, AC-141-07]
+      edge_cases: [EC-141-04]
+    risks:
+      - risk: "Two useEffects watching wardLanguage could cause render loops"
+        mitigation: "The new useEffect only sets initialized=false (a one-time state change per language switch). The existing useEffect then runs once to set template + initialized=true. No loop."
+
+  # -------------------------------------------------------------------------
+  # STEP-05: F142 - Fix WhatsApp template disconnect in InviteManagementSection
+  # -------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Fix src/components/InviteManagementSection.tsx to use the ward's custom
+      WhatsApp template from the database instead of hardcoded empty string,
+      and use wardLanguage instead of app language.
+
+      Changes:
+      1. Import supabase from '../lib/supabase' and useQuery from '@tanstack/react-query'
+         (useQuery already imported via useSpeeches, but needs explicit import for
+         direct use).
+
+      2. Destructure wardId and wardLanguage from useAuth() (currently only
+         destructures hasPermission).
+
+      3. Add useQuery(['ward', wardId]) to fetch wards.whatsapp_template:
+           const { data: ward } = useQuery({
+             queryKey: ['ward', wardId],
+             queryFn: async () => {
+               const { data, error } = await supabase
+                 .from('wards')
+                 .select('whatsapp_template')
+                 .eq('id', wardId)
+                 .single();
+               if (error) throw error;
+               return data;
+             },
+             enabled: !!wardId,
+           });
+         This reuses the same query key ['ward', wardId] as whatsapp.tsx,
+         benefiting from TanStack Query's cache sharing.
+
+      4. Replace `const locale = getCurrentLanguage()` (line 53) with:
+           const locale = (wardLanguage as SupportedLanguage) || getCurrentLanguage();
+         This uses the ward language for template/date formatting instead of app
+         display language. Fallback to getCurrentLanguage() if wardLanguage is
+         somehow undefined.
+
+      5. In handleNotInvitedAction (line 96-99), change:
+           template param from '' to `ward?.whatsapp_template ?? ''`
+         So buildWhatsAppUrl receives the custom template when available,
+         falling back to '' (which makes buildWhatsAppUrl use getDefaultTemplate).
+
+      6. Add ward?.whatsapp_template to handleNotInvitedAction's useCallback
+         dependency array.
+
+      7. Remove getCurrentLanguage import if no longer used (it IS still used
+         as fallback in locale assignment, so keep the import).
+    files:
+      - src/components/InviteManagementSection.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "InviteManagementSection imports supabase and useQuery"
+      - "useAuth() destructures wardId and wardLanguage"
+      - "useQuery(['ward', wardId]) fetches wards.whatsapp_template"
+      - "locale uses wardLanguage as SupportedLanguage with getCurrentLanguage() fallback"
+      - "buildWhatsAppUrl receives ward?.whatsapp_template ?? '' instead of hardcoded ''"
+      - "handleNotInvitedAction useCallback deps include ward?.whatsapp_template"
+      - "formatDateHumanReadable uses locale (which is now wardLanguage-based)"
+      - "getCurrentLanguage import is kept (used as fallback)"
+    tests:
+      - type: unit
+        description: "Verify InviteManagementSection uses useQuery for ward template, wardLanguage from useAuth, and passes template to buildWhatsAppUrl"
+    covers:
+      acceptance_criteria: [AC-142-01, AC-142-02, AC-142-03, AC-142-04, AC-142-05, AC-142-06]
+      edge_cases: [EC-142-01, EC-142-02, EC-142-03]
+    risks:
+      - risk: "Adding useQuery could cause extra renders when ward data changes"
+        mitigation: "TanStack Query caches by query key; the ['ward', wardId] query is already cached by whatsapp.tsx, so no extra network request. Renders are minimal."
+
+  # -------------------------------------------------------------------------
+  # STEP-06: F141 Part A - Verify collections appear in Topics screen
+  # -------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Verification step: confirm that the Topics screen correctly shows the
+      seeded en/es collections after the migration from STEP-02 is applied.
+
+      No code changes needed in src/hooks/useTopics.ts or src/app/(tabs)/settings/topics.tsx
+      (per SPEC files_not_modified). The existing useCollections(language) hook already
+      queries general_collections WHERE language = wardLanguage. Once seed data exists,
+      the query returns results.
+
+      This step verifies by reading the migration file and confirming the data matches
+      what useCollections expects. The test validates:
+        - Migration creates collections with correct language field ('en', 'es')
+        - Migration creates topics linked to parent collections
+        - No schema changes that could break useCollections
+    files: []
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-07"]
+    done_when:
+      - "useTopics.ts is NOT modified (confirmed)"
+      - "topics.tsx is NOT modified (confirmed)"
+      - "Migration data matches the schema expected by useCollections"
+    tests:
+      - type: unit
+        description: "Verify migration data structure matches general_collections/general_topics schema used by useCollections"
+    covers:
+      acceptance_criteria: [AC-141-03, AC-141-04]
+      edge_cases: []
+    risks:
+      - risk: "useCollections may filter by additional fields not present in seed data"
+        mitigation: "Schema only has id, name, language for collections; id, collection_id, title, link for topics. All are populated by the migration."
+
+  # -------------------------------------------------------------------------
+  # STEP-07: Tests - Comprehensive test suite
+  # -------------------------------------------------------------------------
+  - id: STEP-07
+    description: >
+      Create test file src/__tests__/batch23-f140-f141-f142.test.ts with
+      comprehensive tests covering all three features. Tests follow the project
+      pattern of reading source files and asserting content using fs.readFileSync
+      + expect(content).
+
+      Tests cover:
+
+      F140 (users.tsx - invite error handling):
+        - AC-140-01: onError uses err.message (not ignored)
+        - AC-140-02: meta.suppressGlobalError = true
+        - AC-140-03: callEdgeFunction error extraction (unchanged, no regression)
+        - AC-140-04: onSuccess unchanged (no regression)
+        - EC-140-01: err.message fallback (no crash when no JSON body)
+        - EC-140-02: err.message fallback (no crash when no 'error' field)
+        - EC-140-03: t('users.inviteFailed') as fallback for empty err.message
+
+      F141 (migration + settings/index.tsx + whatsapp.tsx):
+        - AC-141-01: general_collections seed data for 'en'
+        - AC-141-02: general_collections seed data for 'es'
+        - AC-141-03: Topics screen works with 'en' (data exists)
+        - AC-141-04: Topics screen works with 'es' (data exists)
+        - AC-141-05: whatsapp_template reset to null in mutation
+        - AC-141-06: WhatsApp template shows new language default
+        - AC-141-07: initialized flag resets on wardLanguage change
+        - AC-141-08: ['ward', wardId] query invalidated after language change
+        - AC-141-09: pt-BR data not modified (no DELETE/UPDATE/TRUNCATE)
+        - AC-141-10: Migration idempotent (IF NOT EXISTS guard)
+        - EC-141-01 to EC-141-04: Language switch edge cases
+
+      F142 (InviteManagementSection.tsx):
+        - AC-142-01: useQuery for ward template
+        - AC-142-02: buildWhatsAppUrl receives custom template
+        - AC-142-03: fallback to default when template is null
+        - AC-142-04: wardLanguage used instead of getCurrentLanguage
+        - AC-142-05: formatDateHumanReadable uses wardLanguage
+        - AC-142-06: Message matches Settings preview
+        - EC-142-01 to EC-142-03: Template edge cases
+    files:
+      - src/__tests__/batch23-f140-f141-f142.test.ts
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "src/__tests__/batch23-f140-f141-f142.test.ts exists"
+      - "Test file imports vitest (describe, it, expect)"
+      - "Test file uses fs.readFileSync to read source files (project pattern)"
+      - "All 4 F140 ACs have at least 1 test"
+      - "All 3 F140 ECs have at least 1 test"
+      - "All 10 F141 ACs have at least 1 test"
+      - "All 4 F141 ECs have at least 1 test"
+      - "All 6 F142 ACs have at least 1 test"
+      - "All 3 F142 ECs have at least 1 test"
+      - "Tests pass: pnpm test -- batch23-f140-f141-f142"
+    tests:
+      - type: unit
+        description: "Self-referential: this IS the test step"
+    covers:
+      acceptance_criteria: [AC-140-01, AC-140-02, AC-140-03, AC-140-04, AC-141-01, AC-141-02, AC-141-03, AC-141-04, AC-141-05, AC-141-06, AC-141-07, AC-141-08, AC-141-09, AC-141-10, AC-142-01, AC-142-02, AC-142-03, AC-142-04, AC-142-05, AC-142-06]
+      edge_cases: [EC-140-01, EC-140-02, EC-140-03, EC-141-01, EC-141-02, EC-141-03, EC-141-04, EC-142-01, EC-142-02, EC-142-03]
+    risks:
+      - risk: "File path resolution may differ between test environment and runtime"
+        mitigation: "Use path.resolve(__dirname, '..', ...) consistent with existing test files"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  # F140 ACs
+  - ac_id: AC-140-01
+    how_to_verify: "Read users.tsx: inviteMutation.onError receives err parameter and Alert.alert shows err.message with t('users.inviteFailed') as fallback"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-140-02
+    how_to_verify: "Read users.tsx: inviteMutation has meta: { suppressGlobalError: true } in useMutation options"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-140-03
+    how_to_verify: "Read users.tsx: callEdgeFunction is unchanged (still extracts serverMessage from error.context.json().error)"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-140-04
+    how_to_verify: "Read users.tsx: inviteMutation.onSuccess is unchanged (still sets inviteResult with deepLink)"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  # F141 ACs
+  - ac_id: AC-141-01
+    how_to_verify: "Read 019_seed_en_es_collections.sql: contains INSERT INTO general_collections with language = 'en' and English names"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  - ac_id: AC-141-02
+    how_to_verify: "Read 019_seed_en_es_collections.sql: contains INSERT INTO general_collections with language = 'es' and Spanish names"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  - ac_id: AC-141-03
+    how_to_verify: "Migration creates en collections with correct schema; useCollections(language) query matches (no code change needed in topics.tsx)"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-141-04
+    how_to_verify: "Migration creates es collections with correct schema; useCollections(language) query matches (no code change needed in topics.tsx)"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-141-05
+    how_to_verify: "Read settings/index.tsx: wardLanguageChangeMutation.mutationFn passes { language: newLanguage, whatsapp_template: null } to .update()"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-141-06
+    how_to_verify: "Read whatsapp.tsx: new useEffect watches wardLanguage and resets initialized to false; existing useEffect then loads getDefaultTemplate(wardLanguage)"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-141-07
+    how_to_verify: "Read whatsapp.tsx: useEffect with [wardLanguage] dependency calls setInitialized(false) when wardLanguage changes (uses ref to skip initial mount)"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-141-08
+    how_to_verify: "Read settings/index.tsx: wardLanguageChangeMutation.onSuccess calls queryClient.invalidateQueries({ queryKey: ['ward', wardId] })"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-141-09
+    how_to_verify: "Read 019_seed_en_es_collections.sql: no DELETE, UPDATE, or TRUNCATE statements; only INSERT and SELECT"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  - ac_id: AC-141-10
+    how_to_verify: "Read 019_seed_en_es_collections.sql: DO $$ block checks IF NOT EXISTS before inserting (guard against re-run)"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  # F142 ACs
+  - ac_id: AC-142-01
+    how_to_verify: "Read InviteManagementSection.tsx: useQuery(['ward', wardId]) fetches wards.whatsapp_template"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-142-02
+    how_to_verify: "Read InviteManagementSection.tsx: buildWhatsAppUrl receives ward?.whatsapp_template ?? '' as template parameter"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-142-03
+    how_to_verify: "Read InviteManagementSection.tsx: when ward?.whatsapp_template is null, '' is passed to buildWhatsAppUrl which falls back to getDefaultTemplate(language)"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-142-04
+    how_to_verify: "Read InviteManagementSection.tsx: locale is derived from wardLanguage (useAuth) instead of getCurrentLanguage()"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-142-05
+    how_to_verify: "Read InviteManagementSection.tsx: formatDateHumanReadable is called with locale (which is now wardLanguage-based)"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-142-06
+    how_to_verify: "Both whatsapp.tsx and InviteManagementSection.tsx use ['ward', wardId] query and the same whatsapp_template value -> same template displayed and sent"
+    covered_by_steps: ["STEP-05", "STEP-07"]

@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 125
-  total_change_requests: 191
+  total_features: 128
+  total_change_requests: 194
   implemented_crs: 96
-  pending_crs: 93
+  pending_crs: 96
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -67,6 +67,7 @@ metadata:
     - docs/specs/SPEC_F130_F134.yaml
     - docs/specs/SPEC_F135_F137.yaml
     - docs/specs/SPEC_F138_F139.yaml
+    - docs/specs/SPEC_F140_F141_F142.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2572,8 +2573,62 @@ features:
       - "register-invited-user NAO muda"
       - "Tela do app invite/[token].tsx mantida como fallback"
 
+  # ---------------------------------------------------------------------------
+  # Batch 23 Phase 1 (F140-F142): Bug fixes - Invite Error, Language Switch, WhatsApp Template
+  # ---------------------------------------------------------------------------
+
+  - id: F140
+    name: "Improve invite user error handling to show server error message"
+    status: pending
+    rfs: []
+    description: >
+      Fix invite user error handling: inviteMutation.onError shows actual server error
+      message (from err.message extracted by callEdgeFunction) instead of generic
+      t('users.inviteFailed'). Add meta: { suppressGlobalError: true } to prevent
+      duplicate alert from global MutationCache handler.
+    modified_by_crs: [205]
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    notes:
+      - "CR-205: Erro ao clicar em Convidar Usuario"
+      - "4 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (users.tsx)"
+      - "callEdgeFunction nao muda, onError usa err.message"
+
+  - id: F141
+    name: "Fix language switch: seed general_collections for en/es and reset whatsapp_template"
+    status: pending
+    rfs: []
+    description: >
+      Two fixes: (1) Create migration 019_seed_en_es_collections.sql with seed data for
+      general_collections and general_topics for 'en' and 'es' languages. (2) Reset
+      whatsapp_template to NULL when ward language changes (settings/index.tsx), reset
+      initialized flag in whatsapp.tsx when wardLanguage changes, invalidate ward cache.
+    modified_by_crs: [206]
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    notes:
+      - "CR-206: Troca de idioma quebra colecoes e template WhatsApp"
+      - "10 acceptance criteria, 4 edge cases"
+      - "3 arquivos impactados (migration nova, settings/index.tsx, whatsapp.tsx)"
+      - "useTopics.ts e topics.tsx NAO mudam"
+
+  - id: F142
+    name: "Fix WhatsApp send to use ward template instead of hardcoded empty string"
+    status: pending
+    rfs: []
+    description: >
+      Fix InviteManagementSection to fetch wards.whatsapp_template and pass it to
+      buildWhatsAppUrl instead of hardcoded empty string. Use wardLanguage from useAuth()
+      instead of getCurrentLanguage() for template language and date formatting.
+    modified_by_crs: [207]
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    notes:
+      - "CR-207: Template WhatsApp desconectado do envio real"
+      - "6 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (InviteManagementSection.tsx)"
+      - "whatsappUtils.ts e whatsapp.ts NAO mudam"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (93 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22)
+# PENDING CHANGE REQUESTS (96 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23)
 # =============================================================================
 
 pending_crs:
@@ -4582,6 +4637,74 @@ pending_crs:
       - supabase/functions/invite-redirect/index.ts (NEW)
       - supabase/functions/create-invitation/index.ts
 
+  # --- Batch 23 Phase 1 (Invite Error, Language Switch, WhatsApp Template) ---
+
+  - id: 205
+    type: bugfix
+    area: "Settings (F001)"
+    feature_id: F140
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    related_crs: [67]
+    description: >
+      Erro generico ao clicar em 'Convidar Usuario'. inviteMutation.onError descarta
+      err.message e mostra apenas t('users.inviteFailed'). MutationCache global dispara
+      alerta duplicado. Fix: usar err.message no onError, fallback para texto generico.
+      Adicionar meta.suppressGlobalError para evitar alerta duplo.
+    acceptance_criteria:
+      - "onError mostra err.message (mensagem do servidor)"
+      - "suppressGlobalError evita alerta duplicado do MutationCache"
+      - "Fallback para t('users.inviteFailed') se err.message vazio"
+      - "Fluxo de sucesso nao muda"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/users.tsx
+
+  - id: 206
+    type: bugfix
+    area: "Settings (F116, F131)"
+    feature_id: F141
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    related_crs: [67, 155]
+    description: >
+      Troca de idioma da ala quebra colecoes (nenhuma aparece) e template WhatsApp
+      (nao troca). Root causes: (1) Tabela general_collections nao tem dados para
+      'en' e 'es'. (2) Flag initialized em whatsapp.tsx impede re-avaliacao quando
+      wardLanguage muda. (3) wardLanguageChangeMutation nao reseta whatsapp_template.
+      Fix: seed data en/es, resetar template no banco, resetar flag initialized.
+    acceptance_criteria:
+      - "Seed data para general_collections em en e es"
+      - "Colecoes aparecem apos trocar idioma para en ou es"
+      - "whatsapp_template resetado para NULL ao trocar idioma"
+      - "Template screen mostra default do novo idioma"
+      - "Flag initialized reseta quando wardLanguage muda"
+      - "Cache do ward invalidado apos troca de idioma"
+      - "Dados pt-BR existentes nao modificados"
+    files_likely_impacted:
+      - supabase/migrations/019_seed_en_es_collections.sql (NEW)
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/whatsapp.tsx
+
+  - id: 207
+    type: bugfix
+    area: "Home (F001, F116)"
+    feature_id: F142
+    spec_file: "docs/specs/SPEC_F140_F141_F142.yaml"
+    related_crs: [67, 155]
+    description: >
+      Template WhatsApp configurado em Configuracoes nao e usado no envio real.
+      InviteManagementSection passa template='' (hardcoded) para buildWhatsAppUrl,
+      que SEMPRE usa default. Tambem usa getCurrentLanguage() (idioma do app) em vez
+      de wardLanguage. Fix: buscar wards.whatsapp_template, passar para buildWhatsAppUrl,
+      usar wardLanguage.
+    acceptance_criteria:
+      - "Busca wards.whatsapp_template do banco"
+      - "Passa template real para buildWhatsAppUrl"
+      - "Usa wardLanguage em vez de getCurrentLanguage()"
+      - "formatDateHumanReadable usa wardLanguage"
+      - "Mensagem WhatsApp corresponde ao preview em Configuracoes"
+      - "Fallback para default quando template e null"
+    files_likely_impacted:
+      - src/components/InviteManagementSection.tsx
+
 # =============================================================================
 
 design_decisions:
@@ -5794,3 +5917,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F138_F139.yaml (CR-202, CR-203 - Password reset web page, invitation acceptance web page)"
     summary: "Phase 1: Rewrite reset-redirect Edge Function to serve complete password reset web page with form using Supabase JS via CDN (F138), create invite-redirect Edge Function with invitation acceptance web page and update create-invitation to return HTTPS URL instead of deep link (F139)."
+
+  batch_23:
+    range: "CR-205, CR-206, CR-207"
+    status: "3 pendentes fase 1 (205, 206, 207)"
+    files:
+      - "docs/specs/SPEC_F140_F141_F142.yaml (CR-205, CR-206, CR-207 - Invite error handling, language switch collections/template, WhatsApp template disconnect)"
+    summary: "Phase 1: Improve invite user error handling to show server error message instead of generic text, suppress duplicate MutationCache alert (F140). Fix language switch breaking collections by seeding general_collections for en/es, reset whatsapp_template to NULL on language change, reset initialized flag in whatsapp.tsx (F141). Fix WhatsApp send to use ward template from DB instead of hardcoded empty string, use wardLanguage instead of app language (F142)."

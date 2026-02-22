@@ -4,9 +4,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  total_crs: 203
-  implemented: 201
-  pending: 2
+  total_crs: 207
+  implemented: 204
+  pending: 3
   last_updated: "2026-02-22"
 
 change_requests:
@@ -1896,3 +1896,42 @@ change_requests:
     regression_of: null
     related_crs: [155, 175]
     implemented_in: "PLAN_P037"
+
+  # ============================================================
+  # BATCH 22 (CRs 204-207)
+  # ============================================================
+  - id: 204
+    type: bug_critical
+    status: in_progress
+    batch: null
+    description: "Reset de senha e convite: pagina web da Edge Function mostra codigo HTML como texto no browser (Safari/Chrome mobile) ao inves de renderizar. Headers HTTP corretos (Content-Type: text/html). Investigar causa raiz (possivelmente cache, proxy ISP, ou dominio compartilhado *.supabase.co). Considerar solucoes: custom domain, intermediate page, code flow."
+    regression_of: 198
+    related_crs: [67, 145, 155, 176, 191, 198, 202]
+    implemented_in: null
+
+  - id: 205
+    type: bug
+    status: implemented
+    batch: 22
+    description: "Botao 'Convidar Usuario' retorna erro: ERROR [MutationCache] Error: Edge Function returned a non-2xx status code. Edge Function create-invitation pode nao estar deployada, ou SUPABASE_SERVICE_ROLE_KEY nao configurada, ou token de sessao expirado, ou permissao insuficiente. Erro real mascarado pelo handler generico."
+    regression_of: null
+    related_crs: [93, 203]
+    implemented_in: "PLAN_P038"
+
+  - id: 206
+    type: bug
+    status: implemented
+    batch: 22
+    description: "Troca de idioma da ala faz sumir TODAS as colecoes na tela de Temas e template WhatsApp nao troca. Causa raiz: mismatch de codigos de idioma no sistema. O banco de dados (general_collections, ward_collection_config) usa formato locale completo (pt-BR, en-US, es-ES) mas o codigo em diversos pontos usa formato curto (en, es) ou mistura formatos. Fix: funcao toDbLocale() mapeia en->en-US, es->es-ES, pt-BR->pt-BR em useCollections e wardLanguageChangeMutation. Template WhatsApp reseta ao trocar idioma da ala."
+    regression_of: 195
+    related_crs: [178, 195]
+    implemented_in: "PLAN_P038"
+
+  - id: 207
+    type: bug
+    status: implemented
+    batch: 22
+    description: "Tela de Template WhatsApp (Configuracoes) desconectada do envio real. A tela le/escreve wards.whatsapp_template no banco, mas InviteManagementSection.tsx passa template='' (hardcoded vazio) e usa getCurrentLanguage() (idioma do app) ao inves de wardLanguage. Resultado: botao WhatsApp sempre usa template default hardcoded, ignorando customizacao do usuario."
+    regression_of: null
+    related_crs: [178]
+    implemented_in: "PLAN_P038"

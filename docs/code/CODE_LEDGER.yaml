@@ -4059,12 +4059,30 @@ batch15_phase2_test_results:
       - src/__tests__/batch22-f138-f139.test.ts
     changes:
       - id: CHG-600
-        description: "R-1 fix: Added regex validation for token (hex-only /^[a-fA-F0-9]+$/) and type (lowercase alpha/underscore /^[a-z_]+$/) in reset-redirect before embedding in HTML template"
+        description: "R-1 fix: Added regex validation for token (/^[a-zA-Z0-9_-]+$/) and type allowlist (ALLOWED_TYPES = ['recovery']) in reset-redirect before embedding in HTML template"
       - id: CHG-601
         description: "R-2 fix: Added UUID regex validation for token in invite-redirect before embedding in HTML template"
       - id: CHG-602
-        description: "Added 6 tests verifying XSS input validation (4 for R-1: hex regex, alpha regex, invalid token 400, invalid type 400; 2 for R-2: UUID regex, invalid token 400)"
+        description: "Added 6 tests verifying XSS input validation (4 for R-1: alphanumeric regex, allowlist, invalid token 400, invalid type 400; 2 for R-2: UUID regex, invalid token 400)"
     tests_added: 6
     acs_covered: []
     ecs_covered: []
     review_issues_fixed: [R-1, R-2]
+
+  - step: REVIEW-FIX-2
+    cr: CR-202
+    plan_ref: plans/PLAN_P037.yaml
+    plan_step: REVIEW-FIX
+    hash: a2235d4
+    message: "fix(security): use allowlist for type and broader token regex per review (R-1)"
+    files_changed:
+      - supabase/functions/reset-redirect/index.ts
+      - src/__tests__/batch22-f138-f139.test.ts
+    changes:
+      - id: CHG-603
+        description: "R-1 refinement: changed token regex from hex-only to /^[a-zA-Z0-9_-]+$/ and type validation from regex to ALLOWED_TYPES whitelist per reviewer recommendation"
+      - id: CHG-604
+        description: "Updated R-1 tests to verify alphanumeric regex and ALLOWED_TYPES whitelist"
+    acs_covered: []
+    ecs_covered: []
+    review_issues_fixed: [R-1]

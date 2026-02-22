@@ -19,6 +19,7 @@
 # CR-155, CR-164 (PRE+POST),
 # CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171 (PRE+POST)
 # CR-172, CR-173, CR-174 (PRE+POST)
+# CR-175, CR-176, CR-177 (PRE)
 # Updated: 2026-02-21
 # =============================================================================
 
@@ -8215,3 +8216,96 @@ cr_batch17:
 
       Tests: 4649/4649 pass (78 files). +81 tests / +1 file from baseline.
       TypeScript: No new errors from Batch 17 changes.
+
+# #############################################################################
+# Batch 18: CR-175, CR-176, CR-177 (F113, F114, F115)
+# PRE validation
+# #############################################################################
+
+cr_batch18:
+  cr_ids: [CR-175, CR-176, CR-177]
+  title: "Batch 18: Deep link scheme fix, Email reset HTTPS redirect, Status circle right-alignment"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_020.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation passed for all 3 CRs. Bugs confirmed and reproducible:
+
+      CR-175 (F113): Deep link scheme is "sacrmeetman" but user wants "sacrmeetplan".
+      Found in 3 locations: app.json:10 (scheme: "sacrmeetman"),
+      create-invitation/index.ts:170 (sacrmeetman://invite/...),
+      send-reset-email/index.ts:194 (sacrmeetman://reset-password?...).
+      iOS bundleIdentifier and Android package use com.sacramentmeetingmanager.app
+      (should remain unchanged). Existing tests in batch7-f035-f039.test.ts and
+      batch15-phase2.test.ts assert sacrmeetman scheme and will need updating.
+
+      CR-176 (F114): Email reset button not clickable. send-reset-email/index.ts
+      builds <a href="sacrmeetman://..."> in HTML template. Email clients (Gmail,
+      Outlook, Yahoo) block/strip custom URL schemes in href attributes, making
+      the button appear but not be clickable. User had to view HTML source to find
+      the link. Fix requires HTTPS intermediary Edge Function that email clients
+      will render as clickable, which then redirects to app deep link.
+
+      CR-177 (F115): Status circle right-alignment. SpeechSlot.tsx uses rightColumn
+      (width:36, alignItems:'center'). StatusLED (14px) is centered in 36px column,
+      so its right edge is at ~25px from the left of rightColumn. The speaker name
+      field ends at the left edge of rightColumn. These do NOT align. User wants
+      LED right edge flush with field right edge.
+
+      Baseline: 4649 tests pass across 78 test files. QA Plan QA-020 created with
+      15 validation checks (13 must_pass, 2 should_pass).
+
+  post_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    verdict: passed
+    summary: |
+      POST validation PASSED for all 3 CRs. All 15 validation checks pass
+      (13 must_pass + 2 should_pass).
+
+      CR-175 (F113): Deep link scheme successfully changed to sacrmeetplan.
+      - app.json:10 -> scheme: "sacrmeetplan" (VC-01 PASS)
+      - create-invitation/index.ts:170 -> sacrmeetplan://invite/${invitationToken} (VC-02 PASS)
+      - send-reset-email/index.ts:194 -> now uses HTTPS redirect URL (VC-03 PASS)
+      - Zero sacrmeetman:// or wardmanager:// in production code (VC-04 PASS)
+      - iOS bundleIdentifier and Android package unchanged (VC-05 PASS)
+
+      CR-176 (F114): HTTPS redirect Edge Function created and integrated.
+      - reset-redirect/index.ts exists with param validation, HTML redirect page,
+        meta refresh, JS redirect, and fallback button (VC-06 PASS)
+      - send-reset-email now uses https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery
+        in email template href (VC-07 PASS)
+      - HTTPS URL includes token and type parameters (VC-08 PASS)
+      - reset-redirect builds deep link as sacrmeetplan://reset-password?token=...&type=...
+        (VC-09 PASS)
+
+      CR-177 (F115): StatusLED moved to labelRow for right-edge alignment.
+      - StatusLED now inside labelRow (leftColumn) within statusSection wrapper,
+        alongside status text. Both LED and speaker field share the same flex:1
+        column, so right edges align (VC-10 PASS)
+      - Speaker field functional: Pressable with styling, onPress, accessibility (VC-11 PASS)
+      - Remove X button functional: hitSlop=8, onPress, accessibilityLabel (VC-12 PASS)
+      - Topic field and clear button functional and unchanged (VC-13 PASS)
+
+      Tests: 4732/4732 pass (79 files). +83 tests / +1 file from baseline (VC-14 PASS).
+      TypeScript: 17 errors (same as baseline, no new errors) (VC-15 PASS).
+
+    validation_results:
+      - { id: VC-01, result: PASS, evidence: "app.json:10 -> scheme: sacrmeetplan" }
+      - { id: VC-02, result: PASS, evidence: "create-invitation/index.ts:170 -> sacrmeetplan://invite/${invitationToken}" }
+      - { id: VC-03, result: PASS, evidence: "send-reset-email/index.ts:194 -> HTTPS redirect URL (sacrmeetplan:// constructed by reset-redirect)" }
+      - { id: VC-04, result: PASS, evidence: "grep src/ and supabase/ for sacrmeetman:// and wardmanager:// -> zero matches in production code" }
+      - { id: VC-05, result: PASS, evidence: "app.json:18 bundleIdentifier com.sacramentmeetingmanager.app, :29 package com.sacramentmeetingmanager.app" }
+      - { id: VC-06, result: PASS, evidence: "supabase/functions/reset-redirect/index.ts exists, 90 lines, CORS, param validation, HTML redirect" }
+      - { id: VC-07, result: PASS, evidence: "send-reset-email/index.ts:194 href is https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?..." }
+      - { id: VC-08, result: PASS, evidence: "HTTPS URL includes token=${hashed_token}&type=recovery" }
+      - { id: VC-09, result: PASS, evidence: "reset-redirect/index.ts:32 -> sacrmeetplan://reset-password?token=${token}&type=${type}" }
+      - { id: VC-10, result: PASS, evidence: "SpeechSlot.tsx:161-166 StatusLED in labelRow/statusSection (leftColumn), same flex:1 column as speaker field" }
+      - { id: VC-11, result: PASS, evidence: "SpeechSlot.tsx:172-193 speaker Pressable with field styles, onPress, accessibilityRole, accessibilityLabel" }
+      - { id: VC-12, result: PASS, evidence: "SpeechSlot.tsx:228-237 remove Pressable with hitSlop=8, onPress=handleRemove, accessibilityLabel" }
+      - { id: VC-13, result: PASS, evidence: "SpeechSlot.tsx:198-219 topic Pressable, :243-249 clear button with hitSlop=8, onPress=handleClearTopic" }
+      - { id: VC-14, result: PASS, evidence: "npx vitest run -> 79 files, 4732 tests, 0 failures" }
+      - { id: VC-15, result: PASS, evidence: "npx tsc --noEmit -> 17 errors (same as baseline, no new errors)" }

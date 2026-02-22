@@ -102,11 +102,12 @@ export default function UserManagementScreen() {
     mutationFn: async ({ email, role }: { email: string; role: Role }) => {
       return callEdgeFunction('create-invitation', { email, role });
     },
+    meta: { suppressGlobalError: true },
     onSuccess: (data) => {
       setInviteResult({ deepLink: data.invitation.deepLink });
     },
-    onError: () => {
-      Alert.alert(t('common.error'), t('users.inviteFailed'));
+    onError: (err: Error) => {
+      Alert.alert(t('common.error'), err.message || t('users.inviteFailed'));
     },
   });
 

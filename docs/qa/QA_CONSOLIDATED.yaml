@@ -21,6 +21,7 @@
 # CR-172, CR-173, CR-174 (PRE+POST)
 # CR-175, CR-176, CR-177 (PRE+POST)
 # CR-178, CR-180, CR-181, CR-191 (PRE+POST) - Batch 19 Phase 1
+# CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (PRE) - Batch 19 Phase 2
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -8508,3 +8509,274 @@ batch19_phase1_post:
     - { id: VC-29, result: PASS, evidence: "reset-redirect/index.ts:49 meta refresh url=${deepLink}, :92 window.location.href='${deepLink}', :42 deepLink=sacrmeetplan://..." }
     - { id: VC-30, result: PASS, evidence: "npx vitest run -> 80 files, 4902 tests, 0 failures (after commit 4149fb1)" }
     - { id: VC-31, result: PASS, evidence: "npx tsc --noEmit -> 18 errors (baseline 17, +1 pre-existing mock pattern). No new production TS errors." }
+
+# #############################################################################
+# Batch 19 Phase 2: PRE validation (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192)
+# #############################################################################
+
+batch19_phase2_pre:
+  batch: 19
+  phase: 2
+  qa_plan: qa/QA_PLAN_batch19_phase2.yaml
+  timestamp: "2026-02-22"
+
+  change_requests:
+    - id: CR-179
+      type: feature_request
+      title: "Clear buttons (X) in all non-text-free, non-switch AgendaForm fields"
+      pre_status: validated
+      evidence: |
+        AgendaForm.tsx SelectorField (lines 591-621) has NO clear button.
+        Only standalone HymnSelector and PrayerSelector have clear buttons,
+        but those are not used in AgendaForm. Feature does not exist.
+
+    - id: CR-182
+      type: feature_request
+      title: "Speech read-only in agenda + pencil -> Speeches tab"
+      pre_status: validated
+      evidence: |
+        AgendaForm.tsx SpeakerField (lines 623-714) is fully editable inline
+        with override editing. No read-only mode, no pencil-to-Speeches navigation.
+        Feature does not exist.
+
+    - id: CR-183
+      type: feature_request
+      title: "Rename Proximas Designacoes -> Proximos Discursos (i18n)"
+      pre_status: validated
+      evidence: |
+        pt-BR.json:259 home.nextAssignments = "Proximas Designacoes"
+        en.json:259 home.nextAssignments = "Next Assignments"
+        es.json:259 home.nextAssignments = "Proximas Asignaciones"
+        Feature does not exist.
+
+    - id: CR-187
+      type: feature_request
+      title: "Rename tab Agenda -> Agendas (i18n)"
+      pre_status: validated
+      evidence: |
+        pt-BR.json:82 tabs.agenda = "Agenda" (singular)
+        en.json:82 tabs.agenda = "Agenda" (singular)
+        Feature does not exist.
+
+    - id: CR-189
+      type: feature_request
+      title: "Align X clear icons with field centers in SpeechSlot"
+      pre_status: validated
+      evidence: |
+        SpeechSlot.tsx rightColumn (width: 36) has statusLedPlaceholder with no
+        explicit height, speakerActionWrapper (height: 38), topicActionWrapper
+        (height: 34, marginTop: 6). Layout may cause vertical misalignment.
+
+    - id: CR-192
+      type: bugfix
+      title: "Push notifications bug - projectId: undefined"
+      pre_status: validated
+      evidence: |
+        useNotifications.ts:65-67 calls getExpoPushTokenAsync({ projectId: undefined }).
+        app.json has projectId: "6ce6536e-08c4-4c3a-ac06-f1c224e43dbd" at extra.eas.projectId.
+        Passing undefined may prevent push token registration in recent Expo SDK.
+
+  baseline:
+    tests: "80 files, 4902 tests, 0 failures"
+    typescript_errors: 18
+    summary: |
+      PRE validation PASSED for all 6 CRs. None of the requested features exist.
+      Bug CR-192 (projectId: undefined) is plausible. QA plan created with 20
+      validation checks (19 must_pass, 1 should_pass).
+
+# #############################################################################
+# Batch 19 Phase 2: POST validation (F120, F121, F122, F123, F124, F125)
+# #############################################################################
+
+batch19_phase2_post:
+  batch: 19
+  phase: 2
+  qa_plan: qa/QA_PLAN_batch19_phase2.yaml
+  timestamp: "2026-02-22"
+  verdict: passed
+
+  validation_results:
+    # === CR-179 / F120: Clear buttons in AgendaForm ===
+    - id: VC-01
+      result: PASS
+      evidence: |
+        AgendaForm.tsx:649-688 SelectorField sub-component now accepts onClear and hasValue props.
+        Lines 681-685: when onClear && hasValue, renders a Pressable with X (U+00D7) in error color.
+        Clear button only appears when value is set and onClear is provided.
+
+    - id: VC-02
+      result: PASS
+      evidence: |
+        All 4 actor fields pass onClear with proper null assignments:
+        - presiding (line 174-179): sets presiding_name: null, presiding_actor_id: null
+        - conducting (line 195-200): sets conducting_name: null, conducting_actor_id: null
+        - pianist (line 263-268): sets pianist_name: null, pianist_actor_id: null
+        - conductor (line 284-289): sets conductor_name: null, conductor_actor_id: null
+        All use !isObserver guard to conditionally provide onClear (undefined for observers).
+
+    - id: VC-03
+      result: PASS
+      evidence: |
+        All 4 hymn fields pass onClear with null:
+        - opening_hymn_id (line 305): onClear={() => updateField('opening_hymn_id', null)}
+        - sacrament_hymn_id (line 401): onClear={() => updateField('sacrament_hymn_id', null)}
+        - intermediate_hymn_id (line 467): onClear={() => updateField('intermediate_hymn_id', null)}
+        - closing_hymn_id (line 521): onClear={() => updateField('closing_hymn_id', null)}
+        All guarded by !isObserver.
+
+    - id: VC-04
+      result: PASS
+      evidence: |
+        Both prayer fields have clear callbacks:
+        - opening_prayer (lines 321-326): sets opening_prayer_name: null, opening_prayer_member_id: null
+        - closing_prayer (lines 537-542): sets closing_prayer_name: null, closing_prayer_member_id: null
+        Both guarded by !isObserver.
+
+    - id: VC-05
+      result: PASS
+      evidence: |
+        Recognizing field (lines 206-238) has clear button:
+        Line 226-229: !isObserver && Pressable with hitSlop=8, onPress={() => updateField('recognized_names', null)}
+        Renders X (U+00D7) in error color. Only shows when recognized_names has entries AND not observer.
+
+    - id: VC-06
+      result: PASS
+      evidence: |
+        All SelectorField instances pass onClear as !isObserver ? () => {...} : undefined.
+        SelectorField renders X only when onClear && hasValue (line 681).
+        When isObserver=true, onClear is undefined -> no X rendered.
+        Recognizing field also guarded by !isObserver (line 226).
+
+    # === CR-182 / F121: Speech read-only in agenda ===
+    - id: VC-07
+      result: PASS
+      evidence: |
+        AgendaForm.tsx:690-723 ReadOnlySpeakerRow replaces old SpeakerField.
+        It renders speaker name as display-only Text (line 706-714), NO TextInput, NO edit mode.
+        Used at lines 412-418 (speech 1), 421-428 (speech 2), 478-484 (speech 3).
+        No inline editing capability exists.
+
+    - id: VC-08
+      result: PASS
+      evidence: |
+        ReadOnlySpeakerRow renders pencil icon (U+270F) as Pressable at line 716-718.
+        onNavigate callback uses router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } }).
+        Lines 415, 424, 481: each ReadOnlySpeakerRow passes onNavigate that navigates to speeches tab.
+        speeches.tsx:177-202 handles expandDate param: expands card, scrolls to it, then clears param.
+        Pencil hidden for observers via !disabled guard (line 715), confirmed by R19P2-2 fix.
+
+    # === CR-183 / F122: Rename labels ===
+    - id: VC-09
+      result: PASS
+      evidence: |
+        pt-BR.json:259 -> home.nextAssignments = "Proximos Discursos" (confirmed via grep)
+
+    - id: VC-10
+      result: PASS
+      evidence: |
+        en.json:259 -> home.nextAssignments = "Upcoming Speeches"
+        es.json:259 -> home.nextAssignments = "Proximos Discursos"
+        Both confirmed via grep.
+
+    - id: VC-11
+      result: PASS
+      evidence: |
+        Key home.nextAssignments used consistently in:
+        - NextAssignmentsSection.tsx:125,146
+        - NextSundaysSection.tsx:209,225
+        All use t('home.nextAssignments'). Key name unchanged (value changed), no broken references.
+
+    # === CR-187 / F123: Rename tab Agenda -> Agendas ===
+    - id: VC-12
+      result: PASS
+      evidence: |
+        All 3 locales confirmed via grep:
+        - pt-BR.json:82 -> "agenda": "Agendas"
+        - en.json:82 -> "agenda": "Agendas"
+        - es.json:82 -> "agenda": "Agendas"
+
+    - id: VC-13
+      result: PASS
+      evidence: |
+        _layout.tsx:41 -> title: t('tabs.agenda')
+        Key unchanged, value now "Agendas" in all locales.
+
+    # === CR-189 / F124: X icon alignment in SpeechSlot ===
+    - id: VC-14
+      result: PASS
+      evidence: |
+        SpeechSlot.tsx restructured to row-per-element layout (ADR-081):
+        - speakerRow (line 206, style line 334-337): flexDirection: 'row', alignItems: 'center'
+        - field height: 38 (style line 342)
+        - actionArea (style lines 355-360): width: 36, height: 38, alignItems/justifyContent: 'center'
+        Speaker field and its X button are in the SAME ROW with matching height 38.
+        No statusLedPlaceholder in this column anymore.
+
+    - id: VC-15
+      result: PASS
+      evidence: |
+        SpeechSlot.tsx topicRow (line 247, style lines 366-370):
+        - flexDirection: 'row', alignItems: 'center', marginTop: 6
+        - topicField height: 34 (style line 381)
+        - topicActionArea (style lines 371-376): width: 36, height: 34, alignItems/justifyContent: 'center'
+        Topic field and its X button are in the SAME ROW with matching height 34.
+
+    - id: VC-16
+      result: PASS
+      evidence: |
+        Old rightColumn with statusLedPlaceholder is GONE. SpeechSlot now uses:
+        - labelRow (lines 163-194): full width, contains label + status LED + toggle
+        - speakerRow (lines 206-243): speaker field + action area, same height
+        - topicRow (lines 246-282): topic field + topic action area, same height
+        Each element is in its own dedicated row. No statusLedPlaceholder offset exists.
+
+    # === CR-192 / F125: Push notifications bug ===
+    - id: VC-17
+      result: PASS
+      evidence: |
+        useNotifications.ts:66-73:
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+        if (!projectId) { console.warn('...skipped...'); return; }
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        projectId is explicitly read from Constants (which reads app.json).
+        No longer uses undefined. Also has a guard to skip gracefully if not available.
+
+    - id: VC-18
+      result: PASS
+      evidence: |
+        useNotifications.ts:46-47:
+        Line 46: if (!user || !wardId || role === 'observer' || hasRegistered.current) return;
+        Line 47: if (!isOnline) return; // Defer to next app opening with connection
+        Both guards remain intact and unchanged from baseline.
+
+    # === Cross-cutting ===
+    - id: VC-19
+      result: PASS
+      evidence: |
+        npx vitest run -> 81 files, 4973 tests, 0 failures.
+        Increased from baseline (80 files, 4902 tests) due to new batch19-phase2 tests.
+        All pass.
+
+    - id: VC-20
+      result: PASS
+      evidence: |
+        npx tsc --noEmit -> 18 errors (matches baseline of 18).
+        No new TypeScript errors introduced. All 18 are pre-existing.
+
+  summary: |
+    POST validation PASSED for all 20 validation checks.
+    - 19 must_pass: ALL PASS
+    - 1 should_pass (VC-16): PASS
+    Verdict: PASSED.
+
+    Test suite grew from 80->81 files and 4902->4973 tests (71 new tests).
+    TypeScript errors unchanged at 18 (all pre-existing).
+
+    All 6 CRs fully implemented:
+    - F120 (CR-179): Clear X buttons on all 11 selector fields in AgendaForm, guarded by !isObserver
+    - F121 (CR-182): ReadOnlySpeakerRow replaces editable SpeakerField, pencil navigates to Speeches tab with expandDate
+    - F122 (CR-183): Labels renamed to Proximos Discursos / Upcoming Speeches / Proximos Discursos
+    - F123 (CR-187): Tab renamed from Agenda to Agendas in all 3 locales
+    - F124 (CR-189): SpeechSlot restructured to row-per-element layout, X buttons aligned with fields
+    - F125 (CR-192): projectId read from Constants.expoConfig, no longer undefined
+

@@ -1,0 +1,653 @@
+# =============================================================================
+# ARCH_M033.yaml
+# Architecture for Batch 19 Phase 2: CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (F120-F125)
+# Features: Clear buttons on selector fields, read-only speeches in Agenda + pencil nav,
+#           rename labels, X alignment fix, push notifications projectId bug
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: >
+    Add X (clear) buttons to all non-free-text, non-switch selector fields in
+    AgendaForm (F120). Replace speaker override editing in AgendaForm with
+    read-only display + pencil navigation to Speeches tab (F121). Rename
+    "Proximas Designacoes" to "Proximos Discursos" in all languages (F122).
+    Rename tab "Agenda" to "Agendas" in all languages (F123). Fix X button
+    vertical alignment in SpeechSlot (F124). Fix push notifications by
+    resolving projectId from Constants instead of passing undefined (F125).
+  principles:
+    - "F120: Modify SelectorField sub-component in AgendaForm to accept optional onClear callback"
+    - "F120: X button uses same visual style as SpeechSlot (Unicode U+00D7, colors.error)"
+    - "F120: Only visible when field has value AND user is NOT Observer"
+    - "F121: SpeakerField override editing replaced with read-only text + pencil nav button"
+    - "F121: Pencil button navigates to Speeches tab with expandDate query param"
+    - "F121: Speaker overrides remain in DB; Presentation Mode still reads them"
+    - "F121: Respects has_second_speech flag for position 2 visibility"
+    - "F122, F123: i18n value-only changes (no key renames)"
+    - "F124: Row-per-element layout approach for guaranteed vertical alignment (ADR-081)"
+    - "F125: Read projectId from Constants.expoConfig instead of passing undefined"
+
+diagram: |
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F120: X Clear Buttons on Selector Fields                       │
+  │                                                                  │
+  │  [AgendaForm]                                                    │
+  │  ├── SelectorField (sub-component)                               │
+  │  │   ├── NEW: onClear? callback prop                             │
+  │  │   ├── NEW: hasValue: boolean prop                             │
+  │  │   └── When onClear provided + hasValue: render ×  button      │
+  │  │                                                               │
+  │  ├── Actor fields: Presidir, Dirigir, Pianist, Conductor         │
+  │  │   └── onClear → set *_name=null, *_actor_id=null             │
+  │  ├── Recognizing (multi-select)                                  │
+  │  │   └── onClear → set recognized_names=null                     │
+  │  ├── Hymn fields: Opening, Sacrament, Intermediate, Closing      │
+  │  │   └── onClear → set *_hymn_id=null                            │
+  │  └── Prayer fields: Opening, Closing                             │
+  │      └── onClear → set *_name=null, *_member_id=null             │
+  │                                                                  │
+  │  NOT affected: free-text (DebouncedTextInput), toggles (Switch), │
+  │  SpeakerField (F121 replaces with read-only + pencil)            │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F121: Read-Only Speeches in Agenda + Pencil Navigation          │
+  │                                                                  │
+  │  [AgendaForm]                                                    │
+  │  ├── REMOVE: SpeakerField component (override editing)           │
+  │  ├── ADD: ReadOnlySpeakerRow (inline sub-component)              │
+  │  │   ├── Read-only text showing speech.speaker_name              │
+  │  │   ├── SelectorField-style visual (no dropdown arrow)          │
+  │  │   └── Pencil icon button (U+270F) at right                    │
+  │  │       └── router.push('/(tabs)/speeches?expandDate=YYYY-MM-DD')│
+  │  │                                                               │
+  │  ├── Position 2: hidden when has_second_speech=false              │
+  │  │   └── Requires agenda.has_second_speech data                   │
+  │  └── Observer: no pencil button visible                           │
+  │                                                                  │
+  │  [speeches.tsx]                                                   │
+  │  ├── useLocalSearchParams() reads expandDate                      │
+  │  └── useEffect: when expandDate set, auto-expand that card        │
+  │      (calls setExpandedDate + scroll)                             │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F122 + F123: i18n Label Renames                                 │
+  │                                                                  │
+  │  F122: home.nextAssignments VALUE change                         │
+  │  ├── pt-BR: "Próximas Designações" → "Próximos Discursos"       │
+  │  ├── en:    "Next Assignments"     → "Upcoming Speeches"         │
+  │  └── es:    "Próximas Asignaciones"→ "Próximos Discursos"       │
+  │                                                                  │
+  │  F123: tabs.agenda + agenda.title VALUE change                   │
+  │  ├── pt-BR: "Agenda" → "Agendas"                                │
+  │  ├── en:    "Agenda" → "Agendas"                                │
+  │  └── es:    "Agenda" → "Agendas"                                │
+  │                                                                  │
+  │  NOTE: i18n KEYS unchanged. Only VALUES updated.                 │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F124: SpeechSlot X Alignment Fix                                │
+  │                                                                  │
+  │  BEFORE (two-column layout):                                     │
+  │  ┌─────────────────────────┬──────┐                              │
+  │  │  leftColumn (flex:1)    │right │                              │
+  │  │  ├── labelRow           │ col  │                              │
+  │  │  ├── speaker field      │(36px)│                              │
+  │  │  └── topic field        │      │                              │
+  │  └─────────────────────────┴──────┘                              │
+  │  Problem: statusLedPlaceholder height mismatch with labelRow     │
+  │                                                                  │
+  │  AFTER (row-per-element, ADR-081):                               │
+  │  ┌────────────────────────────────────────┐                      │
+  │  │  labelRow: [label + toggle] [status+LED] (full-width)         │
+  │  ├────────────────────────────────────────┤                      │
+  │  │  speakerRow: [speaker field (flex:1)] [X (36px)]              │
+  │  ├────────────────────────────────────────┤                      │
+  │  │  topicRow:   [topic field (flex:1)]   [X (36px)]              │
+  │  └────────────────────────────────────────┘                      │
+  │  Guarantee: field and X button in same flexDirection:'row'        │
+  │  → alignItems:'center' ensures perfect vertical centering         │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  F125: Push Notification projectId Fix                           │
+  │                                                                  │
+  │  [useNotifications.ts]                                           │
+  │  BEFORE:                                                         │
+  │    getExpoPushTokenAsync({ projectId: undefined })               │
+  │                                                                  │
+  │  AFTER:                                                          │
+  │    import Constants from 'expo-constants';                       │
+  │    const projectId = Constants.expoConfig?.extra?.eas?.projectId;│
+  │    getExpoPushTokenAsync({ projectId })                           │
+  │    + fallback: if !projectId, log warning, skip registration     │
+  └──────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # F120: SelectorField enhancement + AgendaForm clear handlers
+  # ---------------------------------------------------------------------------
+
+  - id: C-120-01
+    name: "SelectorField onClear enhancement"
+    file: "src/components/AgendaForm.tsx"
+    responsibility: "Add optional onClear callback prop to the existing SelectorField sub-component"
+    changes:
+      - description: "Add onClear?: () => void and hasValue?: boolean props to SelectorField"
+      - description: "When onClear provided and hasValue is true, render X button (U+00D7) inside the Pressable at right side"
+      - description: "X button: color=colors.error, fontSize=20, fontWeight='300', hitSlop=8"
+      - description: "X button onPress calls e.stopPropagation() to prevent field onPress, then calls onClear"
+      - description: "New styles: clearButton { fontSize: 20, fontWeight: '300', paddingHorizontal: 4 }"
+    input:
+      - "onClear?: () => void -- callback to clear the field value"
+      - "hasValue?: boolean -- controls X button visibility (true = show X)"
+    output:
+      - "Renders X button inline when conditions met"
+      - "Calls onClear on press"
+
+  - id: C-120-02
+    name: "AgendaForm clear handlers"
+    file: "src/components/AgendaForm.tsx"
+    responsibility: "Pass onClear callbacks to each SelectorField instance in AgendaForm"
+    changes:
+      - description: "Each actor SelectorField gets onClear that calls updateField with null for both *_name and *_actor_id"
+      - description: "Presiding: updateField('presiding_name', null); updateField('presiding_actor_id', null) -- use single updateAgenda.mutate with both fields"
+      - description: "Conducting: conducting_name=null, conducting_actor_id=null"
+      - description: "Pianist: pianist_name=null, pianist_actor_id=null"
+      - description: "Conductor: conductor_name=null, conductor_actor_id=null"
+      - description: "Recognizing (custom Pressable, not SelectorField): add X button with same style when recognized_names has items, onPress sets recognized_names=null"
+      - description: "Hymn fields: onClear sets *_hymn_id=null (opening_hymn_id, sacrament_hymn_id, intermediate_hymn_id, closing_hymn_id)"
+      - description: "Prayer fields: onClear sets *_name=null and *_member_id=null"
+      - description: "hasValue derived from field value: !!value for text fields, !!hymnId for hymn fields, (recognized_names?.length ?? 0) > 0 for recognizing"
+      - description: "All onClear callbacks gated by !isObserver"
+    input:
+      - "agenda: SundayAgenda -- current agenda data"
+      - "isObserver: boolean -- permission check"
+    output:
+      - "Clear handler per field type that nullifies the appropriate columns via updateAgenda.mutate"
+
+  # ---------------------------------------------------------------------------
+  # F121: Read-only speeches + pencil navigation
+  # ---------------------------------------------------------------------------
+
+  - id: C-121-01
+    name: "ReadOnlySpeakerRow in AgendaForm"
+    file: "src/components/AgendaForm.tsx"
+    responsibility: "Replace SpeakerField with read-only display + pencil nav button"
+    changes:
+      - description: "Remove SpeakerField usage for positions 1, 2, 3 in the speech sections"
+      - description: "Replace with inline ReadOnlySpeakerRow sub-component"
+      - description: "ReadOnlySpeakerRow props: label, speakerName, sundayDate, disabled (isObserver), colors, hidden (for pos 2 when has_second_speech=false)"
+      - description: "Renders FieldRow with read-only text field (SelectorField style but no dropdown arrow and not pressable)"
+      - description: "Pencil icon button (U+270F) at right of the text field, visible only when !disabled"
+      - description: "Pencil onPress: router.push('/(tabs)/speeches?expandDate=SUNDAYDATE')"
+      - description: "Import useRouter from 'expo-router' at component level"
+      - description: "Position 2 row: hidden (return null) when agenda.has_second_speech === false"
+      - description: "Remove SpeakerField sub-component definition and all associated styles (speakerEditRow, speakerEditInput, speakerReadRow, speakerReadText, speakerIconBtn, speakerIcon, lastMinuteLabel)"
+    input:
+      - "label: string"
+      - "speakerName: string (from speeches table, NOT override)"
+      - "sundayDate: string (for navigation param)"
+      - "disabled: boolean (isObserver)"
+      - "colors: ThemeColors"
+    output:
+      - "Read-only display of speaker name"
+      - "Pencil button triggers tab navigation to Speeches with expandDate param"
+
+  - id: C-121-02
+    name: "Speeches tab expandDate param handling"
+    file: "src/app/(tabs)/speeches.tsx"
+    responsibility: "Read expandDate route param and auto-expand the corresponding Sunday card"
+    changes:
+      - description: "Import useLocalSearchParams from 'expo-router'"
+      - description: "Read expandDate param: const { expandDate } = useLocalSearchParams<{ expandDate?: string }>()"
+      - description: "Add useEffect: when expandDate is set and differs from current expandedDate, call handleToggle(expandDate) to expand that card"
+      - description: "This triggers lazy-create and auto-scroll (existing handleToggle behavior)"
+      - description: "Clear the param after handling to avoid re-triggering on re-renders (router.setParams({ expandDate: undefined }))"
+    input:
+      - "expandDate: string | undefined (from route params)"
+    output:
+      - "Auto-expands the SundayCard for the given date"
+      - "Scrolls to the expanded card"
+
+  # ---------------------------------------------------------------------------
+  # F122: Rename 'Proximas Designacoes' to 'Proximos Discursos'
+  # ---------------------------------------------------------------------------
+
+  - id: C-122-01
+    name: "i18n value change for home.nextAssignments"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    responsibility: "Update the text value of home.nextAssignments key in all 3 locale files"
+    changes:
+      - description: "pt-BR.json: 'Próximas Designações' → 'Próximos Discursos'"
+      - description: "en.json: 'Next Assignments' → 'Upcoming Speeches'"
+      - description: "es.json: 'Próximas Asignaciones' → 'Próximos Discursos'"
+    input: "N/A (static text change)"
+    output: "Updated i18n values; all UI components using t('home.nextAssignments') show new text"
+
+  # ---------------------------------------------------------------------------
+  # F123: Rename tab 'Agenda' to 'Agendas'
+  # ---------------------------------------------------------------------------
+
+  - id: C-123-01
+    name: "i18n value change for tabs.agenda and agenda.title"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    responsibility: "Update the text values of tabs.agenda and agenda.title keys in all 3 locale files"
+    changes:
+      - description: "All 3 files: tabs.agenda 'Agenda' → 'Agendas'"
+      - description: "All 3 files: agenda.title 'Agenda' → 'Agendas'"
+    input: "N/A (static text change)"
+    output: "Tab bar and screen header show 'Agendas' in all languages"
+
+  # ---------------------------------------------------------------------------
+  # F124: SpeechSlot X alignment fix
+  # ---------------------------------------------------------------------------
+
+  - id: C-124-01
+    name: "SpeechSlot row-per-element layout restructure"
+    file: "src/components/SpeechSlot.tsx"
+    responsibility: "Restructure SpeechSlot layout from two-column to row-per-element for guaranteed X alignment"
+    changes:
+      - description: "Remove outerRow/leftColumn/rightColumn two-column layout"
+      - description: "Replace with three independent rows: labelRow (unchanged), speakerRow (new), topicRow (restructured)"
+      - description: >
+          speakerRow: flexDirection:'row', alignItems:'center'.
+          Contains: speaker Pressable field (flex:1, height:38) + action area (width:36, alignItems:'center', justifyContent:'center').
+          Action area renders X button when hasSpeaker && canUnassign.
+      - description: >
+          topicRow: flexDirection:'row', alignItems:'center', marginTop:6.
+          Contains: topic Pressable field (flex:1, height:34) + action area (width:36, alignItems:'center', justifyContent:'center').
+          Action area renders X button when topicDisplay && canAssign.
+      - description: "Remove statusLedPlaceholder, speakerActionWrapper, topicActionWrapper styles"
+      - description: "Add speakerRow style: { flexDirection:'row', alignItems:'center' }"
+      - description: "Keep rightColumn style but rename to actionArea: { width:36, alignItems:'center', justifyContent:'center' }"
+      - description: "labelRow remains full-width (no two-column split) -- unchanged from F115"
+      - description: "F118 disabled state (isPos2Disabled): entire content area shows disabled placeholder (no rightColumn needed)"
+    input: "Existing SpeechSlot props (unchanged)"
+    output: "X buttons vertically centered with their corresponding fields"
+
+  # ---------------------------------------------------------------------------
+  # F125: Push notification projectId fix
+  # ---------------------------------------------------------------------------
+
+  - id: C-125-01
+    name: "Fix projectId in getExpoPushTokenAsync"
+    file: "src/hooks/useNotifications.ts"
+    responsibility: "Pass correct projectId from Constants instead of undefined"
+    changes:
+      - description: "Add import: import Constants from 'expo-constants'"
+      - description: "In register() function, before getExpoPushTokenAsync call: const projectId = Constants.expoConfig?.extra?.eas?.projectId"
+      - description: "Add guard: if (!projectId) { console.warn('Push token registration skipped: projectId not available'); return; }"
+      - description: "Replace getExpoPushTokenAsync({ projectId: undefined }) with getExpoPushTokenAsync({ projectId })"
+      - description: "Remove the misleading comment '// Uses default from app.json'"
+    input: "Constants.expoConfig?.extra?.eas?.projectId (from app.json)"
+    output: "Valid Expo push token registered in device_push_tokens table"
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - id: CT-120-01
+    name: "SelectorField onClear prop"
+    from: "AgendaForm (parent)"
+    to: "SelectorField (sub-component)"
+    interface: |
+      // Enhanced SelectorField props
+      {
+        value: string;
+        placeholder: string;
+        onPress: () => void;
+        disabled: boolean;
+        colors: ThemeColors;
+        onClear?: () => void;    // NEW: callback to clear field
+        hasValue?: boolean;       // NEW: controls X visibility
+      }
+    notes: "onClear is optional; existing SelectorField usage without onClear still works"
+
+  - id: CT-120-02
+    name: "Recognizing field X button"
+    from: "AgendaForm"
+    to: "Inline Pressable (recognizing field)"
+    interface: |
+      // X button added as sibling element next to the recognizing Pressable text content
+      // When recognized_names has items AND !isObserver:
+      //   Render X button at right side of the Pressable
+      //   onPress: updateField('recognized_names', null)
+
+  - id: CT-121-01
+    name: "ReadOnlySpeakerRow navigation to Speeches tab"
+    from: "AgendaForm (ReadOnlySpeakerRow)"
+    to: "speeches.tsx"
+    interface: |
+      // Navigation contract:
+      // AgendaForm calls:
+      router.push('/(tabs)/speeches?expandDate=2026-03-01');
+
+      // speeches.tsx reads:
+      const { expandDate } = useLocalSearchParams<{ expandDate?: string }>();
+      // When expandDate set: expand card, scroll to it, clear param
+    notes: "Standard Expo Router query param pattern. No shared context needed."
+
+  - id: CT-121-02
+    name: "ReadOnlySpeakerRow sub-component interface"
+    from: "AgendaForm"
+    to: "ReadOnlySpeakerRow (inline sub-component)"
+    interface: |
+      function ReadOnlySpeakerRow({
+        label: string;
+        speakerName: string;      // from speeches table (NOT override)
+        sundayDate: string;        // for expandDate navigation param
+        disabled: boolean;         // isObserver
+        colors: ThemeColors;
+      }): JSX.Element | null
+
+  - id: CT-124-01
+    name: "SpeechSlot layout restructure"
+    from: "SpeechSlot"
+    to: "Internal layout"
+    interface: |
+      // New layout structure (replaces outerRow/leftColumn/rightColumn):
+      <View style={styles.container}>
+        {/* Row 1: Label (full width) */}
+        <View style={styles.labelRow}>
+          {/* label, toggle, status, LED -- unchanged */}
+        </View>
+
+        {isPos2Disabled ? (
+          {/* Disabled placeholder -- unchanged */}
+        ) : (
+          <>
+            {/* Row 2: Speaker field + X button */}
+            <View style={styles.speakerRow}>
+              <Pressable style={styles.field}>{/* speaker */}</Pressable>
+              <View style={styles.actionArea}>
+                {hasSpeaker && canUnassign && <X button />}
+              </View>
+            </View>
+
+            {/* Row 3: Topic field + X button */}
+            {showTopicRow && (
+              <View style={styles.topicRow}>
+                <Pressable style={styles.topicField}>{/* topic */}</Pressable>
+                <View style={styles.actionArea}>
+                  {topicDisplay && canAssign && <X button />}
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    notes: "Each field row is self-contained with its X button. No cross-row alignment needed."
+
+  - id: CT-125-01
+    name: "getExpoPushTokenAsync projectId"
+    from: "useNotifications.ts (register)"
+    to: "Expo Notifications SDK"
+    interface: |
+      // Before (broken):
+      Notifications.getExpoPushTokenAsync({ projectId: undefined })
+
+      // After (fixed):
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      // projectId = "6ce6536e-08c4-4c3a-ac06-f1c224e43dbd" in EAS builds
+      Notifications.getExpoPushTokenAsync({ projectId })
+    notes: "projectId is always available in EAS builds from app.json expo.extra.eas.projectId"
+
+# =============================================================================
+# ADRS
+# =============================================================================
+
+adrs:
+
+  - id: ADR-081
+    title: "Row-per-element layout for SpeechSlot X button alignment (supersedes two-column approach)"
+    context: >
+      F124/CR-189 reports X buttons misaligned with their corresponding fields.
+      The two-column layout (leftColumn + rightColumn of F112/ADR-076, modified
+      by F115/ADR-078) uses separate flex containers for fields and X buttons,
+      requiring manual height synchronization between statusLedPlaceholder and
+      labelRow. This is fragile: any change to labelRow height (e.g., adding
+      toggle switch in F118) breaks alignment.
+    decision: >
+      Restructure SpeechSlot to use row-per-element: each field (speaker, topic)
+      is in its own flexDirection:'row' with its X button as a sibling. The
+      labelRow remains full-width (not split into columns). This guarantees
+      alignItems:'center' aligns field and X button vertically because they
+      share the same flex container.
+    decided_in: "CR-189"
+    supersedes: "ADR-076 (rightColumn layout for X buttons), ADR-078 (partial -- LED placement unchanged, rightColumn removed)"
+    consequences:
+      - "X button center always aligns with field center (same flex row)"
+      - "No manual height synchronization needed between unrelated elements"
+      - "labelRow is completely decoupled from field rows"
+      - "StatusLED remains in labelRow per ADR-078 (no change)"
+      - "rightColumn removed; replaced by per-row actionArea (width:36)"
+
+  - id: ADR-082
+    title: "Expo Router query param for cross-tab navigation with expanded card"
+    context: >
+      F121/CR-182 needs AgendaForm pencil button to navigate to Speeches tab
+      AND auto-expand a specific Sunday card. Options: (1) shared React Context,
+      (2) global event emitter, (3) Expo Router query params.
+    decision: >
+      Use Expo Router query params: router.push('/(tabs)/speeches?expandDate=YYYY-MM-DD').
+      The Speeches tab reads expandDate via useLocalSearchParams and auto-expands
+      the matching card. This is the idiomatic Expo Router approach, requires no
+      shared state, and is fully declarative.
+    decided_in: "CR-182"
+    consequences:
+      - "No new Context or global state needed"
+      - "Standard Expo Router pattern, well-documented"
+      - "expandDate param must be cleared after handling to avoid re-triggering"
+      - "Works with existing handleToggle which already does lazy-create + scroll"
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+
+  order_of_implementation:
+    - step: 1
+      features: [F122, F123]
+      rationale: "i18n-only changes. Zero risk. Independent of all other features."
+
+    - step: 2
+      features: [F125]
+      rationale: "Critical bug fix. Single file change. Independent of UI features."
+
+    - step: 3
+      features: [F124]
+      rationale: "SpeechSlot layout restructure. Independent of AgendaForm changes."
+
+    - step: 4
+      features: [F120]
+      rationale: "AgendaForm SelectorField enhancement. Should be done before F121 since F121 modifies the same file significantly."
+
+    - step: 5
+      features: [F121]
+      rationale: "AgendaForm speech section rewrite. Depends on F120 being done to avoid merge conflicts. Also modifies speeches.tsx."
+
+  f120_field_mapping:
+    - field: "Presidir (presiding)"
+      clear: "{ presiding_name: null, presiding_actor_id: null }"
+      hasValue: "!!agenda.presiding_name"
+
+    - field: "Dirigir (conducting)"
+      clear: "{ conducting_name: null, conducting_actor_id: null }"
+      hasValue: "!!agenda.conducting_name"
+
+    - field: "Reconhecendo (recognizing)"
+      clear: "{ recognized_names: null }"
+      hasValue: "(agenda.recognized_names?.length ?? 0) > 0"
+      note: "Custom Pressable, not SelectorField. X button added as inline element."
+
+    - field: "Pianista (pianist)"
+      clear: "{ pianist_name: null, pianist_actor_id: null }"
+      hasValue: "!!agenda.pianist_name"
+
+    - field: "Regente (conductor)"
+      clear: "{ conductor_name: null, conductor_actor_id: null }"
+      hasValue: "!!agenda.conductor_name"
+
+    - field: "Hino de Abertura (opening hymn)"
+      clear: "{ opening_hymn_id: null }"
+      hasValue: "!!agenda.opening_hymn_id"
+
+    - field: "Oracao de Abertura (opening prayer)"
+      clear: "{ opening_prayer_name: null, opening_prayer_member_id: null }"
+      hasValue: "!!agenda.opening_prayer_name"
+
+    - field: "Hino Sacramental (sacrament hymn)"
+      clear: "{ sacrament_hymn_id: null }"
+      hasValue: "!!agenda.sacrament_hymn_id"
+
+    - field: "Hino Intermediario (intermediate hymn)"
+      clear: "{ intermediate_hymn_id: null }"
+      hasValue: "!!agenda.intermediate_hymn_id"
+      note: "Only visible when has_intermediate_hymn toggle is on."
+
+    - field: "Hino de Encerramento (closing hymn)"
+      clear: "{ closing_hymn_id: null }"
+      hasValue: "!!agenda.closing_hymn_id"
+
+    - field: "Oracao de Encerramento (closing prayer)"
+      clear: "{ closing_prayer_name: null, closing_prayer_member_id: null }"
+      hasValue: "!!agenda.closing_prayer_name"
+
+  f121_removal_checklist:
+    - item: "Remove SpeakerField sub-component definition (lines ~623-714)"
+    - item: "Remove SpeakerField usage for position 1 (lines ~364-371)"
+    - item: "Remove SpeakerField usage for position 2 (lines ~373-380)"
+    - item: "Remove SpeakerField usage for position 3 (lines ~428-435)"
+    - item: "Remove styles: speakerEditRow, speakerEditInput, speakerReadRow, speakerReadText, speakerIconBtn, speakerIcon, lastMinuteLabel"
+    - item: "Remove 'speaker' from FieldSelectorType union (no longer needed)"
+    - item: "Remove speechPosition from SelectorState (no longer needed)"
+    - item: "Add ReadOnlySpeakerRow sub-component with pencil nav"
+    - item: "Add router import (useRouter from expo-router)"
+
+  f124_style_changes:
+    removed_styles:
+      - "outerRow"
+      - "leftColumn"
+      - "rightColumn"
+      - "statusLedPlaceholder"
+      - "speakerActionWrapper"
+      - "topicActionWrapper"
+    added_styles:
+      - name: "speakerRow"
+        value: "{ flexDirection: 'row', alignItems: 'center' }"
+      - name: "actionArea"
+        value: "{ width: 36, height: 38, alignItems: 'center', justifyContent: 'center' }"
+      - name: "topicActionArea"
+        value: "{ width: 36, height: 34, marginTop: 6, alignItems: 'center', justifyContent: 'center' }"
+    unchanged_styles:
+      - "container"
+      - "labelRow"
+      - "field (height:38)"
+      - "topicField (height:34)"
+      - "topicRow (marginTop:6)"
+      - "removeButton"
+
+  no_migration_needed: true
+  no_edge_function_changes: true
+  no_new_files: true
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+
+risks:
+
+  - id: R-01
+    area: "F121 -- Expo Router tab navigation with query params"
+    description: >
+      Expo Router behavior for query params on tab navigation may vary between
+      router.push and router.navigate. If the Speeches tab is already focused,
+      router.push may push a new screen onto the stack instead of updating params.
+    mitigation: >
+      Use router.navigate('/(tabs)/speeches', { expandDate }) which updates the
+      current tab without pushing. Test both cases: navigating from a different
+      tab and from the same tab. If router.navigate doesn't support params, use
+      router.push with a unique key or timestamp to force re-evaluation.
+
+  - id: R-02
+    area: "F124 -- Layout restructure regression"
+    description: >
+      Restructuring SpeechSlot layout may regress F115 StatusLED positioning or
+      F118 toggle switch behavior.
+    mitigation: >
+      labelRow is NOT modified by F124 -- it remains full-width with status section
+      at the right. Only the field rows below labelRow change structure. Test all
+      3 positions including pos 2 disabled state.
+
+  - id: R-03
+    area: "F120 -- SelectorField onClear stopPropagation"
+    description: >
+      Pressing the X button inside SelectorField must NOT trigger the field's
+      onPress (which opens the selector modal). React Native Pressable nesting
+      may cause both handlers to fire.
+    mitigation: >
+      Wrap the X button in its own Pressable that prevents event bubbling. In
+      React Native, nested Pressable components naturally handle this -- the
+      inner Pressable captures the touch. Verify that pressing X does NOT open
+      the actor/hymn/prayer selector modal.
+
+# =============================================================================
+# FILES CHANGED SUMMARY
+# =============================================================================
+
+files_changed:
+  - file: "src/components/AgendaForm.tsx"
+    features: [F120, F121]
+    type: modify
+    summary: "Add onClear to SelectorField; add X to recognizing; replace SpeakerField with ReadOnlySpeakerRow"
+
+  - file: "src/components/SpeechSlot.tsx"
+    features: [F124]
+    type: modify
+    summary: "Restructure layout from two-column to row-per-element for X alignment"
+
+  - file: "src/app/(tabs)/speeches.tsx"
+    features: [F121]
+    type: modify
+    summary: "Read expandDate param and auto-expand matching Sunday card"
+
+  - file: "src/hooks/useNotifications.ts"
+    features: [F125]
+    type: modify
+    summary: "Import Constants; pass correct projectId to getExpoPushTokenAsync"
+
+  - file: "src/i18n/locales/pt-BR.json"
+    features: [F122, F123]
+    type: modify
+    summary: "Update nextAssignments and agenda values"
+
+  - file: "src/i18n/locales/en.json"
+    features: [F122, F123]
+    type: modify
+    summary: "Update nextAssignments and agenda values"
+
+  - file: "src/i18n/locales/es.json"
+    features: [F122, F123]
+    type: modify
+    summary: "Update nextAssignments and agenda values"

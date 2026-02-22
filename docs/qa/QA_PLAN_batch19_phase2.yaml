@@ -1,0 +1,352 @@
+type: qa_plan
+id: QA-022
+created_at: "2026-02-22"
+request_type: feature_request_and_bugfix
+feature_or_bug: "Batch 19 Phase 2: Clear buttons, speech read-only in agenda, rename labels, X alignment, push notifications bug (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192)"
+user_request: |
+  1. CR-179 (feature_request): Clear buttons (X) em todos os campos nao-texto-livre e nao-switch
+     do card de agenda. Atualmente, os campos SelectorField (presiding, conducting, pianist,
+     conductor, opening hymn, opening prayer, sacrament hymn, closing hymn, closing prayer,
+     intermediate hymn, recognizing) no AgendaForm NAO possuem botao de limpar (X). O usuario
+     precisa poder limpar uma designacao selecionada.
+
+  2. CR-182 (feature_request): Speech read-only na agenda + botao lapis -> aba Discursos.
+     Atualmente, o AgendaForm possui campos SpeakerField editaveis inline para os discursos 1, 2, 3.
+     O usuario quer que esses campos sejam read-only na agenda, e que haja um botao de lapis que
+     navega para a aba Discursos.
+
+  3. CR-183 (feature_request): Rename 'Proximas Designacoes' -> 'Proximos Discursos' (i18n).
+     Atualmente, a chave home.nextAssignments e "Proximas Designacoes" (pt-BR), "Next Assignments" (en),
+     "Proximas Asignaciones" (es). Renomear para "Proximos Discursos" / "Upcoming Speeches" /
+     "Proximos Discursos".
+
+  4. CR-187 (feature_request): Rename aba 'Agenda' -> 'Agendas' (i18n).
+     Atualmente, tabs.agenda e "Agenda" em todos os 3 locales. Renomear para "Agendas".
+
+  5. CR-189 (feature_request): Alinhar icones X de limpar designacao com centro dos campos
+     na tela de discursos (SpeechSlot). Os icones de remover (speaker X e topic X) na coluna
+     direita precisam estar centralizados verticalmente com seus respectivos campos.
+
+  6. CR-192 (bugfix): Push notifications bug. O registro de push token usa
+     projectId: undefined no getExpoPushTokenAsync. Em versoes recentes do Expo,
+     o projectId e obrigatorio e deve ser passado explicitamente.
+
+# Estado atual documentado
+baseline:
+  description: |
+    == CR-179 (Clear buttons) ==
+    Current state: AgendaForm.tsx uses an internal SelectorField sub-component (lines 591-621)
+    for all selector-type fields (presiding, conducting, pianist, conductor, hymns, prayers).
+    This SelectorField does NOT have a clear (X) button - it only shows the value text.
+    In contrast, the standalone HymnSelector.tsx (line 87-90) and PrayerSelector.tsx (line 121-123)
+    components DO have clear buttons, but they are NOT used in AgendaForm. AgendaForm uses its
+    own inline SelectorField + HymnSelectorModal. There is also a Recognizing field with a
+    custom Pressable (lines 192-214) that has no clear button.
+
+    Fields that need clear buttons (non-text-free, non-switch):
+    - presiding (actor selector, line 163-175)
+    - conducting (actor selector, line 177-189)
+    - recognizing (actor multi-select, line 191-215)
+    - pianist (actor selector, line 229-241)
+    - conductor (actor selector, line 243-255)
+    - opening_hymn (hymn selector, line 257-269)
+    - opening_prayer (prayer selector, line 271-283)
+    - sacrament_hymn (hymn selector, line 344-356)
+    - intermediate_hymn (hymn selector, line 407-421)
+    - closing_hymn (hymn selector, line 461-473)
+    - closing_prayer (prayer selector, line 475-487)
+
+    Fields that should NOT have clear buttons:
+    - announcements (text-free DebouncedTextInput)
+    - ward_business (text-free DebouncedTextInput)
+    - baby_blessing toggles + names (switch + text-free)
+    - baptism_confirmation toggles + names (switch + text-free)
+    - stake_announcements (switch)
+    - musical_number toggle + description (switch + text-free)
+    - intermediate_hymn toggle (switch)
+    - speaker override fields (text-free)
+
+    CONCLUSION: Feature does NOT exist. No clear buttons on any SelectorField in AgendaForm.
+
+    == CR-182 (Speech read-only in agenda) ==
+    Current state: AgendaForm.tsx has SpeakerField sub-components (lines 623-714) for speeches
+    1, 2, 3. These fields are EDITABLE inline - when a speaker exists, there's a pencil icon
+    (line 696) that enables inline editing of the speaker name (override). There is NO navigation
+    to the Speeches tab. The SpeakerField allows: viewing the name, editing overrides, and reverting.
+
+    The tabs layout (src/app/(tabs)/_layout.tsx) shows the Speeches tab as a separate tab (line 47-55).
+    There is no cross-tab navigation from AgendaForm to Speeches tab.
+
+    CONCLUSION: Feature does NOT exist. Speech fields are editable inline, not read-only.
+    No pencil-to-Speeches-tab navigation exists.
+
+    == CR-183 (Rename Proximas Designacoes) ==
+    Current state: The i18n key "home.nextAssignments" has these values:
+    - pt-BR.json:259 -> "Proximas Designacoes"
+    - en.json:259 -> "Next Assignments"
+    - es.json:259 -> "Proximas Asignaciones"
+
+    The key is used in:
+    - NextAssignmentsSection.tsx:125,146 -> t('home.nextAssignments')
+    - NextSundaysSection.tsx:209,225 -> t('home.nextAssignments')
+
+    The component name is NextAssignmentsSection.
+
+    CONCLUSION: Feature does NOT exist. Still says "Designacoes"/"Assignments"/"Asignaciones".
+
+    == CR-187 (Rename tab Agenda -> Agendas) ==
+    Current state: The i18n key "tabs.agenda" has these values:
+    - pt-BR.json:82 -> "Agenda"
+    - en.json:82 -> "Agenda"
+    - es.json:82 -> "Agenda" (based on same pattern)
+
+    Used in _layout.tsx:41 -> title: t('tabs.agenda')
+
+    CONCLUSION: Feature does NOT exist. Tab still says singular "Agenda".
+
+    == CR-189 (X icon alignment in speeches card) ==
+    Current state: SpeechSlot.tsx has a rightColumn (width: 36px) with:
+    - statusLedPlaceholder (no explicit height, just justify+align center)
+    - speakerActionWrapper (height: 38, justifyContent: 'center') contains the X remove button
+    - topicActionWrapper (height: 34, marginTop: 6, justifyContent: 'center') contains the X clear topic
+
+    The speaker field (left column) has height: 38 (styles.field:368).
+    The topic field has height: 34 (styles.topicField:406).
+    The speakerActionWrapper has height: 38 to match, but the statusLedPlaceholder has no fixed
+    height, which may cause vertical misalignment.
+    The topicActionWrapper has marginTop: 6 to match topicRow's marginTop: 6.
+
+    The alignment issue is likely that:
+    1. The statusLedPlaceholder takes some space pushing the speakerActionWrapper down
+    2. The X buttons may not be perfectly centered with their respective fields
+
+    CONCLUSION: Alignment issue exists. The rightColumn structure with statusLedPlaceholder
+    may cause misalignment of the X buttons relative to field centers.
+
+    == CR-192 (Push notifications bug) ==
+    Current state: useNotifications.ts:65-67 calls getExpoPushTokenAsync with
+    projectId: undefined. The comment says "Uses default from app.json".
+    app.json has the projectId at extra.eas.projectId: "6ce6536e-08c4-4c3a-ac06-f1c224e43dbd".
+
+    In recent Expo SDK versions, getExpoPushTokenAsync REQUIRES an explicit projectId parameter.
+    Passing undefined may cause the call to fail silently or throw an error on certain platforms,
+    preventing push token registration.
+
+    The process-notifications Edge Function (supabase/functions/process-notifications/index.ts)
+    correctly handles sending, grouping, and invalid token cleanup. The server side looks correct.
+
+    The client-side registration is the likely bug: projectId: undefined should be the actual
+    project ID from app.json.
+
+    CONCLUSION: Bug likely exists. projectId: undefined in getExpoPushTokenAsync.
+
+  evidence:
+    - "AgendaForm.tsx SelectorField (lines 591-621) has NO clear button"
+    - "AgendaForm.tsx SpeakerField (lines 623-714) is editable inline, NOT read-only"
+    - "pt-BR.json:259 home.nextAssignments = 'Proximas Designacoes'"
+    - "en.json:259 home.nextAssignments = 'Next Assignments'"
+    - "es.json:259 home.nextAssignments = 'Proximas Asignaciones'"
+    - "pt-BR.json:82 tabs.agenda = 'Agenda' (singular)"
+    - "en.json:82 tabs.agenda = 'Agenda' (singular)"
+    - "SpeechSlot.tsx rightColumn (lines 324-327) width: 36, no explicit height matching"
+    - "useNotifications.ts:65-67 projectId: undefined in getExpoPushTokenAsync"
+    - "app.json:40 extra.eas.projectId = '6ce6536e-08c4-4c3a-ac06-f1c224e43dbd'"
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+  # === CR-179: Clear buttons in AgendaForm ===
+  - id: VC-01
+    description: "AgendaForm SelectorField sub-component has a clear (X) button when value is set"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx SelectorField component.
+      Check that when value is non-empty and field is not disabled, an X button is rendered.
+      The X button should call a clear handler that sets the field value to null.
+    expected_result: "SelectorField renders an X/clear Pressable when value is truthy and not disabled"
+    priority: must_pass
+
+  - id: VC-02
+    description: "All actor selector fields (presiding, conducting, pianist, conductor) have clear functionality"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. For each actor SelectorField (presiding, conducting, pianist, conductor),
+      verify that an onClear callback is provided that calls updateField with null values for both
+      the name field and the actor_id field.
+    expected_result: "Each actor field has clear handler setting name=null and actor_id=null"
+    priority: must_pass
+
+  - id: VC-03
+    description: "All hymn selector fields (opening, sacrament, intermediate, closing) have clear functionality"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. For each hymn SelectorField, verify clear callback sets hymn_id to null.
+    expected_result: "Each hymn field has clear handler setting hymn_id=null"
+    priority: must_pass
+
+  - id: VC-04
+    description: "Both prayer fields (opening, closing) have clear functionality"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. For each prayer SelectorField, verify clear callback sets
+      prayer_name=null and prayer_member_id=null.
+    expected_result: "Each prayer field has clear handler setting name=null and member_id=null"
+    priority: must_pass
+
+  - id: VC-05
+    description: "Recognizing field has clear functionality"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. Verify the recognizing field (multi-select) has a clear button
+      that sets recognized_names to null/empty.
+    expected_result: "Recognizing field has clear handler setting recognized_names to null"
+    priority: must_pass
+
+  - id: VC-06
+    description: "Clear buttons are hidden for Observer role (disabled fields)"
+    type: behavioral
+    how_to_verify: |
+      Read AgendaForm.tsx. Verify clear buttons are not shown when isObserver is true
+      or when field is disabled.
+    expected_result: "Clear buttons not rendered when isObserver=true or disabled=true"
+    priority: must_pass
+
+  # === CR-182: Speech read-only in agenda ===
+  - id: VC-07
+    description: "Speech fields in AgendaForm are read-only (no inline editing)"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. Verify that the SpeakerField sub-component (or its replacement)
+      does NOT allow inline editing. The speaker name should be display-only.
+      There should be no TextInput for editing overrides in the agenda form.
+    expected_result: "Speaker fields in AgendaForm are display-only, no edit capability"
+    priority: must_pass
+
+  - id: VC-08
+    description: "Pencil icon button on speech fields navigates to Speeches tab"
+    type: functional
+    how_to_verify: |
+      Read AgendaForm.tsx. Verify there is a pencil/edit icon button that, when pressed,
+      navigates to the Speeches tab (e.g., using router.push or router.replace to /(tabs)/speeches).
+    expected_result: "Pencil button exists on speech fields and navigates to /(tabs)/speeches"
+    priority: must_pass
+
+  # === CR-183: Rename Proximas Designacoes -> Proximos Discursos ===
+  - id: VC-09
+    description: "i18n key home.nextAssignments renamed to 'Proximos Discursos' (pt-BR)"
+    type: functional
+    how_to_verify: |
+      Read pt-BR.json. Check the value of the relevant i18n key (whether it was renamed
+      or just the value changed). Should show "Proximos Discursos" or similar.
+    expected_result: "pt-BR value is 'Proximos Discursos'"
+    priority: must_pass
+
+  - id: VC-10
+    description: "i18n key updated for en and es locales"
+    type: functional
+    how_to_verify: |
+      Read en.json and es.json. Check the corresponding key shows
+      "Upcoming Speeches" (en) and "Proximos Discursos" (es) or equivalent.
+    expected_result: "en = 'Upcoming Speeches' or similar, es = 'Proximos Discursos' or similar"
+    priority: must_pass
+
+  - id: VC-11
+    description: "All usages in code reference the correct i18n key"
+    type: functional
+    how_to_verify: |
+      Search for references to home.nextAssignments in the codebase.
+      Verify NextAssignmentsSection.tsx and NextSundaysSection.tsx use the correct key.
+    expected_result: "All references use the updated key consistently"
+    priority: must_pass
+
+  # === CR-187: Rename tab Agenda -> Agendas ===
+  - id: VC-12
+    description: "i18n key tabs.agenda value changed to 'Agendas' in all 3 locales"
+    type: functional
+    how_to_verify: |
+      Read pt-BR.json, en.json, es.json. Check tabs.agenda value in each.
+    expected_result: "pt-BR = 'Agendas', en = 'Agendas', es = 'Agendas'"
+    priority: must_pass
+
+  - id: VC-13
+    description: "_layout.tsx still references t('tabs.agenda') for tab title"
+    type: functional
+    how_to_verify: |
+      Read src/app/(tabs)/_layout.tsx. Verify the agenda tab still uses t('tabs.agenda').
+    expected_result: "Tab title uses t('tabs.agenda') which now resolves to 'Agendas'"
+    priority: must_pass
+
+  # === CR-189: X icon alignment in SpeechSlot ===
+  - id: VC-14
+    description: "Speaker remove (X) button is vertically centered with speaker field"
+    type: functional
+    how_to_verify: |
+      Read SpeechSlot.tsx. Verify the speakerActionWrapper height matches the speaker field height,
+      and the rightColumn layout ensures vertical centering. The statusLedPlaceholder should not
+      cause misalignment.
+    expected_result: "speakerActionWrapper vertically aligns with speaker field (both height 38)"
+    priority: must_pass
+
+  - id: VC-15
+    description: "Topic clear (X) button is vertically centered with topic field"
+    type: functional
+    how_to_verify: |
+      Read SpeechSlot.tsx. Verify the topicActionWrapper height and marginTop match the
+      topicField height and topicRow marginTop, ensuring vertical centering.
+    expected_result: "topicActionWrapper vertically aligns with topic field"
+    priority: must_pass
+
+  - id: VC-16
+    description: "No leftover statusLedPlaceholder causing offset in rightColumn"
+    type: behavioral
+    how_to_verify: |
+      Read SpeechSlot.tsx. Verify the rightColumn layout properly handles the label row
+      height so that the X buttons start at the correct vertical position.
+    expected_result: "rightColumn layout accounts for label row height correctly"
+    priority: should_pass
+
+  # === CR-192: Push notifications bug ===
+  - id: VC-17
+    description: "getExpoPushTokenAsync receives explicit projectId from app.json"
+    type: functional
+    how_to_verify: |
+      Read useNotifications.ts. Verify getExpoPushTokenAsync is called with the actual
+      projectId from app.json (6ce6536e-08c4-4c3a-ac06-f1c224e43dbd) or via Constants.
+    expected_result: "projectId is explicitly set, not undefined"
+    priority: must_pass
+
+  - id: VC-18
+    description: "Push token registration still defers for offline users"
+    type: regression
+    how_to_verify: |
+      Read useNotifications.ts. Verify the isOnline check and Observer role exclusion
+      are still present and unchanged.
+    expected_result: "isOnline guard and role === 'observer' guard remain intact"
+    priority: must_pass
+
+  # === Cross-cutting ===
+  - id: VC-19
+    description: "All existing tests pass"
+    type: regression
+    how_to_verify: |
+      Run npx vitest run. Verify all test files pass with 0 failures.
+      Current baseline: 80 files, 4902 tests.
+    expected_result: "All tests pass, 0 failures"
+    priority: must_pass
+
+  - id: VC-20
+    description: "No new TypeScript errors introduced"
+    type: regression
+    how_to_verify: |
+      Run npx tsc --noEmit. Count errors. Current baseline: 18 errors.
+      New errors should be <= 18 (or justified as pre-existing).
+    expected_result: "TypeScript errors <= 18 (baseline)"
+    priority: must_pass
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.
+
+  must_pass count: 19 (VC-01 through VC-15 except VC-16, plus VC-17 through VC-20)
+  should_pass count: 1 (VC-16)

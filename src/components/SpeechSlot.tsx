@@ -193,13 +193,26 @@ export const SpeechSlot = React.memo(function SpeechSlot({
         )}
       </View>
 
-      {/* F118: Show disabled placeholder when position 2 is off */}
+      {/* F118/F132: Show 2 visible disabled fields with placeholder when position 2 is off */}
       {isPos2Disabled ? (
-        <View style={[styles.field, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
-          <Text style={[styles.fieldText, { color: colors.textSecondary }]} numberOfLines={1}>
-            {t('speeches.secondSpeechDisabledPlaceholder')}
-          </Text>
-        </View>
+        <>
+          <View style={styles.speakerRow}>
+            <View style={[styles.field, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+              <Text style={[styles.fieldText, { color: colors.textSecondary }]} numberOfLines={1}>
+                {t('speeches.secondSpeechDisabledPlaceholder')}
+              </Text>
+            </View>
+            <View style={styles.actionArea} />
+          </View>
+          <View style={styles.topicRow}>
+            <View style={[styles.topicField, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+              <Text style={[styles.topicText, { color: colors.textSecondary }]} numberOfLines={1}>
+                {t('speeches.secondSpeechDisabledPlaceholder')}
+              </Text>
+            </View>
+            <View style={styles.topicActionArea} />
+          </View>
+        </>
       ) : (
         <>
           {/* Row 2: Speaker field + X button (ADR-081) */}

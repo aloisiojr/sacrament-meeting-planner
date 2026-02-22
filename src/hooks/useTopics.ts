@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
+import { toDbLocale } from '../i18n';
 import type {
   WardTopic,
   GeneralCollection,
@@ -185,15 +186,16 @@ interface CollectionWithConfig extends GeneralCollection {
  */
 export function useCollections(language: string) {
   const { wardId } = useAuth();
+  const dbLocale = toDbLocale(language);
 
   return useQuery({
     queryKey: topicKeys.collections(wardId, language),
     queryFn: async (): Promise<CollectionWithConfig[]> => {
-      // Fetch all general collections for this language
+      // Fetch all general collections for this language (using DB locale code)
       const { data: collections, error: collErr } = await supabase
         .from('general_collections')
         .select('*')
-        .eq('language', language);
+        .eq('language', dbLocale);
 
       if (collErr) throw collErr;
 

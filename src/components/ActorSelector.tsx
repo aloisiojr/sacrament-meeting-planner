@@ -93,7 +93,8 @@ export function ActorSelector({
       can_preside: roleFilter === 'can_preside',
       can_conduct: roleFilter === 'can_conduct',
       can_recognize: roleFilter === 'can_recognize',
-      can_music: roleFilter === 'can_music',
+      can_pianist: roleFilter === 'can_pianist',
+      can_conductor: roleFilter === 'can_conductor',
     };
 
     createActor.mutate(input, {

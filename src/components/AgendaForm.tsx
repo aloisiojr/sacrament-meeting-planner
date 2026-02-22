@@ -232,7 +232,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.pianist')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_music' });
+              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_pianist' });
             }
           }}
           disabled={isObserver}
@@ -246,7 +246,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.conductor')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_music' });
+              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_conductor' });
             }
           }}
           disabled={isObserver}

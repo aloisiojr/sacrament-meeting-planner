@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 116
-  total_change_requests: 182
+  total_features: 120
+  total_change_requests: 186
   implemented_crs: 96
-  pending_crs: 84
+  pending_crs: 88
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -63,6 +63,7 @@ metadata:
     - docs/specs/SPEC_F113_F115.yaml
     - docs/specs/SPEC_F116_F119.yaml
     - docs/specs/SPEC_F120_F125.yaml
+    - docs/specs/SPEC_F126_F129.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2306,8 +2307,88 @@ features:
       - "Root cause: projectId: undefined no getExpoPushTokenAsync"
       - "Fix: importar Constants e passar projectId correto"
 
+  # ---------------------------------------------------------------------------
+  # Batch 20 Phase 1 (F126-F129): Navigation & Home redesign
+  # ---------------------------------------------------------------------------
+
+  - id: F126
+    name: "Pencil icon in Presentation screen to navigate to Agenda tab for editing"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar icone de lapis na tela de Apresentacao (header) ao lado do botao
+      de tamanho de fonte. Ao clicar, navega para aba Agendas com card do domingo
+      expandido para edicao. Requer suporte a expandDate query param na aba Agendas
+      (seguindo padrao ADR-082 do speeches.tsx).
+    modified_by_crs: [184]
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    notes:
+      - "CR-184: Pencil button na tela de Apresentacao -> Agenda tab"
+      - "7 acceptance criteria, 3 edge cases"
+      - "2 arquivos impactados: presentation.tsx, agenda.tsx"
+      - "Requer implementacao de expandDate na aba Agendas (ADR-082)"
+      - "Pencil button identico ao fontToggleButton (36x36 circle)"
+
+  - id: F127
+    name: "Play button in expanded Agenda card to navigate to Presentation screen"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar botao play no card expandido da agenda (ao lado da seta de colapsar).
+      Ao clicar, navega para tela de Apresentacao com o domingo selecionado. Requer
+      que Presentation screen aceite parametro de data opcional.
+    modified_by_crs: [185]
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    notes:
+      - "CR-185: Play button no card expandido -> Presentation"
+      - "7 acceptance criteria, 3 edge cases"
+      - "2 arquivos impactados: agenda.tsx, presentation.tsx"
+      - "Play button visivel apenas quando card expandido"
+      - "Presentation screen precisa aceitar date param"
+
+  - id: F128
+    name: "Home - Agenda section redesign with Sunday preview card and play icon"
+    status: pending
+    rfs: []
+    description: >
+      Redesign da secao 'Agenda da Reuniao Sacramental' no Home. Botao Iniciar
+      ganha icone de play antes do texto. Abaixo do botao, card de domingo
+      identico ao contraido da aba Agendas (nao expansivel) mostrando status
+      (roles, speakers, prayers, hymns). Card do proximo domingo (seg-sab) ou
+      do dia (domingo). A direita do card, botao quadrado com lapis que navega
+      para aba Agendas com card expandido.
+    modified_by_crs: [186]
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    notes:
+      - "CR-186: Preview card + play icon no botao Iniciar"
+      - "10 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado: index.tsx (Home)"
+      - "Requer fetch de agenda data no Home (useAgenda, useSpeeches)"
+      - "Preview card replica status lines do card contraido da aba Agendas"
+      - "Pencil button quadrado (36x36, borderRadius:8)"
+
+  - id: F129
+    name: "Home - Upcoming Speeches: non-expandable cards with pencil navigation"
+    status: pending
+    rfs: []
+    description: >
+      Cards na secao 'Proximos Discursos' do Home nao sao mais expansiveis.
+      Remover SpeechSlot, MemberSelectorModal, TopicSelectorModal e hooks de
+      mutacao. Adicionar botao lapis a direita de cada card que navega para aba
+      Discursos com card expandido (ADR-082 expandDate). NextAssignmentsSection
+      (Bishopric-only) nao e afetada.
+    modified_by_crs: [188]
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    notes:
+      - "CR-188: Cards nao-expansiveis + pencil button -> Speeches tab"
+      - "11 acceptance criteria, 3 edge cases"
+      - "2 arquivos impactados: NextSundaysSection.tsx, SundayCard.tsx"
+      - "Remove expand/edit: SpeechSlot, modais, hooks de mutacao"
+      - "Pencil button identico ao de F128 (quadrado, 36x36)"
+      - "NextAssignmentsSection nao afetada (Bishopric-only)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (84 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19)
+# PENDING CHANGE REQUESTS (88 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20)
 # =============================================================================
 
 pending_crs:
@@ -4097,6 +4178,101 @@ pending_crs:
       - "Server-side Edge Function not modified"
     files_likely_impacted:
       - src/hooks/useNotifications.ts
+
+  # --- Batch 20 Phase 1 (Navigation & Home Redesign) ---
+
+  - id: 184
+    type: feature
+    area: "Presentation Mode (F016, F012)"
+    feature_id: F126
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    related_crs: [158]
+    description: >
+      Adicionar icone de lapis na tela de Apresentacao (ao lado do botao de
+      tamanho de fonte) que navega para aba Agendas com card expandido.
+      Requer suporte a expandDate query param na aba Agendas (ADR-082).
+    acceptance_criteria:
+      - "Pencil button visible in Presentation screen header"
+      - "Pencil navigates to Agenda tab with card expanded for the Sunday"
+      - "Agenda tab auto-expands card when expandDate param provided"
+      - "expandDate param cleared after handling"
+      - "Agenda record lazy-created when expandDate provided"
+      - "Pencil visible and functional for all roles"
+      - "Pencil button style matches existing header buttons (36x36 circle)"
+    files_likely_impacted:
+      - src/app/presentation.tsx
+      - src/app/(tabs)/agenda.tsx
+
+  - id: 185
+    type: feature
+    area: "Agenda (F012, F016)"
+    feature_id: F127
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    related_crs: [149]
+    description: >
+      Adicionar botao play no card expandido da agenda (ao lado da seta de
+      colapsar) que navega para tela de Apresentacao com o domingo selecionado.
+      Requer que Presentation screen aceite date param opcional.
+    acceptance_criteria:
+      - "Play button visible when Agenda card is expanded"
+      - "Play button NOT visible when collapsed"
+      - "Play navigates to Presentation screen with correct date"
+      - "Presentation screen accepts date parameter"
+      - "Presentation falls back to getTodaySundayDate when no param"
+      - "Play button not shown for non-expandable cards"
+      - "Play button accessible for all roles"
+    files_likely_impacted:
+      - src/app/(tabs)/agenda.tsx
+      - src/app/presentation.tsx
+
+  - id: 186
+    type: feature
+    area: "Home (F009, F012, F016)"
+    feature_id: F128
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    related_crs: [149, 1, 3]
+    description: >
+      Home - sessao 'Agenda da Reuniao Sacramental': botao Iniciar ganha icone
+      de play. Abaixo, card de domingo identico ao contraido da aba Agendas
+      (nao expansivel). Pencil button navega para aba Agendas com card expandido.
+    acceptance_criteria:
+      - "Play icon (U+25B6) visible before 'Iniciar' text"
+      - "Sunday preview card visible below Iniciar button"
+      - "Preview card shows correct date (next Sunday or today)"
+      - "Preview card shows status lines (missing roles, speakers, prayers, hymns)"
+      - "Pencil button on card navigates to Agenda tab with expandDate"
+      - "Preview card NOT expandable"
+      - "Preview card shows exception label for special meetings"
+      - "All roles see preview card and pencil button"
+      - "Pencil button style: square 36x36, borderRadius 8"
+    files_likely_impacted:
+      - src/app/(tabs)/index.tsx
+
+  - id: 188
+    type: ux
+    area: "Home (F009, F008)"
+    feature_id: F129
+    spec_file: "docs/specs/SPEC_F126_F129.yaml"
+    related_crs: [150]
+    description: >
+      Home - secao 'Proximos Discursos': cards nao sao mais expansiveis.
+      Remover edicao inline. Botao lapis navega para aba Discursos com card
+      expandido (ADR-082). NextAssignmentsSection nao afetada.
+    acceptance_criteria:
+      - "Cards NOT expandable (no toggle, no SpeechSlot)"
+      - "No chevron shown on cards"
+      - "Pencil button visible on each card"
+      - "Pencil navigates to Speeches tab with expandDate"
+      - "Cards still show speaker names and LEDs"
+      - "No MemberSelectorModal or TopicSelectorModal rendered"
+      - "Exception label still shown for special Sundays"
+      - "isNext highlighting preserved"
+      - "F118 has_second_speech respected"
+      - "Pencil button style identical to CR-186 (square, 36x36)"
+      - "Observer can see cards and pencil button"
+    files_likely_impacted:
+      - src/components/NextSundaysSection.tsx
+      - src/components/SundayCard.tsx
 
 # =============================================================================
 

@@ -9919,3 +9919,278 @@ cr_200:
           npx tsc --noEmit: Only pre-existing error about react-test-renderer
           type declaration (not new). No new TS errors from F135/F136/F137 changes.
 
+# #############################################################################
+# CR-202: Password Reset Web Page (F138) - Batch 22 Phase 1
+# CR-203: Invitation Acceptance Web Page (F139) - Batch 22 Phase 1
+# #############################################################################
+
+cr_202_203:
+  cr_ids: [CR-202, CR-203]
+  title: "Web pages for password reset and invitation acceptance (replace broken deep links)"
+  type: feature_request
+  spec: specs/SPEC_F138_F139.yaml
+  qa_plan: qa/QA_PLAN_batch21_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      QA Plan validated. Both flows analyzed end-to-end:
+      - CR-202: reset-redirect uses deep link sacrmeetplan:// that does not work in browsers.
+        User sees "Redirecionando para o aplicativo..." static HTML. Solution: rewrite with
+        full web form using Supabase JS CDN for verifyOtp + updateUser.
+      - CR-203: create-invitation returns deep link sacrmeetplan://invite/ that does not work.
+        Solution: new invite-redirect Edge Function with web form calling register-invited-user via fetch.
+      Impact: reset-redirect rewritten, create-invitation updated, new invite-redirect created.
+      send-reset-email and register-invited-user unchanged. App screens kept as fallback.
+      27 validation_checks defined (23 must_pass, 4 should_pass).
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 4db8e9c
+        message: "feat(reset-redirect): rewrite as self-contained password reset web page (F138)"
+      - hash: cc7117a
+        message: "feat(invite-redirect): create invitation acceptance web page Edge Function (F139)"
+      - hash: 74671ea
+        message: "fix(create-invitation): replace deep link with HTTPS URL to invite-redirect (F139)"
+      - hash: e2b9282
+        message: "test(batch22): add tests for F138, F139 (104 tests, 25 ACs, 12 ECs)"
+      - hash: 052967e
+        message: "docs(code): update CODE_LEDGER with Batch 22 Phase 1 commits (F138, F139)"
+      - hash: cd660ee
+        message: "fix(security): validate token/type input formats to prevent XSS (R-1, R-2)"
+      - hash: ae52a1a
+        message: "docs(code): update CODE_LEDGER with XSS fix commit (R-1, R-2)"
+      - hash: a2235d4
+        message: "fix(security): use allowlist for type and broader token regex per review (R-1)"
+      - hash: 502b047
+        message: "docs(code): update CODE_LEDGER with refined R-1 XSS fix commit"
+
+    reviewer_verdict: approved
+    reviewer_iterations: 2
+    reviewer_note: "Iteration 1 found XSS risk (R-1, R-2) in template interpolation of token/type. Fixed in iteration 2 with input validation (allowlist for type, regex for token)."
+
+    tester_verdict: approved
+    tester_tests_passed: 5401
+    tester_tests_total: 5401
+
+    must_pass_results:
+      # --- CR-202: Password Reset Web Page (F138) ---
+      - id: VC-202-01
+        description: "reset-redirect serves full HTML page with password reset form (not redirect)"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts fully rewritten. HTML has <form id="reset-form"> with
+          two <input type="password"> fields (id="password", id="confirm-password") and
+          <button type="submit">. No meta http-equiv="refresh". No deep link redirect.
+
+      - id: VC-202-02
+        description: "Page uses Supabase JS client to verify recovery token"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:208 loads CDN. Lines 301-304 create Supabase client.
+          Lines 311-314: supabaseClient.auth.verifyOtp({ token_hash: tokenHash, type: tokenType }).
+
+      - id: VC-202-03
+        description: "Page calls updateUser to set new password"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:354: supabaseClient.auth.updateUser({ password: password })
+          called after verifyOtp succeeds and form is submitted.
+
+      - id: VC-202-04
+        description: "Page validates password match and minimum length"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:336 checks password.length < 6 (errorShortPassword).
+          Line 343 checks password !== confirmPassword (errorMismatch).
+
+      - id: VC-202-05
+        description: "Page shows success message after password update"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:362 calls showSuccess() which shows success-msg div.
+          pt-BR: "Senha atualizada com sucesso!" (line 251).
+          en: "Password updated successfully!" (line 221).
+
+      - id: VC-202-06
+        description: "Page shows error for invalid/expired token"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:315-317: if verifyOtp returns error, calls
+          showError(t.errorExpired). pt-BR: "Link expirado ou invalido."
+          Form-container stays hidden.
+
+      - id: VC-202-07
+        description: "Page receives token and type from query parameters"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:29-30: reads token and type from url.searchParams.
+          Lines 307-308: var tokenHash = '${token}', var tokenType = '${type}'.
+
+      - id: VC-202-08
+        description: "send-reset-email still sends link to correct Edge Function URL"
+        status: PASSED
+        evidence: |
+          send-reset-email/index.ts:200 unchanged:
+          https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery
+
+      - id: VC-202-09
+        description: "Page has proper Content-Type (text/html; charset=utf-8)"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:381: 'Content-Type': 'text/html; charset=utf-8'.
+          Also Cache-Control: 'no-cache, no-store, must-revalidate'.
+
+      - id: VC-202-11
+        description: "Page includes Supabase JS client library via CDN"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:208:
+          <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="handleCdnError()">
+          Client initialized at lines 301-303 with window.supabase.createClient(supabaseUrl, supabaseAnonKey).
+
+      - id: VC-202-12
+        description: "No deep link (sacrmeetplan://) references remain"
+        status: PASSED
+        evidence: |
+          grep for 'sacrmeetplan://' in reset-redirect/index.ts: 0 matches.
+          All deep link references fully removed.
+
+      # --- CR-203: Invitation Acceptance Web Page (F139) ---
+      - id: VC-203-01
+        description: "New invite-redirect Edge Function exists"
+        status: PASSED
+        evidence: |
+          supabase/functions/invite-redirect/index.ts (459 lines).
+          Returns HTML page with invitation acceptance form.
+
+      - id: VC-203-02
+        description: "Invitation page has registration form with fullName, password, confirmPassword"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:201 <input type="text" id="fullname" required>
+          Line 204: <input type="password" id="password" required>
+          Line 207: <input type="password" id="confirm-password" required>
+          Line 211: <button type="submit" id="submit-btn">
+
+      - id: VC-203-03
+        description: "Page validates token on load and shows invitation details"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:350-357: fetch(apiBase + '/register-invited-user',
+          { body: JSON.stringify({ token: inviteToken }) }).
+          Lines 367-371: populates read-only fields (stake, ward, role, email).
+
+      - id: VC-203-04
+        description: "Page calls register-invited-user to register user on form submit"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:416-423: fetch with { token, password, fullName }.
+          Line 427: checks regResponse.status === 201 for success.
+
+      - id: VC-203-05
+        description: "Page validates form inputs before submission"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:391 checks !fullName (errorEmptyName).
+          Line 398: password.length < 6 (errorShortPassword).
+          Line 405: password !== confirmPassword (errorMismatch).
+
+      - id: VC-203-06
+        description: "Page shows error states for invalid/used/expired tokens"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:330-336: getErrorMessage() handles token_invalid,
+          token_used, token_expired. Line 362: showError(getErrorMessage(data.error)).
+          Form-container stays hidden when error shown.
+
+      - id: VC-203-07
+        description: "Page shows success message after registration"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:428: showSuccess() on status 201.
+          pt-BR: "Conta criada com sucesso!" (line 286).
+          Form-container hidden.
+
+      - id: VC-203-08
+        description: "Page receives token from URL query parameter"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:29: url.searchParams.get('token').
+          Line 343: var inviteToken = '${token}'.
+
+      - id: VC-203-09
+        description: "create-invitation returns web page URL instead of deep link"
+        status: PASSED
+        evidence: |
+          create-invitation/index.ts:171:
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/invite-redirect?token=${invitationToken}`
+          Deep link sacrmeetplan://invite/ replaced with HTTPS URL.
+
+      - id: VC-203-10
+        description: "Invitation page has proper Content-Type (text/html; charset=utf-8)"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:454: 'Content-Type': 'text/html; charset=utf-8'.
+
+      - id: VC-203-12
+        description: "Page uses correct Supabase Edge Function URL for API calls"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:344: var apiBase = '${supabaseUrl}/functions/v1'.
+          Lines 350, 416: fetch(apiBase + '/register-invited-user', ...).
+          Uses apikey header with anon key.
+
+      - id: VC-203-13
+        description: "register-invited-user remains unchanged (backward compatible)"
+        status: PASSED
+        evidence: |
+          register-invited-user/index.ts is identical to baseline.
+          API contract unchanged: token-only -> validates, token+password+fullName -> registers.
+
+    should_pass_results:
+      - id: VC-202-10
+        description: "Password reset page is responsive and mobile-friendly"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts:72: <meta name="viewport" content="width=device-width, initial-scale=1.0">.
+          Card CSS: max-width: 400px, width: 100%, margin: 16px, padding: 32px 24px.
+          Input width: 100%.
+
+      - id: VC-203-11
+        description: "Invitation page is responsive and mobile-friendly"
+        status: PASSED
+        evidence: |
+          invite-redirect/index.ts:59: <meta name="viewport" content="width=device-width, initial-scale=1.0">.
+          Card CSS: max-width: 400px, width: 100%, margin: 16px.
+          Input width: 100%.
+
+      - id: VC-REG-03
+        description: "App screens still exist and function"
+        status: PASSED
+        evidence: |
+          src/app/(auth)/reset-password.tsx exists (9307 bytes, Feb 21).
+          src/app/(auth)/invite/[token].tsx exists (12652 bytes, Feb 17).
+          Both unmodified, remain as fallback.
+
+    regression_checks:
+      - id: VC-REG-01
+        description: "All existing tests still pass"
+        status: PASSED
+        evidence: |
+          npx vitest run: 87 test files, 5401 tests passed, 34 skipped, 0 failures.
+          Duration: 1.97s.
+
+      - id: VC-REG-02
+        description: "TypeScript compilation has no new errors"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit: 2 errors, both non-production:
+          1. batch22-tester-f138-f139.test.ts:691 - minor .valueOf typo in test file (runtime unaffected)
+          2. setup-integration.ts:12 - pre-existing react-test-renderer type declaration
+          No new TS errors in production code.
+

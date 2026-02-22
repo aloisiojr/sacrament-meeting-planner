@@ -418,15 +418,15 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             disabled={isObserver}
           />
 
-          {agenda.has_second_speech !== false && (
-            <ReadOnlySpeakerRow
-              label={`2\u00BA ${t('speeches.speaker')}`}
-              speakerName={getSpeech(2)?.speaker_name ?? ''}
-              onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
-              colors={colors}
-              disabled={isObserver}
-            />
-          )}
+          <ReadOnlySpeakerRow
+            label={`2\u00BA ${t('speeches.speaker')}`}
+            speakerName={agenda.has_second_speech === false
+              ? t('speeches.secondSpeechDisabledPlaceholder')
+              : (getSpeech(2)?.speaker_name ?? '')}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            colors={colors}
+            disabled={isObserver || agenda.has_second_speech === false}
+          />
 
           <ToggleField
             label={t('agenda.musicalNumber')}

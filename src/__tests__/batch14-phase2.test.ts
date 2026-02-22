@@ -522,9 +522,9 @@ describe('F096 (CR-153): Collapsed agenda card status lines', () => {
       expect(agendaSource).toContain("t('agenda.statusSpeakers'");
     });
 
-    it('counts speakers filled out of 3', () => {
+    it('counts speakers filled dynamically (2 or 3 based on has_second_speech)', () => {
       expect(agendaSource).toContain('speakersFilled');
-      expect(agendaSource).toContain('total: 3');
+      expect(agendaSource).toContain('speakersTotal');
     });
   });
 
@@ -584,8 +584,8 @@ describe('F096 (CR-153): Collapsed agenda card status lines', () => {
       expect(agendaSource).toContain('#22c55e');
     });
 
-    it('speakers line green when speakersFilled === 3', () => {
-      expect(agendaSource).toContain('speakersFilled === 3 ? GREEN');
+    it('speakers line green when speakersFilled === speakersTotal', () => {
+      expect(agendaSource).toContain('speakersFilled === speakersTotal ? GREEN');
     });
 
     it('prayers line green when prayersFilled === 2', () => {

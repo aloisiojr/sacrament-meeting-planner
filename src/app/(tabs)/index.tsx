@@ -84,8 +84,12 @@ function HomeTabContent() {
 
     if (!exceptionLabel) {
       // Normal speeches meeting
+      // F132: Dynamic speaker count based on has_second_speech
+      const hasSecondSpeech = agenda?.has_second_speech ?? true;
+      const speakersTotal = hasSecondSpeech ? 3 : 2;
+      const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
       let speakersFilled = 0;
-      for (let pos = 1; pos <= 3; pos++) {
+      for (const pos of positionsToCheck) {
         const overrideField = `speaker_${pos}_override` as keyof SundayAgenda;
         const overrideVal = agenda?.[overrideField] as string | null;
         const speech = speeches?.find((s) => s.position === pos);
@@ -106,7 +110,7 @@ function HomeTabContent() {
         if (agenda?.intermediate_hymn_id) hymnsFilled++;
       }
 
-      return { missingRoles, speakersFilled, prayersFilled, hymnsFilled, hymnsTotal, GREEN };
+      return { missingRoles, speakersFilled, speakersTotal, prayersFilled, hymnsFilled, hymnsTotal, GREEN };
     }
 
     // Non-expandable exception (Gen Conf, Stake Conf) - no status lines
@@ -197,10 +201,10 @@ function HomeTabContent() {
                         </Text>
                       )}
                       <Text
-                        style={[styles.statusLine, { color: statusLines.speakersFilled === 3 ? statusLines.GREEN : colors.textSecondary }]}
+                        style={[styles.statusLine, { color: statusLines.speakersFilled === statusLines.speakersTotal ? statusLines.GREEN : colors.textSecondary }]}
                         numberOfLines={1}
                       >
-                        {t('agenda.statusSpeakers', { filled: statusLines.speakersFilled, total: 3 })}
+                        {t('agenda.statusSpeakers', { filled: statusLines.speakersFilled, total: statusLines.speakersTotal })}
                       </Text>
                       <Text
                         style={[styles.statusLine, { color: statusLines.prayersFilled === 2 ? statusLines.GREEN : colors.textSecondary }]}

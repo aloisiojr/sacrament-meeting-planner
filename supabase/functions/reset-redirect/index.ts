@@ -89,7 +89,6 @@ Deno.serve(async (req) => {
     <p>Redirecionando para o aplicativo...</p>
     <a href="${deepLink}" class="button">Abrir no aplicativo</a>
   </div>
-  <script>window.location.href = '${deepLink}';</script>
 </body>
 </html>`;
 

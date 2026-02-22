@@ -365,11 +365,12 @@ describe('F057 (CR-117): Fix +1 country code showing Canada instead of USA', () 
 describe('F058 (CR-122): Change 3rd speech label to Ultimo Discurso', () => {
   // --- AC-F058-01: 3rd speech label in Speeches tab shows 'Ultimo Discurso' (pt-BR) ---
   describe('AC-F058-01: 3rd speech label in SpeechSlot (pt-BR)', () => {
-    it('SpeechSlot getPositionLabel uses unified speeches.slot for all positions (updated by F098/CR-160)', () => {
+    // F118 (CR-181): getPositionLabel now HAS special case for position 3 (returns lastSpeech)
+    it('SpeechSlot getPositionLabel has position 3 special case for lastSpeech (F118/CR-181)', () => {
       const content = readSourceFile('components/SpeechSlot.tsx');
-      // F098/CR-160 removed the position === 3 special case
       expect(content).toContain("t('speeches.slot'");
-      expect(content).not.toContain('position === 3');
+      expect(content).toContain('position === 3');
+      expect(content).toContain("t('speeches.lastSpeech')");
     });
 
     it('pt-BR locale should have speeches.lastSpeech = "Último Discurso"', () => {

@@ -214,9 +214,10 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
       expect(content).toContain('sacrmeetplan://reset-password');
     });
 
+    // F119 (CR-191): Content-Type now includes charset=utf-8
     it('reset-redirect returns Content-Type text/html', () => {
       const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain("'Content-Type': 'text/html'");
+      expect(content).toContain("'Content-Type': 'text/html; charset=utf-8'");
     });
 
     it('reset-redirect contains meta refresh tag', () => {

@@ -508,9 +508,12 @@ describe('F054 (CR-111): SpeechSlot spacing and X size', () => {
       expect(rowMatch![0]).not.toContain('gap: 12');
     });
 
+    // F118 (CR-181): gap: 8 now exists in new labelWithToggle style, but NOT in row style
     it('should NOT have gap: 8 in row style', () => {
       const content = getSpeechSlot();
-      expect(content).not.toContain('gap: 8');
+      const rowMatch = content.match(/\brow:\s*\{[^}]*\}/s);
+      expect(rowMatch).not.toBeNull();
+      expect(rowMatch![0]).not.toContain('gap: 8');
     });
   });
 

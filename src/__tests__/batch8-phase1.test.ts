@@ -165,10 +165,11 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
       expect(content).toContain("import { getDefaultTemplate } from '../../../lib/whatsappUtils'");
     });
 
+    // F116 (CR-178): Now uses wardLanguage from AuthContext instead of ward.language
     it('should call getDefaultTemplate when whatsapp_template is null', () => {
       const content = getWhatsAppSettings();
       expect(content).toContain('ward.whatsapp_template === null');
-      expect(content).toContain('getDefaultTemplate(ward.language');
+      expect(content).toContain('getDefaultTemplate(wardLanguage');
     });
 
     it('should handle undefined whatsapp_template as null', () => {
@@ -196,15 +197,16 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
     });
   });
 
+  // F116 (CR-178): Now uses wardLanguage from AuthContext instead of ward.language
   describe('AC-F047-04: Default template correct per ward language', () => {
-    it('should pass ward.language to getDefaultTemplate', () => {
+    it('should pass wardLanguage to getDefaultTemplate', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("getDefaultTemplate(ward.language ?? 'pt-BR')");
+      expect(content).toContain("getDefaultTemplate(wardLanguage ?? 'pt-BR')");
     });
 
-    it('should fallback to pt-BR when language is null', () => {
+    it('should fallback to pt-BR when wardLanguage is null', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("ward.language ?? 'pt-BR'");
+      expect(content).toContain("wardLanguage ?? 'pt-BR'");
     });
   });
 

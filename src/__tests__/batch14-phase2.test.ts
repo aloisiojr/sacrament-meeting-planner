@@ -37,23 +37,21 @@ describe('F093 (CR-150): Collapsed SundayCard with speaker names and vertical LE
 
   const sundayCardSource = readSourceFile('components/SundayCard.tsx');
 
-  // --- AC-093-01: Card collapsed shows 3 lines of speaker names ---
+  // --- AC-093-01: Card collapsed shows speaker name lines ---
+  // F118 (CR-181): Changed from [1,2,3].map to visiblePositions.map; removed ordinal labels
   describe('AC-093-01: Collapsed header shows 3 speaker name lines', () => {
-    it('renders 3 speaker lines when isSpeechesType && !expanded', () => {
+    it('renders speaker lines when isSpeechesType && !expanded', () => {
       expect(sundayCardSource).toContain('isSpeechesType && !expanded');
-      expect(sundayCardSource).toContain('[1, 2, 3].map');
+      expect(sundayCardSource).toContain('visiblePositions.map');
     });
 
-    it('uses speeches.slot i18n key for positions 1 and 2', () => {
-      expect(sundayCardSource).toContain("t('speeches.slot'");
+    it('visiblePositions determined by hasSecondSpeech prop', () => {
+      expect(sundayCardSource).toContain('const visiblePositions = hasSecondSpeech ? [1, 2, 3] : [1, 3]');
     });
 
-    it('uses speeches.slot for all positions including 3 (updated by F098/CR-160)', () => {
-      expect(sundayCardSource).toContain("t('speeches.slot'");
-    });
-
-    it('format is posLabel: name', () => {
-      expect(sundayCardSource).toContain('`${posLabel}: ${name}`');
+    it('no ordinal labels in collapsed view (F118: AC-118-08)', () => {
+      // Collapsed view shows name only, no posLabel prefix
+      expect(sundayCardSource).not.toContain('posLabel: ${name}');
     });
   });
 
@@ -63,9 +61,10 @@ describe('F093 (CR-150): Collapsed SundayCard with speaker names and vertical LE
       expect(sundayCardSource).toContain("speech?.speaker_name ?? ''");
     });
 
+    // F118 (CR-181): Changed from [1, 2, 3].map to visiblePositions.map
     it('line always renders (not conditional on name existing)', () => {
-      // The map over [1, 2, 3] always returns 3 Text elements
-      expect(sundayCardSource).toMatch(/\[1, 2, 3\]\.map\(\(pos\)/);
+      // The map over visiblePositions always returns elements for each visible position
+      expect(sundayCardSource).toContain('visiblePositions.map');
     });
   });
 
@@ -181,17 +180,17 @@ describe('F094 (CR-151): Pianist and Conductor fields in Agenda', () => {
     });
   });
 
-  // --- AC-094-03: Pianist uses roleFilter can_music ---
-  describe('AC-094-03: Pianist uses roleFilter can_music', () => {
-    it('pianist field uses can_music roleFilter', () => {
-      expect(agendaFormSource).toContain("field: 'pianist', roleFilter: 'can_music'");
+  // --- AC-094-03: Pianist uses roleFilter can_pianist (F117/CR-180 update) ---
+  describe('AC-094-03: Pianist uses roleFilter can_pianist', () => {
+    it('pianist field uses can_pianist roleFilter', () => {
+      expect(agendaFormSource).toContain("field: 'pianist', roleFilter: 'can_pianist'");
     });
   });
 
-  // --- AC-094-04: Conductor uses roleFilter can_music ---
-  describe('AC-094-04: Conductor uses roleFilter can_music', () => {
-    it('conductor field uses can_music roleFilter', () => {
-      expect(agendaFormSource).toContain("field: 'conductor', roleFilter: 'can_music'");
+  // --- AC-094-04: Conductor uses roleFilter can_conductor (F117/CR-180 update) ---
+  describe('AC-094-04: Conductor uses roleFilter can_conductor', () => {
+    it('conductor field uses can_conductor roleFilter', () => {
+      expect(agendaFormSource).toContain("field: 'conductor', roleFilter: 'can_conductor'");
     });
   });
 

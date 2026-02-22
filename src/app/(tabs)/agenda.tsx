@@ -632,8 +632,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   playButton: {
-    fontSize: 14,
-    marginRight: 8,
+    fontSize: 18,
+    marginRight: 12,
   },
   expandedContent: {
     paddingHorizontal: 12,

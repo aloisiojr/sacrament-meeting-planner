@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playIcon: {
-    fontSize: 17,
+    fontSize: 20,
     marginRight: 8,
   },
   meetingButtonText: {

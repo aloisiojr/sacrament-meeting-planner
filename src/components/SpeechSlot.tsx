@@ -159,112 +159,74 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }, isPos2Disabled && styles.disabledContainer]}>
-      <View style={styles.outerRow}>
-        {/* Left column: labels and fields */}
-        <View style={styles.leftColumn}>
-          {/* Slot label with status text, LED, and optional toggle */}
-          <View style={styles.labelRow}>
-            <View style={styles.labelWithToggle}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-              {/* F118: Toggle switch for position 2 */}
-              {position === 2 && onToggleSecondSpeech && (
-                <Switch
-                  value={isSecondSpeechEnabled !== false}
-                  onValueChange={onToggleSecondSpeech}
-                  disabled={!isBispado}
-                  trackColor={{ false: colors.divider, true: colors.primary }}
-                  style={styles.toggle}
-                />
-              )}
-            </View>
-            {!isPos2Disabled && (
-              <Pressable
-                style={styles.statusSection}
-                onPress={handleStatusPress}
-                disabled={isObserver || status === 'not_assigned'}
-              >
-                <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                  {t(`speechStatus.${status}`)}
-                </Text>
-                <StatusLED
-                  status={status}
-                  size={14}
-                  onPress={handleStatusPress}
-                  disabled={isObserver || status === 'not_assigned'}
-                />
-              </Pressable>
-            )}
-          </View>
-
-          {/* F118: Show disabled placeholder when position 2 is off */}
-          {isPos2Disabled ? (
-            <View style={[styles.field, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
-              <Text style={[styles.fieldText, { color: colors.textSecondary }]} numberOfLines={1}>
-                {t('speeches.secondSpeechDisabledPlaceholder')}
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={styles.row}>
-                {/* Speaker field */}
-                <Pressable
-                  style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                  onPress={handleSpeakerPress}
-                  disabled={!canAssign || !speech}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('speeches.selectSpeaker')}
-                >
-                  <Text
-                    style={[
-                      styles.fieldText,
-                      { color: hasSpeaker ? colors.text : colors.placeholder },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {speech?.speaker_name ?? t('speeches.selectSpeaker')}
-                  </Text>
-                  {canAssign && (
-                    <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-                      {'\u25BC'}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-
-              {/* Topic field */}
-              <View style={styles.topicRow}>
-                <Pressable
-                  style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                  onPress={handleTopicPress}
-                  disabled={!canAssign || !speech}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('speeches.selectTopic')}
-                >
-                  <Text
-                    style={[
-                      styles.topicText,
-                      { color: topicDisplay ? colors.text : colors.placeholder },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {topicDisplay ?? t('speeches.selectTopic')}
-                  </Text>
-                  {canAssign && (
-                    <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-                      {'\u25BC'}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            </>
+      {/* Row 1: Label (full width) - unchanged from F115 */}
+      <View style={styles.labelRow}>
+        <View style={styles.labelWithToggle}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+          {/* F118: Toggle switch for position 2 */}
+          {position === 2 && onToggleSecondSpeech && (
+            <Switch
+              value={isSecondSpeechEnabled !== false}
+              onValueChange={onToggleSecondSpeech}
+              disabled={!isBispado}
+              trackColor={{ false: colors.divider, true: colors.primary }}
+              style={styles.toggle}
+            />
           )}
         </View>
-
-        {/* Right column: spacer and action buttons */}
         {!isPos2Disabled && (
-          <View style={styles.rightColumn}>
-            <View style={styles.statusLedPlaceholder} />
-            <View style={styles.speakerActionWrapper}>
+          <Pressable
+            style={styles.statusSection}
+            onPress={handleStatusPress}
+            disabled={isObserver || status === 'not_assigned'}
+          >
+            <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+              {t(`speechStatus.${status}`)}
+            </Text>
+            <StatusLED
+              status={status}
+              size={14}
+              onPress={handleStatusPress}
+              disabled={isObserver || status === 'not_assigned'}
+            />
+          </Pressable>
+        )}
+      </View>
+
+      {/* F118: Show disabled placeholder when position 2 is off */}
+      {isPos2Disabled ? (
+        <View style={[styles.field, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+          <Text style={[styles.fieldText, { color: colors.textSecondary }]} numberOfLines={1}>
+            {t('speeches.secondSpeechDisabledPlaceholder')}
+          </Text>
+        </View>
+      ) : (
+        <>
+          {/* Row 2: Speaker field + X button (ADR-081) */}
+          <View style={styles.speakerRow}>
+            <Pressable
+              style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              onPress={handleSpeakerPress}
+              disabled={!canAssign || !speech}
+              accessibilityRole="button"
+              accessibilityLabel={t('speeches.selectSpeaker')}
+            >
+              <Text
+                style={[
+                  styles.fieldText,
+                  { color: hasSpeaker ? colors.text : colors.placeholder },
+                ]}
+                numberOfLines={1}
+              >
+                {speech?.speaker_name ?? t('speeches.selectSpeaker')}
+              </Text>
+              {canAssign && (
+                <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
+                  {'\u25BC'}
+                </Text>
+              )}
+            </Pressable>
+            <View style={styles.actionArea}>
               {hasSpeaker && canUnassign && (
                 <Pressable
                   onPress={handleRemove}
@@ -278,8 +240,34 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 </Pressable>
               )}
             </View>
-            {showTopicRow && (
-              <View style={styles.topicActionWrapper}>
+          </View>
+
+          {/* Row 3: Topic field + X button (ADR-081) */}
+          {showTopicRow && (
+            <View style={styles.topicRow}>
+              <Pressable
+                style={[styles.topicField, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                onPress={handleTopicPress}
+                disabled={!canAssign || !speech}
+                accessibilityRole="button"
+                accessibilityLabel={t('speeches.selectTopic')}
+              >
+                <Text
+                  style={[
+                    styles.topicText,
+                    { color: topicDisplay ? colors.text : colors.placeholder },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {topicDisplay ?? t('speeches.selectTopic')}
+                </Text>
+                {canAssign && (
+                  <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
+                    {'\u25BC'}
+                  </Text>
+                )}
+              </Pressable>
+              <View style={styles.topicActionArea}>
                 {topicDisplay && canAssign && (
                   <Pressable
                     hitSlop={8}
@@ -290,10 +278,10 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                   </Pressable>
                 )}
               </View>
-            )}
-          </View>
-        )}
-      </View>
+            </View>
+          )}
+        </>
+      )}
 
       {/* Status Change Modal */}
       <StatusChangeModal
@@ -315,16 +303,6 @@ const styles = StyleSheet.create({
   disabledContainer: {
     opacity: 0.5,
   },
-  outerRow: {
-    flexDirection: 'row',
-  },
-  leftColumn: {
-    flex: 1,
-  },
-  rightColumn: {
-    width: 36,
-    alignItems: 'center',
-  },
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -345,10 +323,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  statusLedPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   statusSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -357,7 +331,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
   },
-  row: {
+  speakerRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -378,10 +352,11 @@ const styles = StyleSheet.create({
     fontSize: 8,
     marginLeft: 4,
   },
-  speakerActionWrapper: {
+  actionArea: {
+    width: 36,
     height: 38,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   removeButton: {
     fontSize: 24,
@@ -393,11 +368,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 6,
   },
-  topicActionWrapper: {
+  topicActionArea: {
+    width: 36,
     height: 34,
-    marginTop: 6,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   topicField: {
     flex: 1,

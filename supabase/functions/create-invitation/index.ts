@@ -167,8 +167,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build deep link
-    const deepLink = `sacrmeetplan://invite/${invitationToken}`;
+    // Build invitation URL (HTTPS link to invite-redirect Edge Function)
+    const deepLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/invite-redirect?token=${invitationToken}`;
 
     return new Response(
       JSON.stringify({

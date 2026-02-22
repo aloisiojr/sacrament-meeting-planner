@@ -3,6 +3,16 @@
 // Used in password reset emails so that the CTA button is clickable in all email
 // clients (custom URL schemes are blocked by email clients for security).
 // No JWT required (public endpoint). No token validation (pass-through only).
+//
+// F119 (CR-191): Fixed plain-text HTML rendering bug.
+// Root cause: The Content-Type header was set to 'text/html' without charset,
+// and some proxy/CDN layers or browser security policies may interpret the
+// response as plain text if charset is not explicitly specified. Additionally,
+// Content-Type must be set AFTER corsHeaders spread to avoid being overridden
+// by any future corsHeaders changes. corsHeaders verified to NOT contain a
+// Content-Type key. HTML template literal is passed directly to Response
+// constructor with no encoding (no JSON.stringify or encodeURIComponent).
+// Added Cache-Control to prevent intermediary caching of stale responses.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,8 +93,14 @@ Deno.serve(async (req) => {
 </body>
 </html>`;
 
+  console.log(`[reset-redirect] Redirecting to deep link for type=${type}`);
+
   return new Response(html, {
     status: 200,
-    headers: { ...corsHeaders, 'Content-Type': 'text/html' },
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
   });
 });

@@ -171,7 +171,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 <Switch
                   value={isSecondSpeechEnabled !== false}
                   onValueChange={onToggleSecondSpeech}
-                  disabled={isObserver}
+                  disabled={!isBispado}
                   trackColor={{ false: colors.divider, true: colors.primary }}
                   style={styles.toggle}
                 />

@@ -40,8 +40,8 @@ Deno.serve(async (req) => {
   }
 
   // Validate input formats to prevent XSS injection via template interpolation.
-  // token is a hex hash from Supabase Auth; type is a known recovery type string.
-  if (!/^[a-fA-F0-9]+$/.test(token)) {
+  // token is a hex hash from Supabase Auth; type must be an exact known value.
+  if (!/^[a-zA-Z0-9_-]+$/.test(token)) {
     return new Response(
       JSON.stringify({ error: 'Invalid token format' }),
       {
@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
     );
   }
 
-  if (!/^[a-z_]+$/.test(type)) {
+  const ALLOWED_TYPES = ['recovery'];
+  if (!ALLOWED_TYPES.includes(type)) {
     return new Response(
       JSON.stringify({ error: 'Invalid type format' }),
       {

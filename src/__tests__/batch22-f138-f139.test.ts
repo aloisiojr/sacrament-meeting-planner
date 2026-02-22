@@ -166,13 +166,14 @@ describe('F138 (CR-202): Password reset web page (reset-redirect rewrite)', () =
 
   // --- XSS prevention: input format validation (R-1 fix) ---
 
-  describe('R-1 fix: token and type validated with regex before embedding in HTML', () => {
-    it('validates token is hex-only', () => {
-      expect(source).toMatch(/\/\^[^/]*\[a-fA-F0-9\][^/]*\$\/\.test\(token\)/);
+  describe('R-1 fix: token and type validated before embedding in HTML', () => {
+    it('validates token with alphanumeric regex', () => {
+      expect(source).toMatch(/\/\^[^/]*\[a-zA-Z0-9_-\][^/]*\$\/\.test\(token\)/);
     });
 
-    it('validates type is lowercase alpha/underscore only', () => {
-      expect(source).toMatch(/\/\^[^/]*\[a-z_\][^/]*\$\/\.test\(type\)/);
+    it('validates type against allowed values whitelist', () => {
+      expect(source).toContain("ALLOWED_TYPES");
+      expect(source).toContain("'recovery'");
     });
 
     it('returns 400 for invalid token format', () => {

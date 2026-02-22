@@ -242,6 +242,7 @@ describe('Database Types', () => {
         closing_hymn_id: null,
         closing_prayer_member_id: null,
         closing_prayer_name: null,
+        has_second_speech: true,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
@@ -285,12 +286,13 @@ describe('Database Types', () => {
         can_preside: true,
         can_conduct: true,
         can_recognize: false,
-        can_music: false,
+        can_pianist: false,
+        can_conductor: false,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
       expect(actor.can_preside).toBe(true);
-      expect(actor.can_music).toBe(false);
+      expect(actor.can_pianist).toBe(false);
     });
 
     it('should construct a valid NotificationQueue object', () => {

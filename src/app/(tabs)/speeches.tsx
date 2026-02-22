@@ -39,6 +39,7 @@ import {
   groupSpeechesBySunday,
 } from '../../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
+import { supabase } from '../../lib/supabase';
 import { toISODateString } from '../../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../../types/database';
 
@@ -329,9 +330,15 @@ function SpeechesTabContent() {
                 text: t('common.confirm'),
                 style: 'destructive',
                 onPress: () => {
-                  // Clear speech position 2 data and disable
+                  // Clear speech position 2 speaker data
                   if (speech2) {
                     removeAssignment.mutate({ speechId: speech2.id });
+                    // F132/ADR-085: Clear topic fields separately via direct Supabase update
+                    supabase
+                      .from('speeches')
+                      .update({ topic_title: '', topic_link: '', topic_collection: '' })
+                      .eq('id', speech2.id)
+                      .then();
                   }
                   updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
                 },
@@ -340,7 +347,15 @@ function SpeechesTabContent() {
           );
           return;
         }
-        // No assignments: toggle immediately
+        // No assignments but topic may still exist: clear topic fields if speech2 exists
+        if (speech2) {
+          supabase
+            .from('speeches')
+            .update({ topic_title: '', topic_link: '', topic_collection: '' })
+            .eq('id', speech2.id)
+            .then();
+        }
+        // Toggle off immediately
         updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
       } else {
         // Enable: no confirmation needed

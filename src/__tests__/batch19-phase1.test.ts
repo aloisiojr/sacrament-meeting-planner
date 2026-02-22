@@ -636,7 +636,7 @@ describe('F118 (CR-181): Optional 2nd speech toggle', () => {
   describe('AC-118-05: No confirmation when no assignments', () => {
     it('toggle immediately without dialog when no assignments', () => {
       // After the hasAssignments check, there is a path for no assignments
-      expect(speechesSource).toContain('// No assignments: toggle immediately');
+      expect(speechesSource).toContain('// Toggle off immediately');
     });
   });
 

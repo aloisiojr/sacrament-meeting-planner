@@ -172,11 +172,11 @@ describe('F116 (CR-178): Separate language control', () => {
   describe('AC-116-07: Collection reactivation on ward language change', () => {
     it('ward language mutation deactivates old collections', () => {
       expect(settingsSource).toContain("update({ active: false })");
-      expect(settingsSource).toContain("eq('language', oldLanguage)");
+      expect(settingsSource).toContain("eq('language', toDbLocale(oldLanguage))");
     });
 
     it('ward language mutation activates new language collections via upsert', () => {
-      expect(settingsSource).toContain("eq('language', newLanguage)");
+      expect(settingsSource).toContain("eq('language', toDbLocale(newLanguage))");
       expect(settingsSource).toContain('upsert(upsertRows');
       expect(settingsSource).toContain('active: true');
     });

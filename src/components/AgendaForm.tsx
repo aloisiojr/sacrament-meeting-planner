@@ -171,6 +171,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { presiding_name: null, presiding_actor_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.presiding_name}
         />
       </FieldRow>
 
@@ -185,6 +192,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { conducting_name: null, conducting_actor_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.conducting_name}
         />
       </FieldRow>
 
@@ -197,15 +211,24 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           disabled={isObserver}
         >
           {(agenda.recognized_names?.length ?? 0) > 0 ? (
-            agenda.recognized_names!.map((name, idx) => (
-              <Text
-                key={idx}
-                style={[styles.recognizingName, { color: colors.text }]}
-                numberOfLines={1}
-              >
-                {name}
-              </Text>
-            ))
+            <View style={styles.recognizingContent}>
+              <View style={styles.recognizingNames}>
+                {agenda.recognized_names!.map((name, idx) => (
+                  <Text
+                    key={idx}
+                    style={[styles.recognizingName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                ))}
+              </View>
+              {!isObserver && (
+                <Pressable hitSlop={8} onPress={() => updateField('recognized_names', null)}>
+                  <Text style={[styles.clearButton, { color: colors.error }]}>{'\u00D7'}</Text>
+                </Pressable>
+              )}
+            </View>
           ) : (
             <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
               {t('agenda.recognizing')}
@@ -237,6 +260,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { pianist_name: null, pianist_actor_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.pianist_name}
         />
       </FieldRow>
 
@@ -251,6 +281,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { conductor_name: null, conductor_actor_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.conductor_name}
         />
       </FieldRow>
 
@@ -265,6 +302,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => updateField('opening_hymn_id', null) : undefined}
+          hasValue={!!agenda.opening_hymn_id}
         />
       </FieldRow>
 
@@ -279,6 +318,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { opening_prayer_name: null, opening_prayer_member_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.opening_prayer_name}
         />
       </FieldRow>
 
@@ -352,6 +398,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => updateField('sacrament_hymn_id', null) : undefined}
+          hasValue={!!agenda.sacrament_hymn_id}
         />
       </FieldRow>
 
@@ -416,6 +464,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
                     }}
                     disabled={isObserver}
                     colors={colors}
+                    onClear={!isObserver ? () => updateField('intermediate_hymn_id', null) : undefined}
+                    hasValue={!!agenda.intermediate_hymn_id}
                   />
                 </FieldRow>
               )}
@@ -469,6 +519,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => updateField('closing_hymn_id', null) : undefined}
+          hasValue={!!agenda.closing_hymn_id}
         />
       </FieldRow>
 
@@ -483,6 +535,13 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           }}
           disabled={isObserver}
           colors={colors}
+          onClear={!isObserver ? () => {
+            updateAgenda.mutate({
+              agendaId: agenda.id,
+              fields: { closing_prayer_name: null, closing_prayer_member_id: null } as Record<string, unknown>,
+            });
+          } : undefined}
+          hasValue={!!agenda.closing_prayer_name}
         />
       </FieldRow>
 
@@ -594,12 +653,16 @@ function SelectorField({
   onPress,
   disabled,
   colors,
+  onClear,
+  hasValue,
 }: {
   value: string;
   placeholder: string;
   onPress: () => void;
   disabled: boolean;
   colors: ThemeColors;
+  onClear?: () => void;
+  hasValue?: boolean;
 }) {
   return (
     <Pressable
@@ -616,6 +679,11 @@ function SelectorField({
       >
         {value || placeholder}
       </Text>
+      {onClear && hasValue && (
+        <Pressable hitSlop={8} onPress={onClear}>
+          <Text style={[styles.clearButton, { color: colors.error }]}>{'\u00D7'}</Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -855,10 +923,24 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 15,
+    flex: 1,
+  },
+  clearButton: {
+    fontSize: 20,
+    fontWeight: '300',
+    paddingHorizontal: 4,
   },
   recognizingName: {
     fontSize: 15,
     paddingVertical: 2,
+  },
+  recognizingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  recognizingNames: {
+    flex: 1,
   },
   textInput: {
     borderWidth: 1,

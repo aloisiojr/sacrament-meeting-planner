@@ -176,6 +176,7 @@ export function createMockAuthContext(overrides?: Partial<AuthContextValue>): Au
     signOut: vi.fn(),
     hasPermission: (perm: Permission) => checkPermission(role, perm),
     updateAppLanguage: vi.fn(),
+    setWardLanguage: vi.fn(),
     ...overrides,
   };
 }

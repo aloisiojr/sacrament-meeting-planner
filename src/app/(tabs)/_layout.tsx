@@ -60,8 +60,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Text style={{ color, fontSize: size }}>&#x2699;</Text>
           ),
-          // Hide Settings tab for Observer
-          href: isObserver ? null : '/(tabs)/settings',
+          // F116: Observer now has access to Settings tab (limited options rendered in settings/index.tsx)
         }}
       />
     </Tabs>

@@ -10,7 +10,6 @@ import { supabase } from '../../../lib/supabase';
 import {
   SUPPORTED_LANGUAGES,
   LANGUAGE_LABELS,
-  changeLanguage,
   getCurrentLanguage,
 } from '../../../i18n';
 import type { SupportedLanguage } from '../../../i18n';
@@ -44,16 +43,19 @@ const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, c
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, wardId, signOut } = useAuth();
+  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [appLanguageModalVisible, setAppLanguageModalVisible] = useState(false);
+  const [wardLanguageModalVisible, setWardLanguageModalVisible] = useState(false);
 
-  const currentLanguage = getCurrentLanguage();
+  const isObserver = role === 'observer';
+  const currentAppLanguage = getCurrentLanguage();
 
-  const languageChangeMutation = useMutation({
+  // F116: Ward language change mutation (Bispado/Secretario only)
+  const wardLanguageChangeMutation = useMutation({
     mutationFn: async (newLanguage: SupportedLanguage) => {
-      const oldLanguage = getCurrentLanguage();
+      const oldLanguage = wardLanguage as SupportedLanguage;
       if (newLanguage === oldLanguage) return;
 
       // 1. Update ward.language in Supabase
@@ -78,7 +80,7 @@ export default function SettingsScreen() {
           .in('collection_id', oldCollectionIds);
       }
 
-      // 3. Upsert new language collection configs (inactive by default)
+      // 3. Activate new language collections (active by default for built-in collections)
       const { data: newCollections } = await supabase
         .from('general_collections')
         .select('id')
@@ -88,15 +90,12 @@ export default function SettingsScreen() {
         const upsertRows = newCollections.map((col) => ({
           ward_id: wardId,
           collection_id: col.id,
-          active: false,
+          active: true,
         }));
         await supabase
           .from('ward_collection_config')
           .upsert(upsertRows, { onConflict: 'ward_id,collection_id' });
       }
-
-      // 4. Change UI language immediately
-      changeLanguage(newLanguage);
     },
     onSuccess: () => {
       // Invalidate topic/collection caches
@@ -104,10 +103,25 @@ export default function SettingsScreen() {
     },
   });
 
-  const handleLanguageSelect = useCallback(
+  // F116: App language change handler (all roles)
+  const handleAppLanguageSelect = useCallback(
+    async (newLanguage: SupportedLanguage) => {
+      setAppLanguageModalVisible(false);
+      if (newLanguage === currentAppLanguage) return;
+      try {
+        await updateAppLanguage(newLanguage);
+      } catch (err) {
+        Alert.alert(t('common.error'), String(err));
+      }
+    },
+    [currentAppLanguage, updateAppLanguage, t]
+  );
+
+  // F116: Ward language change handler (Bispado/Secretario only)
+  const handleWardLanguageSelect = useCallback(
     (newLanguage: SupportedLanguage) => {
-      setLanguageModalVisible(false);
-      if (newLanguage === currentLanguage) return;
+      setWardLanguageModalVisible(false);
+      if (newLanguage === wardLanguage) return;
 
       Alert.alert(
         t('languageChange.warningTitle'),
@@ -117,12 +131,12 @@ export default function SettingsScreen() {
           {
             text: t('languageChange.confirm'),
             style: 'destructive',
-            onPress: () => languageChangeMutation.mutate(newLanguage),
+            onPress: () => wardLanguageChangeMutation.mutate(newLanguage),
           },
         ]
       );
     },
-    [currentLanguage, t, languageChangeMutation]
+    [wardLanguage, t, wardLanguageChangeMutation]
   );
 
   const handleSignOut = useCallback(() => {
@@ -154,57 +168,72 @@ export default function SettingsScreen() {
           {t('settings.title')}
         </Text>
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {hasPermission('member:read') && (
-            <SettingsItem
-              label={t('settings.members')}
-              onPress={() => router.push('/(tabs)/settings/members')}
-              colors={colors}
-            />
-          )}
-          {hasPermission('topic:write') && (
-            <SettingsItem
-              label={t('settings.topics')}
-              onPress={() => router.push('/(tabs)/settings/topics')}
-              colors={colors}
-            />
-          )}
-        </View>
+        {/* Section 1: Members & Topics (non-Observer only) */}
+        {!isObserver && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            {hasPermission('member:read') && (
+              <SettingsItem
+                label={t('settings.members')}
+                onPress={() => router.push('/(tabs)/settings/members')}
+                colors={colors}
+              />
+            )}
+            {hasPermission('topic:write') && (
+              <SettingsItem
+                label={t('settings.topics')}
+                onPress={() => router.push('/(tabs)/settings/topics')}
+                colors={colors}
+              />
+            )}
+          </View>
+        )}
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {hasPermission('settings:users') && (
-            <SettingsItem
-              label={t('settings.users')}
-              onPress={() => router.push('/(tabs)/settings/users')}
-              colors={colors}
-            />
-          )}
-          {hasPermission('history:read') && (
-            <SettingsItem
-              label={t('settings.history')}
-              onPress={() => router.push('/(tabs)/settings/history')}
-              colors={colors}
-            />
-          )}
-          {hasPermission('settings:whatsapp') && (
-            <SettingsItem
-              label={t('settings.whatsappTemplate')}
-              onPress={() => router.push('/(tabs)/settings/whatsapp')}
-              colors={colors}
-            />
-          )}
-        </View>
+        {/* Section 2: Users, History, WhatsApp (non-Observer only) */}
+        {!isObserver && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            {hasPermission('settings:users') && (
+              <SettingsItem
+                label={t('settings.users')}
+                onPress={() => router.push('/(tabs)/settings/users')}
+                colors={colors}
+              />
+            )}
+            {hasPermission('history:read') && (
+              <SettingsItem
+                label={t('settings.history')}
+                onPress={() => router.push('/(tabs)/settings/history')}
+                colors={colors}
+              />
+            )}
+            {hasPermission('settings:whatsapp') && (
+              <SettingsItem
+                label={t('settings.whatsappTemplate')}
+                onPress={() => router.push('/(tabs)/settings/whatsapp')}
+                colors={colors}
+              />
+            )}
+          </View>
+        )}
 
+        {/* Section 3: Language, Theme, About */}
         <View style={[styles.section, { backgroundColor: colors.card }]}>
+          {/* F116: App Language - available to ALL roles including Observer */}
+          <SettingsItem
+            label={t('settings.appLanguage')}
+            value={LANGUAGE_LABELS[currentAppLanguage]}
+            onPress={() => setAppLanguageModalVisible(true)}
+            colors={colors}
+          />
+          {/* F116: Ward Language - Bispado and Secretario only */}
           {hasPermission('settings:language') && (
             <SettingsItem
-              label={t('settings.language')}
-              value={LANGUAGE_LABELS[currentLanguage]}
-              onPress={() => setLanguageModalVisible(true)}
+              label={t('settings.wardLanguage')}
+              value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+              onPress={() => setWardLanguageModalVisible(true)}
               colors={colors}
             />
           )}
-          {hasPermission('settings:timezone') && (
+          {!isObserver && hasPermission('settings:timezone') && (
             <SettingsItem
               label={t('settings.timezone')}
               onPress={() => router.push('/(tabs)/settings/timezone')}
@@ -234,20 +263,20 @@ export default function SettingsScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* Language Selector Modal */}
+      {/* App Language Selector Modal */}
       <Modal
-        visible={languageModalVisible}
+        visible={appLanguageModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setLanguageModalVisible(false)}
+        onRequestClose={() => setAppLanguageModalVisible(false)}
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setLanguageModalVisible(false)}
+          onPress={() => setAppLanguageModalVisible(false)}
         >
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {t('settings.language')}
+              {t('settings.appLanguage')}
             </Text>
             {SUPPORTED_LANGUAGES.map((lang) => (
               <Pressable
@@ -255,16 +284,57 @@ export default function SettingsScreen() {
                 style={[
                   styles.languageOption,
                   { borderBottomColor: colors.divider },
-                  lang === currentLanguage && { backgroundColor: colors.surfaceVariant },
+                  lang === currentAppLanguage && { backgroundColor: colors.surfaceVariant },
                 ]}
-                onPress={() => handleLanguageSelect(lang)}
+                onPress={() => handleAppLanguageSelect(lang)}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: lang === currentLanguage }}
+                accessibilityState={{ selected: lang === currentAppLanguage }}
               >
                 <Text style={[styles.languageText, { color: colors.text }]}>
                   {LANGUAGE_LABELS[lang]}
                 </Text>
-                {lang === currentLanguage && (
+                {lang === currentAppLanguage && (
+                  <Text style={[styles.checkmark, { color: colors.primary }]}>
+                    {'\u2713'}
+                  </Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Ward Language Selector Modal */}
+      <Modal
+        visible={wardLanguageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWardLanguageModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setWardLanguageModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('settings.wardLanguage')}
+            </Text>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <Pressable
+                key={lang}
+                style={[
+                  styles.languageOption,
+                  { borderBottomColor: colors.divider },
+                  lang === wardLanguage && { backgroundColor: colors.surfaceVariant },
+                ]}
+                onPress={() => handleWardLanguageSelect(lang)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: lang === wardLanguage }}
+              >
+                <Text style={[styles.languageText, { color: colors.text }]}>
+                  {LANGUAGE_LABELS[lang]}
+                </Text>
+                {lang === wardLanguage && (
                   <Text style={[styles.checkmark, { color: colors.primary }]}>
                     {'\u2713'}
                   </Text>

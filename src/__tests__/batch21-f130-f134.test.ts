@@ -433,20 +433,23 @@ describe('F133 (CR-197): Password reset email uses user app language', () => {
 describe('F134 (CR-198): Password reset redirect script blocked', () => {
   const resetRedirectSource = readFile('../supabase/functions/reset-redirect/index.ts');
 
-  describe('AC-134-01: no <script> tags', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect now uses <script> for Supabase JS CDN
+  describe.skip('AC-134-01: no <script> tags [SUPERSEDED by F138]', () => {
     it('does not contain any <script> tags', () => {
       expect(resetRedirectSource).not.toContain('<script');
       expect(resetRedirectSource).not.toContain('</script>');
     });
   });
 
-  describe('AC-134-02: meta refresh preserved', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses meta refresh
+  describe.skip('AC-134-02: meta refresh preserved [SUPERSEDED by F138]', () => {
     it('has meta http-equiv="refresh" tag for automatic redirection', () => {
       expect(resetRedirectSource).toContain('http-equiv="refresh"');
     });
   });
 
-  describe('AC-134-03: manual button link preserved', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer has fallback button
+  describe.skip('AC-134-03: manual button link preserved [SUPERSEDED by F138]', () => {
     it('has <a href> button for manual redirect fallback', () => {
       expect(resetRedirectSource).toContain('<a href=');
       expect(resetRedirectSource).toContain('class="button"');
@@ -469,7 +472,8 @@ describe('F134 (CR-198): Password reset redirect script blocked', () => {
     });
   });
 
-  describe('EC-134-01: manual button link as fallback when meta refresh fails', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer has fallback button or deep link
+  describe.skip('EC-134-01: manual button link as fallback when meta refresh fails [SUPERSEDED by F138]', () => {
     it('button with class="button" links to the deep link', () => {
       expect(resetRedirectSource).toContain('<a href=');
       expect(resetRedirectSource).toContain('class="button"');
@@ -477,7 +481,8 @@ describe('F134 (CR-198): Password reset redirect script blocked', () => {
     });
   });
 
-  describe('EC-134-02: deep link scheme not handled by device', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses deep link scheme
+  describe.skip('EC-134-02: deep link scheme not handled by device [SUPERSEDED by F138]', () => {
     it('deep link uses sacrmeetplan:// scheme', () => {
       expect(resetRedirectSource).toContain('sacrmeetplan://reset-password');
     });

@@ -865,13 +865,15 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- AC-119-05: Deep link uses sacrmeetplan:// scheme ---
-  describe('AC-119-05: Deep link scheme', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses deep link scheme
+  describe.skip('AC-119-05: Deep link scheme [SUPERSEDED by F138]', () => {
     it('uses sacrmeetplan://reset-password deep link', () => {
       expect(resetSource).toContain('sacrmeetplan://reset-password');
     });
   });
 
   // --- AC-119-06: HTML renders properly ---
+  // SUPERSEDED by F138 (CR-202): reset-redirect now serves inline form, no meta-refresh
   describe('AC-119-06: HTML structure is valid', () => {
     it('HTML has DOCTYPE', () => {
       expect(resetSource).toContain('<!DOCTYPE html>');
@@ -881,11 +883,12 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
       expect(resetSource).toContain('<meta charset="UTF-8">');
     });
 
-    it('HTML has meta-refresh as fallback redirect', () => {
+    it.skip('HTML has meta-refresh as fallback redirect [SUPERSEDED by F138]', () => {
       expect(resetSource).toContain('http-equiv="refresh"');
     });
 
     it('HTML does NOT have JavaScript redirect (F134: script tag removed)', () => {
+      // F138 uses CDN script for Supabase JS, but NOT window.location.href redirect
       expect(resetSource).not.toContain('window.location.href');
     });
 
@@ -895,7 +898,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- AC-119-07: Root cause investigation documented ---
-  describe('AC-119-07: Root cause investigation documented', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect was completely rewritten, old comments removed
+  describe.skip('AC-119-07: Root cause investigation documented [SUPERSEDED by F138]', () => {
     it('has code comment documenting root cause', () => {
       expect(resetSource).toContain('Root cause');
     });
@@ -914,7 +918,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- EC-119-01: Browser with strict CSP ---
-  describe('EC-119-01: Meta-refresh as backup redirect', () => {
+  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses meta-refresh or fallback button
+  describe.skip('EC-119-01: Meta-refresh as backup redirect [SUPERSEDED by F138]', () => {
     it('has meta http-equiv=refresh for fallback', () => {
       expect(resetSource).toContain('http-equiv="refresh"');
     });

@@ -152,7 +152,8 @@ export interface MeetingActor {
   can_preside: boolean;
   can_conduct: boolean;
   can_recognize: boolean;
-  can_music: boolean;
+  can_pianist: boolean;
+  can_conductor: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -200,6 +201,8 @@ export interface SundayAgenda {
   speaker_1_override: string | null;
   speaker_2_override: string | null;
   speaker_3_override: string | null;
+  // Optional 2nd speech toggle
+  has_second_speech: boolean;
   // Closing
   closing_hymn_id: string | null;
   closing_prayer_member_id: string | null;
@@ -309,7 +312,8 @@ export interface CreateActorInput {
   can_preside?: boolean;
   can_conduct?: boolean;
   can_recognize?: boolean;
-  can_music?: boolean;
+  can_pianist?: boolean;
+  can_conductor?: boolean;
 }
 
 export interface UpdateActorInput {
@@ -318,7 +322,8 @@ export interface UpdateActorInput {
   can_preside?: boolean;
   can_conduct?: boolean;
   can_recognize?: boolean;
-  can_music?: boolean;
+  can_pianist?: boolean;
+  can_conductor?: boolean;
 }
 
 export interface ImportResult {

@@ -1,0 +1,425 @@
+# =============================================================================
+# ARCH_M039.yaml
+# Architecture for Batch 22 Phase 2: F143, F144
+# CR-208 (Fix invite creation Edge Function root cause)
+# CR-204 (External hosting for HTML pages bypassing Supabase Content-Type override)
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Fix invitation creation root cause with diagnostic logging (CR-208/F143) and move HTML pages to external hosting to bypass Supabase Content-Type text/plain override (CR-204/F144)"
+  principles:
+    - "Diagnostic-first: add structured logging and error codes before fixing, so the exact failure point is visible in production"
+    - "Backward compatible: existing URLs continue to work, error response format gains 'code' field alongside existing 'error' field"
+    - "External hosting for HTML: static files on GitHub Pages bypass Supabase CDN Content-Type restriction"
+    - "Configurable: EXTERNAL_PAGES_URL env var allows changing hosting without redeploying Edge Functions"
+    - "Execution order: F143 first (fix invite creation), then F144 (fix invite/reset page rendering)"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F143 (create-invitation diagnostic logging + error codes):
+    Request -> [auth_header] -> [jwt_validation] -> [metadata_check] -> [role_permission]
+           -> [payload_validation] -> [db_insert] -> 201 Success
+    Each step: console.error('[create-invitation] <step> failed: ...') on failure
+    Each error response: { error: 'Human message', code: 'category/specific-code' }
+    Diagnostic mode: { diagnose: true } -> run all checks, skip db_insert -> 200 { diagnostic: true, checks: {...} }
+
+  F144 (External hosting for HTML pages):
+    BEFORE:
+      Email/Link -> [reset-redirect EF] -> HTML (Content-Type overridden to text/plain by Supabase)
+      Email/Link -> [invite-redirect EF] -> HTML (Content-Type overridden to text/plain by Supabase)
+
+    AFTER:
+      Email/Link -> [reset-redirect EF] -> 302 redirect -> GitHub Pages reset-password.html
+      Email/Link -> [invite-redirect EF] -> 302 redirect -> GitHub Pages accept-invite.html
+      GitHub Pages serves HTML with Content-Type: text/html (correct)
+
+    External pages:
+      docs/public/reset-password.html -> Supabase JS CDN -> verifyOtp + updateUser
+      docs/public/accept-invite.html -> fetch -> register-invited-user EF
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "CreateInvitationDiagnostics"
+    responsibility: "Add structured logging, error codes, and diagnostic mode to create-invitation Edge Function"
+    file: "supabase/functions/create-invitation/index.ts"
+    changes:
+      - "Add console.error at each failure point with structured context: '[create-invitation] <step_name> failed: <details>'"
+      - "Add 'code' field to all error JSON responses alongside existing 'error' field"
+      - "Error codes: auth/missing-header, auth/invalid-token, auth/missing-metadata, auth/insufficient-permission, validation/missing-fields, validation/invalid-role, validation/invalid-email, invitation/insert-failed"
+      - "Add diagnostic mode: when body contains { diagnose: true }, run all validation checks but skip db_insert, return 200 with diagnostic report"
+      - "Diagnostic report: { diagnostic: true, checks: { auth_header, jwt_validation, metadata_check, role_permission, payload_validation }, user_id, ward_id }"
+      - "Diagnostic mode requires authentication (same auth flow as normal mode)"
+    dependencies: []
+
+  - name: "ResetRedirectToExternal"
+    responsibility: "Convert reset-redirect from serving HTML to returning 302 redirect to external page"
+    file: "supabase/functions/reset-redirect/index.ts"
+    changes:
+      - "Remove all inline HTML template (CSS, JS, i18n translations)"
+      - "Read EXTERNAL_PAGES_URL from Deno.env with fallback to 'https://aloisiojr.github.io/sacrament-meeting-planner'"
+      - "On valid token+type: return 302 with Location header to external reset-password.html?token=<token>&type=<type>"
+      - "Keep existing param validation (400 for missing token/type, 400 for invalid token format, 400 for invalid type)"
+      - "Keep CORS headers on all responses (302, 400, OPTIONS)"
+      - "Log warning if EXTERNAL_PAGES_URL not set"
+    dependencies: []
+
+  - name: "InviteRedirectToExternal"
+    responsibility: "Convert invite-redirect from serving HTML to returning 302 redirect to external page"
+    file: "supabase/functions/invite-redirect/index.ts"
+    changes:
+      - "Remove all inline HTML template (CSS, JS, i18n translations)"
+      - "Read EXTERNAL_PAGES_URL from Deno.env with fallback to 'https://aloisiojr.github.io/sacrament-meeting-planner'"
+      - "On valid token: return 302 with Location header to external accept-invite.html?token=<token>"
+      - "Keep existing param validation (400 for missing token, 400 for invalid UUID format)"
+      - "Keep CORS headers on all responses (302, 400, OPTIONS)"
+      - "Log warning if EXTERNAL_PAGES_URL not set"
+    dependencies: []
+
+  - name: "ExternalResetPasswordPage"
+    responsibility: "Self-contained HTML page for password reset, served by GitHub Pages with correct Content-Type"
+    file: "docs/public/reset-password.html (NEW)"
+    changes:
+      - "Extract HTML content from current reset-redirect/index.ts inline template"
+      - "Same structure: card layout, spinner, error, form (2 password fields), success states"
+      - "Same CSS: centered card max-width 400px, primary #4F46E5, bg #f5f5f5"
+      - "Same i18n: navigator.language detection, pt-BR/en/es translations"
+      - "Read token and type from URLSearchParams (instead of server-side template interpolation)"
+      - "Supabase URL and anon key as constants in script (public values)"
+      - "Load Supabase JS from CDN with onerror handler"
+      - "Same verifyOtp + updateUser flow"
+    dependencies: ["Supabase Auth (via CDN JS client in browser)"]
+
+  - name: "ExternalAcceptInvitePage"
+    responsibility: "Self-contained HTML page for invitation acceptance, served by GitHub Pages with correct Content-Type"
+    file: "docs/public/accept-invite.html (NEW)"
+    changes:
+      - "Extract HTML content from current invite-redirect/index.ts inline template"
+      - "Same structure: card layout, spinner, error, form (read-only + editable fields), success states"
+      - "Same CSS: centered card max-width 400px, primary #4F46E5, bg #f5f5f5"
+      - "Same i18n: navigator.language detection, pt-BR/en/es translations, role labels"
+      - "Read token from URLSearchParams (instead of server-side template interpolation)"
+      - "Supabase URL and anon key as constants in script (public values)"
+      - "Same fetch to register-invited-user flow (validate-only on load, full registration on submit)"
+    dependencies: ["register-invited-user EF (via fetch from browser)"]
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "create_invitation_error_codes"
+    component: "CreateInvitationDiagnostics"
+    methods:
+      - name: "error_response_format"
+        input: "Any failed validation or operation"
+        output: "JSON { error: 'Human-readable message', code: '<category>/<specific>' } with appropriate HTTP status. Error codes: auth/missing-header (401), auth/invalid-token (401), auth/missing-metadata (403), auth/insufficient-permission (403), validation/missing-fields (400), validation/invalid-role (400), validation/invalid-email (400), invitation/insert-failed (500). The 'error' field preserves existing English messages for backward compatibility."
+
+      - name: "diagnostic_mode"
+        input: "POST body { diagnose: true, email: string, role: string }"
+        output: "200 JSON { diagnostic: true, checks: { auth_header: 'pass'|'fail', jwt_validation: 'pass'|'fail', metadata_check: 'pass'|{ ward_id: string|null, role: string|null }, role_permission: 'pass'|'fail', payload_validation: 'pass'|'fail' }, user_id: string, ward_id: string }. Requires valid JWT. Does NOT insert into database."
+
+      - name: "structured_logging"
+        input: "Any failure at any step"
+        output: "console.error('[create-invitation] <step_name> failed: <context>'). Context includes: user_id (if available), ward_id (if available), role (if available), error details. Prefix '[create-invitation]' for Supabase log filtering."
+
+  - name: "reset_redirect_302"
+    component: "ResetRedirectToExternal"
+    methods:
+      - name: "OPTIONS"
+        input: "Preflight request"
+        output: "200 'ok' with CORS headers"
+      - name: "GET with valid token+type"
+        input: "GET ?token=<hash>&type=recovery"
+        output: "302 with Location: ${EXTERNAL_PAGES_URL}/reset-password.html?token=<hash>&type=recovery. CORS headers included."
+      - name: "GET missing params"
+        input: "GET without token or type"
+        output: "400 JSON { error: 'Missing required parameters: token and type' }"
+      - name: "GET invalid token format"
+        input: "GET with token containing non-alphanumeric chars"
+        output: "400 JSON { error: 'Invalid token format' }"
+      - name: "GET invalid type"
+        input: "GET with type not in ['recovery']"
+        output: "400 JSON { error: 'Invalid type format' }"
+
+  - name: "invite_redirect_302"
+    component: "InviteRedirectToExternal"
+    methods:
+      - name: "OPTIONS"
+        input: "Preflight request"
+        output: "200 'ok' with CORS headers"
+      - name: "GET with valid token"
+        input: "GET ?token=<uuid>"
+        output: "302 with Location: ${EXTERNAL_PAGES_URL}/accept-invite.html?token=<uuid>. CORS headers included."
+      - name: "GET missing token"
+        input: "GET without token"
+        output: "400 JSON { error: 'Missing required parameter: token' }"
+      - name: "GET invalid token format"
+        input: "GET with token not matching UUID regex"
+        output: "400 JSON { error: 'Invalid token format' }"
+
+  - name: "external_reset_page_flow"
+    component: "ExternalResetPasswordPage"
+    methods:
+      - name: "onLoad"
+        input: "URLSearchParams: token and type"
+        output: "Creates Supabase client with hardcoded URL+anonKey. Calls supabase.auth.verifyOtp({ token_hash: token, type }). Success -> show form. Error -> show localized 'link expired' message. Missing params -> show localized error."
+      - name: "onSubmit"
+        input: "{ password, confirmPassword } from form"
+        output: "Validates password >= 6 chars, passwords match. Calls supabase.auth.updateUser({ password }). Success -> show success message. Error -> show localized error."
+
+  - name: "external_invite_page_flow"
+    component: "ExternalAcceptInvitePage"
+    methods:
+      - name: "onLoad"
+        input: "URLSearchParams: token"
+        output: "Reads Supabase URL+anonKey from constants. Calls fetch POST register-invited-user with { token } (validate-only). Success -> populate read-only fields (stake, ward, role, email), show form. Error -> show localized error (token_invalid, token_used, token_expired). Missing token -> show localized error."
+      - name: "onSubmit"
+        input: "{ token, fullName, password, confirmPassword } from form"
+        output: "Validates fullName not empty, password >= 6 chars, passwords match. Calls fetch POST register-invited-user with { token, password, fullName }. Status 201 -> show success. Error -> show localized error."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  changes: []
+  notes: "No data model changes. No new tables, no new columns, no schema changes. F143 modifies Edge Function behavior only. F144 moves HTML to static files."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    F143:
+    - Diagnostic mode requires authentication (same JWT validation as normal mode).
+      Only bishopric/secretary roles can access diagnostic mode (same permission check).
+    - Error codes do not leak sensitive information. Codes are category/type format.
+    - Structured logs include user_id and ward_id (internal identifiers, not PII).
+    - No new attack surface: same auth flow, same validation, same permissions.
+
+    F144:
+    - External pages embed Supabase URL and anon key (public values, same as mobile app).
+    - Token validation still happens server-side (verifyOtp by Supabase Auth, register-invited-user by EF).
+    - 302 redirect only happens after token format validation (prevents redirect to external page with garbage).
+    - External pages served over HTTPS (GitHub Pages enforces HTTPS).
+    - CORS: External pages (github.io origin) call Supabase APIs. This works because Edge Functions
+      have Access-Control-Allow-Origin: * and Supabase Auth API accepts cross-origin requests.
+    - XSS prevention: Token is read from URLSearchParams (not from template interpolation).
+      Current inline HTML uses ${token} template interpolation which is safe because the EF validates
+      token format before interpolation. External pages use URLSearchParams which is inherently safe.
+    - Cache-Control not needed on 302 responses (browser follows redirect, does not cache).
+      GitHub Pages default caching is acceptable for static HTML files.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    F143:
+    - Every failure point in create-invitation now logs '[create-invitation] <step> failed: <context>'.
+    - Logs are visible in Supabase Dashboard > Edge Functions > Logs.
+    - Diagnostic mode returns a structured report showing which checks pass/fail.
+    - Error responses include machine-readable codes for future i18n mapping and monitoring.
+
+    F144:
+    - reset-redirect logs '[reset-redirect] Redirecting to external page' on 302.
+    - invite-redirect logs '[invite-redirect] Redirecting to external page' on 302.
+    - Warning logged if EXTERNAL_PAGES_URL env var is not set.
+    - Client-side errors on external pages shown to user (no server-side logging for HTML pages).
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-094
+    title: "Structured error codes and diagnostic mode in create-invitation Edge Function"
+    context: >
+      create-invitation returns plain English error messages without machine-readable
+      codes. When the function fails in production, identifying the exact failure
+      point requires reading the error message text. There is no way to test
+      individual validation steps without attempting to create an actual invitation.
+    decision: >
+      Add a 'code' field to all error responses using the format 'category/specific'
+      (e.g., auth/missing-header, validation/invalid-email). Add console.error with
+      '[create-invitation]' prefix at each failure point with structured context.
+      Add diagnostic mode: when the request body includes { diagnose: true },
+      run all validation checks but skip the database insert, returning a structured
+      report of which checks pass and which fail. Diagnostic mode requires the same
+      authentication as normal mode.
+    decided_in: "CR-208"
+    consequences:
+      - "Error responses gain 'code' field (backward compatible: 'error' field unchanged)"
+      - "Each failure point is identifiable in Supabase Edge Function logs"
+      - "Diagnostic mode enables production debugging without side effects"
+      - "Future i18n can map error codes to localized messages"
+
+  - id: ADR-095
+    title: "External hosting via GitHub Pages to bypass Supabase Content-Type override"
+    context: >
+      Supabase Edge Functions override Content-Type from text/html to text/plain
+      for GET responses returning HTML content (anti-phishing security measure in
+      CDN/proxy layer). This causes reset-password and accept-invite pages to render
+      as plain text in browsers. Multiple attempts to fix Content-Type headers
+      (CR-191, CR-198) failed because the override happens at the CDN layer, not
+      in the Edge Function runtime.
+    decision: >
+      Move HTML pages from Edge Function inline templates to static files hosted
+      on GitHub Pages (docs/public/ directory in main branch). Edge Functions
+      become thin redirect endpoints: validate token format, then return 302
+      redirect to the external page URL with query params preserved. The base
+      URL is configurable via EXTERNAL_PAGES_URL env var with fallback to the
+      GitHub Pages URL. HTML pages read token from URLSearchParams instead of
+      server-side template interpolation.
+    decided_in: "CR-204"
+    consequences:
+      - "HTML pages render correctly: GitHub Pages serves text/html (no override)"
+      - "One extra HTTP redirect (invisible to user, standard browser behavior)"
+      - "Edge Functions become simpler (~30 lines instead of ~450 lines)"
+      - "HTML pages are version-controlled alongside code in docs/public/"
+      - "Dependency on GitHub Pages availability (very high uptime, acceptable risk)"
+      - "EXTERNAL_PAGES_URL allows switching hosting without redeploying Edge Functions"
+      - "XSS risk reduced: no more server-side template interpolation of token values"
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: supabase/functions/create-invitation/index.ts
+    feature: F143
+    changes:
+      - "Add console.error('[create-invitation] auth_header failed') at missing auth header check"
+      - "Add console.error('[create-invitation] jwt_validation failed: <error>') at JWT validation"
+      - "Add console.error('[create-invitation] metadata_check failed: ward_id=<>, role=<>, user_id=<>') at metadata check"
+      - "Add console.error('[create-invitation] role_permission failed: userRole=<>, user_id=<>') at role check"
+      - "Add console.error('[create-invitation] payload_validation failed: <reason>') at payload checks"
+      - "Add console.error('[create-invitation] db_insert failed: <error>') at insert (replaces generic 'Invitation creation error')"
+      - "Add 'code' field to all error response JSON objects"
+      - "Add diagnostic mode: check for { diagnose: true } in body, run checks without db insert, return diagnostic report"
+      - "Wrap body parsing in try/catch for malformed JSON"
+
+  - file: supabase/functions/reset-redirect/index.ts
+    feature: F144
+    changes:
+      - "Remove inline HTML template (~300 lines of CSS, JS, i18n)"
+      - "Add EXTERNAL_PAGES_URL env var reading with fallback"
+      - "Replace 200 HTML response with 302 redirect to external page"
+      - "Keep param validation (400 responses unchanged)"
+      - "Keep CORS headers on all responses"
+      - "Add log for redirect and warning for missing env var"
+
+  - file: supabase/functions/invite-redirect/index.ts
+    feature: F144
+    changes:
+      - "Remove inline HTML template (~400 lines of CSS, JS, i18n)"
+      - "Add EXTERNAL_PAGES_URL env var reading with fallback"
+      - "Replace 200 HTML response with 302 redirect to external page"
+      - "Keep param validation (400 responses unchanged)"
+      - "Keep CORS headers on all responses"
+      - "Add log for redirect and warning for missing env var"
+
+  - file: docs/public/reset-password.html (NEW)
+    feature: F144
+    changes:
+      - "Self-contained HTML page extracted from reset-redirect inline template"
+      - "Read token and type from URLSearchParams instead of template interpolation"
+      - "Supabase URL and anon key as hardcoded constants (public values)"
+      - "Same CSS, same i18n, same form logic, same states as current inline page"
+      - "CDN load for Supabase JS with onerror handler"
+
+  - file: docs/public/accept-invite.html (NEW)
+    feature: F144
+    changes:
+      - "Self-contained HTML page extracted from invite-redirect inline template"
+      - "Read token from URLSearchParams instead of template interpolation"
+      - "Supabase URL and anon key as hardcoded constants (public values)"
+      - "Same CSS, same i18n, same form logic, same states as current inline page"
+      - "fetch to register-invited-user with apikey header"
+
+files_not_modified:
+  - src/app/(tabs)/settings/users.tsx
+  - supabase/functions/register-invited-user/index.ts
+  - supabase/functions/send-reset-email/index.ts
+  - src/app/(auth)/reset-password.tsx
+  - src/app/(auth)/invite/[token].tsx
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+  - features: [F143, F144]
+    interaction: >
+      F143 and F144 are independent fixes targeting different parts of the
+      invitation pipeline. F143 fixes the creation step (create-invitation EF).
+      F144 fixes the acceptance page rendering step (invite-redirect and
+      reset-redirect EFs). They share no code or data dependencies.
+      Execution order (F143 first) is logical (fix creation before acceptance)
+      but not technically required.
+
+  - features: [F144, F138_F139]
+    interaction: >
+      F144 supersedes the HTML serving approach from F138 (reset-redirect) and
+      F139 (invite-redirect) from Batch 22 Phase 1. The Edge Functions written
+      in Phase 1 (ARCH_M037) served inline HTML which Supabase overrides to
+      text/plain. F144 extracts the same HTML to external static files and
+      converts the EFs to 302 redirect endpoints. The external HTML pages are
+      functionally identical to the inline HTML from Phase 1.
+
+# =============================================================================
+# ENVIRONMENT CONFIGURATION
+# =============================================================================
+
+environment:
+  new_env_vars:
+    - name: "EXTERNAL_PAGES_URL"
+      used_by: ["reset-redirect", "invite-redirect"]
+      description: "Base URL for externally-hosted HTML pages. No trailing slash."
+      default: "https://aloisiojr.github.io/sacrament-meeting-planner"
+      required: false
+      example: "https://aloisiojr.github.io/sacrament-meeting-planner"
+      notes: "Falls back to default if not set. Set via Supabase Dashboard > Edge Functions > Secrets. Both reset-redirect and invite-redirect read this value."
+
+  github_pages_setup:
+    source_directory: "docs/public"
+    branch: "main"
+    url_pattern: "https://aloisiojr.github.io/sacrament-meeting-planner/<filename>"
+    setup_steps:
+      - "Create docs/public/ directory with reset-password.html and accept-invite.html"
+      - "Push to main branch"
+      - "GitHub repo Settings > Pages > Source: Deploy from a branch > main > /docs/public"
+      - "Wait for GitHub Pages deployment (usually 1-2 minutes)"
+      - "Verify pages are accessible at the URL pattern above"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # Each component has exactly one responsibility
+  GATE-03_contracts_defined: true        # Contracts defined for all integrations and flows
+  GATE-04_adrs_recorded: true           # ADR-094 (diagnostic logging), ADR-095 (external hosting)
+  GATE-05_arch_saved: true              # ARCH_M039.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED updated with ADR-094/095, M001 module, edge functions, directory map, flows
+  GATE-07_arch_summary_filled: true     # Summary provided in message to team lead
+  GATE-08_max_components: true          # 5 components, under 10 limit

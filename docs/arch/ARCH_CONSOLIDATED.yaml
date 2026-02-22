@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  last_updated_by: "batch-23-phase-1"
+  last_updated_by: "batch-22-phase-2"
   total_modules: 8
-  total_adrs: 84
+  total_adrs: 86
   total_crs_implemented: 127
   pending_arch: "none"
   source_documents:
@@ -45,6 +45,7 @@ metadata:
     - docs/arch/ARCH_M036.yaml
     - docs/arch/ARCH_M037.yaml
     - docs/arch/ARCH_M038.yaml
+    - docs/arch/ARCH_M039.yaml
 
 # =============================================================================
 # TECH STACK
@@ -67,7 +68,7 @@ tech_stack:
   file_system: "expo-file-system v19 (new File/Paths API)"
   notifications: "Expo Push Notifications"
   storage: "AsyncStorage (offline queue, theme preference)"
-  deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Changed from sacrmeetman:// to sacrmeetplan:// in CR-175/F113. CR-202/F138: reset-redirect now serves web page instead of deep link redirect. CR-203/F139: create-invitation returns HTTPS URL instead of deep link."
+  deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Changed from sacrmeetman:// to sacrmeetplan:// in CR-175/F113. CR-202/F138: reset-redirect now serves web page instead of deep link redirect. CR-203/F139: create-invitation returns HTTPS URL instead of deep link. CR-204/F144: reset-redirect and invite-redirect converted to 302 redirect to external GitHub Pages."
   csv: "expo-document-picker + expo-file-system + expo-sharing"
 
 # =============================================================================
@@ -156,7 +157,7 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134, F140]
+    spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134, F140, F143, F144]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
@@ -186,7 +187,7 @@ modules:
       - send-reset-email
       - reset-redirect
       - invite-redirect
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198, 202, 203, 205]
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198, 202, 203, 204, 205, 208]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -205,6 +206,8 @@ modules:
       CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
       CR-202/F138: reset-redirect completely rewritten to serve self-contained password reset web page. Loads Supabase JS from CDN, calls verifyOtp + updateUser in browser. No deep link redirect.
       CR-203/F139: New invite-redirect Edge Function serves self-contained invitation acceptance web page. create-invitation returns HTTPS URL instead of sacrmeetplan:// deep link. invite/[token].tsx remains as unused fallback.
+      CR-208/F143: create-invitation gains structured error codes (code field), console.error at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true } runs checks without db insert).
+      CR-204/F144: reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to external hosting (GitHub Pages, docs/public/). EXTERNAL_PAGES_URL env var configurable.
 
   - id: M002
     name: WardDataModule
@@ -547,6 +550,8 @@ modules:
       CR-200/F137: Home tab play icon fontSize increased from 17 to 20 for visual height match with button text.
       CR-202/F138: reset-redirect Edge Function completely rewritten. Now serves self-contained HTML password reset web page with Supabase JS from CDN. Calls verifyOtp + updateUser in browser. No deep link redirect. Multilingual (pt-BR/en/es) (ADR-089).
       CR-203/F139: New invite-redirect Edge Function serves self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. create-invitation deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (ADR-090).
+      CR-208/F143: create-invitation Edge Function gains structured error codes (code field in JSON responses), console.error logging at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true }) (ADR-094).
+      CR-204/F144: reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to docs/public/ for GitHub Pages hosting. EXTERNAL_PAGES_URL env var configurable (ADR-095).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1406,6 +1411,27 @@ adrs:
       - "WhatsApp messages sent from Home match template configured in Settings"
       - "Shared query key ['ward', wardId] propagates updates via TanStack Query cache"
 
+  - id: ADR-094
+    title: "Structured error codes and diagnostic mode in create-invitation Edge Function"
+    context: "create-invitation returns plain English error messages without machine-readable codes. No way to identify exact failure point or test validation steps without creating an invitation."
+    decision: "Add 'code' field (category/specific format) to all error responses. Add console.error with '[create-invitation]' prefix at each failure point. Add diagnostic mode: { diagnose: true } runs all checks without db insert, returns structured report."
+    decided_in: "CR-208"
+    consequences:
+      - "Error responses gain 'code' field (backward compatible: 'error' field unchanged)"
+      - "Each failure point identifiable in Supabase Edge Function logs"
+      - "Diagnostic mode enables production debugging without side effects"
+
+  - id: ADR-095
+    title: "External hosting via GitHub Pages to bypass Supabase Content-Type override"
+    context: "Supabase Edge Functions override Content-Type from text/html to text/plain for GET responses returning HTML (CDN anti-phishing measure). Pages render as plain text in browsers."
+    decision: "Move HTML pages to GitHub Pages (docs/public/). Edge Functions become 302 redirect endpoints. EXTERNAL_PAGES_URL env var configurable with fallback to GitHub Pages URL."
+    decided_in: "CR-204"
+    consequences:
+      - "HTML pages render correctly: GitHub Pages serves text/html"
+      - "One extra HTTP redirect (invisible to user)"
+      - "Edge Functions become simpler (~30 lines instead of ~450 lines)"
+      - "Dependency on GitHub Pages availability (acceptable risk)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1585,9 +1611,9 @@ edge_functions:
 
   - name: create-invitation
     auth: "JWT (bishopric or secretary)"
-    input: "{email, role}"
-    behavior: "Creates invitation record with token and HTTPS URL. Auto-creates actor for bishopric invitees. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>."
-    modified_by_crs: [203]
+    input: "{email, role} or {email, role, diagnose: true} for diagnostic mode"
+    behavior: "Creates invitation record with token and HTTPS URL. Auto-creates actor for bishopric invitees. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>. CR-208/F143: structured error codes (code field), console.error at each failure point, diagnostic mode."
+    modified_by_crs: [203, 208]
 
   - name: list-users
     auth: "JWT (bishopric or secretary)"
@@ -1626,17 +1652,18 @@ edge_functions:
   - name: reset-redirect
     auth: "None (public endpoint, no JWT required)"
     input: "GET query params: token (required), type (required)"
-    behavior: "CR-202/F138: Complete rewrite. Serves self-contained HTML page with password reset form. Loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' }) on page load, then updateUser({ password }) on form submit. Multilingual (pt-BR/en/es via navigator.language). No deep link redirect. No meta refresh. Embeds SUPABASE_URL and SUPABASE_ANON_KEY (public values) from Deno.env. Previous behavior (meta refresh redirect to deep link) fully replaced."
+    behavior: "CR-204/F144: Converted from HTML-serving to 302 redirect. Validates token format and type, then redirects to external page (EXTERNAL_PAGES_URL/reset-password.html?token=...&type=...). Previous behavior (CR-202/F138: self-contained HTML page) replaced. HTML now hosted externally on GitHub Pages to bypass Supabase Content-Type text/plain override."
     verify_jwt: false
     added_in: "CR-176"
-    modified_by_crs: [191, 198, 202]
+    modified_by_crs: [191, 198, 202, 204]
 
   - name: invite-redirect
     auth: "None (public endpoint, no JWT required)"
     input: "GET query params: token (required)"
-    behavior: "CR-203/F139: New Edge Function. Serves self-contained HTML page with invitation acceptance form. Uses fetch to call register-invited-user (validate-only mode on load, full registration on submit). Displays read-only invitation details (stake, ward, role, email) and editable fields (fullName, password). Multilingual (pt-BR/en/es via navigator.language). Embeds SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env for fetch URL and apikey header."
+    behavior: "CR-204/F144: Converted from HTML-serving to 302 redirect. Validates token UUID format, then redirects to external page (EXTERNAL_PAGES_URL/accept-invite.html?token=...). Previous behavior (CR-203/F139: self-contained HTML page) replaced. HTML now hosted externally on GitHub Pages to bypass Supabase Content-Type text/plain override."
     verify_jwt: false
     added_in: "CR-203"
+    modified_by_crs: [204]
 
 # =============================================================================
 # ROLES AND PERMISSIONS
@@ -1872,18 +1899,23 @@ file_structure:
     "functions/":
       "register-first-user/": "Registro do primeiro usuario (cria ala)"
       "register-invited-user/": "Registro via convite"
-      "create-invitation/": "Cria convite com token. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (invite-redirect EF)."
+      "create-invitation/": "Cria convite com token. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (invite-redirect EF). CR-208/F143: structured error codes, diagnostic mode, console.error logging."
       "list-users/": "Lista usuarios da ala"
       "update-user-role/": "Altera role de usuario"
       "update-user-name/": "Auto-edicao de nome (CR-81)"
       "delete-user/": "Remove usuario"
       "process-notifications/": "Cron: processa fila de push"
       "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL. CR-197/F133: language resolution uses user_metadata.language as first priority (ADR-086)."
-      "reset-redirect/": "CR-202/F138: Complete rewrite. Self-contained HTML password reset web page. Loads Supabase JS from CDN, calls verifyOtp + updateUser. Multilingual (pt-BR/en/es). No deep link redirect. Embeds public SUPABASE_URL + SUPABASE_ANON_KEY. Previous behavior (meta refresh redirect) fully replaced."
-      "invite-redirect/": "CR-203/F139: New Edge Function. Self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. Read-only fields (stake, ward, role, email) + registration form. Multilingual (pt-BR/en/es)."
+      "reset-redirect/": "CR-204/F144: Converted to 302 redirect endpoint. Validates token+type, redirects to external GitHub Pages (EXTERNAL_PAGES_URL/reset-password.html). Previous: CR-202/F138 self-contained HTML page."
+      "invite-redirect/": "CR-204/F144: Converted to 302 redirect endpoint. Validates token UUID, redirects to external GitHub Pages (EXTERNAL_PAGES_URL/accept-invite.html). Previous: CR-203/F139 self-contained HTML page."
 
   "scripts/":
     "import-hymns.ts": "CLI script para importar hinos de CSV (CR-51)"
+
+  "docs/":
+    "public/":
+      "reset-password.html": "CR-204/F144: External password reset page hosted on GitHub Pages. Self-contained HTML + CSS + JS. Loads Supabase JS from CDN, calls verifyOtp + updateUser. Multilingual (pt-BR/en/es)."
+      "accept-invite.html": "CR-204/F144: External invitation acceptance page hosted on GitHub Pages. Self-contained HTML + CSS + JS. Uses fetch to call register-invited-user. Multilingual (pt-BR/en/es)."
 
 # =============================================================================
 # KEY FLOWS
@@ -1905,8 +1937,8 @@ key_flows:
     steps:
       - "CR-203/F139: create-invitation returns HTTPS URL (https://.../invite-redirect?token=<uuid>) instead of deep link"
       - "Inviter shares HTTPS URL with invited user (via WhatsApp, email, etc.)"
-      - "Invited user opens URL in browser -> invite-redirect EF serves HTML page"
-      - "Page JS calls register-invited-user with { token } (validate-only mode via fetch)"
+      - "Invited user opens URL in browser -> invite-redirect EF returns 302 redirect to external accept-invite.html page (CR-204/F144)"
+      - "External page JS calls register-invited-user with { token } (validate-only mode via fetch)"
       - "On validation success: read-only fields (stake, ward, role, email) + registration form shown"
       - "User fills in Nome Completo and Password"
       - "Page JS calls register-invited-user with { token, password, fullName } via fetch"
@@ -1921,8 +1953,8 @@ key_flows:
       - "send-reset-email EF: builds HTTPS redirect URL (https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery)"
       - "send-reset-email EF: sends email via Resend API with HTTPS URL in <a href>"
       - "User clica botao no email -> browser abre HTTPS redirect URL"
-      - "CR-202/F138: reset-redirect EF serves self-contained HTML page with password reset form (replaces previous deep link redirect)"
-      - "HTML page loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' })"
+      - "CR-204/F144: reset-redirect EF returns 302 redirect to external reset-password.html page on GitHub Pages (replaces CR-202/F138 inline HTML)"
+      - "External HTML page loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' })"
       - "On verifyOtp success: form with password + confirm password fields is shown"
       - "User enters new password -> page calls updateUser({ password }) -> success message shown"
       - "App screen reset-password.tsx remains as unused fallback (no changes)"
@@ -2275,6 +2307,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-089, ADR-090]
     new_files: ["supabase/functions/invite-redirect/index.ts"]
+
+  batch_22_phase_2:
+    crs: "CR-208, CR-204"
+    scope: "Fix invite creation root cause with diagnostic logging (F143), External hosting for HTML pages bypassing Supabase Content-Type override (F144)"
+    doc: "ARCH_M039.yaml"
+    status: "pending implementation"
+    adrs: [ADR-094, ADR-095]
+    new_files: ["docs/public/reset-password.html", "docs/public/accept-invite.html"]
 
 # =============================================================================
 # OBSERVABILITY

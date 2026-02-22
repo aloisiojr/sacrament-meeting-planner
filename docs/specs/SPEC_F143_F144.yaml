@@ -1,0 +1,500 @@
+# =============================================================================
+# SPEC_F143_F144.yaml
+# Batch 22 Phase 2: Fix invite creation root cause, External hosting for HTML pages
+# (CR-208, CR-204)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 22
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: bugfix
+execution_order: "F143 first (CR-208), then F144 (CR-204)"
+execution_rationale: >
+  CR-208 must be resolved before CR-204. If the invite creation itself fails,
+  fixing the invite acceptance page (CR-204) is pointless -- the user never
+  reaches that page. Fix the pipeline from the beginning (creation) before
+  fixing the end (acceptance page rendering).
+
+# =============================================================================
+# F143: Fix invite creation Edge Function root cause (CR-208)
+# =============================================================================
+
+features:
+
+  - id: F143
+    name: "Debug and fix create-invitation Edge Function to successfully create invitations"
+    cr_id: 208
+    type: bugfix
+    related_crs: [93, 203, 205]
+    related_features: [F001, F139, F140]
+    description: >
+      When clicking 'Invite User' in Settings > Users, the app receives a
+      non-2xx error from the create-invitation Edge Function. CR-205/F140
+      improved the error handling so that the actual server error message is
+      displayed (instead of a generic error), but the underlying cause of the
+      failure was not resolved.
+
+      The create-invitation Edge Function (supabase/functions/create-invitation/index.ts)
+      has multiple potential failure points:
+
+      1. AUTH HEADER (401): The function reads the Authorization header from the
+         request. If supabase.functions.invoke() does not automatically include the
+         JWT in the Authorization header, or if the session is expired, the function
+         returns 401 "Missing authorization header" or 401 "Invalid or expired token".
+
+      2. JWT VALIDATION (401): supabaseAdmin.auth.getUser(token) can fail if the
+         token is malformed, expired, or if the SUPABASE_SERVICE_ROLE_KEY env var
+         is not set (the admin client cannot validate the token).
+
+      3. METADATA CHECK (403): user.app_metadata?.ward_id or user.app_metadata?.role
+         may be undefined if the user was created without proper metadata (e.g., the
+         first user created via Supabase Dashboard or via email signup without going
+         through the invitation flow). Returns 403 "User missing ward or role metadata".
+
+      4. ROLE PERMISSION (403): Only 'bishopric' and 'secretary' roles can create
+         invitations. If userRole is not in ALLOWED_ROLES, returns 403
+         "Insufficient permissions".
+
+      5. PAYLOAD VALIDATION (400): Missing email/role, invalid role value, or
+         invalid email format. Returns 400 with specific error message.
+
+      6. DB INSERT (500): The insert into the invitations table can fail due to
+         RLS policies, missing ward_id FK, or other database-level errors. Returns
+         500 "Failed to create invitation".
+
+      Investigation strategy:
+        - The exact failure point must be identified by examining the error message
+          that is now visible thanks to CR-205/F140 (err.message in the Alert).
+        - Since this is a runtime environment issue (the code logic itself appears
+          correct), the most likely causes are:
+          a) supabase.functions.invoke() not sending the Authorization header
+             correctly (unlikely -- it does by default with an active session).
+          b) The user's JWT does not have ward_id/role in app_metadata (likely
+             for the first user who signed up without invitation flow).
+          c) SUPABASE_SERVICE_ROLE_KEY not configured as a secret in the Edge
+             Function environment.
+          d) RLS policies on the invitations table blocking the insert.
+
+      Fix strategy:
+        - Add detailed error logging to create-invitation so that each failure
+          point logs a distinct, identifiable message with relevant context
+          (e.g., log the userRole, wardId presence, error details).
+        - Ensure the function returns structured error responses with specific
+          error codes (not just generic messages) so the client can display
+          actionable information.
+        - Add a diagnostic mode: when called with { diagnose: true } in the body
+          (in addition to email/role), the function returns a diagnostic report
+          showing which checks pass and which fail, without actually creating the
+          invitation. This helps identify the exact failure point in production.
+        - Fix any identified issues (RLS, metadata, env vars) as part of this CR.
+
+      Known code issues to fix:
+        1. LOGGING: Add console.error at each failure point with structured context
+           (step name, user ID, ward ID, role, error details) to enable debugging
+           via Supabase Edge Function logs.
+        2. ERROR CODES: Return error codes (not just messages) in the JSON response
+           so the client can provide i18n-friendly messages. Current errors use
+           plain English strings which cannot be translated.
+        3. SESSION CHECK: The callEdgeFunction helper in users.tsx already checks
+           for a valid session (ADR-024, line 46-49), which is good. But the error
+           message 'auth/no-session' is not user-friendly. Map it to an i18n key.
+
+    acceptance_criteria:
+      - id: AC-143-01
+        description: "Each failure point in create-invitation logs a distinct error with context"
+        given: "create-invitation Edge Function receives a request that fails at any validation step"
+        when: "The function processes the request and hits a failure"
+        then: "console.error logs a structured message including: step name (e.g., 'auth_header', 'jwt_validation', 'metadata_check', 'role_permission', 'payload_validation', 'db_insert'), user ID (if available), ward ID (if available), and the specific error details. Each log line is prefixed with '[create-invitation]' for easy filtering in Supabase logs."
+        status: pending
+
+      - id: AC-143-02
+        description: "Error responses include error codes for i18n mapping"
+        given: "create-invitation returns a non-2xx response"
+        when: "Client receives the error response"
+        then: "JSON body contains both 'error' (human-readable message in English, for logging) and 'code' (machine-readable error code) fields. Error codes are: 'auth/missing-header', 'auth/invalid-token', 'auth/missing-metadata', 'auth/insufficient-permission', 'validation/missing-fields', 'validation/invalid-role', 'validation/invalid-email', 'invitation/insert-failed'. The 'error' field keeps the current English messages for backward compatibility."
+        status: pending
+
+      - id: AC-143-03
+        description: "Diagnostic mode returns a health check report without creating invitation"
+        given: "create-invitation receives POST body with { diagnose: true, email: '...', role: '...' }"
+        when: "The function processes the request"
+        then: "Function runs all validation checks (auth header, JWT validation, metadata check, role permission, payload validation) but does NOT insert into the database. Returns 200 with JSON body { diagnostic: true, checks: { auth_header: 'pass'|'fail', jwt_validation: 'pass'|'fail', metadata_check: 'pass'|{ward_id: ..., role: ...}, role_permission: 'pass'|'fail', payload_validation: 'pass'|'fail' }, user_id: '...', ward_id: '...' }. Sensitive data (full JWT, service key) is NOT included."
+        status: pending
+
+      - id: AC-143-04
+        description: "Successful invitation creation continues to work without regression"
+        given: "User with valid session, proper app_metadata (ward_id + bishopric/secretary role), valid email and role in request body"
+        when: "User clicks 'Invite User' and the create-invitation function is called"
+        then: "Invitation is created in the invitations table with correct ward_id, email, role, token, expires_at, and created_by. Response is 201 with invitation data including deepLink. No regression from current behavior."
+        status: pending
+
+      - id: AC-143-05
+        description: "Client-side callEdgeFunction preserves error code from server response"
+        given: "create-invitation returns a non-2xx response with JSON body { error: 'msg', code: 'code' }"
+        when: "callEdgeFunction in users.tsx processes the error"
+        then: "The thrown Error object has message set to the server's 'error' field (current behavior, no change). The error code is available for future i18n mapping but does not change current UX (error message is already shown via F140)."
+        status: pending
+
+      - id: AC-143-06
+        description: "Auth no-session error shows user-friendly message"
+        given: "User's session has expired and they click 'Invite User'"
+        when: "callEdgeFunction detects no session (line 46-49 of users.tsx)"
+        then: "The thrown error 'auth/no-session' is caught by inviteMutation.onError. Since err.message is 'auth/no-session', the Alert shows this string. This is acceptable as-is because the session expiry case is rare and the user can re-login. No i18n mapping needed for this CR."
+        status: pending
+
+    edge_cases:
+      - id: EC-143-01
+        case: "User was created via Supabase Dashboard (no app_metadata)"
+        expected: "create-invitation returns 403 with code 'auth/missing-metadata' and error 'User missing ward or role metadata'. Console logs: '[create-invitation] metadata_check failed: ward_id=undefined, role=undefined, user_id=<id>'. The user sees this error in the Alert and knows they need proper ward assignment."
+        status: pending
+
+      - id: EC-143-02
+        case: "SUPABASE_SERVICE_ROLE_KEY is not set in Edge Function secrets"
+        expected: "supabaseAdmin.auth.getUser(token) fails because the admin client cannot authenticate. Returns 401 with code 'auth/invalid-token'. Console logs: '[create-invitation] jwt_validation failed: <error details>'. The fix is to set the secret via Supabase Dashboard > Edge Functions > Secrets."
+        status: pending
+
+      - id: EC-143-03
+        case: "Observer role user tries to create invitation"
+        expected: "Returns 403 with code 'auth/insufficient-permission' and error 'Insufficient permissions'. Console logs: '[create-invitation] role_permission failed: userRole=observer, user_id=<id>'. The user sees 'Insufficient permissions' in the Alert."
+        status: pending
+
+      - id: EC-143-04
+        case: "RLS policy blocks insert into invitations table"
+        expected: "Returns 500 with code 'invitation/insert-failed'. Console logs: '[create-invitation] db_insert failed: <RLS error details>'. Note: create-invitation uses supabaseAdmin (service role key) which bypasses RLS, so this should not happen. If it does, the RLS policy or table structure has an issue."
+        status: pending
+
+      - id: EC-143-05
+        case: "Diagnostic mode called by non-authenticated user"
+        expected: "Diagnostic mode still requires authentication. Returns 401 with code 'auth/missing-header' if no Authorization header is present. The diagnostic endpoint is not publicly accessible."
+        status: pending
+
+      - id: EC-143-06
+        case: "Multiple consecutive invite attempts after first failure"
+        expected: "Each attempt is independent. inviteMutation.reset() is called when the modal is re-opened (closeInviteModal resets mutation state). No stale error state."
+        status: pending
+
+    files_impacted:
+      - supabase/functions/create-invitation/index.ts
+
+    files_not_modified:
+      - src/app/(tabs)/settings/users.tsx
+      - supabase/functions/register-invited-user/index.ts
+      - supabase/functions/invite-redirect/index.ts
+
+# =============================================================================
+# F144: External hosting for HTML pages (CR-204)
+# =============================================================================
+
+  - id: F144
+    name: "Host password reset and invitation acceptance pages externally to bypass Supabase Content-Type restriction"
+    cr_id: 204
+    type: bugfix
+    related_crs: [67, 145, 155, 176, 191, 198, 202]
+    related_features: [F001, F088, F101, F114, F115, F119, F133, F134, F138, F139]
+    description: >
+      CONFIRMED ROOT CAUSE: Supabase overrides the Content-Type header from
+      text/html to text/plain for GET responses from Edge Functions that return
+      HTML content. This is a security restriction (anti-phishing measure) in
+      the Supabase Edge Function runtime. The effect is:
+        - curl returns Content-Type: text/html (because curl uses a direct connection)
+        - Real browsers receive Content-Type: text/plain (because Supabase's CDN/proxy
+          intercepts and overrides the header for browser user agents)
+        - The browser renders raw HTML source code as plain text instead of rendering
+          the page
+
+      This affects both:
+        - reset-redirect (F138): Password reset web page
+        - invite-redirect (F139): Invitation acceptance web page
+
+      SOLUTION: Host the HTML pages on an external static hosting service (GitHub
+      Pages, Vercel, or Netlify -- all free tier). The Edge Functions become thin
+      API endpoints that the externally-hosted pages call via fetch.
+
+      Architecture:
+        1. Create a static site (e.g., GitHub Pages in the same repo under /docs/pages/
+           or a separate gh-pages branch) with two HTML pages:
+           - reset-password.html: The password reset form (currently inline in reset-redirect)
+           - accept-invite.html: The invitation acceptance form (currently inline in invite-redirect)
+
+        2. The HTML pages are identical in functionality to the current inline HTML
+           but are served as static files with correct Content-Type: text/html by
+           the external hosting service.
+
+        3. The Edge Functions change role:
+           - reset-redirect: Instead of returning HTML, returns a 302 redirect to
+             the external page URL with the same query params (token, type).
+             Example: 302 -> https://<user>.github.io/sacrament-meeting-planner/reset-password.html?token=...&type=...
+           - invite-redirect: Instead of returning HTML, returns a 302 redirect to
+             the external page URL with the same query params (token).
+             Example: 302 -> https://<user>.github.io/sacrament-meeting-planner/accept-invite.html?token=...
+
+        4. The external pages use the Supabase project URL and anon key (public values)
+           to call the Supabase APIs directly:
+           - reset-password.html: Calls supabase.auth.verifyOtp() and supabase.auth.updateUser()
+             via Supabase JS CDN (same as current reset-redirect inline JS).
+           - accept-invite.html: Calls register-invited-user Edge Function via fetch
+             (same as current invite-redirect inline JS).
+
+        5. The external pages are self-contained (HTML + inline CSS + inline JS),
+           same structure as the current inline pages. The only change is they are
+           served from a different origin.
+
+      Alternative considered and rejected:
+        - Custom domain (Supabase Pro plan): Requires upgrading to Pro plan ($25/month).
+          Not justified for this use case.
+        - Code flow (PKCE): Would require significant changes to the auth flow and
+          does not solve the invitation page issue.
+
+      Migration path:
+        - Old reset emails continue to work: reset link -> reset-redirect EF -> 302
+          redirect to external page. The user experience is seamless (one extra redirect,
+          invisible to the user).
+        - Old invitation links continue to work: invite link -> invite-redirect EF ->
+          302 redirect to external page.
+        - create-invitation deepLink can optionally be updated to point directly to
+          the external page URL (skipping the redirect), but this is not required
+          for the fix. Keeping the redirect through the EF means we only need to
+          update the external page URL in one place (the EF) if the hosting changes.
+
+      GitHub Pages setup:
+        - Use /docs/public/ directory in the main branch as the source for GitHub Pages.
+        - The repo setting must be configured: Settings > Pages > Source: Deploy from
+          a branch > Branch: main, /docs/public.
+        - Two files: docs/public/reset-password.html, docs/public/accept-invite.html.
+        - GitHub Pages serves these at:
+          https://<user>.github.io/sacrament-meeting-planner/reset-password.html
+          https://<user>.github.io/sacrament-meeting-planner/accept-invite.html
+        - No build step needed. Raw HTML files served as-is.
+
+    acceptance_criteria:
+      - id: AC-144-01
+        description: "reset-redirect Edge Function redirects to external page instead of returning HTML"
+        given: "User clicks password reset link in email"
+        when: "Browser navigates to reset-redirect?token=<hash>&type=recovery"
+        then: "Edge Function returns HTTP 302 with Location header pointing to the external page URL: https://<user>.github.io/sacrament-meeting-planner/reset-password.html?token=<hash>&type=recovery. The browser follows the redirect automatically."
+        status: pending
+
+      - id: AC-144-02
+        description: "invite-redirect Edge Function redirects to external page instead of returning HTML"
+        given: "User clicks invitation link"
+        when: "Browser navigates to invite-redirect?token=<uuid>"
+        then: "Edge Function returns HTTP 302 with Location header pointing to the external page URL: https://<user>.github.io/sacrament-meeting-planner/accept-invite.html?token=<uuid>. The browser follows the redirect automatically."
+        status: pending
+
+      - id: AC-144-03
+        description: "External reset-password.html page renders correctly with Content-Type text/html"
+        given: "Browser follows redirect to external reset-password.html page"
+        when: "Page loads in Safari/Chrome mobile"
+        then: "Page renders as a styled HTML form (not as plain text). Content-Type is text/html. The page shows the password reset form with the same UX as the current inline page (loading spinner, form fields, success/error states). All functionality works: verifyOtp, password validation, updateUser."
+        status: pending
+
+      - id: AC-144-04
+        description: "External accept-invite.html page renders correctly with Content-Type text/html"
+        given: "Browser follows redirect to external accept-invite.html page"
+        when: "Page loads in Safari/Chrome mobile"
+        then: "Page renders as a styled HTML form (not as plain text). Content-Type is text/html. The page shows the invitation acceptance form with the same UX as the current inline page (loading spinner, read-only fields, form fields, success/error states). All functionality works: token validation, registration."
+        status: pending
+
+      - id: AC-144-05
+        description: "External pages read token and params from URL query string"
+        given: "External page loads with query params (token, type)"
+        when: "Page JavaScript executes"
+        then: "Page reads token (and type for reset) from URLSearchParams. These values are used to call the Supabase APIs. If params are missing, an error message is shown."
+        status: pending
+
+      - id: AC-144-06
+        description: "External pages use Supabase URL and anon key for API calls"
+        given: "External page needs to call Supabase APIs"
+        when: "Page makes API calls (verifyOtp, updateUser, register-invited-user)"
+        then: "The Supabase project URL and anon key are embedded in the HTML as constants. These are public values (same as used in the mobile app). The page creates a Supabase client (for reset) or uses fetch with apikey header (for invite) to make API calls."
+        status: pending
+
+      - id: AC-144-07
+        description: "External pages have i18n support for pt-BR, en, es"
+        given: "User opens external page in a browser with any language"
+        when: "Page renders"
+        then: "All labels, buttons, and messages are in the browser's detected language (navigator.language). pt-BR is default, en for English, es for Spanish. Same i18n behavior as current inline pages."
+        status: pending
+
+      - id: AC-144-08
+        description: "Old reset emails continue to work after the change"
+        given: "A password reset email was sent before F144 deployment"
+        when: "User clicks the reset link in that old email"
+        then: "The link goes to reset-redirect EF (same URL as before) which now returns 302 to the external page. The user sees the password reset form and can reset their password. No broken links."
+        status: pending
+
+      - id: AC-144-09
+        description: "Old invitation links continue to work after the change"
+        given: "An invitation link was created before F144 deployment (pointing to invite-redirect)"
+        when: "User clicks the invitation link"
+        then: "The link goes to invite-redirect EF (same URL as before) which now returns 302 to the external page. The user sees the invitation acceptance form. No broken links."
+        status: pending
+
+      - id: AC-144-10
+        description: "reset-redirect returns 400 if token or type params are missing"
+        given: "User navigates to reset-redirect without token or type params"
+        when: "Edge Function processes the request"
+        then: "Returns JSON { error: 'Missing required parameters: token and type' } with status 400. Same behavior as current implementation. No redirect for invalid requests."
+        status: pending
+
+      - id: AC-144-11
+        description: "invite-redirect returns 400 if token param is missing"
+        given: "User navigates to invite-redirect without token param"
+        when: "Edge Function processes the request"
+        then: "Returns JSON { error: 'Missing required parameter: token' } with status 400. Same behavior as current implementation. No redirect for invalid requests."
+        status: pending
+
+      - id: AC-144-12
+        description: "Token format validation happens before redirect"
+        given: "User navigates to reset-redirect or invite-redirect with invalid token format"
+        when: "Edge Function validates the token format"
+        then: "Returns JSON { error: 'Invalid token format' } with status 400. Only valid-format tokens are redirected to the external page. This prevents sending garbage to the external page."
+        status: pending
+
+      - id: AC-144-13
+        description: "CORS headers are maintained on Edge Function responses"
+        given: "Request to reset-redirect or invite-redirect endpoint"
+        when: "Checking response headers on 302 and 400 responses"
+        then: "CORS headers (Access-Control-Allow-Origin: *, Access-Control-Allow-Headers) are present. OPTIONS preflight returns 'ok' with CORS headers."
+        status: pending
+
+      - id: AC-144-14
+        description: "External page URL is configurable via environment variable"
+        given: "Edge Functions need to know the external page base URL"
+        when: "Building the redirect Location URL"
+        then: "The base URL for external pages is read from Deno.env.get('EXTERNAL_PAGES_URL') with a fallback to the GitHub Pages URL. This allows changing the hosting without redeploying the Edge Functions. Example: EXTERNAL_PAGES_URL=https://aloisiojr.github.io/sacrament-meeting-planner"
+        status: pending
+
+    edge_cases:
+      - id: EC-144-01
+        case: "GitHub Pages is temporarily down"
+        expected: "The 302 redirect still happens but the user sees a GitHub Pages error page (404 or 503). This is acceptable because GitHub Pages has very high uptime. The user can retry later. The Edge Functions themselves remain available."
+        status: pending
+
+      - id: EC-144-02
+        case: "Browser blocks the redirect (pop-up blocker, CORS issue)"
+        expected: "Standard 302 redirects are not blocked by pop-up blockers or CORS policies. This is a same-origin-irrelevant redirect (the browser simply navigates to the new URL). No CORS issue because it is a navigation, not a fetch."
+        status: pending
+
+      - id: EC-144-03
+        case: "External page is cached by browser with stale version"
+        expected: "GitHub Pages supports cache busting via query params. The token and type params already make each URL unique enough. Additionally, Cache-Control headers can be set via a _headers file or the page can include <meta> cache control tags. For MVP, no cache busting is needed -- the HTML is self-contained and versioned via git commits."
+        status: pending
+
+      - id: EC-144-04
+        case: "EXTERNAL_PAGES_URL env var is not set"
+        expected: "Falls back to the hardcoded GitHub Pages URL. Console logs a warning: '[reset-redirect] EXTERNAL_PAGES_URL not set, using default'. The page works correctly with the default URL."
+        status: pending
+
+      - id: EC-144-05
+        case: "User opens Edge Function URL directly in curl (not browser)"
+        expected: "curl receives the 302 response with Location header. With curl -L (follow redirects), it fetches the external page. Without -L, it shows the 302 response. This is correct HTTP behavior."
+        status: pending
+
+    files_impacted:
+      - supabase/functions/reset-redirect/index.ts
+      - supabase/functions/invite-redirect/index.ts
+      - docs/public/reset-password.html (NEW)
+      - docs/public/accept-invite.html (NEW)
+
+    files_not_modified:
+      - supabase/functions/send-reset-email/index.ts
+      - supabase/functions/create-invitation/index.ts
+      - supabase/functions/register-invited-user/index.ts
+      - src/app/(auth)/reset-password.tsx
+      - src/app/(auth)/invite/[token].tsx
+      - src/app/(tabs)/settings/users.tsx
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions:
+    - id: OQ-01
+      text: >
+        What is the exact GitHub username for the GitHub Pages URL? The spec
+        uses '<user>' as placeholder. This must be replaced with the actual
+        GitHub username (e.g., 'aloisiojr') before implementation.
+      resolution: >
+        Based on the working directory path (/Users/aloisiojr/), the GitHub
+        username is 'aloisiojr'. The URLs will be:
+        https://aloisiojr.github.io/sacrament-meeting-planner/reset-password.html
+        https://aloisiojr.github.io/sacrament-meeting-planner/accept-invite.html
+      status: resolved
+
+    - id: OQ-02
+      text: >
+        What is the actual error message/code returned by create-invitation
+        when the user clicks 'Invite User'? CR-205/F140 made the server error
+        visible in the Alert, but the exact error has not been reported.
+      resolution: >
+        This will be identified during F143 implementation via the diagnostic
+        mode (AC-143-03). The fix will be applied based on the diagnosed failure
+        point. The most likely cause is missing app_metadata (ward_id/role) on
+        the first user who registered via Supabase Dashboard rather than via
+        invitation.
+      status: resolved
+
+    - id: OQ-03
+      text: >
+        Should the GitHub Pages setup be done via /docs/public directory on the
+        main branch or via a gh-pages branch?
+      resolution: >
+        Use /docs/public directory on the main branch. This keeps everything
+        in one branch, makes it easy to version the HTML files alongside the
+        code, and avoids the complexity of maintaining a separate branch.
+        GitHub Pages supports this configuration: Settings > Pages > Source:
+        Deploy from branch > main > /docs/public.
+      status: resolved
+
+  assumptions:
+    - id: A-01
+      text: >
+        The Supabase Edge Function runtime overrides Content-Type from text/html
+        to text/plain specifically for GET responses that return HTML. This is
+        confirmed behavior (stated in CR-204 description as "Causa raiz CONFIRMADA").
+        The 302 redirect approach bypasses this restriction because the EF no
+        longer returns HTML -- it returns a redirect response.
+
+    - id: A-02
+      text: >
+        GitHub Pages is a reliable hosting option for static HTML files. It has
+        very high uptime, is free, and serves files with correct Content-Type
+        headers (text/html for .html files). No build step is needed.
+
+    - id: A-03
+      text: >
+        The 302 redirect from Edge Functions is not intercepted or modified by
+        Supabase's CDN/proxy. The Location header is preserved and the browser
+        follows the redirect normally. This is standard HTTP behavior.
+
+    - id: A-04
+      text: >
+        The external HTML pages can call Supabase APIs (auth.verifyOtp,
+        auth.updateUser, register-invited-user Edge Function) from a different
+        origin (github.io) because the Supabase project has CORS configured to
+        accept requests from any origin (Access-Control-Allow-Origin: *). This
+        is already the case for all Edge Functions (corsHeaders in the code).
+
+    - id: A-05
+      text: >
+        supabase.functions.invoke() automatically includes the JWT in the
+        Authorization header when a session is active. The callEdgeFunction
+        helper in users.tsx already verifies session existence before calling
+        invoke (ADR-024). Therefore, the create-invitation function should
+        receive a valid Authorization header in normal operation.
+
+    - id: A-06
+      text: >
+        The diagnostic mode in create-invitation (AC-143-03) is a development/
+        debugging tool. It should not be exposed in the production UI. It can
+        be called manually via curl or via a developer console. No UI changes
+        needed for the diagnostic mode.
+
+  inconsistencies: []

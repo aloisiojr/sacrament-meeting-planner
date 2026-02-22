@@ -1,0 +1,496 @@
+# =============================================================================
+# PLAN_P039.yaml
+# Batch 22 Phase 2: Fix invite creation Edge Function root cause (F143/CR-208),
+# External hosting for HTML pages (F144/CR-204)
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Fix the invitation pipeline end-to-end: (1) add structured diagnostic logging,
+  error codes, and diagnostic mode to the create-invitation Edge Function so the
+  exact failure point is identifiable in production (CR-208/F143), and (2) move
+  the password reset and invitation acceptance HTML pages from Edge Function inline
+  templates to external static files on GitHub Pages to bypass Supabase's CDN
+  Content-Type text/plain override (CR-204/F144).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # -------------------------------------------------------------------------
+  # STEP-01: F143 - Structured logging + error codes in create-invitation
+  # -------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Add structured error logging, machine-readable error codes, and diagnostic
+      mode to supabase/functions/create-invitation/index.ts. Three changes:
+
+      1. STRUCTURED LOGGING: At each failure point in the function (auth_header,
+         jwt_validation, metadata_check, role_permission, payload_validation,
+         db_insert), add console.error('[create-invitation] <step_name> failed: ...')
+         with relevant context (user_id, ward_id, role, error details). Replace the
+         existing generic 'Invitation creation error:' log at db_insert with the
+         structured format. The '[create-invitation]' prefix enables easy filtering
+         in Supabase Edge Function logs.
+
+      2. ERROR CODES: Add a 'code' field to every error JSON response alongside
+         the existing 'error' field. Error codes:
+           - 401 missing auth header: code 'auth/missing-header'
+           - 401 invalid/expired token: code 'auth/invalid-token'
+           - 403 missing metadata: code 'auth/missing-metadata'
+           - 403 insufficient permissions: code 'auth/insufficient-permission'
+           - 400 missing fields: code 'validation/missing-fields'
+           - 400 invalid role: code 'validation/invalid-role'
+           - 400 invalid email: code 'validation/invalid-email'
+           - 500 insert failed: code 'invitation/insert-failed'
+         The 'error' field keeps the existing English messages for backward
+         compatibility with the client-side error display (F140/CR-205).
+
+      3. DIAGNOSTIC MODE: When the request body contains { diagnose: true }
+         (along with email and role), the function runs all validation checks
+         (auth header, JWT, metadata, role, payload) but does NOT insert into
+         the database. Returns 200 with a diagnostic report:
+         { diagnostic: true, checks: { auth_header, jwt_validation,
+           metadata_check, role_permission, payload_validation },
+           user_id, ward_id }.
+         Diagnostic mode requires authentication (same JWT flow as normal mode).
+         Wrap body JSON.parse in try/catch for malformed JSON payloads.
+
+    files:
+      - supabase/functions/create-invitation/index.ts
+
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03"]
+
+    done_when:
+      - "console.error('[create-invitation] auth_header failed') logged when Authorization header is missing"
+      - "console.error('[create-invitation] jwt_validation failed: <error>') logged when getUser fails"
+      - "console.error('[create-invitation] metadata_check failed: ward_id=<>, role=<>, user_id=<>') logged when app_metadata missing"
+      - "console.error('[create-invitation] role_permission failed: userRole=<>, user_id=<>') logged when role not in ALLOWED_ROLES"
+      - "console.error('[create-invitation] payload_validation failed: <reason>') logged for each validation failure"
+      - "console.error('[create-invitation] db_insert failed: <error>') logged on insert error"
+      - "All error responses include both 'error' and 'code' fields in JSON body"
+      - "POST with { diagnose: true, email, role } returns 200 with diagnostic report and does not insert into DB"
+      - "Diagnostic mode returns 401/403 if JWT validation or role check fails (same auth as normal mode)"
+      - "Malformed JSON body returns 400 with code 'validation/missing-fields'"
+      - "Existing 201 success response unchanged (no regression)"
+
+    tests:
+      - type: unit
+        description: >
+          Test create-invitation Edge Function error codes and diagnostic mode.
+          Test that each error response includes both 'error' and 'code' fields.
+          Test diagnostic mode response structure (checks, user_id, ward_id).
+          Test that diagnostic mode does not insert into DB.
+          Test malformed JSON body handling.
+
+    covers:
+      acceptance_criteria: ["AC-143-01", "AC-143-02", "AC-143-03", "AC-143-04", "AC-143-05", "AC-143-06"]
+      edge_cases: ["EC-143-01", "EC-143-02", "EC-143-03", "EC-143-04", "EC-143-05", "EC-143-06"]
+
+    risks:
+      - risk: "Diagnostic mode could be misused for probing by an attacker"
+        mitigation: "Diagnostic mode requires same JWT authentication and role permission as normal mode. Only bishopric/secretary can access it."
+      - risk: "Error codes may not match all existing client parsing"
+        mitigation: "Error codes are additive (new 'code' field). The 'error' field is unchanged for backward compatibility."
+
+  # -------------------------------------------------------------------------
+  # STEP-02: F144 - Convert reset-redirect EF to 302 redirect
+  # -------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Convert supabase/functions/reset-redirect/index.ts from serving inline HTML
+      to returning a 302 redirect to the external page on GitHub Pages.
+
+      Changes:
+      1. Remove the entire inline HTML template (~300 lines of CSS, JS, i18n
+         translations, and the html variable). Remove supabaseUrl and
+         supabaseAnonKey reading (no longer needed -- the external page has its
+         own constants).
+
+      2. Add EXTERNAL_PAGES_URL reading:
+         const externalPagesUrl = Deno.env.get('EXTERNAL_PAGES_URL')
+           || 'https://aloisiojr.github.io/sacrament-meeting-planner';
+         Log a warning if env var is not set:
+         console.warn('[reset-redirect] EXTERNAL_PAGES_URL not set, using default');
+
+      3. Keep existing param validation unchanged:
+         - 400 for missing token or type
+         - 400 for invalid token format (regex already validates)
+         - 400 for invalid type (not in ALLOWED_TYPES)
+         All 400 responses keep their current JSON format and CORS headers.
+
+      4. For valid requests, return 302 redirect:
+         const redirectUrl = `${externalPagesUrl}/reset-password.html?token=${token}&type=${type}`;
+         console.log('[reset-redirect] Redirecting to external page');
+         return new Response(null, {
+           status: 302,
+           headers: { ...corsHeaders, 'Location': redirectUrl }
+         });
+
+      5. Keep CORS headers on all responses (302, 400, OPTIONS).
+
+    files:
+      - supabase/functions/reset-redirect/index.ts
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+
+    done_when:
+      - "reset-redirect returns 302 with Location header pointing to external reset-password.html"
+      - "No inline HTML template in the file (< 60 lines total)"
+      - "EXTERNAL_PAGES_URL read from Deno.env with fallback to GitHub Pages URL"
+      - "Warning logged when EXTERNAL_PAGES_URL not set"
+      - "400 responses for missing params, invalid token format, invalid type are unchanged"
+      - "CORS headers present on 302 and 400 responses"
+      - "OPTIONS preflight returns 'ok' with CORS headers"
+
+    tests:
+      - type: unit
+        description: >
+          Test reset-redirect returns 302 with correct Location URL for valid params.
+          Test 400 responses for missing token/type, invalid token, invalid type.
+          Test CORS headers present on all response types.
+
+    covers:
+      acceptance_criteria: ["AC-144-01", "AC-144-10", "AC-144-12", "AC-144-13", "AC-144-14"]
+      edge_cases: ["EC-144-04", "EC-144-05"]
+
+    risks:
+      - risk: "302 redirect cached by browser"
+        mitigation: "Standard 302 is not cached by browsers by default. Token in URL makes each request unique."
+
+  # -------------------------------------------------------------------------
+  # STEP-03: F144 - Convert invite-redirect EF to 302 redirect
+  # -------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Convert supabase/functions/invite-redirect/index.ts from serving inline HTML
+      to returning a 302 redirect to the external page on GitHub Pages.
+
+      Changes:
+      1. Remove the entire inline HTML template (~400 lines of CSS, JS, i18n
+         translations, and the html variable). Remove supabaseUrl and
+         supabaseAnonKey reading.
+
+      2. Add EXTERNAL_PAGES_URL reading (same pattern as STEP-02):
+         const externalPagesUrl = Deno.env.get('EXTERNAL_PAGES_URL')
+           || 'https://aloisiojr.github.io/sacrament-meeting-planner';
+         Log a warning if env var is not set:
+         console.warn('[invite-redirect] EXTERNAL_PAGES_URL not set, using default');
+
+      3. Keep existing param validation unchanged:
+         - 400 for missing token
+         - 400 for invalid token format (UUID regex)
+         All 400 responses keep their current JSON format and CORS headers.
+
+      4. For valid requests, return 302 redirect:
+         const redirectUrl = `${externalPagesUrl}/accept-invite.html?token=${token}`;
+         console.log('[invite-redirect] Redirecting to external page');
+         return new Response(null, {
+           status: 302,
+           headers: { ...corsHeaders, 'Location': redirectUrl }
+         });
+
+      5. Keep CORS headers on all responses (302, 400, OPTIONS).
+
+    files:
+      - supabase/functions/invite-redirect/index.ts
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02"]
+
+    done_when:
+      - "invite-redirect returns 302 with Location header pointing to external accept-invite.html"
+      - "No inline HTML template in the file (< 50 lines total)"
+      - "EXTERNAL_PAGES_URL read from Deno.env with fallback to GitHub Pages URL"
+      - "Warning logged when EXTERNAL_PAGES_URL not set"
+      - "400 responses for missing token and invalid UUID format are unchanged"
+      - "CORS headers present on 302 and 400 responses"
+      - "OPTIONS preflight returns 'ok' with CORS headers"
+
+    tests:
+      - type: unit
+        description: >
+          Test invite-redirect returns 302 with correct Location URL for valid token.
+          Test 400 responses for missing token and invalid token format.
+          Test CORS headers present on all response types.
+
+    covers:
+      acceptance_criteria: ["AC-144-02", "AC-144-11", "AC-144-12", "AC-144-13", "AC-144-14"]
+      edge_cases: ["EC-144-04", "EC-144-05"]
+
+    risks:
+      - risk: "Existing invitation links stop working"
+        mitigation: "Old links go to invite-redirect EF which now returns 302. Browser follows redirect to external page. No broken links."
+
+  # -------------------------------------------------------------------------
+  # STEP-04: F144 - Create external reset-password.html page
+  # -------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Create docs/public/reset-password.html as a self-contained HTML page for
+      password reset, served by GitHub Pages with correct Content-Type: text/html.
+
+      Extract the HTML content from the current reset-redirect/index.ts inline
+      template (before it is removed in STEP-02). Key differences from inline:
+
+      1. TOKEN FROM URL: Read token and type from URLSearchParams instead of
+         server-side template interpolation (${token}, ${type}):
+         var params = new URLSearchParams(window.location.search);
+         var tokenHash = params.get('token');
+         var tokenType = params.get('type');
+         Show localized error if params are missing.
+
+      2. SUPABASE CONSTANTS: Hardcode the Supabase URL and anon key as constants
+         in the script (these are public values, same as in the mobile app).
+         Replace '${supabaseUrl}' and '${supabaseAnonKey}' template interpolations.
+
+      3. SAME STRUCTURE: Keep the exact same:
+         - HTML structure: card layout, spinner, error, form (2 password fields), success states
+         - CSS: centered card max-width 400px, primary #4F46E5, bg #f5f5f5
+         - i18n: navigator.language detection, pt-BR/en/es translations
+         - Form logic: verifyOtp, password validation (>= 6, match), updateUser
+         - CDN load: Supabase JS from CDN with onerror handler
+
+      4. Directory: docs/public/ (NEW directory). GitHub Pages will serve from
+         this directory when configured (Settings > Pages > main > /docs/public).
+
+    files:
+      - docs/public/reset-password.html (NEW)
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-05"]
+
+    done_when:
+      - "docs/public/reset-password.html exists as a complete, self-contained HTML page"
+      - "Token and type read from URLSearchParams (no template interpolation)"
+      - "Supabase URL and anon key are hardcoded constants in the script"
+      - "i18n translations identical to current reset-redirect inline template (pt-BR, en, es)"
+      - "verifyOtp + updateUser flow works (same logic as current inline page)"
+      - "Missing params show localized error message"
+      - "CDN onerror handler shows localized error"
+      - "File opens correctly in a browser (renders as HTML, not plain text)"
+
+    tests:
+      - type: e2e
+        description: >
+          Manual verification: open docs/public/reset-password.html locally in
+          browser. Verify it renders as styled HTML form. Verify i18n works by
+          changing browser language. Verify missing params shows error.
+
+    covers:
+      acceptance_criteria: ["AC-144-03", "AC-144-05", "AC-144-06", "AC-144-07", "AC-144-08"]
+      edge_cases: ["EC-144-01", "EC-144-02", "EC-144-03"]
+
+    risks:
+      - risk: "Supabase URL or anon key change breaks the page"
+        mitigation: "These values rarely change. If they do, update the constants in the HTML file and push to git. GitHub Pages deploys in ~1 min."
+
+  # -------------------------------------------------------------------------
+  # STEP-05: F144 - Create external accept-invite.html page
+  # -------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Create docs/public/accept-invite.html as a self-contained HTML page for
+      invitation acceptance, served by GitHub Pages with correct Content-Type.
+
+      Extract the HTML content from the current invite-redirect/index.ts inline
+      template (before it is removed in STEP-03). Key differences from inline:
+
+      1. TOKEN FROM URL: Read token from URLSearchParams instead of template
+         interpolation (${token}):
+         var params = new URLSearchParams(window.location.search);
+         var inviteToken = params.get('token');
+         Show localized error if token param is missing.
+
+      2. SUPABASE CONSTANTS: Hardcode the Supabase URL and anon key as constants.
+         Construct apiBase from supabaseUrl + '/functions/v1'.
+         Replace '${supabaseUrl}' and '${supabaseAnonKey}' template interpolations.
+
+      3. SAME STRUCTURE: Keep the exact same:
+         - HTML structure: card layout, spinner, error, form (read-only fields + editable), success
+         - CSS: same styling as reset-password.html (centered card, primary #4F46E5)
+         - i18n: navigator.language detection, pt-BR/en/es translations, role labels
+         - Form logic: validate-only fetch on load, full registration fetch on submit
+         - Error mapping: getErrorMessage with token_invalid, token_used, token_expired codes
+
+      4. Directory: same docs/public/ directory as STEP-04.
+
+    files:
+      - docs/public/accept-invite.html (NEW)
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04"]
+
+    done_when:
+      - "docs/public/accept-invite.html exists as a complete, self-contained HTML page"
+      - "Token read from URLSearchParams (no template interpolation)"
+      - "Supabase URL and anon key are hardcoded constants in the script"
+      - "i18n translations identical to current invite-redirect inline template (pt-BR, en, es)"
+      - "validate-only fetch on load + full registration fetch on submit (same logic as current)"
+      - "Role labels translated (bishopric/secretary/observer in 3 languages)"
+      - "Missing token param shows localized error message"
+      - "File opens correctly in a browser (renders as HTML, not plain text)"
+
+    tests:
+      - type: e2e
+        description: >
+          Manual verification: open docs/public/accept-invite.html locally in
+          browser. Verify it renders as styled HTML form. Verify i18n works.
+          Verify missing token shows error.
+
+    covers:
+      acceptance_criteria: ["AC-144-04", "AC-144-05", "AC-144-06", "AC-144-07", "AC-144-09"]
+      edge_cases: ["EC-144-01", "EC-144-02", "EC-144-03"]
+
+    risks:
+      - risk: "register-invited-user EF CORS blocks requests from github.io origin"
+        mitigation: "Edge Functions have Access-Control-Allow-Origin: * in corsHeaders. Cross-origin requests are allowed."
+
+  # -------------------------------------------------------------------------
+  # STEP-06: Tests for all steps
+  # -------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Create/update test files for F143 and F144 changes:
+
+      1. Test create-invitation error codes (F143):
+         - Verify each error response includes both 'error' and 'code' fields
+         - Verify diagnostic mode response structure
+         - Verify diagnostic mode does not insert into DB
+         - Verify malformed JSON body returns 400
+
+      2. Test reset-redirect 302 redirect (F144):
+         - Verify 302 with correct Location for valid params
+         - Verify 400 for missing/invalid params (unchanged)
+         - Verify CORS headers on all responses
+
+      3. Test invite-redirect 302 redirect (F144):
+         - Verify 302 with correct Location for valid token
+         - Verify 400 for missing/invalid token (unchanged)
+         - Verify CORS headers on all responses
+
+      Test files follow the project's existing test naming convention.
+      Tests use mock Deno.env and mock supabaseAdmin where needed.
+
+    files:
+      - "__tests__/edge-functions/create-invitation.test.ts"
+      - "__tests__/edge-functions/reset-redirect.test.ts"
+      - "__tests__/edge-functions/invite-redirect.test.ts"
+
+    dependencies: ["STEP-01", "STEP-02", "STEP-03"]
+    parallelizable_with: []
+
+    done_when:
+      - "create-invitation tests verify error codes for all 8 error types"
+      - "create-invitation tests verify diagnostic mode response structure"
+      - "reset-redirect tests verify 302 redirect with correct Location URL"
+      - "invite-redirect tests verify 302 redirect with correct Location URL"
+      - "All tests pass with 'pnpm test'"
+
+    tests:
+      - type: unit
+        description: "Unit tests covering error codes, diagnostic mode, and 302 redirects"
+
+    covers:
+      acceptance_criteria: ["AC-143-01", "AC-143-02", "AC-143-03", "AC-143-04", "AC-144-01", "AC-144-02", "AC-144-10", "AC-144-11", "AC-144-12"]
+      edge_cases: ["EC-143-01", "EC-143-02", "EC-143-03", "EC-143-04", "EC-143-05", "EC-143-06"]
+
+    risks:
+      - risk: "Deno-specific APIs (Deno.serve, Deno.env) hard to mock in Node test env"
+        mitigation: "Follow existing test patterns in the project for Edge Function testing. Use vi.mock for Deno globals."
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  - ac_id: AC-143-01
+    how_to_verify: "Run diagnostic mode via curl with a valid JWT. Check Supabase EF logs for '[create-invitation]' prefixed messages at each failure point."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-143-02
+    how_to_verify: "Call create-invitation with invalid payload. Verify JSON response has both 'error' and 'code' fields. Check code matches expected error code."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-143-03
+    how_to_verify: "Call create-invitation with { diagnose: true, email, role }. Verify 200 response with diagnostic report. Verify no invitation was created in DB."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-143-04
+    how_to_verify: "Call create-invitation with valid JWT, metadata, email, role. Verify 201 response with invitation data including deepLink. Verify invitation exists in DB."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-143-05
+    how_to_verify: "Trigger a server error from create-invitation. Verify callEdgeFunction throws Error with server's error message. No client-side changes needed."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-143-06
+    how_to_verify: "Click 'Invite User' with expired session. Verify error message 'auth/no-session' is shown. Acceptable as-is per SPEC."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-144-01
+    how_to_verify: "Navigate to reset-redirect?token=validtoken&type=recovery. Verify 302 redirect to external page URL with same params."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-144-02
+    how_to_verify: "Navigate to invite-redirect?token=valid-uuid. Verify 302 redirect to external page URL with same token."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-144-03
+    how_to_verify: "Open external reset-password.html in browser. Verify Content-Type is text/html. Verify page renders as styled form. Verify form functionality."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-144-04
+    how_to_verify: "Open external accept-invite.html in browser. Verify Content-Type is text/html. Verify page renders as styled form. Verify form functionality."
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-144-05
+    how_to_verify: "Open external pages with query params. Verify JavaScript reads token/type from URLSearchParams. Verify missing params show error."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-144-06
+    how_to_verify: "Inspect external page HTML source. Verify Supabase URL and anon key are hardcoded constants. Verify they match the Supabase project values."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-144-07
+    how_to_verify: "Open external pages in browser with different language settings (pt-BR, en, es). Verify labels and messages change per language."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-144-08
+    how_to_verify: "Simulate old reset email link going to reset-redirect EF. Verify 302 redirect to external page. Verify page renders and functions correctly."
+    covered_by_steps: ["STEP-02", "STEP-04"]
+
+  - ac_id: AC-144-09
+    how_to_verify: "Simulate old invitation link going to invite-redirect EF. Verify 302 redirect to external page. Verify page renders and functions correctly."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-144-10
+    how_to_verify: "Navigate to reset-redirect without token or type. Verify 400 JSON response with error message. No redirect."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-144-11
+    how_to_verify: "Navigate to invite-redirect without token. Verify 400 JSON response with error message. No redirect."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-144-12
+    how_to_verify: "Navigate to reset-redirect or invite-redirect with invalid token format. Verify 400 JSON response. No redirect."
+    covered_by_steps: ["STEP-02", "STEP-03", "STEP-06"]
+
+  - ac_id: AC-144-13
+    how_to_verify: "Inspect response headers on 302 and 400 responses from both EFs. Verify CORS headers present."
+    covered_by_steps: ["STEP-02", "STEP-03", "STEP-06"]
+
+  - ac_id: AC-144-14
+    how_to_verify: "Set EXTERNAL_PAGES_URL env var to a test URL. Verify redirect uses the custom URL. Remove env var. Verify fallback to GitHub Pages URL."
+    covered_by_steps: ["STEP-02", "STEP-03"]

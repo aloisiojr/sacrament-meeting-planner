@@ -885,8 +885,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
       expect(resetSource).toContain('http-equiv="refresh"');
     });
 
-    it('HTML has JavaScript redirect', () => {
-      expect(resetSource).toContain('window.location.href');
+    it('HTML does NOT have JavaScript redirect (F134: script tag removed)', () => {
+      expect(resetSource).not.toContain('window.location.href');
     });
 
     it('status code is 200', () => {

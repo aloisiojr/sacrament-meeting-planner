@@ -23,6 +23,140 @@ function readSourceFile(relativePath: string): string {
   return readFile(relativePath);
 }
 
+// --- F130: TypeScript compilation errors + doc naming ---
+
+describe('F130 (CR-194): TypeScript compilation errors and doc naming', () => {
+  describe('AC-130-01 to AC-130-06: SundayAgenda mock fields', () => {
+    it('test mocks include has_intermediate_hymn and speaker_*_override', () => {
+      const files = [
+        readSourceFile('__tests__/cr001-qa-extended.test.ts'),
+        readSourceFile('__tests__/cr001-qa.test.ts'),
+        readSourceFile('__tests__/database-types.test.ts'),
+        readSourceFile('__tests__/phase02-database-types.test.ts'),
+        readSourceFile('__tests__/usePresentationMode-utils.test.ts'),
+        readSourceFile('__tests__/integration/setup-integration.ts'),
+      ];
+      for (const content of files) {
+        expect(content).toContain('has_intermediate_hymn');
+        expect(content).toContain('speaker_1_override');
+        expect(content).toContain('speaker_2_override');
+        expect(content).toContain('speaker_3_override');
+      }
+    });
+  });
+
+  describe('AC-130-02: wardLanguage required in mock', () => {
+    it('setup-integration.ts includes wardLanguage with default value', () => {
+      const content = readSourceFile('__tests__/integration/setup-integration.ts');
+      expect(content).toContain("wardLanguage: 'pt-BR'");
+    });
+  });
+
+  describe('AC-130-03: speeches.tsx uses empty string instead of null', () => {
+    it('handleClearTopic passes empty strings for string-typed fields', () => {
+      const content = readSourceFile('app/(tabs)/speeches.tsx');
+      expect(content).toContain("topicTitle: ''");
+      expect(content).toContain("topicCollection: ''");
+    });
+  });
+
+  describe('AC-130-04: AgendaForm imports Member type', () => {
+    it('AgendaForm.tsx imports Member from database types', () => {
+      const content = readSourceFile('components/AgendaForm.tsx');
+      expect(content).toContain('Member');
+      expect(content).toContain("from '../types/database'");
+    });
+  });
+
+  describe('AC-130-05: DebouncedTextInput uses correct blur event type', () => {
+    it('handleBlur uses TextInputProps onBlur parameter type', () => {
+      const content = readSourceFile('components/DebouncedTextInput.tsx');
+      expect(content).not.toContain('NativeSyntheticEvent<TextInputFocusEventData>');
+      expect(content).toContain("TextInputProps['onBlur']");
+    });
+  });
+
+  describe('AC-130-06: phase04 test includes speeches in SundayExceptionReason', () => {
+    it('ALL_REASONS includes speeches', () => {
+      const content = readSourceFile('__tests__/phase04-agenda-presentation.test.ts');
+      expect(content).toContain("'speeches'");
+    });
+  });
+
+  describe('AC-130-10 to AC-130-12: Documentation naming', () => {
+    it('no can_piano (without ist suffix) in SPEC_F083, ARCH_M024, PLAN_P024', () => {
+      const files = [
+        readFile('../docs/specs/SPEC_F083.yaml'),
+        readFile('../docs/arch/ARCH_M024.yaml'),
+        readFile('../docs/plans/PLAN_P024.yaml'),
+      ];
+      for (const content of files) {
+        // can_piano should not appear; can_pianist is the correct name
+        expect(content).not.toMatch(/can_piano[^i]/);
+      }
+    });
+
+    it('SPEC_F083 uses can_pianist instead of can_piano', () => {
+      const content = readFile('../docs/specs/SPEC_F083.yaml');
+      expect(content).toContain('can_pianist');
+    });
+
+    it('ARCH_M024 uses can_pianist and can_conductor instead of can_piano/can_music', () => {
+      const content = readFile('../docs/arch/ARCH_M024.yaml');
+      expect(content).toContain('can_pianist');
+      expect(content).toContain('can_conductor');
+    });
+  });
+});
+
+// --- F131: Ward language switch ---
+
+describe('F131 (CR-195): Ward language switch not updating AuthContext', () => {
+  describe('AC-131-01: setWardLanguage exposed in AuthContextValue', () => {
+    it('AuthContext interface includes setWardLanguage', () => {
+      const content = readSourceFile('contexts/AuthContext.tsx');
+      expect(content).toContain('setWardLanguage');
+    });
+
+    it('AuthContext value object includes setWardLanguage', () => {
+      const content = readSourceFile('contexts/AuthContext.tsx');
+      // The value object should list setWardLanguage in useMemo
+      expect(content).toContain('setWardLanguage,');
+    });
+  });
+
+  describe('AC-131-02: wardLanguageChangeMutation calls setWardLanguage', () => {
+    it('onSuccess handler calls setWardLanguage with new language', () => {
+      const content = readSourceFile('app/(tabs)/settings/index.tsx');
+      expect(content).toContain('setWardLanguage');
+      expect(content).toContain('setWardLanguage(newLanguage)');
+    });
+  });
+
+  describe('AC-131-03: queryClient.invalidateQueries still called', () => {
+    it('onSuccess still invalidates topic caches', () => {
+      const content = readSourceFile('app/(tabs)/settings/index.tsx');
+      expect(content).toContain('queryClient.invalidateQueries');
+    });
+  });
+
+  describe('AC-131-04: mutationFn unchanged', () => {
+    it('mutation still updates ward language and manages collections', () => {
+      const content = readSourceFile('app/(tabs)/settings/index.tsx');
+      expect(content).toContain("from('wards')");
+      expect(content).toContain("from('general_collections')");
+      expect(content).toContain("from('ward_collection_config')");
+    });
+  });
+
+  describe('EC-131-01: mock includes setWardLanguage', () => {
+    it('setup-integration.ts createMockAuthContext includes setWardLanguage', () => {
+      const content = readSourceFile('__tests__/integration/setup-integration.ts');
+      expect(content).toContain('setWardLanguage');
+    });
+  });
+});
+
 // --- F132: Multiple 2nd speech toggle bugs ---
 
 describe('F132 (CR-196): 2nd speech toggle bugs', () => {
@@ -139,6 +273,106 @@ describe('F132 (CR-196): 2nd speech toggle bugs', () => {
       expect(readSourceFile('components/AgendaForm.tsx')).toBeDefined();
       expect(readSourceFile('app/(tabs)/agenda.tsx')).toBeDefined();
       expect(readSourceFile('app/(tabs)/index.tsx')).toBeDefined();
+    });
+  });
+});
+
+// --- F133: Password reset email language ---
+
+describe('F133 (CR-197): Password reset email uses user app language', () => {
+  const sendResetSource = readFile('../supabase/functions/send-reset-email/index.ts');
+
+  describe('AC-133-01: user_metadata.language checked first', () => {
+    it('checks user.user_metadata?.language as first priority', () => {
+      expect(sendResetSource).toContain('user_metadata?.language');
+      expect(sendResetSource).toContain('userMetaLanguage');
+    });
+  });
+
+  describe('AC-133-02: priority chain is correct', () => {
+    it('uses user_metadata.language > ward.language > pt-BR', () => {
+      // user_metadata check comes before ward lookup
+      const metaIdx = sendResetSource.indexOf('userMetaLanguage');
+      const wardIdx = sendResetSource.indexOf("from('wards')");
+      expect(metaIdx).toBeLessThan(wardIdx);
+    });
+  });
+
+  describe('AC-133-03: fallback to ward.language', () => {
+    it('looks up ward.language when user_metadata.language is not set', () => {
+      expect(sendResetSource).toContain("from('wards')");
+      expect(sendResetSource).toContain("select('language')");
+      expect(sendResetSource).toContain("ward?.language ?? 'pt-BR'");
+    });
+  });
+
+  describe('AC-133-04: fallback to pt-BR', () => {
+    it('defaults to pt-BR when neither is available', () => {
+      expect(sendResetSource).toContain("let language = 'pt-BR'");
+    });
+  });
+
+  describe('AC-133-05: getEmailTemplate receives resolved language', () => {
+    it('passes language variable to getEmailTemplate', () => {
+      expect(sendResetSource).toContain('getEmailTemplate(language, deepLink)');
+    });
+  });
+
+  describe('EC-133-01: unsupported language handling', () => {
+    it('getEmailTemplate falls back to pt-BR for unsupported languages', () => {
+      expect(sendResetSource).toContain("templates[language] ?? templates['pt-BR']");
+    });
+  });
+
+  describe('EC-133-03: null user_metadata handled safely', () => {
+    it('uses optional chaining for user_metadata access', () => {
+      expect(sendResetSource).toContain('user_metadata?.language');
+    });
+
+    it('validates userMetaLanguage type before using', () => {
+      expect(sendResetSource).toContain("typeof userMetaLanguage === 'string'");
+    });
+  });
+});
+
+// --- F134: Password reset redirect script blocked ---
+
+describe('F134 (CR-198): Password reset redirect script blocked', () => {
+  const resetRedirectSource = readFile('../supabase/functions/reset-redirect/index.ts');
+
+  describe('AC-134-01: no <script> tags', () => {
+    it('does not contain any <script> tags', () => {
+      expect(resetRedirectSource).not.toContain('<script');
+      expect(resetRedirectSource).not.toContain('</script>');
+    });
+  });
+
+  describe('AC-134-02: meta refresh preserved', () => {
+    it('has meta http-equiv="refresh" tag for automatic redirection', () => {
+      expect(resetRedirectSource).toContain('http-equiv="refresh"');
+    });
+  });
+
+  describe('AC-134-03: manual button link preserved', () => {
+    it('has <a href> button for manual redirect fallback', () => {
+      expect(resetRedirectSource).toContain('<a href=');
+      expect(resetRedirectSource).toContain('class="button"');
+    });
+  });
+
+  describe('AC-134-04: response headers correct', () => {
+    it('Content-Type is text/html with charset', () => {
+      expect(resetRedirectSource).toContain("'Content-Type': 'text/html; charset=utf-8'");
+    });
+
+    it('Cache-Control prevents caching', () => {
+      expect(resetRedirectSource).toContain("'Cache-Control': 'no-cache, no-store, must-revalidate'");
+    });
+  });
+
+  describe('AC-134-05: no script execution errors possible', () => {
+    it('window.location.href is not used', () => {
+      expect(resetRedirectSource).not.toContain('window.location');
     });
   });
 });

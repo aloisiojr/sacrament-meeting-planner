@@ -139,7 +139,7 @@ export function buildPresentationCards(
   cards.push({ title: t('agenda.sectionSacrament'), fields: designationFields });
 
   if (!isSpecial) {
-    // Card 3: Speeches 1+2
+    // Card 3: Speeches 1+2 (F118: filter speech 2 when has_second_speech=false)
     const speech1 = speeches.find((s) => s.position === 1);
     const speech2 = speeches.find((s) => s.position === 2);
 
@@ -148,8 +148,14 @@ export function buildPresentationCards(
 
     const speechFields: PresentationField[] = [
       { label: `1\u00BA ${t('speeches.speaker')}`, value: speaker1Name, type: 'text' },
-      { label: `2\u00BA ${t('speeches.speaker')}`, value: speaker2Name, type: 'text' },
     ];
+
+    // F118: Only show speech 2 if has_second_speech is true (default true)
+    if (agenda?.has_second_speech !== false) {
+      speechFields.push(
+        { label: `2\u00BA ${t('speeches.speaker')}`, value: speaker2Name, type: 'text' },
+      );
+    }
 
     if (agenda?.has_special_presentation) {
       speechFields.push({

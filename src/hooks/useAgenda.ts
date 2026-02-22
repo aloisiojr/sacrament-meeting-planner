@@ -161,6 +161,69 @@ export function useUpdateAgenda() {
 }
 
 /**
+ * F118: Update agenda by sunday date (lazy-creates if missing).
+ * Used by speeches tab to toggle has_second_speech without requiring agenda ID.
+ */
+export function useUpdateAgendaByDate() {
+  const { wardId, user, userName } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      sundayDate,
+      updates,
+    }: {
+      sundayDate: string;
+      updates: AgendaUpdateInput;
+    }): Promise<SundayAgenda> => {
+      // Check if agenda exists
+      const { data: existing } = await supabase
+        .from('sunday_agendas')
+        .select('*')
+        .eq('ward_id', wardId)
+        .eq('sunday_date', sundayDate)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing
+        const { data, error } = await supabase
+          .from('sunday_agendas')
+          .update(updates)
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
+      // Create new with updates
+      const { data, error } = await supabase
+        .from('sunday_agendas')
+        .insert({
+          ward_id: wardId,
+          sunday_date: sundayDate,
+          has_baby_blessing: false,
+          has_baptism_confirmation: false,
+          has_stake_announcements: false,
+          has_special_presentation: false,
+          ...updates,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: agendaKeys.bySunday(wardId, data.sunday_date),
+      });
+      queryClient.invalidateQueries({ queryKey: agendaKeys.all });
+    },
+  });
+}
+
+/**
  * Fetch all agendas for a date range.
  * Used by agenda tab to show status lines on collapsed cards
  * without requiring each card to be expanded first.

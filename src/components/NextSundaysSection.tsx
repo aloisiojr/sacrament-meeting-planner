@@ -9,6 +9,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -27,6 +28,7 @@ import {
   useRemoveAssignment,
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
+import { useAgendaRange, useUpdateAgendaByDate } from '../hooks/useAgenda';
 import { SUNDAY_TYPE_SPEECHES } from '../hooks/useSundayTypes';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException } from '../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../lib/dateUtils';
@@ -58,6 +60,17 @@ export function NextSundaysSection() {
   // Fetch data
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
+
+  // F118: Fetch agenda range for has_second_speech
+  const { data: agendaRange } = useAgendaRange(startDate, endDate);
+  const updateAgenda = useUpdateAgendaByDate();
+  const agendaMap = useMemo(() => {
+    const map = new Map<string, { has_second_speech: boolean }>();
+    for (const a of agendaRange ?? []) {
+      map.set(a.sunday_date, { has_second_speech: a.has_second_speech });
+    }
+    return map;
+  }, [agendaRange]);
 
   // Mutations
   const lazyCreate = useLazyCreateSpeeches();
@@ -151,6 +164,42 @@ export function NextSundaysSection() {
     [removeSundayException]
   );
 
+  // F118: Handle toggle of 2nd speech for a specific date
+  const handleToggleSecondSpeech = useCallback(
+    (date: string, enabled: boolean) => {
+      if (!enabled) {
+        const entry = speechesBySunday.find((e) => e.date === date);
+        const speech2 = entry?.speeches?.find((s) => s.position === 2);
+        const hasAssignments = !!(speech2?.speaker_name || speech2?.topic_title);
+
+        if (hasAssignments) {
+          Alert.alert(
+            t('speeches.secondSpeechToggleConfirmTitle'),
+            t('speeches.secondSpeechToggleConfirmMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('common.confirm'),
+                style: 'destructive',
+                onPress: () => {
+                  if (speech2) {
+                    removeAssignment.mutate({ speechId: speech2.id });
+                  }
+                  updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
+                },
+              },
+            ]
+          );
+          return;
+        }
+        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
+      } else {
+        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: true } });
+      }
+    },
+    [speechesBySunday, t, removeAssignment, updateAgenda]
+  );
+
   if (nextSundays.length === 0) return null;
 
   if (speechesError || exceptionsError) {
@@ -176,38 +225,45 @@ export function NextSundaysSection() {
         {t('home.nextAssignments')}
       </Text>
 
-      {speechesBySunday.map((entry) => (
-        <SundayCard
-          key={entry.date}
-          date={entry.date}
-          speeches={entry.speeches}
-          exception={entry.exception}
-          isNext={entry.date === nextSunday}
-          expanded={expandedDate === entry.date}
-          onToggle={() => handleToggle(entry.date)}
-          onTypeChange={handleTypeChange}
-          onRemoveException={handleRemoveException}
-          typeDisabled={!canWriteSundayType}
-        >
-          {expandedDate === entry.date &&
-            (!entry.exception || entry.exception.reason === 'speeches') &&
-            [1, 2, 3].map((pos) => {
-              const speech = entry.speeches.find((s) => s.position === pos) ?? null;
-              return (
-                <SpeechSlot
-                  key={pos}
-                  speech={speech}
-                  position={pos}
-                  onChangeStatus={handleChangeStatus}
-                  onRemoveAssignment={handleRemoveAssignment}
-                  onClearTopic={handleClearTopic}
-                  onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
-                  onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
-                />
-              );
-            })}
-        </SundayCard>
-      ))}
+      {speechesBySunday.map((entry) => {
+        const agendaData = agendaMap.get(entry.date);
+        const hasSecondSpeech = agendaData?.has_second_speech ?? true;
+        return (
+          <SundayCard
+            key={entry.date}
+            date={entry.date}
+            speeches={entry.speeches}
+            exception={entry.exception}
+            isNext={entry.date === nextSunday}
+            expanded={expandedDate === entry.date}
+            hasSecondSpeech={hasSecondSpeech}
+            onToggle={() => handleToggle(entry.date)}
+            onTypeChange={handleTypeChange}
+            onRemoveException={handleRemoveException}
+            typeDisabled={!canWriteSundayType}
+          >
+            {expandedDate === entry.date &&
+              (!entry.exception || entry.exception.reason === 'speeches') &&
+              [1, 2, 3].map((pos) => {
+                const speech = entry.speeches.find((s) => s.position === pos) ?? null;
+                return (
+                  <SpeechSlot
+                    key={pos}
+                    speech={speech}
+                    position={pos}
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onClearTopic={handleClearTopic}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                    onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
+                    isSecondSpeechEnabled={pos === 2 ? hasSecondSpeech : undefined}
+                    onToggleSecondSpeech={pos === 2 ? (enabled) => handleToggleSecondSpeech(entry.date, enabled) : undefined}
+                  />
+                );
+              })}
+          </SundayCard>
+        );
+      })}
 
       <MemberSelectorModal
         visible={!!speakerModalSpeechId}

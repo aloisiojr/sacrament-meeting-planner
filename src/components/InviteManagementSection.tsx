@@ -17,6 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
+import { useAgendaRange } from '../hooks/useAgenda';
 import { QueryErrorView } from './QueryErrorView';
 import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
@@ -63,9 +64,29 @@ export function InviteManagementSection() {
 
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
 
+  // F118: Fetch agenda range for has_second_speech filtering
+  const { data: agendaRange } = useAgendaRange(startDate, endDate);
+  const agendaMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const a of agendaRange ?? []) {
+      map.set(a.sunday_date, a.has_second_speech);
+    }
+    return map;
+  }, [agendaRange]);
+
   const inviteItems = useMemo(
-    () => getInviteItems(speeches ?? [], locale, formatDate),
-    [speeches, locale]
+    () => {
+      const items = getInviteItems(speeches ?? [], locale, formatDate);
+      // F118: Filter out position 2 invite items when has_second_speech is false
+      return items.filter((item) => {
+        if (item.speech.position === 2) {
+          const hasSecond = agendaMap.get(item.speech.sunday_date);
+          return hasSecond !== false; // default true if no agenda record
+        }
+        return true;
+      });
+    },
+    [speeches, locale, agendaMap]
   );
 
   const handleNotInvitedAction = useCallback(

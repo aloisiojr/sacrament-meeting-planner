@@ -335,6 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    paddingRight: 36,
   },
   statusSection: {
     flexDirection: 'row',

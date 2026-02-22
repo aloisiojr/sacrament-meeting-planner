@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
@@ -25,6 +26,7 @@ import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } 
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppUrl, buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
 import { getInviteItems } from '../lib/speechUtils';
+import { supabase } from '../lib/supabase';
 import type { Speech, SpeechStatus } from '../types/database';
 
 // Re-export for backward compatibility
@@ -49,10 +51,25 @@ function WhatsAppIcon({ size = 18, color = 'white' }: { size?: number; color?: s
 export function InviteManagementSection() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission } = useAuth();
-  const locale = getCurrentLanguage();
+  const { hasPermission, wardId, wardLanguage } = useAuth();
+  const locale = (wardLanguage as SupportedLanguage) || getCurrentLanguage();
   const changeStatus = useChangeStatus();
   const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
+
+  // F142: Fetch ward's custom WhatsApp template from database
+  const { data: ward } = useQuery({
+    queryKey: ['ward', wardId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wards')
+        .select('whatsapp_template')
+        .eq('id', wardId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!wardId,
+  });
 
   const nextSundays = useMemo(() => {
     const today = new Date();
@@ -96,7 +113,7 @@ export function InviteManagementSection() {
         const url = buildWhatsAppUrl(
           speech.speaker_phone,
           '', // countryCode already in phone
-          '', // Will use default template for language
+          ward?.whatsapp_template ?? '', // F142: use ward's custom template
           {
             speakerName: speech.speaker_name ?? '',
             date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
@@ -114,7 +131,7 @@ export function InviteManagementSection() {
         status: 'assigned_invited',
       });
     },
-    [changeStatus, locale]
+    [changeStatus, locale, ward?.whatsapp_template]
   );
 
   const handleInvitedAction = useCallback(

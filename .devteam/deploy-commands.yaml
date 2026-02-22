@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 8
-last_updated: "2026-02-22T00:21:00"
+version: 9
+last_updated: "2026-02-22T03:15:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -353,3 +353,83 @@ deploy_history:
     verification:
       - "GET /config/auth confirma site_url=sacrmeetplan://home"
       - "GET /config/auth confirma uri_allow_list=sacrmeetplan://invite/*,sacrmeetplan://reset-password"
+
+  - date: "2026-02-22"
+    action: "Backup meeting_actors table (pre-migration 017)"
+    method: "Management API SELECT query"
+    reason: "Migration 017 is destructive (drops can_music column). Backup before applying."
+    result: "Sucesso - 11 rows backed up to /tmp/meeting_actors_backup_20260222.json"
+    verified: true
+    cr: "Batch 19 Phase 1 (F117)"
+    notes: "2 actors had can_music=true (Patricia Dalmora, Rafael Zacharias) - migrated to can_pianist=true"
+
+  - date: "2026-02-22"
+    action: "Migration 017_split_music_actor.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Split can_music boolean into can_pianist and can_conductor with mutual exclusivity constraint"
+    result: "Sucesso - can_music dropped, can_pianist/can_conductor added, data migrated, CHECK constraint applied"
+    verified: true
+    cr: "Batch 19 Phase 1 (F117, CR-180)"
+    verification:
+      - "information_schema.columns: can_pianist BOOLEAN NOT NULL DEFAULT false"
+      - "information_schema.columns: can_conductor BOOLEAN NOT NULL DEFAULT false"
+      - "information_schema.columns: can_music NOT present (dropped)"
+      - "pg_constraint: chk_pianist_conductor_exclusive CHECK ((NOT ((can_pianist = true) AND (can_conductor = true))))"
+      - "Data migration: 2 actors with can_music=true correctly migrated to can_pianist=true"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Migration 018_add_has_second_speech.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Add has_second_speech boolean toggle to sunday_agendas"
+    result: "Sucesso - coluna has_second_speech BOOLEAN NOT NULL DEFAULT true adicionada a sunday_agendas"
+    verified: true
+    cr: "Batch 19 Phase 1 (F118, CR-181)"
+    verification:
+      - "information_schema.columns: has_second_speech BOOLEAN NOT NULL DEFAULT true"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function reset-redirect"
+    method: "supabase functions deploy reset-redirect --no-verify-jwt"
+    reason: "F119 (CR-191): Fixed charset + Cache-Control headers for plain-text HTML rendering bug"
+    result: "Sucesso - Function redeployada e ACTIVE (version 2)"
+    verified: true
+    cr: "Batch 19 Phase 1 (F119, CR-191)"
+    verification:
+      - "supabase functions list mostra reset-redirect como ACTIVE v2"
+      - "GET com token=test123&type=recovery retorna HTML 200 com deep link e charset=utf-8"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function create-invitation"
+    method: "supabase functions deploy create-invitation"
+    reason: "Updated to use can_pianist/can_conductor instead of can_music (F117)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 8)"
+    verified: true
+    cr: "Batch 19 Phase 1 (F117, CR-180)"
+    verification:
+      - "supabase functions list mostra create-invitation como ACTIVE v8"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function update-user-role"
+    method: "supabase functions deploy update-user-role"
+    reason: "Updated to use can_pianist/can_conductor instead of can_music (F117)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 7)"
+    verified: true
+    cr: "Batch 19 Phase 1 (F117, CR-180)"
+    verification:
+      - "supabase functions list mostra update-user-role como ACTIVE v7"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function register-first-user"
+    method: "supabase functions deploy register-first-user --no-verify-jwt"
+    reason: "Updated to use can_pianist/can_conductor instead of can_music (F117)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 7)"
+    verified: true
+    cr: "Batch 19 Phase 1 (F117, CR-180)"
+    verification:
+      - "supabase functions list mostra register-first-user como ACTIVE v7"
+      - "REST API health check: HTTP 200"

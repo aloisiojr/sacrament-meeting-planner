@@ -23,12 +23,13 @@
 # CR-184, CR-185, CR-186, CR-188
 # CR-193, CR-199, CR-200
 # CR-202, CR-203
+# CR-205, CR-206, CR-207
 # Generated: 2026-02-22
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -4086,3 +4087,87 @@ batch15_phase2_test_results:
     acs_covered: []
     ecs_covered: []
     review_issues_fixed: [R-1]
+
+  # --- CR-205, CR-206, CR-207 commits (Batch 23 Phase 1) ---
+
+  - step: S01
+    cr: CR-205
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-01
+    hash: 6681194
+    message: "fix(invite): show server error message and suppress duplicate alert (CR-205)"
+    files_changed:
+      - src/app/(tabs)/settings/users.tsx
+    changes:
+      - id: CHG-605
+        description: "Changed inviteMutation.onError from `() =>` to `(err: Error) =>` and Alert.alert to show err.message || t('users.inviteFailed')"
+      - id: CHG-606
+        description: "Added meta: { suppressGlobalError: true } to inviteMutation useMutation options"
+    acs_covered: [AC-140-01, AC-140-02, AC-140-03, AC-140-04]
+    ecs_covered: [EC-140-01, EC-140-02, EC-140-03]
+
+  - step: S02
+    cr: CR-206
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-02
+    hash: be626a9
+    message: "feat(migration): seed en/es collections and topics for language switch (CR-206)"
+    files_changed:
+      - supabase/migrations/019_seed_en_es_collections.sql
+    changes:
+      - id: CHG-607
+        description: "Created migration with DO $$ blocks that INSERT general_collections and general_topics for 'en' and 'es' languages"
+      - id: CHG-608
+        description: "Uses IF NOT EXISTS guard for idempotency, no DELETE/UPDATE/TRUNCATE on existing data"
+    acs_covered: [AC-141-01, AC-141-02, AC-141-09, AC-141-10]
+    ecs_covered: []
+
+  - step: S03
+    cr: CR-206
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-03
+    hash: 442de88
+    message: "fix(settings): reset whatsapp_template and invalidate ward cache on language switch (CR-206)"
+    files_changed:
+      - src/app/(tabs)/settings/index.tsx
+    changes:
+      - id: CHG-609
+        description: "Changed wardLanguageChangeMutation.mutationFn to pass { language: newLanguage, whatsapp_template: null } to .update()"
+      - id: CHG-610
+        description: "Added queryClient.invalidateQueries({ queryKey: ['ward', wardId] }) in onSuccess"
+    acs_covered: [AC-141-05, AC-141-08]
+    ecs_covered: [EC-141-01, EC-141-02, EC-141-03]
+
+  - step: S04
+    cr: CR-206
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-04
+    hash: f3181ab
+    message: "fix(whatsapp): reset initialized flag when wardLanguage changes (CR-206)"
+    files_changed:
+      - src/app/(tabs)/settings/whatsapp.tsx
+    changes:
+      - id: CHG-611
+        description: "Added useEffect watching wardLanguage that resets initialized to false using prevWardLanguageRef to skip initial mount"
+    acs_covered: [AC-141-06, AC-141-07]
+    ecs_covered: [EC-141-04]
+
+  - step: S05
+    cr: CR-207
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-05
+    hash: 1e609f9
+    message: "fix(invite): use ward template and wardLanguage in InviteManagementSection (CR-207)"
+    files_changed:
+      - src/components/InviteManagementSection.tsx
+    changes:
+      - id: CHG-612
+        description: "Added useQuery(['ward', wardId]) to fetch wards.whatsapp_template and imported supabase"
+      - id: CHG-613
+        description: "Changed locale from getCurrentLanguage() to (wardLanguage as SupportedLanguage) || getCurrentLanguage()"
+      - id: CHG-614
+        description: "Changed buildWhatsAppUrl template param from '' to ward?.whatsapp_template ?? ''"
+      - id: CHG-615
+        description: "Added ward?.whatsapp_template to handleNotInvitedAction useCallback dependency array"
+    acs_covered: [AC-142-01, AC-142-02, AC-142-03, AC-142-04, AC-142-05, AC-142-06]
+    ecs_covered: [EC-142-01, EC-142-02, EC-142-03]

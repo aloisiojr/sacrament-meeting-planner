@@ -339,6 +339,7 @@ function AgendaSundayCard({
 }: AgendaSundayCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const router = useRouter();
 
   const [year, month, day] = date.split('-');
   const dayNum = parseInt(day, 10);
@@ -509,6 +510,18 @@ function AgendaSundayCard({
           })()}
         </View>
 
+        {expandable && isExpanded && (
+          <Pressable
+            onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open presentation"
+          >
+            <Text style={[styles.playButton, { color: colors.textSecondary }]}>
+              {'\u25B6'}
+            </Text>
+          </Pressable>
+        )}
         {expandable && (
           <Text style={[styles.chevron, { color: colors.textSecondary }]}>
             {isExpanded ? '\u25B2' : '\u25BC'}
@@ -613,6 +626,10 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontSize: 12,
+  },
+  playButton: {
+    fontSize: 14,
+    marginRight: 8,
   },
   expandedContent: {
     paddingHorizontal: 12,

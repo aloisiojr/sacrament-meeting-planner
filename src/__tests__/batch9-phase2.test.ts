@@ -89,10 +89,10 @@ describe('F060 (CR-114): Add X button to remove topic assignment', () => {
       expect(content).toContain('onClearTopic?.(speech.id)');
     });
 
-    it('speeches.tsx should wire onClearTopic with assignTopic.mutate setting null', () => {
+    it('speeches.tsx should wire onClearTopic with assignTopic.mutate setting empty/null', () => {
       const content = readSourceFile('app/(tabs)/speeches.tsx');
       expect(content).toContain('handleClearTopic');
-      expect(content).toContain('topicTitle: null');
+      expect(content).toContain("topicTitle: ''");
       expect(content).toContain('topicLink: null');
     });
 

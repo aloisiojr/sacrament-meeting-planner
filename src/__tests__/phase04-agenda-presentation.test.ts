@@ -49,6 +49,7 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     has_special_presentation: false,
     special_presentation_description: null,
     intermediate_hymn_id: 'h-3',
+    has_intermediate_hymn: true,
     speaker_1_override: null,
     speaker_2_override: null,
     speaker_3_override: null,
@@ -87,6 +88,7 @@ const mockHymnLookup = (id: string | null) => (id ? `Hymn-${id}` : '');
 describe('PHASE-04: Agenda exception filtering exhaustive', () => {
   // All 6 SundayExceptionReason values
   const ALL_REASONS: SundayExceptionReason[] = [
+    'speeches',
     'testimony_meeting',
     'general_conference',
     'stake_conference',
@@ -97,6 +99,7 @@ describe('PHASE-04: Agenda exception filtering exhaustive', () => {
 
   describe('isExcludedFromAgenda covers all exception types', () => {
     const expectedExclusion: Record<SundayExceptionReason, boolean> = {
+      speeches: false,
       general_conference: true,
       stake_conference: true,
       testimony_meeting: false,
@@ -114,6 +117,7 @@ describe('PHASE-04: Agenda exception filtering exhaustive', () => {
 
   describe('isSpecialMeeting covers all exception types', () => {
     const expectedSpecial: Record<SundayExceptionReason, boolean> = {
+      speeches: false,
       testimony_meeting: true,
       ward_conference: true,
       primary_presentation: true,

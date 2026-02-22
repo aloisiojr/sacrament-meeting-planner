@@ -277,9 +277,9 @@ function SpeechesTabContent() {
     (speechId: string) => {
       assignTopic.mutate({
         speechId,
-        topicTitle: null,
+        topicTitle: '',
         topicLink: null,
-        topicCollection: null,
+        topicCollection: '',
       });
     },
     [assignTopic]

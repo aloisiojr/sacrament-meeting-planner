@@ -213,6 +213,10 @@ describe('PHASE-02: Database type validation', () => {
         closing_prayer_member_id: 'member-2',
         closing_prayer_name: 'Sister Closing',
         has_second_speech: true,
+        has_intermediate_hymn: true,
+        speaker_1_override: null,
+        speaker_2_override: null,
+        speaker_3_override: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
@@ -261,6 +265,10 @@ describe('PHASE-02: Database type validation', () => {
         closing_prayer_member_id: null,
         closing_prayer_name: null,
         has_second_speech: true,
+        has_intermediate_hymn: true,
+        speaker_1_override: null,
+        speaker_2_override: null,
+        speaker_3_override: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };

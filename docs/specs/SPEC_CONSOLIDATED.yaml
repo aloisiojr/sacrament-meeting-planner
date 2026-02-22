@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 120
-  total_change_requests: 186
+  total_features: 123
+  total_change_requests: 189
   implemented_crs: 96
-  pending_crs: 88
+  pending_crs: 91
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -64,6 +64,8 @@ metadata:
     - docs/specs/SPEC_F116_F119.yaml
     - docs/specs/SPEC_F120_F125.yaml
     - docs/specs/SPEC_F126_F129.yaml
+    - docs/specs/SPEC_F130_F134.yaml
+    - docs/specs/SPEC_F135_F137.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -262,7 +264,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 110 features, 176 CRs, 96 implementados)
+# FEATURES (estado atual apos 123 features, 189 CRs, 96 implementados)
 # =============================================================================
 
 features:
@@ -2469,8 +2471,66 @@ features:
       - "5 acceptance criteria, 3 edge cases"
       - "Remove script tag, keep meta refresh + manual button"
 
+  # ---------------------------------------------------------------------------
+  # Batch 21 Phase 2 (F135-F137): Settings Reorganization, StatusLED Alignment, Play Icon Size
+  # ---------------------------------------------------------------------------
+
+  - id: F135
+    name: "Reorganize Settings tab into 2 labeled groups: Ward Settings and App Settings"
+    status: pending
+    rfs: []
+    description: >
+      Reorganize Settings tab from 3 unlabeled sections into 2 labeled groups:
+      Group 1 'Configuracoes da Ala' (Discursantes, Biblioteca de Temas, WhatsApp,
+      Idioma da Ala, Fuso Horario) and Group 2 'Configuracoes do App' (Usuarios do App,
+      Historico de Uso, Idioma do App, Tema Claro/Escuro, Sobre). Each group has a
+      labeled header. Observer sees only Group 2 (limited items). Permission gating
+      unchanged. New i18n keys for group labels in all 3 languages.
+    modified_by_crs: [193]
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    notes:
+      - "CR-193: Reorganizar aba Configuracoes em 2 grupos"
+      - "12 acceptance criteria, 3 edge cases"
+      - "4 arquivos impactados (settings/index.tsx + 3 locales)"
+      - "New i18n keys: settings.wardSettingsGroup, settings.appSettingsGroup"
+
+  - id: F136
+    name: "Align StatusLED right edge with speaker field right edge in expanded speech card"
+    status: pending
+    rfs: []
+    description: >
+      StatusLED right edge is 36px further right than speaker field right edge
+      because labelRow spans full width but speaker field is followed by 36px
+      actionArea. Fix: add paddingRight equal to actionArea width (36px) to
+      statusSection/labelRow so StatusLED right edge aligns with speaker field.
+      X button position unchanged.
+    modified_by_crs: [199]
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    notes:
+      - "CR-199: Alinhar direita do circulo com direita do campo do discursante"
+      - "6 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (SpeechSlot.tsx)"
+      - "Root cause: actionArea width:36 not accounted for in labelRow"
+
+  - id: F137
+    name: "Enlarge play icon to match text line height in Home button and Agenda card"
+    status: pending
+    rfs: []
+    description: >
+      Play icon (U+25B6) too small in Home button (fontSize:17 same as text but
+      renders smaller) and Agenda card (fontSize:14, stuck to chevron). Fix: increase
+      Home play to fontSize >= 20, Agenda play to fontSize >= 18, add marginRight
+      to Agenda play for spacing from chevron.
+    modified_by_crs: [200]
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    notes:
+      - "CR-200: Trocar icone de play por icone bem maior"
+      - "6 acceptance criteria, 2 edge cases"
+      - "2 arquivos impactados (index.tsx, agenda.tsx)"
+      - "Style-only changes, no structural modifications"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (88 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20)
+# PENDING CHANGE REQUESTS (91 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21)
 # =============================================================================
 
 pending_crs:
@@ -4356,6 +4416,75 @@ pending_crs:
       - src/components/NextSundaysSection.tsx
       - src/components/SundayCard.tsx
 
+  # --- Batch 21 Phase 2 (Settings Reorganization, StatusLED Alignment, Play Icon Size) ---
+
+  - id: 193
+    type: ui
+    area: "Settings (F083, F116)"
+    feature_id: F135
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    related_crs: [140, 178]
+    description: >
+      Reorganizar aba Configuracoes em 2 grupos rotulados: 'Configuracoes da Ala'
+      (Discursantes, Biblioteca de Temas, WhatsApp, Idioma da Ala, Fuso Horario)
+      e 'Configuracoes do App' (Usuarios do App, Historico de Uso, Idioma do App,
+      Tema Claro/Escuro, Sobre). Label com nome de cada grupo antes dos cards.
+    acceptance_criteria:
+      - "Group 1 label 'Configuracoes da Ala' displayed above first card section"
+      - "Group 2 label 'Configuracoes do App' displayed above second card section"
+      - "Group 1 contains: Discursantes, Biblioteca de Temas, WhatsApp, Idioma da Ala, Fuso Horario"
+      - "Group 2 contains: Usuarios do App, Historico de Uso, Idioma do App, Tema Claro/Escuro, Sobre"
+      - "Observer sees only Group 2 (limited items), Group 1 hidden"
+      - "New i18n keys in all 3 languages for group labels"
+      - "Permission gating unchanged"
+      - "Sign Out button remains at bottom"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/index.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 199
+    type: ui
+    area: "SpeechSlot (F115, F124)"
+    feature_id: F136
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    related_crs: [177, 189]
+    description: >
+      Alinhar direita do circulo de status (StatusLED) com direita do campo do
+      discursante sem mexer posicao do X. Root cause: actionArea width:36 not
+      accounted for in labelRow. Fix: add paddingRight:36 to statusSection/labelRow.
+    acceptance_criteria:
+      - "StatusLED right edge aligns with speaker field right edge"
+      - "X button position unchanged"
+      - "Alignment works for all 3 speech positions"
+      - "Status text remains left of StatusLED"
+      - "Position 2 disabled state not affected"
+      - "Toggle switch for position 2 not affected"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 200
+    type: ui
+    area: "Home (F128), Agenda (F127)"
+    feature_id: F137
+    spec_file: "docs/specs/SPEC_F135_F137.yaml"
+    related_crs: [185, 186]
+    description: >
+      Trocar icone de play (Home Iniciar Reuniao e card de agenda) por icone bem
+      maior (altura da fonte). Home: fontSize 17 -> >= 20. Agenda: fontSize 14 ->
+      >= 18, com marginRight adequado para separar do chevron.
+    acceptance_criteria:
+      - "Home play icon fontSize >= 20 (visual height matches button text)"
+      - "Agenda play icon fontSize >= 18"
+      - "Agenda play icon has marginRight >= 8 from chevron"
+      - "Vertical alignment maintained in Home button"
+      - "Play icon visually distinct from chevron in Agenda"
+      - "Navigation behavior unchanged"
+    files_likely_impacted:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+
 # =============================================================================
 
 design_decisions:
@@ -5555,8 +5684,9 @@ cr_history:
     summary: "X clear button for Speeches tab selectors, remove speech editing from agenda card (pencil nav to Speeches), rename 'Proximos Discursos' section, simplify NextSundaysSection to non-expandable cards with pencil navigation."
 
   batch_21:
-    range: "CR-194, CR-195, CR-196, CR-197, CR-198"
-    status: "5 pendentes (194, 195, 196, 197, 198)"
+    range: "CR-193, CR-194, CR-195, CR-196, CR-197, CR-198, CR-199, CR-200"
+    status: "5 pendentes fase 1 (194, 195, 196, 197, 198), 3 pendentes fase 2 (193, 199, 200)"
     files:
       - "docs/specs/SPEC_F130_F134.yaml (CR-194-CR-198 - Bug fixes: TS errors, ward language, 2nd speech toggle, email language, reset redirect)"
-    summary: "Fix TS errors and actor role naming after Pianist/Conductor split (F130), fix ward language switch not updating AuthContext (F131), fix 2nd speech toggle bugs: topic clearing, disabled fields with placeholder, dynamic X/2 vs X/3 (F132), fix password reset email to use user app language (F133), remove script tag from reset-redirect (F134)."
+      - "docs/specs/SPEC_F135_F137.yaml (CR-193, CR-199, CR-200 - Settings reorganization, StatusLED alignment, play icon size)"
+    summary: "Phase 1: Fix TS errors and actor role naming after Pianist/Conductor split (F130), fix ward language switch not updating AuthContext (F131), fix 2nd speech toggle bugs: topic clearing, disabled fields with placeholder, dynamic X/2 vs X/3 (F132), fix password reset email to use user app language (F133), remove script tag from reset-redirect (F134). Phase 2: Reorganize Settings tab into 2 labeled groups Ward Settings and App Settings (F135), align StatusLED right edge with speaker field right edge (F136), enlarge play icon in Home button and Agenda card (F137)."

@@ -24,6 +24,7 @@
 # CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (PRE+POST) - Batch 19 Phase 2
 # CR-184, CR-185, CR-186, CR-188 (PRE+POST) - Batch 19 Phase 3
 # CR-194, CR-195, CR-196, CR-197, CR-198 (PRE+POST) - Batch 20 Phase 1
+# CR-193, CR-199, CR-200 (PRE+POST) - Batch 20 Phase 2
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -9612,4 +9613,308 @@ cr_198:
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-cache, no-store, must-revalidate'
           Both headers present and correct.
+
+# #############################################################################
+# CR-193: Reorganizar aba Configuracoes em 2 grupos (F135)
+# #############################################################################
+
+cr_193:
+  cr_id: CR-193
+  title: "Settings reorganization: 2 labeled groups (Ward Settings + App Settings)"
+  type: feature_request
+  feature_id: F135
+  qa_plan: qa/QA_PLAN_batch20_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Feature does NOT exist yet. Settings screen (settings/index.tsx) currently
+      has 3 unlabeled sections:
+      Section 1: Members + Topics (non-Observer)
+      Section 2: Users + History + WhatsApp (non-Observer)
+      Section 3: AppLang + WardLang + Timezone + Theme + About
+      No section group labels are rendered. Items need to be redistributed into
+      2 groups: "Configuracoes da Ala" (Members, Topics, WhatsApp, WardLanguage,
+      Timezone) and "Configuracoes do App" (Users, History, AppLanguage, Theme, About).
+      i18n keys for group labels do not exist yet.
+    evidence:
+      - "settings/index.tsx has 3 View+styles.section blocks, no label/title before any section"
+      - "No i18n keys for 'wardSettingsGroup' or 'appSettingsGroup' exist in pt-BR.json, en.json, or es.json"
+      - "Current grouping mixes ward and app settings in Section 3 (AppLang + WardLang + Timezone + Theme + About)"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    summary: |
+      All 8 validation checks for CR-193 (F135) PASSED.
+      Settings screen reorganized into 2 labeled groups:
+      Group 1 "Configuracoes da Ala": members, topics, whatsappTemplate, wardLanguage, timezone
+      Group 2 "Configuracoes do App": users, history, appLanguage, theme, about
+      Both groups have i18n keys in 3 languages. Permission gating preserved.
+      Observer sees only Group 2 items (appLanguage, theme, about). Sign-out button below both groups.
+      Group labels styled as section headers (fontSize:13, fontWeight:'600', uppercase, textSecondary).
+    validation_checks:
+      - id: VC-193-01
+        description: "Settings screen has exactly 2 labeled groups instead of 3 unlabeled sections"
+        status: PASSED
+        evidence: |
+          settings/index.tsx lines 175-257: Two groups with sectionLabel + section View.
+          Group 1 (lines 176-220): Wrapped in {!isObserver && (<>...)</>}, label uses t('settings.wardSettingsGroup').
+          Group 2 (lines 222-257): Always visible, label uses t('settings.appSettingsGroup').
+          No more 3 separate unlabeled sections.
+
+      - id: VC-193-02
+        description: "First group labeled 'Configuracoes da Ala' contains correct items"
+        status: PASSED
+        evidence: |
+          settings/index.tsx lines 178-217: Label t('settings.wardSettingsGroup').
+          Items in order: members (line 183), topics (line 189), whatsappTemplate (line 197),
+          wardLanguage (line 203), timezone (line 211). All 5 items present.
+
+      - id: VC-193-03
+        description: "Second group labeled 'Configuracoes do App' contains correct items"
+        status: PASSED
+        evidence: |
+          settings/index.tsx lines 223-257: Label t('settings.appSettingsGroup').
+          Items in order: users (line 228), history (line 234), appLanguage (line 241),
+          theme (line 247), about (line 253). All 5 items present.
+
+      - id: VC-193-04
+        description: "Group labels have i18n keys for all 3 languages"
+        status: PASSED
+        evidence: |
+          pt-BR.json:138: "wardSettingsGroup": "Configurações da Ala"
+          pt-BR.json:139: "appSettingsGroup": "Configurações do App"
+          en.json:138: "wardSettingsGroup": "Ward Settings"
+          en.json:139: "appSettingsGroup": "App Settings"
+          es.json:138: "wardSettingsGroup": "Configuraciones del Barrio"
+          es.json:139: "appSettingsGroup": "Configuraciones de la App"
+
+      - id: VC-193-05
+        description: "Permission gating preserved"
+        status: PASSED
+        evidence: |
+          settings/index.tsx: Group 1 wrapped in {!isObserver} (line 176).
+          members: hasPermission('member:read') (line 182).
+          topics: hasPermission('topic:write') (line 189).
+          whatsappTemplate: hasPermission('settings:whatsapp') (line 196).
+          wardLanguage: hasPermission('settings:language') (line 203).
+          timezone: hasPermission('settings:timezone') (line 211).
+          Group 2: users: hasPermission('settings:users') (line 227).
+          history: hasPermission('history:read') (line 234).
+          appLanguage, theme, about: ungated (visible to all including Observer).
+
+      - id: VC-193-06
+        description: "Sign-out button still exists outside the groups"
+        status: PASSED
+        evidence: |
+          settings/index.tsx lines 259-267: Pressable with signOutButton style,
+          signOutText with colors.error, after both groups. Unchanged.
+
+      - id: VC-193-07
+        description: "Group labels are visually distinct (styled as section headers)"
+        status: PASSED
+        evidence: |
+          settings/index.tsx styles.sectionLabel (lines 371-378):
+          fontSize: 13, fontWeight: '600', textTransform: 'uppercase',
+          paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8.
+          Applied with { color: colors.textSecondary }. Matches iOS section header convention.
+
+      - id: VC-193-08
+        description: "Ward Language and App Language are in different groups"
+        status: PASSED
+        evidence: |
+          wardLanguage at settings/index.tsx line 203-209: in Group 1 (Ward Settings).
+          appLanguage at settings/index.tsx line 241-246: in Group 2 (App Settings).
+          They are no longer in the same section.
+
+# #############################################################################
+# CR-199: Alinhar circulo de status com direita do campo do discursante (F136)
+# #############################################################################
+
+cr_199:
+  cr_id: CR-199
+  title: "Align status circle right edge with speaker field right edge in expanded speech cards"
+  type: feature_request
+  feature_id: F136
+  qa_plan: qa/QA_PLAN_batch20_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Feature does NOT exist yet. In SpeechSlot.tsx, the labelRow uses
+      justifyContent:'space-between' spanning the full container width.
+      The statusSection (containing statusText + StatusLED 14px circle) is
+      right-aligned to the full container edge. Below it, the speakerRow has
+      field(flex:1) + actionArea(width:36px for X button). This means the
+      StatusLED right edge extends ~36px further right than the speaker field
+      right edge. The user wants the circle's right edge aligned with the
+      speaker field's right edge, without moving the X button.
+    evidence:
+      - "SpeechSlot.tsx labelRow: flexDirection:'row', justifyContent:'space-between' (full width)"
+      - "SpeechSlot.tsx statusSection: flexDirection:'row', alignItems:'center', gap:6"
+      - "SpeechSlot.tsx speakerRow: field(flex:1) + actionArea(width:36, height:38)"
+      - "StatusLED right edge is at container right edge. Speaker field right edge is container right - 36px"
+      - "Misalignment = 36px (the width of actionArea)"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    summary: |
+      All 5 validation checks for CR-199 (F136) PASSED.
+      labelRow style now has paddingRight:36 (matching actionArea width:36),
+      which shifts the StatusLED right edge to align with the speaker field right edge.
+      X button position unchanged. Status text and LED remain in labelRow.
+      Label text and toggle switch unaffected. Topic row layout consistent.
+    validation_checks:
+      - id: VC-199-01
+        description: "StatusLED right edge aligns with speaker field right edge"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx styles.labelRow (lines 333-339): paddingRight: 36 added.
+          styles.actionArea (lines 369-374): width: 36.
+          paddingRight:36 on labelRow pushes StatusLED right edge left by 36px,
+          aligning it with the speaker field right edge (which ends before the 36px actionArea).
+
+      - id: VC-199-02
+        description: "X button position is unchanged"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx styles.actionArea (lines 369-374): width:36, height:38,
+          alignItems:'center', justifyContent:'center'. Unchanged from baseline.
+          removeButton (lines 375-379): fontSize:24, fontWeight:'300', paddingHorizontal:4. Unchanged.
+          X button in speakerRow (lines 242-255): still inside actionArea.
+
+      - id: VC-199-03
+        description: "Status text and LED are still on the label row"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 162-194: labelRow still contains labelWithToggle (left)
+          and statusSection (right) with statusText (line 183) and StatusLED (line 186-191).
+          No structural change to label row content.
+
+      - id: VC-199-04
+        description: "Label text on the left is not affected"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 163-175: labelWithToggle with flexDirection:'row',
+          alignItems:'center', gap:8 unchanged. Label text and toggle switch position
+          unaffected by paddingRight:36 on the container.
+
+      - id: VC-199-05
+        description: "Topic field row alignment is consistent with speaker field"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx styles.topicRow (lines 380-384): flexDirection:'row', alignItems:'center'.
+          topicField (flex:1) + topicActionArea (width:36) matches speakerRow layout.
+          F136 fix only applies to labelRow, not to topic row.
+
+# #############################################################################
+# CR-200: Trocar botao de play por icone bem maior (F137)
+# #############################################################################
+
+cr_200:
+  cr_id: CR-200
+  title: "Enlarge play icon in Home Start Meeting button and Agenda expanded card"
+  type: feature_request
+  feature_id: F137
+  qa_plan: qa/QA_PLAN_batch20_phase2.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Feature partially exists but is too small. Both locations use Unicode U+25B6:
+      - Home tab (index.tsx): playIcon fontSize:17, marginRight:8. Text is also 17.
+        While the fontSize matches the text, the user says it's too small.
+      - Agenda tab (agenda.tsx): playButton fontSize:14, marginRight:8. This is
+        smaller than the text around it and appears stuck to the chevron arrow.
+      The user wants the icon to be "bem maior (altura da fonte)" - much larger,
+      matching the font height, and not stuck to the chevron arrow.
+    evidence:
+      - "index.tsx: styles.playIcon { fontSize: 17, marginRight: 8 }"
+      - "index.tsx: styles.meetingButtonText { fontSize: 17, fontWeight: '700' }"
+      - "agenda.tsx: styles.playButton { fontSize: 14, marginRight: 8 }"
+      - "agenda.tsx: styles.chevron { fontSize: 12 } - chevron is right next to play button"
+      - "User complaint: 'Atual muito pequeno e colado na seta' (current too small and stuck to arrow)"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    verdict: passed
+    summary: |
+      All 6 validation checks for CR-200 (F137) PASSED.
+      Home tab play icon fontSize increased from 17 to 20 (>= 20 threshold).
+      Agenda tab play icon fontSize increased from 14 to 18 (>= 18 threshold).
+      Agenda play icon marginRight increased from 8 to 12, providing clear separation from chevron.
+      Both locations still use Unicode U+25B6. Navigation to /presentation preserved.
+      Home button accessibility preserved.
+    validation_checks:
+      - id: VC-200-01
+        description: "Home tab play icon is significantly larger"
+        status: PASSED
+        evidence: |
+          index.tsx styles.playIcon (line 282): fontSize: 20.
+          Baseline was 17. Increase of 3px (17.6% larger).
+          meetingButtonText fontSize is 17. At fontSize:20, the U+25B6 triangle
+          renders at approximately the same visual height as the text.
+
+      - id: VC-200-02
+        description: "Agenda tab expanded card play icon is significantly larger"
+        status: PASSED
+        evidence: |
+          agenda.tsx styles.playButton (line 635): fontSize: 18.
+          Baseline was 14. Increase of 4px (28.6% larger).
+          Now matches the visual prominence of surrounding text.
+
+      - id: VC-200-03
+        description: "Play icon in agenda card is not stuck to the chevron arrow"
+        status: PASSED
+        evidence: |
+          agenda.tsx styles.playButton (line 636): marginRight: 12.
+          Baseline was marginRight: 8. Increase of 4px (50% more spacing).
+          Chevron is a separate Text element (styles.chevron, fontSize:12).
+          With 12px margin, there is clear visual separation between play and chevron.
+
+      - id: VC-200-04
+        description: "Home tab play icon still uses Unicode U+25B6"
+        status: PASSED
+        evidence: |
+          index.tsx line 134: {'\u25B6'} still present inside the play icon Text element.
+
+      - id: VC-200-05
+        description: "Agenda tab play icon still navigates to presentation screen"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 518-528: Pressable onPress calls
+          router.push({ pathname: '/presentation', params: { date } }).
+          Navigation behavior unchanged.
+
+      - id: VC-200-06
+        description: "Home tab button still functional and accessible"
+        status: PASSED
+        evidence: |
+          index.tsx lines 127-131: Pressable with accessibilityRole="button",
+          onPress navigates to /presentation with { date: sundayDate }.
+          meetingButtonContent has flexDirection:'row', alignItems:'center'.
+          Button remains accessible and functional.
+
+    regression_checks:
+      - id: VC-REG-01
+        description: "All existing tests still pass after UI changes"
+        status: PASSED
+        evidence: |
+          npx vitest run: 85 test files, 5226 tests passed, 0 failures.
+          Duration: 1.93s.
+
+      - id: VC-REG-02
+        description: "TypeScript compilation has no new errors"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit: Only pre-existing error about react-test-renderer
+          type declaration (not new). No new TS errors from F135/F136/F137 changes.
 

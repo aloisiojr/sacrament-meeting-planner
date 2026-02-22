@@ -1,0 +1,436 @@
+# =============================================================================
+# SPEC_F135_F137.yaml
+# Batch 21 Phase 2: Settings Reorganization, StatusLED Alignment, Play Icon Size
+# (CR-193, CR-199, CR-200)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 21
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+
+# =============================================================================
+# F135: Reorganize Settings tab into 2 labeled groups (CR-193)
+# =============================================================================
+
+features:
+
+  - id: F135
+    name: "Reorganize Settings tab into 2 labeled groups: Ward Settings and App Settings"
+    cr_id: 193
+    type: enhancement
+    related_crs: [140, 178]
+    related_features: [F083, F116]
+    description: >
+      Reorganize the Settings tab (src/app/(tabs)/settings/index.tsx) from the
+      current 3 unlabeled sections into 2 labeled groups:
+
+      Group 1 - "Configuracoes da Ala" (Ward Settings):
+        - Discursantes (members)
+        - Biblioteca de Temas (topics)
+        - Modelo de Convite pelo WhatsApp (whatsappTemplate)
+        - Idioma da Ala (wardLanguage)
+        - Fuso Horario (timezone)
+
+      Group 2 - "Configuracoes do App" (App Settings):
+        - Usuarios do App (users)
+        - Historico de Uso (history)
+        - Idioma do App (appLanguage)
+        - Tema Claro/Escuro (theme)
+        - Sobre (about)
+
+      Each group has a label (Text component) displayed ABOVE the card section
+      with the group name. The label uses i18n keys so it is translated in all
+      3 languages (pt-BR, en, es).
+
+      Permission gating remains unchanged:
+        - Observer sees only Group 2 items they have access to (appLanguage, theme, about)
+        - Items requiring specific permissions remain gated (e.g., wardLanguage requires settings:language)
+        - The group label for "Configuracoes da Ala" is NOT shown to observers (since they see no items from that group)
+
+      The Sign Out button remains at the bottom, below both groups.
+
+    acceptance_criteria:
+      - id: AC-135-01
+        description: "Group 1 label 'Configuracoes da Ala' is displayed above the first card section"
+        given: "Bispado or Secretario user opens Settings tab"
+        when: "Settings screen renders"
+        then: "A text label 'Configuracoes da Ala' (from i18n key 'settings.wardSettingsGroup') appears above the first card section containing ward-related items"
+        status: pending
+
+      - id: AC-135-02
+        description: "Group 2 label 'Configuracoes do App' is displayed above the second card section"
+        given: "Any user opens Settings tab"
+        when: "Settings screen renders"
+        then: "A text label 'Configuracoes do App' (from i18n key 'settings.appSettingsGroup') appears above the second card section containing app-related items"
+        status: pending
+
+      - id: AC-135-03
+        description: "Group 1 contains exactly 5 items in correct order for Bispado"
+        given: "Bispado user opens Settings tab"
+        when: "Settings screen renders"
+        then: "Group 1 card contains in order: Discursantes, Biblioteca de Temas, Modelo de Convite pelo WhatsApp, Idioma da Ala, Fuso Horario"
+        status: pending
+        notes: "WhatsApp is visible to Secretario only (hasPermission settings:whatsapp), so Bispado sees 4 items. Secretario sees all 5."
+
+      - id: AC-135-04
+        description: "Group 2 contains exactly 5 items in correct order for Bispado"
+        given: "Bispado user opens Settings tab"
+        when: "Settings screen renders"
+        then: "Group 2 card contains in order: Usuarios do App, Historico de Uso, Idioma do App, Tema Claro/Escuro, Sobre"
+        status: pending
+
+      - id: AC-135-05
+        description: "Observer sees only Group 2 with limited items"
+        given: "Observer user opens Settings tab"
+        when: "Settings screen renders"
+        then: "Group 1 is NOT shown (no label, no card). Group 2 label 'Configuracoes do App' is shown with items: Idioma do App, Tema Claro/Escuro, Sobre"
+        status: pending
+
+      - id: AC-135-06
+        description: "Secretario sees Group 1 with WhatsApp template included"
+        given: "Secretario user opens Settings tab"
+        when: "Settings screen renders"
+        then: "Group 1 card includes 'Modelo de Convite pelo WhatsApp' between 'Biblioteca de Temas' and 'Idioma da Ala'"
+        status: pending
+
+      - id: AC-135-07
+        description: "i18n key settings.wardSettingsGroup exists in all 3 languages"
+        given: "i18n locale files"
+        when: "Checking for key settings.wardSettingsGroup"
+        then: "pt-BR: 'Configuracoes da Ala', en: 'Ward Settings', es: 'Configuraciones del Barrio'"
+        status: pending
+        notes: "In Spanish, 'ala' (ward) = 'barrio'. Using 'Barrio' as per Church standard Spanish translation."
+
+      - id: AC-135-08
+        description: "i18n key settings.appSettingsGroup exists in all 3 languages"
+        given: "i18n locale files"
+        when: "Checking for key settings.appSettingsGroup"
+        then: "pt-BR: 'Configuracoes do App', en: 'App Settings', es: 'Configuraciones de la App'"
+        status: pending
+
+      - id: AC-135-09
+        description: "Group label styling is consistent with section header conventions"
+        given: "Settings screen renders with group labels"
+        when: "Checking visual appearance"
+        then: "Group labels use fontSize 13, fontWeight '600', textTransform 'uppercase', color textSecondary, paddingHorizontal 16, paddingTop 16, paddingBottom 8. This matches the pattern of section headers used elsewhere in the app."
+        status: pending
+
+      - id: AC-135-10
+        description: "Sign Out button remains at the bottom below both groups"
+        given: "Any user opens Settings tab"
+        when: "Scrolling to the bottom"
+        then: "Sign Out button is displayed at the bottom, after both groups, unchanged in appearance"
+        status: pending
+
+      - id: AC-135-11
+        description: "Ward language and timezone items move from Group 3 to Group 1"
+        given: "Current settings layout has wardLanguage and timezone in Section 3"
+        when: "After F135 is implemented"
+        then: "wardLanguage and timezone are in Group 1 (Ward Settings), no longer in Group 2 (App Settings)"
+        status: pending
+
+      - id: AC-135-12
+        description: "Users and History items move from Group 2 to Group 2 (App Settings)"
+        given: "Current settings layout has users and history in Section 2"
+        when: "After F135 is implemented"
+        then: "Users and History are in Group 2 (App Settings), keeping the same permission gating"
+        status: pending
+
+    edge_cases:
+      - id: EC-135-01
+        case: "Bispado user does not see WhatsApp template (permissions:whatsapp is false for Bispado)"
+        expected: "Group 1 shows 4 items (Discursantes, Biblioteca de Temas, Idioma da Ala, Fuso Horario). The 'Modelo de Convite pelo WhatsApp' item is not rendered."
+        status: pending
+
+      - id: EC-135-02
+        case: "Secretario user does not have settings:timezone permission"
+        expected: "If Secretario lacks settings:timezone, Fuso Horario is hidden from Group 1. Current permissions show Secretario has timezone access, so this edge case applies only if permissions change."
+        status: pending
+
+      - id: EC-135-03
+        case: "All items in Group 1 are permission-gated away (hypothetical)"
+        expected: "If all Group 1 items are hidden by permissions, the Group 1 label is also hidden (same pattern as Observer)."
+        status: pending
+
+    files_likely_impacted:
+      - src/app/(tabs)/settings/index.tsx  # Main layout restructure
+      - src/i18n/locales/pt-BR.json        # New i18n keys
+      - src/i18n/locales/en.json           # New i18n keys
+      - src/i18n/locales/es.json           # New i18n keys
+
+# =============================================================================
+# F136: Align StatusLED right edge with speaker field right edge (CR-199)
+# =============================================================================
+
+  - id: F136
+    name: "Align StatusLED right edge with speaker field right edge in expanded speech card"
+    cr_id: 199
+    type: enhancement
+    related_crs: [177, 189]
+    related_features: [F115, F124]
+    description: >
+      In the expanded speech card (SpeechSlot.tsx), the StatusLED's right edge
+      is misaligned with the speaker field's right edge. The root cause: the
+      speaker field uses flex:1 and is followed by an actionArea of width:36px.
+      The StatusLED sits in the labelRow which spans full width. Therefore, the
+      StatusLED right edge is 36px further right than the speaker field right edge.
+
+      The fix: add a right margin or right padding to the statusSection (or the
+      labelRow) equal to the actionArea width (36px) so that the StatusLED right
+      edge aligns with the speaker field right edge.
+
+      CONSTRAINT: The X button position (in actionArea) must NOT change. The fix
+      is purely in the labelRow/statusSection alignment, not in the speaker row.
+
+    acceptance_criteria:
+      - id: AC-136-01
+        description: "StatusLED right edge aligns with speaker field right edge"
+        given: "Expanded SpeechSlot with a speaker assigned (StatusLED visible)"
+        when: "Component renders"
+        then: "The right edge of the StatusLED circle is horizontally aligned with the right edge of the speaker field (the field with flex:1, NOT including the actionArea)"
+        status: pending
+
+      - id: AC-136-02
+        description: "X button position does not change"
+        given: "Expanded SpeechSlot with a speaker assigned"
+        when: "Comparing before and after F136"
+        then: "The X button (remove assignment) remains in the same position (actionArea width:36, to the right of the speaker field)"
+        status: pending
+
+      - id: AC-136-03
+        description: "Alignment works for all 3 speech positions (1, 2, 3)"
+        given: "SpeechSlots for positions 1, 2, and 3"
+        when: "All have speakers assigned"
+        then: "StatusLED right edge aligns with speaker field right edge in all 3 positions"
+        status: pending
+
+      - id: AC-136-04
+        description: "Status text remains left of StatusLED in the same row"
+        given: "StatusLED and status text in labelRow"
+        when: "Component renders"
+        then: "Status text (e.g., 'Designado/Confirmado') is to the left of the StatusLED, with gap:6 between them"
+        status: pending
+
+      - id: AC-136-05
+        description: "Position 2 disabled state is not affected"
+        given: "Position 2 with isSecondSpeechEnabled=false"
+        when: "Component renders"
+        then: "The disabled state renders correctly, no StatusLED is shown (statusSection hidden for disabled pos 2)"
+        status: pending
+
+      - id: AC-136-06
+        description: "Toggle switch for position 2 is not affected"
+        given: "Position 2 with toggle switch visible"
+        when: "Component renders"
+        then: "Toggle switch remains in labelWithToggle, no visual change to toggle position"
+        status: pending
+
+    edge_cases:
+      - id: EC-136-01
+        case: "SpeechSlot with no speaker assigned (status: not_assigned)"
+        expected: "StatusLED is still rendered but in not_assigned state. The alignment fix still applies."
+        status: pending
+
+      - id: EC-136-02
+        case: "Narrow screen width (small phone)"
+        expected: "The status text may truncate but the alignment of StatusLED right edge with field right edge is preserved"
+        status: pending
+
+      - id: EC-136-03
+        case: "Topic row clear button alignment"
+        expected: "The topic row X button alignment (topicActionArea width:36) is NOT affected by this fix. F136 only addresses labelRow alignment."
+        status: pending
+
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx  # Add paddingRight or marginRight to labelRow or statusSection
+
+# =============================================================================
+# F137: Enlarge play icon in Home button and Agenda card (CR-200)
+# =============================================================================
+
+  - id: F137
+    name: "Enlarge play icon to match text line height in Home button and Agenda card"
+    cr_id: 200
+    type: enhancement
+    related_crs: [185, 186]
+    related_features: [F127, F128]
+    description: >
+      The play icon (Unicode U+25B6, BLACK RIGHT-POINTING TRIANGLE) in two
+      locations is too small and/or too close to adjacent elements:
+
+      1. Home tab "Iniciar Reuniao Sacramental" button (src/app/(tabs)/index.tsx):
+         Current fontSize: 17. The button text fontSize is also 17, but the
+         triangle renders visually smaller than the text at the same fontSize.
+         Fix: increase play icon fontSize to match the visual height of the text
+         (approximately fontSize: 20-22 to make the triangle the same height as
+         the text line).
+
+      2. Agenda tab expanded card play button (src/app/(tabs)/agenda.tsx):
+         Current fontSize: 14. Too small and visually stuck to the chevron arrow.
+         Fix: increase play icon fontSize to approximately 18-20 to match the
+         line height of adjacent text, and ensure adequate spacing (marginRight)
+         between the play icon and the chevron.
+
+    acceptance_criteria:
+      - id: AC-137-01
+        description: "Home play icon fontSize increased to match button text visual height"
+        given: "Home tab 'Iniciar Reuniao Sacramental' button"
+        when: "Component renders"
+        then: "The play icon (U+25B6) has fontSize >= 20 so that the triangle height visually matches the adjacent text line height (meetingButtonText fontSize: 17)"
+        status: pending
+
+      - id: AC-137-02
+        description: "Agenda play icon fontSize increased"
+        given: "Expanded agenda card with play button"
+        when: "Component renders"
+        then: "The play icon (U+25B6) has fontSize >= 18, replacing the current fontSize: 14"
+        status: pending
+
+      - id: AC-137-03
+        description: "Agenda play icon has adequate spacing from chevron"
+        given: "Expanded agenda card header with play button and chevron"
+        when: "Component renders"
+        then: "There is visible spacing (marginRight >= 8) between the play icon and the chevron arrow, so they are not visually stuck together"
+        status: pending
+
+      - id: AC-137-04
+        description: "Home play icon maintains vertical alignment with button text"
+        given: "Home tab meeting button with play icon and text"
+        when: "Component renders"
+        then: "Play icon and text are vertically centered within the button (meetingButtonContent flexDirection: 'row', alignItems: 'center' preserved)"
+        status: pending
+
+      - id: AC-137-05
+        description: "Agenda play icon is visually distinguishable from chevron"
+        given: "Expanded agenda card with play and chevron"
+        when: "User views the card header"
+        then: "Play icon is clearly a separate tappable element from the chevron, with visible gap between them"
+        status: pending
+
+      - id: AC-137-06
+        description: "Play icon tap targets remain correct"
+        given: "Play icon in both Home and Agenda"
+        when: "User taps the play icon"
+        then: "Navigation to Presentation screen works correctly (same routing behavior, unchanged)"
+        status: pending
+
+    edge_cases:
+      - id: EC-137-01
+        case: "Long translated text in meeting button (e.g., Spanish)"
+        expected: "Play icon size is independent of text length; button wraps text if needed, play icon stays same size"
+        status: pending
+
+      - id: EC-137-02
+        case: "Collapsed agenda card"
+        expected: "Play button is NOT shown when card is collapsed (existing behavior, isExpanded check preserved)"
+        status: pending
+
+    files_likely_impacted:
+      - src/app/(tabs)/index.tsx   # playIcon style fontSize change
+      - src/app/(tabs)/agenda.tsx  # playButton style fontSize change + marginRight adjustment
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: "The Spanish translation for 'Ward Settings' uses 'Configuraciones del Barrio' following Church standard Spanish terminology"
+    reason: "In LDS Church Spanish, 'ward' is 'barrio'. The standard term is 'barrio'."
+    impact_if_wrong: "i18n label would need correction"
+    needs_confirmation: true
+
+  - id: A-2
+    assumption: "The group label style (uppercase, small font, textSecondary color) matches iOS Settings conventions"
+    reason: "iOS Settings app uses this pattern for section headers. The app already uses similar patterns elsewhere."
+    impact_if_wrong: "Would need different styling approach"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: "Bispado does NOT see WhatsApp template in Settings (hasPermission settings:whatsapp is false for Bispado)"
+    reason: "SPEC_CONSOLIDATED permissions table shows settings_whatsapp: bispado:false, secretario:true. So Group 1 for Bispado has 4 items, not 5."
+    impact_if_wrong: "Group 1 item count would differ"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: "Play icon fontSize of 20 for Home and 18 for Agenda provides visually correct sizing"
+    reason: "The Unicode triangle U+25B6 renders approximately 70-75% the visual height of the fontSize value. At fontSize:20, the triangle is about 14-15px tall, matching 17px text. At fontSize:18, it is about 12-13px, matching surrounding text in the card header."
+    impact_if_wrong: "fontSize may need fine-tuning during implementation"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: "The 36px actionArea width is the correct offset to apply to the labelRow for StatusLED alignment"
+    reason: "QA PRE confirmed StatusLED right edge is 36px further right than speaker field right edge, which exactly matches actionArea width:36"
+    impact_if_wrong: "Would need to measure actual pixel offset"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES WITH EXISTING SPEC
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: overlap
+    status: informational
+    description: >
+      F083 (CR-140) already renamed Settings labels. F135 (CR-193) reorganizes the
+      same Settings tab into 2 groups. F083 is status:pending (not yet implemented).
+      F135 does NOT change the labels again, only reorganizes items into labeled groups
+      and adds group header labels. Both features can be implemented independently.
+      If F083 is implemented first, F135 works on top of it. If F135 is implemented
+      first, F083's label changes apply within the F135 structure.
+    existing_spec: "F083: Rename Settings tab options with i18n"
+    new_request: "F135: Reorganize Settings tab into 2 labeled groups"
+    resolution: "No conflict. F135 restructures layout; F083 changes item labels. Independent changes."
+
+  - id: INC-2
+    type: overlap
+    status: informational
+    description: >
+      F115 (CR-177) moved StatusLED from rightColumn to labelRow. F124 (CR-189)
+      fixed X button alignment. F136 (CR-199) adds right padding to labelRow so
+      StatusLED aligns with speaker field. These 3 features progressively refine
+      the same layout area. F136 builds on top of F115's layout.
+    existing_spec: "F115: StatusLED moved to labelRow. F124: X button alignment fix."
+    new_request: "F136: Add paddingRight to labelRow equal to actionArea width (36px)"
+    resolution: "F136 is a simple CSS refinement on top of F115's layout. No structural conflict."
+
+  - id: INC-3
+    type: overlap
+    status: informational
+    description: >
+      F127 (CR-185) added the play button to expanded agenda cards. F128 (CR-186)
+      added play icon to Home meeting button. F137 (CR-200) increases the fontSize
+      of the play icon in both locations. F137 is a style-only change on top of
+      F127/F128.
+    existing_spec: "F127: Play button in agenda card. F128: Play icon in Home button."
+    new_request: "F137: Increase play icon fontSize in both locations"
+    resolution: "F137 is a style-only refinement. No structural conflict."
+
+# =============================================================================
+# VALIDATION GATE (Finalization)
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_spec_consolidated: true
+  GATE-02_identified_ambiguities: true   # INC-1 through INC-3
+  GATE-03_listed_open_questions: true    # None (all clear from user request)
+  GATE-04_listed_assumptions: true       # A-1 through A-5
+  GATE-05_reported_inconsistencies: true # INC-1 through INC-3
+  GATE-06_status_complete: true          # status: complete
+  GATE-07_zero_placeholders: true        # All ACs have given/when/then
+  GATE-08_oq_resolved: true             # No open questions

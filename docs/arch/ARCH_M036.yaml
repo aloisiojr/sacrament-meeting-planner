@@ -1,0 +1,224 @@
+# =============================================================================
+# ARCH_M036.yaml
+# Architecture for Batch 21 Phase 2: F135, F136, F137
+# CR-193 (Settings reorganization), CR-199 (StatusLED alignment), CR-200 (Play icon size)
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "UI refinements: reorganize Settings into 2 labeled groups, align StatusLED with speaker field, enlarge play icons"
+  principles:
+    - "Style-only and layout-only changes; no new data flows, no DB changes, no new hooks"
+    - "Minimal blast radius; each feature touches 1-2 files plus i18n"
+    - "Preserve all existing permission gating and behavior unchanged"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F135 (Settings Reorganization):
+    settings/index.tsx: Section1+Section2+Section3 -> Group1(Ward)+Group2(App)
+    i18n: +settings.wardSettingsGroup, +settings.appSettingsGroup
+
+  F136 (StatusLED Alignment):
+    SpeechSlot.tsx: labelRow gains paddingRight:36 (= actionArea width)
+
+  F137 (Play Icon Size):
+    index.tsx: playIcon fontSize 17->20
+    agenda.tsx: playButton fontSize 14->18, marginRight 8->12
+
+# =============================================================================
+# COMPONENTS (affected, not new)
+# =============================================================================
+
+components:
+  - name: "SettingsScreen"
+    responsibility: "Render settings items organized in labeled groups with permission gating"
+    dependencies: ["AuthContext", "ThemeContext", "i18n"]
+    changes:
+      - "Restructure from 3 unlabeled sections into 2 labeled groups"
+      - "Group 1 'Configuracoes da Ala': members, topics, whatsappTemplate, wardLanguage, timezone"
+      - "Group 2 'Configuracoes do App': users, history, appLanguage, theme, about"
+      - "Add group label Text components above each card section"
+      - "Group 1 label hidden when all items permission-gated (Observer case)"
+      - "Add sectionLabel style: fontSize 13, fontWeight 600, textTransform uppercase, color textSecondary"
+
+  - name: "SpeechSlot"
+    responsibility: "Single speech position with speaker/topic fields, status LED, and action buttons"
+    dependencies: ["StatusLED", "AuthContext", "ThemeContext"]
+    changes:
+      - "Add paddingRight: 36 to labelRow style to offset StatusLED right edge by actionArea width"
+      - "This aligns StatusLED right edge with speaker field right edge"
+
+  - name: "HomeTab"
+    responsibility: "Home tab with meeting button, preview card, and role-aware sections"
+    dependencies: ["ThemeContext", "Router"]
+    changes:
+      - "playIcon style fontSize changed from 17 to 20"
+
+  - name: "AgendaTab"
+    responsibility: "Infinite scroll list of sundays with expandable agenda cards"
+    dependencies: ["ThemeContext", "Router"]
+    changes:
+      - "playButton style fontSize changed from 14 to 18"
+      - "playButton style marginRight changed from 8 to 12 (more spacing from chevron)"
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "settings_group_labels"
+    component: "SettingsScreen"
+    type: "i18n"
+    methods:
+      - name: "settings.wardSettingsGroup"
+        input: "i18n key lookup"
+        output: "pt-BR: 'Configuracoes da Ala' | en: 'Ward Settings' | es: 'Configuraciones del Barrio'"
+      - name: "settings.appSettingsGroup"
+        input: "i18n key lookup"
+        output: "pt-BR: 'Configuracoes do App' | en: 'App Settings' | es: 'Configuraciones de la App'"
+
+  - name: "settings_group_visibility"
+    component: "SettingsScreen"
+    type: "rendering_logic"
+    methods:
+      - name: "renderGroup1"
+        input: "isObserver: boolean, hasPermission: (perm) => boolean"
+        output: "Group 1 rendered if !isObserver (at least some items visible). Label + card with permission-gated items."
+      - name: "renderGroup2"
+        input: "isObserver: boolean, hasPermission: (perm) => boolean"
+        output: "Group 2 always rendered (appLanguage, theme, about visible to all). Non-observer also sees users, history."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No data model changes. All 3 features are pure UI/style changes."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    No security changes. Permission gating in Settings remains identical.
+    Observer continues to see only Group 2 items (appLanguage, theme, about).
+    Bispado does not see WhatsApp template (settings:whatsapp permission check preserved).
+    All existing hasPermission() checks are preserved, just reorganized into groups.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: "No observability changes. No new logs, no new metrics."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-087
+    title: "Settings reorganization from 3 sections to 2 labeled groups"
+    context: >
+      Settings tab has 3 unlabeled card sections mixing ward and app settings.
+      Users cannot distinguish ward-specific vs app-specific settings.
+    decision: >
+      Restructure into 2 groups with visible labels: 'Configuracoes da Ala'
+      (ward-scoped items) and 'Configuracoes do App' (user-scoped items).
+      wardLanguage and timezone move from Section 3 to Group 1.
+      users and history move from Section 2 to Group 2.
+      Group 1 label hidden for Observer (no visible items).
+    consequences:
+      - "Clearer mental model for users separating ward vs app settings"
+      - "Observer experience unchanged (sees only app items)"
+      - "Item order within groups follows logical priority (data, config, display)"
+
+  - id: ADR-088
+    title: "StatusLED alignment via labelRow paddingRight matching actionArea width"
+    context: >
+      StatusLED in labelRow spans full width, but speaker field uses flex:1
+      followed by a 36px actionArea. StatusLED right edge is 36px further
+      right than speaker field right edge.
+    decision: >
+      Add paddingRight: 36 to labelRow style. This offsets the statusSection
+      rightward boundary to match the speaker field right edge. No changes to
+      actionArea or speaker row layout.
+    consequences:
+      - "Visual alignment achieved with minimal CSS change"
+      - "X button position unchanged (actionArea untouched)"
+      - "Status text may truncate slightly earlier on narrow screens (acceptable)"
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/app/(tabs)/settings/index.tsx
+    feature: F135
+    changes:
+      - "Restructure JSX from 3 sections to 2 groups"
+      - "Add sectionLabel style and group label Text components"
+      - "Move wardLanguage and timezone into Group 1"
+      - "Move users and history into Group 2"
+      - "Conditional render of Group 1 label (!isObserver)"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F135
+    changes:
+      - "Add settings.wardSettingsGroup: 'Configuracoes da Ala'"
+      - "Add settings.appSettingsGroup: 'Configuracoes do App'"
+
+  - file: src/i18n/locales/en.json
+    feature: F135
+    changes:
+      - "Add settings.wardSettingsGroup: 'Ward Settings'"
+      - "Add settings.appSettingsGroup: 'App Settings'"
+
+  - file: src/i18n/locales/es.json
+    feature: F135
+    changes:
+      - "Add settings.wardSettingsGroup: 'Configuraciones del Barrio'"
+      - "Add settings.appSettingsGroup: 'Configuraciones de la App'"
+
+  - file: src/components/SpeechSlot.tsx
+    feature: F136
+    changes:
+      - "Add paddingRight: 36 to labelRow style"
+
+  - file: src/app/(tabs)/index.tsx
+    feature: F137
+    changes:
+      - "Change playIcon fontSize from 17 to 20"
+
+  - file: src/app/(tabs)/agenda.tsx
+    feature: F137
+    changes:
+      - "Change playButton fontSize from 14 to 18"
+      - "Change playButton marginRight from 8 to 12"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true   # Read ARCH_CONSOLIDATED before starting
+  GATE-02_single_responsibility: true    # Each component has one responsibility
+  GATE-03_contracts_defined: true        # i18n contracts and visibility logic defined
+  GATE-04_adrs_recorded: true           # ADR-087 (Settings reorg), ADR-088 (LED alignment)
+  GATE-05_arch_saved: true              # ARCH_M036.yaml saved to disk
+  GATE-06_arch_consolidated_updated: true # Will update ARCH_CONSOLIDATED
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 4 components affected, well under 10 limit

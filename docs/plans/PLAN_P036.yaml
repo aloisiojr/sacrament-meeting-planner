@@ -1,0 +1,373 @@
+# =============================================================================
+# PLAN_P036.yaml
+# Batch 21 Phase 2: Settings Reorganization, StatusLED Alignment, Play Icon Size
+# Features: F135, F136, F137
+# CRs: CR-193, CR-199, CR-200
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  UI refinements for 3 features: reorganize Settings tab from 3 unlabeled sections
+  into 2 labeled groups ("Configuracoes da Ala" and "Configuracoes do App") with
+  i18n labels in 3 languages and proper permission gating (CR-193/F135), align
+  StatusLED right edge with speaker field right edge via paddingRight:36 on
+  labelRow in SpeechSlot (CR-199/F136), and enlarge play icon fontSize in Home
+  button (17->20) and Agenda card (14->18) with marginRight adjustment (CR-200/F137).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # ---------------------------------------------------------------------------
+  # STEP-01: F135 - Add i18n keys for group labels
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Add i18n keys for the 2 Settings group labels in all 3 locale files:
+      (1) pt-BR.json: settings.wardSettingsGroup = "Configuracoes da Ala",
+          settings.appSettingsGroup = "Configuracoes do App"
+      (2) en.json: settings.wardSettingsGroup = "Ward Settings",
+          settings.appSettingsGroup = "App Settings"
+      (3) es.json: settings.wardSettingsGroup = "Configuraciones del Barrio",
+          settings.appSettingsGroup = "Configuraciones de la App"
+      Add the keys inside the existing "settings" object in each file.
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    dependencies: []
+    parallelizable_with: ["STEP-03", "STEP-04"]
+    done_when:
+      - "pt-BR.json contains settings.wardSettingsGroup = 'Configuracoes da Ala'"
+      - "pt-BR.json contains settings.appSettingsGroup = 'Configuracoes do App'"
+      - "en.json contains settings.wardSettingsGroup = 'Ward Settings'"
+      - "en.json contains settings.appSettingsGroup = 'App Settings'"
+      - "es.json contains settings.wardSettingsGroup = 'Configuraciones del Barrio'"
+      - "es.json contains settings.appSettingsGroup = 'Configuraciones de la App'"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Verify i18n key settings.wardSettingsGroup exists in all 3 locale files with correct values"
+      - type: unit
+        description: "Verify i18n key settings.appSettingsGroup exists in all 3 locale files with correct values"
+    covers:
+      acceptance_criteria: [AC-135-07, AC-135-08]
+      edge_cases: []
+    risks:
+      - risk: "JSON syntax error if comma placement is incorrect"
+        mitigation: "Validate JSON after editing each file; place new keys after existing settings keys"
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: F135 - Restructure Settings screen into 2 labeled groups
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Restructure settings/index.tsx from 3 unlabeled sections to 2 labeled groups:
+
+      Current structure (3 sections):
+        Section 1 (!isObserver): members, topics
+        Section 2 (!isObserver): users, history, whatsappTemplate
+        Section 3 (all): appLanguage, wardLanguage, timezone, theme, about
+
+      New structure (2 groups):
+        Group 1 - "Configuracoes da Ala" (!isObserver):
+          - members (hasPermission member:read)
+          - topics (hasPermission topic:write)
+          - whatsappTemplate (hasPermission settings:whatsapp) [moved from Section 2]
+          - wardLanguage (hasPermission settings:language) [moved from Section 3]
+          - timezone (!isObserver && hasPermission settings:timezone) [moved from Section 3]
+
+        Group 2 - "Configuracoes do App" (all):
+          - users (hasPermission settings:users) [moved from Section 2]
+          - history (hasPermission history:read) [moved from Section 2]
+          - appLanguage (all) [moved from Section 3]
+          - theme (all) [moved from Section 3]
+          - about (all) [moved from Section 3]
+
+      Implementation:
+      (1) Add sectionLabel style: fontSize 13, fontWeight '600', textTransform
+          'uppercase', color colors.textSecondary, paddingHorizontal 16,
+          paddingTop 16, paddingBottom 8.
+      (2) Render Group 1 label + card conditionally: {!isObserver && (<>label + card</>)}.
+          The Group 1 label uses t('settings.wardSettingsGroup').
+      (3) Render Group 2 label always: t('settings.appSettingsGroup').
+          Group 2 card contains users+history (permission gated) + appLanguage+theme+about.
+      (4) Sign Out button remains after both groups, unchanged.
+      (5) All permission checks (hasPermission) remain identical, just reorganized.
+    files:
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Group 1 label 'Configuracoes da Ala' visible for Bispado/Secretario users"
+      - "Group 1 label NOT visible for Observer users"
+      - "Group 1 card contains: members, topics, whatsappTemplate, wardLanguage, timezone (all permission gated)"
+      - "Group 2 label 'Configuracoes do App' visible for ALL users"
+      - "Group 2 card contains: users, history, appLanguage, theme, about"
+      - "Sign Out button at the bottom, below both groups"
+      - "Observer sees only Group 2 with appLanguage, theme, about"
+      - "Bispado sees Group 1 with 4 items (no whatsapp) + Group 2 with 5 items"
+      - "Secretario sees Group 1 with 5 items (including whatsapp) + Group 2 with 5 items"
+      - "sectionLabel style matches: fontSize 13, fontWeight 600, uppercase, textSecondary"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Test Group 1 label rendered for Bispado user"
+      - type: unit
+        description: "Test Group 1 label NOT rendered for Observer user"
+      - type: unit
+        description: "Test Group 2 label rendered for ALL users (including Observer)"
+      - type: unit
+        description: "Test Group 1 items order: members, topics, whatsappTemplate, wardLanguage, timezone"
+      - type: unit
+        description: "Test Group 2 items order: users, history, appLanguage, theme, about"
+      - type: unit
+        description: "Test Observer sees only appLanguage, theme, about in Group 2"
+      - type: unit
+        description: "Test Bispado does not see whatsappTemplate in Group 1 (permission gated)"
+      - type: unit
+        description: "Test Secretario sees whatsappTemplate in Group 1"
+      - type: unit
+        description: "Test Sign Out button is present after both groups"
+      - type: unit
+        description: "Test sectionLabel style (fontSize 13, fontWeight 600, uppercase, textSecondary)"
+    covers:
+      acceptance_criteria: [AC-135-01, AC-135-02, AC-135-03, AC-135-04, AC-135-05, AC-135-06, AC-135-09, AC-135-10, AC-135-11, AC-135-12]
+      edge_cases: [EC-135-01, EC-135-02, EC-135-03]
+    risks:
+      - risk: "Ward language modal and handler code must remain functional after reorganization"
+        mitigation: "Modal code is outside the ScrollView sections; only the SettingsItem trigger moves between groups"
+      - risk: "Style regression if section spacing changes"
+        mitigation: "Use same styles.section for cards within each group; add only the new sectionLabel style"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: F136 - Align StatusLED right edge with speaker field right edge
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Add paddingRight: 36 to labelRow style in SpeechSlot.tsx:
+      (1) Locate the labelRow style (currently: flexDirection 'row',
+          justifyContent 'space-between', alignItems 'center', marginBottom 6).
+      (2) Add paddingRight: 36.
+      (3) This offsets the StatusLED right edge to align with the speaker
+          field right edge, since the speaker field is followed by an
+          actionArea of width: 36.
+      (4) The X button position (actionArea) is NOT affected.
+      (5) The labelWithToggle and statusSection within labelRow are NOT modified.
+    files:
+      - src/components/SpeechSlot.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04"]
+    done_when:
+      - "SpeechSlot.tsx labelRow style includes paddingRight: 36"
+      - "StatusLED right edge aligns with speaker field right edge visually"
+      - "actionArea (X button) position unchanged"
+      - "Status text and StatusLED remain in the same row (statusSection unchanged)"
+      - "Position 2 disabled state renders correctly"
+      - "Toggle switch for position 2 is not affected"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Test labelRow style includes paddingRight: 36"
+      - type: unit
+        description: "Test SpeechSlot renders correctly for all 3 positions with speaker assigned"
+      - type: unit
+        description: "Test position 2 disabled state is not affected by paddingRight change"
+      - type: unit
+        description: "Test actionArea width: 36 is unchanged"
+    covers:
+      acceptance_criteria: [AC-136-01, AC-136-02, AC-136-03, AC-136-04, AC-136-05, AC-136-06]
+      edge_cases: [EC-136-01, EC-136-02, EC-136-03]
+    risks:
+      - risk: "Status text could truncate earlier on narrow screens due to reduced available width"
+        mitigation: "Status text already uses short labels; 36px reduction is acceptable per ADR-088"
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: F137 - Enlarge play icon in Home and Agenda
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Increase play icon fontSize in 2 locations:
+      (1) Home tab (src/app/(tabs)/index.tsx):
+          Change playIcon style fontSize from 17 to 20.
+          The meetingButtonContent uses flexDirection:'row' and alignItems:'center',
+          so vertical alignment is preserved automatically.
+      (2) Agenda tab (src/app/(tabs)/agenda.tsx):
+          Change playButton style fontSize from 14 to 18.
+          Change playButton style marginRight from 8 to 12.
+          This increases spacing between play icon and chevron arrow.
+      No other changes needed. Tap targets and navigation behavior unchanged.
+    files:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+    done_when:
+      - "index.tsx playIcon style has fontSize: 20"
+      - "agenda.tsx playButton style has fontSize: 18"
+      - "agenda.tsx playButton style has marginRight: 12"
+      - "Play icon in Home is visually taller, matching text line height"
+      - "Play icon in Agenda is visually larger and separated from chevron"
+      - "Vertical alignment preserved in Home button (alignItems center)"
+      - "Play icon tap targets work correctly (navigation unchanged)"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Test Home playIcon style has fontSize >= 20"
+      - type: unit
+        description: "Test Agenda playButton style has fontSize >= 18"
+      - type: unit
+        description: "Test Agenda playButton style has marginRight >= 12 (spacing from chevron)"
+      - type: unit
+        description: "Test collapsed agenda card does not show play icon (isExpanded check preserved)"
+    covers:
+      acceptance_criteria: [AC-137-01, AC-137-02, AC-137-03, AC-137-04, AC-137-05, AC-137-06]
+      edge_cases: [EC-137-01, EC-137-02]
+    risks:
+      - risk: "Play icon might look disproportionate after resize"
+        mitigation: "Unicode triangle U+25B6 renders at ~70-75% fontSize height; 20 yields ~14-15px matching 17px text"
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: Tests for F135, F136, F137
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Write comprehensive tests for all 3 features in a new test file:
+      (1) F135 tests:
+          - Settings screen renders Group 1 label for Bispado/Secretario
+          - Settings screen hides Group 1 for Observer
+          - Group 2 label always visible
+          - Items in correct order within each group
+          - i18n keys exist in all 3 locale files
+          - Bispado does not see whatsappTemplate (permission check)
+          - Secretario sees whatsappTemplate
+          - Observer sees only appLanguage, theme, about
+          - Sign Out button present at bottom
+          - sectionLabel style validation
+          - Group 1 hidden when all items permission-gated
+      (2) F136 tests:
+          - labelRow has paddingRight: 36
+          - SpeechSlot renders all 3 positions correctly
+          - Position 2 disabled state unaffected
+          - actionArea width unchanged
+          - StatusLED alignment with not_assigned status
+      (3) F137 tests:
+          - Home playIcon fontSize >= 20
+          - Agenda playButton fontSize >= 18
+          - Agenda playButton marginRight >= 12
+          - Collapsed card does not show play icon
+          - Play icon navigation works
+      (4) Run npx tsc --noEmit to verify zero TS errors.
+      (5) Run npx vitest run to verify all tests pass.
+    files:
+      - src/__tests__/batch21-phase2-f135-f137.test.ts
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "Test file batch21-phase2-f135-f137.test.ts exists"
+      - "Tests cover all ACs for F135, F136, F137"
+      - "All new tests pass"
+      - "All existing tests pass"
+      - "npx tsc --noEmit returns 0 errors"
+      - "npx vitest run passes 100% of tests"
+    tests:
+      - type: integration
+        description: "Full test suite validation: all existing + new tests pass"
+    covers:
+      acceptance_criteria: [AC-135-01, AC-135-02, AC-135-03, AC-135-04, AC-135-05, AC-135-06, AC-135-07, AC-135-08, AC-135-09, AC-135-10, AC-135-11, AC-135-12, AC-136-01, AC-136-02, AC-136-03, AC-136-04, AC-136-05, AC-136-06, AC-137-01, AC-137-02, AC-137-03, AC-137-04, AC-137-05, AC-137-06]
+      edge_cases: [EC-135-01, EC-135-02, EC-135-03, EC-136-01, EC-136-02, EC-136-03, EC-137-01, EC-137-02]
+    risks:
+      - risk: "Test file could become large with 24 ACs and 8 ECs"
+        mitigation: "Group tests by feature (F135, F136, F137) with describe blocks"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  # F135: Settings reorganization
+  - ac_id: AC-135-01
+    how_to_verify: "Test: Group 1 label 'Configuracoes da Ala' rendered for Bispado user"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-02
+    how_to_verify: "Test: Group 2 label 'Configuracoes do App' rendered for all users"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-03
+    how_to_verify: "Test: Group 1 card contains members, topics, whatsappTemplate, wardLanguage, timezone for Bispado (4 items, no whatsapp)"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-04
+    how_to_verify: "Test: Group 2 card contains users, history, appLanguage, theme, about for Bispado"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-05
+    how_to_verify: "Test: Observer sees no Group 1, only Group 2 with appLanguage, theme, about"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-06
+    how_to_verify: "Test: Secretario sees Group 1 with whatsappTemplate between topics and wardLanguage"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-07
+    how_to_verify: "grep settings.wardSettingsGroup in all 3 locale files shows correct translations"
+    covered_by_steps: ["STEP-01", "STEP-05"]
+  - ac_id: AC-135-08
+    how_to_verify: "grep settings.appSettingsGroup in all 3 locale files shows correct translations"
+    covered_by_steps: ["STEP-01", "STEP-05"]
+  - ac_id: AC-135-09
+    how_to_verify: "Code review: sectionLabel style has fontSize 13, fontWeight 600, textTransform uppercase, color textSecondary, paddingHorizontal 16, paddingTop 16, paddingBottom 8"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-10
+    how_to_verify: "Code review: Sign Out button rendered after both groups"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-11
+    how_to_verify: "Code review: wardLanguage and timezone are in Group 1, not in Group 2"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+  - ac_id: AC-135-12
+    how_to_verify: "Code review: users and history are in Group 2"
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  # F136: StatusLED alignment
+  - ac_id: AC-136-01
+    how_to_verify: "Code review: labelRow style includes paddingRight: 36"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+  - ac_id: AC-136-02
+    how_to_verify: "Code review: actionArea width:36 unchanged"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+  - ac_id: AC-136-03
+    how_to_verify: "Test: SpeechSlot renders for positions 1, 2, 3 with speakers (all use same labelRow)"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+  - ac_id: AC-136-04
+    how_to_verify: "Code review: statusSection style (flexDirection row, alignItems center, gap 6) unchanged"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+  - ac_id: AC-136-05
+    how_to_verify: "Test: position 2 disabled state renders correctly (statusSection hidden)"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+  - ac_id: AC-136-06
+    how_to_verify: "Code review: labelWithToggle and toggle switch code unchanged"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  # F137: Play icon size
+  - ac_id: AC-137-01
+    how_to_verify: "Code review: playIcon fontSize is 20 in index.tsx"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-137-02
+    how_to_verify: "Code review: playButton fontSize is 18 in agenda.tsx"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-137-03
+    how_to_verify: "Code review: playButton marginRight is 12 in agenda.tsx"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-137-04
+    how_to_verify: "Code review: meetingButtonContent flexDirection:'row' and alignItems:'center' preserved in index.tsx"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-137-05
+    how_to_verify: "Test: play icon and chevron are separate tappable elements with visible gap"
+    covered_by_steps: ["STEP-04", "STEP-05"]
+  - ac_id: AC-137-06
+    how_to_verify: "Test: tapping play icon navigates to Presentation screen (routing behavior unchanged)"
+    covered_by_steps: ["STEP-04", "STEP-05"]

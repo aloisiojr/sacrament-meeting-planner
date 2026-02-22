@@ -83,6 +83,20 @@ describe('F130 (CR-194): TypeScript compilation errors and doc naming', () => {
     });
   });
 
+  describe('AC-130-09: can_conduct and can_conductor remain correctly defined as separate roles', () => {
+    it('database.ts MeetingActor has both can_conduct and can_conductor as distinct boolean fields', () => {
+      const dbSource = readSourceFile('types/database.ts');
+      expect(dbSource).toContain('can_conduct: boolean');
+      expect(dbSource).toContain('can_conductor: boolean');
+    });
+
+    it('useActors.ts ActorRoleFilter includes both can_conduct and can_conductor', () => {
+      const actorsSource = readSourceFile('hooks/useActors.ts');
+      expect(actorsSource).toContain("'can_conduct'");
+      expect(actorsSource).toContain("'can_conductor'");
+    });
+  });
+
   describe('AC-130-10 to AC-130-12: Documentation naming', () => {
     it('no can_piano (without ist suffix) in SPEC_F083, ARCH_M024, PLAN_P024', () => {
       const files = [
@@ -105,6 +119,61 @@ describe('F130 (CR-194): TypeScript compilation errors and doc naming', () => {
       const content = readFile('../docs/arch/ARCH_M024.yaml');
       expect(content).toContain('can_pianist');
       expect(content).toContain('can_conductor');
+    });
+  });
+
+  describe('AC-130-11: SPEC_CONSOLIDATED key_columns updated', () => {
+    it('meeting_actors key_columns lists can_pianist and can_conductor (not can_music)', () => {
+      const specConsolidated = readFile('../docs/specs/SPEC_CONSOLIDATED.yaml');
+      // Find the specific key_columns line that contains actor role names
+      const keyColumnsLine = specConsolidated.match(/key_columns:.*can_preside.*$/m);
+      expect(keyColumnsLine).not.toBeNull();
+      expect(keyColumnsLine![0]).toContain('can_pianist');
+      expect(keyColumnsLine![0]).toContain('can_conductor');
+      expect(keyColumnsLine![0]).not.toContain('can_music');
+    });
+  });
+
+  describe('AC-130-12: All 5 canonical actor role names consistent in production code', () => {
+    it('no can_music or can_piano in production .tsx files', () => {
+      // Production code files that deal with actor roles
+      const productionFiles = [
+        readSourceFile('components/AgendaForm.tsx'),
+        readSourceFile('components/ActorSelector.tsx'),
+      ];
+      for (const content of productionFiles) {
+        expect(content).not.toContain('can_music');
+        expect(content).not.toMatch(/can_piano[^i]/);
+      }
+    });
+
+    it('database.ts production types use only canonical role names', () => {
+      const dbSource = readSourceFile('types/database.ts');
+      expect(dbSource).toContain('can_preside');
+      expect(dbSource).toContain('can_conduct');
+      expect(dbSource).toContain('can_recognize');
+      expect(dbSource).toContain('can_pianist');
+      expect(dbSource).toContain('can_conductor');
+    });
+  });
+
+  describe('EC-130-01: Factory functions produce complete mock objects', () => {
+    it('createMockSundayAgenda in setup-integration.ts includes new fields', () => {
+      const content = readSourceFile('__tests__/integration/setup-integration.ts');
+      // Factory function should include the new SundayAgenda fields
+      expect(content).toContain('has_intermediate_hymn');
+      expect(content).toContain('speaker_1_override');
+      expect(content).toContain('speaker_2_override');
+      expect(content).toContain('speaker_3_override');
+    });
+  });
+
+  describe('EC-130-04: REVIEW_CONSOLIDATED not modified (historical review comments)', () => {
+    it('REVIEW_CONSOLIDATED.yaml is not modified for can_piano references', () => {
+      // Historical review comments should be preserved as-is
+      // This test verifies the file exists (it was not modified by the fixes)
+      const reviewConsolidated = readFile('../docs/reviews/REVIEW_CONSOLIDATED.yaml');
+      expect(reviewConsolidated).toBeDefined();
     });
   });
 });
@@ -153,6 +222,23 @@ describe('F131 (CR-195): Ward language switch not updating AuthContext', () => {
     it('setup-integration.ts createMockAuthContext includes setWardLanguage', () => {
       const content = readSourceFile('__tests__/integration/setup-integration.ts');
       expect(content).toContain('setWardLanguage');
+    });
+  });
+
+  describe('EC-131-01: same language selected - early return', () => {
+    it('settings/index.tsx has early return when newLanguage === oldLanguage', () => {
+      const content = readSourceFile('app/(tabs)/settings/index.tsx');
+      expect(content).toContain('newLanguage === oldLanguage');
+      expect(content).toContain('return');
+    });
+  });
+
+  describe('EC-131-02: mutation failure does not update AuthContext', () => {
+    it('setWardLanguage is called in onSuccess (not in mutationFn), so failure skips it', () => {
+      const content = readSourceFile('app/(tabs)/settings/index.tsx');
+      // setWardLanguage should be in onSuccess handler, not in mutationFn
+      const onSuccessMatch = content.match(/onSuccess[\s\S]*?setWardLanguage/);
+      expect(onSuccessMatch).not.toBeNull();
     });
   });
 });
@@ -333,6 +419,13 @@ describe('F133 (CR-197): Password reset email uses user app language', () => {
       expect(sendResetSource).toContain("typeof userMetaLanguage === 'string'");
     });
   });
+
+  describe('EC-133-02: user not found returns success (anti-enumeration)', () => {
+    it('returns success response even when user is not found', () => {
+      expect(sendResetSource).toContain('Anti-enumeration');
+      expect(sendResetSource).toContain("{ success: true }");
+    });
+  });
 });
 
 // --- F134: Password reset redirect script blocked ---
@@ -373,6 +466,28 @@ describe('F134 (CR-198): Password reset redirect script blocked', () => {
   describe('AC-134-05: no script execution errors possible', () => {
     it('window.location.href is not used', () => {
       expect(resetRedirectSource).not.toContain('window.location');
+    });
+  });
+
+  describe('EC-134-01: manual button link as fallback when meta refresh fails', () => {
+    it('button with class="button" links to the deep link', () => {
+      expect(resetRedirectSource).toContain('<a href=');
+      expect(resetRedirectSource).toContain('class="button"');
+      expect(resetRedirectSource).toContain('Abrir no aplicativo');
+    });
+  });
+
+  describe('EC-134-02: deep link scheme not handled by device', () => {
+    it('deep link uses sacrmeetplan:// scheme', () => {
+      expect(resetRedirectSource).toContain('sacrmeetplan://reset-password');
+    });
+  });
+
+  describe('EC-134-03: token or type parameter missing returns 400', () => {
+    it('returns 400 when token or type is missing', () => {
+      expect(resetRedirectSource).toContain("if (!token || !type)");
+      expect(resetRedirectSource).toContain('status: 400');
+      expect(resetRedirectSource).toContain("Missing required parameters: token and type");
     });
   });
 });

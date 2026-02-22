@@ -58,10 +58,10 @@ export default function SettingsScreen() {
       const oldLanguage = wardLanguage as SupportedLanguage;
       if (newLanguage === oldLanguage) return;
 
-      // 1. Update ward.language in Supabase
+      // 1. Update ward.language and reset whatsapp_template in Supabase
       const { error: wardError } = await supabase
         .from('wards')
-        .update({ language: newLanguage })
+        .update({ language: newLanguage, whatsapp_template: null })
         .eq('id', wardId);
       if (wardError) throw wardError;
 
@@ -104,6 +104,8 @@ export default function SettingsScreen() {
       setWardLanguage(newLanguage);
       // Invalidate topic/collection caches
       queryClient.invalidateQueries({ queryKey: topicKeys.all });
+      // F141: Invalidate ward cache so whatsapp.tsx refetches updated record
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
     },
   });
 

@@ -1,0 +1,300 @@
+# =============================================================================
+# QA_PLAN_batch20_phase1.yaml
+# QA Validation Plan for Batch 20 Phase 1 (CR-194, CR-195, CR-196, CR-197, CR-198)
+# Created: 2026-02-22
+# =============================================================================
+
+type: qa_plan
+id: QA-batch20-phase1
+created_at: "2026-02-22"
+request_type: bugfix
+feature_or_bug: "5 bug fixes: actor roles/TS, ward language switch, 2nd speech issues, password reset email language, password reset HTML sandbox"
+
+user_request: |
+  8 pedidos agrupados (Phase 1 = 5 bug fixes):
+  1. Revisao geral dos papeis dos atores, principalmente nos testes. Problemas de TS, testes nao passando, inconsistencia "can_conduct" vs "can_conductor" no codigo.
+  2. Botao de troca de idioma da Ala nao funciona. Ao clicar e confirmar, nao troca selecao, nao troca idioma das colecoes nem do modelo do WhatsApp.
+  3. Funcionalidade de 2o Discurso opcional com multiplos erros: (4.1) toggle desligado apaga so discursante, deveria apagar tema tambem; (4.2) aba Discursos card expandido toggle desligado troca campos por mensagem de aviso ao inves de so desativar; (4.3) aba Agendas card expandido sem 2o discurso mostra texto no campo desabilitado; (4.4) card contraido agenda com 2o discurso desabilitado deve mostrar X/2 ao inves de X/3.
+  4. Email de recuperacao de senha deve usar idioma do app, nao da ala.
+  5. Botao de reset de senha no email resulta em HTML estatico. Erro sandbox: allow-scripts permission not set. Edge Function reset-redirect precisa redirecionar sem scripts.
+
+# =============================================================================
+# Baseline: Estado atual do sistema antes do desenvolvimento
+# =============================================================================
+
+baseline:
+  description: |
+    Batch 20 Phase 1 - 5 bug fixes identified and confirmed in the codebase.
+    All 5064 vitest tests currently pass. TypeScript compilation shows 12 errors
+    across production code and test files.
+  evidence:
+    - "All 5064 vitest tests pass (82 test files)"
+    - "npx tsc --noEmit reveals 12 TypeScript errors in production and test files"
+    - "CR-194: can_conduct and can_conductor both exist as separate roles in types/database.ts (line 155-156) and useActors.ts ActorRoleFilter type - no naming inconsistency found in code, but TS errors exist in test mocks"
+    - "CR-195: wardLanguageChangeMutation in settings/index.tsx does NOT update AuthContext wardLanguage state after mutation success, only invalidates topic cache"
+    - "CR-196.1: useRemoveAssignment in useSpeeches.ts (line 293-312) only clears speaker fields, NOT topic fields"
+    - "CR-196.2: SpeechSlot.tsx line 197-201 shows disabled placeholder text when position 2 is off instead of just disabling the fields"
+    - "CR-196.3: AgendaForm.tsx line 420-428 correctly hides 2nd speaker row when has_second_speech is false"
+    - "CR-196.4: agenda.tsx line 460 iterates all 3 positions and line 494 hardcodes total:3; index.tsx line 203 also hardcodes total:3"
+    - "CR-197: send-reset-email/index.ts line 152-160 uses ward.language instead of user.user_metadata.language"
+    - "CR-198: reset-redirect/index.ts line 92 contains <script>window.location.href='...'</script> that gets blocked in sandboxed iframes"
+
+# =============================================================================
+# Validation Checks (executados no POST)
+# =============================================================================
+
+validation_checks:
+
+  # ---------------------------------------------------------------------------
+  # CR-194: Actor roles review / TS issues
+  # ---------------------------------------------------------------------------
+  - id: VC-194-01
+    description: "can_conduct and can_conductor are properly defined as separate roles in database types"
+    type: functional
+    how_to_verify: "Read src/types/database.ts MeetingActor interface and verify both can_conduct (boolean) and can_conductor (boolean) exist as distinct fields"
+    expected_result: "Both fields exist and are boolean type. No naming inconsistency between can_conduct (condutor da reuniao) and can_conductor (regente musical)"
+    priority: must_pass
+
+  - id: VC-194-02
+    description: "ActorRoleFilter type includes both can_conduct and can_conductor"
+    type: functional
+    how_to_verify: "Read src/hooks/useActors.ts and verify ActorRoleFilter union type includes both roles"
+    expected_result: "ActorRoleFilter = 'all' | 'can_preside' | 'can_conduct' | 'can_recognize' | 'can_pianist' | 'can_conductor'"
+    priority: must_pass
+
+  - id: VC-194-03
+    description: "TypeScript compilation errors in test files are resolved"
+    type: functional
+    how_to_verify: "Run npx tsc --noEmit and check for errors in test files related to SundayAgenda mock objects"
+    expected_result: "No TS errors in test files (phase02-database-types, phase04-agenda-presentation, setup-integration, usePresentationMode-utils)"
+    priority: must_pass
+
+  - id: VC-194-04
+    description: "TypeScript compilation errors in production code are resolved"
+    type: functional
+    how_to_verify: "Run npx tsc --noEmit and check for errors in speeches.tsx, AgendaForm.tsx, DebouncedTextInput.tsx"
+    expected_result: "No TS errors in production source files"
+    priority: must_pass
+
+  - id: VC-194-05
+    description: "All existing tests continue to pass after fixes"
+    type: regression
+    how_to_verify: "Run npx vitest run and verify all tests pass"
+    expected_result: "All tests pass (5064+ tests)"
+    priority: must_pass
+
+  - id: VC-194-06
+    description: "ActorSelector correctly maps roleFilter to input fields for all 5 roles"
+    type: functional
+    how_to_verify: "Read src/components/ActorSelector.tsx and verify handleAdd sets correct boolean flag for each roleFilter value"
+    expected_result: "can_preside, can_conduct, can_recognize, can_pianist, can_conductor each map correctly"
+    priority: should_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-195: Ward language switch not working
+  # ---------------------------------------------------------------------------
+  - id: VC-195-01
+    description: "wardLanguageChangeMutation updates AuthContext wardLanguage state on success"
+    type: functional
+    how_to_verify: "Read settings/index.tsx wardLanguageChangeMutation onSuccess handler and verify it updates the wardLanguage state in AuthContext"
+    expected_result: "After successful mutation, AuthContext.wardLanguage is updated to the new language value so the UI reflects the change"
+    priority: must_pass
+
+  - id: VC-195-02
+    description: "Ward language modal shows updated selection after change"
+    type: behavioral
+    how_to_verify: "Verify the ward language modal's selected state reflects the AuthContext wardLanguage, which should update after mutation"
+    expected_result: "The checkmark in the modal moves to the newly selected language"
+    priority: must_pass
+
+  - id: VC-195-03
+    description: "Collections are deactivated for old language and activated for new language"
+    type: functional
+    how_to_verify: "Read the mutation code in settings/index.tsx and verify it deactivates old language collections and activates new ones"
+    expected_result: "Old language collections set to active=false, new language collections upserted with active=true"
+    priority: must_pass
+
+  - id: VC-195-04
+    description: "WhatsApp template is updated when ward language changes"
+    type: functional
+    how_to_verify: "Check if the mutation also resets or updates the whatsapp_template in the wards table to match the new language"
+    expected_result: "WhatsApp template is updated to default template for the new language, or the user is informed that the template needs manual update"
+    priority: should_pass
+
+  - id: VC-195-05
+    description: "Topic cache is invalidated after language change"
+    type: functional
+    how_to_verify: "Verify queryClient.invalidateQueries is called with topicKeys.all in onSuccess"
+    expected_result: "Topic/collection queries are invalidated so they re-fetch with new language data"
+    priority: must_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-196: 2nd speech toggle multiple bugs
+  # ---------------------------------------------------------------------------
+
+  # Sub-bug 4.1: toggle off should clear both speaker AND topic
+  - id: VC-196-01
+    description: "Toggle off 2nd speech clears both speaker AND topic for position 2"
+    type: functional
+    how_to_verify: "Read speeches.tsx handleToggleSecondSpeech and verify that when disabling, it clears topic_title, topic_link, topic_collection in addition to speaker fields"
+    expected_result: "When toggle turns off, both speaker and topic data for position 2 are cleared (member_id, speaker_name, speaker_phone, topic_title, topic_link, topic_collection all set to null)"
+    priority: must_pass
+
+  - id: VC-196-02
+    description: "useRemoveAssignment clears topic fields as well, or a separate call clears topics"
+    type: functional
+    how_to_verify: "Read useSpeeches.ts useRemoveAssignment mutationFn and verify topic fields are also cleared, or verify speeches.tsx makes an additional call to clear topics"
+    expected_result: "topic_title, topic_link, topic_collection are set to null when removing assignment due to 2nd speech toggle off"
+    priority: must_pass
+
+  # Sub-bug 4.2: Speeches tab expanded card toggle off should just disable, not replace with warning
+  - id: VC-196-03
+    description: "Speeches tab expanded card: toggle off just disables speaker/topic fields (does NOT replace with warning text)"
+    type: behavioral
+    how_to_verify: "Read SpeechSlot.tsx and verify that when isPos2Disabled=true, the component shows disabled fields (grayed out) rather than a text warning message"
+    expected_result: "When position 2 toggle is off in Speeches tab expanded card, the speaker and topic fields appear disabled/grayed out. No warning text message like 'Domingo configurado para nao ter 2o discurso' is shown in this view"
+    priority: must_pass
+
+  # Sub-bug 4.3: Agenda tab expanded card should NOT show text in disabled field
+  - id: VC-196-04
+    description: "Agenda tab expanded card: 2nd speech disabled does NOT show placeholder text in field"
+    type: behavioral
+    how_to_verify: "Read AgendaForm.tsx and verify that when has_second_speech is false, the 2nd speaker row is hidden entirely (not shown with disabled text)"
+    expected_result: "When has_second_speech is false, the 2nd speaker ReadOnlySpeakerRow is not rendered at all. No text like 'Domingo configurado para nao ter 2o discurso' in a disabled field"
+    priority: must_pass
+
+  # Sub-bug 4.4: collapsed card should show X/2 instead of X/3
+  - id: VC-196-05
+    description: "Collapsed card in Agenda tab shows Discursantes X/2 when has_second_speech=false"
+    type: functional
+    how_to_verify: "Read agenda.tsx collapsed speeches status lines and verify the total is dynamic based on has_second_speech"
+    expected_result: "When has_second_speech=false, total=2 (not 3). Speaker count loop iterates only positions [1,3]. Green threshold matches total"
+    priority: must_pass
+
+  - id: VC-196-06
+    description: "Collapsed card in Home tab shows Discursantes X/2 when has_second_speech=false"
+    type: functional
+    how_to_verify: "Read index.tsx (Home tab) status lines and verify the total is dynamic based on has_second_speech"
+    expected_result: "When has_second_speech=false, total=2 (not 3). Green threshold matches total"
+    priority: must_pass
+
+  - id: VC-196-07
+    description: "SundayCard collapsed view shows 2 LEDs when has_second_speech=false"
+    type: regression
+    how_to_verify: "Verify SundayCard.tsx visiblePositions logic works correctly for both true and false values"
+    expected_result: "visiblePositions=[1,2,3] when true, [1,3] when false. LEDs match"
+    priority: should_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-197: Password reset email language
+  # ---------------------------------------------------------------------------
+  - id: VC-197-01
+    description: "send-reset-email Edge Function uses user's app language (user_metadata.language) instead of ward language"
+    type: functional
+    how_to_verify: "Read supabase/functions/send-reset-email/index.ts and verify it reads user.user_metadata.language first, falling back to ward language"
+    expected_result: "Language priority: user.user_metadata.language -> ward.language -> 'pt-BR' fallback"
+    priority: must_pass
+
+  - id: VC-197-02
+    description: "Email template is selected based on app language"
+    type: functional
+    how_to_verify: "Verify getEmailTemplate is called with the user's app language"
+    expected_result: "getEmailTemplate(appLanguage, deepLink) where appLanguage comes from user_metadata first"
+    priority: must_pass
+
+  - id: VC-197-03
+    description: "Fallback to ward language when user has no app language preference"
+    type: edge_case
+    how_to_verify: "Verify fallback chain when user.user_metadata.language is undefined or empty"
+    expected_result: "If user_metadata.language is not set, falls back to ward language, then to pt-BR"
+    priority: should_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-198: Password reset HTML sandbox / script blocked
+  # ---------------------------------------------------------------------------
+  - id: VC-198-01
+    description: "reset-redirect Edge Function does NOT use <script> tags for redirection"
+    type: functional
+    how_to_verify: "Read supabase/functions/reset-redirect/index.ts and verify no <script> tags are used in the HTML response"
+    expected_result: "HTML response uses only meta http-equiv='refresh' and/or <a href> for redirection. No <script> tags present"
+    priority: must_pass
+
+  - id: VC-198-02
+    description: "Redirection works without JavaScript in sandboxed iframes"
+    type: functional
+    how_to_verify: "Verify the HTML response relies on meta refresh tag which works in sandboxed environments"
+    expected_result: "meta http-equiv='refresh' with content='0;url=...' provides immediate redirect without JavaScript"
+    priority: must_pass
+
+  - id: VC-198-03
+    description: "Manual button link still available as fallback"
+    type: functional
+    how_to_verify: "Verify the HTML still contains an <a href> button for manual click fallback"
+    expected_result: "<a href='sacrmeetplan://...' class='button'> element present for users to click manually"
+    priority: should_pass
+
+  - id: VC-198-04
+    description: "Content-Type header remains correct"
+    type: regression
+    how_to_verify: "Verify the response headers include Content-Type: text/html; charset=utf-8"
+    expected_result: "Content-Type: text/html; charset=utf-8 and Cache-Control: no-cache, no-store, must-revalidate"
+    priority: should_pass
+
+# =============================================================================
+# Reproduction steps (for each bug)
+# =============================================================================
+
+reproduction_steps:
+  - bug: CR-194
+    steps:
+      - step: "Run npx tsc --noEmit"
+        expected: "No TypeScript errors"
+        actual: "12 TypeScript errors in test files and production code related to SundayAgenda mock objects missing required properties and type incompatibilities"
+
+  - bug: CR-195
+    steps:
+      - step: "Open Settings > Ward Language > Select different language > Confirm"
+        expected: "Language changes immediately: modal shows new selection, collections switch, WhatsApp template updates"
+        actual: "wardLanguageChangeMutation.onSuccess only invalidates topic cache but does NOT call setWardLanguage in AuthContext. wardLanguage state remains stale, so the UI still shows the old language as selected"
+
+  - bug: CR-196.1
+    steps:
+      - step: "Speeches tab > expand a Sunday > assign speaker and topic to 2nd speech > toggle off 2nd speech"
+        expected: "Both speaker and topic are cleared"
+        actual: "useRemoveAssignment only clears member_id, speaker_name, speaker_phone, status. Topic fields (topic_title, topic_link, topic_collection) are NOT cleared"
+
+  - bug: CR-196.2
+    steps:
+      - step: "Speeches tab > expand a Sunday > toggle off 2nd speech"
+        expected: "Speaker and topic fields appear disabled/grayed out"
+        actual: "SpeechSlot.tsx line 197-201 replaces the fields with a placeholder text message 'speeches.secondSpeechDisabledPlaceholder'"
+
+  - bug: CR-196.4
+    steps:
+      - step: "Agenda tab > collapsed card with has_second_speech=false"
+        expected: "Shows 'Discursantes X/2'"
+        actual: "Shows 'Discursantes X/3' because agenda.tsx line 494 hardcodes total:3 and line 460 iterates positions 1-3"
+
+  - bug: CR-197
+    steps:
+      - step: "User with app language = 'en' in ward with language = 'pt-BR' requests password reset"
+        expected: "Email is in English (user's app language)"
+        actual: "Email is in Portuguese (ward language) because send-reset-email reads ward.language not user.user_metadata.language"
+
+  - bug: CR-198
+    steps:
+      - step: "Click reset password link in email (opened in webmail with sandboxed iframe)"
+        expected: "Page redirects to the app via deep link"
+        actual: "Browser shows 'Blocked script execution because document frame is sandboxed and allow-scripts permission not set'. The meta refresh may work but the script error is visible and alarming"
+
+# =============================================================================
+# Pass criteria
+# =============================================================================
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.
+  Total must_pass: 15
+  Total should_pass: 7
+  Total: 22

@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  last_updated_by: "batch-20"
+  last_updated_by: "batch-21"
   total_modules: 8
-  total_adrs: 75
+  total_adrs: 77
   total_crs_implemented: 122
   pending_arch: "none"
   source_documents:
@@ -41,6 +41,7 @@ metadata:
     - docs/arch/ARCH_M032.yaml
     - docs/arch/ARCH_M033.yaml
     - docs/arch/ARCH_M034.yaml
+    - docs/arch/ARCH_M035.yaml
 
 # =============================================================================
 # TECH STACK
@@ -152,7 +153,7 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023, F101, F113, F114, F116]
+    spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
@@ -181,7 +182,7 @@ modules:
       - delete-user
       - send-reset-email
       - reset-redirect
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178]
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -195,6 +196,9 @@ modules:
       CR-175/F113: Deep link scheme changed from sacrmeetman:// to sacrmeetplan:// in app.json, create-invitation, and send-reset-email.
       CR-176/F114: send-reset-email now uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme in email href. New reset-redirect Edge Function serves HTML with auto-redirect to sacrmeetplan://reset-password deep link.
       CR-178/F116: AuthContext now loads app language from user_metadata.language on login instead of ward language. Exposes wardLanguage and updateAppLanguage(). Per-user app language stored in Supabase Auth user_metadata. Observer gains limited Settings tab (app language, theme, about).
+      CR-195/F131: wardLanguageChangeMutation.onSuccess in settings/index.tsx now calls setWardLanguage() exposed from AuthContext to update local state immediately. AuthContextValue extended with setWardLanguage setter.
+      CR-197/F133: send-reset-email Edge Function now uses user_metadata.language (app language) as first priority for email template. Fallback: ward.language -> pt-BR.
+      CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
 
   - id: M002
     name: WardDataModule
@@ -257,7 +261,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -274,7 +278,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -307,6 +311,8 @@ modules:
       CR-174/F112: SpeechSlot layout restructured to fixed-width right column (36px) for true center-to-center alignment of StatusLED and X buttons. Supersedes ADR-074 paddingRight:5 approach (ADR-076).
       CR-177/F115: SpeechSlot StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only. Supersedes ADR-076 LED placement (ADR-078).
       CR-181/F118: Optional 2nd speech per Sunday. has_second_speech toggle on SpeechSlot position 2. Position 3 label reverts to t('speeches.lastSpeech') in expanded SpeechSlot. SundayCard collapsed: remove ordinal labels, filter position 2 when OFF, show 2 LEDs. Confirmation dialog only when assignments exist. Presentation mode, AgendaForm, InviteManagementSection all respect the flag.
+      CR-194/F130: Fix TypeScript compilation errors in test mocks and production code. SundayAgenda mocks gain missing fields. speeches.tsx null-to-string fix. AgendaForm Member type import fix. Documentation can_piano -> can_pianist.
+      CR-196/F132: Fix 2nd speech toggle: handleToggleSecondSpeech adds separate direct Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder (not single warning). AgendaForm shows disabled ReadOnlySpeakerRow. Agenda/Home collapsed cards use dynamic X/2 or X/3 based on has_second_speech.
 
   - id: M004
     name: AgendaModule
@@ -329,7 +335,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -478,7 +484,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 195, 196]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -524,6 +530,11 @@ modules:
       CR-191/F119: reset-redirect Edge Function Content-Type fix (charset=utf-8) + Cache-Control headers. Root cause investigation for plain-text HTML rendering in Safari.
       CR-186/F128: Home tab Iniciar button gains play icon (U+25B6) before text. Passes date param to Presentation. Non-expandable AgendaPreviewCard below button showing agenda status (dateBlock + status lines + pencil button -> Agenda tab with expandDate). Uses getTodaySundayDate, useAgenda, useSpeeches, useSundayExceptions hooks.
       CR-188/F129: NextSundaysSection cards become non-expandable. All inline editing removed (SpeechSlot, modals, mutation hooks). Pencil button (U+270F) added to each card navigating to Speeches tab with expandDate param (ADR-082). ~130 lines of code removed (net simplification).
+      CR-194/F130: Fix TypeScript errors in test mocks (add missing SundayAgenda fields), speeches.tsx (null-to-string assignment), AgendaForm.tsx (Member type import), DebouncedTextInput.tsx (blur event type), setup-integration.ts (wardLanguage mock), phase04 test (Record type). Documentation fixes: can_piano -> can_pianist in SPEC_F083, ARCH_M024, PLAN_P024; can_music -> can_pianist/can_conductor in SPEC_CONSOLIDATED.
+      CR-195/F131: Settings screen wardLanguageChangeMutation.onSuccess calls setWardLanguage() from AuthContext. AuthContextValue interface extended with setWardLanguage setter.
+      CR-196/F132: Fix 2nd speech toggle bugs. handleToggleSecondSpeech adds separate Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder. AgendaForm always renders ReadOnlySpeakerRow for position 2 (disabled when has_second_speech=false). Agenda/Home collapsed cards use dynamic X/2 or X/3 speaker count.
+      CR-197/F133: send-reset-email Edge Function language resolution changed to priority chain: user_metadata.language -> ward.language -> 'pt-BR' (ADR-086).
+      CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1302,6 +1313,24 @@ adrs:
       - "No risk of regression in agenda.tsx"
       - "Simpler implementation: preview card has no expand/collapse, no past dimming, no chevron"
 
+  - id: ADR-085
+    title: "Separate direct Supabase update for topic fields when toggling off 2nd speech"
+    context: "handleToggleSecondSpeech calls removeAssignment for speaker data, but useRemoveAssignment only clears speaker fields. Topic fields are not cleared."
+    decision: "Add a separate direct supabase.from('speeches').update() to clear topic_title, topic_link, topic_collection after removeAssignment. useRemoveAssignment is NOT modified."
+    decided_in: "CR-196"
+    consequences:
+      - "useRemoveAssignment is not modified, zero risk of regression"
+      - "Two separate database operations (acceptable for infrequent user action)"
+
+  - id: ADR-086
+    title: "User metadata language priority for password reset email"
+    context: "CR-178 separated app language (user_metadata.language) from ward language. send-reset-email still uses ward.language only."
+    decision: "Resolve language with priority chain: user.user_metadata?.language -> ward.language -> 'pt-BR'. getEmailTemplate already handles unknown languages."
+    decided_in: "CR-197"
+    consequences:
+      - "Email arrives in the language the user sees in the app"
+      - "Backward compatible: users without user_metadata.language still get ward language"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1513,18 +1542,18 @@ edge_functions:
   - name: send-reset-email
     auth: "None (unauthenticated, ANON key only)"
     input: "{email}"
-    behavior: "Looks up user, determines ward language, generates recovery token via admin.generateLink, sends translated email via Resend API with HTTPS redirect URL (https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery). CR-175 changed scheme to sacrmeetplan://. CR-176 changed deepLink from custom scheme to HTTPS redirect URL."
+    behavior: "Looks up user, determines email language (priority: user_metadata.language -> ward.language -> pt-BR), generates recovery token via admin.generateLink, sends translated email via Resend API with HTTPS redirect URL (https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery). CR-175 changed scheme to sacrmeetplan://. CR-176 changed deepLink from custom scheme to HTTPS redirect URL. CR-197/F133 changed language resolution from ward-only to user_metadata priority (ADR-086)."
     verify_jwt: false
     added_in: "CR-155"
-    modified_by_crs: [175, 176]
+    modified_by_crs: [175, 176, 197]
 
   - name: reset-redirect
     auth: "None (public endpoint, no JWT required)"
     input: "GET query params: token (required), type (required)"
-    behavior: "Returns HTML page with auto-redirect (meta refresh + JavaScript) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only). CR-191/F119: Content-Type changed to 'text/html; charset=utf-8'. Cache-Control header added."
+    behavior: "Returns HTML page with auto-redirect (meta refresh) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only). CR-191/F119: Content-Type changed to 'text/html; charset=utf-8'. Cache-Control header added. CR-198/F134: <script> tag removed to prevent errors in sandboxed iframes."
     verify_jwt: false
     added_in: "CR-176"
-    modified_by_crs: [191]
+    modified_by_crs: [191, 198]
 
 # =============================================================================
 # ROLES AND PERMISSIONS
@@ -1580,7 +1609,7 @@ security:
     provider: "Supabase Auth (email/password)"
     session: "JWT with app_metadata (role, ward_id, full_name)"
     token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
-    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. CR-176/F114: email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). CR-175/F113: deep link scheme changed to sacrmeetplan://."
+    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. CR-176/F114: email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). CR-175/F113: deep link scheme changed to sacrmeetplan://. CR-197/F133: email language resolved by user_metadata.language -> ward.language -> pt-BR (ADR-086). CR-198/F134: reset-redirect removes <script> tag (security improvement for sandboxed iframes)."
 
   authorization:
     rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"
@@ -1665,12 +1694,12 @@ file_structure:
       "invite/[token].tsx": "Registro via convite (deep link)"
     "(tabs)/":
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). CR-178/F116: Observer gains Settings tab with limited access (app language, theme, about)."
-      "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel. CR-186/F128: play icon on Iniciar button, date param to Presentation, non-expandable AgendaPreviewCard with status lines and pencil -> Agenda tab."
-      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. CR-184/F126: accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. CR-185/F127: play button (U+25B6) in expanded card header navigates to Presentation with date param."
-      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button."
+      "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel. CR-186/F128: play icon on Iniciar button, date param to Presentation, non-expandable AgendaPreviewCard with status lines and pencil -> Agenda tab. CR-196/F132: dynamic speaker count X/2 or X/3 based on has_second_speech."
+      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. CR-184/F126: accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. CR-185/F127: play button (U+25B6) in expanded card header navigates to Presentation with date param. CR-196/F132: collapsed card dynamic speaker count X/2 or X/3 based on has_second_speech."
+      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button. CR-196/F132: handleToggleSecondSpeech adds separate Supabase update for topic fields (ADR-085). CR-194/F130: null-to-string fix in speech update."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
-        "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only)."
+        "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only). CR-195/F131: wardLanguageChangeMutation.onSuccess now calls setWardLanguage() to update AuthContext immediately."
         "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
@@ -1685,7 +1714,7 @@ file_structure:
     "SyncProvider.tsx": "Orquestrador de sync, offline e notificacoes"
 
   "src/contexts/":
-    "AuthContext.tsx": "Sessao, role, wardId, userName, permissoes. CR-178/F116: Loads app language from user_metadata.language on login. Exposes wardLanguage and updateAppLanguage()."
+    "AuthContext.tsx": "Sessao, role, wardId, userName, permissoes. CR-178/F116: Loads app language from user_metadata.language on login. Exposes wardLanguage and updateAppLanguage(). CR-195/F131: Exposes setWardLanguage setter for immediate ward language state update."
     "ThemeContext.tsx": "Tema dark/light com system detection"
 
   "src/hooks/":
@@ -1705,14 +1734,14 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param)."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param). CR-194/F130: Member type import fix. CR-196/F132: disabled ReadOnlySpeakerRow always rendered (not conditionally hidden) when has_second_speech=false."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
     "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. CR-181/F118: collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). CR-189/F124: row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn)."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). CR-189/F124: row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn). CR-196/F132: disabled state shows 2 visible disabled fields with placeholder instead of single warning."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop."
@@ -1766,8 +1795,8 @@ file_structure:
       "update-user-name/": "Auto-edicao de nome (CR-81)"
       "delete-user/": "Remove usuario"
       "process-notifications/": "Cron: processa fila de push"
-      "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL."
-      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com fallback button. Sem auth, sem DB. (CR-176/F114). CR-191/F119: charset=utf-8 + Cache-Control header fix for plain-text HTML bug."
+      "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL. CR-197/F133: language resolution uses user_metadata.language as first priority (ADR-086)."
+      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com meta refresh + fallback button. Sem auth, sem DB. (CR-176/F114). CR-191/F119: charset=utf-8 + Cache-Control header fix for plain-text HTML bug. CR-198/F134: <script> tag removed for sandbox compatibility."
 
   "scripts/":
     "import-hymns.ts": "CLI script para importar hinos de CSV (CR-51)"
@@ -1801,11 +1830,11 @@ key_flows:
     steps:
       - "User toca 'Esqueci minha senha' na tela de login"
       - "forgot-password.tsx chama Edge Function send-reset-email com {email}"
-      - "send-reset-email EF: lookup user, get ward language, generateLink(recovery)"
+      - "send-reset-email EF: lookup user, get email language (priority: user_metadata.language -> ward.language -> pt-BR, CR-197/F133/ADR-086), generateLink(recovery)"
       - "send-reset-email EF: builds HTTPS redirect URL (https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery)"
       - "send-reset-email EF: sends email via Resend API with HTTPS URL in <a href>"
       - "User clica botao no email -> browser abre HTTPS redirect URL"
-      - "reset-redirect EF: retorna HTML com auto-redirect (meta refresh + JS) para sacrmeetplan://reset-password?token=TOKEN&type=recovery"
+      - "reset-redirect EF: retorna HTML com auto-redirect (meta refresh) para sacrmeetplan://reset-password?token=TOKEN&type=recovery. CR-198/F134: <script> tag removed."
       - "App abre reset-password.tsx com token via deep link query params"
       - "reset-password.tsx: verifyOtp({ token_hash, type: 'recovery' }) estabelece sessao"
       - "User define nova senha -> updateUser({ password }) -> sucesso"
@@ -2133,6 +2162,14 @@ change_requests_history:
     doc: "ARCH_M034.yaml"
     status: "pending implementation"
     adrs: [ADR-083, ADR-084]
+    new_files: []
+
+  batch_21_phase_1:
+    crs: "CR-194, CR-195, CR-196, CR-197, CR-198"
+    scope: "Bug fixes: TypeScript errors and actor role naming consistency (F130), ward language switch not updating AuthContext (F131), 2nd speech toggle multiple bugs (F132), password reset email language priority (F133), password reset HTML script blocked in sandbox (F134)"
+    doc: "ARCH_M035.yaml"
+    status: "pending implementation"
+    adrs: [ADR-085, ADR-086]
     new_files: []
 
 # =============================================================================

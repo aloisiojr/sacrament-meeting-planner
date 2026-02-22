@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 23
-  last_updated_by: "batch-20-phase-1"
+  version: 24
+  last_updated_by: "batch-21-phase-1"
   total_phases: 6
-  total_cr_plans: 40
+  total_cr_plans: 41
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -766,6 +766,56 @@ cr_plans:
       (Expo Router query param cross-tab). S01-S04 parallelizaveis, S05 depende de S04,
       S07 depende de todos.
 
+  - id: PLAN_P034
+    title: "Batch 20 Phase 1: Navigation & Home Redesign (Pencil/Play Buttons, Preview Card, Non-expandable Cards)"
+    status: pending
+    crs_covered: [184, 185, 186, 188]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P034.yaml"
+    summary: >
+      4 features cobrindo navegacao cross-screen e redesign do Home tab: botao lapis (U+270F)
+      na tela de Apresentacao para navegar a aba Agenda com expandDate + suporte a expandDate
+      query param na aba Agenda seguindo padrao ADR-082 do speeches.tsx (F126), botao play
+      (U+25B6) no header do card expandido da aba Agenda para navegar a tela de Apresentacao
+      com data param + Apresentacao aceitando data opcional via useLocalSearchParams (F127),
+      icone play no botao Iniciar do Home + card preview nao-expansivel abaixo do botao com
+      dateBlock e status lines (speakers/prayers/hymns) identicas ao card contraido da Agenda +
+      botao lapis no card para navegar a aba Agenda (F128), e simplificacao do NextSundaysSection
+      removendo ~130 linhas de codigo de expand/edit (estados, 7 hooks de mutacao, 9 handlers,
+      SpeechSlot/Modals) substituindo por cards nao-expansiveis com botao lapis navegando para
+      aba Speeches via expandDate + nova prop renderHeaderRight no SundayCard (F129). 4 features,
+      35 ACs, 12 ECs, 5 arquivos impactados (1 novo teste + 4 modificados), zero migracoes SQL,
+      zero Edge Functions, zero dependencias novas. 2 ADRs: ADR-083 (extend ADR-082 to Agenda
+      tab), ADR-084 (inline AgendaPreviewCard). S01, S02, S05 parallelizaveis, S03 depende de
+      S02, S04 depende de S02, S06 depende de todos.
+
+  - id: PLAN_P035
+    title: "Batch 21 Phase 1: Bug Fixes (TypeScript Errors, Ward Language Switch, 2nd Speech Toggle, Password Reset Email/Redirect)"
+    status: pending
+    crs_covered: [194, 195, 196, 197, 198]
+    total_steps: 10
+    plan_ref: "docs/plans/PLAN_P035.yaml"
+    summary: >
+      5 bug fixes (regressions): fix de 16 erros TypeScript em test mocks (SundayAgenda missing
+      fields), production code (null->string, undefined Member, BlurEvent type), e setup-integration
+      (wardLanguage string) + limpeza de nomes de roles em documentacao can_piano->can_pianist,
+      can_music->can_pianist/can_conductor em SPEC_F083, ARCH_M024, PLAN_P024, SPEC_CONSOLIDATED
+      (F130). Fix do ward language switch que nao atualizava AuthContext apos mutation: expor
+      setWardLanguage no AuthContextValue e chamar no onSuccess do wardLanguageChangeMutation
+      (F131). Fix de 4 sub-bugs no toggle de 2o discurso: toggle off agora limpa topic fields
+      via update direto no Supabase (sem modificar useRemoveAssignment), SpeechSlot mostra 2
+      campos visiveis mas disabled com placeholder i18n ao inves de mensagem unica, AgendaForm
+      mostra 2o speaker disabled com placeholder, e cards contraidos mostram X/2 dinamicamente
+      quando has_second_speech=false (F132). Fix do email de reset de senha para usar idioma do
+      app do usuario (user_metadata.language) com fallback para ward.language e pt-BR (F133).
+      Remocao do tag <script> do reset-redirect Edge Function para funcionar em iframes
+      sandboxed, mantendo meta refresh e botao <a href> como fallback (F134). 5 features,
+      44 ACs, 15 ECs, 15 arquivos impactados (1 novo teste + 14 modificados + 4 docs), zero
+      migracoes SQL, zero dependencias novas. 2 ADRs: ADR-085 (separate supabase update for
+      topic clear), ADR-086 (user_metadata language priority). S01, S02, S08, S09 parallelizaveis,
+      S03 paralleliza com S04/S05/S06, S04+S05+S06 dependem de S01, S07 depende de S04+S05+S06,
+      S10 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1095,6 +1145,21 @@ pending_with_plan:
   - cr_id: 188
     plan_id: PLAN_P034
     description: "NextSundaysSection nao-expansivel com lapis navegando para aba Speeches"
+  - cr_id: 194
+    plan_id: PLAN_P035
+    description: "Fix TS errors e naming consistency de actor roles apos Pianist/Conductor split (can_piano->can_pianist, can_music cleanup)"
+  - cr_id: 195
+    plan_id: PLAN_P035
+    description: "Fix ward language switch nao atualizando AuthContext state apos mutation"
+  - cr_id: 196
+    plan_id: PLAN_P035
+    description: "Fix 4 sub-bugs no toggle de 2o discurso: topic clear, disabled fields, dynamic count X/2 vs X/3"
+  - cr_id: 197
+    plan_id: PLAN_P035
+    description: "Fix email de reset de senha para usar idioma do app do usuario (user_metadata.language)"
+  - cr_id: 198
+    plan_id: PLAN_P035
+    description: "Remover <script> tag do reset-redirect Edge Function para funcionar em iframes sandboxed"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1116,6 +1181,20 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 24
+    phase: "batch-21-phase-1"
+    changes:
+      - "Added PLAN_P035 for Batch 21 Phase 1 (F130-F134, CRs 194/195/196/197/198)"
+      - "5 bug fixes (regressions): TypeScript compilation errors + doc naming, ward language switch, 2nd speech toggle (4 sub-bugs), password reset email language, password reset script blocked"
+      - "10 steps, 44 ACs, 15 ECs, 15 arquivos impactados (1 novo teste + 14 modificados + 4 docs)"
+      - "Zero migracoes SQL, zero dependencias novas, 2 Edge Functions modificadas"
+      - "2 ADRs: ADR-085 (separate supabase update for topic fields), ADR-086 (user_metadata language priority chain)"
+      - "F130 fixes 16 TS errors: SundayAgenda mock fields, wardLanguage required string, speeches in SundayExceptionReason, null->string in speeches.tsx, undefined Member in AgendaForm, BlurEvent in DebouncedTextInput + doc naming can_piano->can_pianist, can_music cleanup"
+      - "F131 exposes setWardLanguage in AuthContextValue and calls it in wardLanguageChangeMutation.onSuccess"
+      - "F132 fixes 4 sub-bugs: topic clear on toggle off (separate supabase update per ADR-085), 2 disabled fields with placeholder in SpeechSlot (not single warning), AgendaForm disabled ReadOnlySpeakerRow, dynamic X/2 vs X/3 in collapsed cards"
+      - "F133 changes email language resolution to user_metadata.language -> ward.language -> pt-BR"
+      - "F134 removes <script> tag from reset-redirect, relies on meta refresh + <a href>"
+      - "S01, S02, S08, S09 parallelizaveis; S03 paralleliza com S04/S05/S06; S04+S05+S06 dependem de S01; S07 depende de S04+S05+S06; S10 depende de todos"
   - version: 23
     phase: "batch-20-phase-1"
     changes:
@@ -1143,29 +1222,6 @@ changelog:
       - "F124 reestrutura SpeechSlot de two-column para row-per-element garantindo X button alignment por alignItems:'center' (supersedes ADR-076, ADR-078 parcial)"
       - "F125 corrige projectId: undefined com Constants.expoConfig?.extra?.eas?.projectId + guard para Expo Go"
       - "S01-S04 parallelizaveis (independentes), S05 depende de S04 (ambos AgendaForm.tsx), S06 depende de todos"
-
-  - id: PLAN_P034
-    title: "Batch 20 Phase 1: Navigation & Home Redesign (Pencil/Play Buttons, Preview Card, Non-expandable Cards)"
-    status: pending
-    crs_covered: [184, 185, 186, 188]
-    total_steps: 6
-    plan_ref: "docs/plans/PLAN_P034.yaml"
-    summary: >
-      4 features cobrindo navegacao cross-screen e redesign do Home tab: botao lapis (U+270F)
-      na tela de Apresentacao para navegar a aba Agenda com expandDate + suporte a expandDate
-      query param na aba Agenda seguindo padrao ADR-082 do speeches.tsx (F126), botao play
-      (U+25B6) no header do card expandido da aba Agenda para navegar a tela de Apresentacao
-      com data param + Apresentacao aceitando data opcional via useLocalSearchParams (F127),
-      icone play no botao Iniciar do Home + card preview nao-expansivel abaixo do botao com
-      dateBlock e status lines (speakers/prayers/hymns) identicas ao card contraido da Agenda +
-      botao lapis no card para navegar a aba Agenda (F128), e simplificacao do NextSundaysSection
-      removendo ~130 linhas de codigo de expand/edit (estados, 7 hooks de mutacao, 9 handlers,
-      SpeechSlot/Modals) substituindo por cards nao-expansiveis com botao lapis navegando para
-      aba Speeches via expandDate + nova prop renderHeaderRight no SundayCard (F129). 4 features,
-      35 ACs, 12 ECs, 5 arquivos impactados (1 novo teste + 4 modificados), zero migracoes SQL,
-      zero Edge Functions, zero dependencias novas. 2 ADRs: ADR-083 (extend ADR-082 to Agenda
-      tab), ADR-084 (inline AgendaPreviewCard). S01, S02, S05 parallelizaveis, S03 depende de
-      S02, S04 depende de S02, S06 depende de todos.
   - version: 21
     phase: "batch-19"
     changes:

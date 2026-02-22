@@ -1,0 +1,273 @@
+# =============================================================================
+# ARCH_M035.yaml
+# Batch 21 Phase 1: Bug Fixes (CR-194, CR-195, CR-196, CR-197, CR-198)
+# Features: F130, F131, F132, F133, F134
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+overview:
+  goal: "Fix 5 regressions: TypeScript errors (CR-194), ward language switch (CR-195), 2nd speech toggle bugs (CR-196), password reset email language (CR-197), password reset script blocked (CR-198)"
+  principles:
+    - "Minimal invasive fixes: change only what is necessary to fix each bug"
+    - "No new components or hooks: all fixes are modifications to existing modules"
+    - "Preserve all existing behavior and tests"
+    - "Fix documentation naming inconsistencies alongside code fixes"
+
+diagram: |
+  F130: TS errors
+    TestFiles + speeches.tsx + AgendaForm + DebouncedTextInput + setup-integration
+    + SPEC_F083 + ARCH_M024 + PLAN_P024 + SPEC_CONSOLIDATED (doc fixes)
+
+  F131: Ward language switch
+    settings/index.tsx --onSuccess--> AuthContext.setWardLanguage()
+                                     (new: update wardLanguage state)
+
+  F132: 2nd speech toggle
+    speeches.tsx --toggle off--> removeAssignment + separate supabase.update(topics)
+    SpeechSlot --disabled--> 2 visible fields w/ placeholder (not single warning)
+    AgendaForm --has_second_speech=false--> show disabled ReadOnlySpeakerRow
+    agenda.tsx --collapsed--> dynamic X/2 or X/3 based on has_second_speech
+    index.tsx  --collapsed--> dynamic X/2 or X/3 based on has_second_speech
+
+  F133: Password reset email language
+    send-reset-email EF: user_metadata.language -> ward.language -> pt-BR
+
+  F134: Password reset script blocked
+    reset-redirect EF: remove <script> tag, keep meta refresh + <a href>
+
+# =============================================================================
+# COMPONENTS (modifications only -- no new components)
+# =============================================================================
+
+components:
+  # F130: TypeScript error fixes
+  - name: "TestMocks"
+    responsibility: "Add missing SundayAgenda fields to test mock objects"
+    dependencies: ["database.ts types"]
+    modifications:
+      - file: "src/__tests__/cr001-qa-extended.test.ts"
+        change: "Add has_intermediate_hymn, speaker_1_override, speaker_2_override, speaker_3_override to SundayAgenda mocks"
+      - file: "src/__tests__/cr001-qa.test.ts"
+        change: "Same mock field additions"
+      - file: "src/__tests__/database-types.test.ts"
+        change: "Same mock field additions"
+      - file: "src/__tests__/phase02-database-types.test.ts"
+        change: "Same mock field additions"
+      - file: "src/__tests__/usePresentationMode-utils.test.ts"
+        change: "Same mock field additions"
+      - file: "src/__tests__/integration/setup-integration.ts"
+        change: "Add wardLanguage as required string to AuthContextValue mock"
+      - file: "src/__tests__/phase04-agenda-presentation.test.ts"
+        change: "Add 'speeches' key to Record<SundayExceptionReason, boolean>"
+
+  - name: "SpeechesTab"
+    responsibility: "Fix null-to-string assignment in handleToggleSecondSpeech"
+    dependencies: ["useSpeeches", "useAgenda"]
+    modifications:
+      - file: "src/app/(tabs)/speeches.tsx"
+        change: "Use empty string '' instead of null for string-typed fields when clearing position 2 topic data"
+
+  - name: "AgendaForm"
+    responsibility: "Fix undefined Member type reference"
+    dependencies: ["database.ts types"]
+    modifications:
+      - file: "src/components/AgendaForm.tsx"
+        change: "Import Member from database types or replace with correct type in handlePrayerSelect"
+
+  - name: "DebouncedTextInput"
+    responsibility: "Fix blur event type incompatibility"
+    dependencies: ["react-native TextInput types"]
+    modifications:
+      - file: "src/components/DebouncedTextInput.tsx"
+        change: "handleBlur already uses NativeSyntheticEvent<TextInputFocusEventData> - verify type compatibility with TextInputProps.onBlur"
+
+  - name: "DocumentationFixes"
+    responsibility: "Fix can_piano -> can_pianist and can_music -> can_pianist/can_conductor naming"
+    dependencies: []
+    modifications:
+      - file: "docs/specs/SPEC_F083.yaml"
+        change: "Replace all can_piano references with can_pianist"
+      - file: "docs/arch/ARCH_M024.yaml"
+        change: "Replace all can_piano references with can_pianist"
+      - file: "docs/plans/PLAN_P024.yaml"
+        change: "Replace all can_piano references with can_pianist"
+      - file: "docs/specs/SPEC_CONSOLIDATED.yaml"
+        change: "Update meeting_actors key_columns from can_music to can_pianist, can_conductor"
+
+  # F131: Ward language switch fix
+  - name: "SettingsScreen"
+    responsibility: "Update AuthContext wardLanguage after successful ward language mutation"
+    dependencies: ["AuthContext"]
+    modifications:
+      - file: "src/app/(tabs)/settings/index.tsx"
+        change: "In wardLanguageChangeMutation.onSuccess, call setWardLanguage(newLanguage) to update AuthContext state"
+
+  - name: "AuthContext"
+    responsibility: "Expose setWardLanguage method to update ward language state"
+    dependencies: []
+    modifications:
+      - file: "src/contexts/AuthContext.tsx"
+        change: "Add setWardLanguage to AuthContextValue interface and context value. setWardLanguage is the existing useState setter from line 74."
+
+  # F132: 2nd speech toggle bugs
+  - name: "SpeechesTab_ToggleFix"
+    responsibility: "Clear both speaker AND topic fields when toggling off 2nd speech"
+    dependencies: ["supabase client", "useRemoveAssignment"]
+    modifications:
+      - file: "src/app/(tabs)/speeches.tsx"
+        change: "In handleToggleSecondSpeech onPress callback, after removeAssignment.mutate, add a separate direct supabase.from('speeches').update() to clear topic_title, topic_link, topic_collection for the speech at position 2"
+
+  - name: "SpeechSlot_DisabledFields"
+    responsibility: "Show 2 visible disabled fields with placeholder instead of single warning"
+    dependencies: []
+    modifications:
+      - file: "src/components/SpeechSlot.tsx"
+        change: "When isPos2Disabled, render both speaker field and topic field as disabled (non-interactive, grayed out) with placeholder text from i18n key 'speeches.secondSpeechDisabledPlaceholder'. Remove the single-field replacement pattern."
+
+  - name: "AgendaForm_DisabledSpeaker"
+    responsibility: "Show 2nd speaker field visible+disabled with placeholder when has_second_speech=false"
+    dependencies: []
+    modifications:
+      - file: "src/components/AgendaForm.tsx"
+        change: "Replace conditional hiding (has_second_speech !== false &&) with always-render pattern. When has_second_speech===false, show ReadOnlySpeakerRow with disabled=true and placeholder text from i18n key 'speeches.secondSpeechDisabledPlaceholder'"
+
+  - name: "AgendaTab_CollapsedCount"
+    responsibility: "Show dynamic X/2 or X/3 for speaker count based on has_second_speech"
+    dependencies: ["useAgendaRange"]
+    modifications:
+      - file: "src/app/(tabs)/agenda.tsx"
+        change: "In collapsed card speeches status computation, use agenda.has_second_speech to determine speakersTotal (2 or 3). Loop only positions [1,3] when has_second_speech===false. Green color when speakersFilled===speakersTotal."
+
+  - name: "HomeTab_CollapsedCount"
+    responsibility: "Show dynamic X/2 or X/3 for speaker count based on has_second_speech"
+    dependencies: ["useAgenda"]
+    modifications:
+      - file: "src/app/(tabs)/index.tsx"
+        change: "In statusLines computation, use agenda.has_second_speech to determine speakersTotal (2 or 3). Loop only positions [1,3] when has_second_speech===false. Green color when speakersFilled===speakersTotal."
+
+  # F133: Password reset email language fix
+  - name: "SendResetEmailEF"
+    responsibility: "Use user's app language (user_metadata.language) for email template"
+    dependencies: ["Supabase Auth admin API"]
+    modifications:
+      - file: "supabase/functions/send-reset-email/index.ts"
+        change: "After looking up user, read user.user_metadata?.language as first priority. Fallback to ward.language, then pt-BR. Pass resolved language to getEmailTemplate()."
+
+  # F134: Password reset script blocked fix
+  - name: "ResetRedirectEF"
+    responsibility: "Remove <script> tag from HTML response"
+    dependencies: []
+    modifications:
+      - file: "supabase/functions/reset-redirect/index.ts"
+        change: "Remove line 92: <script>window.location.href = '...';</script>. Meta http-equiv refresh (line 49) and <a href> button (line 90) handle redirection."
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "AuthContextValue.setWardLanguage"
+    component: "AuthContext"
+    methods:
+      - name: "setWardLanguage"
+        input: "string (language code: 'pt-BR' | 'en' | 'es')"
+        output: "void (React state setter)"
+        notes: "Exposes the existing useState setter for wardLanguage to allow Settings screen to update ward language in AuthContext after successful mutation"
+
+  - name: "handleToggleSecondSpeech_topicClear"
+    component: "SpeechesTab"
+    methods:
+      - name: "clearTopicFields"
+        input: "speechId: string"
+        output: "Promise<void>"
+        notes: "Direct supabase update to set topic_title=null, topic_link=null, topic_collection=null. Called AFTER removeAssignment. Does NOT modify useRemoveAssignment hook."
+
+  - name: "send-reset-email_language_resolution"
+    component: "SendResetEmailEF"
+    methods:
+      - name: "resolveEmailLanguage"
+        input: "user: AuthUser (from admin.listUsers)"
+        output: "string (resolved language code)"
+        notes: "Priority: user.user_metadata?.language -> ward.language -> 'pt-BR'. Uses optional chaining for null safety."
+
+# =============================================================================
+# DATA MODEL (no schema changes -- all fixes are behavioral)
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No database schema changes. All fixes are at the application layer or documentation level."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    F133: No security change. user_metadata is already available on the user object from admin.listUsers().
+    F134: Removing <script> tag improves security posture (no JS execution needed for redirect).
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    No new logging or monitoring. Existing console.log in reset-redirect EF preserved.
+
+# =============================================================================
+# ARCHITECT DECISIONS (OQ-3 resolution)
+# =============================================================================
+
+architect_decisions:
+  - id: OQ-3
+    question: "Does AuthContext already expose a setWardLanguage method?"
+    analysis: |
+      AuthContext.tsx (line 74) uses useState: const [wardLanguage, setWardLanguage] = useState<string>('pt-BR');
+      However, setWardLanguage is NOT exposed in the AuthContextValue interface (line 17-29).
+      The wardLanguage VALUE is exposed (line 23, 184), but not the SETTER.
+      AuthContextValue needs to be extended with setWardLanguage.
+    resolution: |
+      Add setWardLanguage to AuthContextValue interface and include it in the context value object.
+      This is a minimal change: the setter already exists as a local useState, it just needs to be exposed.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-085
+    title: "Separate direct Supabase update for topic fields when toggling off 2nd speech"
+    context: "handleToggleSecondSpeech calls removeAssignment for speaker data, but useRemoveAssignment only clears speaker fields (member_id, speaker_name, speaker_phone, status). Topic fields (topic_title, topic_link, topic_collection) are not cleared. User confirmed Option B: do NOT modify useRemoveAssignment."
+    decision: "Add a separate direct supabase.from('speeches').update() call in handleToggleSecondSpeech to set topic_title=null, topic_link=null, topic_collection=null after removeAssignment completes. This keeps useRemoveAssignment's contract unchanged."
+    consequences:
+      - "Pro: useRemoveAssignment is not modified, zero risk of regression in other call sites"
+      - "Pro: Topic clearing is specific to the toggle-off flow only"
+      - "Con: Two separate database operations instead of one (acceptable for infrequent user action)"
+
+  - id: ADR-086
+    title: "User metadata language priority for password reset email"
+    context: "CR-178 separated app language (user_metadata.language) from ward language. send-reset-email still uses ward.language only. Email should be in the user's preferred app language."
+    decision: "Resolve language with priority chain: user.user_metadata?.language -> ward.language -> 'pt-BR'. getEmailTemplate already handles unknown languages via fallback to pt-BR template."
+    consequences:
+      - "Pro: Email arrives in the language the user sees in the app"
+      - "Pro: Backward compatible: users without user_metadata.language still get ward language"
+      - "Pro: No new API calls needed (user_metadata already on the user object from listUsers)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true  # Each component modification has clear single purpose
+  GATE-03_contracts_defined: true      # 3 contracts for the 3 inter-component integrations
+  GATE-04_adrs_for_multi_component: true  # ADR-085 (toggle + topic clear), ADR-086 (language priority)
+  GATE-05_arch_saved: true
+  GATE-06_consolidated_updated: true   # Will be updated as part of this iteration
+  GATE-07_summary_filled: true
+  GATE-08_max_10_components: true      # 13 modifications across 5 features, grouped logically

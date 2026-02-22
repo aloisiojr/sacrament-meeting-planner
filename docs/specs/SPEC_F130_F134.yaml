@@ -1,0 +1,675 @@
+# =============================================================================
+# SPEC_F130_F134.yaml
+# Batch 21 Phase 1: Bug Fixes (CR-194, CR-195, CR-196, CR-197, CR-198)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 21
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: bugfix
+
+# =============================================================================
+# F130: Actor roles review / TypeScript issues (CR-194)
+# Regression of: CR-180 (Pianist/Conductor split)
+# =============================================================================
+
+features:
+
+  - id: F130
+    name: "Fix TypeScript errors and actor role naming consistency after Pianist/Conductor split"
+    cr_id: 194
+    type: bug
+    regression_of: CR-180
+    related_crs: [180]
+    related_features: [F117]
+    description: >
+      After CR-180 (split can_music into can_pianist + can_conductor), multiple
+      TypeScript compilation errors appeared in test files and production code.
+      Test mock objects for SundayAgenda are missing newly added required fields
+      (has_intermediate_hymn, speaker_1_override, speaker_2_override,
+      speaker_3_override). Production code in speeches.tsx assigns null to
+      string-typed fields. AgendaForm.tsx references undefined type 'Member'.
+      DebouncedTextInput.tsx has BlurEvent type incompatibility. Test file
+      phase04 is missing 'speeches' in SundayExceptionReason records.
+      Additionally, old documentation files (SPEC_F083, ARCH_M024, PLAN_P024)
+      reference 'can_piano' which never existed in code -- the correct field
+      name is 'can_pianist'. The canonical actor role field names are:
+      can_preside (presiding), can_conduct (conducting the meeting),
+      can_recognize (sustaining), can_pianist (pianist), can_conductor
+      (music conductor). All code and documentation must use these names
+      consistently.
+
+    acceptance_criteria:
+      - id: AC-130-01
+        description: "SundayAgenda mock objects include all required fields"
+        given: "Test files with SundayAgenda mock objects"
+        when: "TypeScript compiler checks type compatibility"
+        then: "No TS errors for missing properties (has_intermediate_hymn, speaker_*_override)"
+        status: pending
+
+      - id: AC-130-02
+        description: "AuthContext mock includes wardLanguage as required string"
+        given: "setup-integration.ts with AuthContextValue mock"
+        when: "TypeScript compiler checks type compatibility"
+        then: "wardLanguage is always a string (not string | undefined)"
+        status: pending
+
+      - id: AC-130-03
+        description: "speeches.tsx does not assign null to string-typed fields"
+        given: "speeches.tsx handleToggleSecondSpeech or related code"
+        when: "TypeScript compiler checks type compatibility"
+        then: "No TS2322 errors for null-to-string assignments"
+        status: pending
+
+      - id: AC-130-04
+        description: "AgendaForm.tsx does not reference undefined 'Member' type"
+        given: "AgendaForm.tsx imports and type references"
+        when: "TypeScript compiler checks"
+        then: "No TS2304 error for 'Member' (either import it or use correct type)"
+        status: pending
+
+      - id: AC-130-05
+        description: "DebouncedTextInput.tsx handles blur event type correctly"
+        given: "DebouncedTextInput.tsx onBlur handler"
+        when: "TypeScript compiler checks event type"
+        then: "No TS2769 overload mismatch error"
+        status: pending
+
+      - id: AC-130-06
+        description: "SundayExceptionReason records include 'speeches' key"
+        given: "phase04-agenda-presentation.test.ts Record<SundayExceptionReason, boolean>"
+        when: "TypeScript compiler checks record completeness"
+        then: "All SundayExceptionReason values including 'speeches' are present in the record"
+        status: pending
+
+      - id: AC-130-07
+        description: "Zero TypeScript compilation errors after all fixes"
+        given: "Full project codebase"
+        when: "Running npx tsc --noEmit"
+        then: "No TypeScript errors in any file (test or production)"
+        status: pending
+
+      - id: AC-130-08
+        description: "All existing tests continue to pass"
+        given: "Full test suite"
+        when: "Running npx vitest run"
+        then: "All 5064+ tests pass"
+        status: pending
+
+      - id: AC-130-09
+        description: "can_conduct and can_conductor remain correctly defined as separate roles"
+        given: "database.ts MeetingActor interface and useActors.ts ActorRoleFilter"
+        when: "Reviewing type definitions"
+        then: "Both can_conduct (boolean) and can_conductor (boolean) exist as distinct fields. ActorRoleFilter includes both 'can_conduct' and 'can_conductor'"
+        status: pending
+
+      - id: AC-130-10
+        description: "No 'can_piano' references remain in documentation"
+        given: "Documentation files SPEC_F083.yaml, ARCH_M024.yaml, PLAN_P024.yaml that reference 'can_piano'"
+        when: "Reviewing all documentation for actor role naming"
+        then: "All 'can_piano' references are corrected to 'can_pianist'. No file in the project contains 'can_piano' as a role name"
+        status: pending
+
+      - id: AC-130-11
+        description: "No 'can_music' references remain in documentation key_columns or active specs"
+        given: "SPEC_CONSOLIDATED.yaml key_columns still lists can_music (line 5159)"
+        when: "Reviewing SPEC_CONSOLIDATED meeting_actors table definition"
+        then: "key_columns updated to [id, ward_id, name, can_preside, can_conduct, can_recognize, can_pianist, can_conductor]"
+        status: pending
+
+      - id: AC-130-12
+        description: "All 5 canonical actor role names are consistent across code and tests"
+        given: "Production code (database.ts, useActors.ts, activityLog.ts) and test files"
+        when: "Searching for actor role field references"
+        then: "Only canonical names used: can_preside, can_conduct, can_recognize, can_pianist, can_conductor. No can_music or can_piano in production code or type definitions"
+        status: pending
+
+    edge_cases:
+      - id: EC-130-01
+        case: "Mock objects created via factory/helper functions"
+        expected: "Factory functions produce objects with all required SundayAgenda fields including new ones"
+        status: pending
+
+      - id: EC-130-02
+        case: "Partial SundayAgenda objects used in tests (e.g., Partial<SundayAgenda>)"
+        expected: "Use Partial<SundayAgenda> where appropriate to avoid requiring all fields"
+        status: pending
+
+      - id: EC-130-03
+        case: "DebouncedTextInput blur event on different React Native versions"
+        expected: "Event type is compatible with both old and new RN event types"
+        status: pending
+
+      - id: EC-130-04
+        case: "Documentation files with 'can_piano' in REVIEW_CONSOLIDATED.yaml"
+        expected: "REVIEW_CONSOLIDATED references are historical review comments; update only the actionable docs (SPEC_F083, ARCH_M024, PLAN_P024) not historical review narratives"
+        status: pending
+
+    files_likely_impacted:
+      - src/__tests__/cr001-qa-extended.test.ts
+      - src/__tests__/cr001-qa.test.ts
+      - src/__tests__/database-types.test.ts
+      - src/__tests__/integration/setup-integration.ts
+      - src/__tests__/phase02-database-types.test.ts
+      - src/__tests__/phase04-agenda-presentation.test.ts
+      - src/__tests__/usePresentationMode-utils.test.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/DebouncedTextInput.tsx
+      - docs/specs/SPEC_F083.yaml          # can_piano -> can_pianist
+      - docs/arch/ARCH_M024.yaml           # can_piano -> can_pianist
+      - docs/plans/PLAN_P024.yaml          # can_piano -> can_pianist
+      - docs/specs/SPEC_CONSOLIDATED.yaml  # can_music -> can_pianist/can_conductor in key_columns
+
+# =============================================================================
+# F131: Ward language switch not working (CR-195)
+# Regression of: CR-178 (Separate app/ward language control)
+# =============================================================================
+
+  - id: F131
+    name: "Fix ward language switch not updating AuthContext state"
+    cr_id: 195
+    type: bug
+    regression_of: CR-178
+    related_crs: [178]
+    related_features: [F116]
+    description: >
+      When changing ward language in Settings, the wardLanguageChangeMutation
+      onSuccess handler only invalidates the topic cache (queryClient.invalidateQueries)
+      but does NOT call setWardLanguage (or equivalent) in AuthContext to update
+      the local state. As a result, the modal still shows the old language as
+      selected after the mutation succeeds, and the UI does not reflect the change
+      until a full app restart.
+
+    acceptance_criteria:
+      - id: AC-131-01
+        description: "wardLanguageChangeMutation onSuccess updates AuthContext wardLanguage"
+        given: "User confirms ward language change"
+        when: "Mutation succeeds"
+        then: "AuthContext.wardLanguage is updated to the new language value immediately"
+        status: pending
+
+      - id: AC-131-02
+        description: "Ward language modal shows new selection after change"
+        given: "User changed ward language from pt-BR to en"
+        when: "Modal is reopened"
+        then: "Checkmark appears next to the newly selected language (en)"
+        status: pending
+
+      - id: AC-131-03
+        description: "Topic/collection caches are invalidated after language change"
+        given: "Ward language mutation succeeds"
+        when: "onSuccess fires"
+        then: "queryClient.invalidateQueries is called for topicKeys.all (existing behavior preserved)"
+        status: pending
+
+      - id: AC-131-04
+        description: "Collections are correctly deactivated/activated for language switch"
+        given: "Ward language changed from pt-BR to en"
+        when: "Mutation executes"
+        then: "Old language collections deactivated, new language collections activated (existing mutationFn behavior preserved)"
+        status: pending
+
+      - id: AC-131-05
+        description: "All existing tests pass after fix"
+        given: "Full test suite"
+        when: "Running npx vitest run"
+        then: "All tests pass"
+        status: pending
+
+    edge_cases:
+      - id: EC-131-01
+        case: "User selects the same language that is already active"
+        expected: "Early return (no mutation), no state change, no cache invalidation"
+        status: pending
+
+      - id: EC-131-02
+        case: "Mutation fails (network error or DB error)"
+        expected: "AuthContext wardLanguage is NOT updated, user sees error, old selection remains"
+        status: pending
+
+      - id: EC-131-03
+        case: "AuthContext does not expose setWardLanguage method"
+        expected: "If setWardLanguage is not available in AuthContext, it must be added or an alternative mechanism (e.g., refetch user session) must be used"
+        status: pending
+
+    files_likely_impacted:
+      - src/app/(tabs)/settings/index.tsx
+      - src/contexts/AuthContext.tsx  # may need setWardLanguage if not exposed
+
+# =============================================================================
+# F132: 2nd speech toggle multiple bugs (CR-196)
+# Regression of: CR-181 (Optional 2nd speech toggle)
+# =============================================================================
+
+  - id: F132
+    name: "Fix multiple bugs in 2nd speech toggle functionality"
+    cr_id: 196
+    type: bug
+    regression_of: CR-181
+    related_crs: [181]
+    related_features: [F118]
+    description: >
+      Three sub-bugs in the 2nd speech toggle feature:
+      (4.1) Toggle off only clears speaker fields via useRemoveAssignment, but
+      NOT topic fields (topic_title, topic_link, topic_collection remain).
+      Fix: handleToggleSecondSpeech does a separate direct Supabase update to
+      clear topic fields (do NOT extend useRemoveAssignment).
+      (4.2) In Speeches tab expanded card, toggle off replaces BOTH fields
+      (speaker + topic) with a SINGLE warning text message. The correct behavior
+      is: keep both fields (speaker and topic) visible but DISABLED, with
+      placeholder text inside each field using i18n key
+      'speeches.secondSpeechDisabledPlaceholder' (already exists in pt-BR, en, es).
+      (4.3) In Agenda tab expanded card, the 2nd speaker field should be visible
+      but disabled with placeholder text when has_second_speech is false. This
+      is the DESIRED behavior (confirmed by user -- NOT a bug).
+      (4.4) Collapsed card in Agenda tab and Home tab hardcodes total:3 for
+      speakers, should show X/2 when has_second_speech is false.
+
+    acceptance_criteria:
+      # Sub-bug 4.1: toggle off should clear both speaker AND topic (separate update)
+      - id: AC-132-01
+        description: "Toggle off 2nd speech clears both speaker AND topic for position 2"
+        given: "Sunday with speaker and topic assigned to position 2"
+        when: "User toggles off 2nd speech and confirms"
+        then: "member_id, speaker_name, speaker_phone, status, topic_title, topic_link, topic_collection all set to null for position 2"
+        status: pending
+
+      - id: AC-132-02
+        description: "Topic fields are cleared via separate direct Supabase update in handleToggleSecondSpeech"
+        given: "speeches.tsx handleToggleSecondSpeech calls removeAssignment for speaker"
+        when: "removeAssignment mutation executes"
+        then: "A separate direct update clears topic_title, topic_link, topic_collection. useRemoveAssignment is NOT modified."
+        status: pending
+        notes: "OQ-1 resolved: Option B confirmed by user"
+
+      # Sub-bug 4.2: Speeches tab -- visible disabled fields with placeholder
+      - id: AC-132-03
+        description: "Speeches tab expanded card shows both fields visible but disabled with placeholder text when toggle off"
+        given: "SpeechSlot with position 2 and isSecondSpeechEnabled=false"
+        when: "Component renders"
+        then: "Both speaker field and topic field are rendered (visible), but disabled (non-interactive, grayed out). Each field shows placeholder text from i18n key 'speeches.secondSpeechDisabledPlaceholder'. The current single-message replacement is removed."
+        status: pending
+        notes: "OQ-2 resolved: User wants 2 visible disabled fields with placeholder, NOT single warning message"
+
+      - id: AC-132-04
+        description: "Placeholder text is i18n-aware in all 3 languages"
+        given: "i18n key 'speeches.secondSpeechDisabledPlaceholder' already exists"
+        when: "App language is pt-BR, en, or es"
+        then: "Placeholder shows correctly: pt-BR='Domingo configurado para nao ter 2o discurso', en='Sunday configured to have no 2nd speech', es='Domingo configurado para no tener 2o discurso'"
+        status: pending
+
+      - id: AC-132-05
+        description: "Toggle switch still functional when fields are disabled"
+        given: "SpeechSlot position 2 in disabled state"
+        when: "Bispado user taps the toggle"
+        then: "Toggle re-enables the fields (removes disabled state, removes placeholder)"
+        status: pending
+
+      # Sub-bug 4.3: Agenda tab expanded card (desired behavior -- NOT a bug)
+      - id: AC-132-06
+        description: "Agenda tab expanded card shows 2nd speaker field visible+disabled with placeholder when has_second_speech=false"
+        given: "AgendaForm with has_second_speech=false"
+        when: "Component renders"
+        then: "2nd speaker ReadOnlySpeakerRow is visible but disabled with placeholder text 'speeches.secondSpeechDisabledPlaceholder'. This is the DESIRED behavior."
+        status: pending
+        notes: "A-1 resolved: User confirmed this is desired behavior, NOT a bug. If current code hides the field instead of showing it disabled, it must be changed to show it disabled with placeholder."
+
+      # Sub-bug 4.4: Collapsed card total dynamic
+      - id: AC-132-07
+        description: "Collapsed card in Agenda tab shows Discursantes X/2 when has_second_speech=false"
+        given: "Collapsed agenda card for a Sunday with has_second_speech=false"
+        when: "Component renders status lines"
+        then: "Speaker status line shows 'Discursantes X/2' (not X/3). Loop iterates only positions [1,3]. Green color applied when X===2"
+        status: pending
+
+      - id: AC-132-08
+        description: "Collapsed card in Home tab shows Discursantes X/2 when has_second_speech=false"
+        given: "Home preview card for a Sunday with has_second_speech=false"
+        when: "Component renders status lines"
+        then: "Speaker status line shows 'Discursantes X/2' (not X/3). Loop iterates only positions [1,3]. Green color applied when X===2"
+        status: pending
+
+      - id: AC-132-09
+        description: "Collapsed card shows X/3 when has_second_speech=true (default)"
+        given: "Collapsed card for a Sunday with has_second_speech=true or undefined"
+        when: "Component renders status lines"
+        then: "Speaker status line shows 'Discursantes X/3'. Loop iterates positions [1,2,3]. Green color applied when X===3"
+        status: pending
+
+      - id: AC-132-10
+        description: "SundayCard collapsed view shows 2 LEDs when has_second_speech=false"
+        given: "SundayCard collapsed with hasSecondSpeech=false"
+        when: "Component renders speech LEDs"
+        then: "visiblePositions=[1,3] so only 2 LEDs shown (already implemented, verify preserved)"
+        status: pending
+
+      - id: AC-132-11
+        description: "All existing tests pass after fixes"
+        given: "Full test suite"
+        when: "Running npx vitest run"
+        then: "All tests pass"
+        status: pending
+
+    edge_cases:
+      - id: EC-132-01
+        case: "Toggle off position 2 when only topic is assigned (no speaker)"
+        expected: "Topic fields are still cleared even without a speaker"
+        status: pending
+
+      - id: EC-132-02
+        case: "Toggle off position 2 when no speech record exists yet"
+        expected: "No error thrown, toggle state updated in agenda, no removeAssignment call needed"
+        status: pending
+
+      - id: EC-132-03
+        case: "Agenda tab needs has_second_speech from agenda data for collapsed view"
+        expected: "agenda.tsx has access to has_second_speech from the agenda record to determine total"
+        status: pending
+
+      - id: EC-132-04
+        case: "Home tab needs has_second_speech from agenda data for status lines"
+        expected: "index.tsx has access to has_second_speech from the agenda record to determine total"
+        status: pending
+
+    files_likely_impacted:
+      - src/hooks/useSpeeches.ts           # useRemoveAssignment: NOT modified (OQ-1 resolved)
+      - src/app/(tabs)/speeches.tsx         # handleToggleSecondSpeech: separate direct update to clear topics
+      - src/components/SpeechSlot.tsx       # Show 2 visible disabled fields with placeholder, not single warning
+      - src/components/AgendaForm.tsx       # 4.3: show 2nd speaker disabled+placeholder (not hidden)
+      - src/app/(tabs)/agenda.tsx           # Collapsed card: dynamic total based on has_second_speech
+      - src/app/(tabs)/index.tsx            # Home card: dynamic total based on has_second_speech
+
+# =============================================================================
+# F133: Password reset email language (CR-197)
+# Regression of: CR-155 (Multilingual password reset email)
+# =============================================================================
+
+  - id: F133
+    name: "Fix password reset email to use user's app language instead of ward language"
+    cr_id: 197
+    type: bug
+    regression_of: CR-155
+    related_crs: [155, 178]
+    related_features: [F101, F116]
+    description: >
+      The send-reset-email Edge Function currently reads ward.language to
+      determine the email template language. After CR-178 (separate app/ward
+      language), the email should use the user's app language preference
+      (stored in user.user_metadata.language), falling back to ward language,
+      then to pt-BR as last resort.
+
+    acceptance_criteria:
+      - id: AC-133-01
+        description: "send-reset-email reads user's app language from user_metadata first"
+        given: "User with user_metadata.language = 'en' in a pt-BR ward"
+        when: "Password reset email is sent"
+        then: "Email is in English (user's app language), not Portuguese"
+        status: pending
+
+      - id: AC-133-02
+        description: "Language priority chain: user_metadata.language -> ward.language -> pt-BR"
+        given: "send-reset-email Edge Function"
+        when: "Determining email language"
+        then: "Checks user.user_metadata.language first, then ward.language, then defaults to pt-BR"
+        status: pending
+
+      - id: AC-133-03
+        description: "Fallback to ward language when user has no app language"
+        given: "User with no user_metadata.language set, ward language is 'es'"
+        when: "Password reset email is sent"
+        then: "Email is in Spanish (ward language)"
+        status: pending
+
+      - id: AC-133-04
+        description: "Fallback to pt-BR when neither user nor ward language is set"
+        given: "User with no user_metadata.language and no ward language"
+        when: "Password reset email is sent"
+        then: "Email defaults to pt-BR"
+        status: pending
+
+      - id: AC-133-05
+        description: "getEmailTemplate receives the correct resolved language"
+        given: "Language resolved from priority chain"
+        when: "getEmailTemplate is called"
+        then: "getEmailTemplate(resolvedLanguage, deepLink) uses the correct language"
+        status: pending
+
+    edge_cases:
+      - id: EC-133-01
+        case: "User has user_metadata.language set to an unsupported language"
+        expected: "Falls back to ward language, then pt-BR (getEmailTemplate already handles unknown languages via fallback)"
+        status: pending
+
+      - id: EC-133-02
+        case: "User not found in database (anti-enumeration)"
+        expected: "Returns success response without sending email (existing behavior preserved)"
+        status: pending
+
+      - id: EC-133-03
+        case: "user_metadata is null or empty object"
+        expected: "Safely handles with optional chaining, falls back to ward language"
+        status: pending
+
+    files_likely_impacted:
+      - supabase/functions/send-reset-email/index.ts
+
+# =============================================================================
+# F134: Password reset HTML sandbox / script blocked (CR-198)
+# Regression of: CR-191 (Password reset redirect HTML rendering)
+# =============================================================================
+
+  - id: F134
+    name: "Fix password reset redirect to work without JavaScript in sandboxed iframes"
+    cr_id: 198
+    type: bug
+    regression_of: CR-191
+    related_crs: [67, 145, 155, 176, 191]
+    related_features: [F119, F114, F088]
+    description: >
+      The reset-redirect Edge Function HTML response includes a <script> tag
+      (line 92: <script>window.location.href='...'</script>) that gets blocked
+      when the email client renders the link in a sandboxed iframe without
+      allow-scripts permission. The meta http-equiv="refresh" tag (line 49)
+      should handle redirection, but the visible script error is alarming to
+      users. The fix is to remove the <script> tag entirely, relying on the
+      meta refresh and the manual <a href> button as fallbacks.
+
+    acceptance_criteria:
+      - id: AC-134-01
+        description: "reset-redirect HTML does NOT contain <script> tags"
+        given: "reset-redirect Edge Function"
+        when: "Generating HTML response"
+        then: "No <script> tag in the HTML. Redirection relies solely on meta http-equiv='refresh' and <a href> button"
+        status: pending
+
+      - id: AC-134-02
+        description: "meta http-equiv refresh provides immediate redirect"
+        given: "HTML response from reset-redirect"
+        when: "Browser renders the page"
+        then: "meta http-equiv='refresh' with content='0;url=...' causes immediate redirect to deep link"
+        status: pending
+
+      - id: AC-134-03
+        description: "Manual button link available as fallback"
+        given: "HTML response from reset-redirect"
+        when: "Meta refresh does not work (e.g., some email clients strip it)"
+        then: "User can click the 'Abrir no aplicativo' button (<a href> element) to navigate manually"
+        status: pending
+
+      - id: AC-134-04
+        description: "Content-Type and Cache-Control headers remain correct"
+        given: "HTTP response from reset-redirect"
+        when: "Checking response headers"
+        then: "Content-Type: text/html; charset=utf-8 and Cache-Control: no-cache, no-store, must-revalidate"
+        status: pending
+
+      - id: AC-134-05
+        description: "No JavaScript errors visible to users"
+        given: "User clicks reset link in email client with sandboxed iframe"
+        when: "Page loads"
+        then: "No 'Blocked script execution' error in browser console or visible to user"
+        status: pending
+
+    edge_cases:
+      - id: EC-134-01
+        case: "Email client strips meta refresh tag"
+        expected: "User sees the manual button link and can click it to redirect"
+        status: pending
+
+      - id: EC-134-02
+        case: "Deep link scheme (sacrmeetplan://) not handled by device"
+        expected: "Browser shows the manual button; no crash or error"
+        status: pending
+
+      - id: EC-134-03
+        case: "Token or type parameter missing in URL"
+        expected: "Edge Function returns 400 error response (existing behavior preserved)"
+        status: pending
+
+    files_likely_impacted:
+      - supabase/functions/reset-redirect/index.ts
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    question: "For CR-196 sub-bug 4.1, should we extend useRemoveAssignment to also clear topic fields, or should handleToggleSecondSpeech make a separate direct Supabase call to clear topics?"
+    status: resolved
+    resolution: "Option B confirmed by user. handleToggleSecondSpeech does a separate direct Supabase update to clear topic fields. useRemoveAssignment is NOT modified."
+
+  - id: OQ-2
+    question: "For CR-196 sub-bug 4.2, how should the disabled SpeechSlot render when toggle is off?"
+    status: resolved
+    resolution: >
+      User chose a different option from the original proposals. The correct behavior is:
+      keep both fields (speaker and topic) VISIBLE but DISABLED, with placeholder text
+      from i18n key 'speeches.secondSpeechDisabledPlaceholder' inside each field.
+      The current implementation wrongly replaces BOTH fields with a SINGLE warning message.
+      The fix: render the 2 normal fields (speaker + topic) as disabled inputs with
+      placeholder text.
+
+  - id: OQ-3
+    question: "For CR-195, does AuthContext already expose a setWardLanguage method?"
+    status: delegated
+    resolution: "Delegated to architect agent to verify and decide during architecture phase."
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: "CR-196 sub-bug 4.3 (Agenda tab expanded card) shows 2nd speaker field visible+disabled with placeholder -- this is the DESIRED behavior"
+    reason: "User explicitly confirmed: the 2nd speaker field should be visible but disabled with placeholder text, NOT hidden"
+    impact_if_wrong: "N/A - user confirmed"
+    needs_confirmation: false
+    status: confirmed
+
+  - id: A-2
+    assumption: "SundayCard visiblePositions logic (F118) for collapsed LEDs is already correct"
+    reason: "Code review shows visiblePositions = hasSecondSpeech ? [1, 2, 3] : [1, 3] which is correct"
+    impact_if_wrong: "Would need fix in SundayCard.tsx"
+    needs_confirmation: false
+    status: delegated_to_architect
+
+  - id: A-3
+    assumption: "The meta http-equiv refresh tag in reset-redirect is sufficient for redirection without JavaScript"
+    reason: "meta refresh is widely supported by browsers and works in sandboxed iframes"
+    impact_if_wrong: "Would need an alternative non-JS redirect mechanism (HTTP 302 redirect instead of HTML response)"
+    needs_confirmation: true
+
+  - id: A-4
+    assumption: "All 16 TS errors identified by tsc --noEmit are the complete set to fix for CR-194"
+    reason: "npx tsc --noEmit showed exactly 16 errors across the listed files"
+    impact_if_wrong: "Additional errors may surface after fixing the initial set"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: "Removing the <script> tag from reset-redirect is safe because meta refresh handles the redirect"
+    reason: "The meta refresh tag (content='0;url=...') fires before the page finishes loading, so the script tag was redundant"
+    impact_if_wrong: "Some edge-case browsers might not support meta refresh (very unlikely for modern browsers)"
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: "The user_metadata object is available on the user record returned by supabase auth admin getUserById"
+    reason: "Supabase Auth stores user_metadata in raw_user_meta_data, accessible via user.user_metadata"
+    impact_if_wrong: "Would need alternative way to retrieve user's app language preference"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES WITH EXISTING SPEC
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: contradiction
+    status: resolved
+    description: >
+      F118 spec (CR-181) says 'Agenda: disabled placeholder when off' in its
+      acceptance criteria. CR-196 sub-bug 4.2 says the current implementation
+      (replacing 2 fields with 1 warning message) is wrong. User confirmed:
+      both fields should remain visible but disabled with placeholder text.
+      This supersedes F118's AC about disabled placeholder in Speeches tab.
+      In Agenda tab (4.3), the disabled+placeholder behavior IS desired.
+    existing_spec: "F118 AC: 'Agenda: disabled placeholder when off'"
+    new_request: "CR-196.2: Keep 2 fields visible+disabled with placeholder text in each, not replace with single warning"
+    resolution: "F132 ACs (AC-132-03 through AC-132-06) define the correct behavior. F118 AC is superseded."
+
+  - id: INC-2
+    type: overlap
+    description: >
+      F118 spec has acceptance criteria for collapsed card behavior ('hides pos 2
+      when off') but did not specify that the total count in status lines should
+      change from 3 to 2. CR-196.4 adds this requirement.
+    existing_spec: "F118 AC: 'Collapsed card: no ordinal labels, hides pos 2 when off'"
+    new_request: "CR-196.4: Collapsed card shows X/2 instead of X/3 when has_second_speech=false"
+    question: "This is an extension of F118 behavior. Should be added as new ACs to F118 or documented under F132?"
+
+  - id: INC-3
+    type: missing_context
+    description: >
+      CR-197 says email should use 'idioma do app do usuario'. F116 (CR-178)
+      established that app language is stored in user_metadata.language. But
+      CR-155/F101 (original multilingual email) was implemented BEFORE CR-178
+      and only knew about ward language. The send-reset-email function was never
+      updated to use the new user_metadata.language field.
+    existing_spec: "F101 (CR-155): Email template selected by ward language"
+    new_request: "CR-197: Email template selected by user's app language (user_metadata.language)"
+    question: "F133 supersedes F101 behavior for language selection. The priority chain user_metadata -> ward -> pt-BR should be documented."
+
+  - id: INC-4
+    type: missing_context
+    description: >
+      SPEC_CONSOLIDATED meeting_actors table still lists can_music in key_columns
+      (line 5159). After CR-180/F117, can_music was split into can_pianist and
+      can_conductor. Additionally, SPEC_F083, ARCH_M024, and PLAN_P024 reference
+      'can_piano' which never existed in code (correct name is 'can_pianist').
+      Both naming issues need documentation cleanup.
+    existing_spec: "key_columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_music]"
+    new_request: "Should be: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_pianist, can_conductor]. All 'can_piano' refs should be 'can_pianist'."
+    question: "Should be corrected when updating SPEC_CONSOLIDATED. Not a code issue, just documentation."
+
+# =============================================================================
+# VALIDATION GATE (Finalization)
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_spec_consolidated: true
+  GATE-02_identified_ambiguities: true  # INC-1 through INC-4
+  GATE-03_listed_open_questions: true   # OQ-1, OQ-2, OQ-3 (all resolved/delegated)
+  GATE-04_listed_assumptions: true      # A-1 through A-6 (A-1 confirmed, A-2 delegated)
+  GATE-05_reported_inconsistencies: true # INC-1 through INC-4 (INC-1 resolved)
+  GATE-06_status_complete: true         # status: complete
+  GATE-07_zero_placeholders: true       # All ACs have given/when/then
+  GATE-08_oq_resolved: true            # OQ-1 resolved, OQ-2 resolved, OQ-3 delegated

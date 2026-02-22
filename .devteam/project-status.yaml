@@ -1,54 +1,45 @@
 project:
-  name: "Batch 19 - Language control, Pianist/Conductor split, Optional 2nd speech, Home redesign, Navigation improvements"
+  name: "Batch 20 - Settings reorganization, Actor roles fix, Language switch fix, 2nd speech bugs, Password reset fixes, UI alignment & play icon"
   type: feature_request
-  created_at: "2026-02-21"
+  created_at: "2026-02-22"
   user_request: |
-    14 pedidos agrupados:
-    1. Controle de idioma separado app vs ala. Ala controla template WhatsApp e coleções de temas. App controla UI. Idioma da ala alterável por Bispado/Secretário, salvo na tabela wards. Idioma do app por usuário, salvo no banco. Ao trocar idioma da ala, reabilitar automaticamente coleções (Temas especiais, Força dos jovens, Princípios do evangelho) no novo idioma.
-    2. Clear buttons (X) em todos os campos não-texto-livre e não-switch do card de agenda.
-    3. Split ator Música em Pianista e Regente. Migração: todos Music→Pianista. Designações existentes de Regente mantêm ator.
-    4. 2º discurso opcional via toggle por domingo. Default: ligado. Desligado: desabilita campos, apaga designações com confirmação, card contraído sem linha. Independente do toggle: '3º Discurso'→'Último Discurso', remover labels do card contraído.
-    5. Speech read-only na agenda + botão lápis→aba Discursos.
-    6. Rename 'Próximas Designações'→'Próximos Discursos' (i18n).
-    7. Ícone lápis na tela de apresentação→aba Agenda.
-    8. Botão play no card expandido da agenda→tela de apresentação.
-    9. Home: card de agenda não-expansível abaixo do botão Iniciar + botão lápis. Botão Iniciar com ícone play.
-    10. Rename aba 'Agenda'→'Agendas' (i18n).
-    11. Home: cards de discursos não-expansíveis + botão lápis→aba Discursos.
-    12. Alinhar ícones X de limpar designação com centro dos campos.
-    13. Explorar suporte a fontes maiores do sistema (accessibility). Se fácil, implementar.
-    14. Bug reset senha: Gmail→Safari mostra HTML como plain-text.
+    8 pedidos agrupados:
+    1. Reorganizar aba Configurações em 2 grupos: "Configurações da Ala" (Discursantes, Biblioteca de Temas, Modelo de Convite pelo WhatsApp, Idioma da Ala, Fuso Horário) e "Configurações do App" (Usuários do App, Histórico de Uso, Idioma do App, Tema Claro/Escuro, Sobre). Label com nome de cada grupo antes dos cards.
+    2. Revisão geral dos papéis dos atores, principalmente nos testes. Problemas de TS, testes não passando, inconsistência "can_conduct" vs "can_conductor" no código.
+    3. Botão de troca de idioma da Ala não funciona. Ao clicar e confirmar, não troca seleção, não troca idioma das coleções nem do modelo do WhatsApp.
+    4. Funcionalidade de 2º Discurso opcional com múltiplos erros: (4.1) toggle desligado apaga só discursante, deveria apagar tema também; (4.2) aba Discursos card expandido toggle desligado troca campos por mensagem de aviso ao invés de só desativar; (4.3) aba Agendas card expandido sem 2º discurso mostra texto no campo desabilitado; (4.4) card contraído agenda com 2º discurso desabilitado deve mostrar X/2 ao invés de X/3.
+    5. Email de recuperação de senha deve usar idioma do app, não da ala.
+    6. Botão de reset de senha no email resulta em HTML estático. Erro sandbox: allow-scripts permission not set. Edge Function reset-redirect precisa redirecionar sem scripts.
+    7. Card expandido de discursos: alinhar direita do círculo de status com direita do campo do discursante sem mexer posição do X.
+    8. Trocar botão de play (Iniciar Reunião e card de agenda) por ícone bem maior (altura da fonte). Atual muito pequeno e colado na seta.
 
 phases:
-  total: 3
-  current: 2
+  total: 2
+  current: 1
   summary:
     - phase: 1
-      description: "Data model & architecture: language control, pianist/conductor split, optional 2nd speech, password reset bug (CR-178, CR-180, CR-181, CR-191)"
+      description: "Bug fixes: actor roles, language switch, 2nd speech, password reset email language, password reset HTML sandbox (CR-194, CR-195, CR-196, CR-197, CR-198)"
       status: completed
     - phase: 2
-      description: "Card UI/UX: clear buttons, speech read-only in agenda, X alignment, rename labels, push notifications bug (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192)"
-      status: completed
-    - phase: 3
-      description: "Navigation & Home redesign: edit/play icons, Home agenda card, Home speeches non-expandable (CR-184, CR-185, CR-186, CR-188)"
-      status: completed
+      description: "UI improvements: settings reorganization, status circle alignment, play icon resize (CR-193, CR-199, CR-200)"
+      status: pending
 
 current_phase:
-  id: 3
+  id: 1
   started_at: "2026-02-22"
-  features: []
-  change_requests: [CR-184, CR-185, CR-186, CR-188]
+  features: [F130, F131, F132, F133, F134]
+  change_requests: [CR-194, CR-195, CR-196, CR-197, CR-198]
   current_agent: "none"
-  current_step: "Phase 3 DONE"
+  current_step: "Phase 1 DONE"
   completed_steps:
-    - "QA PRE validation (validated=true, QA_PLAN_batch19_phase3, 26 ACs, 15 checks, 8 edge cases)"
-    - "Requirements extraction (F126-F129, 35 ACs, 12 ECs, 0 OQs, status=complete)"
-    - "Architecture definition (ARCH_M034, ADR-083/084, 0 DB changes, 4 files)"
-    - "Implementation plan (PLAN_P034, 6 steps, 35 ACs, 12 ECs, 100% coverage)"
-    - "Code implementation (7 commits, 91 new tests, 5064/5064 passing, S01-S05 complete)"
-    - "Testing (91 tests, 35/35 ACs, 12/12 ECs, verdict approved, 5064/5064 passing)"
-    - "Code review iteration 1 (verdict: approved, 0 P0, 0 P1, 0 P2, chain intact)"
-    - "QA POST validation (verdict: passed, 15/15 checks)"
+    - "QA PRE validation (validated=true, QA_PLAN_batch20_phase1, 22 checks, 15 must_pass)"
+    - "Requirements extraction (F130-F134, 38 ACs, 17 ECs, 0 OQs remaining, status=complete)"
+    - "Architecture definition (ARCH_M035, ADR-085/086, 13 component mods, 0 new components)"
+    - "Implementation plan (PLAN_P035, 10 steps, 44 ACs, 15 ECs, 100% coverage)"
+    - "Code implementation (12 commits, 56 new tests, 5124/5124 passing, S01-S10 complete)"
+    - "Testing (56 tests, 38/38 ACs, 17/17 ECs, verdict approved, 5124/5124 passing)"
+    - "Code review (verdict: approved, 0 P0, 0 P1, 0 P2, chain intact)"
+    - "QA POST validation (verdict: passed, 15/15 must_pass, 6/7 should_pass)"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -59,5 +50,11 @@ artifacts:
   review_consolidated: "docs/reviews/REVIEW_CONSOLIDATED.yaml"
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
-pending_deploys: []
+pending_deploys:
+  - type: "edge_function"
+    description: "Deploy send-reset-email Edge Function (F133)"
+    instructions: "supabase functions deploy send-reset-email --project-ref <ref>"
+  - type: "edge_function"
+    description: "Deploy reset-redirect Edge Function (F134)"
+    instructions: "supabase functions deploy reset-redirect --project-ref <ref>"
 last_updated: "2026-02-22"

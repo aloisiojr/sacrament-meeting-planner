@@ -158,10 +158,10 @@ describe('F116 (CR-178): Separate language control', () => {
     });
 
     it('members, topics, users, history, whatsapp hidden from Observer', () => {
-      // These are all inside !isObserver blocks
+      // These are all inside !isObserver blocks (F135 added sectionLabel between !isObserver and members)
       const membersSection = settingsSource.indexOf("t('settings.members')");
       const beforeMembers = settingsSource.substring(
-        Math.max(0, membersSection - 300),
+        Math.max(0, membersSection - 500),
         membersSection
       );
       expect(beforeMembers).toContain('!isObserver');

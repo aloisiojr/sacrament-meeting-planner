@@ -258,10 +258,12 @@ describe('F128 (CR-186): Home preview card and play icon', () => {
       expect(homeSource).toContain('styles.playIcon, { color: colors.onPrimary }');
     });
 
-    it('play icon uses fontSize 17', () => {
+    it('play icon uses fontSize >= 17 (F137 increased to 20)', () => {
       const playStyle = homeSource.match(/playIcon:\s*\{[^}]+\}/s);
       expect(playStyle).not.toBeNull();
-      expect(playStyle![0]).toContain('fontSize: 17');
+      const fontSizeMatch = playStyle![0].match(/fontSize:\s*(\d+)/);
+      expect(fontSizeMatch).not.toBeNull();
+      expect(parseInt(fontSizeMatch![1], 10)).toBeGreaterThanOrEqual(17);
     });
   });
 

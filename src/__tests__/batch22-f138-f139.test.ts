@@ -164,6 +164,26 @@ describe('F138 (CR-202): Password reset web page (reset-redirect rewrite)', () =
     });
   });
 
+  // --- XSS prevention: input format validation (R-1 fix) ---
+
+  describe('R-1 fix: token and type validated with regex before embedding in HTML', () => {
+    it('validates token is hex-only', () => {
+      expect(source).toMatch(/\/\^[^/]*\[a-fA-F0-9\][^/]*\$\/\.test\(token\)/);
+    });
+
+    it('validates type is lowercase alpha/underscore only', () => {
+      expect(source).toMatch(/\/\^[^/]*\[a-z_\][^/]*\$\/\.test\(type\)/);
+    });
+
+    it('returns 400 for invalid token format', () => {
+      expect(source).toContain("'Invalid token format'");
+    });
+
+    it('returns 400 for invalid type format', () => {
+      expect(source).toContain("'Invalid type format'");
+    });
+  });
+
   // --- AC-138-09: Success message ---
 
   describe('AC-138-09: Success message text', () => {
@@ -443,6 +463,18 @@ describe('F139 (CR-203): Invitation acceptance web page', () => {
     it('returns 400 with error message', () => {
       expect(inviteSource).toContain("'Missing required parameter: token'");
       expect(inviteSource).toContain('status: 400');
+    });
+  });
+
+  // --- XSS prevention: token format validation (R-2 fix) ---
+
+  describe('R-2 fix: token validated as UUID before embedding in HTML', () => {
+    it('validates token matches UUID format', () => {
+      expect(inviteSource).toContain('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+    });
+
+    it('returns 400 for invalid token format', () => {
+      expect(inviteSource).toContain("'Invalid token format'");
     });
   });
 

@@ -1,0 +1,568 @@
+# =============================================================================
+# PLAN_P034.yaml
+# Batch 20 Phase 1: Navigation & Home redesign (F126-F129)
+# CR-184, CR-185, CR-186, CR-188
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Add cross-screen navigation buttons (pencil/play) between Presentation,
+  Agenda, Speeches tabs and Home; redesign Home tab with Sunday agenda preview
+  card; simplify NextSundaysSection to non-expandable cards with pencil
+  navigation to Speeches tab.
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+steps:
+  # ============================================================================
+  # STEP-01: Presentation screen date param + pencil button (F126 + F127)
+  # ============================================================================
+  - id: STEP-01
+    description: >
+      Modify presentation.tsx to: (1) accept optional date query param via
+      useLocalSearchParams<{ date?: string }>(), using params.date as
+      sundayDate when provided and falling back to getTodaySundayDate()
+      otherwise (F127). (2) Add pencil button (U+270F) to the header between
+      the font toggle and the close button. Pencil button navigates to the
+      Agenda tab with expandDate param: router.push({ pathname: '/(tabs)/agenda',
+      params: { expandDate: sundayDate } }). Style: 36x36 circle, borderRadius:18,
+      surfaceVariant background, marginRight:8. Icon: fontSize:16, fontWeight:'600',
+      color: colors.text (F126).
+    files:
+      - "src/app/presentation.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03"]
+    done_when:
+      - "presentation.tsx imports useLocalSearchParams from expo-router"
+      - "sundayDate uses params.date when provided, getTodaySundayDate() when not"
+      - "Pencil button (U+270F) rendered between font toggle and close button"
+      - "Pencil onPress calls router.push to /(tabs)/agenda with expandDate param"
+      - "Pencil button style: 36x36 circle, borderRadius 18, surfaceVariant bg, marginRight:8"
+      - "When no date param provided (Home button), behavior unchanged"
+    tests:
+      - type: unit
+        description: "Test presentation.tsx uses params.date when provided"
+      - type: unit
+        description: "Test presentation.tsx falls back to getTodaySundayDate when no param"
+      - type: unit
+        description: "Test pencil button is rendered in header"
+      - type: unit
+        description: "Test pencil button navigates to Agenda tab with expandDate"
+    covers:
+      acceptance_criteria:
+        - AC-126-01
+        - AC-126-06
+        - AC-126-07
+        - AC-127-04
+        - AC-127-05
+      edge_cases: []
+    risks:
+      - risk: "useLocalSearchParams may return undefined for optional params"
+        mitigation: "Use fallback: const sundayDate = params.date ?? getTodaySundayDate()"
+
+  # ============================================================================
+  # STEP-02: Agenda tab expandDate param support (F126 ADR-082 pattern)
+  # ============================================================================
+  - id: STEP-02
+    description: >
+      Add expandDate query param support to agenda.tsx following the exact
+      ADR-082 pattern from speeches.tsx (lines 177-202). Import
+      useLocalSearchParams and useRouter from expo-router. Add useEffect
+      that: (1) reads params.expandDate, (2) sets expandedDate to the target
+      date, (3) calls lazyCreate.mutate(expandDate) to ensure agenda record
+      exists, (4) scrolls FlatList to the target card with setTimeout 400ms
+      and viewPosition:0, (5) clears the param via router.setParams({ expandDate: undefined }).
+      This enables cross-tab navigation from Presentation pencil (F126) and
+      Home preview card pencil (F128).
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+    done_when:
+      - "agenda.tsx imports useLocalSearchParams and useRouter from expo-router"
+      - "useLocalSearchParams<{ expandDate?: string }>() reads expandDate param"
+      - "useEffect triggers when expandDate is provided and listItems.length > 0"
+      - "setExpandedDate(targetDate) called in the useEffect"
+      - "lazyCreate.mutate(expandDate) called to ensure agenda record exists"
+      - "scrollToIndex called with viewPosition:0 and 400ms delay"
+      - "router.setParams({ expandDate: undefined }) clears param after handling"
+      - "Navigating away and back does not re-trigger expansion"
+    tests:
+      - type: unit
+        description: "Test agenda.tsx expands card when expandDate param provided"
+      - type: unit
+        description: "Test agenda.tsx calls lazyCreate.mutate for expandDate"
+      - type: unit
+        description: "Test expandDate param is cleared after handling"
+    covers:
+      acceptance_criteria:
+        - AC-126-02
+        - AC-126-03
+        - AC-126-04
+        - AC-126-05
+      edge_cases:
+        - EC-126-01
+        - EC-126-02
+        - EC-126-03
+    risks:
+      - risk: "expandDate may target a date not in the current FlatList range"
+        mitigation: "onScrollToIndexFailed already handles this with offset fallback"
+
+  # ============================================================================
+  # STEP-03: Agenda tab play button in expanded card header (F127)
+  # ============================================================================
+  - id: STEP-03
+    description: >
+      Add a play button (U+25B6) to the AgendaSundayCard header in agenda.tsx,
+      visible ONLY when the card is expanded. Position: to the LEFT of the
+      collapse chevron (U+25B2). Play button onPress: router.push({ pathname:
+      '/presentation', params: { date } }) passing the card's Sunday date.
+      Style: textSecondary color, fontSize:14-16, hitSlop:8. Must import
+      useRouter from expo-router (already imported in STEP-02). Play button
+      NOT shown for non-expandable cards (already controlled by expandable
+      prop condition).
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "Play button (U+25B6) rendered in AgendaSundayCard header when isExpanded"
+      - "Play button positioned to the left of the chevron"
+      - "Play button NOT visible when card is collapsed"
+      - "Play button onPress navigates to /presentation with date param"
+      - "Play button uses textSecondary color and hitSlop:8"
+      - "Non-expandable cards (Gen Conf, Stake Conf) do NOT show play button"
+    tests:
+      - type: unit
+        description: "Test play button visible only when card is expanded"
+      - type: unit
+        description: "Test play button navigates to Presentation with date param"
+      - type: unit
+        description: "Test play button not shown for non-expandable cards"
+    covers:
+      acceptance_criteria:
+        - AC-127-01
+        - AC-127-02
+        - AC-127-03
+        - AC-127-06
+        - AC-127-07
+      edge_cases:
+        - EC-127-01
+        - EC-127-02
+        - EC-127-03
+    risks:
+      - risk: "Adding play button may crowd the header on small screens"
+        mitigation: "Use small fontSize (14) and hitSlop for touch area without visual size"
+
+  # ============================================================================
+  # STEP-04: Home tab play icon + preview card + pencil (F128)
+  # ============================================================================
+  - id: STEP-04
+    description: >
+      Modify index.tsx (Home tab) to: (1) Add play icon (U+25B6, fontSize:17,
+      colors.onPrimary) BEFORE the "Iniciar Reuniao Sacramental" text in the
+      button, layout as play icon + space + text, centered. (2) Pass date param
+      to Presentation: router.push({ pathname: '/presentation', params: { date:
+      sundayDate } }). (3) Import getTodaySundayDate from usePresentationMode.ts
+      to compute sundayDate. (4) Add non-expandable AgendaPreviewCard inline
+      below the Iniciar button showing: dateBlock (44x44, day + month abbrev),
+      status lines (missing roles, speakers X/3, prayers X/2, hymns X/Y with
+      green when complete), and a square pencil button (U+270F, 36x36,
+      borderRadius:8, surfaceVariant bg). (5) Pencil button navigates to Agenda
+      tab with expandDate: router.push({ pathname: '/(tabs)/agenda', params:
+      { expandDate: sundayDate } }). (6) Fetch data via useAgenda(sundayDate),
+      useSpeeches({ start: sundayDate, end: sundayDate }),
+      useSundayExceptions(sundayDate, sundayDate). (7) Import dateUtils for
+      zeroPadDay, getMonthAbbr, getCurrentLanguage for locale. (8) Card style
+      identical to agenda.tsx collapsed card (borderWidth:1, borderRadius:8,
+      marginHorizontal:12). (9) Show exception label for special meetings.
+      (10) Card visible for all roles.
+    files:
+      - "src/app/(tabs)/index.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "Play icon (U+25B6) visible before 'Iniciar' text in button"
+      - "Iniciar button passes date param to Presentation navigation"
+      - "AgendaPreviewCard rendered below Iniciar button"
+      - "Preview card shows dateBlock with day number and month abbreviation"
+      - "Preview card shows status lines: missing roles, speakers, prayers, hymns"
+      - "Status lines show green color when count matches total"
+      - "Pencil button (U+270F, 36x36 square, borderRadius:8) on card right side"
+      - "Pencil button navigates to Agenda tab with expandDate"
+      - "Card not expandable (no chevron, no onPress expand)"
+      - "Card visible for all roles (Observer, Secretary, Bishopric)"
+      - "Exception label shown for special meetings (testimony, primary presentation)"
+      - "getTodaySundayDate used for date computation (Mon-Sat: next Sunday, Sunday: today)"
+    tests:
+      - type: unit
+        description: "Test play icon visible before Iniciar text"
+      - type: unit
+        description: "Test preview card renders with dateBlock and status lines"
+      - type: unit
+        description: "Test pencil button navigates to Agenda tab with expandDate"
+      - type: unit
+        description: "Test preview card shows correct date (next Sunday Mon-Sat, today on Sunday)"
+      - type: unit
+        description: "Test preview card not expandable"
+      - type: unit
+        description: "Test exception label shown for special meetings"
+    covers:
+      acceptance_criteria:
+        - AC-128-01
+        - AC-128-02
+        - AC-128-03
+        - AC-128-04
+        - AC-128-05
+        - AC-128-06
+        - AC-128-07
+        - AC-128-08
+        - AC-128-09
+        - AC-128-10
+      edge_cases:
+        - EC-128-01
+        - EC-128-02
+        - EC-128-03
+    risks:
+      - risk: "Status line computation logic duplicated from agenda.tsx collapsed card"
+        mitigation: "ADR-084 accepts this trade-off; future refactoring can extract shared utility"
+      - risk: "New hook calls (useAgenda, useSpeeches, useSundayExceptions) may impact performance"
+        mitigation: "TanStack Query caching prevents duplicate network requests for same date"
+
+  # ============================================================================
+  # STEP-05: NextSundaysSection simplification + pencil navigation (F129)
+  # ============================================================================
+  - id: STEP-05
+    description: >
+      Simplify NextSundaysSection.tsx to remove all expand/edit functionality
+      and add pencil navigation. Specifically: (1) Remove state variables:
+      expandedDate, speakerModalSpeechId, topicModalSpeechId. (2) Remove
+      mutation hooks: useAssignSpeaker, useAssignTopic, useChangeStatus,
+      useRemoveAssignment, useLazyCreateSpeeches, useSetSundayType,
+      useRemoveSundayException, useUpdateAgendaByDate. (3) Remove handlers:
+      handleToggle, handleAssignSpeaker, handleAssignTopic, handleChangeStatus,
+      handleRemoveAssignment, handleClearTopic, handleTypeChange,
+      handleRemoveException, handleToggleSecondSpeech. (4) Remove rendered
+      components: SpeechSlot (children of SundayCard), MemberSelectorModal,
+      TopicSelectorModal. (5) Remove imports for removed hooks and components.
+      (6) Keep data-fetching: useSpeeches, useSundayExceptions, useAgendaRange
+      (for has_second_speech). (7) Pass onToggle=undefined to SundayCard to
+      disable expand and hide chevron. (8) Add useRouter from expo-router.
+      (9) Add square pencil button (U+270F, 36x36, borderRadius:8,
+      surfaceVariant bg) to each card, positioned at the right side. Pencil
+      onPress: router.push({ pathname: '/(tabs)/speeches', params:
+      { expandDate: date } }). (10) Render pencil button via
+      SundayCard's header area - add a renderHeaderRight prop to SundayCard
+      or render the pencil within the existing header layout by passing it as
+      a new optional prop. (11) SundayCard.tsx: add optional
+      renderHeaderRight prop that renders in the header at the position where
+      the chevron would be when onToggle is undefined. When onToggle is defined,
+      chevron renders normally; when undefined and renderHeaderRight provided,
+      renderHeaderRight renders instead.
+    files:
+      - "src/components/NextSundaysSection.tsx"
+      - "src/components/SundayCard.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02"]
+    done_when:
+      - "expandedDate state removed from NextSundaysSection"
+      - "speakerModalSpeechId and topicModalSpeechId states removed"
+      - "All mutation hooks removed (7 hooks)"
+      - "All expand/edit handlers removed (9 handlers)"
+      - "SpeechSlot, MemberSelectorModal, TopicSelectorModal not rendered"
+      - "SundayCard receives onToggle=undefined (disables expand, hides chevron)"
+      - "Pencil button (U+270F) rendered at right side of each card"
+      - "Pencil button navigates to Speeches tab with expandDate param"
+      - "Pencil button style: 36x36 square, borderRadius:8, surfaceVariant bg"
+      - "SundayCard.tsx has renderHeaderRight optional prop"
+      - "Cards still show DateBlock + LEDs + speaker names (collapsed view)"
+      - "Exception labels still shown for special Sundays"
+      - "isNext highlighting preserved on first card"
+      - "has_second_speech respected (position 2 hidden when false)"
+      - "Estimated ~130 lines removed from NextSundaysSection"
+    tests:
+      - type: unit
+        description: "Test cards are not expandable (no SpeechSlot rendered)"
+      - type: unit
+        description: "Test no chevron shown on cards"
+      - type: unit
+        description: "Test pencil button rendered on each card"
+      - type: unit
+        description: "Test pencil navigates to Speeches tab with expandDate"
+      - type: unit
+        description: "Test speaker names and LEDs still visible"
+      - type: unit
+        description: "Test exception labels shown for special Sundays"
+      - type: unit
+        description: "Test isNext highlighting preserved"
+      - type: unit
+        description: "Test has_second_speech=false hides position 2"
+    covers:
+      acceptance_criteria:
+        - AC-129-01
+        - AC-129-02
+        - AC-129-03
+        - AC-129-04
+        - AC-129-05
+        - AC-129-06
+        - AC-129-07
+        - AC-129-08
+        - AC-129-09
+        - AC-129-10
+        - AC-129-11
+      edge_cases:
+        - EC-129-01
+        - EC-129-02
+        - EC-129-03
+    risks:
+      - risk: "SundayCard renderHeaderRight prop may conflict with chevron logic"
+        mitigation: "Chevron only renders when onToggle is defined; renderHeaderRight only when onToggle is undefined"
+      - risk: "Removing ~150 lines of code may cause merge conflicts with pending plans"
+        mitigation: "NextSundaysSection is only modified by this plan in the current batch"
+
+  # ============================================================================
+  # STEP-06: Tests for batch 20 phase 1 (F126-F129)
+  # ============================================================================
+  - id: STEP-06
+    description: >
+      Create test file src/__tests__/batch20-phase1.test.ts covering all 4
+      features. Tests should follow the existing batch test file patterns
+      (e.g., batch19-phase2.test.ts). Test coverage:
+      F126: (1) Pencil button renders in Presentation header, (2) Pencil
+      navigates to Agenda tab with expandDate, (3) Agenda tab expands card
+      when expandDate provided, (4) expandDate param cleared after handling,
+      (5) lazyCreate called for expandDate, (6) Non-expandable card not
+      expanded by expandDate.
+      F127: (1) Play button visible when Agenda card expanded, (2) Play
+      button hidden when collapsed, (3) Play navigates to Presentation with
+      date, (4) Presentation uses date param when provided, (5) Falls back
+      to getTodaySundayDate when no param, (6) Play not visible for
+      non-expandable cards.
+      F128: (1) Play icon in Iniciar button, (2) Preview card renders with
+      dateBlock and status lines, (3) Pencil on preview card navigates to
+      Agenda, (4) Card not expandable, (5) Exception label for special
+      meetings, (6) All roles see preview card.
+      F129: (1) Cards not expandable in NextSundaysSection, (2) No chevron
+      shown, (3) Pencil button on each card, (4) Pencil navigates to Speeches
+      with expandDate, (5) No SpeechSlot/Modal rendered, (6) Speaker names
+      and LEDs visible, (7) Exception labels shown, (8) isNext highlighting
+      preserved, (9) has_second_speech respected.
+    files:
+      - "src/__tests__/batch20-phase1.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "Test file src/__tests__/batch20-phase1.test.ts created"
+      - "All F126 ACs covered by tests (AC-126-01 to AC-126-07)"
+      - "All F127 ACs covered by tests (AC-127-01 to AC-127-07)"
+      - "All F128 ACs covered by tests (AC-128-01 to AC-128-10)"
+      - "All F129 ACs covered by tests (AC-129-01 to AC-129-11)"
+      - "Edge cases EC-126-01 to EC-126-03, EC-127-01 to EC-127-03, EC-128-01 to EC-128-03, EC-129-01 to EC-129-03 considered"
+      - "All tests pass with pnpm test"
+    tests:
+      - type: unit
+        description: "~27 test cases covering 4 features, 35 ACs, 12 ECs"
+    covers:
+      acceptance_criteria:
+        - AC-126-01
+        - AC-126-02
+        - AC-126-03
+        - AC-126-04
+        - AC-126-05
+        - AC-126-06
+        - AC-126-07
+        - AC-127-01
+        - AC-127-02
+        - AC-127-03
+        - AC-127-04
+        - AC-127-05
+        - AC-127-06
+        - AC-127-07
+        - AC-128-01
+        - AC-128-02
+        - AC-128-03
+        - AC-128-04
+        - AC-128-05
+        - AC-128-06
+        - AC-128-07
+        - AC-128-08
+        - AC-128-09
+        - AC-128-10
+        - AC-129-01
+        - AC-129-02
+        - AC-129-03
+        - AC-129-04
+        - AC-129-05
+        - AC-129-06
+        - AC-129-07
+        - AC-129-08
+        - AC-129-09
+        - AC-129-10
+        - AC-129-11
+      edge_cases:
+        - EC-126-01
+        - EC-126-02
+        - EC-126-03
+        - EC-127-01
+        - EC-127-02
+        - EC-127-03
+        - EC-128-01
+        - EC-128-02
+        - EC-128-03
+        - EC-129-01
+        - EC-129-02
+        - EC-129-03
+    risks:
+      - risk: "Test file may be large with ~27 test cases"
+        mitigation: "Organize with describe blocks per feature (F126, F127, F128, F129)"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  - ac_id: AC-126-01
+    how_to_verify: "Pencil button (U+270F) visible in Presentation header, circular 36x36"
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-126-02
+    how_to_verify: "Press pencil in Presentation, Agenda tab opens with target card expanded"
+    covered_by_steps: ["STEP-01", "STEP-02", "STEP-06"]
+
+  - ac_id: AC-126-03
+    how_to_verify: "Agenda tab auto-expands card when expandDate param provided, scrolls to it"
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-126-04
+    how_to_verify: "expandDate param cleared after handling (router.setParams)"
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-126-05
+    how_to_verify: "lazyCreate.mutate called when expandDate processed"
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-126-06
+    how_to_verify: "Observer can see and press pencil button, navigates to Agenda read-only"
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-126-07
+    how_to_verify: "Pencil button dimensions 36x36, borderRadius 18, surfaceVariant bg"
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-127-01
+    how_to_verify: "Play button (U+25B6) visible in expanded Agenda card header, left of chevron"
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-127-02
+    how_to_verify: "Play button NOT visible when card collapsed"
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-127-03
+    how_to_verify: "Play button navigates to Presentation with correct date param"
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-127-04
+    how_to_verify: "Presentation screen uses params.date when provided"
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-127-05
+    how_to_verify: "Presentation falls back to getTodaySundayDate when no date param"
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-127-06
+    how_to_verify: "Non-expandable cards do not show play button"
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-127-07
+    how_to_verify: "Observer can see play button and navigate to Presentation"
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-128-01
+    how_to_verify: "Play icon U+25B6 visible before Iniciar text in Home button"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-02
+    how_to_verify: "Non-expandable preview card visible below Iniciar button"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-03
+    how_to_verify: "Preview card shows next Sunday date on weekdays"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-04
+    how_to_verify: "Preview card shows today date on Sundays"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-05
+    how_to_verify: "Status lines match Agenda tab collapsed card (speakers X/3, prayers X/2, hymns X/Y)"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-06
+    how_to_verify: "Pencil button on preview card navigates to Agenda with expandDate"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-07
+    how_to_verify: "Press on preview card body does nothing (not expandable)"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-08
+    how_to_verify: "Exception label shown for Testimony Meeting etc."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-09
+    how_to_verify: "Observer can see preview card and pencil button"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-128-10
+    how_to_verify: "Pencil button dimensions 36x36 square, borderRadius 8, surfaceVariant bg"
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-129-01
+    how_to_verify: "SundayCard in NextSundaysSection does not expand on press"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-02
+    how_to_verify: "No chevron visible on cards in NextSundaysSection"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-03
+    how_to_verify: "Pencil button (U+270F) visible on each card right side"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-04
+    how_to_verify: "Pencil navigates to Speeches tab with expandDate param"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-05
+    how_to_verify: "Speaker names and LEDs visible in collapsed card view"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-06
+    how_to_verify: "No MemberSelectorModal, TopicSelectorModal, SpeechSlot rendered"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-07
+    how_to_verify: "Exception label shown for special Sundays"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-08
+    how_to_verify: "First card has borderColor: colors.primary highlighting"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-09
+    how_to_verify: "Position 2 speaker hidden when has_second_speech=false"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-10
+    how_to_verify: "Pencil button 36x36 square, borderRadius:8, surfaceVariant bg"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-129-11
+    how_to_verify: "Observer sees cards with pencil button, Speeches tab is read-only"
+    covered_by_steps: ["STEP-05", "STEP-06"]

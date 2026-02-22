@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 22
-  last_updated_by: "batch-19-phase-2"
+  version: 23
+  last_updated_by: "batch-20-phase-1"
   total_phases: 6
-  total_cr_plans: 39
+  total_cr_plans: 40
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1083,6 +1083,18 @@ pending_with_plan:
   - cr_id: 192
     plan_id: PLAN_P033
     description: "Fix push notifications com projectId de Constants ao inves de undefined"
+  - cr_id: 184
+    plan_id: PLAN_P034
+    description: "Botao lapis na tela de Apresentacao para navegar a aba Agenda com card expandido"
+  - cr_id: 185
+    plan_id: PLAN_P034
+    description: "Botao play no card expandido da Agenda para navegar a tela de Apresentacao com data"
+  - cr_id: 186
+    plan_id: PLAN_P034
+    description: "Home redesign: play icon no Iniciar, preview card com status, lapis para Agenda"
+  - cr_id: 188
+    plan_id: PLAN_P034
+    description: "NextSundaysSection nao-expansivel com lapis navegando para aba Speeches"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1104,6 +1116,19 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 23
+    phase: "batch-20-phase-1"
+    changes:
+      - "Added PLAN_P034 for Batch 20 Phase 1 (F126-F129, CRs 184/185/186/188)"
+      - "4 features: pencil button in Presentation to Agenda, play button in Agenda to Presentation, Home preview card + play icon, non-expandable NextSundaysSection with pencil navigation"
+      - "6 steps, 35 ACs, 12 ECs, 5 arquivos impactados (1 novo teste + 4 modificados)"
+      - "Zero migracoes SQL, zero Edge Functions, zero dependencias novas"
+      - "2 ADRs: ADR-083 (extend ADR-082 expandDate pattern to Agenda tab), ADR-084 (inline AgendaPreviewCard in Home)"
+      - "F126 adds pencil (U+270F) to Presentation header + expandDate support in agenda.tsx (ADR-082 copy from speeches.tsx)"
+      - "F127 adds play (U+25B6) to expanded Agenda card header + date param support in presentation.tsx"
+      - "F128 adds play icon to Iniciar button, inline AgendaPreviewCard with dateBlock + status lines + pencil to Agenda"
+      - "F129 is a net ~130 lines removal: strips 7 mutation hooks, 9 handlers, SpeechSlot/Modals from NextSundaysSection, adds pencil + renderHeaderRight prop to SundayCard"
+      - "S01, S02, S05 parallelizaveis (independentes), S03 depende de S02 (ambos agenda.tsx), S04 depende de S02 (expandDate), S06 depende de todos"
   - version: 22
     phase: "batch-19-phase-2"
     changes:
@@ -1118,6 +1143,29 @@ changelog:
       - "F124 reestrutura SpeechSlot de two-column para row-per-element garantindo X button alignment por alignItems:'center' (supersedes ADR-076, ADR-078 parcial)"
       - "F125 corrige projectId: undefined com Constants.expoConfig?.extra?.eas?.projectId + guard para Expo Go"
       - "S01-S04 parallelizaveis (independentes), S05 depende de S04 (ambos AgendaForm.tsx), S06 depende de todos"
+
+  - id: PLAN_P034
+    title: "Batch 20 Phase 1: Navigation & Home Redesign (Pencil/Play Buttons, Preview Card, Non-expandable Cards)"
+    status: pending
+    crs_covered: [184, 185, 186, 188]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P034.yaml"
+    summary: >
+      4 features cobrindo navegacao cross-screen e redesign do Home tab: botao lapis (U+270F)
+      na tela de Apresentacao para navegar a aba Agenda com expandDate + suporte a expandDate
+      query param na aba Agenda seguindo padrao ADR-082 do speeches.tsx (F126), botao play
+      (U+25B6) no header do card expandido da aba Agenda para navegar a tela de Apresentacao
+      com data param + Apresentacao aceitando data opcional via useLocalSearchParams (F127),
+      icone play no botao Iniciar do Home + card preview nao-expansivel abaixo do botao com
+      dateBlock e status lines (speakers/prayers/hymns) identicas ao card contraido da Agenda +
+      botao lapis no card para navegar a aba Agenda (F128), e simplificacao do NextSundaysSection
+      removendo ~130 linhas de codigo de expand/edit (estados, 7 hooks de mutacao, 9 handlers,
+      SpeechSlot/Modals) substituindo por cards nao-expansiveis com botao lapis navegando para
+      aba Speeches via expandDate + nova prop renderHeaderRight no SundayCard (F129). 4 features,
+      35 ACs, 12 ECs, 5 arquivos impactados (1 novo teste + 4 modificados), zero migracoes SQL,
+      zero Edge Functions, zero dependencias novas. 2 ADRs: ADR-083 (extend ADR-082 to Agenda
+      tab), ADR-084 (inline AgendaPreviewCard). S01, S02, S05 parallelizaveis, S03 depende de
+      S02, S04 depende de S02, S06 depende de todos.
   - version: 21
     phase: "batch-19"
     changes:

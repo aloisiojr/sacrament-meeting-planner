@@ -1,0 +1,280 @@
+# =============================================================================
+# ARCH_M034.yaml
+# Architecture for F126-F129 / CR-184, CR-185, CR-186, CR-188
+# Batch: 20 Phase 1 - Navigation & Home redesign
+# Created: 2026-02-22
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Add cross-screen navigation (pencil/play buttons) between Presentation, Agenda, Speeches tabs and Home; redesign Home with Sunday preview card and non-expandable speech cards"
+  principles:
+    - "Reuse ADR-082 expandDate query param pattern for all cross-tab navigations"
+    - "Extract shared UI patterns (pencil button, status lines) into reusable concepts rather than duplicating code"
+    - "No new database schema changes - all features are UI-only navigation and layout changes"
+    - "Minimize component API surface - add optional props, do not create new components when possible"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Home Tab (index.tsx)                                            │
+  │  ┌──────────────────────────────┐  ┌──────────────────────────┐ │
+  │  │ Iniciar button (+ play icon) │  │ AgendaPreviewCard (new)  │ │
+  │  │ -> /presentation?date=       │  │ dateBlock + status lines │ │
+  │  └──────────────────────────────┘  │ pencil -> Agenda?expand  │ │
+  │  ┌──────────────────────────────┐  └──────────────────────────┘ │
+  │  │ NextSundaysSection (slimmed) │                                │
+  │  │ non-expandable cards         │                                │
+  │  │ pencil -> Speeches?expand    │                                │
+  │  └──────────────────────────────┘                                │
+  └────────────┬────────────────────────────────────┬────────────────┘
+               │ expandDate param                    │ date param
+               ▼                                     ▼
+  ┌──────────────────┐  pencil(expandDate)  ┌──────────────────────┐
+  │ Agenda Tab       │◀─────────────────────│ Presentation Screen  │
+  │ (agenda.tsx)     │                      │ (presentation.tsx)   │
+  │ +expandDate param│  play(date)          │ +date param          │
+  │ (new, ADR-082)   │─────────────────────▶│ (new, fallback)      │
+  └──────────────────┘                      └──────────────────────┘
+               ▲
+  ┌────────────┴─────┐
+  │ Speeches Tab     │
+  │ (speeches.tsx)   │
+  │ expandDate param │
+  │ (existing)       │
+  └──────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "PresentationScreen"
+    responsibility: "Accept optional date query param; render pencil button for Agenda navigation"
+    dependencies: ["AgendaTab"]
+
+  - name: "AgendaTab"
+    responsibility: "Accept expandDate query param (ADR-082 pattern); auto-expand and scroll to target Sunday"
+    dependencies: []
+
+  - name: "HomeTab"
+    responsibility: "Show play icon on Iniciar button; render AgendaPreviewCard below button; pass date param to Presentation"
+    dependencies: ["AgendaTab", "PresentationScreen"]
+
+  - name: "AgendaPreviewCard"
+    responsibility: "Non-expandable card showing agenda status summary for target Sunday with pencil button to Agenda tab"
+    dependencies: ["AgendaTab"]
+
+  - name: "NextSundaysSection"
+    responsibility: "Simplified non-expandable speech cards with pencil button navigating to Speeches tab"
+    dependencies: ["SpeechesTab"]
+
+  - name: "SundayCard"
+    responsibility: "Support optional renderHeaderRight prop for pencil button placement (replaces chevron when onToggle undefined)"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "presentation_date_param"
+    component: "PresentationScreen"
+    description: "Presentation screen accepts optional date query param to display agenda for a specific Sunday"
+    methods:
+      - name: "useLocalSearchParams"
+        input: "{ date?: string } via Expo Router query params"
+        output: "sundayDate: string (params.date ?? getTodaySundayDate())"
+    notes: "Fallback to getTodaySundayDate() preserves existing behavior for Home button and direct navigation"
+
+  - name: "presentation_pencil_button"
+    component: "PresentationScreen"
+    description: "Pencil button in header navigates to Agenda tab with expandDate"
+    methods:
+      - name: "onPress"
+        input: "sundayDate (from current presentation date)"
+        output: "router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })"
+    notes: "Button style: 36x36 circle, surfaceVariant bg, U+270F icon. Position: between font toggle and close button"
+
+  - name: "agenda_expand_date_param"
+    component: "AgendaTab"
+    description: "Agenda tab accepts expandDate query param to auto-expand and scroll to a specific Sunday card"
+    methods:
+      - name: "useLocalSearchParams"
+        input: "{ expandDate?: string } via Expo Router query params"
+        output: "Side effects: setExpandedDate, lazyCreate.mutate, scrollToIndex, router.setParams({ expandDate: undefined })"
+    notes: "Exact same pattern as speeches.tsx lines 96, 177-202 (ADR-082). Clears param after handling."
+
+  - name: "agenda_play_button"
+    component: "AgendaTab (AgendaSundayCard)"
+    description: "Play button in expanded card header navigates to Presentation screen with date"
+    methods:
+      - name: "onPress"
+        input: "date (from expanded card)"
+        output: "router.push({ pathname: '/presentation', params: { date } })"
+    notes: "Play button (U+25B6) visible only when card is expanded. Position: left of collapse chevron. Not visible for non-expandable cards."
+
+  - name: "home_iniciar_play_icon"
+    component: "HomeTab"
+    description: "Add play icon before Iniciar button text and pass date param"
+    methods:
+      - name: "onPress"
+        input: "sundayDate (from getTodaySundayDate())"
+        output: "router.push({ pathname: '/presentation', params: { date: sundayDate } })"
+    notes: "Play icon U+25B6 before text. Date param ensures consistency with F127."
+
+  - name: "home_agenda_preview_card"
+    component: "HomeTab (inline)"
+    description: "Non-expandable card below Iniciar button showing agenda status for target Sunday"
+    methods:
+      - name: "render"
+        input: "sundayDate, useAgenda(sundayDate), useSpeeches({start,end}), useSundayExceptions(start,end)"
+        output: "dateBlock + status lines (missing roles, speakers X/3, prayers X/2, hymns X/Y) + pencil button"
+      - name: "pencil_onPress"
+        input: "sundayDate"
+        output: "router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })"
+    notes: "Card style identical to agenda.tsx collapsed card. Pencil button: 36x36 square, borderRadius:8, surfaceVariant bg, U+270F icon."
+
+  - name: "next_sundays_pencil_button"
+    component: "NextSundaysSection"
+    description: "Non-expandable cards with pencil button navigating to Speeches tab"
+    methods:
+      - name: "pencil_onPress"
+        input: "date (from card)"
+        output: "router.push({ pathname: '/(tabs)/speeches', params: { expandDate: date } })"
+    notes: "Pencil button style identical to F128 (36x36 square, borderRadius:8, surfaceVariant bg, U+270F icon)"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No database schema changes. All features are UI-only. Data fetching uses existing hooks: useAgenda, useSpeeches, useSundayExceptions, useAgendaRange, usePresentationData."
+
+  new_data_flows:
+    - description: "Home tab fetches agenda data for preview card"
+      hooks:
+        - "getTodaySundayDate() from usePresentationMode.ts (already exported)"
+        - "useAgenda(sundayDate) from useAgenda.ts (lazy create for single date)"
+        - "useSpeeches({ start: sundayDate, end: sundayDate }) from useSpeeches.ts"
+        - "useSundayExceptions(sundayDate, sundayDate) from useSundayTypes.ts"
+      notes: "These are existing hooks. No new queries needed. TanStack Query caching applies."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: "No security changes. All navigation is client-side. Existing RLS policies apply to all data queries. Observer permissions enforced by target screens."
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: "No new logging or monitoring. Existing TanStack Query error handling covers new hook usages."
+
+# =============================================================================
+# IMPLEMENTATION NOTES
+# =============================================================================
+
+implementation_notes:
+  feature_ordering: "F127 and F126 should be implemented together since both modify presentation.tsx. F128 depends on F126 (agenda.tsx expandDate). F129 is independent."
+
+  files_modified:
+    - path: src/app/presentation.tsx
+      features: [F126, F127]
+      changes:
+        - "F127: Add useLocalSearchParams<{ date?: string }>(), use params.date ?? getTodaySundayDate()"
+        - "F126: Add pencil button (U+270F) to header, navigates to Agenda tab with expandDate"
+
+    - path: src/app/(tabs)/agenda.tsx
+      features: [F126, F127, F128]
+      changes:
+        - "F126: Add useLocalSearchParams<{ expandDate?: string }>(), auto-expand/scroll/clear (ADR-082 pattern from speeches.tsx)"
+        - "F127: Add play button (U+25B6) to expanded AgendaSundayCard header, left of chevron"
+        - "F127: Import useRouter from expo-router"
+
+    - path: src/app/(tabs)/index.tsx
+      features: [F128]
+      changes:
+        - "F128: Add play icon (U+25B6) before Iniciar button text"
+        - "F128: Pass date param to Presentation navigation"
+        - "F128: Add AgendaPreviewCard inline (dateBlock + status lines + pencil button)"
+        - "F128: Import getTodaySundayDate, useAgenda/useSpeeches/useSundayExceptions, dateUtils"
+
+    - path: src/components/NextSundaysSection.tsx
+      features: [F129]
+      changes:
+        - "F129: Remove expandedDate state, handleToggle, all expand/collapse logic"
+        - "F129: Remove SpeechSlot, MemberSelectorModal, TopicSelectorModal rendering"
+        - "F129: Remove mutation hooks: useAssignSpeaker, useAssignTopic, useChangeStatus, useRemoveAssignment, useLazyCreateSpeeches"
+        - "F129: Remove handleToggleSecondSpeech, useUpdateAgendaByDate"
+        - "F129: Remove state: speakerModalSpeechId, topicModalSpeechId"
+        - "F129: Remove onTypeChange, onRemoveException handlers and hooks"
+        - "F129: Add pencil button to each card (U+270F, 36x36, borderRadius:8, surfaceVariant)"
+        - "F129: Pencil navigates to Speeches tab with expandDate"
+        - "F129: Import useRouter from expo-router"
+        - "F129: Pass onToggle=undefined to SundayCard (disables expand + hides chevron)"
+
+    - path: src/components/SundayCard.tsx
+      features: [F129]
+      changes:
+        - "F129: Verify that onToggle=undefined already hides chevron (existing conditional at line 482-486 already does this)"
+        - "F129: Add optional renderHeaderRight prop for pencil button placement when onToggle is undefined"
+
+  removed_code_estimation:
+    file: src/components/NextSundaysSection.tsx
+    lines_removed: "~150 lines (all mutation hooks, handlers, SpeechSlot/Modal rendering, expand state)"
+    lines_added: "~20 lines (pencil button, useRouter, simplified card rendering)"
+    net_change: "~130 lines removed (significant simplification)"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-083
+    title: "Extend ADR-082 expandDate pattern to Agenda tab for cross-screen navigation"
+    context: "F126 and F128 need Agenda tab to accept expandDate query param, identical to the existing Speeches tab implementation (ADR-082). Replicating the same pattern avoids inventing new navigation mechanisms."
+    decision: "Add expandDate query param support to agenda.tsx using the exact same useEffect pattern from speeches.tsx (lines 177-202): read param, setExpandedDate, lazyCreate.mutate, scrollToIndex, clear param."
+    consequences:
+      - "Consistent navigation pattern across both tabs (Speeches and Agenda)"
+      - "No new Context or global state required"
+      - "Code is nearly identical to speeches.tsx implementation (copy-paste with minor adjustments)"
+
+  - id: ADR-084
+    title: "Inline AgendaPreviewCard in Home tab instead of extracting reusable component"
+    context: "F128 needs a non-expandable agenda status card on Home. Options: (a) extract AgendaSundayCard collapsed view into shared component, (b) inline the card in index.tsx. The collapsed card in agenda.tsx is deeply intertwined with local state (isExpanded, isPast, agenda data from parent)."
+    decision: "Inline the preview card directly in index.tsx. Replicate the status line computation logic from agenda.tsx collapsed card. No extraction of AgendaSundayCard into a shared component."
+    consequences:
+      - "Some code duplication between agenda.tsx collapsed card and index.tsx preview card status lines (~40 lines)"
+      - "No risk of regression in agenda.tsx (no refactoring of existing component)"
+      - "Simpler implementation: preview card has no expand/collapse, no past dimming, no chevron"
+      - "Future refactoring can extract a shared StatusLines utility if needed"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li ARCH_CONSOLIDATED antes de comecar
+  GATE-02: true  # Componentes tem responsabilidade unica
+  GATE-03: true  # Contratos definidos para cada integracao
+  GATE-04: true  # ADRs registrados para decisoes que afetam multiplos componentes
+  GATE-05: true  # ARCH_M034.yaml salvo no disco
+  GATE-06: true  # ARCH_CONSOLIDATED sera atualizado na iteracao final
+  GATE-07: true  # ARCH_SUMMARY preenchido
+  GATE-08: true  # Maximo 10 componentes por modulo respeitado (6 components)

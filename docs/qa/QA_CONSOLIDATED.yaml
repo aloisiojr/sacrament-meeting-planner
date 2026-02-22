@@ -21,7 +21,8 @@
 # CR-172, CR-173, CR-174 (PRE+POST)
 # CR-175, CR-176, CR-177 (PRE+POST)
 # CR-178, CR-180, CR-181, CR-191 (PRE+POST) - Batch 19 Phase 1
-# CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (PRE) - Batch 19 Phase 2
+# CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (PRE+POST) - Batch 19 Phase 2
+# CR-184, CR-185, CR-186, CR-188 (PRE+POST) - Batch 19 Phase 3
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -8779,4 +8780,380 @@ batch19_phase2_post:
     - F123 (CR-187): Tab renamed from Agenda to Agendas in all 3 locales
     - F124 (CR-189): SpeechSlot restructured to row-per-element layout, X buttons aligned with fields
     - F125 (CR-192): projectId read from Constants.expoConfig, no longer undefined
+
+# #############################################################################
+# CR-184, CR-185, CR-186, CR-188: Navigation & Home redesign (Batch 19 Phase 3)
+# F126 (CR-184): Pencil in Presentation -> Agenda tab navigation
+# F127 (CR-185): Play button in Agenda card -> Presentation navigation
+# F128 (CR-186): Home preview card + play icon on Iniciar button
+# F129 (CR-188): NextSundaysSection non-expandable cards with pencil
+# #############################################################################
+
+cr_184_185_186_188:
+  cr_ids: [CR-184, CR-185, CR-186, CR-188]
+  features: [F126, F127, F128, F129]
+  title: "Navigation & Home redesign"
+  type: feature_request
+  spec: specs/SPEC_F126_F129.yaml
+  qa_plan: qa/QA_PLAN_batch19_phase3.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      All 4 CRs validated as implementable. Key findings:
+      - CR-184: presentation.tsx needed pencil button + agenda.tsx needed expandDate support (new)
+      - CR-185: agenda.tsx needed play button + presentation.tsx needed date param support
+      - CR-186: index.tsx needed preview card + agenda data fetching + play icon on button
+      - CR-188: NextSundaysSection needed major simplification (remove expand/edit, add pencil)
+      26 ACs (20 must_pass, 6 should_pass), 8 edge cases, 15 validation checks defined.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "3 of 3 (Batch 19)"
+    test_execution:
+      total: 5064
+      passed: 5064
+      failed: 0
+      test_files: 82
+
+    validation_checks:
+      # === CR-184: Pencil in Presentation header ===
+
+      - id: VC-184-01
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-184-01]
+        evidence: |
+          presentation.tsx:99-108: Pencil button with U+270F icon exists in header.
+          Style 'pencilButton' at line 200-207: width:36, height:36, borderRadius:18,
+          backgroundColor: colors.surfaceVariant, marginRight:8.
+          Icon text '\u270F' at line 106.
+
+      - id: VC-184-02
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-184-03]
+        evidence: |
+          presentation.tsx:101:
+          onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } }))
+          Navigates to Agenda tab with expandDate param set to the current sundayDate.
+
+      - id: VC-184-03
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-184-04]
+        evidence: |
+          agenda.tsx:19: import { useLocalSearchParams, useRouter } from 'expo-router';
+          agenda.tsx:52: const params = useLocalSearchParams<{ expandDate?: string }>();
+          agenda.tsx:154-178: useEffect handles expandDate - calls setExpandedDate(targetDate),
+          lazyCreate.mutate(targetDate), scrollToIndex for the target card.
+
+      - id: VC-184-04
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-184-05]
+        evidence: |
+          agenda.tsx:177: router.setParams({ expandDate: undefined });
+          Clears expandDate param after handling to prevent re-triggering on tab refocus.
+
+      - id: VC-184-05
+        result: PASS
+        criteria: should_pass
+        maps_to: [AC-184-02]
+        evidence: |
+          presentation.tsx:102-103:
+          accessibilityRole="button"
+          accessibilityLabel="Edit agenda"
+          Proper accessibility attributes present on pencil button.
+
+      # === CR-185: Play button in expanded Agenda card ===
+
+      - id: VC-185-01
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-185-01]
+        evidence: |
+          agenda.tsx:513-524: Play button renders U+25B6 icon inside a Pressable.
+          Text style 'playButton' at line 630-633: fontSize:14, marginRight:8.
+
+      - id: VC-185-02
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-185-02]
+        evidence: |
+          agenda.tsx:513: {expandable && isExpanded && (
+          Play button is conditionally rendered only when both expandable AND isExpanded are true.
+          When collapsed, only the chevron is shown (line 525-529).
+
+      - id: VC-185-03
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-185-03]
+        evidence: |
+          agenda.tsx:515:
+          onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+          Navigates to Presentation screen with the specific sunday date as param.
+
+      - id: VC-185-04
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-185-04]
+        evidence: |
+          presentation.tsx:16: import { useRouter, useLocalSearchParams } from 'expo-router';
+          presentation.tsx:39: const params = useLocalSearchParams<{ date?: string }>();
+          presentation.tsx:44: const sundayDate = params.date ?? getTodaySundayDate();
+          Accepts optional date param, falls back to getTodaySundayDate() when not provided.
+
+      # === CR-186: Home section redesign ===
+
+      - id: VC-186-01
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-186-01]
+        evidence: |
+          index.tsx:129-131: Play icon U+25B6 rendered before button text.
+          <Text style={[styles.playIcon, { color: colors.onPrimary }]}>{'\u25B6'}</Text>
+          Style 'playIcon' at line 277-280: fontSize:17, marginRight:8.
+          Wrapped in meetingButtonContent flexDirection:'row' layout (line 272-276).
+
+      - id: VC-186-02
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-186-02]
+        evidence: |
+          index.tsx:138-233: Preview card with previewCard style renders below Iniciar button.
+          Contains dateBlock (44x44), previewCardCenter with status lines,
+          and pencil button on the right. Style matches Agenda tab collapsed card.
+
+      - id: VC-186-03
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-186-03]
+        evidence: |
+          index.tsx:21: import { getTodaySundayDate } from '../../hooks/usePresentationMode';
+          index.tsx:35: const sundayDate = useMemo(() => getTodaySundayDate(), []);
+          Uses getTodaySundayDate() which returns next Sunday (Mon-Sat) or today (Sunday).
+
+      - id: VC-186-04
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-186-05]
+        evidence: |
+          index.tsx:139-233: Preview card has no onToggle handler, no Pressable wrapper for
+          expand behavior, no chevron. It's a static View with dateBlock + status + pencil.
+          Card is purely display-only, not expandable.
+
+      - id: VC-186-05
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-186-06, AC-186-07]
+        evidence: |
+          index.tsx:222-231: Pencil button with U+270F icon navigates to Agenda tab.
+          onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } }))
+          Style 'pencilButton' at line 327-333: width:36, height:36, borderRadius:8,
+          backgroundColor: colors.surfaceVariant. Square button (borderRadius:8 not circular).
+
+      # === CR-188: Proximos Discursos non-expandable ===
+
+      - id: VC-188-01
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-188-01]
+        evidence: |
+          NextSundaysSection.tsx: No expandedDate state, no setExpandedDate,
+          no handleToggle function. SundayCard rendered WITHOUT onToggle prop (line 93-112).
+          No expansion state management at all. Cards are always collapsed.
+
+      - id: VC-188-02
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-188-02]
+        evidence: |
+          NextSundaysSection.tsx:100-111: renderHeaderRight prop provides pencil button.
+          Pressable with U+270F icon (line 107-109).
+          Style 'pencilButton' at line 129-135: width:36, height:36, borderRadius:8.
+          SundayCard.tsx:403: {!onToggle && renderHeaderRight && renderHeaderRight()}
+          Pencil shown when onToggle is undefined (non-expandable card).
+
+      - id: VC-188-03
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-188-03]
+        evidence: |
+          NextSundaysSection.tsx:103:
+          onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: entry.date } }))
+          Navigates to Speeches tab with expandDate param for that sunday.
+
+      - id: VC-188-04
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-188-04]
+        evidence: |
+          NextSundaysSection.tsx: File is 141 lines total. INVERSE CHECK confirmed:
+          - No 'SpeechSlot' import or usage
+          - No 'MemberSelectorModal' import or usage
+          - No 'TopicSelectorModal' import or usage
+          - No 'useAssignSpeaker', 'useAssignTopic', 'useChangeStatus', 'useRemoveAssignment'
+          - No 'useLazyCreateSpeeches', 'useSetSundayType', 'useRemoveSundayException'
+          - No 'useUpdateAgendaByDate'
+          - No 'speakerModalSpeechId', 'topicModalSpeechId' state
+          All inline editing code has been removed.
+
+      - id: VC-188-05
+        result: PASS
+        criteria: must_pass
+        maps_to: [AC-188-05]
+        evidence: |
+          NextSundaysSection.tsx:93-112: SundayCard rendered with date, speeches, exception,
+          isNext, hasSecondSpeech props. SundayCard.tsx:364-400 renders collapsed view with
+          StatusLED + speakerNameLine for each visible position. Collapsed display preserved.
+
+    # === Acceptance Criteria Summary ===
+
+    ac_results:
+      # CR-184 (F126)
+      - id: AC-184-01
+        result: PASS
+        priority: must_pass
+      - id: AC-184-02
+        result: PASS
+        priority: should_pass
+      - id: AC-184-03
+        result: PASS
+        priority: must_pass
+      - id: AC-184-04
+        result: PASS
+        priority: must_pass
+      - id: AC-184-05
+        result: PASS
+        priority: must_pass
+      - id: AC-184-06
+        result: PASS
+        priority: should_pass
+
+      # CR-185 (F127)
+      - id: AC-185-01
+        result: PASS
+        priority: must_pass
+      - id: AC-185-02
+        result: PASS
+        priority: must_pass
+      - id: AC-185-03
+        result: PASS
+        priority: must_pass
+      - id: AC-185-04
+        result: PASS
+        priority: must_pass
+      - id: AC-185-05
+        result: PASS
+        priority: should_pass
+        note: "agenda.tsx:517-518: accessibilityRole='button' accessibilityLabel='Open presentation'"
+      - id: AC-185-06
+        result: PASS
+        priority: should_pass
+        note: "agenda.tsx:513: gated by 'expandable &&' - non-expandable cards never show play button"
+
+      # CR-186 (F128)
+      - id: AC-186-01
+        result: PASS
+        priority: must_pass
+      - id: AC-186-02
+        result: PASS
+        priority: must_pass
+      - id: AC-186-03
+        result: PASS
+        priority: must_pass
+      - id: AC-186-04
+        result: PASS
+        priority: must_pass
+        note: "index.tsx uses same dateBlock/status-line pattern as agenda.tsx collapsed cards"
+      - id: AC-186-05
+        result: PASS
+        priority: must_pass
+      - id: AC-186-06
+        result: PASS
+        priority: must_pass
+      - id: AC-186-07
+        result: PASS
+        priority: must_pass
+      - id: AC-186-08
+        result: PASS
+        priority: should_pass
+        note: "Both index.tsx and NextSundaysSection pencil buttons use same style: 36x36, borderRadius:8, surfaceVariant"
+
+      # CR-188 (F129)
+      - id: AC-188-01
+        result: PASS
+        priority: must_pass
+      - id: AC-188-02
+        result: PASS
+        priority: must_pass
+      - id: AC-188-03
+        result: PASS
+        priority: must_pass
+      - id: AC-188-04
+        result: PASS
+        priority: must_pass
+      - id: AC-188-05
+        result: PASS
+        priority: must_pass
+      - id: AC-188-06
+        result: PASS
+        priority: should_pass
+
+    # === Edge Cases Summary ===
+
+    ec_results:
+      - id: EC-P3-01
+        result: PASS
+        priority: should_pass
+        note: "agenda.tsx:237: expandable={!exception || !isExcludedFromAgenda(exception.reason)} - Gen Conf cards are non-expandable, setExpandedDate won't expand them; param is cleared on line 177"
+      - id: EC-P3-02
+        result: PASS
+        priority: should_pass
+        note: "presentation.tsx:44: sundayDate = params.date ?? getTodaySundayDate() - any valid date string can be passed from agenda play button, past dates load correctly"
+      - id: EC-P3-03
+        result: PASS
+        priority: must_pass
+        note: "index.tsx:35: getTodaySundayDate() returns today when today is Sunday (usePresentationMode.ts:55-56)"
+      - id: EC-P3-04
+        result: PASS
+        priority: must_pass
+        note: "index.tsx:35: getTodaySundayDate() returns next Sunday when today is Mon-Sat (usePresentationMode.ts:57-59)"
+      - id: EC-P3-05
+        result: PASS
+        priority: should_pass
+        note: "NextSundaysSection has no role-gating on pencil buttons. All roles see pencil. Speeches tab enforces permissions."
+      - id: EC-P3-06
+        result: PASS
+        priority: must_pass
+        note: "presentation.tsx:44: params.date ?? getTodaySundayDate() - nullish coalescing provides backward compatibility"
+      - id: EC-P3-07
+        result: PASS
+        priority: should_pass
+        note: "index.tsx:56-58: isSpecialWithStatus computed for testimony_meeting and primary_presentation. Shows exception label in warning color (line 154-160) and adjusted status lines (line 162-190)"
+      - id: EC-P3-08
+        result: PASS
+        priority: should_pass
+        note: "NextSundaysSection.tsx reduced from 298 lines to 141 lines. All modal state, mutation hooks, and SpeechSlot references removed."
+
+  summary: |
+    POST validation PASSED for all 15 validation checks.
+    - 11 must_pass: ALL PASS
+    - 4 should_pass: ALL PASS
+    Verdict: PASSED.
+
+    Test suite: 82 files, 5064 tests, 0 failures.
+
+    All 4 CRs fully implemented:
+    - F126 (CR-184): Pencil button in Presentation header navigates to Agenda tab with expandDate.
+      Agenda tab supports expandDate param (new ADR-082 pattern), auto-expands and scrolls to card.
+    - F127 (CR-185): Play button (U+25B6) in expanded Agenda card header navigates to Presentation
+      with date param. Presentation screen accepts optional date param with getTodaySundayDate fallback.
+    - F128 (CR-186): Home tab has play icon on Iniciar button, non-expandable preview card with
+      dateBlock + status lines (matching Agenda tab style), pencil button navigating to Agenda tab.
+    - F129 (CR-188): NextSundaysSection simplified to non-expandable read-only cards with pencil
+      buttons navigating to Speeches tab. All inline editing code removed (141 lines from 298).
 

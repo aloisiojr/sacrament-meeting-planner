@@ -1,0 +1,883 @@
+# =============================================================================
+# SPEC_F126_F129.yaml
+# Features F126-F129 / CR-184, CR-185, CR-186, CR-188
+# Batch: 20 Phase 1 - Navigation & Home redesign
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 20
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+
+# =============================================================================
+# F126 / CR-184: Pencil icon in Presentation screen to edit agenda
+# =============================================================================
+
+features:
+
+  - id: F126
+    name: "Pencil icon in Presentation screen to navigate to Agenda tab for editing"
+    cr_id: 184
+    type: feature
+    priority: medium
+    related_features: [F016, F012]
+    related_crs: [158, 38]
+
+    user_request: >
+      "Na tela 'Iniciar Reuniao Sacramental', adicionar icone de lapis ao lado
+      do icone de tamanho de fonte para edicao da agenda. Ao clicar, leva para
+      aba Agenda com card aberto para edicao"
+
+    current_behavior: >
+      The Presentation screen (src/app/presentation.tsx) header currently has:
+      1. Title container (left): "Iniciar Reuniao Sacramental" + formatted date
+      2. Font size toggle button (circular, 36x36, surfaceVariant background):
+         Shows "Aa" (normal) or "AA" (large mode). Toggles fontSizeMode state.
+      3. Close button (circular, 36x36, surfaceVariant background, marginRight:8
+         between font toggle and close): Shows Unicode U+2715 (X). Calls
+         router.back().
+
+      There is NO pencil/edit button. The user cannot navigate from Presentation
+      to the Agenda tab to edit the displayed agenda.
+
+      The Presentation screen hardcodes the date via getTodaySundayDate() (line 43
+      of presentation.tsx). It does not accept a date parameter.
+
+      The Agenda tab (src/app/(tabs)/agenda.tsx) does NOT support an expandDate
+      query parameter. Unlike the Speeches tab (which supports expandDate via
+      ADR-082 pattern at speeches.tsx:96), the Agenda tab has no mechanism to
+      auto-expand a specific Sunday's card from an external navigation.
+
+    expected_behavior: >
+      **1. Add pencil button to Presentation screen header:**
+      - Add a new circular button between the font size toggle and the close
+        button (or to the left of the font size toggle - same visual row).
+      - Button style: identical to fontToggleButton (width:36, height:36,
+        borderRadius:18, backgroundColor: colors.surfaceVariant).
+      - Icon: Unicode pencil character U+270F (same style as used in
+        AgendaForm ReadOnlySpeakerRow pencil buttons from F121/CR-182).
+      - Text style: fontSize: 16, fontWeight: '600', color: colors.text.
+
+      **2. Pencil button position in header:**
+      - Header layout (left to right): Title container (flex:1) | Pencil button |
+        Font toggle button | Close button.
+      - Pencil button has marginRight:8 (same spacing as between other buttons).
+
+      **3. Pencil button behavior:**
+      - Pressing the pencil button navigates to the Agenda tab with the
+        currently displayed Sunday's card expanded for editing.
+      - Navigation: router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })
+      - This follows the ADR-082 pattern already used for Speeches tab.
+      - After navigation, the Presentation screen is dismissed (router.push
+        replaces the current route in the navigation stack).
+
+      **4. Agenda tab: support expandDate query parameter (ADR-082):**
+      - The Agenda tab (agenda.tsx) must accept an optional expandDate query
+        parameter via useLocalSearchParams<{ expandDate?: string }>().
+      - When expandDate is provided:
+        a. Set expandedDate state to the provided date.
+        b. Trigger lazyCreate.mutate(expandDate) to ensure the agenda record
+           exists.
+        c. Scroll the FlatList to the target Sunday card (similar to existing
+           initialIndex scroll logic but triggered by param).
+        d. Clear the expandDate param after handling:
+           router.setParams({ expandDate: undefined }).
+      - This is the same pattern implemented in speeches.tsx (lines 96, 177-202).
+
+      **5. Observer role:**
+      - Observer CAN see the pencil button and navigate to Agenda tab.
+      - Agenda tab shows read-only fields for Observer (existing behavior).
+      - The pencil button simply navigates; editing permissions are enforced
+        by the Agenda tab itself.
+
+    files_impacted:
+      - path: src/app/presentation.tsx
+        action: modify
+        changes:
+          - "Add pencil button (U+270F) to header between font toggle and close button"
+          - "Pencil onPress: router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })"
+          - "Button style: same as fontToggleButton (36x36 circle, surfaceVariant)"
+
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+        changes:
+          - "Add useLocalSearchParams<{ expandDate?: string }>() to read expandDate param"
+          - "When expandDate provided: set expandedDate, call lazyCreate.mutate, scroll to card"
+          - "Clear expandDate param after handling (router.setParams)"
+          - "Import useLocalSearchParams and useRouter from expo-router"
+
+    acceptance_criteria:
+      - id: AC-126-01
+        description: "Pencil button visible in Presentation screen header"
+        given: "Presentation screen is open"
+        when: "View the header"
+        then: "Pencil icon (U+270F) visible as a circular button, positioned between font toggle and close button (or to the left of font toggle)."
+
+      - id: AC-126-02
+        description: "Pencil button navigates to Agenda tab with card expanded"
+        given: "Presentation screen showing agenda for 2026-03-01"
+        when: "Press pencil button"
+        then: "App navigates to Agenda tab. Card for 2026-03-01 is auto-expanded. Presentation screen is dismissed."
+
+      - id: AC-126-03
+        description: "Agenda tab auto-expands card when expandDate param is provided"
+        given: "Agenda tab receives expandDate=2026-03-01 param"
+        when: "Tab renders"
+        then: "Card for 2026-03-01 is expanded. FlatList scrolled to show the card. AgendaForm visible inside the expanded card."
+
+      - id: AC-126-04
+        description: "expandDate param is cleared after handling"
+        given: "Agenda tab received and processed expandDate param"
+        when: "Card is expanded and scrolled to"
+        then: "expandDate param is cleared (router.setParams({ expandDate: undefined })). Navigating away and back does not re-trigger expansion."
+
+      - id: AC-126-05
+        description: "Agenda record lazy-created when expandDate provided"
+        given: "Agenda tab receives expandDate for a Sunday with no agenda record"
+        when: "Tab processes the param"
+        then: "lazyCreate.mutate(expandDate) is called, creating the agenda record. AgendaForm renders with default values."
+
+      - id: AC-126-06
+        description: "Pencil button visible and functional for all roles"
+        given: "User logged in as Observer"
+        when: "Open Presentation screen"
+        then: "Pencil button visible. Pressing it navigates to Agenda tab (read-only view)."
+
+      - id: AC-126-07
+        description: "Pencil button style matches existing header buttons"
+        given: "Presentation screen header"
+        when: "View pencil button"
+        then: "Same dimensions (36x36), borderRadius (18), backgroundColor (surfaceVariant) as font toggle and close buttons."
+
+    edge_cases:
+      - id: EC-126-01
+        case: "Agenda tab already showing the target Sunday expanded"
+        expected: "Navigation still works. Card remains expanded. No duplicate expand/collapse toggle."
+
+      - id: EC-126-02
+        case: "expandDate targets a date not visible in current FlatList range"
+        expected: "FlatList scrolls to the target date using scrollToIndex. If index not found, falls back to offset-based scroll (existing onScrollToIndexFailed pattern)."
+
+      - id: EC-126-03
+        case: "expandDate targets a non-expandable Sunday (Gen Conf / Stake Conf)"
+        expected: "Card is scrolled to but not expanded (isExcludedFromAgenda returns true). User sees the non-expandable card."
+
+  # =============================================================================
+  # F127 / CR-185: Play button in Agenda card to navigate to Presentation screen
+  # =============================================================================
+
+  - id: F127
+    name: "Play button in expanded Agenda card to navigate to Presentation screen"
+    cr_id: 185
+    type: feature
+    priority: medium
+    related_features: [F012, F016]
+    related_crs: [149]
+
+    user_request: >
+      "No card expandido da agenda, no topo ao lado da seta de colapsar,
+      adicionar botao play que leva para tela 'Iniciar Reuniao Sacramental'
+      com o domingo selecionado"
+
+    current_behavior: >
+      The Agenda tab (agenda.tsx) renders AgendaSundayCard components. Each card
+      has a header with:
+      1. dateBlock (44x44, date display)
+      2. cardCenter (flex:1, status lines or exception text)
+      3. chevron (U+25B2 expanded / U+25BC collapsed, colors.textSecondary)
+
+      When expanded, the card shows SundayTypeDropdown + AgendaForm.
+
+      There is NO play button. The user cannot navigate from an Agenda card
+      directly to the Presentation screen for that specific Sunday.
+
+      The Presentation screen (presentation.tsx) currently hardcodes the date
+      via getTodaySundayDate() at line 43. It does NOT accept a date parameter
+      from navigation. To support CR-185, the Presentation screen must accept
+      an optional date parameter.
+
+    expected_behavior: >
+      **1. Add play button to expanded Agenda card header:**
+      - When the card is expanded, show a play button (U+25B6 or U+23F5) in
+        the header, to the LEFT of the collapse chevron (U+25B2).
+      - The play button is ONLY visible when the card is expanded.
+      - Button style: same color as textSecondary, fontSize ~14-16, hitSlop:8.
+      - Play button and chevron are in the same row at the right end of the
+        header.
+
+      **2. Play button behavior:**
+      - Pressing the play button navigates to the Presentation screen with the
+        Sunday date of the expanded card.
+      - Navigation: router.push({ pathname: '/presentation', params: { date: date } })
+      - The Presentation screen receives the date param and uses it instead of
+        getTodaySundayDate().
+
+      **3. Presentation screen: accept optional date parameter:**
+      - Add useLocalSearchParams<{ date?: string }>() to read the date param.
+      - If date param is provided, use it as sundayDate instead of calling
+        getTodaySundayDate().
+      - If no date param is provided, fall back to getTodaySundayDate()
+        (existing behavior for Home button "Iniciar Reuniao Sacramental").
+      - The header date label should reflect the provided date (already
+        computed from sundayDate via formatFullDate).
+
+      **4. Play button NOT visible when collapsed:**
+      - When the card is collapsed, only the chevron (U+25BC) is visible.
+      - The play button appears only when isExpanded is true.
+
+      **5. Non-expandable cards:**
+      - Cards for Gen Conf, Stake Conf, etc. (non-expandable) do NOT show
+        the play button since they cannot be expanded.
+
+    files_impacted:
+      - path: src/app/(tabs)/agenda.tsx
+        action: modify
+        changes:
+          - "Add play button (U+25B6) to AgendaSundayCard header when expanded"
+          - "Play button onPress: router.push({ pathname: '/presentation', params: { date } })"
+          - "Play button visible only when isExpanded"
+          - "Import useRouter from expo-router"
+
+      - path: src/app/presentation.tsx
+        action: modify
+        changes:
+          - "Add useLocalSearchParams<{ date?: string }>() to read date param"
+          - "Use params.date as sundayDate when provided, fallback to getTodaySundayDate()"
+          - "Import useLocalSearchParams from expo-router"
+
+    acceptance_criteria:
+      - id: AC-127-01
+        description: "Play button visible when Agenda card is expanded"
+        given: "Agenda tab with a Sunday card expanded"
+        when: "View the card header"
+        then: "Play button (U+25B6) visible to the left of the collapse chevron (U+25B2)."
+
+      - id: AC-127-02
+        description: "Play button NOT visible when card is collapsed"
+        given: "Agenda tab with all cards collapsed"
+        when: "View any card header"
+        then: "Only the expand chevron (U+25BC) visible. No play button."
+
+      - id: AC-127-03
+        description: "Play button navigates to Presentation screen with correct date"
+        given: "Agenda card for 2026-04-05 is expanded"
+        when: "Press play button"
+        then: "Presentation screen opens showing agenda for 2026-04-05 (not today's Sunday)."
+
+      - id: AC-127-04
+        description: "Presentation screen accepts date parameter"
+        given: "Presentation screen opened with date=2026-04-05 param"
+        when: "Screen renders"
+        then: "Header shows formatted date for April 5, 2026. Agenda and speech data loaded for that date."
+
+      - id: AC-127-05
+        description: "Presentation screen falls back to getTodaySundayDate when no param"
+        given: "Presentation screen opened from Home button (no date param)"
+        when: "Screen renders"
+        then: "Uses getTodaySundayDate() for the date. Existing behavior unchanged."
+
+      - id: AC-127-06
+        description: "Play button not shown for non-expandable cards"
+        given: "A Sunday marked as General Conference (non-expandable)"
+        when: "View the card"
+        then: "No play button visible. Card cannot be expanded."
+
+      - id: AC-127-07
+        description: "Play button accessible for all roles"
+        given: "User logged in as Observer"
+        when: "Expand an Agenda card"
+        then: "Play button visible and functional. Presentation screen shows read-only data."
+
+    edge_cases:
+      - id: EC-127-01
+        case: "Navigate to Presentation for a past Sunday with incomplete agenda"
+        expected: "Presentation screen renders with available data. Missing fields show '---' placeholder."
+
+      - id: EC-127-02
+        case: "Navigate to Presentation for a Sunday with no agenda record"
+        expected: "Presentation screen shows empty/default values. No crash (usePresentationData handles null agenda)."
+
+      - id: EC-127-03
+        case: "Press play then immediately press back"
+        expected: "Returns to Agenda tab. Card remains expanded at the same date."
+
+  # =============================================================================
+  # F128 / CR-186: Home - Agenda section redesign with preview card and play icon
+  # =============================================================================
+
+  - id: F128
+    name: "Home - Agenda section redesign with Sunday preview card and play icon on button"
+    cr_id: 186
+    type: feature
+    priority: high
+    related_features: [F009, F012, F016]
+    related_crs: [149, 1, 3]
+
+    user_request: >
+      "Home - sessao 'Agenda da Reuniao Sacramental': abaixo do botao Iniciar,
+      card de domingo identico ao contraido da aba Agendas (nao expansivel).
+      Card do proximo domingo (seg-sab) ou do dia (domingo). A direita, botao
+      quadrado com lapis para editar na aba Agenda. Botao Iniciar ganha icone
+      de play antes da palavra"
+
+    current_behavior: >
+      The Home tab (src/app/(tabs)/index.tsx) has a "Agenda da Reuniao
+      Sacramental" section with:
+      1. Section title: t('home.meetingAgendaTitle') = "Agenda da Reuniao
+         Sacramental"
+      2. "Iniciar Reuniao Sacramental" button: plain text button with
+         colors.primary background. onPress navigates to '/presentation'.
+         The button shows only text, no icon.
+
+      Below the button, there is NO Sunday preview card. The user has no
+      visual indication of which Sunday's agenda will be shown when they
+      press "Iniciar".
+
+      The Home tab does NOT fetch agenda data. It only renders
+      NextSundaysSection (speech cards), NextAssignmentsSection, and
+      InviteManagementSection.
+
+      The Agenda tab's collapsed card (AgendaSundayCard in agenda.tsx)
+      displays: dateBlock, status lines (missing roles, speakers X/3,
+      prayers X/2, hymns X/Y), and a chevron. This is the card style
+      that CR-186 wants replicated on Home.
+
+      The date logic already exists in getTodaySundayDate() from
+      usePresentationMode.ts: returns next Sunday (Mon-Sat) or today (Sunday).
+
+    expected_behavior: >
+      **1. Add play icon to "Iniciar" button:**
+      - Add a play icon (U+25B6) BEFORE the text "Iniciar Reuniao Sacramental".
+      - Layout: play icon + space + text, centered horizontally in the button.
+      - Icon style: same color as button text (colors.onPrimary), fontSize ~17.
+
+      **2. Add Sunday preview card below the "Iniciar" button:**
+      - Below the "Iniciar" button, render a non-expandable card showing the
+        agenda summary for the target Sunday.
+      - The card is visually identical to the collapsed AgendaSundayCard in
+        the Agenda tab (agenda.tsx lines 341-487):
+        a. dateBlock (44x44, day number + month abbreviation)
+        b. cardCenter with status lines:
+           - Missing roles line (if any roles missing)
+           - Speakers X/3 line (green when 3/3)
+           - Prayers X/2 line (green when 2/2)
+           - Hymns X/Y line (green when full)
+        c. Exception label for special meetings
+      - The card is NOT expandable (no chevron, no onToggle).
+      - The card has the same styling as Agenda tab cards (borderWidth:1,
+        borderRadius:8, marginHorizontal:12, etc.).
+
+      **3. Pencil button on the preview card:**
+      - To the RIGHT of the card content (where the chevron would be in
+        the Agenda tab), render a square pencil button.
+      - Button style: square with rounded corners (e.g., 36x36,
+        borderRadius:8, backgroundColor: colors.surfaceVariant).
+      - Icon: Unicode pencil U+270F, fontSize:16, color: colors.text.
+      - Pressing the pencil button navigates to the Agenda tab with the
+        Sunday's card expanded for editing:
+        router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })
+      - This reuses the ADR-082 expandDate pattern (same as F126).
+
+      **4. Date logic for the preview card:**
+      - Use getTodaySundayDate() to determine which Sunday to show:
+        Mon-Sat: next Sunday. Sunday: today.
+      - This is the same date used by the "Iniciar" button for Presentation.
+
+      **5. Data fetching:**
+      - The Home tab needs to fetch agenda data for the target Sunday to
+        display the status summary.
+      - Use useAgenda(sundayDate) hook to fetch the SundayAgenda record.
+      - Use useSpeeches({ start: sundayDate, end: sundayDate }) to fetch
+        speeches for status counting.
+      - Use useSundayExceptions(sundayDate, sundayDate) to fetch exception
+        data.
+
+      **6. Card renders for all roles:**
+      - All roles (Bishopric, Secretary, Observer) see the preview card.
+      - The pencil button is visible for all roles (Agenda tab enforces
+        read-only for Observer).
+
+      **7. "Iniciar" button date param:**
+      - The "Iniciar" button already navigates to '/presentation'. No change
+        needed since getTodaySundayDate() is the same date the Presentation
+        screen will compute. However, for consistency with F127, the button
+        can pass the date: router.push({ pathname: '/presentation', params: { date: sundayDate } }).
+
+    files_impacted:
+      - path: src/app/(tabs)/index.tsx
+        action: modify
+        changes:
+          - "Add play icon (U+25B6) before text in Iniciar button"
+          - "Add Sunday preview card below Iniciar button (non-expandable)"
+          - "Preview card shows dateBlock + status lines (identical to Agenda tab collapsed card)"
+          - "Add pencil button on preview card right side navigating to Agenda tab with expandDate"
+          - "Import and use getTodaySundayDate from usePresentationMode"
+          - "Fetch agenda data via useAgenda, useSpeeches, useSundayExceptions"
+          - "Pass date param to Presentation navigation for consistency"
+
+    acceptance_criteria:
+      - id: AC-128-01
+        description: "Play icon visible before 'Iniciar' text"
+        given: "Home tab"
+        when: "View the Iniciar button"
+        then: "Play icon (U+25B6) visible before the text. Button layout: play icon + text, centered."
+
+      - id: AC-128-02
+        description: "Sunday preview card visible below Iniciar button"
+        given: "Home tab"
+        when: "View the Agenda section"
+        then: "A non-expandable card is shown below the Iniciar button. Card displays dateBlock and status summary lines."
+
+      - id: AC-128-03
+        description: "Preview card shows correct date (next Sunday or today)"
+        given: "Today is Wednesday 2026-02-25"
+        when: "View the preview card"
+        then: "Card shows dateBlock for Sunday 2026-03-01 (next Sunday)."
+
+      - id: AC-128-04
+        description: "Preview card shows correct date on Sunday"
+        given: "Today is Sunday 2026-03-01"
+        when: "View the preview card"
+        then: "Card shows dateBlock for 2026-03-01 (today)."
+
+      - id: AC-128-05
+        description: "Preview card shows status lines matching Agenda tab"
+        given: "Sunday with 2/3 speakers, 1/2 prayers, 3/4 hymns assigned"
+        when: "View the preview card"
+        then: "Status lines show: Speakers 2/3, Prayers 1/2, Hymns 3/4. Missing roles listed if applicable."
+
+      - id: AC-128-06
+        description: "Pencil button on preview card navigates to Agenda tab"
+        given: "Preview card showing Sunday 2026-03-01"
+        when: "Press pencil button"
+        then: "App navigates to Agenda tab. Card for 2026-03-01 is auto-expanded."
+
+      - id: AC-128-07
+        description: "Preview card not expandable"
+        given: "Home tab"
+        when: "Press on the preview card body"
+        then: "Nothing happens. No expand/collapse behavior. No chevron shown."
+
+      - id: AC-128-08
+        description: "Preview card shows exception label for special meetings"
+        given: "Next Sunday is marked as Testimony Meeting"
+        when: "View the preview card"
+        then: "Exception label 'Reuniao de Testemunho' shown in warning color. Status lines adjusted for special meeting."
+
+      - id: AC-128-09
+        description: "Preview card visible for all roles"
+        given: "User logged in as Observer"
+        when: "View Home tab"
+        then: "Preview card visible with status summary. Pencil button visible."
+
+      - id: AC-128-10
+        description: "Pencil button style: square with rounded corners"
+        given: "Preview card"
+        when: "View pencil button"
+        then: "Square button (36x36), borderRadius 8, surfaceVariant background. Pencil icon (U+270F) centered."
+
+    edge_cases:
+      - id: EC-128-01
+        case: "No agenda record exists for the target Sunday"
+        expected: "Preview card shows empty status (Speakers 0/3, Prayers 0/2, Hymns 0/3). Missing roles: all 4 roles listed. Card still renders."
+
+      - id: EC-128-02
+        case: "Target Sunday is General Conference (non-expandable in Agenda tab)"
+        expected: "Preview card shows the exception label. Pencil button still navigates to Agenda tab where the card is non-expandable."
+
+      - id: EC-128-03
+        case: "Network error fetching agenda data"
+        expected: "Preview card shows loading state or empty status. No crash. Iniciar button still functional."
+
+  # =============================================================================
+  # F129 / CR-188: Home - Upcoming Speeches section: non-expandable cards with pencil
+  # =============================================================================
+
+  - id: F129
+    name: "Home - Upcoming Speeches section: non-expandable cards with pencil navigation"
+    cr_id: 188
+    type: feature
+    priority: high
+    related_features: [F009, F008]
+    related_crs: [150]
+
+    user_request: >
+      "Home - sessao 'Proximos Discursos': cards nao sao mais expansiveis.
+      Cada card tem botao a direita com icone de lapis (identico ao de CR-186)
+      que leva para aba Discursos com card aberto para edicao"
+
+    current_behavior: >
+      The NextSundaysSection component (src/components/NextSundaysSection.tsx)
+      currently renders 3 SundayCards that are expandable:
+      - Each card uses <SundayCard> with onToggle={handleToggle}.
+      - When expanded, the card shows SpeechSlot components for positions 1-3,
+        with full inline editing: MemberSelectorModal, TopicSelectorModal,
+        status change, remove assignment, clear topic.
+      - The section imports and uses many hooks: useAssignSpeaker,
+        useAssignTopic, useChangeStatus, useRemoveAssignment, etc.
+      - State variables track expandedDate, speakerModalSpeechId,
+        topicModalSpeechId.
+
+      When a card is expanded, the user can:
+      - Assign/unassign speakers (via MemberSelectorModal)
+      - Assign/clear topics (via TopicSelectorModal)
+      - Change speech status (via SpeechSlot)
+      - Toggle 2nd speech (via handleToggleSecondSpeech)
+
+      The card collapsed state shows: DateBlock, 3 LEDs with speaker names
+      (vertical layout), and a chevron.
+
+    expected_behavior: >
+      **1. Remove expandability from NextSundaysSection cards:**
+      - Cards are NO LONGER expandable. Remove onToggle, expanded state,
+        expandedDate state, and all expand/collapse logic.
+      - Remove the chevron from cards (no U+25B2/U+25BC arrows).
+      - Cards always show the collapsed view: DateBlock + LEDs + speaker names.
+
+      **2. Remove inline editing:**
+      - Remove SpeechSlot rendering from NextSundaysSection.
+      - Remove MemberSelectorModal and TopicSelectorModal from the component.
+      - Remove all mutation hooks that are no longer needed:
+        useAssignSpeaker, useAssignTopic, useChangeStatus,
+        useRemoveAssignment, useLazyCreateSpeeches.
+      - Remove the handleToggleSecondSpeech logic and useUpdateAgendaByDate.
+      - Remove state variables: expandedDate, speakerModalSpeechId,
+        topicModalSpeechId.
+      - Keep only the data-fetching hooks needed for display: useSpeeches,
+        useSundayExceptions, useAgendaRange (for has_second_speech).
+
+      **3. Add pencil button to each card:**
+      - To the RIGHT of each card (where the chevron used to be), add a
+        square pencil button.
+      - Button style: identical to the pencil button in CR-186/F128:
+        square (36x36), borderRadius:8, backgroundColor: colors.surfaceVariant.
+      - Icon: Unicode pencil U+270F, fontSize:16, color: colors.text.
+      - Pressing the pencil button navigates to the Speeches tab with the
+        card for that Sunday expanded:
+        router.push({ pathname: '/(tabs)/speeches', params: { expandDate: date } })
+      - This reuses the existing ADR-082 expandDate pattern already
+        implemented in speeches.tsx.
+
+      **4. Cards still show collapsed content:**
+      - DateBlock (day + month abbreviation)
+      - Speaker names with LEDs (existing SundayCard collapsed view)
+      - Exception label for non-speech Sundays
+      - isNext highlighting for the first card (borderColor: colors.primary)
+      - F118: has_second_speech respected (position 2 hidden when false)
+
+      **5. SundayTypeDropdown removed from cards:**
+      - Since cards are no longer expandable, the SundayTypeDropdown is not
+        rendered. Sunday type changes can be done in the Agenda tab or
+        Speeches tab.
+      - Remove onTypeChange and onRemoveException handlers.
+
+      **6. Role behavior:**
+      - All roles see the cards with pencil buttons.
+      - The pencil button navigates to Speeches tab where role-specific
+        permissions are enforced.
+      - Observer sees cards with pencil button; Speeches tab is read-only.
+
+    files_impacted:
+      - path: src/components/NextSundaysSection.tsx
+        action: modify
+        changes:
+          - "Remove expand/collapse logic (expandedDate state, handleToggle)"
+          - "Remove SpeechSlot rendering when expanded"
+          - "Remove MemberSelectorModal and TopicSelectorModal"
+          - "Remove mutation hooks (useAssignSpeaker, useAssignTopic, useChangeStatus, useRemoveAssignment, useLazyCreateSpeeches)"
+          - "Remove handleToggleSecondSpeech and useUpdateAgendaByDate"
+          - "Remove state: speakerModalSpeechId, topicModalSpeechId"
+          - "Add pencil button (U+270F) to each card navigating to Speeches tab with expandDate"
+          - "Pass onToggle=undefined or remove from SundayCard to disable expand"
+          - "Import useRouter from expo-router"
+
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "When onToggle is undefined, hide chevron (already supported by existing conditional)"
+          - "Allow rendering pencil button in the header (via new prop or children in header)"
+
+    acceptance_criteria:
+      - id: AC-129-01
+        description: "Cards are not expandable"
+        given: "Home tab, NextSundaysSection"
+        when: "Press on a Sunday card"
+        then: "Card does NOT expand. No SpeechSlot shown. No expand/collapse animation."
+
+      - id: AC-129-02
+        description: "No chevron shown on cards"
+        given: "Home tab, NextSundaysSection"
+        when: "View any Sunday card"
+        then: "No expand/collapse chevron (U+25B2/U+25BC) visible."
+
+      - id: AC-129-03
+        description: "Pencil button visible on each card"
+        given: "Home tab, NextSundaysSection"
+        when: "View any Sunday card"
+        then: "Square pencil button (U+270F) visible on the right side of the card."
+
+      - id: AC-129-04
+        description: "Pencil button navigates to Speeches tab with card expanded"
+        given: "Card for Sunday 2026-03-01"
+        when: "Press pencil button"
+        then: "App navigates to Speeches tab. Card for 2026-03-01 is auto-expanded (ADR-082 expandDate)."
+
+      - id: AC-129-05
+        description: "Cards still show speaker names and LEDs"
+        given: "Sunday with 2 speakers assigned"
+        when: "View card in NextSundaysSection"
+        then: "Card shows DateBlock, speaker names with LEDs (collapsed view)."
+
+      - id: AC-129-06
+        description: "No inline editing modals remain"
+        given: "NextSundaysSection component"
+        when: "Inspect rendered elements"
+        then: "No MemberSelectorModal, no TopicSelectorModal rendered. No SpeechSlot components."
+
+      - id: AC-129-07
+        description: "Exception label still shown for special Sundays"
+        given: "A Sunday marked as Testimony Meeting"
+        when: "View card in NextSundaysSection"
+        then: "Exception label 'Reuniao de Testemunho' shown in warning color."
+
+      - id: AC-129-08
+        description: "isNext highlighting preserved"
+        given: "NextSundaysSection showing 3 upcoming Sundays"
+        when: "View the first card"
+        then: "First card has borderColor: colors.primary (highlighted). Other cards have normal border."
+
+      - id: AC-129-09
+        description: "F118 has_second_speech respected"
+        given: "Sunday with has_second_speech=false"
+        when: "View card in NextSundaysSection"
+        then: "Position 2 speaker line hidden. Only positions 1 and 3 shown."
+
+      - id: AC-129-10
+        description: "Pencil button style identical to CR-186"
+        given: "NextSundaysSection card"
+        when: "View pencil button"
+        then: "Square (36x36), borderRadius:8, surfaceVariant background. Pencil icon (U+270F) centered."
+
+      - id: AC-129-11
+        description: "Observer can see cards and pencil button"
+        given: "User logged in as Observer"
+        when: "View NextSundaysSection"
+        then: "Cards visible with pencil buttons. Pressing pencil navigates to Speeches tab (read-only)."
+
+    edge_cases:
+      - id: EC-129-01
+        case: "All 3 Sundays have no speeches created yet"
+        expected: "Cards show empty speaker lines (no names, not_assigned LEDs). Pencil buttons still functional."
+
+      - id: EC-129-02
+        case: "Sunday card was previously expanded before this change"
+        expected: "N/A - this is a UI removal. No migration needed. Cards simply never expand."
+
+      - id: EC-129-03
+        case: "SundayCard onToggle=undefined behavior"
+        expected: "SundayCard header press does nothing. Chevron not rendered. Card stays collapsed."
+
+# =============================================================================
+# RESOLVED OPEN QUESTIONS
+# =============================================================================
+
+resolved_open_questions:
+
+  - id: OQ-10
+    question: "For CR-184, should the pencil button in Presentation dismiss the Presentation screen?"
+    answer: >
+      YES. Using router.push to navigate to the Agenda tab will push a new
+      route. The Presentation screen will remain in the navigation stack but
+      not be visible. The user can use back navigation to return if needed.
+      Since the Presentation screen is a full-screen modal-like route, the
+      standard behavior is to leave it in the stack.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-11
+    question: "For CR-185, how does the Presentation screen receive the date parameter?"
+    answer: >
+      Via Expo Router useLocalSearchParams. The Agenda tab navigates with
+      router.push({ pathname: '/presentation', params: { date: sundayDate } }).
+      The Presentation screen reads params.date and uses it as sundayDate.
+      Fallback: getTodaySundayDate() when no param (Home button behavior).
+    resolved_date: "2026-02-22"
+
+  - id: OQ-12
+    question: "For CR-186, what data does the Home tab need to fetch for the preview card?"
+    answer: >
+      The Home tab needs: (1) SundayAgenda record via useAgenda(sundayDate) for
+      roles, hymns, prayers, speakers; (2) Speeches via useSpeeches for speaker
+      count; (3) SundayException via useSundayExceptions for exception type.
+      These are the same data sources used by the Agenda tab's collapsed card
+      status lines.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-13
+    question: "For CR-186, should the pencil button on the Home preview card navigate to Agenda or Speeches?"
+    answer: >
+      AGENDA tab. The CR explicitly says "botao quadrado com lapis para editar
+      na aba Agenda". The pencil navigates to the Agenda tab with expandDate,
+      not the Speeches tab. This is different from CR-188 where the pencil
+      navigates to the Speeches tab.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-14
+    question: "For CR-188, should the pencil button use the same expandDate pattern as Speeches tab?"
+    answer: >
+      YES. The Speeches tab already supports the expandDate query parameter
+      (ADR-082, implemented in speeches.tsx:96). The pencil button navigates
+      with router.push({ pathname: '/(tabs)/speeches', params: { expandDate: date } }).
+      No new mechanism needed.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-15
+    question: "For CR-188, what happens to the SundayTypeDropdown when cards are non-expandable?"
+    answer: >
+      The SundayTypeDropdown is only rendered inside the expanded card content
+      (SundayCard.tsx line 403: expanded && ...). Since cards are never
+      expanded, the dropdown is never rendered. Sunday type changes must be
+      done in the Agenda tab or Speeches tab. The handlers (onTypeChange,
+      onRemoveException) can be removed from NextSundaysSection.
+    resolved_date: "2026-02-22"
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+resolved_assumptions:
+
+  - id: A-16
+    assumption: "CR-184 pencil button position is between font toggle and close button"
+    status: assumed
+    notes: >
+      The CR says "ao lado do icone de tamanho de fonte". This could mean either
+      side. Placing it between font toggle and close button (left-to-right:
+      pencil, font toggle, close) creates a logical grouping: edit action,
+      display setting, dismiss. Alternative: pencil to the left of font toggle.
+      Both are acceptable.
+
+  - id: A-17
+    assumption: "CR-185 play button uses Unicode U+25B6 (black right-pointing triangle)"
+    status: assumed
+    notes: >
+      The CR says "botao play". Unicode U+25B6 is the standard play icon used
+      in text-based UIs. This is consistent with the app's pattern of using
+      Unicode characters for icons (U+270F for pencil, U+25B2/U+25BC for
+      chevrons, U+2715 for close, etc.).
+
+  - id: A-18
+    assumption: "CR-186 preview card status lines use the same logic as Agenda tab collapsed card"
+    status: assumed
+    notes: >
+      The CR says "card de domingo identico ao contraido da aba Agendas". The
+      collapsed card in agenda.tsx (lines 420-479) computes: missing roles,
+      speakers filled/total, prayers filled/total, hymns filled/total. The
+      Home preview card should replicate this exact logic.
+
+  - id: A-19
+    assumption: "CR-186 pencil button is a separate element outside the card, not overlapping"
+    status: assumed
+    notes: >
+      The CR says "a direita, botao quadrado com lapis". This could be:
+      (a) inside the card at the right edge (where chevron would be), or
+      (b) a separate button outside the card to the right. Option (a) is more
+      consistent with the card layout pattern. The pencil button will be
+      rendered inside the card header, at the right side where the chevron
+      normally appears.
+
+  - id: A-20
+    assumption: "CR-188 removes ALL expand/edit functionality from NextSundaysSection"
+    status: assumed
+    notes: >
+      The CR says "cards nao sao mais expansiveis" and adds pencil buttons to
+      navigate to the Speeches tab. This implies ALL inline editing (SpeechSlot,
+      modals, assignment hooks) should be removed. The pencil button replaces
+      the expand-to-edit workflow with a navigate-to-edit workflow.
+
+  - id: A-21
+    assumption: "CR-186 and CR-188 pencil buttons have identical visual style"
+    status: assumed
+    notes: >
+      CR-188 explicitly says "icone de lapis (identico ao de CR-186)". Both
+      use: square shape (36x36), borderRadius:8, surfaceVariant background,
+      pencil icon U+270F. The only difference is the navigation target:
+      CR-186 pencil -> Agenda tab, CR-188 pencil -> Speeches tab.
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-10
+    type: dependency
+    description: >
+      F126 (CR-184) requires the Agenda tab to support expandDate query param.
+      F128 (CR-186) also requires the same expandDate param for Agenda tab
+      navigation from the Home preview card pencil button. These are the same
+      requirement and should be implemented once (in agenda.tsx). Both features
+      depend on this capability.
+    existing_spec: "N/A - Agenda tab does not support expandDate"
+    new_request: "CR-184 and CR-186 both need expandDate in Agenda tab"
+    resolution: >
+      Implement expandDate support in agenda.tsx once. Both F126 and F128
+      will use it. Follow the ADR-082 pattern from speeches.tsx.
+
+  - id: INC-11
+    type: dependency
+    description: >
+      F127 (CR-185) requires the Presentation screen to accept a date parameter.
+      F128 (CR-186) also benefits from passing date to Presentation (for
+      consistency, so Home button uses the same sundayDate as the preview card).
+      These are complementary changes to presentation.tsx.
+    existing_spec: "F016: Presentation Mode hardcodes getTodaySundayDate()"
+    new_request: "CR-185 needs date param in Presentation"
+    resolution: >
+      Add optional date param to presentation.tsx. F127 passes it from Agenda
+      tab play button. F128 passes it from Home Iniciar button. When absent,
+      fallback to getTodaySundayDate().
+
+  - id: INC-12
+    type: overlap
+    description: >
+      F129 (CR-188) removes expand/edit from NextSundaysSection, but
+      NextAssignmentsSection.tsx (Bishopric-only) also has expandable
+      SundayCard with SpeechSlot editing. CR-188 only mentions the
+      "Proximos Discursos" section. NextAssignmentsSection is NOT mentioned
+      and should remain unchanged (it serves a different purpose: showing
+      the 4th+ pending Sunday for forward planning).
+    existing_spec: "F009: NextAssignmentsSection with expandable card and SpeechSlots"
+    new_request: "CR-188: non-expandable cards in NextSundaysSection only"
+    resolution: >
+      F129 changes only NextSundaysSection. NextAssignmentsSection remains
+      unchanged with its expand/edit functionality.
+
+  - id: INC-13
+    type: overlap
+    description: >
+      F121 (CR-182, implemented) added pencil buttons in AgendaForm that
+      navigate to Speeches tab with expandDate. F129 (CR-188) adds pencil
+      buttons in NextSundaysSection that also navigate to Speeches tab with
+      expandDate. Both use the same ADR-082 pattern. No conflict; they are
+      different entry points to the same destination.
+    existing_spec: "F121/CR-182: Pencil in AgendaForm -> Speeches tab"
+    new_request: "CR-188: Pencil in NextSundaysSection -> Speeches tab"
+    resolution: "No conflict. Both use same expandDate pattern."
+
+# =============================================================================
+# VALIDATION GATE (Final - Complete)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true  # Identifiquei todas ambiguidades
+  GATE-03: true  # Listei TODAS open questions com IDs (OQ-10 to OQ-15)
+  GATE-04: true  # Listei TODAS assumptions com IDs (A-16 to A-21)
+  GATE-05: true  # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-10 to INC-13)
+  GATE-06: true  # Status e "complete"
+  GATE-07: true  # Incorporei informacoes do QA PRE (agenda.tsx no expandDate, presentation.tsx hardcoded date)
+  GATE-08: true  # Zero placeholders no SPEC

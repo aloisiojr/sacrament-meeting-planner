@@ -920,7 +920,7 @@ describe('F144 (CR-204) - Tester: Cross-page consistency', () => {
   it('both redirect EFs use same EXTERNAL_PAGES_URL default', () => {
     const resetEF = readEdgeFunction('reset-redirect');
     const inviteEF = readEdgeFunction('invite-redirect');
-    const defaultUrl = 'https://aloisiojr.github.io/sacrament-meeting-planner';
+    const defaultUrl = 'https://aloisiojr.github.io/sacrament-meeting-planner/public';
     expect(resetEF).toContain(defaultUrl);
     expect(inviteEF).toContain(defaultUrl);
   });

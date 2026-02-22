@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
   }
 
   const externalPagesUrl = Deno.env.get('EXTERNAL_PAGES_URL')
-    || 'https://aloisiojr.github.io/sacrament-meeting-planner';
+    || 'https://aloisiojr.github.io/sacrament-meeting-planner/public';
 
   if (!Deno.env.get('EXTERNAL_PAGES_URL')) {
     console.warn('[reset-redirect] EXTERNAL_PAGES_URL not set, using default');

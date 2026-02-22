@@ -102,15 +102,6 @@ export default function WhatsAppTemplateScreen() {
     }
   }, [ward, initialized, wardLanguage]);
 
-  // F141: Reset initialized flag when wardLanguage changes (skip initial mount)
-  const prevWardLanguageRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (prevWardLanguageRef.current !== undefined && prevWardLanguageRef.current !== wardLanguage) {
-      setInitialized(false);
-    }
-    prevWardLanguageRef.current = wardLanguage;
-  }, [wardLanguage]);
-
   // Auto-save mutation
   const saveMutation = useMutation({
     mutationFn: async (newTemplate: string) => {

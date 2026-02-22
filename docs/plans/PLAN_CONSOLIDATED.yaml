@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-21"
-  version: 20
-  last_updated_by: "batch-18"
+  last_updated: "2026-02-22"
+  version: 21
+  last_updated_by: "batch-19"
   total_phases: 6
-  total_cr_plans: 37
+  total_cr_plans: 38
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -714,6 +714,33 @@ cr_plans:
       Edge Function), ADR-078 (StatusLED no labelRow supersedes ADR-076). S01, S02, S03
       parallelizaveis (S04 pode paralelizar com S03), S05 (testes novos) depende de todos.
 
+  - id: PLAN_P032
+    title: "Batch 19 Phase 1: Language Control, Pianist/Conductor Split, Optional 2nd Speech, Password Reset Bug"
+    status: pending
+    crs_covered: [178, 180, 181, 191]
+    total_steps: 10
+    plan_ref: "docs/plans/PLAN_P032.yaml"
+    summary: >
+      4 features cobrindo controle de idioma, split de atores, toggle de discurso e bug fix:
+      separacao do controle de idioma em idioma do app (per-user, salvo em Supabase Auth
+      user_metadata) e idioma da ala (wards.language existente) com Observer ganhando aba
+      Settings limitada (idioma app, tema, sobre), fix do bug de reativacao de colecoes ao
+      trocar idioma da ala, traducao de placeholders WhatsApp por idioma do app, e label
+      'Temas da Ala' traduzido via t() (F116). Split de can_music em can_pianist e
+      can_conductor com CHECK constraint de exclusividade mutua, migracao de dados existentes
+      para can_pianist, atualizacao de tipos TypeScript, useActors, ActorSelector e AgendaForm
+      (F117). Toggle opcional de 2o discurso por domingo com has_second_speech BOOLEAN DEFAULT
+      true, Switch UI no SpeechSlot posicao 2 (apenas Bispado), dialogo de confirmacao ao
+      desligar com designacoes existentes, cards contraidos sem labels ordinais, LEDs filtrados,
+      modo apresentacao, AgendaForm e InviteManagement respeitando o toggle, label de posicao 3
+      trocado para 'Ultimo Discurso' (F118). Fix do bug de plain-text HTML na Edge Function
+      reset-redirect com charset=utf-8, Cache-Control, e investigacao de causa raiz (F119).
+      4 features, 44 ACs, 15 ECs, 20+ arquivos impactados (2 novos + 18+ modificados +
+      1 teste novo), 2 migracoes SQL (017, 018), zero dependencias novas. 2 ADRs: ADR-079
+      (user_metadata para idioma app), ADR-080 (CHECK constraint pianist/conductor). S01, S02,
+      S09 parallelizaveis, S03 depende de S01+S02, S04+S05 dependem de S03, S06 depende de
+      S04, S07 depende de S03, S08 depende de S04+S06+S07, S10 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1001,6 +1028,18 @@ pending_with_plan:
   - cr_id: 177
     plan_id: PLAN_P031
     description: "Alinhar borda direita do circulo de status com borda direita do campo de nome"
+  - cr_id: 178
+    plan_id: PLAN_P032
+    description: "Separar controle de idioma: idioma do app (per-user) vs idioma da ala (ward-wide)"
+  - cr_id: 180
+    plan_id: PLAN_P032
+    description: "Split tipo de ator Musica em Pianista e Regente com CHECK constraint exclusividade mutua"
+  - cr_id: 181
+    plan_id: PLAN_P032
+    description: "Toggle opcional de 2o discurso por domingo com has_second_speech column"
+  - cr_id: 191
+    plan_id: PLAN_P032
+    description: "Fix Edge Function reset-redirect mostrando HTML como plain-text no Safari"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1022,6 +1061,19 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 21
+    phase: "batch-19"
+    changes:
+      - "Added PLAN_P032 for Batch 19 Phase 1 (F116-F119, CRs 178/180/181/191)"
+      - "4 features: separate app/ward language control, pianist/conductor split, optional 2nd speech toggle, password reset plain-text HTML bug fix"
+      - "10 steps, 44 ACs, 15 ECs, 20+ arquivos impactados (2 novos + 18+ modificados + 1 teste novo)"
+      - "2 migracoes SQL (017_split_music_actor, 018_add_has_second_speech), zero dependencias novas"
+      - "2 ADRs: ADR-079 (user_metadata for app language), ADR-080 (CHECK constraint pianist/conductor)"
+      - "F116 e a mais complexa: AuthContext language split, Settings 2 pickers, Observer limited Settings tab, collection reactivation bug fix, WhatsApp placeholder translation, Topics ward language, useTopics label i18n"
+      - "F117 e migracao destrutiva (drop can_music) + type/hook/component updates para can_pianist/can_conductor"
+      - "F118 adiciona toggle per-Sunday com UI em SpeechSlot, SundayCard collapsed (remove labels ordinais), presentation mode, AgendaForm, InviteManagement"
+      - "F119 e investigacao + fix de charset/Cache-Control na Edge Function reset-redirect"
+      - "S01, S02, S09 parallelizaveis; S03 depende S01+S02; S04, S05 dependem S03; S06 depende S04; S07 depende S03; S08 depende S04+S06+S07; S10 depende todos"
   - version: 20
     phase: "batch-18"
     changes:

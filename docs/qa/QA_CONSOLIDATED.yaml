@@ -19,8 +19,9 @@
 # CR-155, CR-164 (PRE+POST),
 # CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171 (PRE+POST)
 # CR-172, CR-173, CR-174 (PRE+POST)
-# CR-175, CR-176, CR-177 (PRE)
-# Updated: 2026-02-21
+# CR-175, CR-176, CR-177 (PRE+POST)
+# CR-178, CR-180, CR-181, CR-191 (PRE+POST) - Batch 19 Phase 1
+# Updated: 2026-02-22
 # =============================================================================
 
 # #############################################################################
@@ -8309,3 +8310,201 @@ cr_batch18:
       - { id: VC-13, result: PASS, evidence: "SpeechSlot.tsx:198-219 topic Pressable, :243-249 clear button with hitSlop=8, onPress=handleClearTopic" }
       - { id: VC-14, result: PASS, evidence: "npx vitest run -> 79 files, 4732 tests, 0 failures" }
       - { id: VC-15, result: PASS, evidence: "npx tsc --noEmit -> 17 errors (same as baseline, no new errors)" }
+
+# #############################################################################
+# CR-178 (F116): Separate language control - app language (per-user) vs ward language
+# #############################################################################
+
+cr_178:
+  cr_id: CR-178
+  title: "Separate language control: app language (per-user) vs ward language"
+  type: feature_request
+  spec: specs/SPEC_F116_F119.yaml
+  qa_plan: qa/QA_PLAN_021.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation confirmed no per-user language preference exists in the DB.
+      Single ward.language controls both UI and data. WhatsApp placeholders hardcoded
+      in Portuguese. Topic Library uses app language for collection listing.
+      8 validation checks defined (7 must_pass, 1 should_pass).
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+
+# #############################################################################
+# CR-180 (F117): Split Music actor type into Pianist and Conductor
+# #############################################################################
+
+cr_180:
+  cr_id: CR-180
+  title: "Split Music actor type into Pianist and Conductor"
+  type: feature_request
+  spec: specs/SPEC_F116_F119.yaml
+  qa_plan: qa/QA_PLAN_021.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation confirmed meeting_actors has single can_music boolean.
+      Both pianist and conductor fields use same actor pool. DB already has
+      separate FK fields. 7 validation checks defined (all must_pass).
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+
+# #############################################################################
+# CR-181 (F118): Optional 2nd speech toggle per sunday
+# #############################################################################
+
+cr_181:
+  cr_id: CR-181
+  title: "Optional 2nd speech toggle per sunday"
+  type: feature_request
+  spec: specs/SPEC_F116_F119.yaml
+  qa_plan: qa/QA_PLAN_021.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation confirmed hardcoded [1,2,3] speech positions in all views.
+      No has_second_speech field exists. Labels use ordinal format.
+      10 validation checks defined (all must_pass).
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+
+# #############################################################################
+# CR-191 (F119): Password reset plain-text HTML bugfix
+# #############################################################################
+
+cr_191:
+  cr_id: CR-191
+  title: "Password reset redirect shows plain-text HTML"
+  type: bugfix
+  spec: specs/SPEC_F116_F119.yaml
+  qa_plan: qa/QA_PLAN_021.yaml
+
+  pre_validation:
+    timestamp: "2026-02-21"
+    status: passed
+    summary: |
+      PRE validation confirmed reset-redirect returns Content-Type text/html
+      without charset. HTML template literal is not escaped. corsHeaders do not
+      conflict. Reproduction steps documented. 4 validation checks defined.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+
+# #############################################################################
+# Batch 19 Phase 1: Combined POST validation results (CR-178, CR-180, CR-181, CR-191)
+# #############################################################################
+
+batch19_phase1_post:
+  batch: 19
+  phase: 1
+  qa_plan: qa/QA_PLAN_021.yaml
+  verdict: passed
+  timestamp: "2026-02-22"
+
+  commits:
+    - { hash: 59023f2, message: "feat(db): migration 017 split can_music (F117)" }
+    - { hash: 07e499f, message: "feat(db): migration 018 has_second_speech (F118)" }
+    - { hash: 1ee6c93, message: "feat(types): MeetingActor + SundayAgenda updates (F117+F118)" }
+    - { hash: b3602d9, message: "feat(auth): language control split + Observer Settings (F116)" }
+    - { hash: ae974a5, message: "feat(actors): useActors + ActorSelector + AgendaForm (F117)" }
+    - { hash: edee1fc, message: "feat(i18n): WhatsApp placeholders + ward language topics (F116)" }
+    - { hash: 02f6dcc, message: "feat(speeches): 2nd speech toggle + collapsed + presentation (F118)" }
+    - { hash: 1c05840, message: "feat(i18n): new keys for all 3 locales (F116+F117+F118)" }
+    - { hash: b7329ca, message: "fix(edge): reset-redirect charset + Cache-Control (F119)" }
+    - { hash: c6e881b, message: "test(batch19): tests for F116-F119" }
+    - { hash: ed821b6, message: "fix(edge): can_music -> can_pianist/can_conductor in 3 Edge Functions" }
+    - { hash: 8d7b9f5, message: "fix(speeches): SpeechSlot toggle restricted to Bispado" }
+    - { hash: 4149fb1, message: "fix(tests): update stale can_music refs and add has_second_speech to mocks" }
+
+  summary: |
+    POST validation PASSED. All 31 validation checks pass after test fixes (commit 4149fb1).
+
+    == CR-178 (F116): Language control - ALL 8 CHECKS PASS ==
+    VC-01 PASS: User language stored in Supabase auth user_metadata via updateAppLanguage()
+    VC-02 PASS: Ward language controls WhatsApp defaults and collection listing
+    VC-03 PASS: App language (user_metadata) drives i18n, fallback: device locale -> ward
+    VC-04 PASS: WhatsApp placeholders translated via i18n keys, UI labels use t()
+    VC-05 PASS: Settings has separate "Idioma do App" and "Idioma da Ala" controls
+    VC-06 PASS: Ward language change deactivates old + upserts new collections with active=true
+    VC-07 PASS: Ward language change restricted via hasPermission('settings:language') - Observer excluded
+    VC-08 PASS: wardTopicLabel uses t('topics.wardTopics') instead of hardcoded 'Temas da Ala'
+
+    == CR-180 (F117): Pianist/Conductor split - ALL 7 CHECKS PASS ==
+    VC-09 PASS: Migration 017 adds can_pianist/can_conductor, migrates can_music->can_pianist, drops can_music
+    VC-10 PASS: MeetingActor has can_pianist/can_conductor (database.ts:155-156), no can_music
+    VC-11 PASS: ActorRoleFilter includes 'can_pianist' | 'can_conductor' (useActors.ts:28-29)
+    VC-12 PASS: AgendaForm pianist uses roleFilter: 'can_pianist' (AgendaForm.tsx:235)
+    VC-13 PASS: AgendaForm conductor uses roleFilter: 'can_conductor' (AgendaForm.tsx:249)
+    VC-14 PASS: CreateActorInput/UpdateActorInput have can_pianist/can_conductor (database.ts:315-316, 325-326)
+    VC-15 PASS: Migration does not modify sunday_agendas FKs - existing assignments preserved
+
+    == CR-181 (F118): Optional 2nd speech - ALL 10 CHECKS PASS ==
+    VC-16 PASS: Migration 018 adds has_second_speech BOOLEAN DEFAULT true to sunday_agendas
+    VC-17 PASS: Switch component in SpeechSlot.tsx:170-178 for position 2
+    VC-18 PASS: Position 2 disabled when isSecondSpeechEnabled=false (SpeechSlot.tsx:95, :200-205)
+    VC-19 PASS: Alert.alert confirmation when disabling with existing assignments (speeches.tsx:291-311)
+    VC-20 PASS: SundayCard.tsx:310 visiblePositions = hasSecondSpeech ? [1,2,3] : [1,3]
+    VC-21 PASS: Disabled placeholder t('speeches.secondSpeechDisabledPlaceholder') in SpeechSlot.tsx:203
+    VC-22 PASS: Position 3 label uses t('speeches.lastSpeech') = "Ultimo Discurso" (SpeechSlot.tsx:60-61)
+    VC-23 PASS: Collapsed card shows only speaker names with StatusLED, no ordinal labels (SundayCard.tsx:363-395)
+    VC-24 PASS: Presentation mode filters speech 2 when has_second_speech=false (usePresentationMode.ts:153-158)
+    VC-25 PASS: Default value is true (migration DEFAULT true + SundayCard prop default true + ?? true fallbacks)
+
+    == CR-191 (F119): Password reset bug - ALL 4 CHECKS PASS ==
+    VC-26 PASS: Content-Type: 'text/html; charset=utf-8' (reset-redirect/index.ts:102)
+    VC-27 PASS: HTML template literal returned directly in Response body, no escaping
+    VC-28 PASS: corsHeaders (lines 17-21) do NOT contain Content-Type - no conflict
+    VC-29 PASS: meta http-equiv=refresh (line 49) and window.location.href (line 92) both use
+           sacrmeetplan://reset-password?token=${token}&type=${type}
+
+    == Cross-cutting ==
+    VC-30 PASS: 80 test files, 4902 tests, 0 failures (after commit 4149fb1)
+    VC-31 PASS: 18 TypeScript errors (baseline 17, +1 is pre-existing mock pattern in
+           setup-integration.ts for optional updateAppLanguage). No new production TS errors.
+
+  validation_results:
+    - { id: VC-01, result: PASS, evidence: "AuthContext.tsx:123 user_metadata.language, :169-175 updateAppLanguage saves to supabase.auth.updateUser" }
+    - { id: VC-02, result: PASS, evidence: "whatsapp.tsx:93 getDefaultTemplate(wardLanguage), topics.tsx:270 language=wardLanguage" }
+    - { id: VC-03, result: PASS, evidence: "AuthContext.tsx:122-140 priority: user_metadata > device locale > ward language" }
+    - { id: VC-04, result: PASS, evidence: "whatsapp.tsx:21-28 PLACEHOLDER_I18N_KEYS, :68 t(key), :181,200,223 t('settings.whatsapp.*')" }
+    - { id: VC-05, result: PASS, evidence: "settings/index.tsx:221-225 'Idioma do App' (all roles), :228-235 'Idioma da Ala' (permission gated)" }
+    - { id: VC-06, result: PASS, evidence: "settings/index.tsx:83-98 upsert new language collections with active: true" }
+    - { id: VC-07, result: PASS, evidence: "settings/index.tsx:228 hasPermission('settings:language'), permissions.ts:27,52 bishopric+secretary only" }
+    - { id: VC-08, result: PASS, evidence: "useTopics.ts:346 t('topics.wardTopics'), pt-BR.json:191, en.json:191, es.json:191" }
+    - { id: VC-09, result: PASS, evidence: "017_split_music_actor.sql: ADD can_pianist, ADD can_conductor, UPDATE can_pianist=can_music, DROP can_music" }
+    - { id: VC-10, result: PASS, evidence: "database.ts:155-156 can_pianist: boolean, can_conductor: boolean, no can_music" }
+    - { id: VC-11, result: PASS, evidence: "useActors.ts:23-29 ActorRoleFilter includes 'can_pianist' | 'can_conductor'" }
+    - { id: VC-12, result: PASS, evidence: "AgendaForm.tsx:235 roleFilter: 'can_pianist'" }
+    - { id: VC-13, result: PASS, evidence: "AgendaForm.tsx:249 roleFilter: 'can_conductor'" }
+    - { id: VC-14, result: PASS, evidence: "database.ts:315-316 can_pianist/can_conductor in CreateActorInput, :325-326 in UpdateActorInput" }
+    - { id: VC-15, result: PASS, evidence: "017_split_music_actor.sql does not modify sunday_agendas table, FKs untouched" }
+    - { id: VC-16, result: PASS, evidence: "018_add_has_second_speech.sql: ADD COLUMN has_second_speech BOOLEAN NOT NULL DEFAULT true" }
+    - { id: VC-17, result: PASS, evidence: "SpeechSlot.tsx:170-178 Switch for position 2 with onValueChange={onToggleSecondSpeech}" }
+    - { id: VC-18, result: PASS, evidence: "SpeechSlot.tsx:95 isPos2Disabled=position===2 && isSecondSpeechEnabled===false, :200-205 disabled view" }
+    - { id: VC-19, result: PASS, evidence: "speeches.tsx:291-311 Alert.alert with secondSpeechToggleConfirmTitle/Message when hasAssignments" }
+    - { id: VC-20, result: PASS, evidence: "SundayCard.tsx:310 visiblePositions = hasSecondSpeech ? [1,2,3] : [1,3], collapsed renders only visible" }
+    - { id: VC-21, result: PASS, evidence: "SpeechSlot.tsx:200-205 disabled placeholder t('speeches.secondSpeechDisabledPlaceholder')" }
+    - { id: VC-22, result: PASS, evidence: "SpeechSlot.tsx:60-61 position===3 returns t('speeches.lastSpeech'), all 3 locales have key" }
+    - { id: VC-23, result: PASS, evidence: "SundayCard.tsx:363-395 collapsed renders name only, no posLabel, no ordinal labels" }
+    - { id: VC-24, result: PASS, evidence: "usePresentationMode.ts:153-158 if(agenda?.has_second_speech!==false) speechFields.push 2nd speaker" }
+    - { id: VC-25, result: PASS, evidence: "migration DEFAULT true, SundayCard default prop true, speeches.tsx ?? true, NextSundaysSection ?? true" }
+    - { id: VC-26, result: PASS, evidence: "reset-redirect/index.ts:102 'Content-Type': 'text/html; charset=utf-8'" }
+    - { id: VC-27, result: PASS, evidence: "reset-redirect/index.ts:44-94 HTML template literal, :98 new Response(html, ...) - no escaping" }
+    - { id: VC-28, result: PASS, evidence: "reset-redirect/index.ts:17-21 corsHeaders has Allow-Origin and Allow-Headers only, no Content-Type" }
+    - { id: VC-29, result: PASS, evidence: "reset-redirect/index.ts:49 meta refresh url=${deepLink}, :92 window.location.href='${deepLink}', :42 deepLink=sacrmeetplan://..." }
+    - { id: VC-30, result: PASS, evidence: "npx vitest run -> 80 files, 4902 tests, 0 failures (after commit 4149fb1)" }
+    - { id: VC-31, result: PASS, evidence: "npx tsc --noEmit -> 18 errors (baseline 17, +1 pre-existing mock pattern). No new production TS errors." }

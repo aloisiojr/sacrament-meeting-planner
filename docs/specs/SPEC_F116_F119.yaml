@@ -1,0 +1,1120 @@
+# =============================================================================
+# SPEC_F116_F119.yaml
+# Features F116-F119 / CR-178, CR-180, CR-181, CR-191
+# Batch: 19 Phase 1 - Language control, Pianist/Conductor split,
+#   Optional 2nd speech toggle, Password reset bug
+# Created: 2026-02-21
+# Finalized: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 19
+phase: 1
+created: "2026-02-21"
+last_updated: "2026-02-22"
+
+# =============================================================================
+# F116 / CR-178: Separate language control for app (per-user) and ward
+# =============================================================================
+
+features:
+
+  - id: F116
+    name: "Separate language control: app language (per-user) vs ward language"
+    cr_id: 178
+    type: feature
+    priority: high
+    related_features: [F002, F005, F006, F020, F083, F088]
+    related_crs: [2, 11, 41, 59, 94, 140]
+
+    user_request: >
+      "Na tela de template de WhatsApp, quando eu troco de idioma, os placeholders
+      e o template mostrado na tela ainda estao em portugues. Dentro de Settings ->
+      Topic Library e a mesma coisa, quando eu troco de idioma, eu nao vejo as
+      colecoes do idioma novo na lista de colecoes. Solucao: Ter controle de lingua
+      separado para o app (individual por usuario, salvo no banco) e para a ala
+      (na tabela wards, alteravel por Bispado/Secretario). Idioma da ala controla
+      WhatsApp template e lista de temas disponiveis. Idioma do app controla a
+      lingua do app (incluindo traducao de placeholders do WhatsApp). Ao trocar
+      idioma da ala, reabilitar automaticamente colecoes no novo idioma."
+
+    current_behavior: >
+      There is a SINGLE language setting per ward (wards.language column, default
+      'pt-BR'). This single setting controls both the UI language AND the ward-level
+      data language (WhatsApp templates, collections).
+
+      1. i18n/index.ts: initI18n() detects device locale, but AuthContext.tsx
+         overrides with ward language on login (lines 101-116). changeLanguage()
+         exists for runtime changes.
+
+      2. Settings/index.tsx: Language selector (lines 199-205) updates wards.language
+         AND calls changeLanguage(). This is a ward-wide setting. The language
+         mutation also deactivates old-language collections and creates configs for
+         new-language collections (lines 67-95).
+
+      3. WhatsApp template screen (settings/whatsapp.tsx): Placeholders are hardcoded
+         in Portuguese (lines 20-27: {nome}, {data}, {posicao}, {colecao}, {titulo},
+         {link}). Sample data also Portuguese (lines 30-37). The "Placeholders:",
+         "Template:", "Preview:" labels are hardcoded in English (lines 167, 184, 207).
+
+      4. Topics screen (settings/topics.tsx): Uses getCurrentLanguage() to fetch
+         collections for that language (lines 270, 288). If app language equals ward
+         language, collections show correctly.
+
+      5. useTopics.ts: useCollections(language) fetches general_collections filtered
+         by language (line 195). useActiveTopics() does NOT filter by language - it
+         fetches ALL active collection configs regardless of language (lines 356-395).
+         The "Temas da Ala" label is hardcoded in Portuguese (line 344).
+
+      6. There is NO user-specific language preference in the database. No
+         user_preferences or user_settings table exists. The Ward interface has a
+         'language' field (database.ts:78).
+
+      7. BUG: When changing ward language, the current code in settings/index.tsx
+         deactivates old-language collections BUT the new-language collections do NOT
+         appear correctly. The collection reactivation is broken and needs fixing.
+
+      ISSUE: A single ward.language controls both the UI language and the
+      WhatsApp/collections language. Changing it affects all users simultaneously
+      and does not allow individual app language preferences. Additionally, the
+      collection reactivation on language change is buggy.
+
+    expected_behavior: >
+      Separate language into two independent settings:
+
+      **1. Ward language (wards.language column - already exists)**
+      - Controls: WhatsApp template defaults, collection listing (which language
+        collections show), activity log descriptions.
+      - Changed by: Bispado and Secretario only.
+      - Stored in: wards.language (existing column, no change needed).
+      - When changed: Auto-reactivate collections for the new language. Current
+        reactivation is BROKEN and must be fixed as part of this feature. The 3
+        built-in collections (Temas especiais, Forca dos jovens, Principios do
+        evangelho) must appear in the new language after ward language change.
+
+      **2. App language (new per-user setting)**
+      - Controls: UI translations (all t() calls), WhatsApp placeholder NAMES
+        in the template settings screen (e.g., {nome} -> {name} when app is English),
+        section headers, buttons, etc.
+      - Changed by: Any authenticated user (including Observer).
+      - Stored in: Supabase Auth user_metadata (auth.users.raw_user_meta_data).
+        This avoids creating a new table and migration, uses Supabase's built-in
+        metadata system, and is accessible from any authenticated session.
+      - On login: App language is loaded from user_metadata.language. If no
+        preference saved, falls back to device locale, then to ward language.
+
+      **3. Settings screen changes**
+      - Observer NOW gets a limited Settings tab with 3 options only:
+        a. "Idioma do App" (App Language) - changes current user's UI language
+        b. "Tema" (Theme) - dark/light mode toggle
+        c. "Sobre" (About) - version info
+      - Bispado/Secretario see the full Settings as before, PLUS the new split:
+        a. "Idioma do App" - per-user, saves to user_metadata
+        b. "Idioma da Ala" - ward-wide, updates wards.language + reactivates collections
+
+      **4. WhatsApp settings screen fixes**
+      - Placeholder names ({nome}, {data}, etc.) are translated per APP language
+        (not ward language, not fixed in Portuguese). When user's app is in English,
+        they see {name}, {date}, {position}, {collection}, {title}, {link}. The
+        actual substitution in the sent message uses whatever placeholder names are
+        in the saved template.
+      - UI labels ("Placeholders:", "Template:", "Preview:") use APP language via
+        t() calls instead of being hardcoded.
+      - Sample data uses WARD language for contextual correctness.
+
+      **5. Topics screen fix**
+      - Collection listing uses WARD language (wards.language) to determine which
+        language collections to show, NOT the app language.
+
+      **6. useTopics.ts fix**
+      - "Temas da Ala" label uses t() translation function instead of being
+        hardcoded in Portuguese.
+
+      **7. Collection reactivation bug fix**
+      - Investigate and fix why new-language collections do not appear after
+        changing ward language. The 3 built-in collections must be automatically
+        activated in the new language when ward language changes.
+
+    files_impacted:
+      - path: src/contexts/AuthContext.tsx
+        action: modify
+        changes:
+          - "On login: Load user_metadata.language, call i18n.changeLanguage(userLang)"
+          - "Remove override of i18n with ward language (lines 101-116)"
+          - "Expose wardLanguage from context for components that need it"
+          - "Add function to save app language to user_metadata via supabase.auth.updateUser()"
+
+      - path: src/app/(tabs)/settings/index.tsx
+        action: modify
+        changes:
+          - "Split language setting into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide)"
+          - "'Idioma do App' available to all roles (including Observer), saves to user_metadata"
+          - "'Idioma da Ala' available to bishopric/secretary, updates wards.language + reactivates collections"
+          - "Fix collection reactivation bug: investigate and fix why new-language collections do not appear"
+
+      - path: src/app/(tabs)/settings/whatsapp.tsx
+        action: modify
+        changes:
+          - "Replace hardcoded Portuguese placeholder names with app-language-aware translated values"
+          - "Replace hardcoded English UI labels with t() calls"
+          - "Use ward language for default template selection"
+          - "Use ward language for sample data"
+
+      - path: src/app/(tabs)/settings/topics.tsx
+        action: modify
+        changes:
+          - "Use ward language (from context/query) for collection listing instead of getCurrentLanguage()"
+
+      - path: src/hooks/useTopics.ts
+        action: modify
+        changes:
+          - "Replace hardcoded 'Temas da Ala' with t() call"
+          - "useCollections: accept wardLanguage parameter for filtering"
+
+      - path: src/app/(tabs)/_layout.tsx
+        action: modify
+        changes:
+          - "Add Settings tab for Observer role with limited access (only app language, theme, about)"
+
+      - path: src/types/database.ts
+        action: modify
+        changes:
+          - "No new table needed (using auth.users metadata)"
+          - "Add wardLanguage to AuthContext type if not already present"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Add keys for 'Idioma do App', 'Idioma da Ala', WhatsApp placeholder labels"
+          - "Add translated placeholder names: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Add keys for 'App Language', 'Ward Language', WhatsApp placeholder labels"
+          - "Add translated placeholder names: {name}, {date}, {position}, {collection}, {title}, {link}"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Add keys for 'Idioma de la App', 'Idioma del Barrio', WhatsApp placeholder labels"
+          - "Add translated placeholder names: {nombre}, {fecha}, {posicion}, {coleccion}, {titulo}, {enlace}"
+
+    acceptance_criteria:
+      - id: AC-116-01
+        description: "Per-user app language preference stored in Supabase Auth user_metadata"
+        given: "User is logged in"
+        when: "User changes app language in Settings"
+        then: "Language preference is saved to auth.users.raw_user_meta_data.language via supabase.auth.updateUser(). Other users in the same ward are NOT affected."
+
+      - id: AC-116-02
+        description: "App language controls UI translations"
+        given: "User has app language set to 'en'"
+        when: "User navigates to any screen"
+        then: "All UI text (buttons, labels, headers, messages) appears in English"
+
+      - id: AC-116-03
+        description: "Ward language controls WhatsApp template defaults"
+        given: "Ward language is 'pt-BR', app language is 'en'"
+        when: "User opens WhatsApp template settings"
+        then: "Default template text is in Portuguese (ward language). UI labels ('Placeholders:', 'Template:') are in English (app language)."
+
+      - id: AC-116-04
+        description: "Ward language controls collection listing"
+        given: "Ward language is 'es', app language is 'en'"
+        when: "User opens Topic Library in Settings"
+        then: "Collections shown are Spanish language collections (matching ward language)"
+
+      - id: AC-116-05
+        description: "Settings screen has separate controls for app and ward language"
+        given: "User is logged in as Bispado or Secretario"
+        when: "User opens Settings"
+        then: "Two separate language settings visible: 'App Language' and 'Ward Language'"
+
+      - id: AC-116-06
+        description: "Observer has limited Settings tab with app language, theme, and about"
+        given: "User is logged in as Observer"
+        when: "User navigates to Settings tab"
+        then: "Settings tab is visible with exactly 3 options: 'Idioma do App', 'Tema' (dark/light), and 'Sobre'. No ward language, WhatsApp, members, topics, users, or history settings."
+
+      - id: AC-116-07
+        description: "Changing ward language auto-reactivates collections for the new language (bug fix)"
+        given: "Ward language is 'pt-BR' with Portuguese collections active"
+        when: "Bispado changes ward language to 'en'"
+        then: "English collections (Temas especiais, Forca dos jovens, Principios do evangelho) are automatically activated and VISIBLE in the collection list. Portuguese collections remain (can be manually deactivated)."
+
+      - id: AC-116-08
+        description: "WhatsApp placeholder names translated per app language"
+        given: "App language is 'en'"
+        when: "View placeholder list in WhatsApp settings"
+        then: "Placeholder names show in English: {name}, {date}, {position}, {collection}, {title}, {link}. If app language is 'pt-BR', shows {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}."
+
+      - id: AC-116-09
+        description: "'Temas da Ala' label in useTopics.ts is translated"
+        given: "App language is 'en'"
+        when: "View topic selector that includes ward topics"
+        then: "Ward topics section label shows 'Ward Topics' (English) instead of hardcoded 'Temas da Ala'"
+
+      - id: AC-116-10
+        description: "On login, app language loaded from user_metadata"
+        given: "User previously set app language to 'es'"
+        when: "User logs in"
+        then: "App immediately shows in Spanish. Does NOT use ward language or device locale."
+
+      - id: AC-116-11
+        description: "First login fallback: device locale then ward language"
+        given: "User has never set app language preference (no language in user_metadata)"
+        when: "User logs in for the first time"
+        then: "App language set to device locale if supported (pt-BR, en, es). If device locale not supported, falls back to ward language."
+
+    edge_cases:
+      - id: EC-116-01
+        case: "User changes app language while offline"
+        expected: "Language change takes effect immediately in UI. user_metadata update is queued for sync when online."
+
+      - id: EC-116-02
+        case: "Ward language changed by another user while current user is active"
+        expected: "Real-time sync picks up ward language change. WhatsApp template defaults and collections update. App language NOT affected."
+
+      - id: EC-116-03
+        case: "User with 'en' app language views activity log entries created when ward was 'pt-BR'"
+        expected: "Historical log entries that use structured format (CR-142) render in current ward language. Old plain-text entries remain as-is."
+
+      - id: EC-116-04
+        case: "Observer role accesses Settings tab"
+        expected: "Observer sees limited Settings with 3 options only: app language, theme, about. All other settings are hidden."
+
+  # =============================================================================
+  # F117 / CR-180: Split Music actor type into Pianist and Conductor
+  # =============================================================================
+
+  - id: F117
+    name: "Split Music actor type into Pianist and Conductor"
+    cr_id: 180
+    type: feature
+    priority: high
+    related_features: [F013, F012]
+    related_crs: [26, 34, 70, 71, 72, 73, 151]
+
+    user_request: >
+      "Dividir o tipo de ator 'Musica' (can_music) em dois tipos separados:
+      'Pianista' (can_pianist) e 'Regente' (can_conductor). Pianista sera
+      selecionado/criado/editado/apagado no campo pianista e Regente no campo
+      regente. Para migracao do banco, mover todos atores can_music para
+      can_pianist. Usuario cria manualmente os de tipo Regente depois.
+      Designacoes existentes de Regente em domingos passados mantem o ator
+      (agora tipo Pianista)."
+
+    current_behavior: >
+      The meeting_actors table has a single boolean column "can_music"
+      (001_initial_schema.sql:148). Both the pianist and conductor fields in
+      AgendaForm.tsx use roleFilter 'can_music' (lines 235, 249), meaning both
+      fields pull from the same pool of actors.
+
+      Key code locations:
+      - database.ts:155: MeetingActor interface has can_music boolean
+      - database.ts:312: CreateActorInput has can_music optional boolean
+      - database.ts:321: UpdateActorInput has can_music optional boolean
+      - useActors.ts:28: ActorRoleFilter type includes 'can_music'
+      - useActors.ts:45: filterActorsByRole uses can_music
+      - useActors.ts:64: getPrimaryRole returns 'can_music'
+      - useActors.ts:114: createActor sets can_music
+      - AgendaForm.tsx:235: Pianist field uses roleFilter 'can_music'
+      - AgendaForm.tsx:249: Conductor field uses roleFilter 'can_music'
+      - ActorSelector.tsx:96: Creates actor with can_music=true for 'can_music' filter
+      - SundayAgenda type: Already has separate pianist_actor_id and conductor_actor_id
+        (database.ts:179-183). The DB agenda table already separates pianist/conductor
+        assignments, just the actor pool is shared.
+
+    expected_behavior: >
+      **1. Database migration:**
+      - Add can_pianist BOOLEAN DEFAULT false to meeting_actors
+      - Add can_conductor BOOLEAN DEFAULT false to meeting_actors
+      - Add CHECK constraint: NOT (can_pianist = true AND can_conductor = true).
+        An actor is EITHER pianist OR conductor, NEVER both. If a person plays
+        piano AND conducts, they must be two separate entries in meeting_actors.
+      - Migrate: UPDATE meeting_actors SET can_pianist = true WHERE can_music = true
+      - Drop can_music column (ALTER TABLE meeting_actors DROP COLUMN can_music)
+      - Update RLS policies if they reference can_music (check)
+
+      **2. TypeScript type updates:**
+      - MeetingActor: Replace can_music with can_pianist and can_conductor
+      - CreateActorInput: Replace can_music with can_pianist and can_conductor
+      - UpdateActorInput: Replace can_music with can_pianist and can_conductor
+
+      **3. Hook updates (useActors.ts):**
+      - ActorRoleFilter: Replace 'can_music' with 'can_pianist' | 'can_conductor'
+      - filterActorsByRole: Works automatically via a[role] pattern
+      - getPrimaryRole: Replace can_music check with can_pianist/can_conductor
+      - createActor: Update to set can_pianist or can_conductor based on roleFilter
+
+      **4. Component updates:**
+      - AgendaForm.tsx: Pianist field uses roleFilter 'can_pianist' (line 235)
+      - AgendaForm.tsx: Conductor field uses roleFilter 'can_conductor' (line 249)
+      - ActorSelector.tsx: Updated role mapping for actor creation
+
+      **5. Existing assignments preservation:**
+      - sunday_agendas.pianist_actor_id and conductor_actor_id are FK to
+        meeting_actors.id. These are NOT affected by the column rename.
+      - Actors previously marked as can_music become can_pianist.
+      - If a "music" actor was assigned as conductor in a past agenda, the
+        FK still points to the same actor row. The actor is now typed as
+        "pianist" but the conductor assignment is preserved.
+      - The user explicitly stated: "Designacoes existentes de Regente mantem
+        o ator (agora tipo Pianista)."
+
+    files_impacted:
+      - path: supabase/migrations/NNN_split_music_actor.sql
+        action: create
+        changes:
+          - "ALTER TABLE meeting_actors ADD COLUMN can_pianist BOOLEAN NOT NULL DEFAULT false"
+          - "ALTER TABLE meeting_actors ADD COLUMN can_conductor BOOLEAN NOT NULL DEFAULT false"
+          - "UPDATE meeting_actors SET can_pianist = true WHERE can_music = true"
+          - "ALTER TABLE meeting_actors DROP COLUMN can_music"
+          - "ALTER TABLE meeting_actors ADD CONSTRAINT chk_pianist_conductor_exclusive CHECK (NOT (can_pianist = true AND can_conductor = true))"
+
+      - path: src/types/database.ts
+        action: modify
+        changes:
+          - "MeetingActor: can_music -> can_pianist + can_conductor"
+          - "CreateActorInput: can_music -> can_pianist + can_conductor"
+          - "UpdateActorInput: can_music -> can_pianist + can_conductor"
+
+      - path: src/hooks/useActors.ts
+        action: modify
+        changes:
+          - "ActorRoleFilter: 'can_music' -> 'can_pianist' | 'can_conductor'"
+          - "getPrimaryRole: check can_pianist and can_conductor"
+          - "createActor: map roleFilter to correct boolean"
+
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Line 235: roleFilter 'can_music' -> 'can_pianist'"
+          - "Line 249: roleFilter 'can_music' -> 'can_conductor'"
+
+      - path: src/components/ActorSelector.tsx
+        action: modify
+        changes:
+          - "Line 96: Update role mapping for 'can_pianist' and 'can_conductor'"
+
+    acceptance_criteria:
+      - id: AC-117-01
+        description: "Database has can_pianist and can_conductor columns, no can_music"
+        given: "Database after migration"
+        when: "Inspect meeting_actors table schema"
+        then: "Columns can_pianist (BOOLEAN) and can_conductor (BOOLEAN) exist. Column can_music does NOT exist."
+
+      - id: AC-117-02
+        description: "Migration preserves existing music actors as pianists"
+        given: "Actor with can_music=true before migration"
+        when: "Migration runs"
+        then: "Actor now has can_pianist=true, can_conductor=false"
+
+      - id: AC-117-03
+        description: "MeetingActor TypeScript type updated"
+        given: "database.ts MeetingActor interface"
+        when: "Read the type definition"
+        then: "Has can_pianist: boolean and can_conductor: boolean. No can_music field."
+
+      - id: AC-117-04
+        description: "CreateActorInput and UpdateActorInput types updated"
+        given: "database.ts input interfaces"
+        when: "Read the type definitions"
+        then: "Both have can_pianist and can_conductor optional booleans. No can_music."
+
+      - id: AC-117-05
+        description: "ActorRoleFilter includes can_pianist and can_conductor"
+        given: "useActors.ts"
+        when: "Read ActorRoleFilter type"
+        then: "Includes 'can_pianist' | 'can_conductor'. Does NOT include 'can_music'."
+
+      - id: AC-117-06
+        description: "Pianist field in agenda uses can_pianist filter"
+        given: "AgendaForm.tsx pianist field"
+        when: "Open pianist ActorSelector"
+        then: "Only actors with can_pianist=true are shown"
+
+      - id: AC-117-07
+        description: "Conductor field in agenda uses can_conductor filter"
+        given: "AgendaForm.tsx conductor field"
+        when: "Open conductor ActorSelector"
+        then: "Only actors with can_conductor=true are shown"
+
+      - id: AC-117-08
+        description: "Creating new actor from pianist field sets can_pianist=true"
+        given: "User is in pianist ActorSelector and creates a new actor"
+        when: "Actor is saved"
+        then: "New actor has can_pianist=true, can_conductor=false"
+
+      - id: AC-117-09
+        description: "Creating new actor from conductor field sets can_conductor=true"
+        given: "User is in conductor ActorSelector and creates a new actor"
+        when: "Actor is saved"
+        then: "New actor has can_pianist=false, can_conductor=true"
+
+      - id: AC-117-10
+        description: "Existing agenda assignments preserved after migration"
+        given: "Agenda with pianist_actor_id and conductor_actor_id pointing to can_music actors"
+        when: "Migration runs"
+        then: "FKs still valid. Pianist/conductor assignments display correctly."
+
+      - id: AC-117-11
+        description: "No remaining references to can_music in production code"
+        given: "All files in src/ and supabase/ directories"
+        when: "Search for 'can_music'"
+        then: "Zero matches in production source code (test files may still reference for historical context)"
+
+      - id: AC-117-12
+        description: "Mutual exclusivity constraint: actor cannot be both pianist and conductor"
+        given: "An actor has can_pianist=true"
+        when: "Attempt to set can_conductor=true on the same actor"
+        then: "Database rejects the update with a CHECK constraint violation. UI should never allow this state."
+
+    edge_cases:
+      - id: EC-117-01
+        case: "Actor with can_music=true is currently assigned as conductor in a past agenda"
+        expected: "Actor becomes can_pianist=true after migration. The conductor assignment FK still points to this actor. Actor name shows correctly. User can later create a separate conductor actor and reassign."
+
+      - id: EC-117-02
+        case: "Actor with multiple roles (e.g., can_preside=true AND can_music=true)"
+        expected: "After migration: can_preside=true, can_pianist=true, can_conductor=false. Multi-role preserved (can_pianist and can_preside are independent axes; only can_pianist/can_conductor are mutually exclusive)."
+
+      - id: EC-117-03
+        case: "No actors with can_music=true exist"
+        expected: "Migration runs without error. No actors gain can_pianist. This is a valid initial state."
+
+      - id: EC-117-04
+        case: "Person who plays piano AND conducts"
+        expected: "User creates two separate entries in meeting_actors: one with can_pianist=true and one with can_conductor=true, both with the same name. DB constraint prevents a single actor from having both flags."
+
+  # =============================================================================
+  # F118 / CR-181: Optional 2nd speech toggle
+  # =============================================================================
+
+  - id: F118
+    name: "Optional 2nd speech toggle per Sunday"
+    cr_id: 181
+    type: feature
+    priority: high
+    related_features: [F007, F008, F009, F012, F016]
+    related_crs: [4, 56, 99, 122, 160]
+
+    user_request: >
+      "Segundo discurso de todo 'Domingo com Discursos' pode ser opcional. Toggle
+      pequeno apos o label de '2o Discurso'. Quando desligado: campos de discursante
+      e tema do 2o discurso ficam desabilitados; designacoes do 2o discurso sao
+      apagadas (com confirmacao); card contraido nao mostra a linha do 2o discurso;
+      agenda mostra campo desabilitado com placeholder 'Domingo configurado para nao
+      ter 2o discurso'. Toggle por domingo, default ligado. Trocar label '3o Discurso'
+      para 'Ultimo Discurso'. Remover labels 1o/2o/3o Discurso do card contraido
+      (tanto Discursos quanto Home), deixando so os nomes. Na tela de apresentacao,
+      secao 'Primeiros Discursos' simplesmente nao mostra nada sobre o 2o discurso
+      quando desligado."
+
+    current_behavior: >
+      All speech-type Sundays always have exactly 3 speech slots (positions 1, 2, 3).
+
+      Key code locations:
+      - speeches.tsx:314: Hardcoded [1, 2, 3].map((pos) => ...) renders 3 SpeechSlots.
+      - SundayCard.tsx:307: [1, 2, 3].map for speechStatuses (LEDs).
+      - SundayCard.tsx:357: [1, 2, 3].map for collapsed card speech rows.
+      - SpeechSlot.tsx:53-56: getPositionLabel() creates ordinal labels.
+      - usePresentationMode.ts:143-151: speech1 + speech2 in "First Speeches" card.
+      - usePresentationMode.ts:170-177: speech3 as "Last Speech".
+      - AgendaForm.tsx: Speaker overrides for positions 1, 2, 3.
+      - SundayAgenda type: No field for "has_second_speech" or similar.
+      - i18n: speeches.slot uses "{{number}} Discurso". speeches.lastSpeech is
+        "Ultimo Discurso" (already exists from CR-122).
+
+      No per-Sunday configuration for making the 2nd speech optional exists.
+
+    expected_behavior: >
+      **1. Database change:**
+      - Add has_second_speech BOOLEAN NOT NULL DEFAULT true to sunday_agendas table.
+      - Default is true (2nd speech is on by default, preserving current behavior).
+      - This is a per-Sunday toggle, stored alongside the agenda for that Sunday.
+
+      **2. Toggle UI in expanded speech card (speeches.tsx):**
+      - Small Switch component after the "2o Discurso" label in the SpeechSlot
+        for position 2.
+      - Toggle visible only for Bispado (same permission as speech assignment).
+      - When toggled OFF with existing assignments:
+        a. Confirmation dialog: "Desativar o 2o discurso apagara as designacoes
+           existentes. Continuar?" (i18n in 3 languages).
+        b. If confirmed: Clear speech position 2 data (speaker_name, topic_title,
+           etc.) from the speeches table for this Sunday.
+        c. Update sunday_agendas.has_second_speech = false.
+        d. Position 2 SpeechSlot fields become disabled/greyed out.
+      - When toggled OFF without existing assignments:
+        a. NO confirmation dialog (nothing to delete).
+        b. Update sunday_agendas.has_second_speech = false immediately.
+        c. Position 2 SpeechSlot fields become disabled/greyed out.
+      - When toggled ON:
+        a. No confirmation needed.
+        b. Update sunday_agendas.has_second_speech = true.
+        c. Position 2 SpeechSlot fields become enabled.
+
+      **3. Collapsed card (SundayCard.tsx) in Speeches tab AND Home:**
+      - When has_second_speech = false: Do NOT render the row for position 2.
+        Only show positions 1 and 3 (now "Ultimo Discurso").
+      - Remove ordinal labels ("1o Discurso:", "2o Discurso:") from collapsed
+        card rows. Show ONLY speaker names with LEDs. This applies regardless
+        of the toggle state.
+
+      **4. LEDs in collapsed card header (SundayCard.tsx):**
+      - When has_second_speech = false: Show only 2 LEDs (positions 1 and 3)
+        instead of 3.
+
+      **5. Label change: "3o Discurso" -> "Ultimo Discurso" in expanded card:**
+      - The i18n key speeches.lastSpeech already exists ("Ultimo Discurso").
+      - Position 3 label in expanded SpeechSlot should use t('speeches.lastSpeech')
+        instead of t('speeches.slot', { number: '3o' }).
+      - NOTE: This label change was ALREADY partially implemented in F058/CR-122
+        for InviteManagementSection and in the presentation mode. This CR extends
+        it to the expanded SpeechSlot in the speeches tab.
+
+      **6. Agenda form (AgendaForm.tsx):**
+      - When has_second_speech = false for the current Sunday:
+        Speech position 2 area shows a disabled field with placeholder text:
+        "Domingo configurado para nao ter 2o discurso" (i18n in 3 languages).
+      - Speaker override field for position 2 is also disabled.
+
+      **7. Presentation mode (usePresentationMode.ts):**
+      - When has_second_speech = false:
+        The "Primeiros Discursos" card shows only speech 1 (no speech 2 line).
+        Does NOT skip to another section. Simply shows fewer items in the section.
+      - When has_second_speech = true: Current behavior (both speech 1 and 2).
+
+      **8. Invite management (InviteManagementSection.tsx, Home):**
+      - When has_second_speech = false: Do NOT show invite management row for
+        position 2 speech.
+
+    files_impacted:
+      - path: supabase/migrations/NNN_add_has_second_speech.sql
+        action: create
+        changes:
+          - "ALTER TABLE sunday_agendas ADD COLUMN has_second_speech BOOLEAN NOT NULL DEFAULT true"
+
+      - path: src/types/database.ts
+        action: modify
+        changes:
+          - "SundayAgenda interface: add has_second_speech: boolean"
+
+      - path: src/app/(tabs)/speeches.tsx
+        action: modify
+        changes:
+          - "Pass has_second_speech from agenda to SpeechSlot position 2"
+          - "Conditionally disable position 2 SpeechSlot when toggle is off"
+          - "Handle toggle change: confirm dialog only when assignments exist, clear speech, update agenda"
+
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Add toggle Switch for position 2 after the label"
+          - "Position 3: use t('speeches.lastSpeech') instead of ordinal label"
+          - "Disabled state when has_second_speech=false for position 2"
+
+      - path: src/components/SundayCard.tsx
+        action: modify
+        changes:
+          - "Collapsed view: filter out position 2 when has_second_speech=false"
+          - "Collapsed view: remove ordinal labels, show only names"
+          - "LED array: filter to positions 1 and 3 when has_second_speech=false"
+
+      - path: src/hooks/usePresentationMode.ts
+        action: modify
+        changes:
+          - "Conditionally include speech2 in First Speeches card based on has_second_speech"
+
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Show disabled placeholder for speech 2 when has_second_speech=false"
+          - "Disable speaker_2_override when has_second_speech=false"
+
+      - path: src/components/InviteManagementSection.tsx
+        action: modify
+        changes:
+          - "Filter out position 2 when has_second_speech=false"
+
+      - path: src/components/NextSundaysSection.tsx
+        action: modify
+        changes:
+          - "Collapsed cards: same changes as SundayCard (remove labels, filter pos 2)"
+
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Add key for confirmation dialog text"
+          - "Add key for disabled placeholder text: 'Domingo configurado para nao ter 2o discurso'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Add key for confirmation dialog text"
+          - "Add key for disabled placeholder text"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Add key for confirmation dialog text"
+          - "Add key for disabled placeholder text"
+
+    acceptance_criteria:
+      - id: AC-118-01
+        description: "New has_second_speech field in SundayAgenda"
+        given: "Database and TypeScript types"
+        when: "Inspect schema and interface"
+        then: "has_second_speech BOOLEAN DEFAULT true exists in DB and TypeScript type"
+
+      - id: AC-118-02
+        description: "Toggle UI visible in expanded speech card for position 2"
+        given: "Expanded SpeechSlot for position 2 (Bispado role)"
+        when: "View the card"
+        then: "Small Switch toggle visible after '2o Discurso' label"
+
+      - id: AC-118-03
+        description: "Toggle OFF shows confirmation dialog ONLY when assignments exist"
+        given: "Position 2 has an assigned speaker or topic"
+        when: "User toggles the switch to OFF"
+        then: "Confirmation dialog appears with warning about deleting assignments"
+
+      - id: AC-118-04
+        description: "After toggle OFF confirmation: speech 2 data is cleared"
+        given: "User confirmed the toggle OFF dialog"
+        when: "Check speeches table for this Sunday"
+        then: "Position 2 speech has speaker_name, topic_title etc. cleared. has_second_speech=false."
+
+      - id: AC-118-05
+        description: "Toggle OFF without assignments: no confirmation, immediate toggle"
+        given: "Position 2 has no assigned speaker and no topic (not_assigned status)"
+        when: "User toggles the switch to OFF"
+        then: "Toggle changes immediately without confirmation dialog. has_second_speech=false."
+
+      - id: AC-118-06
+        description: "Toggle ON: no confirmation, fields re-enabled"
+        given: "has_second_speech is false"
+        when: "User toggles the switch to ON"
+        then: "Fields become enabled immediately. has_second_speech=true. No confirmation dialog."
+
+      - id: AC-118-07
+        description: "Collapsed card hides position 2 when toggle off"
+        given: "Sunday with has_second_speech=false"
+        when: "View collapsed card in Speeches tab"
+        then: "Only 2 speech rows visible (positions 1 and 3). Position 2 row hidden."
+
+      - id: AC-118-08
+        description: "Collapsed card shows no ordinal labels"
+        given: "Any Sunday with speeches (regardless of toggle)"
+        when: "View collapsed card in Speeches tab or Home"
+        then: "Speech rows show only speaker names with LEDs. No '1o Discurso:', '2o Discurso:' labels."
+
+      - id: AC-118-09
+        description: "Position 3 label is 'Ultimo Discurso' in expanded card"
+        given: "Expanded speech card"
+        when: "View position 3 SpeechSlot"
+        then: "Label shows 'Ultimo Discurso' (pt-BR) / 'Final Speech' (en) / 'Ultimo Discurso' (es)"
+
+      - id: AC-118-10
+        description: "LEDs in collapsed card: only 2 when toggle off"
+        given: "Sunday with has_second_speech=false"
+        when: "View collapsed card header LEDs"
+        then: "Only 2 LEDs shown (for positions 1 and 3)"
+
+      - id: AC-118-11
+        description: "Presentation mode hides speech 2 when toggle off"
+        given: "Sunday with has_second_speech=false"
+        when: "Enter Presentation Mode"
+        then: "'Primeiros Discursos' card shows only 1st speaker. No empty/blank line for 2nd. Section does NOT skip to another section."
+
+      - id: AC-118-12
+        description: "Agenda form shows disabled placeholder when toggle off"
+        given: "Sunday with has_second_speech=false"
+        when: "View Agenda form for that Sunday"
+        then: "Speech 2 area shows disabled field with 'Domingo configurado para nao ter 2o discurso' placeholder"
+
+      - id: AC-118-13
+        description: "Default toggle is ON for new agendas"
+        given: "A new Sunday without any agenda saved"
+        when: "Expand the speech card"
+        then: "Toggle defaults to ON. All 3 speech positions are enabled."
+
+      - id: AC-118-14
+        description: "Invite management hides position 2 when toggle off"
+        given: "Sunday with has_second_speech=false"
+        when: "View invite management section in Home"
+        then: "No invite row for position 2"
+
+    edge_cases:
+      - id: EC-118-01
+        case: "Toggle OFF then ON: speaker data was deleted on toggle off"
+        expected: "Fields are re-enabled but empty (data was cleared). User must reassign."
+
+      - id: EC-118-02
+        case: "Sunday without an agenda record yet (no sunday_agendas row)"
+        expected: "Default behavior: 3 speech slots shown. When toggle is first used, creates/updates the agenda record."
+
+      - id: EC-118-03
+        case: "Observer role viewing the toggle"
+        expected: "Toggle is visible but disabled (read-only). Observer can see the state but cannot change it."
+
+      - id: EC-118-04
+        case: "Secretary role and the toggle"
+        expected: "Secretary cannot assign speakers (no speech_assign permission) but the toggle controls speech slots. The toggle should follow speech_assign permission (only Bispado can toggle)."
+
+  # =============================================================================
+  # F119 / CR-191: Password reset plain-text HTML bug
+  # =============================================================================
+
+  - id: F119
+    name: "Fix password reset redirect showing HTML as plain-text"
+    cr_id: 191
+    type: bug
+    priority: high
+    related_features: [F001, F088, F114]
+    related_crs: [67, 145, 155, 176]
+
+    user_request: >
+      "Ao clicar em 'Redefinir Senha' no email de recuperacao (Gmail->Safari),
+      o browser mostra plain-text do HTML ao inves de renderizar. Possivelmente
+      Edge Function reset-redirect retornando Content-Type incorreto ou HTML
+      escapado."
+
+    current_behavior: >
+      The reset-redirect Edge Function (supabase/functions/reset-redirect/index.ts)
+      returns HTML with Content-Type 'text/html' and status 200 (line 86-89):
+
+      ```typescript
+      return new Response(html, {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'text/html' },
+      });
+      ```
+
+      corsHeaders (lines 7-11) includes Access-Control-Allow-Origin and
+      Access-Control-Allow-Headers but does NOT include Content-Type.
+
+      The HTML template (lines 34-84) is a properly structured HTML document
+      with DOCTYPE, head, meta charset, body, and JavaScript redirect.
+
+      The code looks correct at first inspection. Possible causes of the bug:
+      1. Missing charset in Content-Type: 'text/html' vs 'text/html; charset=utf-8'
+      2. Supabase Edge Function runtime may be adding additional headers or
+         modifying the response
+      3. Some versions of the Deno.serve runtime or Supabase proxy may double-encode
+         the response body
+      4. The Response constructor may need explicit charset specification for
+         proper rendering on iOS Safari
+      5. If the HTML is being served through a CDN or proxy that modifies headers,
+         the Content-Type could be overridden
+
+    expected_behavior: >
+      The reset-redirect Edge Function should serve properly rendered HTML that
+      Safari (and all browsers) displays as a web page, NOT as plain text.
+
+      **Deeper investigation required (per user request):**
+
+      This bug needs a thorough investigation, NOT just a charset fix. Steps:
+
+      1. Add charset to Content-Type header as a baseline fix:
+         'Content-Type': 'text/html; charset=utf-8'
+
+      2. Add Cache-Control headers to prevent proxy caching issues:
+         'Cache-Control': 'no-cache, no-store, must-revalidate'
+
+      3. Investigate the Supabase Edge Function response pipeline:
+         - Check if the Supabase proxy/CDN modifies Content-Type headers
+         - Check if the Deno runtime wraps or escapes the Response body
+         - Check if the function is invoked via the correct URL pattern
+           (e.g., /functions/v1/reset-redirect vs direct Deno.serve)
+         - Check Supabase Edge Function logs for any response transformations
+
+      4. Investigate iOS Safari specific behavior:
+         - Test if the issue reproduces in Chrome/Firefox on the same URL
+         - Test if Gmail's in-app browser (not Safari) handles it differently
+         - Check if Gmail prefetches the URL and caches a non-HTML response
+
+      5. Consider deploying a minimal test Edge Function that returns
+         simple HTML to isolate whether the issue is in the code or the
+         Supabase infrastructure.
+
+      6. Verify the HTML template literal is not escaped or double-encoded.
+         Check for JSON.stringify() or other encoding being applied.
+
+      7. Test the fix by deploying the Edge Function and clicking the reset
+         password button in a Gmail email on iOS Safari.
+
+    files_impacted:
+      - path: supabase/functions/reset-redirect/index.ts
+        action: modify
+        changes:
+          - "Change Content-Type from 'text/html' to 'text/html; charset=utf-8'"
+          - "Add 'Cache-Control': 'no-cache, no-store, must-revalidate' header"
+          - "Investigate and fix root cause (may require additional changes beyond headers)"
+          - "Verify HTML template literal is not escaped or double-encoded"
+
+    acceptance_criteria:
+      - id: AC-119-01
+        description: "Content-Type includes charset=utf-8"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the Response headers"
+        then: "Content-Type is 'text/html; charset=utf-8'"
+
+      - id: AC-119-02
+        description: "HTML is not escaped or double-encoded"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the Response body construction"
+        then: "HTML template literal is passed directly to new Response(). No JSON.stringify(), encodeURIComponent(), or other encoding applied."
+
+      - id: AC-119-03
+        description: "No conflicting Content-Type in corsHeaders"
+        given: "reset-redirect/index.ts corsHeaders definition"
+        when: "Read corsHeaders object"
+        then: "corsHeaders does NOT contain a Content-Type key"
+
+      - id: AC-119-04
+        description: "Cache-Control header prevents proxy caching issues"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the Response headers"
+        then: "Cache-Control: 'no-cache, no-store, must-revalidate' is set"
+
+      - id: AC-119-05
+        description: "Deep link uses sacrmeetplan:// scheme"
+        given: "reset-redirect/index.ts source code"
+        when: "Read the redirect target URL"
+        then: "Uses sacrmeetplan://reset-password (consistent with F113)"
+
+      - id: AC-119-06
+        description: "HTML renders properly in Safari on iOS"
+        given: "User clicks reset password button in Gmail on iOS"
+        when: "Safari opens the HTTPS redirect URL"
+        then: "HTML page renders properly (not shown as plain text). Auto-redirect triggers the deep link."
+
+      - id: AC-119-07
+        description: "Root cause investigation documented"
+        given: "Bug fix complete"
+        when: "Review the changes"
+        then: "Root cause is identified and documented (not just a speculative charset fix). Investigation covered Supabase proxy behavior, Deno runtime, and browser-specific handling."
+
+    edge_cases:
+      - id: EC-119-01
+        case: "Browser with strict Content Security Policy"
+        expected: "The meta-refresh tag provides a backup redirect mechanism even if JavaScript is blocked."
+
+      - id: EC-119-02
+        case: "Supabase proxy adding/modifying headers"
+        expected: "The explicit Content-Type with charset should take precedence. If Supabase adds headers, the charset=utf-8 helps ensure correct interpretation."
+
+      - id: EC-119-03
+        case: "Chrome on Android instead of Safari on iOS"
+        expected: "Same fix applies. Chrome should also respect Content-Type with charset. The bug may only manifest on specific browser/OS combinations."
+
+# =============================================================================
+# RESOLVED OPEN QUESTIONS (all answered by user)
+# =============================================================================
+
+resolved_open_questions:
+
+  - id: OQ-1
+    question: "Where should the per-user app language preference be stored?"
+    answer: >
+      Supabase Auth user_metadata (auth.users.raw_user_meta_data.language).
+      Decision made by requirements extractor per user delegation. Rationale:
+      No migration needed, no new table, Supabase provides built-in API
+      (supabase.auth.updateUser()), accessible from any authenticated session.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-2
+    question: "How does Observer access app language setting if Settings tab is hidden?"
+    answer: >
+      Add Settings tab for Observer with exactly 3 limited options:
+      1. Idioma do App (App Language)
+      2. Tema claro/escuro (Light/Dark Theme)
+      3. Sobre (About)
+      Observer previously had no Settings tab. Now gains limited access.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-3
+    question: "Should the confirmation dialog for disabling 2nd speech fire even when there are no assignments?"
+    answer: >
+      NO. Do NOT show confirmation dialog when position 2 has no assignments.
+      Confirmation only fires when there are actual assignments to delete.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-4
+    question: "Should the WhatsApp placeholder names in the template be translated?"
+    answer: >
+      YES, placeholder names ARE translated, but per APP language (not ward
+      language, not fixed in Portuguese). When user's app is English: {name},
+      {date}, {position}, {collection}, {title}, {link}. When Portuguese:
+      {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}. This corrects
+      the original draft assumption A-9.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-5
+    question: "For the password reset bug (CR-191), is the fix limited to adding charset?"
+    answer: >
+      DEEPER INVESTIGATION required. Not just charset. Investigate Supabase
+      proxy behavior, Deno runtime, browser-specific handling. Deploy minimal
+      test Edge Function to isolate. Apply charset + Cache-Control as baseline
+      but root cause must be identified.
+    resolved_date: "2026-02-22"
+
+# =============================================================================
+# RESOLVED ASSUMPTIONS (all confirmed or corrected by user)
+# =============================================================================
+
+resolved_assumptions:
+
+  - id: A-1
+    assumption: "Ward.language column stays as-is (no schema change for ward language)"
+    status: confirmed
+    notes: "No change needed. Assumption was correct."
+
+  - id: A-2
+    assumption: "Collection reactivation on ward language change already works correctly"
+    status: corrected
+    correction: >
+      DOES NOT WORK TODAY. It is a bug. When changing ward language, the
+      new-language collections do not appear. This must be investigated and
+      fixed as part of F116. The 3 built-in collections must be automatically
+      activated and visible in the new language.
+
+  - id: A-3
+    assumption: "An actor CAN have both can_pianist=true and can_conductor=true"
+    status: corrected
+    correction: >
+      NO. An actor is EITHER Pianist OR Conductor, NEVER both. If a person
+      plays piano AND conducts, they must be two separate entries in
+      meeting_actors (same name, different role flags). A CHECK constraint
+      must be added: NOT (can_pianist = true AND can_conductor = true).
+
+  - id: A-4
+    assumption: "has_second_speech belongs in sunday_agendas table"
+    status: confirmed
+    notes: "Follows existing pattern of per-Sunday flags."
+
+  - id: A-5
+    assumption: "No confirmation dialog when toggling OFF 2nd speech with no assignments"
+    status: confirmed
+    notes: "User confirmed: no dialog when nothing to delete."
+
+  - id: A-6
+    assumption: "Label change uses existing speeches.lastSpeech i18n key"
+    status: confirmed
+    notes: "Reuse CR-122's key."
+
+  - id: A-7
+    assumption: "Remove ordinal labels from collapsed cards in both Speeches and Home"
+    status: confirmed
+    notes: "User explicitly stated this in the original request."
+
+  - id: A-8
+    assumption: "Root cause is missing charset in Content-Type"
+    status: corrected
+    correction: >
+      User requested deeper investigation. The charset fix is a baseline but
+      NOT the assumed root cause. Must investigate further.
+
+  - id: A-9
+    assumption: "WhatsApp placeholder names stay Portuguese regardless of language"
+    status: corrected
+    correction: >
+      NO. Placeholder names must be TRANSLATED per APP language (not ward
+      language). When app is English: {name}, {date}, etc. When Portuguese:
+      {nome}, {data}, etc. When Spanish: {nombre}, {fecha}, etc.
+
+  - id: A-10
+    assumption: "Default has_second_speech=true for new agendas"
+    status: confirmed
+    notes: "DB DEFAULT true ensures backward compatibility."
+
+# =============================================================================
+# INCONSISTENCIES (unchanged - all low-severity, compatible)
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: overlap
+    description: >
+      CR-181 asks to change "3o Discurso" to "Ultimo Discurso" in the expanded
+      SpeechSlot. This was ALREADY done by F058/CR-122 in InviteManagementSection
+      and presentation mode, but NOT in the expanded SpeechSlot label in
+      speeches.tsx. The i18n key speeches.lastSpeech exists. The change is
+      extending CR-122's scope to cover the SpeechSlot component.
+    existing_spec: >
+      F058/CR-122: "pt-BR: 'Ultimo Discurso' para posicao 3" (pending implementation).
+      Applies to SpeechSlot, AgendaForm, InviteManagementSection.
+    new_request: "CR-181: 'trocar 3o Discurso para Ultimo Discurso'"
+    resolution: "No conflict - CR-181 reinforces and extends CR-122. Both use speeches.lastSpeech. Implementing F118 covers this."
+
+  - id: INC-2
+    type: overlap
+    description: >
+      CR-181 asks to remove ordinal labels from collapsed cards. This overlaps with
+      F058/CR-122 which also touches speech labels. However, F058 changes the label
+      TEXT (1o Discurso -> keep, 3o Discurso -> Ultimo Discurso) while CR-181 REMOVES
+      labels entirely from collapsed cards. These are compatible changes - labels are
+      removed from collapsed view, and the label text change only affects expanded view.
+    existing_spec: >
+      F058/CR-122: Changes label text for position 3 in expanded card.
+      SPEC_CONSOLIDATED pending_crs section, CR-122.
+    new_request: >
+      CR-181: Removes ALL ordinal labels from collapsed cards (both Speeches and Home).
+    resolution: "No conflict - different scopes (collapsed vs expanded). Both can be implemented."
+
+  - id: INC-3
+    type: bug
+    description: >
+      CR-178 requests collection reactivation on ward language change. The current
+      code in settings/index.tsx (lines 67-95) ATTEMPTS to deactivate old-language
+      collections and create new configs, but it is BUGGY - new-language collections
+      do not appear. This is now confirmed as a bug that must be fixed in F116.
+    existing_spec: >
+      F006: "Ao mudar idioma da ala, colecoes do idioma anterior sao desativadas."
+    new_request: >
+      CR-178: "Ao trocar idioma da ala, reabilitar automaticamente colecoes no novo idioma."
+    resolution: "Existing code is broken. F116 must investigate and fix the collection reactivation bug."
+
+  - id: INC-4
+    type: overlap
+    description: >
+      F116 (CR-178) will modify the Settings screen language selector. F083 (CR-140,
+      pending) renames Settings options. Both affect settings/index.tsx. F083 renames
+      the settings cards; F116 splits the language setting into two. These changes
+      must be coordinated if implemented in the same phase. Since F083 is still pending
+      and F116 is being implemented now, the implementation should account for both
+      label changes and the language split.
+    existing_spec: "F083/CR-140: Settings tab options renamed with i18n."
+    new_request: "CR-178: Split language setting into app + ward."
+    resolution: "F083 is still pending. F116 implementation should use the renamed label convention from F083 for new language settings, but F083 itself is not part of this batch."
+
+  - id: INC-5
+    type: dependency
+    description: >
+      CR-180 (F117) changes the actor type filtering from can_music to
+      can_pianist/can_conductor. CR-151 (pending, Batch 14 Phase 2) adds
+      pianist/conductor fields to the agenda welcome section and uses can_music.
+      Since F117 is implemented first, CR-151 must use can_pianist/can_conductor
+      when eventually implemented.
+    existing_spec: "CR-151 (pending): Pianist/conductor fields in agenda welcome section."
+    new_request: "CR-180: Split can_music into can_pianist + can_conductor."
+    resolution: "F117 is implemented first. CR-151 must use can_pianist/can_conductor when eventually implemented."
+
+# =============================================================================
+# VALIDATION GATE (Final - Complete)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true  # Identifiquei todas ambiguidades
+  GATE-03: true  # Listei TODAS open questions com IDs (OQ-1 to OQ-5) - ALL RESOLVED
+  GATE-04: true  # Listei TODAS assumptions com IDs (A-1 to A-10) - ALL RESOLVED
+  GATE-05: true  # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-1 to INC-5)
+  GATE-06: true  # Status e "complete"
+  GATE-07: true  # Incorporei respostas do usuario em OQs, assumptions, e ACs
+  GATE-08: true  # Zero placeholders no SPEC

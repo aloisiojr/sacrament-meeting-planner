@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-21"
-  last_updated_by: "batch-18"
+  last_updated: "2026-02-22"
+  last_updated_by: "batch-19"
   total_modules: 8
-  total_adrs: 69
-  total_crs_implemented: 108
+  total_adrs: 71
+  total_crs_implemented: 112
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -38,6 +38,7 @@ metadata:
     - docs/arch/ARCH_M029.yaml
     - docs/arch/ARCH_M030.yaml
     - docs/arch/ARCH_M031.yaml
+    - docs/arch/ARCH_M032.yaml
 
 # =============================================================================
 # TECH STACK
@@ -149,7 +150,7 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023, F101, F113, F114]
+    spec_features: [F001, F018, F023, F101, F113, F114, F116]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
@@ -178,7 +179,7 @@ modules:
       - delete-user
       - send-reset-email
       - reset-redirect
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176]
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -191,6 +192,7 @@ modules:
       AuthContext expoe: session, user, role, wardId, userName, loading, signIn, signOut, hasPermission.
       CR-175/F113: Deep link scheme changed from sacrmeetman:// to sacrmeetplan:// in app.json, create-invitation, and send-reset-email.
       CR-176/F114: send-reset-email now uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme in email href. New reset-redirect Edge Function serves HTML with auto-redirect to sacrmeetplan://reset-password deep link.
+      CR-178/F116: AuthContext now loads app language from user_metadata.language on login instead of ward language. Exposes wardLanguage and updateAppLanguage(). Per-user app language stored in Supabase Auth user_metadata. Observer gains limited Settings tab (app language, theme, about).
 
   - id: M002
     name: WardDataModule
@@ -222,7 +224,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118, 130, 137, 138, 142]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118, 130, 137, 138, 142, 178, 180]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -247,11 +249,13 @@ modules:
       CR-142/F085: Activity log descriptions changed to structured format. All hooks use buildLogDescription().
         activityLog.ts gains buildLogDescription, parseLogDescription, formatLogDescription.
         history.tsx renders translated descriptions via formatLogDescription(desc, t).
+      CR-178/F116: topics.tsx uses wardLanguage (from AuthContext) for collection listing instead of getCurrentLanguage(). useTopics.ts 'Temas da Ala' hardcoded label replaced with t('topics.wardTopics').
+      CR-180/F117: meeting_actors.can_music split into can_pianist + can_conductor. Migration 017. CHECK constraint prevents both true. useActors ActorRoleFilter updated. ActorSelector role mapping updated.
 
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -268,7 +272,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -300,6 +304,7 @@ modules:
       CR-165/F103: SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED by CR-174/F112.
       CR-174/F112: SpeechSlot layout restructured to fixed-width right column (36px) for true center-to-center alignment of StatusLED and X buttons. Supersedes ADR-074 paddingRight:5 approach (ADR-076).
       CR-177/F115: SpeechSlot StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only. Supersedes ADR-076 LED placement (ADR-078).
+      CR-181/F118: Optional 2nd speech per Sunday. has_second_speech toggle on SpeechSlot position 2. Position 3 label reverts to t('speeches.lastSpeech') in expanded SpeechSlot. SundayCard collapsed: remove ordinal labels, filter position 2 when OFF, show 2 LEDs. Confirmation dialog only when assignments exist. Presentation mode, AgendaForm, InviteManagementSection all respect the flag.
 
   - id: M004
     name: AgendaModule
@@ -322,7 +327,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -358,6 +363,8 @@ modules:
       CR-171/F109: agenda.tsx collapsed card: testimony_meeting and primary_presentation show 4 status lines (Falta, Type, Orações, Hinos). New i18n key agenda.statusPrayersLabel.
       CR-172/F110: usePresentationMode.ts buildPresentationCards Card 2: add stake announcements field (label + text) when has_stake_announcements is true. New i18n key presentation.stakeAnnouncementsText.
       CR-173/F111: AgendaForm.tsx last speech label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech'). Same fix as CR-170/F108 in usePresentationMode.ts.
+      CR-180/F117: AgendaForm pianist field roleFilter changed from 'can_music' to 'can_pianist'. Conductor field roleFilter changed from 'can_music' to 'can_conductor'.
+      CR-181/F118: AgendaForm shows disabled placeholder for speech 2 when has_second_speech=false. Speaker override for position 2 also disabled. usePresentationMode conditionally includes speech 2 in First Speeches card.
 
   - id: M005
     name: NotificationModule
@@ -433,7 +440,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -467,7 +474,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -508,6 +515,9 @@ modules:
       CR-169/F107: SundayCard collapsed: render Text(' ') when no speaker name to maintain consistent row height.
       CR-174/F112: SpeechSlot layout restructured to fixed-width right column for center-to-center alignment (supersedes paddingRight:5, ADR-076 supersedes ADR-074).
       CR-175/F113: app.json scheme changed from sacrmeetman to sacrmeetplan. Deep link scheme updated globally.
+      CR-178/F116: Settings screen split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). WhatsApp placeholder names translated per app language. Topics screen uses wardLanguage. Observer gains limited Settings tab. i18n keys added.
+      CR-181/F118: SundayCard collapsed: remove ordinal labels from speech rows, filter position 2 when has_second_speech=false. InviteManagementSection filters position 2. NextSundaysSection same changes.
+      CR-191/F119: reset-redirect Edge Function Content-Type fix (charset=utf-8) + Cache-Control headers. Root cause investigation for plain-text HTML rendering in Safari.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1221,6 +1231,27 @@ adrs:
       - "StatusText and LED remain grouped and tappable"
       - "X buttons still in rightColumn (unchanged)"
 
+  - id: ADR-079
+    title: "Store per-user app language in Supabase Auth user_metadata instead of new table"
+    context: "F116 needs per-user app language preference. Options: new table, AsyncStorage, or auth.users user_metadata."
+    decision: "Use Supabase Auth user_metadata via supabase.auth.updateUser({ data: { language } }). No migration, no new table, built-in API, cross-device persistence."
+    decided_in: "CR-178"
+    consequences:
+      - "Zero database migration for app language storage"
+      - "Built-in Supabase API (updateUser, getUser) for read/write"
+      - "Per-user, cross-device persistence"
+      - "Cannot query all users' language preferences from DB (not needed)"
+
+  - id: ADR-080
+    title: "Mutual exclusivity CHECK constraint for can_pianist and can_conductor"
+    context: "F117 splits can_music into can_pianist and can_conductor. User stated actor is EITHER pianist OR conductor, NEVER both."
+    decision: "Database CHECK constraint: NOT (can_pianist = true AND can_conductor = true). Person doing both roles needs two separate actor entries."
+    decided_in: "CR-180"
+    consequences:
+      - "DB-level enforcement prevents all invalid states"
+      - "Multi-role actors (can_preside + can_pianist) still allowed (independent axes)"
+      - "Person doing both roles needs two actor entries (user accepted)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1246,10 +1277,10 @@ database_schema:
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
 
     - name: meeting_actors
-      description: "Atores que podem presidir/conduzir/reconhecer/musica"
-      columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_music, created_at, updated_at]
+      description: "Atores que podem presidir/conduzir/reconhecer/pianista/regente"
+      columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_pianist, can_conductor, created_at, updated_at]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "can_conduct e can_preside sao independentes (CR-71, ADR-020)"
+      notes: "can_conduct e can_preside sao independentes (CR-71, ADR-020). CR-180/F117: can_music split into can_pianist + can_conductor with CHECK constraint (ADR-080). Migration 017."
 
     - name: speeches
       description: "Discursos designados (3 slots por domingo)"
@@ -1267,10 +1298,10 @@ database_schema:
 
     - name: sunday_agendas
       description: "Agenda completa da reuniao sacramental por domingo"
-      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, opening_prayer_member_id, opening_prayer_name, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, closing_hymn_id, closing_prayer_member_id, closing_prayer_name, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
+      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, opening_prayer_member_id, opening_prayer_name, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, closing_prayer_member_id, closing_prayer_name, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
       unique: ["(ward_id, sunday_date)"]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016)"
+      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016). has_second_speech added by CR-181/F118 (migration 018)."
 
     - name: ward_collection_config
       description: "Configuracao de colecoes ativas por ala"
@@ -1325,6 +1356,8 @@ database_schema:
         ward_id: "uuid"
         role: "bishopric | secretary | observer"
         full_name: "string (added CR-81)"
+      user_metadata_fields:
+        language: "string (optional, 'pt-BR' | 'en' | 'es', added CR-178/F116)"
 
   rpc_functions:
     - name: import_members
@@ -1356,6 +1389,8 @@ database_schema:
     - "014_add_speaker_overrides.sql"
     - "015_fix_function_search_path.sql"
     - "016_add_has_intermediate_hymn.sql"
+    - "017_split_music_actor.sql"
+    - "018_add_has_second_speech.sql"
 
   key_relationships:
     - "members.ward_id -> wards.id"
@@ -1436,9 +1471,10 @@ edge_functions:
   - name: reset-redirect
     auth: "None (public endpoint, no JWT required)"
     input: "GET query params: token (required), type (required)"
-    behavior: "Returns HTML page with auto-redirect (meta refresh + JavaScript) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only)."
+    behavior: "Returns HTML page with auto-redirect (meta refresh + JavaScript) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only). CR-191/F119: Content-Type changed to 'text/html; charset=utf-8'. Cache-Control header added."
     verify_jwt: false
     added_in: "CR-176"
+    modified_by_crs: [191]
 
 # =============================================================================
 # ROLES AND PERMISSIONS
@@ -1482,7 +1518,8 @@ roles:
       - "member:read"
       - "agenda:read"
       - "presentation:start"
-    notes: "Sem acesso a Settings. Nao recebe push notifications."
+      - "settings:limited (app language, theme, about only)"
+    notes: "CR-178/F116: Observer gains limited Settings tab (app language, theme, about). Still no push notifications."
 
 # =============================================================================
 # SECURITY MODEL
@@ -1526,7 +1563,7 @@ cross_cutting:
     framework: "react-i18next"
     languages: ["pt-BR", "en", "es"]
     locale_files: "src/i18n/locales/{pt-BR,en,es}.json"
-    initialization: "Device locale -> ward language override on login (CR-11)"
+    initialization: "Device locale -> user_metadata.language on login (CR-178/F116). Fallback: device locale -> ward language. Ward language no longer overrides i18n on login."
 
   permissions:
     file: "src/lib/permissions.ts"
@@ -1577,18 +1614,18 @@ file_structure:
       "forgot-password.tsx": "Recuperacao de senha via email. CR-145/F088: adiciona redirectTo com Linking.createURL() para deep link."
       "invite/[token].tsx": "Registro via convite (deep link)"
     "(tabs)/":
-      "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings)"
+      "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). CR-178/F116: Observer gains Settings tab with limited access (app language, theme, about)."
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel."
       "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry."
       "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
-        "index.tsx": "Settings menu (links para sub-telas)"
+        "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only)."
         "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
         "history.tsx": "Log de atividades com busca e paginacao + close button (CR-118/F065)"
-        "whatsapp.tsx": "Editor de template WhatsApp com preview"
+        "whatsapp.tsx": "Editor de template WhatsApp com preview. CR-178/F116: placeholder names translated per app language. UI labels via t() calls. Ward language for defaults/sample data."
         "theme.tsx": "Toggle de tema (automatic/light/dark)"
         "about.tsx": "Info do app, creditos, disclaimer"
         "timezone.tsx": "Seletor de timezone da ala + close button (CR-118/F065)"
@@ -1598,19 +1635,19 @@ file_structure:
     "SyncProvider.tsx": "Orquestrador de sync, offline e notificacoes"
 
   "src/contexts/":
-    "AuthContext.tsx": "Sessao, role, wardId, userName, permissoes"
+    "AuthContext.tsx": "Sessao, role, wardId, userName, permissoes. CR-178/F116: Loads app language from user_metadata.language on login. Exposes wardLanguage and updateAppLanguage()."
     "ThemeContext.tsx": "Tema dark/light com system detection"
 
   "src/hooks/":
     "useMembers.ts": "CRUD membros via TanStack Query"
-    "useTopics.ts": "CRUD topicos + toggle colecoes + useCollectionTopics (CR-89)"
+    "useTopics.ts": "CRUD topicos + toggle colecoes + useCollectionTopics (CR-89). CR-178/F116: hardcoded 'Temas da Ala' replaced with t('topics.wardTopics'). useCollections uses wardLanguage."
     "useSpeeches.ts": "CRUD discursos + status lifecycle. CR-127/F070: useDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo. CR-134/F077: VALID_TRANSITIONS expandido para full mesh entre status atribuidos."
     "useAgenda.ts": "CRUD agenda + lazy creation"
-    "useActors.ts": "CRUD atores (inline no AgendaForm)"
+    "useActors.ts": "CRUD atores (inline no AgendaForm). CR-180/F117: ActorRoleFilter 'can_music' replaced with 'can_pianist' | 'can_conductor'. getPrimaryRole and createActor updated."
     "useSundayTypes.ts": "Auto-assign + override tipos de domingo"
     "useHymns.ts": "Busca de hinos (read-only)"
     "useActivityLog.ts": "Log paginado com busca"
-    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys. CR-172/F110: stake announcements field in Card 2 when has_stake_announcements is true."
+    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys. CR-172/F110: stake announcements field in Card 2 when has_stake_announcements is true. CR-181/F118: conditionally includes speech 2 in First Speeches based on has_second_speech."
     "useSundayList.ts": "Lista de domingos com scroll infinito"
     "useRealtimeSync.ts": "Subscricao Supabase Realtime"
     "useConnection.ts": "Monitor de conexao (NetInfo). CR-146/F089: integra onlineManager.setOnline() do TanStack Query."
@@ -1618,13 +1655,13 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech')."
-    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false."
+    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
-    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only."
+    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. CR-181/F118: collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF."
     "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078)."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
@@ -1669,7 +1706,7 @@ file_structure:
 
   "supabase/":
     "config.toml": "Configuracao local do Supabase"
-    "migrations/": "14 migrations SQL"
+    "migrations/": "18 migrations SQL"
     "functions/":
       "register-first-user/": "Registro do primeiro usuario (cria ala)"
       "register-invited-user/": "Registro via convite"
@@ -1680,7 +1717,7 @@ file_structure:
       "delete-user/": "Remove usuario"
       "process-notifications/": "Cron: processa fila de push"
       "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL."
-      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com fallback button. Sem auth, sem DB. (CR-176/F114)"
+      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com fallback button. Sem auth, sem DB. (CR-176/F114). CR-191/F119: charset=utf-8 + Cache-Control header fix for plain-text HTML bug."
 
   "scripts/":
     "import-hymns.ts": "CLI script para importar hinos de CSV (CR-51)"
@@ -1698,7 +1735,7 @@ key_flows:
       - "Se role=bishopric: auto-cria meeting_actor (can_preside=true, can_conduct=true)"
       - "EF retorna session; client armazena via setSession()"
       - "AuthContext pega full_name de app_metadata"
-      - "changeLanguage(ward.language) alinha i18n"
+      - "App language loaded from user_metadata.language (CR-178/F116). Fallback: device locale -> ward language."
       - "NavigationGuard redireciona para (tabs)"
 
   invite_registration:
@@ -2022,6 +2059,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-077, ADR-078]
     new_files: ["supabase/functions/reset-redirect/index.ts"]
+
+  batch_19_phase_1:
+    crs: "CR-178, CR-180, CR-181, CR-191"
+    scope: "Separate app/ward language control (F116), Pianist/Conductor split from Music actor type (F117), Optional 2nd speech toggle per Sunday (F118), Password reset plain-text HTML bug fix (F119)"
+    doc: "ARCH_M032.yaml"
+    status: "pending implementation"
+    adrs: [ADR-079, ADR-080]
+    new_files: ["supabase/migrations/017_split_music_actor.sql", "supabase/migrations/018_add_has_second_speech.sql"]
 
 # =============================================================================
 # OBSERVABILITY

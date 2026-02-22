@@ -82,9 +82,15 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain("can_recognize: roleFilter === 'can_recognize',");
     });
 
-    it('handleAdd should set can_music only for can_music roleFilter', () => {
+    // F117 (CR-180): can_music replaced by can_pianist and can_conductor
+    it('handleAdd should set can_pianist for can_pianist roleFilter', () => {
       const source = readSourceFile('components/ActorSelector.tsx');
-      expect(source).toContain("can_music: roleFilter === 'can_music',");
+      expect(source).toContain("can_pianist: roleFilter === 'can_pianist',");
+    });
+
+    it('handleAdd should set can_conductor for can_conductor roleFilter', () => {
+      const source = readSourceFile('components/ActorSelector.tsx');
+      expect(source).toContain("can_conductor: roleFilter === 'can_conductor',");
     });
   });
 
@@ -99,12 +105,14 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain('const enforced = enforceActorRules(input) as UpdateActorInput');
     });
 
-    it('useCreateActor should spread all four capability flags', () => {
+    // F117 (CR-180): can_music replaced by can_pianist and can_conductor
+    it('useCreateActor should spread all five capability flags', () => {
       const source = readSourceFile('hooks/useActors.ts');
       expect(source).toContain('can_preside: enforced.can_preside ?? false');
       expect(source).toContain('can_conduct: enforced.can_conduct ?? false');
       expect(source).toContain('can_recognize: enforced.can_recognize ?? false');
-      expect(source).toContain('can_music: enforced.can_music ?? false');
+      expect(source).toContain('can_pianist: enforced.can_pianist ?? false');
+      expect(source).toContain('can_conductor: enforced.can_conductor ?? false');
     });
 
     it('ActorRoleFilter type should include can_recognize', () => {

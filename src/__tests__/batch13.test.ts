@@ -609,10 +609,17 @@ describe('F085 (CR-142): Activity log structured descriptions', () => {
       expect(source).toContain("activityLog.actorRoles.recognize");
     });
 
-    it('ACTOR_ROLE_I18N_KEYS maps can_music', () => {
+    // F117 (CR-180): can_music replaced by can_pianist and can_conductor
+    it('ACTOR_ROLE_I18N_KEYS maps can_pianist', () => {
       const source = readSourceFile('lib/activityLog.ts');
-      expect(source).toContain("can_music");
-      expect(source).toContain("activityLog.actorRoles.music");
+      expect(source).toContain("can_pianist");
+      expect(source).toContain("activityLog.actorRoles.pianist");
+    });
+
+    it('ACTOR_ROLE_I18N_KEYS maps can_conductor', () => {
+      const source = readSourceFile('lib/activityLog.ts');
+      expect(source).toContain("can_conductor");
+      expect(source).toContain("activityLog.actorRoles.conductor");
     });
   });
 
@@ -661,7 +668,8 @@ describe('F085 (CR-142): Activity log structured descriptions', () => {
 
   // --- i18n keys: actor role keys in all 3 locales ---
   describe('F085 i18n: actorRoles keys in all 3 locales', () => {
-    const roleKeys = ['preside', 'conduct', 'recognize', 'music'];
+    // F117 (CR-180): replaced 'music' with 'pianist' and 'conductor'
+    const roleKeys = ['preside', 'conduct', 'recognize', 'pianist', 'conductor'];
 
     for (const key of roleKeys) {
       it(`pt-BR has activityLog.actorRoles.${key}`, () => {

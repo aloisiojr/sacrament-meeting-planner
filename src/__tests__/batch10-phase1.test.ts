@@ -612,13 +612,11 @@ describe('F071 (CR-129): LED click shows all except not_assigned', () => {
       expect(handlePress).toContain("status === 'not_assigned'");
     });
 
+    // F118 (CR-181): StatusLED disabled check is now inside !isPos2Disabled block
     it('StatusLED disabled includes not_assigned', () => {
       const content = getSpeechSlot();
-      const disabledSection = content.substring(
-        content.indexOf('disabled={isObserver'),
-        content.indexOf('}', content.indexOf('disabled={isObserver') + 20) + 1
-      );
-      expect(disabledSection).toContain("'not_assigned'");
+      // StatusLED has disabled={isObserver || status === 'not_assigned'}
+      expect(content).toContain("disabled={isObserver || status === 'not_assigned'}");
     });
   });
 

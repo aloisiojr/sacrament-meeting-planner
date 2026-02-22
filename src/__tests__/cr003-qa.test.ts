@@ -245,10 +245,11 @@ describe('CR-33: Global back button convention', () => {
 // =============================================================================
 
 describe('CR-35: Remove {duracao} placeholder', () => {
-  // AC-35.1: PLACEHOLDERS constant does not include {duracao}
+  // AC-35.1: PLACEHOLDER_TOKENS constant does not include {duracao}
+  // F116 (CR-178): Renamed PLACEHOLDERS to PLACEHOLDER_TOKENS
   it('AC-35.1: whatsapp.tsx PLACEHOLDERS does not include {duracao}', () => {
     const content = readSourceFile('app/(tabs)/settings/whatsapp.tsx');
-    const placeholderMatch = content.match(/PLACEHOLDERS\s*=\s*\[([^\]]+)\]/s);
+    const placeholderMatch = content.match(/PLACEHOLDER_TOKENS\s*=\s*\[([^\]]+)\]/s);
     expect(placeholderMatch).toBeTruthy();
     expect(placeholderMatch![1]).not.toContain('{duracao}');
   });
@@ -279,9 +280,10 @@ describe('CR-35: Remove {duracao} placeholder', () => {
   });
 
   // AC-35.6: Only 6 valid placeholders
+  // F116 (CR-178): Renamed PLACEHOLDERS to PLACEHOLDER_TOKENS
   it('AC-35.6: whatsapp.tsx has exactly 6 placeholders', () => {
     const content = readSourceFile('app/(tabs)/settings/whatsapp.tsx');
-    const placeholderMatch = content.match(/PLACEHOLDERS\s*=\s*\[([^\]]+)\]/s);
+    const placeholderMatch = content.match(/PLACEHOLDER_TOKENS\s*=\s*\[([^\]]+)\]/s);
     expect(placeholderMatch).toBeTruthy();
     const placeholders = placeholderMatch![1].match(/'\{[^}]+\}'/g);
     expect(placeholders).toHaveLength(6);

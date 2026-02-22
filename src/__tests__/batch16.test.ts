@@ -912,9 +912,10 @@ describe('Batch 16 cross-feature regression checks', () => {
       expect(source).toContain('speechRow');
     });
 
-    it('SundayCard collapsed section still iterates [1, 2, 3]', () => {
+    // F118 (CR-181): Changed from [1,2,3].map to visiblePositions.map
+    it('SundayCard collapsed section still iterates visiblePositions', () => {
       const source = readSourceFile('components/SundayCard.tsx');
-      expect(source).toContain('[1, 2, 3].map');
+      expect(source).toContain('visiblePositions.map');
     });
   });
 });

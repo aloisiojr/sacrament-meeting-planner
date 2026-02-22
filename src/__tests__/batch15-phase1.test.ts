@@ -383,24 +383,32 @@ describe('F098 (CR-160): Speech label context-aware (position 3)', () => {
   const speechSlotSource = readSourceFile('components/SpeechSlot.tsx');
   const sundayCardSource = readSourceFile('components/SundayCard.tsx');
 
-  // --- AC-098-01: Collapsed card shows 3o Discurso for position 3 ---
+  // --- AC-098-01: Collapsed card position 3 label ---
+  // F118 (CR-181): Collapsed card no longer shows ordinal labels; position 3 uses lastSpeech in expanded
   describe('AC-098-01: Collapsed card position 3 label', () => {
-    it('SundayCard uses speeches.slot for all positions including 3', () => {
-      expect(sundayCardSource).toContain("t('speeches.slot', { number: `${pos}\\u00BA` })");
+    it('SundayCard collapsed uses visiblePositions.map (F118 update)', () => {
+      expect(sundayCardSource).toContain('visiblePositions.map');
     });
 
-    it('SundayCard does NOT have ternary for pos === 3', () => {
-      expect(sundayCardSource).not.toContain('pos === 3');
+    it('SundayCard collapsed does NOT show ordinal labels (F118: AC-118-08)', () => {
+      // Collapsed view shows name only, no posLabel prefix
+      const collapsedSection = sundayCardSource.match(
+        /isSpeechesType && !expanded[\s\S]*?visiblePositions\.map[\s\S]*?<\/>/
+      );
+      expect(collapsedSection).not.toBeNull();
+      expect(collapsedSection![0]).not.toContain('posLabel');
     });
   });
 
-  // --- AC-098-02: Expanded card shows 3o Discurso for position 3 ---
+  // --- AC-098-02: Expanded card position 3 label ---
+  // F118 (CR-181): getPositionLabel now HAS special case for position 3 (lastSpeech)
   describe('AC-098-02: Expanded card position 3 label', () => {
-    it('getPositionLabel has no if(position === 3) special case', () => {
-      expect(speechSlotSource).not.toContain('position === 3');
+    it('getPositionLabel has if(position === 3) for lastSpeech label', () => {
+      expect(speechSlotSource).toContain('position === 3');
+      expect(speechSlotSource).toContain("t('speeches.lastSpeech')");
     });
 
-    it('getPositionLabel returns speeches.slot for all positions', () => {
+    it('getPositionLabel returns speeches.slot for positions 1 and 2', () => {
       expect(speechSlotSource).toContain("t('speeches.slot', { number: `${position}\\u00BA` })");
     });
   });
@@ -555,14 +563,16 @@ describe('F099 (CR-161): Collapsed speech card redesign', () => {
     });
   });
 
-  // --- AC-099-07: All three positions show full format ---
+  // --- AC-099-07: All positions show full format ---
+  // F118 (CR-181): Changed from [1,2,3].map to visiblePositions.map; removed posLabel prefix
   describe('AC-099-07: All positions with speakers show LED + text', () => {
-    it('iterates over [1, 2, 3] for all positions', () => {
-      expect(sundayCardSource).toContain('[1, 2, 3].map');
+    it('iterates over visiblePositions for all positions (F118 update)', () => {
+      expect(sundayCardSource).toContain('visiblePositions.map');
     });
 
-    it('shows posLabel: name format', () => {
-      expect(sundayCardSource).toContain('`${posLabel}: ${name}`');
+    it('shows speaker name without ordinal prefix (F118: AC-118-08)', () => {
+      // Collapsed view shows name only now
+      expect(sundayCardSource).toContain('speech?.speaker_name');
     });
   });
 

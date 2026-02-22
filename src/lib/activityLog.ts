@@ -99,7 +99,8 @@ const ACTOR_ROLE_I18N_KEYS: Record<string, string> = {
   can_preside: 'activityLog.actorRoles.preside',
   can_conduct: 'activityLog.actorRoles.conduct',
   can_recognize: 'activityLog.actorRoles.recognize',
-  can_music: 'activityLog.actorRoles.music',
+  can_pianist: 'activityLog.actorRoles.pianist',
+  can_conductor: 'activityLog.actorRoles.conductor',
 };
 
 /**

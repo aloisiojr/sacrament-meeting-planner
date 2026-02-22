@@ -25,7 +25,8 @@ export type ActorRoleFilter =
   | 'can_preside'
   | 'can_conduct'
   | 'can_recognize'
-  | 'can_music';
+  | 'can_pianist'
+  | 'can_conductor';
 
 // --- Utilities ---
 
@@ -60,8 +61,9 @@ export function sortActors(actors: MeetingActor[]): MeetingActor[] {
 function getPrimaryRole(actor: MeetingActor | CreateActorInput): string {
   if (actor.can_preside) return 'can_preside';
   if (actor.can_conduct) return 'can_conduct';
+  if (actor.can_pianist) return 'can_pianist';
+  if (actor.can_conductor) return 'can_conductor';
   if (actor.can_recognize) return 'can_recognize';
-  if (actor.can_music) return 'can_music';
   return 'can_recognize';
 }
 
@@ -111,7 +113,8 @@ export function useCreateActor() {
           can_preside: enforced.can_preside ?? false,
           can_conduct: enforced.can_conduct ?? false,
           can_recognize: enforced.can_recognize ?? false,
-          can_music: enforced.can_music ?? false,
+          can_pianist: enforced.can_pianist ?? false,
+          can_conductor: enforced.can_conductor ?? false,
         })
         .select()
         .single();

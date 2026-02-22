@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  last_updated_by: "batch-21-phase-2"
+  last_updated_by: "batch-22-phase-1"
   total_modules: 8
-  total_adrs: 79
-  total_crs_implemented: 122
+  total_adrs: 81
+  total_crs_implemented: 124
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -43,6 +43,7 @@ metadata:
     - docs/arch/ARCH_M034.yaml
     - docs/arch/ARCH_M035.yaml
     - docs/arch/ARCH_M036.yaml
+    - docs/arch/ARCH_M037.yaml
 
 # =============================================================================
 # TECH STACK
@@ -65,7 +66,7 @@ tech_stack:
   file_system: "expo-file-system v19 (new File/Paths API)"
   notifications: "Expo Push Notifications"
   storage: "AsyncStorage (offline queue, theme preference)"
-  deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Changed from sacrmeetman:// to sacrmeetplan:// in CR-175/F113."
+  deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Changed from sacrmeetman:// to sacrmeetplan:// in CR-175/F113. CR-202/F138: reset-redirect now serves web page instead of deep link redirect. CR-203/F139: create-invitation returns HTTPS URL instead of deep link."
   csv: "expo-document-picker + expo-file-system + expo-sharing"
 
 # =============================================================================
@@ -183,7 +184,8 @@ modules:
       - delete-user
       - send-reset-email
       - reset-redirect
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198]
+      - invite-redirect
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198, 202, 203]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -200,6 +202,8 @@ modules:
       CR-195/F131: wardLanguageChangeMutation.onSuccess in settings/index.tsx now calls setWardLanguage() exposed from AuthContext to update local state immediately. AuthContextValue extended with setWardLanguage setter.
       CR-197/F133: send-reset-email Edge Function now uses user_metadata.language (app language) as first priority for email template. Fallback: ward.language -> pt-BR.
       CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
+      CR-202/F138: reset-redirect completely rewritten to serve self-contained password reset web page. Loads Supabase JS from CDN, calls verifyOtp + updateUser in browser. No deep link redirect.
+      CR-203/F139: New invite-redirect Edge Function serves self-contained invitation acceptance web page. create-invitation returns HTTPS URL instead of sacrmeetplan:// deep link. invite/[token].tsx remains as unused fallback.
 
   - id: M002
     name: WardDataModule
@@ -540,6 +544,8 @@ modules:
       CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
       CR-193/F135: Settings screen restructured from 3 unlabeled sections to 2 labeled groups: 'Configuracoes da Ala' (members, topics, whatsapp, wardLanguage, timezone) and 'Configuracoes do App' (users, history, appLanguage, theme, about). Group 1 label hidden for Observer. New i18n keys settings.wardSettingsGroup, settings.appSettingsGroup (ADR-087).
       CR-200/F137: Home tab play icon fontSize increased from 17 to 20 for visual height match with button text.
+      CR-202/F138: reset-redirect Edge Function completely rewritten. Now serves self-contained HTML password reset web page with Supabase JS from CDN. Calls verifyOtp + updateUser in browser. No deep link redirect. Multilingual (pt-BR/en/es) (ADR-089).
+      CR-203/F139: New invite-redirect Edge Function serves self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. create-invitation deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (ADR-090).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1354,6 +1360,24 @@ adrs:
       - "Visual alignment achieved with minimal CSS change"
       - "X button position unchanged (actionArea untouched)"
 
+  - id: ADR-089
+    title: "Replace deep link redirect with self-contained password reset web page"
+    context: "reset-redirect served HTML with meta refresh redirect to sacrmeetplan:// deep link. Deep link does not work in browsers. Multiple iterations (CR-176, CR-191, CR-198) could not fix fundamental deep link unreliability."
+    decision: "Rewrite reset-redirect to serve a complete password reset web page. Load Supabase JS from CDN, call verifyOtp with token, provide form for updateUser. No deep link. Existing endpoint URL preserved for backward compatibility with old emails."
+    decided_in: "CR-202"
+    consequences:
+      - "Password reset works reliably in all browsers without app installation"
+      - "CDN dependency for Supabase JS client; onerror fallback handles failure"
+
+  - id: ADR-090
+    title: "New invite-redirect Edge Function replaces deep link for invitation acceptance"
+    context: "create-invitation returns sacrmeetplan://invite/<token> deep link that does not work in practice. Invited users cannot open custom URL schemes from external apps."
+    decision: "Create invite-redirect Edge Function serving self-contained HTML page with invitation form. Uses fetch to call register-invited-user (same API). create-invitation returns HTTPS URL instead of deep link."
+    decided_in: "CR-203"
+    consequences:
+      - "Invitation acceptance works reliably in all browsers without app installation"
+      - "Old deep links for new invitations replaced; previous ones never worked anyway"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1534,7 +1558,8 @@ edge_functions:
   - name: create-invitation
     auth: "JWT (bishopric or secretary)"
     input: "{email, role}"
-    behavior: "Creates invitation record with token and deep link. Auto-creates actor for bishopric invitees."
+    behavior: "Creates invitation record with token and HTTPS URL. Auto-creates actor for bishopric invitees. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>."
+    modified_by_crs: [203]
 
   - name: list-users
     auth: "JWT (bishopric or secretary)"
@@ -1573,10 +1598,17 @@ edge_functions:
   - name: reset-redirect
     auth: "None (public endpoint, no JWT required)"
     input: "GET query params: token (required), type (required)"
-    behavior: "Returns HTML page with auto-redirect (meta refresh) to sacrmeetplan://reset-password?token=TOKEN&type=TYPE. Includes fallback button 'Abrir no aplicativo' for manual redirect. No DB access, no token validation (pass-through only). CR-191/F119: Content-Type changed to 'text/html; charset=utf-8'. Cache-Control header added. CR-198/F134: <script> tag removed to prevent errors in sandboxed iframes."
+    behavior: "CR-202/F138: Complete rewrite. Serves self-contained HTML page with password reset form. Loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' }) on page load, then updateUser({ password }) on form submit. Multilingual (pt-BR/en/es via navigator.language). No deep link redirect. No meta refresh. Embeds SUPABASE_URL and SUPABASE_ANON_KEY (public values) from Deno.env. Previous behavior (meta refresh redirect to deep link) fully replaced."
     verify_jwt: false
     added_in: "CR-176"
-    modified_by_crs: [191, 198]
+    modified_by_crs: [191, 198, 202]
+
+  - name: invite-redirect
+    auth: "None (public endpoint, no JWT required)"
+    input: "GET query params: token (required)"
+    behavior: "CR-203/F139: New Edge Function. Serves self-contained HTML page with invitation acceptance form. Uses fetch to call register-invited-user (validate-only mode on load, full registration on submit). Displays read-only invitation details (stake, ward, role, email) and editable fields (fullName, password). Multilingual (pt-BR/en/es via navigator.language). Embeds SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env for fetch URL and apikey header."
+    verify_jwt: false
+    added_in: "CR-203"
 
 # =============================================================================
 # ROLES AND PERMISSIONS
@@ -1632,7 +1664,7 @@ security:
     provider: "Supabase Auth (email/password)"
     session: "JWT with app_metadata (role, ward_id, full_name)"
     token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
-    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. CR-176/F114: email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). CR-175/F113: deep link scheme changed to sacrmeetplan://. CR-197/F133: email language resolved by user_metadata.language -> ward.language -> pt-BR (ADR-086). CR-198/F134: reset-redirect removes <script> tag (security improvement for sandboxed iframes)."
+    password_reset: "Edge Function send-reset-email (CR-155/F101). Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. CR-176/F114: email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). CR-175/F113: deep link scheme changed to sacrmeetplan://. CR-197/F133: email language resolved by user_metadata.language -> ward.language -> pt-BR (ADR-086). CR-198/F134: reset-redirect removes <script> tag (security improvement for sandboxed iframes). CR-202/F138: reset-redirect rewritten to serve self-contained password reset web page with Supabase JS (verifyOtp + updateUser); no deep link redirect (ADR-089)."
 
   authorization:
     rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"
@@ -1812,14 +1844,15 @@ file_structure:
     "functions/":
       "register-first-user/": "Registro do primeiro usuario (cria ala)"
       "register-invited-user/": "Registro via convite"
-      "create-invitation/": "Cria convite com token"
+      "create-invitation/": "Cria convite com token. CR-203/F139: deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (invite-redirect EF)."
       "list-users/": "Lista usuarios da ala"
       "update-user-role/": "Altera role de usuario"
       "update-user-name/": "Auto-edicao de nome (CR-81)"
       "delete-user/": "Remove usuario"
       "process-notifications/": "Cron: processa fila de push"
       "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. CR-175: scheme sacrmeetplan://. CR-176: deepLink agora e HTTPS redirect URL. CR-197/F133: language resolution uses user_metadata.language as first priority (ADR-086)."
-      "reset-redirect/": "Redirect HTTPS -> deep link sacrmeetplan://reset-password. HTML auto-redirect com meta refresh + fallback button. Sem auth, sem DB. (CR-176/F114). CR-191/F119: charset=utf-8 + Cache-Control header fix for plain-text HTML bug. CR-198/F134: <script> tag removed for sandbox compatibility."
+      "reset-redirect/": "CR-202/F138: Complete rewrite. Self-contained HTML password reset web page. Loads Supabase JS from CDN, calls verifyOtp + updateUser. Multilingual (pt-BR/en/es). No deep link redirect. Embeds public SUPABASE_URL + SUPABASE_ANON_KEY. Previous behavior (meta refresh redirect) fully replaced."
+      "invite-redirect/": "CR-203/F139: New Edge Function. Self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. Read-only fields (stake, ward, role, email) + registration form. Multilingual (pt-BR/en/es)."
 
   "scripts/":
     "import-hymns.ts": "CLI script para importar hinos de CSV (CR-51)"
@@ -1842,12 +1875,15 @@ key_flows:
 
   invite_registration:
     steps:
-      - "User abre deep link sacrmeetplan://invite/{token}"
-      - "Expo Router rota para (auth)/invite/[token].tsx"
-      - "Screen valida token via EF, mostra campos read-only (stake, ward, role)"
-      - "User preenche Nome e Password"
-      - "Client chama register-invited-user EF"
-      - "EF cria user, marca invitation used, retorna session"
+      - "CR-203/F139: create-invitation returns HTTPS URL (https://.../invite-redirect?token=<uuid>) instead of deep link"
+      - "Inviter shares HTTPS URL with invited user (via WhatsApp, email, etc.)"
+      - "Invited user opens URL in browser -> invite-redirect EF serves HTML page"
+      - "Page JS calls register-invited-user with { token } (validate-only mode via fetch)"
+      - "On validation success: read-only fields (stake, ward, role, email) + registration form shown"
+      - "User fills in Nome Completo and Password"
+      - "Page JS calls register-invited-user with { token, password, fullName } via fetch"
+      - "On success (201): success message shown with instructions to open app"
+      - "App screen invite/[token].tsx remains as unused fallback for deep links (no changes)"
 
   password_reset:
     steps:
@@ -1857,10 +1893,11 @@ key_flows:
       - "send-reset-email EF: builds HTTPS redirect URL (https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery)"
       - "send-reset-email EF: sends email via Resend API with HTTPS URL in <a href>"
       - "User clica botao no email -> browser abre HTTPS redirect URL"
-      - "reset-redirect EF: retorna HTML com auto-redirect (meta refresh) para sacrmeetplan://reset-password?token=TOKEN&type=recovery. CR-198/F134: <script> tag removed."
-      - "App abre reset-password.tsx com token via deep link query params"
-      - "reset-password.tsx: verifyOtp({ token_hash, type: 'recovery' }) estabelece sessao"
-      - "User define nova senha -> updateUser({ password }) -> sucesso"
+      - "CR-202/F138: reset-redirect EF serves self-contained HTML page with password reset form (replaces previous deep link redirect)"
+      - "HTML page loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' })"
+      - "On verifyOtp success: form with password + confirm password fields is shown"
+      - "User enters new password -> page calls updateUser({ password }) -> success message shown"
+      - "App screen reset-password.tsx remains as unused fallback (no changes)"
     steps:
       - "Bishopric expande SundayCard -> lazy creation de 3 speech records"
       - "Seleciona Speaker via MemberSelectorModal -> mutation seta member_id, snapshot name/phone, status=assigned_not_invited"
@@ -2194,6 +2231,22 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-085, ADR-086]
     new_files: []
+
+  batch_21_phase_2:
+    crs: "CR-193, CR-199, CR-200"
+    scope: "Settings reorganization into labeled groups (F135), StatusLED alignment with speaker field (F136), Play icon size increase (F137)"
+    doc: "ARCH_M036.yaml"
+    status: "pending implementation"
+    adrs: [ADR-087, ADR-088]
+    new_files: []
+
+  batch_22_phase_1:
+    crs: "CR-202, CR-203"
+    scope: "Password reset web page replacing deep link redirect (F138), Invitation acceptance web page with new invite-redirect Edge Function (F139)"
+    doc: "ARCH_M037.yaml"
+    status: "pending implementation"
+    adrs: [ADR-089, ADR-090]
+    new_files: ["supabase/functions/invite-redirect/index.ts"]
 
 # =============================================================================
 # OBSERVABILITY

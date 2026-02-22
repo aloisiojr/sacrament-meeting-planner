@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 123
-  total_change_requests: 189
+  total_features: 125
+  total_change_requests: 191
   implemented_crs: 96
-  pending_crs: 91
+  pending_crs: 93
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -66,6 +66,7 @@ metadata:
     - docs/specs/SPEC_F126_F129.yaml
     - docs/specs/SPEC_F130_F134.yaml
     - docs/specs/SPEC_F135_F137.yaml
+    - docs/specs/SPEC_F138_F139.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2529,8 +2530,50 @@ features:
       - "2 arquivos impactados (index.tsx, agenda.tsx)"
       - "Style-only changes, no structural modifications"
 
+  # ---------------------------------------------------------------------------
+  # Batch 22 Phase 1 (F138-F139): Password Reset Web Page, Invitation Acceptance Web Page
+  # ---------------------------------------------------------------------------
+
+  - id: F138
+    name: "Rewrite reset-redirect Edge Function to serve a complete password reset web page"
+    status: pending
+    rfs: []
+    description: >
+      Rewrite reset-redirect to serve a self-contained HTML page with a password reset form
+      instead of redirecting to a deep link (sacrmeetplan://reset-password). Uses Supabase JS
+      client via CDN to call verifyOtp + updateUser directly in the browser. Multilingual
+      (pt-BR, en, es via navigator.language). send-reset-email NOT modified. Existing reset
+      emails continue to work since the endpoint URL is unchanged.
+    modified_by_crs: [202]
+    spec_file: "docs/specs/SPEC_F138_F139.yaml"
+    notes:
+      - "CR-202: Pagina web de reset de senha"
+      - "12 acceptance criteria, 5 edge cases"
+      - "1 arquivo impactado (reset-redirect/index.ts)"
+      - "send-reset-email NAO muda"
+      - "Tela do app reset-password.tsx mantida como fallback"
+
+  - id: F139
+    name: "Create invite-redirect Edge Function to serve a complete invitation acceptance web page"
+    status: pending
+    rfs: []
+    description: >
+      New Edge Function (invite-redirect) that serves a self-contained HTML page with an
+      invitation acceptance form. Validates token via fetch to register-invited-user, displays
+      invitation details (ward, stake, role, email as read-only), and provides registration
+      form (fullName, password). create-invitation updated to return HTTPS URL instead of
+      sacrmeetplan:// deep link. register-invited-user NOT modified.
+    modified_by_crs: [203]
+    spec_file: "docs/specs/SPEC_F138_F139.yaml"
+    notes:
+      - "CR-203: Pagina web de aceitar convite"
+      - "13 acceptance criteria, 7 edge cases"
+      - "1 arquivo novo (invite-redirect/index.ts), 1 modificado (create-invitation/index.ts)"
+      - "register-invited-user NAO muda"
+      - "Tela do app invite/[token].tsx mantida como fallback"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (91 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21)
+# PENDING CHANGE REQUESTS (93 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22)
 # =============================================================================
 
 pending_crs:
@@ -4485,6 +4528,60 @@ pending_crs:
       - src/app/(tabs)/index.tsx
       - src/app/(tabs)/agenda.tsx
 
+  # --- Batch 22 Phase 1 (Password Reset & Invitation Web Pages) ---
+
+  - id: 202
+    type: enhancement
+    area: "Auth (F001, F088, F114)"
+    feature_id: F138
+    spec_file: "docs/specs/SPEC_F138_F139.yaml"
+    related_crs: [67, 155, 176, 191, 197, 198]
+    description: >
+      Reescrever reset-redirect para servir pagina web com formulario de nova senha.
+      Usa Supabase JS via CDN para chamar verifyOtp + updateUser direto no browser.
+      send-reset-email NAO muda (link ja aponta para reset-redirect com token+type).
+      Endpoint reset-redirect mantido para nao quebrar emails ja enviados.
+    acceptance_criteria:
+      - "Pagina HTML com formulario de reset de senha (sem deep link)"
+      - "verifyOtp chamado on load para validar token"
+      - "updateUser chamado on submit com nova senha"
+      - "Validacao client-side: senha >= 6 chars, senhas coincidem"
+      - "Multilingue (pt-BR, en, es) via navigator.language"
+      - "Supabase JS carregado via CDN"
+      - "send-reset-email inalterado"
+      - "Content-Type: text/html; charset=utf-8"
+      - "Estado de loading, erro e sucesso"
+    files_likely_impacted:
+      - supabase/functions/reset-redirect/index.ts
+
+  - id: 203
+    type: feature
+    area: "Auth (F001)"
+    feature_id: F139
+    spec_file: "docs/specs/SPEC_F138_F139.yaml"
+    related_crs: [67]
+    description: >
+      Nova Edge Function (invite-redirect) com pagina web + formulario de registro.
+      Formulario com campos: nome completo e senha (email/role/ward sao read-only,
+      vindos do convite). Chama register-invited-user via fetch direto do browser.
+      create-invitation muda deepLink de sacrmeetplan://invite/... para URL HTTPS
+      da nova pagina.
+    acceptance_criteria:
+      - "Nova Edge Function invite-redirect serve pagina HTML"
+      - "Token validado via fetch para register-invited-user (validate-only)"
+      - "Campos read-only: estaca, ala, funcao, email"
+      - "Campos editaveis: nome completo, senha, confirmar senha"
+      - "Submit chama register-invited-user com token+password+fullName"
+      - "create-invitation retorna URL HTTPS ao inves de deep link"
+      - "Multilingue (pt-BR, en, es) via navigator.language"
+      - "register-invited-user inalterado"
+      - "Funcao (role) traduzida na exibicao"
+      - "Content-Type: text/html; charset=utf-8"
+      - "Estado de loading, erro e sucesso"
+    files_likely_impacted:
+      - supabase/functions/invite-redirect/index.ts (NEW)
+      - supabase/functions/create-invitation/index.ts
+
 # =============================================================================
 
 design_decisions:
@@ -5690,3 +5787,10 @@ cr_history:
       - "docs/specs/SPEC_F130_F134.yaml (CR-194-CR-198 - Bug fixes: TS errors, ward language, 2nd speech toggle, email language, reset redirect)"
       - "docs/specs/SPEC_F135_F137.yaml (CR-193, CR-199, CR-200 - Settings reorganization, StatusLED alignment, play icon size)"
     summary: "Phase 1: Fix TS errors and actor role naming after Pianist/Conductor split (F130), fix ward language switch not updating AuthContext (F131), fix 2nd speech toggle bugs: topic clearing, disabled fields with placeholder, dynamic X/2 vs X/3 (F132), fix password reset email to use user app language (F133), remove script tag from reset-redirect (F134). Phase 2: Reorganize Settings tab into 2 labeled groups Ward Settings and App Settings (F135), align StatusLED right edge with speaker field right edge (F136), enlarge play icon in Home button and Agenda card (F137)."
+
+  batch_22:
+    range: "CR-202, CR-203"
+    status: "2 pendentes fase 1 (202, 203)"
+    files:
+      - "docs/specs/SPEC_F138_F139.yaml (CR-202, CR-203 - Password reset web page, invitation acceptance web page)"
+    summary: "Phase 1: Rewrite reset-redirect Edge Function to serve complete password reset web page with form using Supabase JS via CDN (F138), create invite-redirect Edge Function with invitation acceptance web page and update create-invitation to return HTTPS URL instead of deep link (F139)."

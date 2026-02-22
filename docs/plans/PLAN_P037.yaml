@@ -1,0 +1,445 @@
+# =============================================================================
+# PLAN_P037.yaml
+# Batch 22 Phase 1: Password Reset Web Page (F138), Invitation Acceptance Web Page (F139)
+# CR-202, CR-203
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Replace broken deep link redirects with self-contained web pages for password
+  reset (F138) and invitation acceptance (F139). Rewrite reset-redirect Edge
+  Function to serve a complete password reset form using Supabase JS CDN. Create
+  new invite-redirect Edge Function serving an invitation acceptance form using
+  fetch to register-invited-user. Update create-invitation to generate HTTPS URLs
+  instead of deep links.
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # -------------------------------------------------------------------------
+  # STEP-01: F138 Happy Path - Rewrite reset-redirect Edge Function
+  # -------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Complete rewrite of supabase/functions/reset-redirect/index.ts.
+      Remove the meta refresh + deep link redirect approach. Serve a
+      self-contained HTML page with:
+        - Supabase JS loaded from CDN (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)
+        - SUPABASE_URL and SUPABASE_ANON_KEY embedded from Deno.env
+        - On page load: verifyOtp({ token_hash: token, type: 'recovery' })
+        - Loading spinner state during verifyOtp
+        - On verifyOtp success: show password form (nova senha + confirmar senha)
+        - On form submit: validate password >= 6 chars + match, then updateUser({ password })
+        - On updateUser success: show success message
+        - i18n: detect navigator.language, support pt-BR (default), en, es
+        - All labels, placeholders, button text, messages from inline i18n object
+        - Centered card layout (max-width 400px, responsive)
+        - Styling: primary #4F46E5, background #f5f5f5, card bg #fff, border-radius 8px
+        - Content-Type: text/html; charset=utf-8
+        - Cache-Control: no-cache, no-store, must-revalidate
+        - Preserve CORS headers and 400 for missing params (same behavior)
+        - Preserve OPTIONS preflight handler
+    files:
+      - supabase/functions/reset-redirect/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03"]
+    done_when:
+      - "reset-redirect/index.ts serves HTML page with password reset form (no deep link, no meta refresh)"
+      - "HTML includes <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'>"
+      - "HTML JS calls supabase.auth.verifyOtp on page load with token_hash and type from URL params"
+      - "HTML JS calls supabase.auth.updateUser on form submit after validation"
+      - "Loading spinner is shown during verifyOtp (div with id='loading' or similar)"
+      - "Form has two password input fields (type=password)"
+      - "Success message is displayed after updateUser succeeds"
+      - "i18n object with pt-BR, en, es translations for all text"
+      - "navigator.language detection with startsWith('en'), startsWith('es'), else pt-BR"
+      - "Content-Type is 'text/html; charset=utf-8'"
+      - "Cache-Control is 'no-cache, no-store, must-revalidate'"
+      - "Missing token/type returns 400 JSON (same as before)"
+      - "OPTIONS returns 'ok' with CORS headers"
+    tests:
+      - type: unit
+        description: "Verify reset-redirect/index.ts serves HTML with password reset form, Supabase JS CDN, verifyOtp call, updateUser call, i18n, loading/error/form/success states, CORS, 400 for missing params"
+    covers:
+      acceptance_criteria: [AC-138-01, AC-138-02, AC-138-04, AC-138-05, AC-138-06, AC-138-07, AC-138-08, AC-138-09, AC-138-10, AC-138-11, AC-138-12]
+      edge_cases: []
+    risks:
+      - risk: "Supabase JS CDN URL may change or become unavailable"
+        mitigation: "Pin to @2 major version; EC-138-03 handles CDN failure with onerror"
+
+  # -------------------------------------------------------------------------
+  # STEP-02: F138 Happy Path - Client-side validation
+  # -------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Ensure the password form in reset-redirect includes client-side validation:
+        - Password must be >= 6 characters
+        - Password and confirm password must match
+        - On validation failure, show localized error message
+        - updateUser is NOT called when validation fails
+      This is implemented inline in the HTML JS of the reset-redirect page.
+      NOTE: This step is part of the same file as STEP-01. If implemented
+      together in STEP-01 (as it should be since it's inline JS), this step
+      serves as verification that validation logic is present and correct.
+    files:
+      - supabase/functions/reset-redirect/index.ts
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Inline JS checks password.length >= 6 before calling updateUser"
+      - "Inline JS checks password === confirmPassword before calling updateUser"
+      - "Validation error messages are localized (pt-BR, en, es)"
+      - "Error message for short password: pt-BR 'A senha deve ter pelo menos 6 caracteres'"
+      - "Error message for non-matching passwords: pt-BR 'As senhas nao coincidem'"
+    tests:
+      - type: unit
+        description: "Verify HTML source contains password length check (>= 6), password match check, and localized validation error messages in all 3 languages"
+    covers:
+      acceptance_criteria: [AC-138-03]
+      edge_cases: [EC-138-04, EC-138-05]
+    risks:
+      - risk: "Validation messages may be inconsistent across languages"
+        mitigation: "All messages defined in single i18n object; test checks all 3 languages"
+
+  # -------------------------------------------------------------------------
+  # STEP-03: F139 Happy Path - Create invite-redirect Edge Function
+  # -------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Create new Edge Function: supabase/functions/invite-redirect/index.ts.
+      GET endpoint that:
+        - Reads token query param from URL
+        - Returns 400 JSON if token is missing
+        - Serves self-contained HTML page with invitation acceptance form
+        - Embeds SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env
+        - On page load: fetch POST to register-invited-user with { token }
+          (validate-only mode) using apikey header
+        - On validation success: populate read-only fields (Estaca, Ala, Funcao, Email)
+          from response data (stakeName, wardName, role, email)
+        - Role displayed translated: bishopric->Bispado/Bishopric/Obispado, etc.
+        - Show editable fields: Nome Completo, Senha, Confirmar Senha
+        - On form submit: validate fullName not empty, password >= 6, passwords match
+        - On submit: fetch POST to register-invited-user with { token, password, fullName }
+        - On success (status 201): show success message
+        - On error: show localized error message based on error code
+          (token_invalid, token_used, token_expired, 'Failed to create user')
+        - i18n: detect navigator.language, support pt-BR (default), en, es
+        - Centered card layout (max-width 400px, responsive)
+        - Styling: primary #4F46E5, background #f5f5f5 (same as F138)
+        - Content-Type: text/html; charset=utf-8
+        - Cache-Control: no-cache, no-store, must-revalidate
+        - CORS headers, OPTIONS preflight
+        - States: loading spinner -> error | form -> success
+    files:
+      - supabase/functions/invite-redirect/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04"]
+    done_when:
+      - "supabase/functions/invite-redirect/index.ts exists"
+      - "GET with token param returns HTML page (status 200, Content-Type text/html; charset=utf-8)"
+      - "GET without token returns 400 JSON { error: 'Missing required parameter: token' }"
+      - "OPTIONS returns 'ok' with CORS headers"
+      - "HTML JS fetches register-invited-user with { token } on page load"
+      - "HTML shows read-only fields for stakeName, wardName, role (translated), email"
+      - "HTML shows editable fields for fullName, password, confirmPassword"
+      - "HTML JS validates fullName not empty, password >= 6, passwords match"
+      - "HTML JS fetches register-invited-user with { token, password, fullName } on submit"
+      - "Success message shown after status 201 response"
+      - "Error messages localized for token_invalid, token_used, token_expired, create_failed"
+      - "i18n with pt-BR/en/es translations"
+      - "Cache-Control: no-cache, no-store, must-revalidate"
+    tests:
+      - type: unit
+        description: "Verify invite-redirect/index.ts serves HTML with invitation form, fetch to register-invited-user, read-only fields, editable fields, validation, role translation, i18n, all states, CORS, 400 for missing token"
+    covers:
+      acceptance_criteria: [AC-139-01, AC-139-02, AC-139-03, AC-139-04, AC-139-05, AC-139-07, AC-139-08, AC-139-09, AC-139-10, AC-139-11, AC-139-12, AC-139-13]
+      edge_cases: [EC-139-04, EC-139-05, EC-139-06]
+    risks:
+      - risk: "register-invited-user may require specific auth headers from the browser fetch"
+        mitigation: "Use apikey header with SUPABASE_ANON_KEY (same pattern as mobile app); ARCH confirms no JWT needed for validate-only"
+      - risk: "CORS preflight between browser and Edge Function"
+        mitigation: "Both Edge Functions are on same Supabase domain; CORS headers set on register-invited-user"
+
+  # -------------------------------------------------------------------------
+  # STEP-04: F139 Happy Path - Update create-invitation deep link
+  # -------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Update supabase/functions/create-invitation/index.ts to generate an
+      HTTPS URL pointing to invite-redirect instead of the sacrmeetplan://
+      deep link.
+      Change line ~171:
+        FROM: const deepLink = `sacrmeetplan://invite/${invitationToken}`;
+        TO:   const deepLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/invite-redirect?token=${invitationToken}`;
+      All other logic (auth, validation, actor creation) remains unchanged.
+    files:
+      - supabase/functions/create-invitation/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+    done_when:
+      - "create-invitation/index.ts deepLink uses HTTPS URL with invite-redirect path"
+      - "deepLink format is 'https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<uuid>'"
+      - "deepLink does NOT contain 'sacrmeetplan://'"
+      - "All other logic in create-invitation is unchanged"
+    tests:
+      - type: unit
+        description: "Verify create-invitation/index.ts generates HTTPS URL for invite-redirect instead of deep link"
+    covers:
+      acceptance_criteria: [AC-139-06]
+      edge_cases: []
+    risks:
+      - risk: "SUPABASE_URL env var may not be set"
+        mitigation: "Deno.env.get('SUPABASE_URL') is already used in create-invitation for supabase client creation; same availability"
+
+  # -------------------------------------------------------------------------
+  # STEP-05: F138 Edge Cases - Token errors and CDN failure
+  # -------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Verify and ensure the reset-redirect page handles edge cases:
+        - EC-138-01/EC-138-02: Expired/already-used token (verifyOtp error)
+          -> Show localized error message (same message for both since Supabase
+          does not distinguish them)
+        - EC-138-03: CDN fails to load Supabase JS
+          -> onerror handler on script tag or check window.supabase before use
+          -> Show generic error: 'Erro ao carregar a pagina. Tente novamente.'
+      These behaviors should be implemented in STEP-01 as part of the inline JS.
+      This step verifies they are present and correct.
+    files:
+      - supabase/functions/reset-redirect/index.ts
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-06"]
+    done_when:
+      - "HTML shows localized error when verifyOtp fails (token expired/used)"
+      - "Error text includes pt-BR: 'Link expirado ou invalido. Solicite um novo link de redefinicao de senha.'"
+      - "Error text includes en: 'Link expired or invalid. Please request a new password reset link.'"
+      - "Error text includes es: 'Enlace expirado o invalido. Solicite un nuevo enlace de restablecimiento.'"
+      - "Script tag has onerror handler OR inline JS checks window.supabase before use"
+      - "CDN failure shows: pt-BR 'Erro ao carregar a pagina. Tente novamente.' (or localized)"
+    tests:
+      - type: unit
+        description: "Verify HTML contains error messages for expired/invalid tokens in 3 languages and CDN failure handler"
+    covers:
+      acceptance_criteria: []
+      edge_cases: [EC-138-01, EC-138-02, EC-138-03]
+    risks:
+      - risk: "CDN onerror may not fire in all browsers"
+        mitigation: "Double protection: onerror on script tag + check window.supabase existence before use"
+
+  # -------------------------------------------------------------------------
+  # STEP-06: F139 Edge Cases - Token error variants
+  # -------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Verify and ensure the invite-redirect page handles edge cases:
+        - EC-139-01: Token invalid (register-invited-user returns token_invalid)
+        - EC-139-02: Token already used (register-invited-user returns token_used)
+        - EC-139-03: Token expired (register-invited-user returns token_expired)
+        - EC-139-07: Registration failure ('Failed to create user')
+      Each error code maps to a specific localized error message in 3 languages.
+      These behaviors should be implemented in STEP-03 as part of the inline JS.
+      This step verifies they are present and correct.
+    files:
+      - supabase/functions/invite-redirect/index.ts
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-05"]
+    done_when:
+      - "HTML JS handles 'token_invalid' error with localized message"
+      - "pt-BR: 'Convite invalido. Solicite um novo convite ao lider da ala.'"
+      - "HTML JS handles 'token_used' error with localized message"
+      - "pt-BR: 'Este convite ja foi utilizado.'"
+      - "HTML JS handles 'token_expired' error with localized message"
+      - "pt-BR: 'Este convite expirou. Solicite um novo convite.'"
+      - "HTML JS handles 'Failed to create user' error with localized message"
+      - "pt-BR: 'Nao foi possivel criar a conta. Este email pode ja estar registrado.'"
+      - "All error messages available in en and es as well"
+    tests:
+      - type: unit
+        description: "Verify HTML contains specific error messages for each token error code (token_invalid, token_used, token_expired, create_failed) in 3 languages"
+    covers:
+      acceptance_criteria: []
+      edge_cases: [EC-139-01, EC-139-02, EC-139-03, EC-139-07]
+    risks:
+      - risk: "Error codes from register-invited-user may change"
+        mitigation: "register-invited-user is not modified (AC-139-13); error codes are stable"
+
+  # -------------------------------------------------------------------------
+  # STEP-07: Tests - Comprehensive test suite
+  # -------------------------------------------------------------------------
+  - id: STEP-07
+    description: >
+      Create test file src/__tests__/batch22-f138-f139.test.ts with comprehensive
+      tests covering both features. Tests follow the project pattern of reading
+      source files and asserting content using fs.readFileSync + expect(content).
+      Tests cover:
+
+      F138 (reset-redirect):
+        - AC-138-01: HTML serves password reset form (no deep link redirect)
+        - AC-138-02: verifyOtp called with token_hash and type
+        - AC-138-03: Client-side validation (password >= 6, passwords match)
+        - AC-138-04: updateUser called on submit
+        - AC-138-05: i18n with navigator.language detection (pt-BR, en, es)
+        - AC-138-06: Supabase JS CDN script tag
+        - AC-138-07: send-reset-email NOT modified
+        - AC-138-08: 400 for missing params
+        - AC-138-09: Success message text
+        - AC-138-10: Loading spinner state
+        - AC-138-11: CORS headers
+        - AC-138-12: Content-Type text/html charset=utf-8
+        - EC-138-01/02: Token error messages in 3 languages
+        - EC-138-03: CDN failure handling
+        - EC-138-04: Short password validation message
+        - EC-138-05: Non-matching password validation message
+
+      F139 (invite-redirect + create-invitation):
+        - AC-139-01: HTML serves invitation acceptance form
+        - AC-139-02: fetch to register-invited-user (validate-only) on load
+        - AC-139-03: Read-only fields (stake, ward, role, email)
+        - AC-139-04: Client-side validation (fullName, password, match)
+        - AC-139-05: fetch to register-invited-user (full registration) on submit
+        - AC-139-06: create-invitation generates HTTPS URL
+        - AC-139-07: i18n with navigator.language detection
+        - AC-139-08: 400 for missing token
+        - AC-139-09: Success message text
+        - AC-139-10: Role translation (bishopric, secretary, observer)
+        - AC-139-11: CORS headers
+        - AC-139-12: Content-Type text/html charset=utf-8
+        - AC-139-13: register-invited-user NOT modified
+        - EC-139-01 to EC-139-07: Error handling for all token and validation cases
+    files:
+      - src/__tests__/batch22-f138-f139.test.ts
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "src/__tests__/batch22-f138-f139.test.ts exists"
+      - "Test file imports vitest (describe, it, expect)"
+      - "Test file uses fs.readFileSync to read source files (project pattern)"
+      - "All 12 F138 ACs have at least 1 test"
+      - "All 5 F138 ECs have at least 1 test"
+      - "All 13 F139 ACs have at least 1 test"
+      - "All 7 F139 ECs have at least 1 test"
+      - "Tests pass: pnpm test -- batch22-f138-f139"
+    tests:
+      - type: unit
+        description: "Self-referential: this IS the test step"
+    covers:
+      acceptance_criteria: [AC-138-01, AC-138-02, AC-138-03, AC-138-04, AC-138-05, AC-138-06, AC-138-07, AC-138-08, AC-138-09, AC-138-10, AC-138-11, AC-138-12, AC-139-01, AC-139-02, AC-139-03, AC-139-04, AC-139-05, AC-139-06, AC-139-07, AC-139-08, AC-139-09, AC-139-10, AC-139-11, AC-139-12, AC-139-13]
+      edge_cases: [EC-138-01, EC-138-02, EC-138-03, EC-138-04, EC-138-05, EC-139-01, EC-139-02, EC-139-03, EC-139-04, EC-139-05, EC-139-06, EC-139-07]
+    risks:
+      - risk: "File path resolution may differ between test environment and runtime"
+        mitigation: "Use path.resolve(__dirname, '..', ...) consistent with existing test files"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  - ac_id: AC-138-01
+    how_to_verify: "Read reset-redirect/index.ts: HTML contains form with password inputs, no meta refresh, no deep link text 'Redirecionando para o aplicativo'"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-02
+    how_to_verify: "Read reset-redirect/index.ts: HTML JS contains supabase.auth.verifyOtp call with token_hash and type parameters"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-03
+    how_to_verify: "Read reset-redirect/index.ts: HTML JS checks password.length >= 6 and password === confirmPassword before calling updateUser"
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  - ac_id: AC-138-04
+    how_to_verify: "Read reset-redirect/index.ts: HTML JS contains supabase.auth.updateUser({ password: ... }) call"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-05
+    how_to_verify: "Read reset-redirect/index.ts: HTML JS uses navigator.language with startsWith('en'), startsWith('es'), else pt-BR"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-06
+    how_to_verify: "Read reset-redirect/index.ts: HTML contains script tag with src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-07
+    how_to_verify: "git diff on supabase/functions/send-reset-email/index.ts shows no changes"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-138-08
+    how_to_verify: "Read reset-redirect/index.ts: missing token or type returns 400 JSON with error message"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-09
+    how_to_verify: "Read reset-redirect/index.ts: success state text contains 'Senha atualizada com sucesso' (pt-BR) and equivalents"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-10
+    how_to_verify: "Read reset-redirect/index.ts: HTML contains loading spinner element shown during verifyOtp"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-11
+    how_to_verify: "Read reset-redirect/index.ts: corsHeaders with Access-Control-Allow-Origin and Allow-Headers present"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-138-12
+    how_to_verify: "Read reset-redirect/index.ts: response headers include Content-Type 'text/html; charset=utf-8' and Cache-Control"
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-139-01
+    how_to_verify: "supabase/functions/invite-redirect/index.ts exists and serves HTML page with form"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-02
+    how_to_verify: "Read invite-redirect/index.ts: HTML JS fetches register-invited-user with { token } on page load"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-03
+    how_to_verify: "Read invite-redirect/index.ts: HTML contains disabled/readonly input fields for stake, ward, role, email"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-04
+    how_to_verify: "Read invite-redirect/index.ts: HTML JS validates fullName not empty, password >= 6, passwords match"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-05
+    how_to_verify: "Read invite-redirect/index.ts: HTML JS fetches register-invited-user with { token, password, fullName } on submit"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-06
+    how_to_verify: "Read create-invitation/index.ts: deepLink contains 'invite-redirect?token=' and does not contain 'sacrmeetplan://'"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-139-07
+    how_to_verify: "Read invite-redirect/index.ts: HTML JS uses navigator.language with startsWith('en'), startsWith('es'), else pt-BR"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-08
+    how_to_verify: "Read invite-redirect/index.ts: missing token returns 400 JSON with error message"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-09
+    how_to_verify: "Read invite-redirect/index.ts: success state text contains 'Conta criada com sucesso' and equivalents"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-10
+    how_to_verify: "Read invite-redirect/index.ts: role translations (Bispado, Secretary, Observador, etc.) in i18n object"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-11
+    how_to_verify: "Read invite-redirect/index.ts: corsHeaders with Access-Control-Allow-Origin and Allow-Headers present"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-12
+    how_to_verify: "Read invite-redirect/index.ts: response headers include Content-Type 'text/html; charset=utf-8' and Cache-Control"
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-139-13
+    how_to_verify: "git diff on supabase/functions/register-invited-user/index.ts shows no changes"
+    covered_by_steps: ["STEP-07"]

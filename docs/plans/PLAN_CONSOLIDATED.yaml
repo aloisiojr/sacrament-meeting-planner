@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 25
-  last_updated_by: "batch-21-phase-2"
+  version: 26
+  last_updated_by: "batch-22-phase-1"
   total_phases: 6
-  total_cr_plans: 42
+  total_cr_plans: 43
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -816,6 +816,29 @@ cr_plans:
       S03 paralleliza com S04/S05/S06, S04+S05+S06 dependem de S01, S07 depende de S04+S05+S06,
       S10 depende de todos.
 
+  - id: PLAN_P037
+    title: "Batch 22 Phase 1: Password Reset Web Page, Invitation Acceptance Web Page"
+    status: pending
+    crs_covered: [202, 203]
+    total_steps: 7
+    plan_ref: "docs/plans/PLAN_P037.yaml"
+    summary: >
+      2 features substituindo deep links quebrados por paginas web self-contained: rewrite
+      completo da Edge Function reset-redirect para servir pagina HTML com formulario de
+      redefinicao de senha usando Supabase JS CDN (verifyOtp + updateUser) com i18n em 3
+      idiomas, loading/error/form/success states, validacao client-side (senha >= 6 chars,
+      senhas iguais) e onerror handler para CDN failure (F138). Nova Edge Function
+      invite-redirect servindo pagina HTML com formulario de aceite de convite, campos
+      read-only (estaca, ala, funcao traduzida, email) e editaveis (nome completo, senha,
+      confirmar senha), usando fetch para register-invited-user (validate-only no load,
+      registration no submit), i18n em 3 idiomas com mensagens de erro especificas por
+      codigo (token_invalid, token_used, token_expired), e atualizacao de create-invitation
+      para gerar URL HTTPS ao inves de deep link sacrmeetplan:// (F139). 2 features,
+      25 ACs, 12 ECs, 3 arquivos impactados (1 novo + 2 modificados + 1 teste), zero
+      migracoes SQL, zero dependencias novas. 2 ADRs: ADR-089 (reset page substitui
+      deep link), ADR-090 (invite page substitui deep link). S01, S03, S04 parallelizaveis,
+      S02+S05 dependem de S01, S06 depende de S03, S07 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1169,6 +1192,12 @@ pending_with_plan:
   - cr_id: 200
     plan_id: PLAN_P036
     description: "Aumentar fontSize do icone play no Home (17->20) e Agenda (14->18) com marginRight ajustado"
+  - cr_id: 202
+    plan_id: PLAN_P037
+    description: "Rewrite reset-redirect Edge Function para servir pagina web completa de redefinicao de senha"
+  - cr_id: 203
+    plan_id: PLAN_P037
+    description: "Nova Edge Function invite-redirect com pagina web de aceite de convite + create-invitation com URL HTTPS"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1190,6 +1219,10 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 26
+    phase: "batch-22-phase-1"
+    changes:
+      - "Added PLAN_P037 for Batch 22 Phase 1 (F138-F139, CRs 202/203)"
   - version: 25
     phase: "batch-21-phase-2"
     changes:

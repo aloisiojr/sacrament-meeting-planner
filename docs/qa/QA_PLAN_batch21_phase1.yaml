@@ -1,0 +1,306 @@
+# =============================================================================
+# QA_PLAN_batch21_phase1.yaml
+# QA Validation Plan for Batch 21 Phase 1 (CR-202, CR-203)
+# Created: 2026-02-22
+# =============================================================================
+
+type: qa_plan
+id: QA-batch21-phase1
+created_at: "2026-02-22"
+request_type: feature_request
+feature_or_bug: "2 web page features: password reset web page (replace deep link redirect) and invitation acceptance web page (replace deep link)"
+
+user_request: |
+  "Eu consigo ter no supabase uma pagina html so para resetar senha a aceitar convite de para entrar?
+  Pois o redirecionamento nao esta funcionando. Ele continua mostrando codigo estatico do html"
+
+  Problema: O redirecionamento atual via deep link (sacrmeetplan://) nao funciona - mostra codigo HTML
+  estatico em vez de abrir o app. Solucao: paginas web completas com formularios que resolvem tudo
+  direto no browser, sem depender de deep links.
+
+  CR-202: Pagina web de reset de senha (substituir reset-redirect por pagina com formulario)
+  CR-203: Pagina web de aceitar convite (pagina com formulario de registro)
+
+# =============================================================================
+# Baseline: Estado atual do sistema antes do desenvolvimento
+# =============================================================================
+
+baseline:
+  description: |
+    Batch 21 Phase 1 - 2 web page features to replace broken deep link flows.
+    Current state of each area:
+
+    CR-202 (Password Reset Web Page - replace reset-redirect):
+    - Edge Function: supabase/functions/reset-redirect/index.ts
+      - Receives token + type via query params
+      - Renders HTML page with meta http-equiv="refresh" pointing to sacrmeetplan://reset-password?token=...&type=...
+      - Also has a manual "Abrir no aplicativo" button link to the same deep link
+      - Problem: Deep link sacrmeetplan:// does not work in browsers -> user sees static HTML saying
+        "Redirecionando para o aplicativo..." but nothing happens. The page cannot redirect to the app.
+    - Edge Function: supabase/functions/send-reset-email/index.ts
+      - Generates recovery token via supabase.auth.admin.generateLink({ type: 'recovery' })
+      - Builds link: https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery
+      - Sends email via Resend API with this link as CTA button
+    - App screen: src/app/(auth)/reset-password.tsx
+      - React Native screen that handles the actual password reset
+      - Calls supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' }) to verify token
+      - Then calls supabase.auth.updateUser({ password }) to set new password
+      - This screen works IF the deep link opens the app (which it does not)
+    - The solution (CR-202) must: replace the redirect page with a full web form that calls
+      verifyOtp + updateUser directly from the browser page, without needing the app at all.
+
+    CR-203 (Invitation Acceptance Web Page):
+    - Edge Function: supabase/functions/create-invitation/index.ts
+      - Creates invitation in DB with token (crypto.randomUUID())
+      - Returns deep link: sacrmeetplan://invite/${invitationToken}
+      - This deep link is shared (e.g., via WhatsApp) with the invited user
+      - Problem: Deep link sacrmeetplan:// does not open the app from mobile browsers or desktop
+    - Edge Function: supabase/functions/register-invited-user/index.ts
+      - Validates invitation token (checks existence, expiry, used_at)
+      - If only token sent: returns invitation data (email, role, ward, stake)
+      - If token + password + fullName sent: creates user, marks invitation used, signs in
+    - App screen: src/app/(auth)/invite/[token].tsx
+      - React Native screen for invitation acceptance
+      - Validates token on mount, shows ward/stake/role/email info
+      - Form: fullName + password + confirmPassword
+      - Calls register-invited-user Edge Function
+      - This screen works IF the deep link opens the app (which it does not)
+    - The solution (CR-203) must: create a new Edge Function with a web page form that validates
+      the invitation token and registers the user entirely in the browser, calling
+      register-invited-user from the page's JavaScript.
+
+  evidence:
+    - "reset-redirect/index.ts:42 -> deepLink = sacrmeetplan://reset-password?token=${token}&type=${type}"
+    - "reset-redirect/index.ts:49 -> meta http-equiv='refresh' content='0;url=${deepLink}' (auto-redirect to deep link)"
+    - "reset-redirect/index.ts:90 -> <a href='${deepLink}' class='button'>Abrir no aplicativo</a>"
+    - "send-reset-email/index.ts:200 -> link points to https://.../functions/v1/reset-redirect?token=...&type=recovery"
+    - "create-invitation/index.ts:171 -> deepLink = sacrmeetplan://invite/${invitationToken}"
+    - "register-invited-user/index.ts:38 -> if token only: validation mode. if token+password: registration mode"
+    - "reset-password.tsx:37 -> supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' })"
+    - "reset-password.tsx:91 -> supabase.auth.updateUser({ password })"
+    - "invite/[token].tsx:51 -> calls register-invited-user with { token } for validation"
+    - "invite/[token].tsx:95 -> calls register-invited-user with { token, password, fullName } for registration"
+    - "app.json:10 -> scheme: sacrmeetplan (this scheme does not work outside the app)"
+
+# =============================================================================
+# Validation Checks (executados no POST)
+# =============================================================================
+
+validation_checks:
+
+  # ---------------------------------------------------------------------------
+  # CR-202: Password Reset Web Page
+  # ---------------------------------------------------------------------------
+  - id: VC-202-01
+    description: "reset-redirect Edge Function now returns a full HTML page with a password reset form (not a redirect)"
+    type: functional
+    how_to_verify: "Read supabase/functions/reset-redirect/index.ts (or replacement function) and verify it returns HTML with form inputs for new password and confirm password, plus a submit button"
+    expected_result: "HTML contains: password input field, confirm password input field, and a submit button. No meta http-equiv='refresh' redirect to sacrmeetplan://. No deep link references in auto-redirect"
+    priority: must_pass
+
+  - id: VC-202-02
+    description: "Password reset web page uses Supabase JS client to verify the recovery token"
+    type: functional
+    how_to_verify: "Read the Edge Function HTML and verify the embedded JavaScript calls Supabase verifyOtp with the token_hash from query params"
+    expected_result: "JavaScript in the page: creates Supabase client with anon key, calls supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' }) to establish a session before allowing password update"
+    priority: must_pass
+
+  - id: VC-202-03
+    description: "Password reset web page calls updateUser to set the new password"
+    type: functional
+    how_to_verify: "Read the Edge Function HTML JavaScript and verify it calls supabase.auth.updateUser({ password }) after verifyOtp succeeds"
+    expected_result: "After verifyOtp establishes session, the form submit handler calls supabase.auth.updateUser({ password: newPassword }) to actually change the password"
+    priority: must_pass
+
+  - id: VC-202-04
+    description: "Password reset page validates password match and minimum length"
+    type: functional
+    how_to_verify: "Read the JavaScript in the HTML and verify client-side validation: password length >= 6, password === confirmPassword"
+    expected_result: "JavaScript validates: (1) password length >= 6 characters, (2) password matches confirmPassword. Shows error message if validation fails"
+    priority: must_pass
+
+  - id: VC-202-05
+    description: "Password reset page shows success message after password update"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify it shows a success state/message after updateUser resolves without error"
+    expected_result: "After successful password update, page shows a success message (e.g., 'Senha atualizada com sucesso'). Form is hidden or disabled"
+    priority: must_pass
+
+  - id: VC-202-06
+    description: "Password reset page shows error for invalid/expired token"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify it handles verifyOtp error (expired/invalid token) by showing an error message"
+    expected_result: "If verifyOtp fails, page shows an error message indicating the link is expired or invalid. No form is shown or form is disabled"
+    priority: must_pass
+
+  - id: VC-202-07
+    description: "Password reset page receives token and type from query parameters"
+    type: functional
+    how_to_verify: "Read the Edge Function and verify it extracts token and type from URL search params and passes them to the HTML/JS"
+    expected_result: "Edge Function still reads token and type from req.url searchParams. These values are embedded in the HTML page for the JavaScript to use"
+    priority: must_pass
+
+  - id: VC-202-08
+    description: "send-reset-email still sends link to the correct Edge Function URL"
+    type: regression
+    how_to_verify: "Read send-reset-email/index.ts and verify the deepLink URL still points to the reset-redirect (or replacement) Edge Function with token and type params"
+    expected_result: "send-reset-email builds URL as https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery (or updated function name if renamed). The email link is NOT broken"
+    priority: must_pass
+
+  - id: VC-202-09
+    description: "Password reset page has proper Content-Type and renders as HTML (not plain text)"
+    type: functional
+    how_to_verify: "Read Edge Function and verify Response headers include Content-Type: text/html; charset=utf-8"
+    expected_result: "Response has Content-Type: text/html; charset=utf-8. HTML renders correctly in browser, not as raw text"
+    priority: must_pass
+
+  - id: VC-202-10
+    description: "Password reset page is responsive and mobile-friendly"
+    type: behavioral
+    how_to_verify: "Read HTML and verify viewport meta tag is present and form elements have appropriate CSS for mobile devices"
+    expected_result: "HTML has <meta name='viewport' content='width=device-width, initial-scale=1.0'>. Form has CSS that makes it usable on mobile screens (max-width, padding, readable font sizes)"
+    priority: should_pass
+
+  - id: VC-202-11
+    description: "Password reset page includes Supabase JS client library via CDN"
+    type: functional
+    how_to_verify: "Read HTML and verify it includes a script tag loading @supabase/supabase-js from a CDN (e.g., unpkg, jsdelivr, or esm.sh)"
+    expected_result: "HTML has a <script> tag that loads the Supabase JS client library. The client is initialized with the project URL and anon key"
+    priority: must_pass
+
+  - id: VC-202-12
+    description: "No deep link (sacrmeetplan://) references remain in the reset-redirect function"
+    type: functional
+    how_to_verify: "Search for 'sacrmeetplan://' in the reset-redirect Edge Function source"
+    expected_result: "No occurrences of sacrmeetplan:// in the reset-redirect/index.ts (or replacement). Deep link redirect is fully replaced by the web form"
+    priority: must_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-203: Invitation Acceptance Web Page
+  # ---------------------------------------------------------------------------
+  - id: VC-203-01
+    description: "New Edge Function exists for invitation acceptance web page"
+    type: functional
+    how_to_verify: "Check for a new Edge Function directory (e.g., supabase/functions/invite-page/ or similar) with an index.ts file that returns HTML"
+    expected_result: "A new Edge Function exists that serves an HTML page for invitation acceptance. The function name is discoverable from the codebase"
+    priority: must_pass
+
+  - id: VC-203-02
+    description: "Invitation web page has a registration form with fullName, password, confirmPassword fields"
+    type: functional
+    how_to_verify: "Read the new Edge Function and verify the HTML contains input fields for fullName, password, and confirmPassword"
+    expected_result: "HTML form has: (1) fullName text input, (2) password input (type=password), (3) confirmPassword input (type=password), (4) submit button"
+    priority: must_pass
+
+  - id: VC-203-03
+    description: "Invitation web page validates token on load and shows invitation details"
+    type: functional
+    how_to_verify: "Read the JavaScript in the HTML and verify it calls register-invited-user with { token } on page load to validate and show invitation data (email, role, ward, stake)"
+    expected_result: "Page JavaScript: on load, calls the register-invited-user Edge Function with just the token. On success, displays the invitation email, role, ward name, and stake name as read-only info"
+    priority: must_pass
+
+  - id: VC-203-04
+    description: "Invitation web page calls register-invited-user to register the user on form submit"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify the form submit handler calls register-invited-user with { token, password, fullName }"
+    expected_result: "On form submit, JavaScript calls the register-invited-user Edge Function with token, password, and fullName. Handles success (user created) and error responses"
+    priority: must_pass
+
+  - id: VC-203-05
+    description: "Invitation web page validates form inputs before submission"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify client-side validation: fullName not empty, password >= 6 chars, password === confirmPassword"
+    expected_result: "JavaScript validates: (1) fullName is not empty/whitespace, (2) password >= 6 characters, (3) password === confirmPassword. Shows error messages for validation failures"
+    priority: must_pass
+
+  - id: VC-203-06
+    description: "Invitation web page shows error states for invalid/used/expired tokens"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify it handles token_invalid, token_used, token_expired error responses from register-invited-user"
+    expected_result: "Page shows appropriate error messages: invalid token, already used token, expired token. No registration form is shown when token is invalid/used/expired"
+    priority: must_pass
+
+  - id: VC-203-07
+    description: "Invitation web page shows success message after registration"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify it shows a success state after register-invited-user returns successfully"
+    expected_result: "After successful registration, page shows success message (e.g., 'Conta criada com sucesso'). Form is hidden or disabled. May show instruction to open the app"
+    priority: must_pass
+
+  - id: VC-203-08
+    description: "Invitation web page receives token from URL path or query parameter"
+    type: functional
+    how_to_verify: "Read the Edge Function and verify it extracts the invitation token from the URL (path segment or query param)"
+    expected_result: "Edge Function extracts invitation token from the URL. The token is passed to the HTML JavaScript for API calls"
+    priority: must_pass
+
+  - id: VC-203-09
+    description: "create-invitation returns the web page URL instead of (or in addition to) the deep link"
+    type: functional
+    how_to_verify: "Read create-invitation/index.ts and verify the deepLink now points to the new web page URL instead of sacrmeetplan://invite/${token}"
+    expected_result: "create-invitation returns a URL like https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/invite-page?token=${token} (or similar). The deep link sacrmeetplan://invite/ is replaced or supplemented with the web URL"
+    priority: must_pass
+
+  - id: VC-203-10
+    description: "Invitation web page has proper Content-Type and renders as HTML"
+    type: functional
+    how_to_verify: "Read the Edge Function and verify Response headers include Content-Type: text/html; charset=utf-8"
+    expected_result: "Response has Content-Type: text/html; charset=utf-8. Page renders correctly in browser"
+    priority: must_pass
+
+  - id: VC-203-11
+    description: "Invitation web page is responsive and mobile-friendly"
+    type: behavioral
+    how_to_verify: "Read HTML and verify viewport meta tag and mobile-friendly CSS"
+    expected_result: "HTML has viewport meta tag and responsive CSS for mobile usage"
+    priority: should_pass
+
+  - id: VC-203-12
+    description: "Invitation web page uses the correct Supabase Edge Function URL for API calls"
+    type: functional
+    how_to_verify: "Read the JavaScript and verify it calls the register-invited-user function via the correct Supabase URL"
+    expected_result: "JavaScript calls https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/register-invited-user (or uses a relative path) for both token validation and registration"
+    priority: must_pass
+
+  - id: VC-203-13
+    description: "register-invited-user Edge Function remains unchanged (backward compatible)"
+    type: regression
+    how_to_verify: "Read register-invited-user/index.ts and verify it has not been modified (or only minimally modified to support CORS from the web page)"
+    expected_result: "register-invited-user API contract is unchanged: token-only request returns invitation data, token+password+fullName creates user. App screens that call it still work"
+    priority: must_pass
+
+  # ---------------------------------------------------------------------------
+  # General Regression
+  # ---------------------------------------------------------------------------
+  - id: VC-REG-01
+    description: "All existing tests still pass after changes"
+    type: regression
+    how_to_verify: "Run npx vitest run and verify all tests pass"
+    expected_result: "All existing tests pass (5100+ tests expected)"
+    priority: must_pass
+
+  - id: VC-REG-02
+    description: "TypeScript compilation has no new errors"
+    type: regression
+    how_to_verify: "Run npx tsc --noEmit and check for errors"
+    expected_result: "No new TypeScript errors introduced by the changes"
+    priority: must_pass
+
+  - id: VC-REG-03
+    description: "App screens (reset-password.tsx and invite/[token].tsx) still exist and function"
+    type: regression
+    how_to_verify: "Verify src/app/(auth)/reset-password.tsx and src/app/(auth)/invite/[token].tsx are not deleted or broken"
+    expected_result: "App screens remain intact. They may or may not be used going forward, but they should not be deleted (they may still work for users who have the app installed and deep links work)"
+    priority: should_pass
+
+# =============================================================================
+# Pass criteria
+# =============================================================================
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.
+  Total must_pass: 23
+  Total should_pass: 4
+  Total: 27

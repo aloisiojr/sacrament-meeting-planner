@@ -1,0 +1,321 @@
+# =============================================================================
+# ARCH_M037.yaml
+# Architecture for Batch 22 Phase 1: F138, F139
+# CR-202 (Password Reset Web Page), CR-203 (Invitation Acceptance Web Page)
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Replace broken deep link redirects with self-contained web pages for password reset (F138) and invitation acceptance (F139)"
+  principles:
+    - "Self-contained HTML pages: inline CSS + inline JS, no external CSS frameworks"
+    - "Reuse existing Edge Function endpoints where possible (reset-redirect rewritten in place)"
+    - "No changes to app-side screens (reset-password.tsx, invite/[token].tsx remain as fallbacks)"
+    - "Multilingual: detect navigator.language, support pt-BR (default), en, es"
+    - "Public values only embedded in HTML (Supabase URL + anon key, same as mobile app client-side)"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F138 (Password Reset Web Page):
+    Email -> [reset-redirect EF] -> HTML page (Supabase JS CDN)
+    HTML page: verifyOtp(token) -> show form -> updateUser(password) -> success
+
+  F139 (Invitation Acceptance Web Page):
+    [create-invitation EF] -> HTTPS URL (was deep link)
+    Shared link -> [invite-redirect EF] -> HTML page (fetch)
+    HTML page: fetch(register-invited-user, {token}) -> show form
+             -> fetch(register-invited-user, {token,password,fullName}) -> success
+
+  Unchanged:
+    send-reset-email (no changes)
+    register-invited-user (no changes)
+    reset-password.tsx (app fallback, no changes)
+    invite/[token].tsx (app fallback, no changes)
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "ResetRedirectEF"
+    responsibility: "Serve self-contained HTML page with password reset form using Supabase JS client"
+    dependencies: ["Supabase Auth (via CDN JS client in browser)"]
+    changes:
+      - "Complete rewrite of supabase/functions/reset-redirect/index.ts"
+      - "Remove meta refresh redirect and deep link approach"
+      - "Serve HTML with inline CSS + inline JS that loads @supabase/supabase-js@2 from CDN"
+      - "HTML JS: verifyOtp({ token_hash, type: 'recovery' }) on page load"
+      - "HTML JS: updateUser({ password }) on form submit"
+      - "Embed SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env into HTML template"
+      - "i18n: detect navigator.language, inline translations for pt-BR, en, es"
+      - "States: loading (spinner) -> error | form -> success"
+      - "Client-side validation: password >= 6 chars, passwords match"
+      - "CORS headers and 400 for missing params preserved from current implementation"
+
+  - name: "InviteRedirectEF"
+    responsibility: "Serve self-contained HTML page with invitation acceptance form using fetch to register-invited-user"
+    dependencies: ["RegisterInvitedUserEF (via fetch from browser)"]
+    changes:
+      - "New file: supabase/functions/invite-redirect/index.ts"
+      - "GET endpoint: reads token query param, serves HTML page"
+      - "HTML JS: fetch register-invited-user with { token } (validate-only mode) on page load"
+      - "HTML JS: display read-only fields (stake, ward, role, email) from validation response"
+      - "HTML JS: fetch register-invited-user with { token, password, fullName } on form submit"
+      - "Embed SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env for building fetch URL + auth header"
+      - "i18n: detect navigator.language, inline translations for pt-BR, en, es"
+      - "States: loading (spinner) -> error | form -> success"
+      - "Client-side validation: fullName not empty, password >= 6 chars, passwords match"
+      - "Role translation in i18n: bishopric/secretary/observer -> localized labels"
+      - "CORS headers, 400 for missing token param"
+
+  - name: "CreateInvitationEF"
+    responsibility: "Create invitation with HTTPS URL instead of deep link"
+    dependencies: ["Supabase Admin Client"]
+    changes:
+      - "Change deepLink from 'sacrmeetplan://invite/<token>' to HTTPS URL"
+      - "HTTPS URL: https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>"
+      - "Read SUPABASE_URL from Deno.env to build the invite-redirect URL"
+      - "All other logic (auth, validation, actor creation) unchanged"
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "reset_redirect_http"
+    component: "ResetRedirectEF"
+    methods:
+      - name: "OPTIONS"
+        input: "preflight request"
+        output: "200 'ok' with CORS headers"
+      - name: "GET with token+type"
+        input: "GET ?token=<hash>&type=recovery"
+        output: "200 text/html; charset=utf-8 with self-contained password reset page"
+      - name: "GET missing params"
+        input: "GET without token or type"
+        output: "400 JSON { error: 'Missing required parameters: token and type' }"
+
+  - name: "reset_page_browser_flow"
+    component: "ResetRedirectEF (HTML JS)"
+    methods:
+      - name: "onLoad"
+        input: "token and type from URL query params"
+        output: "calls supabase.auth.verifyOtp({ token_hash: token, type: 'recovery' }). Success -> show form. Error -> show localized error message."
+      - name: "onSubmit"
+        input: "{ password, confirmPassword } from form fields"
+        output: "validates password >= 6 chars + match. calls supabase.auth.updateUser({ password }). Success -> show success message. Error -> show localized error."
+
+  - name: "invite_redirect_http"
+    component: "InviteRedirectEF"
+    methods:
+      - name: "OPTIONS"
+        input: "preflight request"
+        output: "200 'ok' with CORS headers"
+      - name: "GET with token"
+        input: "GET ?token=<uuid>"
+        output: "200 text/html; charset=utf-8 with self-contained invitation acceptance page"
+      - name: "GET missing token"
+        input: "GET without token"
+        output: "400 JSON { error: 'Missing required parameter: token' }"
+
+  - name: "invite_page_browser_flow"
+    component: "InviteRedirectEF (HTML JS)"
+    methods:
+      - name: "onLoad"
+        input: "token from URL query param"
+        output: "fetch POST register-invited-user with { token } (validate-only). Success -> populate read-only fields + show registration form. Error -> show localized error (token_invalid, token_used, token_expired)."
+      - name: "onSubmit"
+        input: "{ token, fullName, password, confirmPassword } from form fields"
+        output: "validates fullName not empty, password >= 6, passwords match. fetch POST register-invited-user with { token, password, fullName }. Status 201 -> success message. Error -> localized error."
+
+  - name: "create_invitation_deeplink_change"
+    component: "CreateInvitationEF"
+    methods:
+      - name: "buildDeepLink"
+        input: "invitationToken (UUID)"
+        output: "was: 'sacrmeetplan://invite/<token>'. now: 'https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>'"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No data model changes. No new tables, no schema changes. Both features operate on existing invitations table and Supabase Auth."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    - Supabase URL and anon key embedded in HTML are public values (same as mobile app client-side).
+      Row-Level Security (RLS) protects all data. Anon key only grants access through RLS policies.
+    - reset-redirect: verifyOtp is called client-side. The token_hash is a one-time recovery token
+      generated by Supabase Auth. It can only be used once and expires. No server-side token
+      storage needed in the Edge Function.
+    - invite-redirect: register-invited-user is called via fetch with the Supabase anon key in
+      the apikey header. The function does its own token validation (lookup, used_at check,
+      expiry check). No JWT required for validate-only or registration calls.
+    - Both pages use HTTPS (served by Supabase Edge Functions). No sensitive data in URL
+      beyond the token (which is required for the flow to work).
+    - Cache-Control: no-cache, no-store, must-revalidate prevents intermediary caching.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - reset-redirect: console.log on verifyOtp redirect (existing pattern, updated for new flow).
+    - invite-redirect: console.log on token validation and registration attempts.
+    - No new server-side logging beyond Edge Function console output (Supabase dashboard logs).
+    - Client-side errors shown to user via localized messages in the HTML page.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-089
+    title: "Replace deep link redirect with self-contained password reset web page"
+    context: >
+      reset-redirect Edge Function serves HTML with meta refresh redirect to
+      sacrmeetplan://reset-password deep link. This deep link does not work: browsers
+      cannot handle custom URL schemes, and the user sees raw HTML with
+      'Redirecionando para o aplicativo...' text instead of being able to reset
+      their password. Multiple iterations (CR-176, CR-191, CR-198) tried to fix
+      the redirect approach but the fundamental problem remains: deep links from
+      browser to app are unreliable.
+    decision: >
+      Rewrite reset-redirect to serve a complete password reset web page. The page
+      loads Supabase JS from CDN, calls verifyOtp with the token, and provides a
+      form to set a new password via updateUser. No deep link needed. No app
+      interaction required. The existing endpoint URL is preserved so old reset
+      emails continue to work.
+    consequences:
+      - "Password reset works reliably in all browsers without app installation"
+      - "Dependency on CDN (jsdelivr) for Supabase JS client; onerror fallback handles CDN failure"
+      - "App reset-password.tsx screen remains as unused fallback (no code removed)"
+
+  - id: ADR-090
+    title: "New invite-redirect Edge Function replaces deep link for invitation acceptance"
+    context: >
+      create-invitation returns a sacrmeetplan://invite/<token> deep link that does
+      not work in practice. Invited users receive the link via WhatsApp/email, but
+      clicking it does nothing because the app is not installed and browsers cannot
+      handle custom URL schemes from external apps.
+    decision: >
+      Create new invite-redirect Edge Function serving a self-contained HTML page
+      with invitation acceptance form. The page calls register-invited-user via
+      fetch (same API contract, no changes to that EF). create-invitation is
+      updated to return an HTTPS URL (https://.../invite-redirect?token=<uuid>)
+      instead of the sacrmeetplan:// deep link. Unlike reset-redirect (which uses
+      Supabase JS CDN for auth operations), invite-redirect uses plain fetch since
+      it only needs to call the existing register-invited-user Edge Function.
+    consequences:
+      - "Invitation acceptance works reliably in all browsers without app installation"
+      - "Old deep links (sacrmeetplan://invite/<token>) stop working for new invitations, but they never worked properly anyway"
+      - "App invite/[token].tsx screen remains as unused fallback (no code removed)"
+      - "create-invitation response deepLink field changes from custom scheme to HTTPS URL"
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: supabase/functions/reset-redirect/index.ts
+    feature: F138
+    changes:
+      - "Complete rewrite: remove meta refresh + deep link redirect"
+      - "Serve self-contained HTML with password reset form"
+      - "Load Supabase JS from CDN (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)"
+      - "Embed SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env into HTML"
+      - "Inline JS: verifyOtp on load, updateUser on submit"
+      - "Inline CSS: centered card (max-width 400px), primary #4F46E5, bg #f5f5f5"
+      - "Inline i18n: pt-BR/en/es translations for all labels and messages"
+      - "States: loading spinner, error, form (2 password fields), success"
+      - "Client-side validation: password >= 6 chars, passwords match"
+      - "onerror handler on CDN script tag for CDN failure fallback"
+
+  - file: supabase/functions/invite-redirect/index.ts (NEW)
+    feature: F139
+    changes:
+      - "New Edge Function: GET endpoint serving HTML invitation acceptance page"
+      - "Embed SUPABASE_URL and SUPABASE_ANON_KEY from Deno.env for building fetch URL + apikey header"
+      - "Inline JS: fetch register-invited-user (validate-only) on load"
+      - "Inline JS: fetch register-invited-user (full registration) on submit"
+      - "Inline CSS: centered card (max-width 400px), primary #4F46E5, bg #f5f5f5 (same as F138)"
+      - "Inline i18n: pt-BR/en/es translations for all labels and messages"
+      - "Read-only fields: stake, ward, role (translated), email"
+      - "Editable fields: fullName, password, confirmPassword"
+      - "States: loading spinner, error, form, success"
+      - "Client-side validation: fullName not empty, password >= 6 chars, passwords match"
+      - "Role translation: bishopric->Bispado/Bishopric/Obispado, secretary->Secretario/Secretary/Secretario, observer->Observador/Observer/Observador"
+
+  - file: supabase/functions/create-invitation/index.ts
+    feature: F139
+    changes:
+      - "Change deepLink from 'sacrmeetplan://invite/<token>' to HTTPS URL"
+      - "Build URL: `${Deno.env.get('SUPABASE_URL')}/functions/v1/invite-redirect?token=${invitationToken}`"
+      - "Line ~171: replace deep link construction"
+
+files_not_modified:
+  - supabase/functions/send-reset-email/index.ts
+  - supabase/functions/register-invited-user/index.ts
+  - src/app/(auth)/reset-password.tsx
+  - src/app/(auth)/invite/[token].tsx
+
+# =============================================================================
+# SHARED PATTERNS BETWEEN F138 AND F139
+# =============================================================================
+
+shared_patterns:
+  html_structure:
+    - "<!DOCTYPE html><html lang='pt-BR'> with charset UTF-8 and viewport meta"
+    - "Centered card layout: max-width 400px, margin auto, padding 24px"
+    - "App title 'Planejador de Reuniao Sacramental' as h1"
+    - "Styling: primary #4F46E5, bg #f5f5f5, card bg #fff, border-radius 8px"
+    - "States managed by showing/hiding div elements (display:none vs display:block)"
+
+  i18n_pattern:
+    - "const lang = navigator.language || 'pt-BR'"
+    - "if (lang.startsWith('en')) -> English translations"
+    - "if (lang.startsWith('es')) -> Spanish translations"
+    - "else -> pt-BR translations (default)"
+    - "All text (labels, placeholders, buttons, messages) from i18n object"
+
+  error_handling:
+    - "Server errors: display localized message from i18n object"
+    - "Client validation errors: display localized message, prevent API call"
+    - "Network errors: generic localized error message"
+
+  response_headers:
+    - "Content-Type: text/html; charset=utf-8"
+    - "Cache-Control: no-cache, no-store, must-revalidate"
+    - "CORS headers: Access-Control-Allow-Origin: *, Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true   # Read ARCH_CONSOLIDATED before starting
+  GATE-02_single_responsibility: true    # ResetRedirectEF serves reset page, InviteRedirectEF serves invite page, CreateInvitationEF creates invitations
+  GATE-03_contracts_defined: true        # HTTP contracts + browser flow contracts defined for all integrations
+  GATE-04_adrs_recorded: true           # ADR-089 (reset page), ADR-090 (invite page)
+  GATE-05_arch_saved: true              # ARCH_M037.yaml saved to disk
+  GATE-06_arch_consolidated_updated: true # Will update ARCH_CONSOLIDATED
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 3 components, well under 10 limit

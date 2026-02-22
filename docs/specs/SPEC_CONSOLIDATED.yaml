@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 110
-  total_change_requests: 176
+  total_features: 116
+  total_change_requests: 182
   implemented_crs: 96
-  pending_crs: 78
+  pending_crs: 84
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -62,6 +62,7 @@ metadata:
     - docs/specs/SPEC_F110_F112.yaml
     - docs/specs/SPEC_F113_F115.yaml
     - docs/specs/SPEC_F116_F119.yaml
+    - docs/specs/SPEC_F120_F125.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2195,8 +2196,118 @@ features:
       - "7 acceptance criteria, 3 edge cases"
       - "1 arquivo impactado (reset-redirect/index.ts)"
 
+  # ---------------------------------------------------------------------------
+  # Batch 19 Phase 2 (F120-F125): Card UI/UX, label renames, push notifications
+  # ---------------------------------------------------------------------------
+
+  - id: F120
+    name: "X button to clear non-free-text, non-switch fields in Agenda card"
+    status: pending
+    rfs: []
+    description: >
+      Adicionar botao X a todos os campos de selecao (atores, hinos, oracoes,
+      reconhecendo) no AgendaForm para limpar valor atual. X visivel quando campo
+      tem valor e usuario nao e Observer. Sem dialogo de confirmacao. Campos de
+      texto livre e switches nao afetados.
+    modified_by_crs: [179]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-179: X button para limpar campos de selecao na agenda"
+      - "10 acceptance criteria"
+      - "Afeta SelectorField e AgendaForm.tsx"
+      - "Campos afetados: presidir, dirigir, reconhecendo, pianista, regente, hinos (4), oracoes (2)"
+      - "Nao afeta DebouncedTextInput, Switch, nem SpeakerField"
+
+  - id: F121
+    name: "Remove speech editing from Agenda card; navigate to Speeches tab"
+    status: pending
+    rfs: []
+    description: >
+      Remover edicao de discursos (SpeakerField com override) do card de agenda.
+      Campos mostram nome do discursante como read-only. Botao com icone de lapis
+      a direita de cada campo navega para aba Discursos com card do domingo expandido.
+      Override DB fields permanecem (Presentation Mode ainda usa). Supersede
+      SpeakerField editing do F044 no AgendaForm.
+    modified_by_crs: [182]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-182: Remover edicao de discursos do card de agenda"
+      - "8 acceptance criteria, 3 edge cases"
+      - "Supersede SpeakerField editing do F044 no AgendaForm"
+      - "Pencil button navega para Speeches tab com expandDate param"
+      - "Observer nao ve pencil button"
+
+  - id: F122
+    name: "Rename 'Proximas Designacoes' to 'Proximos Discursos' in all languages"
+    status: pending
+    rfs: []
+    description: >
+      Trocar texto da secao 'Proximas Designacoes' na Home para 'Proximos
+      Discursos' em todos os 3 idiomas. Key i18n home.nextAssignments permanece
+      (apenas o valor muda). pt-BR: 'Proximos Discursos', en: 'Upcoming Speeches',
+      es: 'Proximos Discursos'.
+    modified_by_crs: [183]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-183: Renomear secao na Home"
+      - "4 acceptance criteria"
+      - "3 arquivos modificados (somente locales JSON)"
+      - "Nenhuma alteracao de codigo TypeScript"
+
+  - id: F123
+    name: "Rename tab 'Agenda' to 'Agendas' in all languages"
+    status: pending
+    rfs: []
+    description: >
+      Trocar nome da aba 'Agenda' para 'Agendas' em todos os 3 idiomas. Afeta
+      tabs.agenda e agenda.title nos 3 locales. 'Agendas' e a mesma palavra
+      nos 3 idiomas (plural).
+    modified_by_crs: [187]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-187: Renomear aba Agenda para Agendas"
+      - "4 acceptance criteria"
+      - "3 arquivos modificados (somente locales JSON)"
+      - "Nenhuma alteracao de codigo TypeScript"
+
+  - id: F124
+    name: "Fix alignment of X clear buttons in SpeechSlot"
+    status: pending
+    rfs: []
+    description: >
+      Corrigir alinhamento dos icones X no SpeechSlot. Centro do icone X do
+      speaker deve alinhar horizontalmente com centro do campo de selecao do
+      discursante. Centro do X do tema deve alinhar com centro do campo de tema.
+      Causa: statusLedPlaceholder no rightColumn cria offset vertical.
+    modified_by_crs: [189]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-189: Alinhamento dos icones X no card de discursos"
+      - "6 acceptance criteria, 2 edge cases"
+      - "1 arquivo modificado (SpeechSlot.tsx)"
+      - "Deve ser compativel com F115/CR-177 layout"
+
+  - id: F125
+    name: "Fix push notifications not working (projectId undefined)"
+    status: pending
+    rfs: []
+    description: >
+      Push notifications nao funcionam porque useNotifications.ts passa
+      projectId: undefined para getExpoPushTokenAsync. O correto e usar
+      Constants.expoConfig?.extra?.eas?.projectId (valor:
+      '6ce6536e-08c4-4c3a-ac06-f1c224e43dbd' do app.json). Fix client-side
+      apenas. Server-side Edge Function esta correta.
+    modified_by_crs: [192]
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    notes:
+      - "CR-192: Bug critico - push notifications nao funcionam"
+      - "7 acceptance criteria, 3 edge cases"
+      - "1 arquivo modificado (useNotifications.ts)"
+      - "Root cause: projectId: undefined no getExpoPushTokenAsync"
+      - "Fix: importar Constants e passar projectId correto"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (78 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19)
+# PENDING CHANGE REQUESTS (84 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19)
 # =============================================================================
 
 pending_crs:
@@ -3859,6 +3970,134 @@ pending_crs:
     files_likely_impacted:
       - supabase/functions/reset-redirect/index.ts
 
+  # --- Batch 19 Phase 2 (Card UI/UX, Label Renames, Push Notifications Bug) ---
+
+  - id: 179
+    type: feature
+    area: "AgendaForm (F012, F013, F014, F015)"
+    feature_id: F120
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: [26, 73, 114, 128]
+    description: >
+      Adicionar botao X a todos os campos de selecao (atores, hinos, oracoes,
+      reconhecendo) no AgendaForm para limpar valor atual. X visivel quando campo
+      tem valor e usuario nao e Observer. Sem dialogo de confirmacao.
+    acceptance_criteria:
+      - "X visible on actor fields (preside, conduct, pianist, conductor) when value set"
+      - "X visible on hymn fields (opening, sacrament, intermediate, closing) when hymn selected"
+      - "X visible on prayer fields (opening, closing) when prayer name set"
+      - "X visible on recognizing field when names selected"
+      - "X NOT visible when field is empty"
+      - "X NOT visible for Observer role"
+      - "No confirmation dialog on clear"
+      - "Auto-save triggered after clear via updateField()"
+      - "Free-text, switch, and SpeakerField NOT affected"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+
+  - id: 182
+    type: feature
+    area: "AgendaForm (F012, F008, F044)"
+    feature_id: F121
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: [31, 100]
+    description: >
+      Remover edicao de discursos (SpeakerField com override) do card de agenda.
+      Campos mostram nome do discursante como read-only. Botao lapis a direita
+      navega para aba Discursos com card do domingo expandido. Supersede
+      SpeakerField editing do F044 no AgendaForm.
+    acceptance_criteria:
+      - "Speaker names shown as read-only in Agenda card"
+      - "Pencil button visible next to each speaker field"
+      - "Pencil button navigates to Speeches tab with card expanded"
+      - "Speaker override editing removed from Agenda UI"
+      - "Position 2 hidden when has_second_speech=false"
+      - "Empty state shows placeholder text"
+      - "Presentation Mode still uses overrides (unchanged)"
+      - "Observer sees read-only fields without pencil button"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+      - src/app/(tabs)/speeches.tsx
+
+  - id: 183
+    type: ui_text_change
+    area: "Home Tab (F009)"
+    feature_id: F122
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: []
+    description: >
+      Trocar texto 'Proximas Designacoes' para 'Proximos Discursos' na Home
+      em todos os 3 idiomas. Key i18n home.nextAssignments permanece (valor muda).
+    acceptance_criteria:
+      - "pt-BR: 'Proximos Discursos'"
+      - "en: 'Upcoming Speeches'"
+      - "es: 'Proximos Discursos'"
+      - "NextSundaysSection also updated (uses same i18n key)"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 187
+    type: ui_text_change
+    area: "Agenda Tab (F012)"
+    feature_id: F123
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: []
+    description: >
+      Trocar nome da aba 'Agenda' para 'Agendas' em todos os 3 idiomas.
+      Afeta tabs.agenda e agenda.title nos 3 locales.
+    acceptance_criteria:
+      - "Tab label shows 'Agendas' in pt-BR"
+      - "Tab label shows 'Agendas' in en"
+      - "Tab label shows 'Agendas' in es"
+      - "Screen title updated to 'Agendas'"
+    files_likely_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 189
+    type: bug
+    area: "SpeechSlot (F008, F060, F073, F112, F115)"
+    feature_id: F124
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: [114, 128, 162, 174, 177]
+    description: >
+      Icones X no SpeechSlot deslocados. Centro do X do speaker deve alinhar
+      com centro do campo de selecao. Centro do X do tema deve alinhar com
+      centro do campo de tema. Causa: statusLedPlaceholder cria offset vertical.
+    acceptance_criteria:
+      - "Speaker X center aligns with speaker field center"
+      - "Topic X center aligns with topic field center"
+      - "Alignment works for all 3 speech positions"
+      - "Layout does not break on narrow screens"
+      - "Alignment correct when X is not visible"
+      - "StatusLED positioning not regressed (F115)"
+    files_likely_impacted:
+      - src/components/SpeechSlot.tsx
+
+  - id: 192
+    type: bug_critical
+    area: "Push Notifications (F017)"
+    feature_id: F125
+    spec_file: "docs/specs/SPEC_F120_F125.yaml"
+    related_crs: [52, 53]
+    description: >
+      Push notifications nao funcionam. Root cause: useNotifications.ts passa
+      projectId: undefined para getExpoPushTokenAsync. O correto e usar
+      Constants.expoConfig?.extra?.eas?.projectId. Fix client-side apenas.
+    acceptance_criteria:
+      - "projectId correctly passed to getExpoPushTokenAsync"
+      - "Constants imported from expo-constants"
+      - "Push token registered successfully on EAS build"
+      - "Notifications received after fix"
+      - "Fallback when projectId unavailable (Expo Go)"
+      - "Observer still excluded from push registration"
+      - "Server-side Edge Function not modified"
+    files_likely_impacted:
+      - src/hooks/useNotifications.ts
+
 # =============================================================================
 
 design_decisions:
@@ -5043,8 +5282,9 @@ cr_history:
     summary: "Change deep link scheme from sacrmeetman:// to sacrmeetplan:// in 3 files, create HTTPS redirect Edge Function (reset-redirect) so email reset button is clickable in email clients, align right edge of StatusLED circle with right edge of speaker name field (supersedes F112 center-to-center approach)."
 
   batch_19:
-    range: "CR-178, CR-180, CR-181, CR-191"
-    status: "4 pendentes (178, 180, 181, 191)"
+    range: "CR-178, CR-179, CR-180, CR-181, CR-182, CR-183, CR-187, CR-189, CR-191, CR-192"
+    status: "4 pendentes fase 1 (178, 180, 181, 191), 6 pendentes fase 2 (179, 182, 183, 187, 189, 192)"
     files:
       - "docs/specs/SPEC_F116_F119.yaml (CR-178, CR-180, CR-181, CR-191 - Language control, Pianist/Conductor split, Optional 2nd speech, Password reset bug)"
-    summary: "Separate app language (per-user, Supabase Auth metadata) from ward language (wards.language). Split can_music into can_pianist + can_conductor with mutual exclusivity constraint. Optional 2nd speech toggle per Sunday with conditional confirmation. Password reset HTML-as-plaintext bug fix with deep investigation."
+      - "docs/specs/SPEC_F120_F125.yaml (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 - Card UI/UX, Label renames, Push notifications bug)"
+    summary: "Phase 1 (pending): Separate app/ward language control, split can_music into can_pianist/can_conductor, optional 2nd speech toggle, password reset HTML rendering fix. Phase 2 (pending): X clear buttons on agenda selector fields, remove speech editing from agenda card (pencil nav to Speeches tab), rename 'Proximas Designacoes' to 'Proximos Discursos', rename tab 'Agenda' to 'Agendas', fix X alignment in SpeechSlot, fix push notifications (projectId undefined)."

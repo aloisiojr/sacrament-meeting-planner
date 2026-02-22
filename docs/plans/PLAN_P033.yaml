@@ -1,0 +1,715 @@
+# =============================================================================
+# PLAN_P033.yaml
+# Batch 19 Phase 2: Card UI/UX changes, label renames, push notifications bug
+# Features: F120 (CR-179), F121 (CR-182), F122 (CR-183), F123 (CR-187),
+#           F124 (CR-189), F125 (CR-192)
+# Created: 2026-02-22
+# Phase: 2 of 3
+# Total ACs: 39 (F120: 10, F121: 8, F122: 4, F123: 4, F124: 6, F125: 7)
+# Total ECs: 11 (F120: 3, F121: 3, F124: 2, F125: 3)
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+batch: 19
+created: "2026-02-22"
+last_updated: "2026-02-22"
+spec_ref: "docs/specs/SPEC_F120_F125.yaml"
+arch_ref: "docs/arch/ARCH_M033.yaml"
+
+goal: >
+  Implement 6 features: Add X (clear) buttons to all non-free-text, non-switch
+  selector fields in AgendaForm by enhancing the SelectorField sub-component with
+  an optional onClear callback (F120). Replace speaker override editing in
+  AgendaForm with read-only display and a pencil button that navigates to the
+  Speeches tab with auto-expand of the target Sunday card via Expo Router query
+  param (F121). Rename "Proximas Designacoes" to "Proximos Discursos" in all 3
+  languages (F122). Rename tab/title "Agenda" to "Agendas" in all 3 languages
+  (F123). Fix X button vertical alignment in SpeechSlot by restructuring from
+  two-column layout to row-per-element per ADR-081 (F124). Fix push notifications
+  by reading projectId from Constants.expoConfig instead of passing undefined
+  (F125). Zero database migrations, zero Edge Function changes, zero new files
+  (except test file). 2 ADRs: ADR-081 (row-per-element layout), ADR-082 (Expo
+  Router query param for cross-tab navigation).
+
+strategy:
+  order: "i18n label renames (F122, F123) -> Bug fix (F125) -> SpeechSlot layout fix (F124) -> AgendaForm clear buttons (F120) -> AgendaForm read-only speeches + navigation (F121) -> Tests"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "S06 creates batch test file covering all ACs and ECs"
+  dependency_notes: >
+    F122 and F123 are i18n-only changes with zero risk, fully independent of all
+    other features. F125 is a single-file bug fix in useNotifications.ts, fully
+    independent. F124 modifies SpeechSlot.tsx only, independent of AgendaForm
+    changes. F120 and F121 both modify AgendaForm.tsx: F120 should be done first
+    because F121 removes SpeakerField which is a larger structural change.
+    F121 also modifies speeches.tsx for the expandDate param handling.
+    Steps S01-S04 are fully parallelizable (independent files). S05 (F120)
+    should precede S06 (F121) to avoid merge conflicts in AgendaForm.tsx.
+    S06 (tests) depends on all previous steps.
+
+# =============================================================================
+# Steps
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F122 + F123 - i18n label renames
+  # ---------------------------------------------------------------------------
+  - id: S01
+    title: "F122 + F123: Rename 'Proximas Designacoes' and 'Agenda' labels in all languages"
+    feature: [F122, F123]
+    cr: [183, 187]
+    depends_on: []
+    parallelizable_with: [S02, S03, S04]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en.json
+        action: modify
+      - path: src/i18n/locales/es.json
+        action: modify
+    changes:
+      - description: >
+          F122: Update i18n VALUES for home.nextAssignments key (key unchanged):
+          - pt-BR.json: "Proximas Designacoes" -> "Proximos Discursos"
+          - en.json: "Next Assignments" -> "Upcoming Speeches"
+          - es.json: "Proximas Asignaciones" -> "Proximos Discursos"
+
+      - description: >
+          F123: Update i18n VALUES for tabs.agenda and agenda.title keys (keys unchanged):
+          - All 3 files: tabs.agenda "Agenda" -> "Agendas"
+          - All 3 files: agenda.title "Agenda" -> "Agendas"
+
+    done_when:
+      - "pt-BR.json home.nextAssignments value is 'Proximos Discursos'"
+      - "en.json home.nextAssignments value is 'Upcoming Speeches'"
+      - "es.json home.nextAssignments value is 'Proximos Discursos'"
+      - "All 3 files tabs.agenda value is 'Agendas'"
+      - "All 3 files agenda.title value is 'Agendas'"
+      - "No i18n KEY renames (only value changes)"
+    tests:
+      - type: unit
+        description: >
+          Test i18n values for home.nextAssignments in all 3 locales.
+          Test i18n values for tabs.agenda and agenda.title in all 3 locales.
+    covers:
+      acceptance_criteria: [AC-122-01, AC-122-02, AC-122-03, AC-122-04, AC-123-01, AC-123-02, AC-123-03, AC-123-04]
+      edge_cases: []
+    risks:
+      - risk: "None - pure text value changes"
+        mitigation: "N/A"
+    commit_message: "feat(i18n): rename 'Proximas Designacoes' to 'Proximos Discursos' and 'Agenda' to 'Agendas' in all languages (F122+F123, CR-183+CR-187)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F125 - Push notification projectId fix
+  # ---------------------------------------------------------------------------
+  - id: S02
+    title: "F125: Fix push notifications by reading projectId from Constants instead of undefined"
+    feature: F125
+    cr: 192
+    depends_on: []
+    parallelizable_with: [S01, S03, S04]
+    files:
+      - path: src/hooks/useNotifications.ts
+        action: modify
+    changes:
+      - description: >
+          1. Add import: import Constants from 'expo-constants'
+          2. In register() function, before getExpoPushTokenAsync call:
+             const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+          3. Add guard: if (!projectId) {
+               console.warn('Push token registration skipped: projectId not available');
+               return;
+             }
+          4. Replace getExpoPushTokenAsync({ projectId: undefined }) with
+             getExpoPushTokenAsync({ projectId })
+          5. Remove the misleading comment '// Uses default from app.json'
+
+    done_when:
+      - "import Constants from 'expo-constants' present in useNotifications.ts"
+      - "projectId extracted from Constants.expoConfig?.extra?.eas?.projectId"
+      - "Guard: if (!projectId) logs warning and returns early"
+      - "getExpoPushTokenAsync called with { projectId } (NOT undefined)"
+      - "No remaining 'projectId: undefined' in useNotifications.ts"
+      - "Misleading comment removed"
+    tests:
+      - type: unit
+        description: >
+          Test Constants import. Test projectId extraction. Test fallback
+          when projectId undefined (warning logged, no crash). Test
+          getExpoPushTokenAsync receives correct projectId.
+    covers:
+      acceptance_criteria: [AC-125-01, AC-125-02, AC-125-03, AC-125-04, AC-125-05, AC-125-06, AC-125-07]
+      edge_cases: [EC-125-01, EC-125-02, EC-125-03]
+    risks:
+      - risk: "Constants.expoConfig may be null in some environments"
+        mitigation: "Optional chaining (?.) handles null safely. Guard clause prevents crash when projectId is undefined."
+    commit_message: "fix(notifications): read projectId from Constants.expoConfig instead of passing undefined to getExpoPushTokenAsync (F125, CR-192)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F124 - SpeechSlot X alignment fix (row-per-element layout)
+  # ---------------------------------------------------------------------------
+  - id: S03
+    title: "F124: Restructure SpeechSlot layout from two-column to row-per-element for X alignment"
+    feature: F124
+    cr: 189
+    depends_on: []
+    parallelizable_with: [S01, S02, S04]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+    changes:
+      - description: >
+          Layout restructure per ADR-081:
+
+          REMOVE two-column layout:
+          - Remove outerRow style and its View wrapper
+          - Remove leftColumn style and its View wrapper
+          - Remove rightColumn style and its View wrapper
+          - Remove statusLedPlaceholder style and its View
+          - Remove speakerActionWrapper style and its View
+          - Remove topicActionWrapper style and its View
+
+          REPLACE with row-per-element layout:
+          - labelRow remains full-width (unchanged from F115/ADR-078)
+          - Add speakerRow: View with flexDirection:'row', alignItems:'center'
+            containing:
+            a. Speaker Pressable field (flex:1, height:38) -- existing speaker field
+            b. Action area View (width:36, height:38, alignItems:'center',
+               justifyContent:'center') containing X button when hasSpeaker && canUnassign
+          - Restructure topicRow: View with flexDirection:'row', alignItems:'center',
+            marginTop:6 containing:
+            a. Topic Pressable field (flex:1, height:34) -- existing topic field
+            b. Action area View (width:36, height:34, marginTop:0, alignItems:'center',
+               justifyContent:'center') containing X button when topicDisplay && canAssign
+
+          NEW styles:
+          - speakerRow: { flexDirection: 'row', alignItems: 'center' }
+          - actionArea: { width: 36, height: 38, alignItems: 'center',
+              justifyContent: 'center' }
+          - topicActionArea: { width: 36, height: 34, alignItems: 'center',
+              justifyContent: 'center' }
+
+          UNCHANGED styles:
+          - container, labelRow, field (height:38), topicField (height:34),
+            removeButton
+
+          F118 disabled state (isPos2Disabled): entire content area shows disabled
+          placeholder -- this logic remains in the outer container, not in the
+          column structure. So the disabled placeholder rendering is NOT affected.
+
+      - description: >
+          StatusLED positioning: labelRow remains full-width with the status section
+          (StatusLED + status text) at the right side per ADR-078. This is NOT
+          modified by F124. The labelRow is completely decoupled from the speaker
+          and topic rows.
+
+    done_when:
+      - "outerRow, leftColumn, rightColumn styles removed"
+      - "statusLedPlaceholder, speakerActionWrapper, topicActionWrapper styles removed"
+      - "speakerRow style added with flexDirection:'row', alignItems:'center'"
+      - "Speaker field and X button are siblings in the same speakerRow flex container"
+      - "Topic field and X button are siblings in the same topicRow flex container"
+      - "X button vertical center aligns with field vertical center (guaranteed by alignItems:'center')"
+      - "labelRow remains full-width, unchanged from F115"
+      - "StatusLED positioning not regressed"
+      - "Disabled state for position 2 (F118) still works"
+      - "Layout correct on narrow screens (320px)"
+    tests:
+      - type: unit
+        description: >
+          Test speaker X center aligns with speaker field center.
+          Test topic X center aligns with topic field center.
+          Test alignment for all 3 positions. Test narrow screen.
+          Test X hidden when no value. Test StatusLED position unchanged.
+    covers:
+      acceptance_criteria: [AC-124-01, AC-124-02, AC-124-03, AC-124-04, AC-124-05, AC-124-06]
+      edge_cases: [EC-124-01, EC-124-02]
+    risks:
+      - risk: "Layout restructure may regress F115 StatusLED positioning"
+        mitigation: "labelRow is NOT modified. StatusLED stays in labelRow per ADR-078. Only field rows below change."
+      - risk: "Layout restructure may regress F118 toggle switch behavior"
+        mitigation: "Toggle switch is in labelRow. Disabled placeholder is outside the column structure. Both are unaffected."
+    commit_message: "fix(ui): restructure SpeechSlot to row-per-element layout for correct X button alignment (F124, CR-189, ADR-081)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F120 - SelectorField onClear enhancement + AgendaForm clear handlers
+  # ---------------------------------------------------------------------------
+  - id: S04
+    title: "F120: Add X clear buttons to all selector-type fields in AgendaForm"
+    feature: F120
+    cr: 179
+    depends_on: []
+    parallelizable_with: [S01, S02, S03]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+    changes:
+      - description: >
+          SelectorField sub-component enhancement:
+          1. Add optional props: onClear?: () => void, hasValue?: boolean
+          2. When onClear provided AND hasValue is true: render X button
+             (Text with Unicode U+00D7) inside the Pressable at the right side
+          3. X button styling: color=colors.error, fontSize=20, fontWeight='300',
+             paddingHorizontal=4, hitSlop=8
+          4. X button is wrapped in its own Pressable to prevent the parent
+             Pressable onPress from firing (React Native nested Pressable captures
+             the touch). The inner Pressable calls onClear.
+          5. New style: clearButton { fontSize: 20, fontWeight: '300',
+             paddingHorizontal: 4 }
+
+      - description: >
+          AgendaForm clear handler wiring for actor fields:
+          1. Presidir (presiding): onClear calls updateAgenda.mutate with
+             { presiding_name: null, presiding_actor_id: null }
+             hasValue = !!agenda.presiding_name
+          2. Dirigir (conducting): onClear -> { conducting_name: null,
+             conducting_actor_id: null }
+             hasValue = !!agenda.conducting_name
+          3. Pianista (pianist): onClear -> { pianist_name: null,
+             pianist_actor_id: null }
+             hasValue = !!agenda.pianist_name
+          4. Regente (conductor): onClear -> { conductor_name: null,
+             conductor_actor_id: null }
+             hasValue = !!agenda.conductor_name
+
+      - description: >
+          Recognizing field (custom Pressable, NOT SelectorField):
+          Add X button as a sibling element within the recognizing Pressable.
+          Visible when (agenda.recognized_names?.length ?? 0) > 0 AND !isObserver.
+          onPress: updateField('recognized_names', null)
+          Same styling as SelectorField X button.
+
+      - description: >
+          Hymn fields:
+          1. Hino de Abertura: onClear -> { opening_hymn_id: null }
+             hasValue = !!agenda.opening_hymn_id
+          2. Hino Sacramental: onClear -> { sacrament_hymn_id: null }
+             hasValue = !!agenda.sacrament_hymn_id
+          3. Hino Intermediario: onClear -> { intermediate_hymn_id: null }
+             hasValue = !!agenda.intermediate_hymn_id
+             (only visible when has_intermediate_hymn toggle is on)
+          4. Hino de Encerramento: onClear -> { closing_hymn_id: null }
+             hasValue = !!agenda.closing_hymn_id
+
+      - description: >
+          Prayer fields:
+          1. Oracao de Abertura: onClear -> { opening_prayer_name: null,
+             opening_prayer_member_id: null }
+             hasValue = !!agenda.opening_prayer_name
+          2. Oracao de Encerramento: onClear -> { closing_prayer_name: null,
+             closing_prayer_member_id: null }
+             hasValue = !!agenda.closing_prayer_name
+
+      - description: >
+          Visibility rules:
+          - All onClear callbacks are only passed when !isObserver
+            (Observer sees no X buttons)
+          - hasValue controls whether X renders (false = no X shown)
+          - No confirmation dialog for any clear action
+
+    done_when:
+      - "SelectorField has optional onClear and hasValue props"
+      - "X button (U+00D7) renders inside SelectorField when onClear + hasValue"
+      - "X button uses colors.error, fontSize 20, fontWeight '300', hitSlop 8"
+      - "Pressing X does NOT open the selector modal (touch captured by inner Pressable)"
+      - "Actor fields: X clears both *_name and *_actor_id to null"
+      - "Recognizing: X clears recognized_names to null"
+      - "Hymn fields: X clears *_hymn_id to null"
+      - "Prayer fields: X clears both *_name and *_member_id to null"
+      - "X NOT visible when field is empty"
+      - "X NOT visible for Observer role"
+      - "No confirmation dialog on clear"
+      - "updateField/updateAgenda.mutate called on clear (auto-save)"
+      - "Free-text fields (DebouncedTextInput) NOT affected"
+      - "Switch/Toggle fields NOT affected"
+      - "SpeakerField NOT affected (handled by F121)"
+    tests:
+      - type: unit
+        description: >
+          Test SelectorField onClear prop. Test X visible when hasValue.
+          Test X hidden when empty. Test X hidden for Observer.
+          Test each field type clears correct DB columns.
+          Test no confirmation dialog. Test auto-save triggered.
+          Test free-text and switch fields unchanged.
+    covers:
+      acceptance_criteria: [AC-120-01, AC-120-02, AC-120-03, AC-120-04, AC-120-05, AC-120-06, AC-120-07, AC-120-08, AC-120-09, AC-120-10]
+      edge_cases: [EC-120-01, EC-120-02, EC-120-03]
+    risks:
+      - risk: "Pressing X inside SelectorField may also trigger field onPress (modal)"
+        mitigation: "Wrap X in its own Pressable. React Native nested Pressable captures touch naturally. Verify pressing X does NOT open selector."
+      - risk: "Too many null-setting calls on actor fields (2 fields per clear)"
+        mitigation: "Use single updateAgenda.mutate call with both fields in the update object."
+    commit_message: "feat(agenda): add X clear buttons to all selector-type fields in AgendaForm (F120, CR-179)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F121 - Read-only speeches in Agenda + pencil navigation
+  # ---------------------------------------------------------------------------
+  - id: S05
+    title: "F121: Replace speaker override editing with read-only display + pencil navigation to Speeches tab"
+    feature: F121
+    cr: 182
+    depends_on: [S04]
+    parallelizable_with: []
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+      - path: src/app/(tabs)/speeches.tsx
+        action: modify
+    changes:
+      - description: >
+          AgendaForm.tsx - Remove SpeakerField:
+          1. Remove the SpeakerField sub-component definition entirely
+             (function, props, all internal logic for override editing)
+          2. Remove SpeakerField usage for positions 1, 2, and 3 in the
+             sectionFirstSpeeches and sectionLastSpeech sections
+          3. Remove associated styles: speakerEditRow, speakerEditInput,
+             speakerReadRow, speakerReadText, speakerIconBtn, speakerIcon,
+             lastMinuteLabel
+          4. Remove 'speaker' from FieldSelectorType union if it exists
+          5. Remove speechPosition from SelectorState if it exists
+
+      - description: >
+          AgendaForm.tsx - Add ReadOnlySpeakerRow inline sub-component:
+          1. Props: label (string), speakerName (string from speeches table,
+             NOT override), sundayDate (string), disabled (boolean = isObserver),
+             colors (ThemeColors)
+          2. Renders a View with flexDirection:'row', alignItems:'center'
+          3. Left side: SelectorField-style visual (same background, border,
+             height:38) but NOT pressable. Shows speakerName as read-only text.
+             If no speaker, shows placeholder t('speeches.selectSpeaker').
+          4. Right side: Pencil icon button (U+270F), visible only when !disabled.
+             Styling: fontSize=20, color=colors.primary, hitSlop=8.
+             onPress: router.push('/(tabs)/speeches?expandDate=' + sundayDate)
+          5. Import useRouter from 'expo-router' at the component level.
+          6. Position 2 row: return null when agenda.has_second_speech === false.
+          7. Observer (disabled=true): no pencil button visible. Read-only text only.
+
+      - description: >
+          AgendaForm.tsx - Wire ReadOnlySpeakerRow into speech sections:
+          1. In sectionFirstSpeeches: render ReadOnlySpeakerRow for positions 1 and 2.
+             Position 2 hidden when has_second_speech=false.
+          2. In sectionLastSpeech: render ReadOnlySpeakerRow for position 3
+             (Last Speech).
+          3. Speaker names come from the speeches data (speeches array filtered
+             by position). NOT from speaker_*_override fields.
+          4. Speaker override fields remain in DB and are still used by
+             usePresentationMode.ts (no change to presentation behavior).
+
+      - description: >
+          speeches.tsx - Accept expandDate route param:
+          1. Import useLocalSearchParams from 'expo-router'.
+          2. Read expandDate param:
+             const { expandDate } = useLocalSearchParams<{ expandDate?: string }>()
+          3. Add useEffect watching expandDate:
+             - When expandDate is set and differs from current expandedDate:
+               call handleToggle(expandDate) to expand that card and scroll to it.
+             - Clear the param after handling:
+               router.setParams({ expandDate: undefined })
+             - This prevents re-triggering on re-renders.
+          4. handleToggle already does lazy-create and auto-scroll. The expandDate
+             param just triggers it from an external source (Agenda tab).
+
+    done_when:
+      - "SpeakerField sub-component removed from AgendaForm.tsx"
+      - "SpeakerField-related styles removed"
+      - "ReadOnlySpeakerRow renders read-only speaker name for each position"
+      - "ReadOnlySpeakerRow shows placeholder when no speaker assigned"
+      - "Pencil icon visible for non-Observer roles"
+      - "Pencil navigates to Speeches tab with expandDate=YYYY-MM-DD"
+      - "speeches.tsx reads expandDate param and auto-expands matching card"
+      - "expandDate param cleared after handling"
+      - "Position 2 hidden when has_second_speech=false"
+      - "Observer sees read-only text, no pencil button"
+      - "Presentation Mode still uses overrides (no change)"
+      - "Speaker override DB fields untouched (no migration)"
+    tests:
+      - type: unit
+        description: >
+          Test SpeakerField removed. Test ReadOnlySpeakerRow renders read-only.
+          Test pencil button navigates with expandDate. Test speeches.tsx reads
+          param and auto-expands. Test position 2 hidden when toggle off.
+          Test Observer has no pencil. Test Presentation Mode unchanged.
+    covers:
+      acceptance_criteria: [AC-121-01, AC-121-02, AC-121-03, AC-121-04, AC-121-05, AC-121-06, AC-121-07, AC-121-08]
+      edge_cases: [EC-121-01, EC-121-02, EC-121-03]
+    risks:
+      - risk: "Expo Router tab navigation with query params may not work as expected"
+        mitigation: "Per ADR-082, use router.push which is well-documented. If router.push pushes a new screen, try router.navigate instead. Test both from-same-tab and from-different-tab scenarios."
+      - risk: "Removing SpeakerField may break references in other files"
+        mitigation: "SpeakerField is a sub-component defined inline in AgendaForm.tsx. It is not exported or used elsewhere. Removal is safe."
+      - risk: "expandDate param may re-trigger on re-renders if not cleared"
+        mitigation: "Clear param after handling with router.setParams({ expandDate: undefined }). Use a ref to track last handled expandDate as additional guard."
+    commit_message: "feat(agenda): replace speaker override editing with read-only display + pencil navigation to Speeches tab (F121, CR-182, ADR-082)"
+
+  # ---------------------------------------------------------------------------
+  # NOTE: F121 does NOT require new i18n keys. The pencil button has no text
+  # label. The placeholder uses existing t('speeches.selectSpeaker'). No
+  # separate i18n step needed.
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Tests for all features
+  # ---------------------------------------------------------------------------
+  - id: S06
+    title: "Batch 19 Phase 2 tests for F120-F125"
+    feature: all
+    cr: [179, 182, 183, 187, 189, 192]
+    depends_on: [S01, S02, S03, S04, S05]
+    parallelizable_with: []
+    files:
+      - path: src/__tests__/batch19-phase2.test.ts
+        action: create
+    changes:
+      - description: >
+          Create comprehensive test file batch19-phase2.test.ts covering
+          all 6 features.
+
+          F120 tests (X clear buttons on selector fields):
+          - Verify SelectorField sub-component in AgendaForm accepts onClear and hasValue props
+          - Verify X button (U+00D7) renders when onClear provided and hasValue=true
+          - Verify X button NOT rendered when hasValue=false
+          - Verify X button NOT rendered for Observer (isObserver=true)
+          - Verify actor field onClear sets *_name and *_actor_id to null
+          - Verify recognizing onClear sets recognized_names to null
+          - Verify hymn field onClear sets *_hymn_id to null
+          - Verify prayer field onClear sets *_name and *_member_id to null
+          - Verify no confirmation dialog on clear (direct updateField call)
+          - Verify auto-save triggered (updateAgenda.mutate or updateField called)
+          - Verify free-text fields (DebouncedTextInput) have no X button
+          - Verify switch/toggle fields have no X button
+          - Verify SpeakerField NOT affected (removed by F121)
+
+      - description: >
+          F121 tests (Read-only speeches + pencil navigation):
+          - Verify SpeakerField sub-component removed from AgendaForm source
+          - Verify ReadOnlySpeakerRow renders read-only text (not editable)
+          - Verify ReadOnlySpeakerRow shows placeholder when no speaker name
+          - Verify pencil icon (U+270F) visible for non-Observer
+          - Verify pencil icon NOT visible for Observer
+          - Verify pencil onPress calls router.push with expandDate param
+          - Verify speeches.tsx reads expandDate via useLocalSearchParams
+          - Verify speeches.tsx has useEffect that handles expandDate
+          - Verify position 2 row returns null when has_second_speech=false
+          - Verify usePresentationMode.ts still reads speaker_*_override (unchanged)
+          - Verify SpeakerField-related styles removed from StyleSheet
+          - Verify no new DB migration for override field removal
+
+      - description: >
+          F122 tests (Rename Proximas Designacoes):
+          - Verify pt-BR.json home.nextAssignments is "Proximos Discursos"
+          - Verify en.json home.nextAssignments is "Upcoming Speeches"
+          - Verify es.json home.nextAssignments is "Proximos Discursos"
+          - Verify i18n key name unchanged (home.nextAssignments)
+
+      - description: >
+          F123 tests (Rename Agenda to Agendas):
+          - Verify tabs.agenda is "Agendas" in all 3 locale files
+          - Verify agenda.title is "Agendas" in all 3 locale files
+          - Verify i18n key names unchanged (tabs.agenda, agenda.title)
+
+      - description: >
+          F124 tests (SpeechSlot X alignment):
+          - Verify outerRow, leftColumn, rightColumn styles removed
+          - Verify statusLedPlaceholder, speakerActionWrapper, topicActionWrapper removed
+          - Verify speakerRow style has flexDirection:'row' and alignItems:'center'
+          - Verify speaker field and X button are siblings in speakerRow
+          - Verify topicRow has topic field and X button as siblings
+          - Verify actionArea has width:36
+          - Verify labelRow remains full-width (not split into columns)
+          - Verify StatusLED position unchanged (in labelRow per ADR-078)
+
+      - description: >
+          F125 tests (Push notification projectId fix):
+          - Verify import Constants from 'expo-constants' in useNotifications.ts
+          - Verify projectId extracted from Constants.expoConfig?.extra?.eas?.projectId
+          - Verify getExpoPushTokenAsync receives { projectId } (not undefined)
+          - Verify guard: if (!projectId) logs warning and returns
+          - Verify no remaining 'projectId: undefined' in source
+          - Verify misleading comment removed
+          - Verify server-side Edge Function NOT modified
+
+    done_when:
+      - "batch19-phase2.test.ts created with tests for all 6 features"
+      - "All tests pass with vitest"
+      - "Coverage: 39 ACs + 11 ECs across 6 features"
+    tests:
+      - type: unit
+        description: "Self-contained test file covering all 39 ACs and 11 ECs across 6 features"
+    covers:
+      acceptance_criteria: [AC-120-01, AC-120-02, AC-120-03, AC-120-04, AC-120-05, AC-120-06, AC-120-07, AC-120-08, AC-120-09, AC-120-10, AC-121-01, AC-121-02, AC-121-03, AC-121-04, AC-121-05, AC-121-06, AC-121-07, AC-121-08, AC-122-01, AC-122-02, AC-122-03, AC-122-04, AC-123-01, AC-123-02, AC-123-03, AC-123-04, AC-124-01, AC-124-02, AC-124-03, AC-124-04, AC-124-05, AC-124-06, AC-125-01, AC-125-02, AC-125-03, AC-125-04, AC-125-05, AC-125-06, AC-125-07]
+      edge_cases: [EC-120-01, EC-120-02, EC-120-03, EC-121-01, EC-121-02, EC-121-03, EC-124-01, EC-124-02, EC-125-01, EC-125-02, EC-125-03]
+    risks:
+      - risk: "Large test file covering 6 features"
+        mitigation: "Organized into clearly labeled describe blocks per feature. Follow established batch test pattern."
+    commit_message: "test(batch19): add tests for F120-F125 (clear buttons, read-only speeches, label renames, X alignment, push notifications) (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192)"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+
+  # F120 - X clear buttons on selector fields
+  - ac_id: AC-120-01
+    how_to_verify: "View AgendaForm with preside_name set. Verify X button visible inside Presidir field. Press X. Verify preside_name and preside_actor_id set to null."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-02
+    how_to_verify: "View AgendaForm with opening_hymn_id set. Verify X button visible on Hino de Abertura field. Press X. Verify opening_hymn_id set to null. Repeat for sacrament, intermediate, closing."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-03
+    how_to_verify: "View AgendaForm with opening_prayer_name set. Verify X button visible on Oracao de Abertura field. Press X. Verify opening_prayer_name and opening_prayer_member_id set to null."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-04
+    how_to_verify: "View AgendaForm with recognized_names containing names. Verify X button visible on Reconhecendo field. Press X. Verify recognized_names set to null."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-05
+    how_to_verify: "View AgendaForm with preside_name=null. Verify NO X button on Presidir field. Only placeholder text."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-06
+    how_to_verify: "Log in as Observer. View AgendaForm. Verify no X buttons on any field."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-07
+    how_to_verify: "Press X button on any field with value. Verify field cleared immediately. No Alert.alert confirmation."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-08
+    how_to_verify: "Press X button. Verify updateField/updateAgenda.mutate called with null values. Check DB for persisted change."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-09
+    how_to_verify: "View AgendaForm DebouncedTextInput fields (Anuncios, baby blessing, etc.) and Switch fields. Verify no X buttons added."
+    covered_by_steps: [S04, S06]
+
+  - ac_id: AC-120-10
+    how_to_verify: "View speaker fields in AgendaForm. Verify existing pencil/X mechanism from F044 unchanged (or replaced by F121 ReadOnlySpeakerRow)."
+    covered_by_steps: [S04, S05, S06]
+
+  # F121 - Read-only speeches + pencil navigation
+  - ac_id: AC-121-01
+    how_to_verify: "View AgendaForm for Sunday with assigned speakers. Verify speaker names shown as read-only text. No TextInput, no editable override."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-02
+    how_to_verify: "View AgendaForm speech section for positions 1, 2, 3. Verify pencil icon button (U+270F) visible to the right of each speaker name."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-03
+    how_to_verify: "Press pencil button on AgendaForm for Sunday 2026-03-01. Verify app navigates to Speeches tab. Verify card for 2026-03-01 is expanded."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-04
+    how_to_verify: "Read AgendaForm.tsx source. Verify SpeakerField sub-component removed. No pencil-to-edit-mode toggle, no TextInput override, no revert X."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-05
+    how_to_verify: "View AgendaForm for Sunday with has_second_speech=false. Verify position 2 speaker row is hidden. No pencil button for position 2."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-06
+    how_to_verify: "View AgendaForm for Sunday with no speaker assigned to position 1. Verify placeholder text shown. Pencil button still visible."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-07
+    how_to_verify: "Set speaker_1_override in DB. Enter Presentation Mode. Verify override name shown (usePresentationMode.ts unchanged)."
+    covered_by_steps: [S05, S06]
+
+  - ac_id: AC-121-08
+    how_to_verify: "Log in as Observer. View AgendaForm. Verify speaker names shown as read-only. No pencil buttons visible."
+    covered_by_steps: [S05, S06]
+
+  # F122 - Rename Proximas Designacoes
+  - ac_id: AC-122-01
+    how_to_verify: "Set app language to pt-BR. View Home tab as Bishopric. Verify section title is 'Proximos Discursos'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-122-02
+    how_to_verify: "Set app language to en. View Home tab as Bishopric. Verify section title is 'Upcoming Speeches'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-122-03
+    how_to_verify: "Set app language to es. View Home tab as Bishopric. Verify section title is 'Proximos Discursos'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-122-04
+    how_to_verify: "Search code for t('home.nextAssignments'). Verify all usages show updated text."
+    covered_by_steps: [S01, S06]
+
+  # F123 - Rename Agenda to Agendas
+  - ac_id: AC-123-01
+    how_to_verify: "Set app language to pt-BR. View bottom tab bar. Verify Agenda tab shows 'Agendas'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-123-02
+    how_to_verify: "Set app language to en. View bottom tab bar. Verify Agenda tab shows 'Agendas'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-123-03
+    how_to_verify: "Set app language to es. View bottom tab bar. Verify Agenda tab shows 'Agendas'."
+    covered_by_steps: [S01, S06]
+
+  - ac_id: AC-123-04
+    how_to_verify: "Navigate to Agenda tab. Verify screen title header shows 'Agendas'."
+    covered_by_steps: [S01, S06]
+
+  # F124 - SpeechSlot X alignment
+  - ac_id: AC-124-01
+    how_to_verify: "View SpeechSlot with assigned speaker (X visible). Verify horizontal center of X button at same vertical level as center of speaker field."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-124-02
+    how_to_verify: "View SpeechSlot with assigned topic (X visible). Verify horizontal center of topic X at same vertical level as center of topic field."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-124-03
+    how_to_verify: "View all 3 speech positions with speakers and topics. Verify X buttons aligned correctly for all."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-124-04
+    how_to_verify: "View SpeechSlot on narrow screen (320px). Verify no overflow or clipping."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-124-05
+    how_to_verify: "View SpeechSlot with no speaker (X hidden). Verify spacing remains consistent."
+    covered_by_steps: [S03, S06]
+
+  - ac_id: AC-124-06
+    how_to_verify: "View SpeechSlot with StatusLED visible. Verify LED and status text positioned correctly per F115."
+    covered_by_steps: [S03, S06]
+
+  # F125 - Push notification projectId fix
+  - ac_id: AC-125-01
+    how_to_verify: "Read useNotifications.ts. Verify projectId is Constants.expoConfig?.extra?.eas?.projectId, NOT undefined."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-02
+    how_to_verify: "Read useNotifications.ts imports. Verify import Constants from 'expo-constants' present."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-03
+    how_to_verify: "Run app on EAS build with notification permission. Verify push token upserted in device_push_tokens table."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-04
+    how_to_verify: "After fix: assign speech to trigger notification. Verify push notification received."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-05
+    how_to_verify: "Run app in Expo Go (no EAS config). Verify warning logged. No crash."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-06
+    how_to_verify: "Log in as Observer. Verify push token registration skipped (existing behavior)."
+    covered_by_steps: [S02, S06]
+
+  - ac_id: AC-125-07
+    how_to_verify: "Read process-notifications/index.ts. Verify no changes (server-side untouched)."
+    covered_by_steps: [S02, S06]

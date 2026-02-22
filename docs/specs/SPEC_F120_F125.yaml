@@ -1,0 +1,946 @@
+# =============================================================================
+# SPEC_F120_F125.yaml
+# Features F120-F125 / CR-179, CR-182, CR-183, CR-187, CR-189, CR-192
+# Batch: 19 Phase 2 - Card UI/UX changes, label renames, push notifications bug
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 19
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+
+# =============================================================================
+# F120 / CR-179: X button to clear non-free-text, non-switch fields in Agenda card
+# =============================================================================
+
+features:
+
+  - id: F120
+    name: "X button to clear non-free-text, non-switch fields in Agenda card"
+    cr_id: 179
+    type: feature
+    priority: high
+    related_features: [F012, F013, F014, F015]
+    related_crs: [26, 73, 114, 128]
+
+    user_request: >
+      "No card de domingo da agenda, todo campo que nao e texto livre nem switch
+      deve ter botao X a direita (pode ser dentro do campo) para apagar valor atual.
+      Todo campo nao desabilitado pode ser limpo"
+
+    current_behavior: >
+      In the AgendaForm.tsx, selector-type fields (actors, hymns, prayers) are
+      rendered using SelectorField which is a Pressable that opens a modal on
+      tap. Currently there is NO clear/reset button on any of these fields.
+      Once a value is selected, the only way to change it is to select a
+      different value; there is no way to clear it back to empty/unassigned.
+
+      Fields affected (selector-type, non-free-text, non-switch):
+      1. Presidir (preside) - ActorSelector, field: preside_name/preside_actor_id
+      2. Dirigir (conduct) - ActorSelector, field: conductor_name/conductor_actor_id
+         NOTE: This field name "conductor" in the DB refers to "dirigir" (meeting
+         conductor), NOT the music conductor (regente). The music conductor uses
+         conductor_actor_id in a DIFFERENT context.
+      3. Reconhecendo a Presenca (recognizing) - ActorSelector multi-select,
+         field: recognized_names (string array)
+      4. Pianista (pianist) - ActorSelector, field: pianist_name/pianist_actor_id
+      5. Regente (conductor/music conductor) - ActorSelector, field: conductor_name/conductor_actor_id
+         NOTE: In the DB, the music conductor uses the same field naming pattern.
+         Actually from reading the code: pianist uses pianist_name/pianist_actor_id,
+         and the music conductor uses conductor_name/conductor_actor_id.
+         The meeting conductor (dirigir) uses conduct_name/conduct_actor_id.
+      6. Hino de Abertura (opening hymn) - HymnSelector, field: opening_hymn_id
+      7. Oracao de Abertura (opening prayer) - PrayerSelector, field: opening_prayer_name/opening_prayer_member_id
+      8. Hino Sacramental (sacrament hymn) - HymnSelector, field: sacrament_hymn_id
+      9. Hino Intermediario (intermediate hymn) - HymnSelector, field: intermediate_hymn_id
+         (only visible when has_intermediate_hymn toggle is on)
+      10. Hino de Encerramento (closing hymn) - HymnSelector, field: closing_hymn_id
+      11. Oracao de Encerramento (closing prayer) - PrayerSelector, field: closing_prayer_name/closing_prayer_member_id
+
+      Free-text fields (NOT affected - they already have keyboard/clear):
+      - Anuncios (announcements) - DebouncedTextInput
+      - Apoios e Desobrigacoes (sustaining_releasing) - DebouncedTextInput
+      - Baby blessing names - DebouncedTextInput
+      - Baptism confirmation names - DebouncedTextInput
+      - Apresentacao especial description - DebouncedTextInput
+
+      Switch/Toggle fields (NOT affected):
+      - Baby Blessing toggle
+      - Baptism Confirmation toggle
+      - Stake Announcements toggle
+      - Apresentacao Especial toggle
+      - Hino Intermediario toggle
+
+      Speaker fields (SpeakerField) are read-only with their own pencil/X
+      mechanism (CR-100/F044). NOT affected by this CR.
+
+    expected_behavior: >
+      **1. Add X (clear) button to all selector-type fields in AgendaForm:**
+
+      For each non-free-text, non-switch field listed above, add a clear button
+      (X icon, Unicode U+00D7 multiplication sign, same as used in SpeechSlot)
+      that appears when the field has a value and the user has write permission.
+
+      **2. Button position and style:**
+      - Position: INSIDE the SelectorField, at the right side (before the
+        dropdown arrow if present, or replacing the dropdown arrow area).
+      - Alternative acceptable position: immediately to the right of the field
+        as a sibling element (same pattern as SpeechSlot topic X button after
+        CR-128/F073).
+      - The X button should use the same visual style as existing X buttons in
+        the app: color: colors.error, fontSize ~20-24, fontWeight '300'.
+      - hitSlop: 8 for comfortable touch target.
+
+      **3. Clear behavior per field type:**
+      - Actor fields (preside, conduct, pianist, conductor): Set both
+        *_name and *_actor_id to null. E.g., preside_name=null,
+        preside_actor_id=null.
+      - Hymn fields (opening, sacrament, intermediate, closing): Set
+        *_hymn_id to null.
+      - Prayer fields (opening, closing): Set both *_name and *_member_id
+        to null.
+      - Recognizing (multi-select): Clear entire recognized_names array
+        (set to null or empty array).
+      - All clears trigger updateField() for auto-save (existing pattern).
+
+      **4. Visibility rules:**
+      - X visible ONLY when field has a value (non-null, non-empty).
+      - X visible ONLY when user is NOT Observer (isObserver === false).
+      - No confirmation dialog for clearing (values are easily re-selectable).
+
+      **5. Implementation approach:**
+      - Modify SelectorField component to accept optional onClear callback.
+      - When onClear is provided and field has a value, show X button.
+      - Each SelectorField usage in AgendaForm passes appropriate onClear.
+
+    files_impacted:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Add onClear prop to each SelectorField for actor, hymn, and prayer fields"
+          - "Implement clear handlers that set *_name/*_id to null via updateField()"
+          - "Recognizing clear: set recognized_names to null"
+
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "SelectorField component: add optional onClear prop"
+          - "When onClear provided and value is non-empty, render X button inside field"
+          - "X button: Unicode U+00D7, color: colors.error, fontSize 20, hitSlop 8"
+
+    acceptance_criteria:
+      - id: AC-120-01
+        description: "X button visible on actor fields (preside, conduct, pianist, conductor) when value is set"
+        given: "AgendaForm with preside_name set to a name"
+        when: "View the Presidir field"
+        then: "X button visible inside or next to the field. Pressing X clears preside_name and preside_actor_id to null."
+
+      - id: AC-120-02
+        description: "X button visible on hymn fields when hymn is selected"
+        given: "AgendaForm with opening_hymn_id set"
+        when: "View the Hino de Abertura field"
+        then: "X button visible. Pressing X sets opening_hymn_id to null. Same for sacrament, intermediate, and closing hymns."
+
+      - id: AC-120-03
+        description: "X button visible on prayer fields when prayer name is set"
+        given: "AgendaForm with opening_prayer_name set"
+        when: "View the Oracao de Abertura field"
+        then: "X button visible. Pressing X sets opening_prayer_name and opening_prayer_member_id to null."
+
+      - id: AC-120-04
+        description: "X button visible on recognizing field when names are selected"
+        given: "AgendaForm with recognized_names containing names"
+        when: "View the Reconhecendo a Presenca field"
+        then: "X button visible. Pressing X sets recognized_names to null."
+
+      - id: AC-120-05
+        description: "X button NOT visible when field is empty"
+        given: "AgendaForm with preside_name is null"
+        when: "View the Presidir field"
+        then: "No X button shown. Only placeholder text and dropdown arrow visible."
+
+      - id: AC-120-06
+        description: "X button NOT visible for Observer role"
+        given: "User logged in as Observer"
+        when: "View AgendaForm"
+        then: "No X buttons visible on any field (all fields are read-only for Observer)."
+
+      - id: AC-120-07
+        description: "No confirmation dialog when clearing"
+        given: "Field has a value"
+        when: "Press X button"
+        then: "Field cleared immediately. No Alert.alert confirmation."
+
+      - id: AC-120-08
+        description: "Auto-save triggered after clear"
+        given: "Field has a value"
+        when: "Press X button"
+        then: "updateField() called with null value. Change persisted to database."
+
+      - id: AC-120-09
+        description: "Free-text and switch fields NOT affected"
+        given: "AgendaForm fields like Anuncios, Baby Blessing toggle, etc."
+        when: "View those fields"
+        then: "No X button added. DebouncedTextInput and Switch remain unchanged."
+
+      - id: AC-120-10
+        description: "Speaker fields (SpeakerField) NOT affected"
+        given: "Speaker override fields in the speeches section"
+        when: "View speaker fields"
+        then: "Existing pencil/X mechanism from F044 unchanged. No duplicate X."
+
+    edge_cases:
+      - id: EC-120-01
+        case: "Clear recognizing when only one name selected"
+        expected: "Entire recognized_names set to null. Field shows placeholder."
+
+      - id: EC-120-02
+        case: "Clear intermediate hymn when toggle is about to be turned off"
+        expected: "Clearing hymn via X and toggling off are independent operations. Both work correctly."
+
+      - id: EC-120-03
+        case: "Rapidly pressing X and then selecting a new value"
+        expected: "Auto-save debounce handles correctly. Final state reflects the selection, not the clear."
+
+  # =============================================================================
+  # F121 / CR-182: Remove speech editing from Agenda card, navigate to Speeches tab
+  # =============================================================================
+
+  - id: F121
+    name: "Remove speech editing from Agenda card; navigate to Speeches tab"
+    cr_id: 182
+    type: feature
+    priority: high
+    related_features: [F012, F008, F044]
+    related_crs: [31, 100]
+
+    user_request: >
+      "Remover edicao de discursos do card de agenda. Campos de discursantes
+      mostram nome mas sao indisponiveis para edicao. A direita de cada campo,
+      botao com icone de lapis que leva para aba Discursos com card do domingo
+      expandido"
+
+    current_behavior: >
+      AgendaForm.tsx (lines 358-435) renders SpeakerField components for
+      speech positions 1, 2, and 3 (or "Last Speech"). The SpeakerField
+      component allows inline editing of speaker overrides via a pencil icon
+      that toggles a TextInput. The speaker_*_override fields in sunday_agendas
+      are used for last-minute swaps (F044/CR-100).
+
+      Current SpeakerField in AgendaForm shows:
+      - Read-only display of the assigned speaker name (from speeches table)
+      - Pencil icon to enter override edit mode (TextInput)
+      - X icon to revert override to original name
+      - Override is stored in speaker_1_override, speaker_2_override,
+        speaker_3_override fields in sunday_agendas
+
+      The Speeches tab (speeches.tsx) has full speech management with
+      SpeechSlot components that allow assigning/unassigning speakers and
+      topics, changing status, etc.
+
+    expected_behavior: >
+      **1. Remove speaker override editing from AgendaForm:**
+      - Remove the SpeakerField components from the Speeches sections
+        (sectionFirstSpeeches and sectionLastSpeech) of AgendaForm.
+      - Replace with simple read-only display fields showing the assigned
+        speaker name from the speeches table.
+
+      **2. Read-only speaker display:**
+      - Each speech position shows a non-editable field with the speaker name.
+      - Field styling: same as SelectorField but without the dropdown arrow.
+      - If no speaker assigned, show placeholder text (e.g., t('speeches.selectSpeaker')).
+      - Field is NOT pressable (no modal opens on tap).
+
+      **3. Pencil button for navigation:**
+      - To the RIGHT of each speech name field, render a pencil icon button
+        (Unicode pencil character U+270F or U+2710, same style as used in
+        SwipeableCard edit button).
+      - Pressing the pencil button navigates to the Speeches tab AND expands
+        the card for the current Sunday date.
+      - Navigation: router.push('/(tabs)/speeches') or router.navigate() with
+        appropriate params to indicate which Sunday to expand.
+      - The Speeches tab should auto-expand the card for the given Sunday date.
+        This may require passing a route param (e.g., ?expandDate=2026-02-22)
+        or using a shared state/context.
+
+      **4. Speaker override removal:**
+      - The speaker_1_override, speaker_2_override, speaker_3_override fields
+        in sunday_agendas are NO LONGER editable from the Agenda card.
+      - These fields can remain in the DB schema (no migration needed) but
+        the UI for editing them is removed from AgendaForm.
+      - If there is an override value, the Agenda card shows the ORIGINAL
+        speaker name from the speeches table (NOT the override).
+      - The Presentation Mode (usePresentationMode.ts) still uses overrides
+        if they exist (no change to presentation behavior).
+
+      **5. F118 interaction (has_second_speech):**
+      - When has_second_speech is false, the speech 2 row should either be
+        hidden or show the disabled placeholder (consistent with how SpeechSlot
+        handles it in the Speeches tab).
+      - The pencil button for position 2 should be hidden when has_second_speech
+        is false.
+
+    files_impacted:
+      - path: src/components/AgendaForm.tsx
+        action: modify
+        changes:
+          - "Replace SpeakerField components with read-only display + pencil nav button"
+          - "Remove speaker override editing (pencil/X toggle, TextInput)"
+          - "Add pencil button that navigates to Speeches tab with expandDate param"
+          - "Handle has_second_speech for position 2 visibility"
+
+      - path: src/app/(tabs)/speeches.tsx
+        action: modify
+        changes:
+          - "Accept route param expandDate and auto-expand that Sunday's card"
+          - "Use useLocalSearchParams or similar to read the param"
+
+    acceptance_criteria:
+      - id: AC-121-01
+        description: "Speaker names shown as read-only in Agenda card"
+        given: "Sunday with assigned speakers"
+        when: "View AgendaForm for that Sunday"
+        then: "Speaker names displayed as read-only text. No TextInput, no editable override."
+
+      - id: AC-121-02
+        description: "Pencil button visible next to each speaker name field"
+        given: "AgendaForm showing speech section"
+        when: "View positions 1, 2, and 3 (Last Speech)"
+        then: "Pencil icon button visible to the right of each speaker name field."
+
+      - id: AC-121-03
+        description: "Pencil button navigates to Speeches tab with card expanded"
+        given: "AgendaForm for Sunday 2026-03-01"
+        when: "Press pencil button on any speech position"
+        then: "App navigates to Speeches tab. Card for 2026-03-01 is expanded."
+
+      - id: AC-121-04
+        description: "Speaker override editing removed from Agenda"
+        given: "AgendaForm"
+        when: "Interact with any speaker field"
+        then: "No pencil-to-edit-mode toggle. No TextInput for override. No X to revert."
+
+      - id: AC-121-05
+        description: "Position 2 hidden or disabled when has_second_speech is false"
+        given: "Sunday with has_second_speech=false"
+        when: "View AgendaForm"
+        then: "Position 2 speaker row is either hidden or shows disabled placeholder. No pencil button for position 2."
+
+      - id: AC-121-06
+        description: "Empty state shows placeholder"
+        given: "Sunday with no speaker assigned for position 1"
+        when: "View AgendaForm"
+        then: "Position 1 field shows placeholder text (e.g., 'Selecionar Discursante'). Pencil button still visible to navigate."
+
+      - id: AC-121-07
+        description: "Presentation Mode still uses overrides"
+        given: "Sunday with speaker_1_override set in DB"
+        when: "Enter Presentation Mode"
+        then: "Override name shown in presentation (usePresentationMode.ts behavior unchanged)."
+
+      - id: AC-121-08
+        description: "Observer sees read-only fields without pencil button"
+        given: "User logged in as Observer"
+        when: "View AgendaForm"
+        then: "Speaker names shown as read-only. No pencil buttons visible."
+
+    edge_cases:
+      - id: EC-121-01
+        case: "Speeches tab is already showing the target Sunday expanded"
+        expected: "Navigation still works. Card remains expanded. No duplicate expand/collapse."
+
+      - id: EC-121-02
+        case: "Sunday has no agenda record yet"
+        expected: "Speaker fields show empty placeholders. Pencil buttons still navigate to Speeches tab."
+
+      - id: EC-121-03
+        case: "Secretary role views the pencil button"
+        expected: "Pencil button visible and functional. Secretary can navigate to Speeches tab (where they can change status but not assign)."
+
+  # =============================================================================
+  # F122 / CR-183: Rename 'Proximas Designacoes' to 'Proximos Discursos'
+  # =============================================================================
+
+  - id: F122
+    name: "Rename 'Proximas Designacoes' to 'Proximos Discursos' in all languages"
+    cr_id: 183
+    type: ui_text_change
+    priority: low
+    related_features: [F009]
+    related_crs: []
+
+    user_request: >
+      "No Home, trocar 'Proximas Designacoes' para 'Proximos Discursos' em
+      todas as linguas (pt-BR, en, es)"
+
+    current_behavior: >
+      The i18n key home.nextAssignments is used in two components:
+      1. NextAssignmentsSection.tsx (lines 125, 146): Renders the section
+         title for the "Next Assignments" section shown to Bishopric.
+      2. NextSundaysSection.tsx (lines 209, 225): Also references the same
+         key for a section header.
+
+      Current values:
+      - pt-BR.json:259: "nextAssignments": "Proximas Designacoes"
+      - en.json:259: "nextAssignments": "Next Assignments"
+      - es.json:259: "nextAssignments": "Proximas Asignaciones"
+
+    expected_behavior: >
+      **1. Update i18n values (text-only change, no code change needed):**
+      - pt-BR: "Proximas Designacoes" -> "Proximos Discursos"
+      - en: "Next Assignments" -> "Upcoming Speeches"
+      - es: "Proximas Asignaciones" -> "Proximos Discursos"
+
+      **2. The i18n KEY remains home.nextAssignments** (no key rename needed,
+      as it would require updating all code references). Only the VALUE changes.
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Change home.nextAssignments from 'Proximas Designacoes' to 'Proximos Discursos'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Change home.nextAssignments from 'Next Assignments' to 'Upcoming Speeches'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Change home.nextAssignments from 'Proximas Asignaciones' to 'Proximos Discursos'"
+
+    acceptance_criteria:
+      - id: AC-122-01
+        description: "pt-BR shows 'Proximos Discursos'"
+        given: "App language is pt-BR"
+        when: "View Home tab as Bishopric"
+        then: "Section title shows 'Proximos Discursos' instead of 'Proximas Designacoes'"
+
+      - id: AC-122-02
+        description: "en shows 'Upcoming Speeches'"
+        given: "App language is en"
+        when: "View Home tab as Bishopric"
+        then: "Section title shows 'Upcoming Speeches' instead of 'Next Assignments'"
+
+      - id: AC-122-03
+        description: "es shows 'Proximos Discursos'"
+        given: "App language is es"
+        when: "View Home tab as Bishopric"
+        then: "Section title shows 'Proximos Discursos' instead of 'Proximas Asignaciones'"
+
+      - id: AC-122-04
+        description: "NextSundaysSection also updated"
+        given: "NextSundaysSection uses same i18n key"
+        when: "View any component using home.nextAssignments"
+        then: "Updated text shown consistently across all usages"
+
+    edge_cases: []
+
+  # =============================================================================
+  # F123 / CR-187: Rename tab 'Agenda' to 'Agendas'
+  # =============================================================================
+
+  - id: F123
+    name: "Rename tab 'Agenda' to 'Agendas' in all languages"
+    cr_id: 187
+    type: ui_text_change
+    priority: low
+    related_features: [F012]
+    related_crs: []
+
+    user_request: >
+      "Trocar nome da aba 'Agenda' para 'Agendas' em todas as linguas"
+
+    current_behavior: >
+      The tabs layout (_layout.tsx:39-41) uses t('tabs.agenda') for the
+      Agenda tab title. The i18n key tabs.agenda has values:
+      - pt-BR.json:82: "agenda": "Agenda"
+      - en.json:82: "agenda": "Agenda"
+      - es.json:82: "agenda": "Agenda"
+
+      Additionally, the agenda screen has a title key:
+      - pt-BR.json:217: "title": "Agenda"
+      - en.json:217: "title": "Agenda"
+      - es.json:217: "title": "Agenda"
+
+    expected_behavior: >
+      **1. Update tab label in all 3 languages:**
+      - pt-BR: tabs.agenda from "Agenda" to "Agendas"
+      - en: tabs.agenda from "Agenda" to "Agendas"
+      - es: tabs.agenda from "Agenda" to "Agendas"
+
+      **2. Update screen title (agenda.title) in all 3 languages:**
+      - pt-BR: agenda.title from "Agenda" to "Agendas"
+      - en: agenda.title from "Agenda" to "Agendas"
+      - es: agenda.title from "Agenda" to "Agendas"
+
+      NOTE: "Agendas" is the same word in all 3 languages (pluralized).
+
+    files_impacted:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+        changes:
+          - "Change tabs.agenda from 'Agenda' to 'Agendas'"
+          - "Change agenda.title from 'Agenda' to 'Agendas'"
+
+      - path: src/i18n/locales/en.json
+        action: modify
+        changes:
+          - "Change tabs.agenda from 'Agenda' to 'Agendas'"
+          - "Change agenda.title from 'Agenda' to 'Agendas'"
+
+      - path: src/i18n/locales/es.json
+        action: modify
+        changes:
+          - "Change tabs.agenda from 'Agenda' to 'Agendas'"
+          - "Change agenda.title from 'Agenda' to 'Agendas'"
+
+    acceptance_criteria:
+      - id: AC-123-01
+        description: "Tab label shows 'Agendas' in pt-BR"
+        given: "App language is pt-BR"
+        when: "View bottom tab bar"
+        then: "Agenda tab label shows 'Agendas'"
+
+      - id: AC-123-02
+        description: "Tab label shows 'Agendas' in en"
+        given: "App language is en"
+        when: "View bottom tab bar"
+        then: "Agenda tab label shows 'Agendas'"
+
+      - id: AC-123-03
+        description: "Tab label shows 'Agendas' in es"
+        given: "App language is es"
+        when: "View bottom tab bar"
+        then: "Agenda tab label shows 'Agendas'"
+
+      - id: AC-123-04
+        description: "Screen title updated to 'Agendas'"
+        given: "Any language"
+        when: "Navigate to Agenda tab"
+        then: "Screen title header shows 'Agendas'"
+
+    edge_cases: []
+
+  # =============================================================================
+  # F124 / CR-189: Fix alignment of X clear buttons in Speech card (Discursos tab)
+  # =============================================================================
+
+  - id: F124
+    name: "Fix alignment of X clear buttons in SpeechSlot"
+    cr_id: 189
+    type: bug
+    priority: medium
+    related_features: [F008, F060, F073, F112, F115]
+    related_crs: [114, 128, 162, 174, 177]
+
+    user_request: >
+      "No card de discursos, icones X que limpam designacao estao deslocados.
+      Centro do icone deve alinhar horizontalmente com centro do campo de
+      selecao do discursante (e X do tema alinhado ao tema)"
+
+    current_behavior: >
+      In SpeechSlot.tsx, the layout uses a two-column approach:
+      - leftColumn (flex:1): Contains labelRow, speaker field, and topic field
+      - rightColumn (width:36): Contains statusLedPlaceholder, speakerActionWrapper
+        (height:38 for X button), and topicActionWrapper (height:34 for topic X button)
+
+      The X buttons in rightColumn are centered within their wrapper views using
+      justifyContent: 'center' and alignItems: 'center'. However, the X icons
+      appear visually misaligned with the centers of their corresponding fields:
+      - Speaker X should align horizontally with the center of the speaker
+        selection field (height:38)
+      - Topic X should align horizontally with the center of the topic
+        selection field (height:34)
+
+      The misalignment is caused by:
+      1. statusLedPlaceholder in rightColumn takes up space above the speaker X,
+         pushing it down relative to the speaker field
+      2. The labelRow height in leftColumn does not match statusLedPlaceholder
+         height in rightColumn
+      3. topicActionWrapper has marginTop:6 but topicRow in leftColumn also has
+         marginTop:6 - these should stay in sync
+
+    expected_behavior: >
+      **1. Align speaker X center with speaker field center:**
+      - The center of the X button (within speakerActionWrapper) must be at
+        the same vertical position as the center of the speaker field
+        (within the row View).
+      - Both have height:38, so the issue is vertical offset caused by
+        preceding elements in the rightColumn (statusLedPlaceholder).
+      - Fix: Ensure statusLedPlaceholder in rightColumn has the same height
+        as the labelRow in leftColumn. This can be done by giving
+        statusLedPlaceholder a fixed height matching labelRow, or by using
+        flexbox alignment that automatically synchronizes.
+
+      **2. Align topic X center with topic field center:**
+      - The center of the topic X button (within topicActionWrapper) must be
+        at the same vertical position as the center of the topic field
+        (within topicRow).
+      - Both should have matching height (34) and marginTop (6).
+      - Fix: Ensure topicActionWrapper height and marginTop match topicField
+        exactly.
+
+      **3. Implementation approach (recommended):**
+      - Instead of separate leftColumn/rightColumn layout, consider wrapping
+        each row (label, speaker, topic) in its own flexDirection:'row' with
+        the X/LED at the end. This guarantees vertical alignment because the
+        field and its action button are in the same flex row.
+      - Alternatively, keep the two-column approach but ensure exact height
+        matching between left and right elements:
+        a. statusLedPlaceholder height = labelRow actual height
+        b. speakerActionWrapper height = speaker field height (38)
+        c. topicActionWrapper height = topic field height (34)
+        d. marginTop values synchronized
+
+    files_impacted:
+      - path: src/components/SpeechSlot.tsx
+        action: modify
+        changes:
+          - "Fix vertical alignment of speaker X button center with speaker field center"
+          - "Fix vertical alignment of topic X button center with topic field center"
+          - "Ensure labelRow and statusLedPlaceholder heights are synchronized"
+
+    acceptance_criteria:
+      - id: AC-124-01
+        description: "Speaker X button center aligns with speaker field center"
+        given: "SpeechSlot with assigned speaker (X visible)"
+        when: "View the expanded speech card"
+        then: "Horizontal center of X button is at the same vertical level as horizontal center of speaker selection field"
+
+      - id: AC-124-02
+        description: "Topic X button center aligns with topic field center"
+        given: "SpeechSlot with assigned topic (X visible)"
+        when: "View the expanded speech card"
+        then: "Horizontal center of topic X button is at the same vertical level as horizontal center of topic selection field"
+
+      - id: AC-124-03
+        description: "Alignment works for all 3 speech positions"
+        given: "Expanded Sunday card with speakers and topics on all 3 positions"
+        when: "View positions 1, 2, and 3"
+        then: "X buttons aligned correctly for all positions"
+
+      - id: AC-124-04
+        description: "Layout does not break on narrow screens"
+        given: "Small phone screen (320px width)"
+        when: "View SpeechSlot"
+        then: "Layout remains correct. No overflow or clipping."
+
+      - id: AC-124-05
+        description: "Alignment correct when X is not visible"
+        given: "SpeechSlot with no speaker assigned (X hidden)"
+        when: "View the slot"
+        then: "rightColumn spacing remains consistent. No layout shift."
+
+      - id: AC-124-06
+        description: "Status LED and status text positioning not regressed"
+        given: "SpeechSlot with status and LED visible"
+        when: "View labelRow"
+        then: "StatusLED and status text are positioned correctly (as per F115/CR-177)"
+
+    edge_cases:
+      - id: EC-124-01
+        case: "Toggle position 2 off then on - X alignment maintained"
+        expected: "After re-enabling position 2, X buttons re-render with correct alignment."
+
+      - id: EC-124-02
+        case: "Long speaker name causing text wrapping"
+        expected: "Speaker field is numberOfLines=1 with ellipsis. Height remains 38px. X alignment unaffected."
+
+  # =============================================================================
+  # F125 / CR-192: Fix push notifications not working (projectId bug)
+  # =============================================================================
+
+  - id: F125
+    name: "Fix push notifications not working (projectId undefined)"
+    cr_id: 192
+    type: bug
+    priority: critical
+    related_features: [F017]
+    related_crs: [52, 53]
+
+    user_request: >
+      "Push notifications nao estao funcionando. Testado com Secretario no iOS
+      (build EAS) e Bispo no Android (build EAS). Ambos possuem permissao de
+      notificacao concedida no sistema. Notifications nao chegam"
+
+    current_behavior: >
+      In useNotifications.ts (lines 65-66), the getExpoPushTokenAsync call
+      passes projectId: undefined:
+
+      ```typescript
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: undefined, // Uses default from app.json
+      });
+      ```
+
+      The comment says "Uses default from app.json" but this is INCORRECT.
+      When projectId is undefined (or not provided), getExpoPushTokenAsync in
+      EAS builds requires the explicit projectId from the EAS configuration.
+
+      The correct projectId is "6ce6536e-08c4-4c3a-ac06-f1c224e43dbd" as
+      defined in app.json:40 (expo.extra.eas.projectId).
+
+      In Expo SDK 54, getExpoPushTokenAsync resolves the projectId from
+      Constants.expoConfig.extra.eas.projectId when not explicitly provided,
+      but passing undefined OVERRIDES the automatic resolution, causing the
+      SDK to fail silently or return an invalid token.
+
+      The server-side Edge Function (process-notifications/index.ts) is
+      correctly implemented - the issue is entirely client-side. Without a
+      valid push token registered, the server has no token to send
+      notifications to.
+
+    expected_behavior: >
+      **1. Fix projectId in getExpoPushTokenAsync:**
+      - Import Constants from expo-constants
+      - Pass the correct projectId from Constants.expoConfig.extra.eas.projectId
+      - Remove the undefined value and the incorrect comment
+
+      **2. Updated code:**
+      ```typescript
+      import Constants from 'expo-constants';
+
+      // In register() function:
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+      ```
+
+      **3. Fallback handling:**
+      - If projectId is somehow undefined (e.g., running in Expo Go where EAS
+        config may not be available), log a warning and skip registration.
+      - This is defensive: in production EAS builds, projectId will always
+        be available.
+
+    files_impacted:
+      - path: src/hooks/useNotifications.ts
+        action: modify
+        changes:
+          - "Import Constants from 'expo-constants'"
+          - "Extract projectId from Constants.expoConfig?.extra?.eas?.projectId"
+          - "Pass projectId to getExpoPushTokenAsync (replacing undefined)"
+          - "Add fallback: if projectId undefined, log warning and skip"
+
+    acceptance_criteria:
+      - id: AC-125-01
+        description: "projectId correctly passed to getExpoPushTokenAsync"
+        given: "useNotifications.ts source code"
+        when: "Read the getExpoPushTokenAsync call"
+        then: "projectId is Constants.expoConfig?.extra?.eas?.projectId, NOT undefined"
+
+      - id: AC-125-02
+        description: "Constants imported from expo-constants"
+        given: "useNotifications.ts imports"
+        when: "Read the import statements"
+        then: "import Constants from 'expo-constants' is present"
+
+      - id: AC-125-03
+        description: "Push token registered successfully on EAS build"
+        given: "App running on EAS build (iOS or Android) with notification permission granted"
+        when: "User logs in as Bishopric or Secretary"
+        then: "Push token is successfully obtained and upserted in device_push_tokens table"
+
+      - id: AC-125-04
+        description: "Notifications received after fix"
+        given: "Push token registered successfully"
+        when: "A speech assignment is made (triggering notification)"
+        then: "Push notification is received on the device"
+
+      - id: AC-125-05
+        description: "Fallback when projectId unavailable (Expo Go)"
+        given: "App running in Expo Go (no EAS config)"
+        when: "App mounts"
+        then: "Warning logged: 'Push token registration error: projectId not available'. No crash."
+
+      - id: AC-125-06
+        description: "Observer still excluded from push registration"
+        given: "User logged in as Observer"
+        when: "App mounts"
+        then: "Push token registration skipped (existing behavior preserved)"
+
+      - id: AC-125-07
+        description: "Server-side Edge Function not modified"
+        given: "process-notifications/index.ts"
+        when: "Compare before and after"
+        then: "No changes to server-side code. Fix is client-side only."
+
+    edge_cases:
+      - id: EC-125-01
+        case: "User denies notification permission"
+        expected: "Registration skipped (existing behavior). No error, no crash."
+
+      - id: EC-125-02
+        case: "App is offline during registration"
+        expected: "Registration deferred to next app opening with connection (existing behavior via isOnline check)."
+
+      - id: EC-125-03
+        case: "Token already registered from before (stale token)"
+        expected: "Upsert overwrites the old token. New valid token is stored."
+
+# =============================================================================
+# RESOLVED OPEN QUESTIONS
+# =============================================================================
+
+resolved_open_questions:
+
+  - id: OQ-6
+    question: "For CR-179, should the X button be inside or outside the SelectorField?"
+    answer: >
+      User explicitly said 'pode ser dentro do campo' (can be inside the field).
+      Implementation should place X inside the SelectorField at the right side,
+      which is simpler and avoids layout changes. If implementation finds this
+      visually crowded, an outside position (as sibling) is also acceptable.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-7
+    question: "For CR-182, should the speaker_*_override fields be deleted from DB?"
+    answer: >
+      NO. The DB fields remain. The override mechanism is removed from the Agenda
+      UI only. Presentation Mode still reads overrides. If overrides were set before
+      this change, they continue to be used in presentation. No migration needed.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-8
+    question: "For CR-182, how does the pencil button navigate to Speeches tab with a specific Sunday expanded?"
+    answer: >
+      Use Expo Router navigation with a query parameter: router.push('/(tabs)/speeches?expandDate=YYYY-MM-DD').
+      The Speeches tab reads this param via useLocalSearchParams and auto-expands
+      the matching Sunday card. This is the standard Expo Router pattern for passing
+      data between tabs.
+    resolved_date: "2026-02-22"
+
+  - id: OQ-9
+    question: "For CR-192, is the root cause confirmed as projectId: undefined?"
+    answer: >
+      YES. QA PRE analysis confirmed useNotifications.ts:65-66 passes
+      projectId: undefined. The correct projectId is in app.json:40 as
+      "6ce6536e-08c4-4c3a-ac06-f1c224e43dbd". Server-side is correctly
+      implemented. Issue is client-side only.
+    resolved_date: "2026-02-22"
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+resolved_assumptions:
+
+  - id: A-11
+    assumption: "CR-183 English translation for 'Proximos Discursos' should be 'Upcoming Speeches'"
+    status: assumed
+    notes: >
+      User did not specify the English translation. 'Upcoming Speeches' chosen
+      as the closest semantic equivalent. 'Next Speeches' would also be valid.
+      The i18n key remains home.nextAssignments (only value changes).
+
+  - id: A-12
+    assumption: "CR-187 'Agendas' is the same in all 3 languages"
+    status: assumed
+    notes: >
+      'Agendas' is valid in Portuguese, English, and Spanish as the plural of
+      'Agenda'. User said 'em todas as linguas' implying the same word.
+
+  - id: A-13
+    assumption: "CR-182 removes the speaker override editing but NOT the override DB fields"
+    status: assumed
+    notes: >
+      Removing the UI for editing overrides does not require removing the DB
+      fields. Presentation Mode still uses overrides. No migration needed.
+      Existing overrides remain functional for presentation.
+
+  - id: A-14
+    assumption: "CR-179 X clear buttons do NOT require confirmation dialogs"
+    status: assumed
+    notes: >
+      Consistent with existing patterns in the app: topic clear in SpeechSlot
+      (F060/CR-114) has no confirmation. Values are easily re-selectable.
+      Only speaker unassignment has confirmation (because it affects invite cycle).
+
+  - id: A-15
+    assumption: "CR-189 alignment fix only affects the rightColumn X buttons, not the StatusLED position"
+    status: assumed
+    notes: >
+      The StatusLED positioning was addressed by CR-177/F115 (right edge alignment).
+      CR-189 specifically mentions the X icons. The StatusLED position should not
+      be regressed by this fix.
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-6
+    type: dependency
+    description: >
+      CR-182 removes speaker editing from AgendaForm but F044/CR-100 (pending)
+      ADDED the speaker override editing. Since F044 is still pending (not
+      implemented), the override mechanism may or may not exist in the codebase
+      when F121 is implemented. However, looking at the current code
+      (AgendaForm.tsx:364-435), the SpeakerField with override IS already
+      implemented, so F044 was apparently implemented. F121 removes this
+      capability from the Agenda card.
+    existing_spec: "F044/CR-100: Read-only speaker field with last-minute swap (override)"
+    new_request: "CR-182: Remove speech editing from Agenda card entirely"
+    resolution: >
+      F121 supersedes the SpeakerField editing in AgendaForm from F044.
+      The override DB fields and Presentation Mode behavior remain.
+      The edit capability is simply removed from the Agenda UI.
+
+  - id: INC-7
+    type: overlap
+    description: >
+      CR-179 (F120) adds X clear buttons to ALL selector fields in AgendaForm.
+      CR-182 (F121) removes speech editing from AgendaForm. If both are
+      implemented, the SpeakerField rows that F120 would add X buttons to are
+      removed by F121. This is NOT a conflict: F120 adds X to actor/hymn/prayer
+      fields, F121 removes speech edit UI. The speech section fields affected by
+      F121 are SpeakerField (different from SelectorField). F120 targets
+      SelectorField-based fields which are NOT in the speech section.
+    existing_spec: "F120/CR-179: X clear buttons on selector fields"
+    new_request: "F121/CR-182: Remove speech editing from Agenda"
+    resolution: "No actual conflict. F120 targets non-speech selector fields. F121 targets speech section only."
+
+  - id: INC-8
+    type: dependency
+    description: >
+      CR-189 (F124) fixes X alignment in SpeechSlot.tsx. Several pending CRs
+      (F112/CR-174, F115/CR-177) also modify SpeechSlot layout. F115 supersedes
+      F112. F124 must be implemented on top of whatever SpeechSlot layout exists
+      at implementation time.
+    existing_spec: "F115/CR-177: StatusLED right edge alignment in SpeechSlot"
+    new_request: "CR-189: X button center alignment in SpeechSlot"
+    resolution: "F124 addresses X button alignment independently. Must be compatible with F115 layout if F115 is implemented first."
+
+  - id: INC-9
+    type: dependency
+    description: >
+      F094/CR-151 (pending) adds pianist/conductor fields to AgendaForm with
+      roleFilter 'can_music'. But F117/CR-180 (Batch 19 Phase 1) renamed
+      can_music to can_pianist/can_conductor. The current AgendaForm code already
+      uses can_pianist and can_conductor (lines 235, 249), confirming F117 was
+      implemented. F094 spec still says 'can_music' but implementation should
+      use can_pianist/can_conductor. This is noted in INC-5 of SPEC_F116_F119.
+    existing_spec: "F094/CR-151: Pianist/conductor fields with can_music"
+    new_request: "N/A (already noted)"
+    resolution: "Already documented in INC-5 of SPEC_F116_F119.yaml. No action needed."
+
+# =============================================================================
+# VALIDATION GATE (Final - Complete)
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Li SPEC_CONSOLIDATED antes de comecar
+  GATE-02: true  # Identifiquei todas ambiguidades
+  GATE-03: true  # Listei TODAS open questions com IDs (OQ-6 to OQ-9)
+  GATE-04: true  # Listei TODAS assumptions com IDs (A-11 to A-15)
+  GATE-05: true  # Reportei inconsistencias com SPEC_CONSOLIDATED (INC-6 to INC-9)
+  GATE-06: true  # Status e "complete"
+  GATE-07: true  # Incorporei informacoes do QA PRE (CR-192 root cause)
+  GATE-08: true  # Zero placeholders no SPEC

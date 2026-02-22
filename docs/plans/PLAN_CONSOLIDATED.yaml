@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 21
-  last_updated_by: "batch-19"
+  version: 22
+  last_updated_by: "batch-19-phase-2"
   total_phases: 6
-  total_cr_plans: 38
+  total_cr_plans: 39
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -741,6 +741,31 @@ cr_plans:
       S09 parallelizaveis, S03 depende de S01+S02, S04+S05 dependem de S03, S06 depende de
       S04, S07 depende de S03, S08 depende de S04+S06+S07, S10 depende de todos.
 
+  - id: PLAN_P033
+    title: "Batch 19 Phase 2: Clear Buttons, Read-Only Speeches, Label Renames, X Alignment, Push Notifications"
+    status: pending
+    crs_covered: [179, 182, 183, 187, 189, 192]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P033.yaml"
+    summary: >
+      6 features cobrindo UI/UX de cards, renames de labels e bug fix de push notifications:
+      botoes X de limpeza em todos os campos seletores (actor, hino, oracao, reconhecendo) do
+      AgendaForm com SelectorField onClear callback, visivel apenas quando campo tem valor e
+      usuario nao e Observer (F120). Substituicao da edicao de override de discursante no
+      AgendaForm por display read-only + botao lapis que navega para aba Discursos com
+      auto-expand do card via query param expandDate (ADR-082), remocao do SpeakerField e
+      estilos associados, posicao 2 oculta quando has_second_speech=false (F121). Rename de
+      'Proximas Designacoes' para 'Proximos Discursos' em 3 idiomas (F122). Rename de tab e
+      titulo 'Agenda' para 'Agendas' em 3 idiomas (F123). Fix de alinhamento vertical dos
+      botoes X no SpeechSlot com reestruturacao de layout two-column para row-per-element
+      per ADR-081, garantindo alinhamento por alignItems:'center' na mesma flex row (F124).
+      Fix de push notifications com leitura de projectId de Constants.expoConfig ao inves de
+      undefined, com guard para Expo Go (F125). 6 features, 39 ACs, 11 ECs, 5 arquivos
+      impactados (1 novo teste + 4 modificados), zero migracoes SQL, zero Edge Functions,
+      zero dependencias novas. 2 ADRs: ADR-081 (row-per-element SpeechSlot), ADR-082
+      (Expo Router query param cross-tab). S01-S04 parallelizaveis, S05 depende de S04,
+      S07 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1040,6 +1065,24 @@ pending_with_plan:
   - cr_id: 191
     plan_id: PLAN_P032
     description: "Fix Edge Function reset-redirect mostrando HTML como plain-text no Safari"
+  - cr_id: 179
+    plan_id: PLAN_P033
+    description: "Botao X para limpar campos seletores (actor, hino, oracao) no card de Agenda"
+  - cr_id: 182
+    plan_id: PLAN_P033
+    description: "Remover edicao de discursos do card de Agenda, navegar para aba Discursos com lapis"
+  - cr_id: 183
+    plan_id: PLAN_P033
+    description: "Rename 'Proximas Designacoes' para 'Proximos Discursos' em 3 idiomas"
+  - cr_id: 187
+    plan_id: PLAN_P033
+    description: "Rename tab e titulo 'Agenda' para 'Agendas' em 3 idiomas"
+  - cr_id: 189
+    plan_id: PLAN_P033
+    description: "Fix alinhamento dos botoes X no card de Discursos (SpeechSlot row-per-element)"
+  - cr_id: 192
+    plan_id: PLAN_P033
+    description: "Fix push notifications com projectId de Constants ao inves de undefined"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1061,6 +1104,20 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 22
+    phase: "batch-19-phase-2"
+    changes:
+      - "Added PLAN_P033 for Batch 19 Phase 2 (F120-F125, CRs 179/182/183/187/189/192)"
+      - "6 features: X clear buttons on selector fields, read-only speeches + pencil nav, label renames, SpeechSlot X alignment, push notification projectId fix"
+      - "6 steps, 39 ACs, 11 ECs, 5 arquivos impactados (1 novo teste + 4 modificados)"
+      - "Zero migracoes SQL, zero Edge Functions, zero dependencias novas"
+      - "2 ADRs: ADR-081 (row-per-element SpeechSlot layout), ADR-082 (Expo Router query param cross-tab navigation)"
+      - "F120 adiciona onClear/hasValue props ao SelectorField sub-component no AgendaForm com clear handlers para 11 campos (actor, hymn, prayer, recognizing)"
+      - "F121 remove SpeakerField do AgendaForm, substitui por ReadOnlySpeakerRow com display read-only + botao lapis que navega para Speeches tab com expandDate param"
+      - "F122+F123 sao mudancas de valor i18n apenas (no code changes): 'Proximas Designacoes'->'Proximos Discursos', 'Agenda'->'Agendas'"
+      - "F124 reestrutura SpeechSlot de two-column para row-per-element garantindo X button alignment por alignItems:'center' (supersedes ADR-076, ADR-078 parcial)"
+      - "F125 corrige projectId: undefined com Constants.expoConfig?.extra?.eas?.projectId + guard para Expo Go"
+      - "S01-S04 parallelizaveis (independentes), S05 depende de S04 (ambos AgendaForm.tsx), S06 depende de todos"
   - version: 21
     phase: "batch-19"
     changes:

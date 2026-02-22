@@ -9,8 +9,8 @@ metadata:
   last_updated: "2026-02-22"
   last_updated_by: "batch-19"
   total_modules: 8
-  total_adrs: 71
-  total_crs_implemented: 112
+  total_adrs: 73
+  total_crs_implemented: 118
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -39,6 +39,7 @@ metadata:
     - docs/arch/ARCH_M030.yaml
     - docs/arch/ARCH_M031.yaml
     - docs/arch/ARCH_M032.yaml
+    - docs/arch/ARCH_M033.yaml
 
 # =============================================================================
 # TECH STACK
@@ -1205,6 +1206,7 @@ adrs:
     decision: "Restructure SpeechSlot to outerRow with leftColumn (flex:1) + rightColumn (width:36). All right-side elements centered in same column. Remove paddingRight:5."
     decided_in: "CR-174"
     supersedes: "ADR-074 (full)"
+    superseded_by: "ADR-081 (CR-189/F124 -- row-per-element replaces two-column approach)"
     consequences:
       - "True center-to-center alignment regardless of font metrics"
       - "Layout restructure (more complex but robust)"
@@ -1226,6 +1228,7 @@ adrs:
     decision: "Move StatusLED from rightColumn back into labelRow (leftColumn flex:1), grouped with statusText in a Pressable. rightColumn retains X buttons only."
     decided_in: "CR-177"
     supersedes: "ADR-076 (partial -- LED placement only; rightColumn for X buttons retained)"
+    superseded_by: "ADR-081 (CR-189/F124 -- rightColumn removed entirely; LED placement in labelRow unchanged)"
     consequences:
       - "LED right edge aligns with field right edge (same flex container)"
       - "StatusText and LED remain grouped and tappable"
@@ -1251,6 +1254,28 @@ adrs:
       - "DB-level enforcement prevents all invalid states"
       - "Multi-role actors (can_preside + can_pianist) still allowed (independent axes)"
       - "Person doing both roles needs two actor entries (user accepted)"
+
+  - id: ADR-081
+    title: "Row-per-element layout for SpeechSlot X button alignment (supersedes two-column approach)"
+    context: "F124/CR-189 reports X buttons misaligned with fields. Two-column layout (ADR-076/ADR-078) requires manual height synchronization between statusLedPlaceholder and labelRow, which is fragile."
+    decision: "Restructure SpeechSlot to row-per-element: each field (speaker, topic) in its own flexDirection:'row' with its X button as sibling. alignItems:'center' guarantees vertical alignment."
+    decided_in: "CR-189"
+    supersedes: "ADR-076 (rightColumn layout for X buttons), ADR-078 (partial -- LED placement unchanged, rightColumn removed)"
+    consequences:
+      - "X button center always aligns with field center (same flex row)"
+      - "No manual height synchronization needed"
+      - "labelRow decoupled from field rows"
+      - "rightColumn removed; replaced by per-row actionArea (width:36)"
+
+  - id: ADR-082
+    title: "Expo Router query param for cross-tab navigation with expanded card"
+    context: "F121/CR-182 needs AgendaForm pencil button to navigate to Speeches tab AND auto-expand a specific Sunday card."
+    decision: "Use Expo Router query params: router.push('/(tabs)/speeches?expandDate=YYYY-MM-DD'). Speeches tab reads expandDate via useLocalSearchParams and auto-expands the matching card."
+    decided_in: "CR-182"
+    consequences:
+      - "No new Context or global state needed"
+      - "Standard Expo Router pattern"
+      - "expandDate param cleared after handling to avoid re-triggering"
 
 # =============================================================================
 # DATABASE SCHEMA
@@ -1617,7 +1642,7 @@ file_structure:
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). CR-178/F116: Observer gains Settings tab with limited access (app language, theme, about)."
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel."
       "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry."
-      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso."
+      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
         "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only)."
@@ -1651,18 +1676,18 @@ file_structure:
     "useSundayList.ts": "Lista de domingos com scroll infinito"
     "useRealtimeSync.ts": "Subscricao Supabase Realtime"
     "useConnection.ts": "Monitor de conexao (NetInfo). CR-146/F089: integra onlineManager.setOnline() do TanStack Query."
-    "useNotifications.ts": "Registro de token + handler de tap"
+    "useNotifications.ts": "Registro de token + handler de tap. CR-192/F125: projectId from Constants.expoConfig instead of undefined; fallback guard for Expo Go."
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param)."
     "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
     "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. CR-181/F118: collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078)."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). CR-189/F124: row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn)."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop."
@@ -2067,6 +2092,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-079, ADR-080]
     new_files: ["supabase/migrations/017_split_music_actor.sql", "supabase/migrations/018_add_has_second_speech.sql"]
+
+  batch_19_phase_2:
+    crs: "CR-179, CR-182, CR-183, CR-187, CR-189, CR-192"
+    scope: "X clear buttons on selector fields (F120), read-only speeches in Agenda + pencil nav (F121), rename Proximas Designacoes to Proximos Discursos (F122), rename tab Agenda to Agendas (F123), SpeechSlot X alignment fix (F124), push notifications projectId bug fix (F125)"
+    doc: "ARCH_M033.yaml"
+    status: "pending implementation"
+    adrs: [ADR-081, ADR-082]
+    new_files: []
 
 # =============================================================================
 # OBSERVABILITY

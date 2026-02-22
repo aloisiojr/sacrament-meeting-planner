@@ -170,10 +170,12 @@ export function createMockAuthContext(overrides?: Partial<AuthContextValue>): Au
     role,
     wardId: 'ward-1',
     userName: 'Test User',
+    wardLanguage: 'pt-BR',
     loading: false,
     signIn: vi.fn(),
     signOut: vi.fn(),
     hasPermission: (perm: Permission) => checkPermission(role, perm),
+    updateAppLanguage: vi.fn(),
     ...overrides,
   };
 }
@@ -450,6 +452,7 @@ export function createMockAgenda(overrides?: Partial<SundayAgenda>): SundayAgend
     has_special_presentation: false,
     special_presentation_description: null,
     intermediate_hymn_id: null,
+    has_intermediate_hymn: true,
     speaker_1_override: null,
     speaker_2_override: null,
     speaker_3_override: null,

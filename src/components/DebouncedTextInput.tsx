@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { TextInput, type TextInputProps, type NativeSyntheticEvent, type TextInputFocusEventData } from 'react-native';
+import { TextInput, type TextInputProps } from 'react-native';
 
 export interface DebouncedTextInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   /** The current persisted value. */
@@ -63,7 +63,7 @@ export function DebouncedTextInput({
   );
 
   const handleBlur = useCallback(
-    (e: NativeSyntheticEvent<TextInputFocusEventData>) => {
+    (e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
       flush();
       rest.onBlur?.(e);
     },

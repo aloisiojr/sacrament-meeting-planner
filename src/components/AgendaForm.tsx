@@ -32,6 +32,7 @@ import { SearchInput } from './SearchInput';
 import type {
   SundayAgenda,
   MeetingActor,
+  Member,
   Hymn,
   SundayExceptionReason,
   Speech,

@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 10
-last_updated: "2026-02-22T19:00:00"
+version: 11
+last_updated: "2026-02-22T20:16:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -457,4 +457,41 @@ deploy_history:
       - "supabase functions list mostra reset-redirect como ACTIVE v3"
       - "GET com token=test123&type=recovery retorna HTML 200 com deep link e charset=utf-8"
       - "HTML nao contem tag script (usa apenas meta http-equiv refresh)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function reset-redirect"
+    method: "supabase functions deploy reset-redirect --no-verify-jwt"
+    reason: "F138 (CR-202): Complete rewrite - now serves self-contained HTML page with password reset form (Supabase JS from CDN, verifyOtp + updateUser in browser). Replaces meta refresh deep link redirect."
+    result: "Sucesso - Function redeployada e ACTIVE (version 4)"
+    verified: true
+    cr: "Batch 21 (F138, CR-202)"
+    verification:
+      - "supabase functions list mostra reset-redirect como ACTIVE v4"
+      - "GET com token=test123&type=recovery retorna HTML 200 (pagina web com formulario)"
+      - "HTML contem formulario de nova senha + confirmacao"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Deploy Edge Function invite-redirect (nova)"
+    method: "supabase functions deploy invite-redirect --no-verify-jwt"
+    reason: "F139 (CR-203): New Edge Function - self-contained HTML page for invitation acceptance. Shows read-only fields (stake, ward, role, email) + registration form (fullName, password, confirm)."
+    result: "Sucesso - Function deployada e ACTIVE (version 1)"
+    verified: true
+    cr: "Batch 21 (F139, CR-203)"
+    verification:
+      - "supabase functions list mostra invite-redirect como ACTIVE v1"
+      - "GET com token UUID retorna HTML 200 (pagina web com formulario)"
+      - "HTML contem campos read-only + formulario de registro"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function create-invitation"
+    method: "supabase functions deploy create-invitation"
+    reason: "F139 (CR-203): deepLink changed from sacrmeetplan://invite/ to HTTPS URL of invite-redirect Edge Function"
+    result: "Sucesso - Function redeployada e ACTIVE (version 9)"
+    verified: true
+    cr: "Batch 21 (F139, CR-203)"
+    verification:
+      - "supabase functions list mostra create-invitation como ACTIVE v9"
       - "REST API health check: HTTP 200"

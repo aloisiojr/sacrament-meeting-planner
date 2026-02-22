@@ -204,9 +204,9 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
 
   // --- AC-114-03: reset-redirect returns HTML with auto-redirect ---
   describe('AC-114-03: HTML with auto-redirect', () => {
-    it('reset-redirect contains window.location.href redirect', () => {
+    it('reset-redirect uses meta refresh for auto-redirect (F134: script tag removed)', () => {
       const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('window.location.href');
+      expect(content).toContain('http-equiv="refresh"');
     });
 
     it('reset-redirect redirect target uses sacrmeetplan://reset-password', () => {
@@ -333,26 +333,25 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
     });
   });
 
-  // --- EC-114-03: Auto-redirect blocked ---
-  describe('EC-114-03: Multiple redirect mechanisms', () => {
-    it('has both meta refresh and JavaScript redirect', () => {
+  // --- EC-114-03: Auto-redirect mechanisms (F134: script removed) ---
+  describe('EC-114-03: Redirect mechanisms', () => {
+    it('has meta refresh for auto-redirect', () => {
       const content = readProjectFile(resetRedirectPath);
       expect(content).toContain('meta http-equiv="refresh"');
-      expect(content).toContain('window.location.href');
     });
 
-    it('has fallback button as third mechanism', () => {
+    it('has fallback button as second mechanism', () => {
       const content = readProjectFile(resetRedirectPath);
       expect(content).toContain('<a href=');
     });
   });
 
-  // --- EC-114-04: Email client strips JavaScript ---
-  describe('EC-114-04: JavaScript only executes in browser', () => {
-    it('JavaScript redirect is in HTML body (not in email template)', () => {
+  // --- EC-114-04: No script tags in redirect or email (F134) ---
+  describe('EC-114-04: No script tags', () => {
+    it('reset-redirect does NOT contain <script> tags (F134 fix)', () => {
       const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('<script>');
-      expect(content).toContain('</script>');
+      expect(content).not.toContain('<script>');
+      expect(content).not.toContain('</script>');
     });
 
     it('email template does NOT contain <script> tags', () => {

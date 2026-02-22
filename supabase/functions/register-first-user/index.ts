@@ -194,7 +194,8 @@ Deno.serve(async (req) => {
               can_preside: true,
               can_conduct: true,
               can_recognize: false,
-              can_music: false,
+              can_pianist: false,
+              can_conductor: false,
             });
         }
       } catch (actorErr) {

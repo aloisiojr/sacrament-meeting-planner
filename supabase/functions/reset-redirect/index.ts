@@ -39,6 +39,28 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Validate input formats to prevent XSS injection via template interpolation.
+  // token is a hex hash from Supabase Auth; type is a known recovery type string.
+  if (!/^[a-fA-F0-9]+$/.test(token)) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid token format' }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  if (!/^[a-z_]+$/.test(type)) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid type format' }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 

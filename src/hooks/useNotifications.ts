@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -62,8 +63,13 @@ export function useRegisterPushToken(isOnline: boolean): void {
         if (finalStatus !== 'granted') return;
 
         // Get Expo push token
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+        if (!projectId) {
+          console.warn('Push token registration skipped: projectId not available');
+          return;
+        }
         const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: undefined, // Uses default from app.json
+          projectId,
         });
         const expoPushToken = tokenData.data;
 

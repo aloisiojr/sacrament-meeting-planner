@@ -1,0 +1,237 @@
+# =============================================================================
+# QA_PLAN_003.yaml
+# PRE validation plan for Batch 22 Phase 2: CR-204 + CR-208
+# Created: 2026-02-22
+# =============================================================================
+
+plan_id: QA_PLAN_003
+batch: 22
+phase: 2
+type: bugfix
+change_requests: [CR-204, CR-208]
+created_at: "2026-02-22"
+
+# =============================================================================
+# CR-204: Supabase text/plain override for Edge Function HTML responses
+# =============================================================================
+
+cr_204:
+  cr_id: CR-204
+  title: "Reset de senha e convite: pagina web da Edge Function mostra codigo HTML como texto no browser"
+  type: bug_critical
+  status: in_progress
+
+  root_cause: |
+    Supabase sobrescreve Content-Type de text/html para text/plain em respostas GET
+    de Edge Functions que retornam HTML (restricao de seguranca anti-phishing).
+    O curl retorna text/html mas o browser real recebe text/plain.
+    Afeta: reset-redirect (F138) e invite-redirect (F139) - ambas servem HTML pages.
+
+  affected_files:
+    - supabase/functions/reset-redirect/index.ts    # Pagina web de reset de senha
+    - supabase/functions/invite-redirect/index.ts   # Pagina web de aceitar convite
+    # Potencialmente novos arquivos se solucao for hosting externo
+
+  reproduction_steps:
+    - step: 1
+      description: "Abrir reset-redirect ou invite-redirect URL no browser mobile (Safari/Chrome)"
+      expected: "Pagina HTML renderizada com formulario"
+      actual: "HTML exibido como texto puro - browser recebe Content-Type: text/plain"
+    - step: 2
+      description: "Testar mesma URL com curl -v"
+      expected: "Content-Type: text/html; charset=utf-8 (correto via curl)"
+      actual: "curl mostra text/html corretamente, mas browser real recebe text/plain"
+    - step: 3
+      description: "Supabase Edge Functions restringe GET responses com HTML para prevenir phishing"
+      expected: "N/A - restricao de seguranca do Supabase"
+      actual: "Supabase intercepta e muda Content-Type para text/plain em GET responses com HTML body"
+
+  possible_solutions:
+    - id: SOL-1
+      description: "Custom domain para Edge Functions (requer Supabase Pro plan)"
+      viability: "Requer upgrade de plano pago"
+    - id: SOL-2
+      description: "Pagina intermediaria em hosting proprio (Vercel/Netlify/GitHub Pages gratis)"
+      viability: "Viavel - hosting gratuito, pagina HTML hospedada externamente faz redirect ou embed"
+    - id: SOL-3
+      description: "Code flow - Edge Function retorna JSON com dados, frontend processa"
+      viability: "Viavel mas requer app aberto - nao funciona para cenario email->browser"
+
+  validation_checks:
+    must_pass:
+      - id: MP-204-01
+        description: "Solucao escolhida resolve o problema de Content-Type text/plain no browser real"
+        type: functional
+      - id: MP-204-02
+        description: "Pagina de reset de senha renderiza como HTML no Safari mobile"
+        type: functional
+      - id: MP-204-03
+        description: "Pagina de aceitar convite renderiza como HTML no Chrome mobile"
+        type: functional
+      - id: MP-204-04
+        description: "Fluxo completo de reset de senha funcional (email -> link -> pagina -> nova senha)"
+        type: e2e
+      - id: MP-204-05
+        description: "Fluxo completo de aceitar convite funcional (link -> pagina -> formulario -> conta criada)"
+        type: e2e
+      - id: MP-204-06
+        description: "Se hosting externo: URL HTTPS valida e acessivel publicamente"
+        type: infrastructure
+      - id: MP-204-07
+        description: "Se hosting externo: pagina referencia corretamente o Supabase URL/anon_key"
+        type: configuration
+
+    should_pass:
+      - id: SP-204-01
+        description: "i18n mantido (pt-BR, en, es) em qualquer nova solucao"
+        type: functional
+      - id: SP-204-02
+        description: "Estilo visual consistente com paginas anteriores (#4F46E5 primary, card layout)"
+        type: visual
+      - id: SP-204-03
+        description: "Links de email de reset (Resend) apontam para nova URL se mudou"
+        type: configuration
+      - id: SP-204-04
+        description: "Links de convite (deepLink no create-invitation) apontam para nova URL se mudou"
+        type: configuration
+
+# =============================================================================
+# CR-208: Causa raiz do erro ao convidar usuario
+# =============================================================================
+
+cr_208:
+  cr_id: CR-208
+  title: "Edge Function create-invitation retorna non-2xx status code ao convidar usuario"
+  type: bug_critical
+  status: in_progress
+
+  root_cause: |
+    CR-205 melhorou o error handling (mostra mensagem do servidor no Alert ao inves
+    de erro generico), mas NAO resolveu a causa raiz. A Edge Function create-invitation
+    retorna erro (401/403/400/500). Possiveis causas raiz:
+    1. JWT invalido ou expirado no momento da chamada (401)
+    2. app_metadata.role nao esta em ALLOWED_ROLES (403) - usuario nao e bishopric/secretary
+    3. app_metadata.ward_id ausente (403)
+    4. Payload invalido (email/role faltando ou invalido) (400)
+    5. Erro no INSERT na tabela invitations (500) - constraint violation, RLS, etc.
+    6. SUPABASE_SERVICE_ROLE_KEY nao configurada no Edge Function (500)
+    Investigar qual dessas causas esta ocorrendo no ambiente real.
+
+  affected_files:
+    - supabase/functions/create-invitation/index.ts   # Edge Function que cria convite
+    - src/app/(tabs)/settings/users.tsx               # Frontend que chama create-invitation
+    # callEdgeFunction em users.tsx:41-67
+
+  reproduction_steps:
+    - step: 1
+      description: "Login como usuario com role bishopric ou secretary"
+      expected: "Sessao ativa com JWT valido"
+      actual: "A ser investigado - JWT pode estar expirado ou role incorreto"
+    - step: 2
+      description: "Navegar para Settings > Users > Convidar Usuario"
+      expected: "Modal de convite abre"
+      actual: "Modal abre corretamente"
+    - step: 3
+      description: "Preencher email e role, clicar em 'Convidar Usuario'"
+      expected: "Convite criado com sucesso (201), deepLink retornado"
+      actual: "Erro: Edge Function returned a non-2xx status code"
+    - step: 4
+      description: "Verificar logs da Edge Function no Supabase Dashboard"
+      expected: "Log mostra erro especifico (401/403/400/500)"
+      actual: "A ser investigado"
+
+  code_analysis:
+    frontend_flow:
+      - "users.tsx:46 - callEdgeFunction verifica sessao com getSession()"
+      - "users.tsx:51 - supabase.functions.invoke('create-invitation', { body })"
+      - "users.tsx:54-64 - error handling extrai serverMessage de error.context.json()"
+      - "users.tsx:101-112 - inviteMutation chama callEdgeFunction"
+      - "users.tsx:109 - onError mostra Alert com err.message"
+
+    backend_flow:
+      - "create-invitation:29-35 - Verifica Authorization header (401 se ausente)"
+      - "create-invitation:44-52 - Valida JWT com auth.getUser(token) (401 se invalido)"
+      - "create-invitation:54-62 - Verifica ward_id e role em app_metadata (403 se ausente)"
+      - "create-invitation:65-70 - Verifica role em ALLOWED_ROLES (403 se nao autorizado)"
+      - "create-invitation:72 - Parse JSON body (pode falhar se payload invalido)"
+      - "create-invitation:75-96 - Validacoes de email/role (400)"
+      - "create-invitation:106-125 - INSERT na tabela invitations (500 se falhar)"
+
+    potential_issues:
+      - issue: "supabase.functions.invoke pode nao enviar Authorization header automaticamente"
+        likelihood: medium
+        check: "Verificar se invoke() inclui Bearer token do session"
+      - issue: "app_metadata.role pode nao estar definido para primeiro usuario (register-first-user)"
+        likelihood: medium
+        check: "Verificar register-first-user define app_metadata.role"
+      - issue: "Tabela invitations pode ter RLS que bloqueia INSERT mesmo com service_role"
+        likelihood: low
+        check: "service_role bypassa RLS por padrao no Supabase"
+      - issue: "SUPABASE_SERVICE_ROLE_KEY pode nao estar configurada como secret no Edge Functions"
+        likelihood: medium
+        check: "Verificar secrets com supabase secrets list"
+
+  validation_checks:
+    must_pass:
+      - id: MP-208-01
+        description: "Causa raiz do erro identificada com evidencia (log, status code, mensagem)"
+        type: investigation
+      - id: MP-208-02
+        description: "Convite criado com sucesso (status 201) apos fix aplicado"
+        type: functional
+      - id: MP-208-03
+        description: "deepLink retornado contendo URL HTTPS valida"
+        type: functional
+      - id: MP-208-04
+        description: "Error handling continua funcionando (CR-205 nao regredido)"
+        type: regression
+      - id: MP-208-05
+        description: "callEdgeFunction em users.tsx envia Authorization header corretamente"
+        type: code_review
+      - id: MP-208-06
+        description: "create-invitation Edge Function recebe JWT valido e processa request"
+        type: functional
+
+    should_pass:
+      - id: SP-208-01
+        description: "Convite funciona para todos os roles validos (bishopric, secretary, observer)"
+        type: functional
+      - id: SP-208-02
+        description: "Reenvio de convite para mesmo email gera novo token"
+        type: functional
+      - id: SP-208-03
+        description: "Auto-criacao de meeting_actor para role bishopric (best-effort)"
+        type: functional
+      - id: SP-208-04
+        description: "Mensagem de erro legivel quando convite falha (nao erro generico)"
+        type: ux
+
+# =============================================================================
+# Interacao entre CR-204 e CR-208
+# =============================================================================
+
+cross_cr_interaction:
+  description: |
+    CR-204 e CR-208 sao bugs independentes mas ambos afetam o fluxo de convite:
+    - CR-208: o convite nem chega a ser criado (create-invitation falha)
+    - CR-204: mesmo se o convite fosse criado, a pagina HTML seria exibida como texto
+    Resolver CR-208 primeiro faz sentido logicamente (criar convite), depois CR-204
+    (pagina funcional no browser).
+  recommended_order: [CR-208, CR-204]
+
+# =============================================================================
+# Test execution baseline
+# =============================================================================
+
+test_baseline:
+  existing_tests:
+    - file: src/__tests__/batch22-f138-f139.test.ts
+      tests: 110
+      status: all_passing
+    - file: src/__tests__/batch22-tester-f138-f139.test.ts
+      tests: 99
+      status: all_passing
+    - file: src/__tests__/batch23-f140-f142.test.ts
+      status: exists
+      notes: "Tests for CR-205 error handling improvements"
+  full_suite_status: "All existing tests passing as of 2026-02-22"

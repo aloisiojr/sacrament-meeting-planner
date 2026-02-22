@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 27
-  last_updated_by: "batch-23-phase-1"
+  version: 28
+  last_updated_by: "batch-22-phase-2"
   total_phases: 6
-  total_cr_plans: 44
+  total_cr_plans: 45
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -863,6 +863,32 @@ cr_plans:
       wardLanguage). S01, S02, S03, S04, S05 parallelizaveis (todos independentes),
       S06 depende de S02, S07 depende de todos.
 
+  - id: PLAN_P039
+    title: "Batch 22 Phase 2: Fix Invite Creation Root Cause, External Hosting for HTML Pages"
+    status: pending
+    crs_covered: [208, 204]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P039.yaml"
+    summary: >
+      2 bug fixes no pipeline de convites: structured logging com console.error
+      prefixado '[create-invitation]' em cada ponto de falha + error codes
+      (auth/missing-header, auth/invalid-token, etc.) em todos os JSON de erro +
+      modo diagnostico ({ diagnose: true }) que roda validacoes sem inserir no
+      DB retornando relatorio de checks pass/fail (F143/CR-208). Migracao de
+      paginas HTML inline nas Edge Functions reset-redirect e invite-redirect
+      para arquivos estaticos em GitHub Pages (docs/public/): EFs convertidas
+      em redirects 302 com EXTERNAL_PAGES_URL env var configuravel, 2 arquivos
+      HTML self-contained (reset-password.html, accept-invite.html) extraidos
+      dos templates inline com token lido de URLSearchParams ao inves de
+      template interpolation, mesma UX/i18n/CSS/logica dos templates originais,
+      Content-Type text/html correto servido pelo GitHub Pages (F144/CR-204).
+      2 features, 20 ACs, 11 ECs, 5 arquivos impactados (2 novos + 3 modificados
+      + 3 testes), zero migracoes de banco, zero dependencias novas. 2 ADRs:
+      ADR-094 (structured error codes + diagnostic mode), ADR-095 (external
+      hosting via GitHub Pages). S01, S02, S03 parallelizaveis (independentes),
+      S04 e S05 parallelizaveis entre si (independentes), S06 depende de
+      S01+S02+S03.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1231,6 +1257,12 @@ pending_with_plan:
   - cr_id: 207
     plan_id: PLAN_P038
     description: "Fix WhatsApp send: useQuery ward template + wardLanguage ao inves de app language"
+  - cr_id: 208
+    plan_id: PLAN_P039
+    description: "Fix create-invitation: structured logging, error codes, e diagnostic mode"
+  - cr_id: 204
+    plan_id: PLAN_P039
+    description: "External hosting para HTML pages (GitHub Pages) bypass Supabase Content-Type override"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1252,6 +1284,18 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 28
+    phase: "batch-22-phase-2"
+    changes:
+      - "Added PLAN_P039 for Batch 22 Phase 2 (F143-F144, CRs 208/204)"
+      - "2 bug fixes: invite creation structured logging + error codes + diagnostic mode, external hosting for HTML pages"
+      - "6 steps, 20 ACs, 11 ECs, 5 arquivos impactados (2 novos + 3 modificados + 3 testes)"
+      - "Zero migracoes SQL, zero dependencias novas"
+      - "2 ADRs: ADR-094 (structured error codes + diagnostic mode), ADR-095 (external hosting via GitHub Pages)"
+      - "F143 adds console.error at 6 failure points, 'code' field in all error responses, diagnostic mode returning checks report"
+      - "F144 converts reset-redirect and invite-redirect EFs from inline HTML to 302 redirects to GitHub Pages"
+      - "F144 creates 2 new HTML files in docs/public/ (reset-password.html, accept-invite.html) extracted from inline templates"
+      - "S01, S02, S03 parallelizaveis (independentes), S04+S05 parallelizaveis entre si, S06 depende de S01+S02+S03"
   - version: 27
     phase: "batch-23-phase-1"
     changes:

@@ -14,7 +14,7 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 128
+  total_features: 130
   total_change_requests: 194
   implemented_crs: 96
   pending_crs: 96
@@ -68,6 +68,7 @@ metadata:
     - docs/specs/SPEC_F135_F137.yaml
     - docs/specs/SPEC_F138_F139.yaml
     - docs/specs/SPEC_F140_F141_F142.yaml
+    - docs/specs/SPEC_F143_F144.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2627,6 +2628,49 @@ features:
       - "1 arquivo impactado (InviteManagementSection.tsx)"
       - "whatsappUtils.ts e whatsapp.ts NAO mudam"
 
+  # ---------------------------------------------------------------------------
+  # Batch 22 Phase 2 (F143-F144) - Fix invite creation root cause, External page hosting
+  # ---------------------------------------------------------------------------
+
+  - id: F143
+    name: "Debug and fix create-invitation Edge Function to successfully create invitations"
+    status: pending
+    rfs: []
+    description: >
+      Fix the create-invitation Edge Function which returns non-2xx errors when
+      clicking 'Invite User'. Add detailed logging at each failure point, structured
+      error codes in responses, and a diagnostic mode for troubleshooting. CR-205/F140
+      improved error visibility but did not fix the root cause.
+    modified_by_crs: [208]
+    spec_file: "docs/specs/SPEC_F143_F144.yaml"
+    notes:
+      - "CR-208: Invite creation fails with non-2xx (root cause unknown, needs diagnosis)"
+      - "6 acceptance criteria, 6 edge cases"
+      - "1 arquivo impactado (create-invitation/index.ts)"
+      - "users.tsx e register-invited-user NAO mudam"
+      - "Diagnostic mode: POST { diagnose: true } returns health check report"
+      - "Deve ser implementado ANTES de F144"
+
+  - id: F144
+    name: "Host password reset and invitation acceptance pages externally to bypass Supabase Content-Type restriction"
+    status: pending
+    rfs: []
+    description: >
+      Supabase overrides Content-Type from text/html to text/plain for Edge Function
+      GET responses returning HTML (anti-phishing security restriction). Both
+      reset-redirect (F138) and invite-redirect (F139) pages show raw HTML as plain
+      text in mobile browsers. Fix: host the HTML pages on GitHub Pages (free) and
+      change the Edge Functions to return 302 redirects to the external pages.
+    modified_by_crs: [204]
+    spec_file: "docs/specs/SPEC_F143_F144.yaml"
+    notes:
+      - "CR-204: Supabase sobrescreve Content-Type text/html para text/plain"
+      - "14 acceptance criteria, 5 edge cases"
+      - "4 arquivos impactados (2 EFs modificados, 2 HTML novos em docs/public/)"
+      - "send-reset-email, create-invitation, register-invited-user NAO mudam"
+      - "GitHub Pages: docs/public/reset-password.html, docs/public/accept-invite.html"
+      - "EXTERNAL_PAGES_URL env var configuravel com fallback para GitHub Pages URL"
+
 # =============================================================================
 # PENDING CHANGE REQUESTS (96 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23)
 # =============================================================================
@@ -4704,6 +4748,57 @@ pending_crs:
       - "Fallback para default quando template e null"
     files_likely_impacted:
       - src/components/InviteManagementSection.tsx
+
+  # --- Batch 22 Phase 2 (Invite Root Cause, External Page Hosting) ---
+
+  - id: 208
+    type: bugfix
+    area: "Settings (F001, F139, F140)"
+    feature_id: F143
+    spec_file: "docs/specs/SPEC_F143_F144.yaml"
+    related_crs: [93, 203, 205]
+    description: >
+      Ao clicar em 'Convidar Usuario' recebe erro: Edge Function returned a
+      non-2xx status code. CR-205/F140 melhorou visibilidade do erro mas nao
+      resolveu a causa raiz. create-invitation tem multiplos pontos de falha
+      (auth header, JWT, metadata, role, payload, DB). Fix: logging detalhado,
+      error codes estruturados, modo diagnostico para identificar ponto de falha.
+    acceptance_criteria:
+      - "Cada ponto de falha loga erro estruturado com contexto"
+      - "Respostas de erro incluem 'code' para mapeamento i18n"
+      - "Modo diagnostico { diagnose: true } retorna health check"
+      - "Criacao de convite continua funcionando sem regressao"
+      - "callEdgeFunction preserva error code do servidor"
+      - "Erro auth/no-session mostra mensagem adequada"
+    files_likely_impacted:
+      - supabase/functions/create-invitation/index.ts
+
+  - id: 204
+    type: bugfix
+    area: "Auth (F138, F139)"
+    feature_id: F144
+    spec_file: "docs/specs/SPEC_F143_F144.yaml"
+    related_crs: [67, 145, 155, 176, 191, 198, 202]
+    description: >
+      Supabase sobrescreve Content-Type de text/html para text/plain em respostas
+      GET de Edge Functions que retornam HTML (restricao de seguranca anti-phishing).
+      Browser mostra codigo HTML como texto. Fix: hospedar paginas em GitHub Pages
+      (gratuito) e mudar Edge Functions para retornar 302 redirect para as paginas
+      externas. Env var EXTERNAL_PAGES_URL configuravel.
+    acceptance_criteria:
+      - "reset-redirect retorna 302 para pagina externa"
+      - "invite-redirect retorna 302 para pagina externa"
+      - "Paginas externas renderizam corretamente com Content-Type text/html"
+      - "Todas as funcionalidades preservadas (verifyOtp, updateUser, registro)"
+      - "i18n (pt-BR, en, es) preservado"
+      - "Links antigos continuam funcionando (redirect transparente)"
+      - "Validacao de formato do token antes do redirect"
+      - "EXTERNAL_PAGES_URL configuravel via env var"
+    files_likely_impacted:
+      - supabase/functions/reset-redirect/index.ts
+      - supabase/functions/invite-redirect/index.ts
+      - docs/public/reset-password.html (NEW)
+      - docs/public/accept-invite.html (NEW)
 
 # =============================================================================
 

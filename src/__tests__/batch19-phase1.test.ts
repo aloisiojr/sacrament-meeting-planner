@@ -825,14 +825,16 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   const resetSource = readProjectFile('supabase/functions/reset-redirect/index.ts');
 
   // --- AC-119-01: Content-Type includes charset=utf-8 ---
-  describe('AC-119-01: Content-Type with charset', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect now returns 302 redirect, no HTML
+  describe.skip('AC-119-01: Content-Type with charset [SUPERSEDED by F144]', () => {
     it('Content-Type header is text/html; charset=utf-8', () => {
       expect(resetSource).toContain("'Content-Type': 'text/html; charset=utf-8'");
     });
   });
 
   // --- AC-119-02: HTML not escaped or double-encoded ---
-  describe('AC-119-02: HTML template not encoded', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
+  describe.skip('AC-119-02: HTML template not encoded [SUPERSEDED by F144]', () => {
     it('HTML passed directly to Response (no JSON.stringify)', () => {
       expect(resetSource).toContain('new Response(html,');
     });
@@ -858,7 +860,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- AC-119-04: Cache-Control header ---
-  describe('AC-119-04: Cache-Control header set', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML, returns 302
+  describe.skip('AC-119-04: Cache-Control header set [SUPERSEDED by F144]', () => {
     it('Cache-Control is no-cache, no-store, must-revalidate', () => {
       expect(resetSource).toContain("'Cache-Control': 'no-cache, no-store, must-revalidate'");
     });
@@ -873,8 +876,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- AC-119-06: HTML renders properly ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect now serves inline form, no meta-refresh
-  describe('AC-119-06: HTML structure is valid', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns inline HTML
+  describe.skip('AC-119-06: HTML structure is valid [SUPERSEDED by F144]', () => {
     it('HTML has DOCTYPE', () => {
       expect(resetSource).toContain('<!DOCTYPE html>');
     });
@@ -931,7 +934,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- EC-119-02: Supabase proxy adding/modifying headers ---
-  describe('EC-119-02: Explicit charset takes precedence', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
+  describe.skip('EC-119-02: Explicit charset takes precedence [SUPERSEDED by F144]', () => {
     it('Content-Type set AFTER corsHeaders spread', () => {
       // Content-Type should come after ...corsHeaders in the object literal
       const responseHeaders = resetSource.match(
@@ -946,7 +950,8 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
   });
 
   // --- EC-119-03: Chrome on Android ---
-  describe('EC-119-03: Cross-browser compatibility', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
+  describe.skip('EC-119-03: Cross-browser compatibility [SUPERSEDED by F144]', () => {
     it('uses standard Content-Type with charset', () => {
       expect(resetSource).toContain('text/html; charset=utf-8');
     });

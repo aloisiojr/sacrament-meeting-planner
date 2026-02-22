@@ -456,7 +456,8 @@ describe('F134 (CR-198): Password reset redirect script blocked', () => {
     });
   });
 
-  describe('AC-134-04: response headers correct', () => {
+  // SUPERSEDED by F144 (CR-204): reset-redirect now returns 302 redirect, no HTML
+  describe.skip('AC-134-04: response headers correct [SUPERSEDED by F144]', () => {
     it('Content-Type is text/html with charset', () => {
       expect(resetRedirectSource).toContain("'Content-Type': 'text/html; charset=utf-8'");
     });

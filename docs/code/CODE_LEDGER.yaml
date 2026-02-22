@@ -4106,51 +4106,74 @@ batch15_phase2_test_results:
     acs_covered: [AC-140-01, AC-140-02, AC-140-03, AC-140-04]
     ecs_covered: [EC-140-01, EC-140-02, EC-140-03]
 
-  - step: S02
+  - step: S02-REVERTED
     cr: CR-206
     plan_ref: plans/PLAN_P038.yaml
     plan_step: STEP-02
     hash: be626a9
+    status: REVERTED
+    reverted_by: 73cc06e
     message: "feat(migration): seed en/es collections and topics for language switch (CR-206)"
-    files_changed:
-      - supabase/migrations/019_seed_en_es_collections.sql
-    changes:
-      - id: CHG-607
-        description: "Created migration with DO $$ blocks that INSERT general_collections and general_topics for 'en' and 'es' languages"
-      - id: CHG-608
-        description: "Uses IF NOT EXISTS guard for idempotency, no DELETE/UPDATE/TRUNCATE on existing data"
-    acs_covered: [AC-141-01, AC-141-02, AC-141-09, AC-141-10]
-    ecs_covered: []
+    note: "REVERTED - migration was incorrect: DB already has data with locale codes en-US/es-ES, not en/es"
 
-  - step: S03
+  - step: S03-REVERTED
     cr: CR-206
     plan_ref: plans/PLAN_P038.yaml
     plan_step: STEP-03
     hash: 442de88
+    status: REVERTED
+    reverted_by: 73cc06e
     message: "fix(settings): reset whatsapp_template and invalidate ward cache on language switch (CR-206)"
-    files_changed:
-      - src/app/(tabs)/settings/index.tsx
-    changes:
-      - id: CHG-609
-        description: "Changed wardLanguageChangeMutation.mutationFn to pass { language: newLanguage, whatsapp_template: null } to .update()"
-      - id: CHG-610
-        description: "Added queryClient.invalidateQueries({ queryKey: ['ward', wardId] }) in onSuccess"
-    acs_covered: [AC-141-05, AC-141-08]
-    ecs_covered: [EC-141-01, EC-141-02, EC-141-03]
+    note: "REVERTED along with S02 - re-applied in S03b with toDbLocale fix"
 
-  - step: S04
+  - step: S04-REVERTED
     cr: CR-206
     plan_ref: plans/PLAN_P038.yaml
     plan_step: STEP-04
     hash: f3181ab
+    status: REVERTED
+    reverted_by: 73cc06e
     message: "fix(whatsapp): reset initialized flag when wardLanguage changes (CR-206)"
+    note: "REVERTED along with S02 - re-applied in S03b"
+
+  - step: S02b
+    cr: CR-206
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-02
+    hash: 195cd95
+    message: "fix(i18n): add toDbLocale mapping to fix language code mismatch in collections (CR-206)"
     files_changed:
+      - src/i18n/index.ts
+      - src/hooks/useTopics.ts
+      - src/app/(tabs)/settings/index.tsx
+    changes:
+      - id: CHG-616
+        description: "Added toDbLocale() mapping function in src/i18n/index.ts (en->en-US, es->es-ES, pt-BR->pt-BR)"
+      - id: CHG-617
+        description: "Updated useCollections in useTopics.ts to use toDbLocale(language) when querying general_collections"
+      - id: CHG-618
+        description: "Updated wardLanguageChangeMutation in settings/index.tsx to use toDbLocale() for old/new language collection queries"
+    acs_covered: [AC-141-01, AC-141-02, AC-141-03, AC-141-04, AC-141-09]
+    ecs_covered: [EC-141-01, EC-141-02]
+
+  - step: S03b
+    cr: CR-206
+    plan_ref: plans/PLAN_P038.yaml
+    plan_step: STEP-03
+    hash: 396b23c
+    message: "fix(settings): reset whatsapp_template on language switch and initialized flag (CR-206)"
+    files_changed:
+      - src/app/(tabs)/settings/index.tsx
       - src/app/(tabs)/settings/whatsapp.tsx
     changes:
-      - id: CHG-611
+      - id: CHG-619
+        description: "Changed wardLanguageChangeMutation.mutationFn to pass { language: newLanguage, whatsapp_template: null } to .update()"
+      - id: CHG-620
+        description: "Added queryClient.invalidateQueries({ queryKey: ['ward', wardId] }) in onSuccess"
+      - id: CHG-621
         description: "Added useEffect watching wardLanguage that resets initialized to false using prevWardLanguageRef to skip initial mount"
-    acs_covered: [AC-141-06, AC-141-07]
-    ecs_covered: [EC-141-04]
+    acs_covered: [AC-141-05, AC-141-06, AC-141-07, AC-141-08]
+    ecs_covered: [EC-141-03, EC-141-04]
 
   - step: S05
     cr: CR-207

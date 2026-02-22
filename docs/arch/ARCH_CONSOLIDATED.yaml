@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  last_updated_by: "batch-21"
+  last_updated_by: "batch-21-phase-2"
   total_modules: 8
-  total_adrs: 77
+  total_adrs: 79
   total_crs_implemented: 122
   pending_arch: "none"
   source_documents:
@@ -42,6 +42,7 @@ metadata:
     - docs/arch/ARCH_M033.yaml
     - docs/arch/ARCH_M034.yaml
     - docs/arch/ARCH_M035.yaml
+    - docs/arch/ARCH_M036.yaml
 
 # =============================================================================
 # TECH STACK
@@ -261,7 +262,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -278,7 +279,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -313,11 +314,12 @@ modules:
       CR-181/F118: Optional 2nd speech per Sunday. has_second_speech toggle on SpeechSlot position 2. Position 3 label reverts to t('speeches.lastSpeech') in expanded SpeechSlot. SundayCard collapsed: remove ordinal labels, filter position 2 when OFF, show 2 LEDs. Confirmation dialog only when assignments exist. Presentation mode, AgendaForm, InviteManagementSection all respect the flag.
       CR-194/F130: Fix TypeScript compilation errors in test mocks and production code. SundayAgenda mocks gain missing fields. speeches.tsx null-to-string fix. AgendaForm Member type import fix. Documentation can_piano -> can_pianist.
       CR-196/F132: Fix 2nd speech toggle: handleToggleSecondSpeech adds separate direct Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder (not single warning). AgendaForm shows disabled ReadOnlySpeakerRow. Agenda/Home collapsed cards use dynamic X/2 or X/3 based on has_second_speech.
+      CR-199/F136: SpeechSlot labelRow gains paddingRight:36 to align StatusLED right edge with speaker field right edge. actionArea width is 36px, so labelRow content is offset to match (ADR-088).
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -335,7 +337,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -375,6 +377,7 @@ modules:
       CR-181/F118: AgendaForm shows disabled placeholder for speech 2 when has_second_speech=false. Speaker override for position 2 also disabled. usePresentationMode conditionally includes speech 2 in First Speeches card.
       CR-184/F126: Pencil button (U+270F) added to Presentation header. Navigates to Agenda tab with expandDate param (ADR-083). Agenda tab gains expandDate query param support (same ADR-082 pattern as speeches.tsx).
       CR-185/F127: Play button (U+25B6) in expanded agenda card header. Navigates to Presentation with date param. Presentation screen accepts optional date param (fallback getTodaySundayDate).
+      CR-200/F137: Play icon fontSize increased in agenda.tsx (14->18) with marginRight 8->12 for better spacing from chevron.
 
   - id: M005
     name: NotificationModule
@@ -450,7 +453,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -484,7 +487,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 195, 196]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -535,6 +538,8 @@ modules:
       CR-196/F132: Fix 2nd speech toggle bugs. handleToggleSecondSpeech adds separate Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder. AgendaForm always renders ReadOnlySpeakerRow for position 2 (disabled when has_second_speech=false). Agenda/Home collapsed cards use dynamic X/2 or X/3 speaker count.
       CR-197/F133: send-reset-email Edge Function language resolution changed to priority chain: user_metadata.language -> ward.language -> 'pt-BR' (ADR-086).
       CR-198/F134: reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
+      CR-193/F135: Settings screen restructured from 3 unlabeled sections to 2 labeled groups: 'Configuracoes da Ala' (members, topics, whatsapp, wardLanguage, timezone) and 'Configuracoes do App' (users, history, appLanguage, theme, about). Group 1 label hidden for Observer. New i18n keys settings.wardSettingsGroup, settings.appSettingsGroup (ADR-087).
+      CR-200/F137: Home tab play icon fontSize increased from 17 to 20 for visual height match with button text.
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1330,6 +1335,24 @@ adrs:
     consequences:
       - "Email arrives in the language the user sees in the app"
       - "Backward compatible: users without user_metadata.language still get ward language"
+
+  - id: ADR-087
+    title: "Settings reorganization from 3 sections to 2 labeled groups"
+    context: "Settings tab has 3 unlabeled card sections mixing ward and app settings. Users cannot distinguish ward-specific vs app-specific settings."
+    decision: "Restructure into 2 groups with visible labels: 'Configuracoes da Ala' (ward-scoped items) and 'Configuracoes do App' (user-scoped items). wardLanguage and timezone move to Group 1. users and history move to Group 2. Group 1 label hidden for Observer."
+    decided_in: "CR-193"
+    consequences:
+      - "Clearer mental model separating ward vs app settings"
+      - "Observer experience unchanged (sees only app items)"
+
+  - id: ADR-088
+    title: "StatusLED alignment via labelRow paddingRight matching actionArea width"
+    context: "StatusLED in labelRow spans full width but speaker field uses flex:1 followed by 36px actionArea. StatusLED right edge is 36px further right than speaker field right edge."
+    decision: "Add paddingRight: 36 to labelRow style. This offsets the statusSection rightward boundary to match the speaker field right edge. No changes to actionArea."
+    decided_in: "CR-199"
+    consequences:
+      - "Visual alignment achieved with minimal CSS change"
+      - "X button position unchanged (actionArea untouched)"
 
 # =============================================================================
 # DATABASE SCHEMA

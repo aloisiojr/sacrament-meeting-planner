@@ -1,0 +1,241 @@
+# =============================================================================
+# QA_PLAN_batch20_phase2.yaml
+# QA Validation Plan for Batch 20 Phase 2 (CR-193, CR-199, CR-200)
+# Created: 2026-02-22
+# =============================================================================
+
+type: qa_plan
+id: QA-batch20-phase2
+created_at: "2026-02-22"
+request_type: feature_request
+feature_or_bug: "3 UI improvements: settings reorganization into 2 groups, status circle alignment in speech cards, play icon resize"
+
+user_request: |
+  8 pedidos agrupados (Phase 2 = 3 UI improvements):
+  1. Reorganizar aba Configuracoes em 2 grupos: "Configuracoes da Ala" (Discursantes,
+     Biblioteca de Temas, Modelo de Convite pelo WhatsApp, Idioma da Ala, Fuso Horario)
+     e "Configuracoes do App" (Usuarios do App, Historico de Uso, Idioma do App,
+     Tema Claro/Escuro, Sobre). Label com nome de cada grupo antes dos cards.
+  7. Card expandido de discursos: alinhar direita do circulo de status com direita do
+     campo do discursante sem mexer posicao do X.
+  8. Trocar botao de play (Iniciar Reuniao e card de agenda) por icone bem maior
+     (altura da fonte). Atual muito pequeno e colado na seta.
+
+# =============================================================================
+# Baseline: Estado atual do sistema antes do desenvolvimento
+# =============================================================================
+
+baseline:
+  description: |
+    Batch 20 Phase 2 - 3 UI improvement features to be implemented.
+    Current state of each area:
+
+    CR-193 (Settings Reorganization - F135):
+    - Settings screen (src/app/(tabs)/settings/index.tsx) has 3 sections without labels:
+      Section 1: Members + Topics (non-Observer)
+      Section 2: Users + History + WhatsApp Template (non-Observer)
+      Section 3: App Language + Ward Language + Timezone + Theme + About
+    - No section/group titles/labels are rendered before any card group.
+    - The user wants 2 labeled groups: "Configuracoes da Ala" and "Configuracoes do App"
+      with specific items redistributed between them.
+
+    CR-199 (Status Circle Alignment - F136):
+    - SpeechSlot.tsx: The StatusLED circle (14px) is in the labelRow which stretches
+      full width (justifyContent: 'space-between'). The speakerRow below has a field
+      (flex:1) + actionArea (width:36px for the X button). This means the StatusLED
+      right edge extends 36px further right than the speaker field right edge.
+    - The user wants the StatusLED right edge to align with the speaker field right edge,
+      without moving the X button.
+
+    CR-200 (Play Icon Resize - F137):
+    - index.tsx (Home tab): playIcon style has fontSize: 17, marginRight: 8.
+      Uses Unicode U+25B6 (black right-pointing triangle).
+    - agenda.tsx: playButton style has fontSize: 14, marginRight: 8.
+      Also uses U+25B6. Appears only in expanded cards, between content and chevron.
+    - User says current icon is "muito pequeno e colado na seta" (too small and
+      stuck to the arrow/chevron).
+
+  evidence:
+    - "settings/index.tsx: 3 sections, no group labels. Section 1=Members+Topics, Section 2=Users+History+WhatsApp, Section 3=AppLang+WardLang+Timezone+Theme+About"
+    - "settings/index.tsx: No Text element with 'Configuracoes da Ala' or 'Configuracoes do App'"
+    - "SpeechSlot.tsx: labelRow has justifyContent:'space-between', statusSection is right-aligned at full container width. speakerRow has field(flex:1)+actionArea(width:36). StatusLED circle right edge is 36px to the right of speaker field right edge"
+    - "index.tsx Home: playIcon fontSize:17, marginRight:8"
+    - "agenda.tsx: playButton fontSize:14, marginRight:8. Positioned between card content and chevron"
+    - "Both use Unicode U+25B6 for play triangle"
+
+# =============================================================================
+# Validation Checks (executados no POST)
+# =============================================================================
+
+validation_checks:
+
+  # ---------------------------------------------------------------------------
+  # CR-193: Settings Reorganization (F135)
+  # ---------------------------------------------------------------------------
+  - id: VC-193-01
+    description: "Settings screen has exactly 2 labeled groups instead of 3 unlabeled sections"
+    type: functional
+    how_to_verify: "Read settings/index.tsx and verify there are exactly 2 main groups (each with a label Text before the card group), plus the sign-out button"
+    expected_result: "Two group containers with visible labels rendered before each group's card list. No more 3 separate unlabeled sections"
+    priority: must_pass
+
+  - id: VC-193-02
+    description: "First group labeled 'Configuracoes da Ala' contains correct items"
+    type: functional
+    how_to_verify: "Read settings/index.tsx and verify the first group contains: Discursantes, Biblioteca de Temas, Modelo de Convite pelo WhatsApp, Idioma da Ala, Fuso Horario (in this order or any reasonable order)"
+    expected_result: "First group has label 'settings.wardSettingsGroup' (or similar i18n key for 'Configuracoes da Ala') and contains exactly these 5 items: members, topics, whatsappTemplate, wardLanguage, timezone"
+    priority: must_pass
+
+  - id: VC-193-03
+    description: "Second group labeled 'Configuracoes do App' contains correct items"
+    type: functional
+    how_to_verify: "Read settings/index.tsx and verify the second group contains: Usuarios do App, Historico de Uso, Idioma do App, Tema Claro/Escuro, Sobre (in this order or any reasonable order)"
+    expected_result: "Second group has label 'settings.appSettingsGroup' (or similar i18n key for 'Configuracoes do App') and contains exactly these 5 items: users, history, appLanguage, theme, about"
+    priority: must_pass
+
+  - id: VC-193-04
+    description: "Group labels have i18n keys for all 3 languages (pt-BR, en, es)"
+    type: functional
+    how_to_verify: "Read i18n locales pt-BR.json, en.json, es.json and verify the group label keys exist with appropriate translations"
+    expected_result: "pt-BR: 'Configuracoes da Ala' / 'Configuracoes do App'. en: 'Ward Settings' / 'App Settings'. es: appropriate Spanish translations"
+    priority: must_pass
+
+  - id: VC-193-05
+    description: "Permission gating preserved: Observer sees only App Settings items they have access to"
+    type: functional
+    how_to_verify: "Verify that permission checks (hasPermission, !isObserver) still guard ward-only items. Observer should still see App Language, Theme, About. Members, Topics, Users, History, WhatsApp should still be permission-gated"
+    expected_result: "Ward settings items are still permission-gated. App settings items visible to all roles remain visible. Observer can see: App Language, Theme, About. Cannot see: Members, Topics, Users, History, WhatsApp"
+    priority: must_pass
+
+  - id: VC-193-06
+    description: "Sign-out button still exists outside the groups"
+    type: functional
+    how_to_verify: "Read settings/index.tsx and verify the sign-out Pressable is still rendered after both groups"
+    expected_result: "Sign-out button (signOutButton style) is still rendered below both settings groups"
+    priority: must_pass
+
+  - id: VC-193-07
+    description: "Group labels are visually distinct (styled as section headers)"
+    type: behavioral
+    how_to_verify: "Check that the group label Text elements have appropriate styling (fontSize, fontWeight, color, padding) to look like section headers"
+    expected_result: "Group labels are styled as prominent section headers (e.g., bold, appropriately sized, with padding/margin before the card group)"
+    priority: should_pass
+
+  - id: VC-193-08
+    description: "Ward Language and App Language are in different groups"
+    type: functional
+    how_to_verify: "Verify wardLanguage is in the 'Ward Settings' group and appLanguage is in the 'App Settings' group"
+    expected_result: "wardLanguage is in group 1 (Configuracoes da Ala), appLanguage is in group 2 (Configuracoes do App). They are no longer in the same section"
+    priority: must_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-199: Status Circle Alignment (F136)
+  # ---------------------------------------------------------------------------
+  - id: VC-199-01
+    description: "StatusLED right edge aligns with speaker field right edge in SpeechSlot"
+    type: behavioral
+    how_to_verify: "Read SpeechSlot.tsx and verify the statusSection or StatusLED positioning has been adjusted so its right edge aligns with the right edge of the speaker field (not the actionArea)"
+    expected_result: "The statusSection has a marginRight or paddingRight of ~36 (equal to actionArea width) to shift it left, OR the labelRow layout is restructured so the status circle right edge aligns with the flex:1 field right edge"
+    priority: must_pass
+
+  - id: VC-199-02
+    description: "X button position is unchanged"
+    type: regression
+    how_to_verify: "Read SpeechSlot.tsx and verify actionArea (width:36) and removeButton are still in the same position relative to the speaker field"
+    expected_result: "actionArea width:36 unchanged, still positioned to the right of the speaker field. X button click target unchanged"
+    priority: must_pass
+
+  - id: VC-199-03
+    description: "Status text and LED are still on the label row"
+    type: regression
+    how_to_verify: "Verify statusText and StatusLED are still rendered in the labelRow section of SpeechSlot"
+    expected_result: "Status text and LED are still in Row 1 (labelRow), not moved to a different row"
+    priority: must_pass
+
+  - id: VC-199-04
+    description: "Label text on the left is not affected by alignment change"
+    type: regression
+    how_to_verify: "Verify the label text (e.g., '1o Discurso') and toggle switch are still left-aligned in the labelRow"
+    expected_result: "Label + toggle position unchanged. Only the status section on the right is affected"
+    priority: should_pass
+
+  - id: VC-199-05
+    description: "Topic field row alignment is consistent with speaker field"
+    type: behavioral
+    how_to_verify: "Verify topicRow alignment is consistent - topic field (flex:1) + topicActionArea (width:36) should match speakerRow layout"
+    expected_result: "Topic row layout unchanged or consistent with speaker row. Status circle alignment applies to the speaker field reference"
+    priority: should_pass
+
+  # ---------------------------------------------------------------------------
+  # CR-200: Play Icon Resize (F137)
+  # ---------------------------------------------------------------------------
+  - id: VC-200-01
+    description: "Home tab play icon is significantly larger (height of font)"
+    type: behavioral
+    how_to_verify: "Read index.tsx and check playIcon fontSize is larger than current 17"
+    expected_result: "playIcon fontSize is increased to match or be close to meetingButtonText fontSize (17) or larger. The icon should be visually prominent and match the text height"
+    priority: must_pass
+
+  - id: VC-200-02
+    description: "Agenda tab expanded card play icon is significantly larger"
+    type: behavioral
+    how_to_verify: "Read agenda.tsx and check playButton fontSize is larger than current 14"
+    expected_result: "playButton fontSize is increased significantly from 14 to be more visible and match surrounding text height"
+    priority: must_pass
+
+  - id: VC-200-03
+    description: "Play icon in agenda card is not stuck to the chevron arrow"
+    type: behavioral
+    how_to_verify: "Read agenda.tsx and verify adequate spacing between the play button and the chevron"
+    expected_result: "marginRight on playButton is increased or gap/spacing is added between play icon and chevron to prevent them from appearing stuck together"
+    priority: must_pass
+
+  - id: VC-200-04
+    description: "Home tab play icon still uses Unicode U+25B6 (or equivalent visible play symbol)"
+    type: regression
+    how_to_verify: "Read index.tsx and verify the play icon character is still present and visible"
+    expected_result: "The play icon still uses U+25B6 or an equivalent clear play symbol"
+    priority: must_pass
+
+  - id: VC-200-05
+    description: "Agenda tab play icon still navigates to presentation screen"
+    type: regression
+    how_to_verify: "Read agenda.tsx and verify the play button Pressable still calls router.push to /presentation"
+    expected_result: "Play button onPress still navigates to /presentation with the correct date param"
+    priority: must_pass
+
+  - id: VC-200-06
+    description: "Home tab button still functional and accessible"
+    type: regression
+    how_to_verify: "Verify meetingButton Pressable still has accessibilityRole='button' and onPress navigating to /presentation"
+    expected_result: "Button remains accessible and functional"
+    priority: should_pass
+
+  # ---------------------------------------------------------------------------
+  # General Regression
+  # ---------------------------------------------------------------------------
+  - id: VC-REG-01
+    description: "All existing tests still pass after UI changes"
+    type: regression
+    how_to_verify: "Run npx vitest run and verify all tests pass"
+    expected_result: "All existing tests pass (5100+ tests expected)"
+    priority: must_pass
+
+  - id: VC-REG-02
+    description: "TypeScript compilation has no new errors"
+    type: regression
+    how_to_verify: "Run npx tsc --noEmit and check for errors"
+    expected_result: "No new TypeScript errors introduced by the UI changes"
+    priority: must_pass
+
+# =============================================================================
+# Pass criteria
+# =============================================================================
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.
+  Total must_pass: 14
+  Total should_pass: 5
+  Total: 19

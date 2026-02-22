@@ -24,12 +24,13 @@
 # CR-193, CR-199, CR-200
 # CR-202, CR-203
 # CR-205, CR-206, CR-207
+# CR-204, CR-208
 # Generated: 2026-02-22
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -4210,3 +4211,131 @@ batch15_phase2_test_results:
         description: "Updated AC-116-07 test assertion from eq('language', newLanguage) to eq('language', toDbLocale(newLanguage))"
     acs_covered: [AC-116-07]
     ecs_covered: []
+
+  # --- CR-208 commits (Phase 2) ---
+
+  - step: S01
+    cr: CR-208
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-01
+    hash: 0bc0169
+    message: "feat(edge-fn): add structured error codes, logging, and diagnostic mode to create-invitation (F143)"
+    files_changed:
+      - supabase/functions/create-invitation/index.ts
+    changes:
+      - id: CHG-624
+        description: "Added structured console.error logging with '[create-invitation] <step> failed' prefix at each failure point"
+      - id: CHG-625
+        description: "Added machine-readable 'code' field to all error JSON responses (8 codes: auth/missing-header, auth/invalid-token, auth/missing-metadata, auth/insufficient-permission, validation/missing-fields, validation/invalid-role, validation/invalid-email, invitation/insert-failed)"
+      - id: CHG-626
+        description: "Added diagnose?: boolean to CreateInvitationInput interface"
+      - id: CHG-627
+        description: "Added diagnostic mode: when input.diagnose === true, returns 200 with { diagnostic: true, checks: {...}, user_id, ward_id } without DB insert"
+      - id: CHG-628
+        description: "Wrapped req.json() in try/catch for malformed JSON body handling"
+    acs_covered: [AC-143-01, AC-143-02, AC-143-03, AC-143-04, AC-143-05, AC-143-06]
+    ecs_covered: [EC-143-01, EC-143-02, EC-143-03, EC-143-04, EC-143-05, EC-143-06]
+
+  # --- CR-204 commits (Phase 2) ---
+
+  - step: S02
+    cr: CR-204
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-02
+    hash: 1e461ad
+    message: "feat(edge-fn): convert reset-redirect to 302 redirect to external page (F144)"
+    files_changed:
+      - supabase/functions/reset-redirect/index.ts
+    changes:
+      - id: CHG-629
+        description: "Removed inline HTML template (~300 lines) and replaced with 302 redirect to external reset-password.html page"
+      - id: CHG-630
+        description: "Added EXTERNAL_PAGES_URL env var read from Deno.env with fallback to GitHub Pages URL"
+      - id: CHG-631
+        description: "Added console.warn when EXTERNAL_PAGES_URL not set and console.log for redirect action"
+    acs_covered: [AC-144-01, AC-144-10, AC-144-12, AC-144-13, AC-144-14]
+    ecs_covered: []
+
+  - step: S03
+    cr: CR-204
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-03
+    hash: 1dd7ec0
+    message: "feat(edge-fn): convert invite-redirect to 302 redirect to external page (F144)"
+    files_changed:
+      - supabase/functions/invite-redirect/index.ts
+    changes:
+      - id: CHG-632
+        description: "Removed inline HTML template (~400 lines) and replaced with 302 redirect to external accept-invite.html page"
+      - id: CHG-633
+        description: "Added EXTERNAL_PAGES_URL env var read from Deno.env with fallback to GitHub Pages URL"
+      - id: CHG-634
+        description: "Added console.warn when EXTERNAL_PAGES_URL not set and console.log for redirect action"
+    acs_covered: [AC-144-02, AC-144-11, AC-144-12, AC-144-13, AC-144-14]
+    ecs_covered: []
+
+  - step: S04
+    cr: CR-204
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-04
+    hash: 62cbcf3
+    message: "feat(pages): create external reset-password.html for GitHub Pages (F144)"
+    files_changed:
+      - docs/public/reset-password.html
+    changes:
+      - id: CHG-635
+        description: "Created self-contained HTML page with password reset form, extracted from reset-redirect EF inline template"
+      - id: CHG-636
+        description: "Token and type read from URLSearchParams instead of server-side template interpolation"
+      - id: CHG-637
+        description: "Hardcoded SUPABASE_URL and SUPABASE_ANON_KEY as JS constants (public values)"
+      - id: CHG-638
+        description: "Added errorMissingParams i18n key for missing URL parameters"
+    acs_covered: [AC-144-03, AC-144-05, AC-144-06, AC-144-07, AC-144-08]
+    ecs_covered: []
+
+  - step: S05
+    cr: CR-204
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-05
+    hash: 59a441f
+    message: "feat(pages): create external accept-invite.html for GitHub Pages (F144)"
+    files_changed:
+      - docs/public/accept-invite.html
+    changes:
+      - id: CHG-639
+        description: "Created self-contained HTML page with invitation acceptance form, extracted from invite-redirect EF inline template"
+      - id: CHG-640
+        description: "Token read from URLSearchParams instead of server-side template interpolation"
+      - id: CHG-641
+        description: "Hardcoded SUPABASE_URL and SUPABASE_ANON_KEY as JS constants, apiBase constructed from URL"
+      - id: CHG-642
+        description: "Added errorMissingToken i18n key for missing token parameter"
+    acs_covered: [AC-144-04, AC-144-05, AC-144-06, AC-144-07, AC-144-09]
+    ecs_covered: []
+
+  - step: S06
+    cr: [CR-204, CR-208]
+    plan_ref: plans/PLAN_P039.yaml
+    plan_step: STEP-06
+    hash: 2504daf
+    message: "test(batch-22): add F143/F144 tests and update F138/F139 tests for 302 redirect (STEP-06)"
+    files_changed:
+      - src/__tests__/batch22-f143-f144.test.ts
+      - src/__tests__/batch22-f138-f139.test.ts
+      - src/__tests__/batch22-tester-f138-f139.test.ts
+      - src/__tests__/batch19-phase1.test.ts
+      - src/__tests__/batch21-f130-f134.test.ts
+    changes:
+      - id: CHG-643
+        description: "Created batch22-f143-f144.test.ts with 148 tests covering F143 error codes/diagnostic mode and F144 302 redirects/external pages"
+      - id: CHG-644
+        description: "Updated batch22-f138-f139.test.ts to redirect HTML assertions from EF source to docs/public/ external pages"
+      - id: CHG-645
+        description: "Updated batch22-tester-f138-f139.test.ts to redirect HTML assertions from EF source to docs/public/ external pages"
+      - id: CHG-646
+        description: "Updated batch19-phase1.test.ts to skip F119 tests superseded by F144 (AC-119-01, AC-119-02, AC-119-04, AC-119-06, EC-119-02, EC-119-03)"
+      - id: CHG-647
+        description: "Updated batch21-f130-f134.test.ts to skip F134 AC-134-04 superseded by F144"
+    acs_covered: [AC-143-01, AC-143-02, AC-143-03, AC-143-04, AC-143-05, AC-143-06, AC-144-01, AC-144-02, AC-144-03, AC-144-04, AC-144-05, AC-144-06, AC-144-07, AC-144-08, AC-144-09, AC-144-10, AC-144-11, AC-144-12, AC-144-13, AC-144-14]
+    ecs_covered: [EC-143-01, EC-143-02, EC-143-03, EC-143-04, EC-143-05, EC-143-06]

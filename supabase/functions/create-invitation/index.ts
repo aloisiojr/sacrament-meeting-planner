@@ -1,6 +1,9 @@
 // Edge Function: create-invitation
 // Creates an invitation with token + deep link for a new user.
 // Requires JWT with Bishopric or Secretary role (invitation:create permission).
+//
+// F143 (CR-208): Structured error logging, error codes, and diagnostic mode.
+// ADR-094: Structured error codes + diagnostic mode for production debugging.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -13,6 +16,7 @@ const corsHeaders = {
 interface CreateInvitationInput {
   email: string;
   role: 'bishopric' | 'secretary' | 'observer';
+  diagnose?: boolean;
 }
 
 const VALID_ROLES = ['bishopric', 'secretary', 'observer'];
@@ -28,8 +32,9 @@ Deno.serve(async (req) => {
     // Verify JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('[create-invitation] auth_header failed: no Authorization header present');
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: 'Missing authorization header', code: 'auth/missing-header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -45,8 +50,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
+      console.error(`[create-invitation] jwt_validation failed: ${userError?.message ?? 'user is null'}`);
       return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
+        JSON.stringify({ error: 'Invalid or expired token', code: 'auth/invalid-token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -55,43 +61,76 @@ Deno.serve(async (req) => {
     const userRole = user.app_metadata?.role;
 
     if (!wardId || !userRole) {
+      console.error(`[create-invitation] metadata_check failed: ward_id=${wardId}, role=${userRole}, user_id=${user.id}`);
       return new Response(
-        JSON.stringify({ error: 'User missing ward or role metadata' }),
+        JSON.stringify({ error: 'User missing ward or role metadata', code: 'auth/missing-metadata' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Check permission: only Bishopric and Secretary can create invitations
     if (!ALLOWED_ROLES.includes(userRole)) {
+      console.error(`[create-invitation] role_permission failed: userRole=${userRole}, user_id=${user.id}`);
       return new Response(
-        JSON.stringify({ error: 'Insufficient permissions' }),
+        JSON.stringify({ error: 'Insufficient permissions', code: 'auth/insufficient-permission' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const input: CreateInvitationInput = await req.json();
+    let input: CreateInvitationInput;
+    try {
+      input = await req.json();
+    } catch {
+      console.error('[create-invitation] payload_validation failed: malformed JSON body');
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: email and role', code: 'validation/missing-fields' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate required fields
     if (!input.email || !input.role) {
+      console.error(`[create-invitation] payload_validation failed: missing email=${!!input.email} role=${!!input.role}`);
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: email and role' }),
+        JSON.stringify({ error: 'Missing required fields: email and role', code: 'validation/missing-fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate role
     if (!VALID_ROLES.includes(input.role)) {
+      console.error(`[create-invitation] payload_validation failed: invalid role=${input.role}`);
       return new Response(
-        JSON.stringify({ error: 'Invalid role. Must be bishopric, secretary, or observer.' }),
+        JSON.stringify({ error: 'Invalid role. Must be bishopric, secretary, or observer.', code: 'validation/invalid-role' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate email format (basic)
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {
+      console.error(`[create-invitation] payload_validation failed: invalid email format`);
       return new Response(
-        JSON.stringify({ error: 'Invalid email format' }),
+        JSON.stringify({ error: 'Invalid email format', code: 'validation/invalid-email' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Diagnostic mode: run all checks but skip DB insert
+    if (input.diagnose === true) {
+      return new Response(
+        JSON.stringify({
+          diagnostic: true,
+          checks: {
+            auth_header: 'pass',
+            jwt_validation: 'pass',
+            metadata_check: 'pass',
+            role_permission: 'pass',
+            payload_validation: 'pass',
+          },
+          user_id: user.id,
+          ward_id: wardId,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -117,9 +156,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error('Invitation creation error:', insertError);
+      console.error(`[create-invitation] db_insert failed: ${insertError.message}`);
       return new Response(
-        JSON.stringify({ error: 'Failed to create invitation' }),
+        JSON.stringify({ error: 'Failed to create invitation', code: 'invitation/insert-failed' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

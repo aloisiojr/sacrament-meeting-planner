@@ -9,7 +9,6 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Switch,
   Pressable,
@@ -19,6 +18,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
@@ -60,6 +60,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
+  const router = useRouter();
   const locale = getCurrentLanguage();
 
   const isObserver = !hasPermission('agenda:write');
@@ -409,21 +410,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           {/* Normal meeting: speeches 1 + 2 */}
           <SectionHeader title={t('agenda.sectionFirstSpeeches')} colors={colors} />
 
-          <SpeakerField
+          <ReadOnlySpeakerRow
             label={`1\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(1)?.speaker_name ?? ''}
-            overrideName={agenda.speaker_1_override ?? null}
-            onEditOverride={(name) => updateField('speaker_1_override', name)}
-            disabled={isObserver}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}
           />
 
-          <SpeakerField
+          <ReadOnlySpeakerRow
             label={`2\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(2)?.speaker_name ?? ''}
-            overrideName={agenda.speaker_2_override ?? null}
-            onEditOverride={(name) => updateField('speaker_2_override', name)}
-            disabled={isObserver}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}
           />
 
@@ -475,12 +472,10 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           {/* Section 4: Last Speech */}
           <SectionHeader title={t('agenda.sectionLastSpeech')} colors={colors} />
 
-          <SpeakerField
+          <ReadOnlySpeakerRow
             label={t('speeches.lastSpeech')}
             speakerName={getSpeech(3)?.speaker_name ?? ''}
-            overrideName={agenda.speaker_3_override ?? null}
-            onEditOverride={(name) => updateField('speaker_3_override', name)}
-            disabled={isObserver}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}
           />
         </>
@@ -688,95 +683,33 @@ function SelectorField({
   );
 }
 
-function SpeakerField({
+function ReadOnlySpeakerRow({
   label,
   speakerName,
-  overrideName,
-  onEditOverride,
-  disabled,
+  onNavigate,
   colors,
 }: {
   label: string;
   speakerName: string;
-  overrideName: string | null;
-  onEditOverride: (name: string | null) => void;
-  disabled: boolean;
+  onNavigate: () => void;
   colors: ThemeColors;
 }) {
-  const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
-
-  const displayName = overrideName ?? speakerName;
-  const hasOverride = overrideName !== null && overrideName !== speakerName;
-  const hasSpeaker = !!speakerName;
-
-  const handleStartEdit = useCallback(() => {
-    setEditValue(displayName);
-    setIsEditing(true);
-  }, [displayName]);
-
-  const handleSave = useCallback(() => {
-    const trimmed = editValue.trim();
-    if (!trimmed || trimmed === speakerName) {
-      // Empty or same as original -> clear override
-      onEditOverride(null);
-    } else {
-      onEditOverride(trimmed);
-    }
-    setIsEditing(false);
-  }, [editValue, speakerName, onEditOverride]);
-
-  const handleRevert = useCallback(() => {
-    onEditOverride(null);
-    setIsEditing(false);
-  }, [onEditOverride]);
-
   return (
     <FieldRow label={label} colors={colors}>
-      {isEditing ? (
-        <View style={styles.speakerEditRow}>
-          <TextInput
-            style={[styles.speakerEditInput, { color: colors.text, borderColor: colors.border }]}
-            value={editValue}
-            onChangeText={setEditValue}
-            autoFocus
-            onSubmitEditing={handleSave}
-            onBlur={handleSave}
-            returnKeyType="done"
-          />
-          <Pressable hitSlop={12} onPress={handleRevert} style={styles.speakerIconBtn}>
-            <Text style={[styles.speakerIcon, { color: colors.error }]}>{'\u2716'}</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={[styles.speakerReadRow, { borderColor: colors.border }]}>
-          <Text
-            style={[
-              styles.speakerReadText,
-              { color: displayName ? colors.text : colors.textTertiary },
-            ]}
-            numberOfLines={1}
-          >
-            {displayName || label}
-          </Text>
-          {hasSpeaker && !disabled && (
-            <Pressable hitSlop={12} onPress={handleStartEdit} style={styles.speakerIconBtn}>
-              <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
-            </Pressable>
-          )}
-          {hasOverride && !disabled && (
-            <Pressable hitSlop={12} onPress={handleRevert} style={styles.speakerIconBtn}>
-              <Text style={[styles.speakerIcon, { color: colors.error }]}>{'\u2716'}</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-      {hasOverride && !isEditing && (
-        <Text style={[styles.lastMinuteLabel, { color: colors.textTertiary }]}>
-          {t('agenda.lastMinuteAssignment')}
+      <View style={[styles.speakerReadRow, { borderColor: colors.border }]}>
+        <Text
+          style={[
+            styles.speakerReadText,
+            { color: speakerName ? colors.text : colors.textTertiary },
+          ]}
+          numberOfLines={1}
+        >
+          {speakerName || label}
         </Text>
-      )}
+        <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
+          <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
+        </Pressable>
+      </View>
     </FieldRow>
   );
 }
@@ -916,6 +849,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   selectorField: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
@@ -1012,19 +947,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
   },
-  speakerEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  speakerEditInput: {
-    flex: 1,
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    fontSize: 15,
-  },
   speakerReadRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1042,11 +964,5 @@ const styles = StyleSheet.create({
   },
   speakerIcon: {
     fontSize: 18,
-  },
-  lastMinuteLabel: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 2,
-    marginLeft: 2,
   },
 });

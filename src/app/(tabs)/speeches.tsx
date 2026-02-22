@@ -21,6 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { SundayCard } from '../../components/SundayCard';
 import { SpeechSlot } from '../../components/SpeechSlot';
 import { MemberSelectorModal } from '../../components/MemberSelectorModal';
@@ -92,6 +93,7 @@ function SpeechesTabContent() {
   const { colors } = useTheme();
   const { hasPermission, role } = useAuth();
   const flatListRef = useRef<FlatList>(null);
+  const params = useLocalSearchParams<{ expandDate?: string }>();
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [speakerModalSpeechId, setSpeakerModalSpeechId] = useState<string | null>(null);
@@ -170,6 +172,30 @@ function SpeechesTabContent() {
       }, 100);
     }
   }, [listItems, nextSunday, initialScrollDone]);
+
+  // ADR-082: Handle expandDate query param from Agenda tab pencil navigation
+  useEffect(() => {
+    if (!params.expandDate || listItems.length === 0) return;
+    const targetDate = params.expandDate;
+
+    // Expand the card and lazy-create speeches
+    setExpandedDate(targetDate);
+    lazyCreate.mutate(targetDate);
+
+    // Scroll to the target date
+    const index = listItems.findIndex(
+      (i) => i.type === 'sunday' && i.key === targetDate
+    );
+    if (index >= 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0,
+        });
+      }, 400);
+    }
+  }, [params.expandDate, listItems.length]);
 
   // Toggle expand/collapse
   const handleToggle = useCallback(

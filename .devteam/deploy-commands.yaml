@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 9
-last_updated: "2026-02-22T03:15:00"
+version: 10
+last_updated: "2026-02-22T19:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -432,4 +432,29 @@ deploy_history:
     cr: "Batch 19 Phase 1 (F117, CR-180)"
     verification:
       - "supabase functions list mostra register-first-user como ACTIVE v7"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function send-reset-email"
+    method: "supabase functions deploy send-reset-email --no-verify-jwt"
+    reason: "F133 (Batch 20 Phase 1): Language priority changed to user_metadata.language > ward.language > pt-BR"
+    result: "Sucesso - Function redeployada e ACTIVE (version 6)"
+    verified: true
+    cr: "Batch 20 Phase 1 (F133)"
+    verification:
+      - "supabase functions list mostra send-reset-email como ACTIVE v6"
+      - "POST com email inexistente retorna {success:true} (anti-enumeration)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function reset-redirect"
+    method: "supabase functions deploy reset-redirect --no-verify-jwt"
+    reason: "F134 (Batch 20 Phase 1): Removed script tag, uses only meta http-equiv refresh for redirect"
+    result: "Sucesso - Function redeployada e ACTIVE (version 3)"
+    verified: true
+    cr: "Batch 20 Phase 1 (F134)"
+    verification:
+      - "supabase functions list mostra reset-redirect como ACTIVE v3"
+      - "GET com token=test123&type=recovery retorna HTML 200 com deep link e charset=utf-8"
+      - "HTML nao contem tag script (usa apenas meta http-equiv refresh)"
       - "REST API health check: HTTP 200"

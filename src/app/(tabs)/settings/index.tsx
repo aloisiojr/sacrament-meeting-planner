@@ -172,78 +172,78 @@ export default function SettingsScreen() {
           {t('settings.title')}
         </Text>
 
-        {/* Section 1: Members & Topics (non-Observer only) */}
+        {/* Group 1: Ward Settings (non-Observer only) */}
         {!isObserver && (
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            {hasPermission('member:read') && (
-              <SettingsItem
-                label={t('settings.members')}
-                onPress={() => router.push('/(tabs)/settings/members')}
-                colors={colors}
-              />
-            )}
-            {hasPermission('topic:write') && (
-              <SettingsItem
-                label={t('settings.topics')}
-                onPress={() => router.push('/(tabs)/settings/topics')}
-                colors={colors}
-              />
-            )}
-          </View>
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('settings.wardSettingsGroup')}
+            </Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {hasPermission('member:read') && (
+                <SettingsItem
+                  label={t('settings.members')}
+                  onPress={() => router.push('/(tabs)/settings/members')}
+                  colors={colors}
+                />
+              )}
+              {hasPermission('topic:write') && (
+                <SettingsItem
+                  label={t('settings.topics')}
+                  onPress={() => router.push('/(tabs)/settings/topics')}
+                  colors={colors}
+                />
+              )}
+              {hasPermission('settings:whatsapp') && (
+                <SettingsItem
+                  label={t('settings.whatsappTemplate')}
+                  onPress={() => router.push('/(tabs)/settings/whatsapp')}
+                  colors={colors}
+                />
+              )}
+              {hasPermission('settings:language') && (
+                <SettingsItem
+                  label={t('settings.wardLanguage')}
+                  value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+                  onPress={() => setWardLanguageModalVisible(true)}
+                  colors={colors}
+                />
+              )}
+              {hasPermission('settings:timezone') && (
+                <SettingsItem
+                  label={t('settings.timezone')}
+                  onPress={() => router.push('/(tabs)/settings/timezone')}
+                  colors={colors}
+                />
+              )}
+            </View>
+          </>
         )}
 
-        {/* Section 2: Users, History, WhatsApp (non-Observer only) */}
-        {!isObserver && (
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            {hasPermission('settings:users') && (
-              <SettingsItem
-                label={t('settings.users')}
-                onPress={() => router.push('/(tabs)/settings/users')}
-                colors={colors}
-              />
-            )}
-            {hasPermission('history:read') && (
-              <SettingsItem
-                label={t('settings.history')}
-                onPress={() => router.push('/(tabs)/settings/history')}
-                colors={colors}
-              />
-            )}
-            {hasPermission('settings:whatsapp') && (
-              <SettingsItem
-                label={t('settings.whatsappTemplate')}
-                onPress={() => router.push('/(tabs)/settings/whatsapp')}
-                colors={colors}
-              />
-            )}
-          </View>
-        )}
-
-        {/* Section 3: Language, Theme, About */}
+        {/* Group 2: App Settings (all users) */}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {t('settings.appSettingsGroup')}
+        </Text>
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {/* F116: App Language - available to ALL roles including Observer */}
+          {hasPermission('settings:users') && (
+            <SettingsItem
+              label={t('settings.users')}
+              onPress={() => router.push('/(tabs)/settings/users')}
+              colors={colors}
+            />
+          )}
+          {hasPermission('history:read') && (
+            <SettingsItem
+              label={t('settings.history')}
+              onPress={() => router.push('/(tabs)/settings/history')}
+              colors={colors}
+            />
+          )}
           <SettingsItem
             label={t('settings.appLanguage')}
             value={LANGUAGE_LABELS[currentAppLanguage]}
             onPress={() => setAppLanguageModalVisible(true)}
             colors={colors}
           />
-          {/* F116: Ward Language - Bispado and Secretario only */}
-          {hasPermission('settings:language') && (
-            <SettingsItem
-              label={t('settings.wardLanguage')}
-              value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
-              onPress={() => setWardLanguageModalVisible(true)}
-              colors={colors}
-            />
-          )}
-          {!isObserver && hasPermission('settings:timezone') && (
-            <SettingsItem
-              label={t('settings.timezone')}
-              onPress={() => router.push('/(tabs)/settings/timezone')}
-              colors={colors}
-            />
-          )}
           <SettingsItem
             label={t('settings.theme')}
             onPress={() => router.push('/(tabs)/settings/theme')}
@@ -367,6 +367,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginHorizontal: 16,
     overflow: 'hidden',
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   item: {
     flexDirection: 'row',

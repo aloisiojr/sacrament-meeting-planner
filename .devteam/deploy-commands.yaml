@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 7
-last_updated: "2026-02-21T06:15:00"
+version: 8
+last_updated: "2026-02-22T00:21:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -68,6 +68,32 @@ services:
       - name: "Deploy function especifica"
         command: "supabase functions deploy <function-name>"
         when: "Alterar apenas uma function"
+
+      - name: "Deploy function publica (sem JWT)"
+        command: "supabase functions deploy <function-name> --no-verify-jwt"
+        when: "Alterar function que nao requer autenticacao (ex: reset-redirect, send-reset-email)"
+        notes: "Usa flag --no-verify-jwt para desabilitar verificacao de JWT. Necessario para endpoints publicos."
+
+    auth_config:
+      - name: "Ler configuracao de autenticacao"
+        command: |
+          TOKEN_RAW=$(security find-generic-password -s "Supabase CLI" -w)
+          TOKEN=$(echo "$TOKEN_RAW" | sed 's/go-keyring-base64://' | base64 -d)
+          curl -s "https://api.supabase.com/v1/projects/poizgglzdjqwrhsnhkke/config/auth" \
+            -H "Authorization: Bearer $TOKEN"
+        when: "Verificar site_url, uri_allow_list (redirect URLs), ou qualquer config de auth"
+        notes: "Retorna JSON com todas as configuracoes de auth do projeto"
+
+      - name: "Atualizar configuracao de autenticacao"
+        command: |
+          TOKEN_RAW=$(security find-generic-password -s "Supabase CLI" -w)
+          TOKEN=$(echo "$TOKEN_RAW" | sed 's/go-keyring-base64://' | base64 -d)
+          curl -s -X PATCH "https://api.supabase.com/v1/projects/poizgglzdjqwrhsnhkke/config/auth" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"site_url":"<NEW_URL>","uri_allow_list":"<COMMA_SEPARATED_URLS>"}'
+        when: "Atualizar site_url, redirect URLs, ou qualquer config de auth"
+        notes: "PATCH aceita campos parciais. Campos nao enviados nao sao alterados."
 
     secrets:
       - name: "Listar secrets configurados"
@@ -182,6 +208,21 @@ troubleshooting:
   - problem: "Resend API retorna erro 403 ou 'domain not verified'"
     solution: "Dominio do email remetente (FROM) nao esta verificado no Resend. Ir em https://resend.com/domains e verificar o dominio, ou usar onboarding@resend.dev para testes."
 
+  - problem: "Deep link scheme incorreto no Supabase (site_url ou redirect URLs)"
+    solution: "Usar Management API PATCH para atualizar site_url e/ou uri_allow_list"
+    command: |
+      TOKEN_RAW=$(security find-generic-password -s "Supabase CLI" -w)
+      TOKEN=$(echo "$TOKEN_RAW" | sed 's/go-keyring-base64://' | base64 -d)
+      curl -s -X PATCH "https://api.supabase.com/v1/projects/poizgglzdjqwrhsnhkke/config/auth" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"site_url":"sacrmeetplan://home","uri_allow_list":"sacrmeetplan://invite/*,sacrmeetplan://reset-password"}'
+    notes: "Verificar com GET antes de PATCH. uri_allow_list e comma-separated."
+
+  - problem: "Botao de email nao clicavel (custom URL scheme bloqueado por email clients)"
+    solution: "Usar Edge Function intermediaria HTTPS (reset-redirect) que faz redirect para deep link. Email aponta para URL HTTPS, que redireciona para app."
+    notes: "Email clients como Gmail, Outlook bloqueiam links com custom URL schemes (sacrmeetplan://, wardmanager://, etc) por seguranca."
+
 deploy_history:
   - date: "2026-02-18"
     action: "Migration 012_drop_members_phone_unique_constraint.sql"
@@ -266,3 +307,49 @@ deploy_history:
       - "Executar: supabase secrets set RESEND_API_KEY=<key>"
       - 'Executar: supabase secrets set RESEND_FROM_EMAIL="Sacrament Meeting Planner <noreply@yourdomain.com>"'
       - "Testar com email de usuario real no banco"
+
+  - date: "2026-02-22"
+    action: "Deploy Edge Function reset-redirect (nova)"
+    method: "supabase functions deploy reset-redirect --no-verify-jwt"
+    reason: "Nova Edge Function intermediaria HTTPS para deep links de reset de senha (email clients bloqueiam custom URL schemes)"
+    result: "Sucesso - Function deployada e ACTIVE (version 1)"
+    verified: true
+    cr: "Batch 18 (CR-175 to CR-177)"
+    verification:
+      - "supabase functions list mostra reset-redirect como ACTIVE v1"
+      - "GET com token=test123&type=recovery retorna HTML 200 com deep link sacrmeetplan://reset-password"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function send-reset-email"
+    method: "supabase functions deploy send-reset-email --no-verify-jwt"
+    reason: "Atualizada para usar HTTPS redirect (reset-redirect) em vez de deep link direto no email"
+    result: "Sucesso - Function redeployada e ACTIVE (version 4)"
+    verified: true
+    cr: "Batch 18 (CR-175 to CR-177)"
+    verification:
+      - "supabase functions list mostra send-reset-email como ACTIVE v4"
+      - "POST com email inexistente retorna {success:true} (anti-enumeration)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Redeploy Edge Function create-invitation"
+    method: "supabase functions deploy create-invitation"
+    reason: "Atualizada com deep link scheme corrigido (sacrmeetplan:// em vez de wardmanager://)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 7)"
+    verified: true
+    cr: "Batch 18 (CR-175 to CR-177)"
+    verification:
+      - "supabase functions list mostra create-invitation como ACTIVE v7"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-22"
+    action: "Atualizar site_url de sacrmeetman:// para sacrmeetplan://"
+    method: "Management API PATCH /config/auth"
+    reason: "site_url ainda usava scheme antigo sacrmeetman://home"
+    result: "Sucesso - site_url atualizado para sacrmeetplan://home"
+    verified: true
+    cr: "Batch 18 (CR-175 to CR-177)"
+    verification:
+      - "GET /config/auth confirma site_url=sacrmeetplan://home"
+      - "GET /config/auth confirma uri_allow_list=sacrmeetplan://invite/*,sacrmeetplan://reset-password"

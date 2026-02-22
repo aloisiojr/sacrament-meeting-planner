@@ -1,0 +1,395 @@
+type: qa_plan
+id: QA-021
+created_at: "2026-02-21"
+request_type: feature_request_and_bugfix
+feature_or_bug: "Batch 19 Phase 1: Language control (app + ward), Pianist/Conductor split, Optional 2nd speech, Password reset bug (CR-178, CR-180, CR-181, CR-191)"
+user_request: |
+  1. CR-178 (feature_request): Na tela de template de WhatsApp, quando eu troco de idioma, os placeholders
+     e o template mostrado na tela ainda estao em portugues. Dentro de Settings -> Topic Library e a mesma
+     coisa, quando eu troco de idioma, eu nao vejo as colecoes do idioma novo na lista de colecoes.
+     Solucao: Ter controle de lingua separado para o app (individual por usuario, salvo no banco) e para
+     a ala (na tabela wards, alteravel por Bispado/Secretario). Idioma da ala controla WhatsApp template
+     e lista de temas disponiveis. Idioma do app controla a lingua do app (incluindo traducao de
+     placeholders do WhatsApp). Ao trocar idioma da ala, reabilitar automaticamente colecoes no novo idioma.
+
+  2. CR-180 (feature_request): Dividir o tipo de ator "Musica" (can_music) em dois tipos separados:
+     "Pianista" (can_pianist) e "Regente" (can_conductor). Pianista sera selecionado/criado/editado/apagado
+     no campo pianista e Regente no campo regente. Para migracao do banco, mover todos atores can_music
+     para can_pianist. Usuario cria manualmente os de tipo Regente depois. Designacoes existentes de
+     Regente em domingos passados mantem o ator (agora tipo Pianista).
+
+  3. CR-181 (feature_request): Segundo discurso de todo "Domingo com Discursos" pode ser opcional.
+     Toggle pequeno apos o label de "2o Discurso". Quando desligado: campos de discursante e tema do
+     2o discurso ficam desabilitados; designacoes do 2o discurso sao apagadas (com confirmacao);
+     card contraido nao mostra a linha do 2o discurso; agenda mostra campo desabilitado com placeholder
+     "Domingo configurado para nao ter 2o discurso". Toggle por domingo, default ligado.
+     Trocar label "3o Discurso" para "Ultimo Discurso". Remover labels 1o/2o/3o Discurso do card
+     contraido (tanto Discursos quanto Home), deixando so os nomes.
+     Na tela de apresentacao, secao "Primeiros Discursos" simplesmente nao mostra nada sobre o 2o
+     discurso quando desligado.
+
+  4. CR-191 (bugfix): Ao clicar em "Redefinir Senha" no email de recuperacao (Gmail->Safari),
+     o browser mostra plain-text do HTML ao inves de renderizar. Possivelmente Edge Function
+     reset-redirect retornando Content-Type incorreto ou HTML escapado.
+
+# Estado atual documentado
+baseline:
+  description: |
+    == CR-178 (Language control) ==
+    Current state: There is a SINGLE language setting per ward (wards.language column, default 'pt-BR').
+    - i18n/index.ts: initI18n() detects device locale, but AuthContext.tsx overrides with ward language
+      on login (line 101-116). changeLanguage() exists for runtime changes.
+    - Settings/index.tsx: Language selector (line 199-205) updates wards.language AND calls
+      changeLanguage(). This is a ward-wide setting, not per-user. The language mutation also
+      deactivates old-language collections and creates configs for new-language collections (lines 67-95).
+    - WhatsApp template screen (settings/whatsapp.tsx): Placeholders are hardcoded in Portuguese
+      (line 20-27: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}). Sample data is also
+      Portuguese (line 30-37). The screen fetches ward.language (line 63) and uses it for default
+      template (line 79). The "Placeholders:" label and "Template:" label and "Preview:" label are
+      hardcoded in English (lines 167, 184, 207).
+    - Topics screen (settings/topics.tsx): Uses getCurrentLanguage() to fetch collections for that
+      language (line 270, 288). This means if app language = ward language, collections show correctly.
+    - useTopics.ts: useCollections(language) fetches general_collections filtered by language (line 195).
+      useActiveTopics() does NOT filter by language - it fetches ALL active collection configs regardless
+      of language (lines 356-395). The "Temas da Ala" label is hardcoded in Portuguese (line 344).
+    - There is NO user-specific language preference in the database. No user_preferences or
+      user_settings table exists. The Ward interface has a 'language' field (database.ts:78).
+
+    ISSUE: There is no separation between "app language" (per-user) and "ward language" (ward-wide).
+    Currently a single ward.language controls both the UI language and the WhatsApp/collections language.
+    The user wants these separated: app language per user (saved in DB) and ward language for
+    WhatsApp + collections.
+
+    == CR-180 (Pianist/Conductor split) ==
+    Current state: meeting_actors table has a single boolean column "can_music" (001_initial_schema.sql:148).
+    - database.ts MeetingActor interface: has can_music boolean (line 155).
+    - useActors.ts: ActorRoleFilter includes 'can_music' (line 28). filterActorsByRole uses can_music (line 45).
+    - AgendaForm.tsx: Pianist field uses roleFilter 'can_music' (line 235). Conductor field ALSO uses
+      roleFilter 'can_music' (line 249). Both fields pull from the same pool of actors.
+    - SundayAgenda type: has pianist_name, pianist_actor_id, conductor_name, conductor_actor_id
+      (database.ts:179-183). The DB already separates pianist/conductor in the agenda, but the actor
+      pool is shared via can_music.
+    - ActorSelector.tsx: When creating a new actor, it sets the flag based on roleFilter (line 91-97).
+      For 'can_music', it sets can_music=true.
+    - CreateActorInput/UpdateActorInput: has can_music boolean (database.ts:312, 321).
+
+    ISSUE: The user wants separate actor types: can_pianist and can_conductor, replacing can_music.
+    This requires: (1) DB migration adding can_pianist and can_conductor columns, migrating can_music
+    actors to can_pianist, dropping can_music; (2) updating TypeScript types; (3) updating hooks;
+    (4) updating AgendaForm to use 'can_pianist' for pianist field and 'can_conductor' for conductor.
+
+    == CR-181 (Optional 2nd speech) ==
+    Current state: All speech-type Sundays always have 3 speech slots (positions 1, 2, 3).
+    - speeches.tsx: Hardcoded [1, 2, 3].map((pos) => ...) on line 314. Always renders 3 SpeechSlots.
+    - SundayCard.tsx: Collapsed view also hardcodes [1, 2, 3].map (line 357). Always shows 3 speech rows.
+    - SpeechSlot.tsx: Has getPositionLabel() that creates ordinal labels like "1o Discurso" (line 53-56).
+    - usePresentationMode.ts: buildPresentationCards hardcodes speech1, speech2 (lines 143-151) in
+      "First Speeches" card, and speech3 as "Last Speech" (lines 169-177).
+    - AgendaForm.tsx: Speaker overrides for positions 1, 2, 3 (database.ts:200-202).
+    - SundayAgenda: No field for "has_second_speech" or similar toggle. No per-sunday configuration
+      for optional 2nd speech.
+
+    ISSUE: Need new per-sunday toggle (likely in sunday_agendas table or a new field) to disable
+    the 2nd speech. Need UI toggle in SpeechSlot/SundayCard, conditional rendering in collapsed view,
+    presentation mode, and agenda form. Label changes: "3o Discurso" -> "Ultimo Discurso",
+    remove ordinal labels from collapsed card.
+
+    == CR-191 (Password reset plain-text HTML) ==
+    Current state: reset-redirect Edge Function exists (supabase/functions/reset-redirect/index.ts).
+    - Line 86-89: Returns HTML with Content-Type 'text/html' and status 200.
+    - The Response constructor: `new Response(html, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/html' } })`
+    - corsHeaders includes Access-Control-Allow-Origin, Access-Control-Allow-Headers.
+    - The HTML is built via template literal (lines 34-84) with proper DOCTYPE, head, body tags.
+    - send-reset-email/index.ts line 194: deepLink points to the HTTPS reset-redirect URL.
+
+    BUG ANALYSIS: The code looks correct - it returns proper HTML with Content-Type text/html.
+    Possible causes:
+    1. The Content-Type header might be overridden or duplicated by corsHeaders spreading
+    2. Gmail might be altering the URL before opening Safari
+    3. The response might have charset issues
+    4. The corsHeaders spread might override Content-Type if it's also set in corsHeaders
+    5. Most likely: corsHeaders does NOT contain Content-Type, so the explicit 'Content-Type': 'text/html'
+       should work. But if there is a Supabase proxy or middleware adding a different Content-Type,
+       that could cause the issue.
+    6. The charset is missing: should be 'text/html; charset=utf-8'
+
+    Looking at the code more carefully, the corsHeaders on line 8-11 do NOT contain Content-Type.
+    The Content-Type is set explicitly to 'text/html' on line 88. This should be correct.
+    The issue might be that the charset specification is missing, or that Safari on iOS is not
+    properly handling the redirect. Adding '; charset=utf-8' to Content-Type could help.
+
+  evidence:
+    - "i18n/index.ts: single ward language controls UI, no per-user language preference"
+    - "AuthContext.tsx:101-116: ward language applied on login, overrides device locale"
+    - "settings/index.tsx:54-105: language change mutation updates wards.language + deactivates old collections"
+    - "settings/whatsapp.tsx:20-27: placeholders hardcoded in Portuguese ({nome}, {data}, etc.)"
+    - "settings/whatsapp.tsx:30-37: sample data hardcoded in Portuguese"
+    - "settings/whatsapp.tsx:167,184,207: UI labels hardcoded in English (Placeholders, Template, Preview)"
+    - "useTopics.ts:344: 'Temas da Ala' label hardcoded in Portuguese"
+    - "No user_preferences or user_settings table in database"
+    - "001_initial_schema.sql:148: meeting_actors has can_music boolean, no can_pianist or can_conductor"
+    - "database.ts:155: MeetingActor interface has can_music, not can_pianist/can_conductor"
+    - "useActors.ts:28: ActorRoleFilter includes 'can_music', not 'can_pianist'/'can_conductor'"
+    - "AgendaForm.tsx:235,249: Both pianist and conductor fields use roleFilter 'can_music'"
+    - "speeches.tsx:314: Hardcoded [1, 2, 3].map for speech positions"
+    - "SundayCard.tsx:357: Collapsed view hardcodes [1, 2, 3] for 3 speech rows"
+    - "SpeechSlot.tsx:53-56: Position labels use ordinal format '1o Discurso'"
+    - "usePresentationMode.ts:143-151: Presentation hardcodes speech1+speech2 in First Speeches card"
+    - "No has_second_speech or similar toggle field in SundayAgenda type"
+    - "reset-redirect/index.ts:86-89: Returns HTML with Content-Type text/html (no charset)"
+    - "reset-redirect/index.ts:8-11: corsHeaders do NOT contain Content-Type"
+    - "send-reset-email/index.ts:194: deepLink uses HTTPS URL to reset-redirect"
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+  # ============================
+  # CR-178: Language control (app + ward)
+  # ============================
+  - id: VC-01
+    description: "User-level language preference exists in database (new table or column)"
+    type: functional
+    how_to_verify: "Check for new migration adding user language preference. Check for new table (e.g., user_preferences) or column in existing auth metadata."
+    expected_result: "Per-user language preference stored in database, separate from ward.language"
+    priority: must_pass
+
+  - id: VC-02
+    description: "Ward language (wards.language) controls WhatsApp template defaults and collections"
+    type: functional
+    how_to_verify: "Read settings/whatsapp.tsx - verify template initialization uses ward.language. Read useTopics.ts - verify collections use ward.language, not app language."
+    expected_result: "WhatsApp template default and collection listing use ward.language"
+    priority: must_pass
+
+  - id: VC-03
+    description: "App language (user preference) controls i18n/UI translations including WhatsApp placeholder translations"
+    type: functional
+    how_to_verify: "Read AuthContext or layout - verify i18n.changeLanguage uses user preference. Read whatsapp.tsx - verify placeholder labels are translated via i18n, not hardcoded."
+    expected_result: "UI language driven by user preference. Placeholders use t() for labels."
+    priority: must_pass
+
+  - id: VC-04
+    description: "WhatsApp screen placeholders are translatable (not hardcoded in Portuguese)"
+    type: functional
+    how_to_verify: "Read settings/whatsapp.tsx PLACEHOLDERS const - verify they use i18n keys or are language-aware. Check the 'Placeholders:', 'Template:', 'Preview:' labels use t()."
+    expected_result: "Placeholder names and UI labels use translation keys"
+    priority: must_pass
+
+  - id: VC-05
+    description: "Settings screen has separate controls for ward language and app language"
+    type: functional
+    how_to_verify: "Read settings/index.tsx - verify two language settings exist or the existing one is correctly split"
+    expected_result: "Ward language and app language are independently configurable"
+    priority: must_pass
+
+  - id: VC-06
+    description: "Changing ward language auto-reactivates collections for the new language"
+    type: functional
+    how_to_verify: "Read the ward language change mutation - verify it activates (not just creates) new language collections"
+    expected_result: "New language collections are automatically activated (not just config rows created)"
+    priority: must_pass
+
+  - id: VC-07
+    description: "Ward language change permission restricted to Bishopric/Secretary"
+    type: functional
+    how_to_verify: "Check permissions.ts or settings UI for ward language - verify Observer cannot change ward language"
+    expected_result: "Only bishopric and secretary roles can change ward language"
+    priority: must_pass
+
+  - id: VC-08
+    description: "'Temas da Ala' label in useTopics.ts is translated (not hardcoded Portuguese)"
+    type: functional
+    how_to_verify: "Read useTopics.ts useActiveTopics - check if wardTopicLabel uses i18n"
+    expected_result: "wardTopicLabel uses t() translation function"
+    priority: should_pass
+
+  # ============================
+  # CR-180: Pianist/Conductor split
+  # ============================
+  - id: VC-09
+    description: "Database migration replaces can_music with can_pianist and can_conductor"
+    type: functional
+    how_to_verify: "Check for new migration SQL file. Verify it adds can_pianist BOOLEAN, can_conductor BOOLEAN, migrates can_music=true actors to can_pianist=true, and drops can_music."
+    expected_result: "New columns can_pianist and can_conductor in meeting_actors table, can_music removed"
+    priority: must_pass
+
+  - id: VC-10
+    description: "MeetingActor TypeScript type updated (can_pianist, can_conductor instead of can_music)"
+    type: functional
+    how_to_verify: "Read database.ts MeetingActor interface"
+    expected_result: "can_pianist: boolean and can_conductor: boolean fields, no can_music"
+    priority: must_pass
+
+  - id: VC-11
+    description: "ActorRoleFilter type updated to include can_pianist and can_conductor"
+    type: functional
+    how_to_verify: "Read useActors.ts ActorRoleFilter type"
+    expected_result: "ActorRoleFilter includes 'can_pianist' | 'can_conductor' instead of 'can_music'"
+    priority: must_pass
+
+  - id: VC-12
+    description: "AgendaForm pianist field uses roleFilter 'can_pianist'"
+    type: functional
+    how_to_verify: "Read AgendaForm.tsx pianist field setSelectorModal call"
+    expected_result: "roleFilter: 'can_pianist'"
+    priority: must_pass
+
+  - id: VC-13
+    description: "AgendaForm conductor field uses roleFilter 'can_conductor'"
+    type: functional
+    how_to_verify: "Read AgendaForm.tsx conductor field setSelectorModal call"
+    expected_result: "roleFilter: 'can_conductor'"
+    priority: must_pass
+
+  - id: VC-14
+    description: "CreateActorInput and UpdateActorInput types updated"
+    type: functional
+    how_to_verify: "Read database.ts CreateActorInput and UpdateActorInput"
+    expected_result: "can_pianist and can_conductor fields, no can_music"
+    priority: must_pass
+
+  - id: VC-15
+    description: "DB migration preserves existing actor assignments (pianist_actor_id, conductor_actor_id not broken)"
+    type: regression
+    how_to_verify: "Verify migration does not modify sunday_agendas table foreign keys"
+    expected_result: "Existing agenda assignments to actors preserved"
+    priority: must_pass
+
+  # ============================
+  # CR-181: Optional 2nd speech toggle
+  # ============================
+  - id: VC-16
+    description: "New per-sunday field for optional 2nd speech toggle (e.g., has_second_speech in SundayAgenda)"
+    type: functional
+    how_to_verify: "Check database.ts SundayAgenda interface and migration for new boolean field"
+    expected_result: "New field (e.g., has_second_speech) with default true"
+    priority: must_pass
+
+  - id: VC-17
+    description: "Toggle UI present in expanded speech card after 2nd speech label"
+    type: functional
+    how_to_verify: "Read SpeechSlot.tsx or SundayCard.tsx/speeches.tsx for toggle Switch component near position 2"
+    expected_result: "Small toggle (Switch) visible after 2nd speech label"
+    priority: must_pass
+
+  - id: VC-18
+    description: "When toggle OFF: 2nd speech speaker and topic fields are disabled"
+    type: functional
+    how_to_verify: "Read SpeechSlot or parent component for conditional disabled state when has_second_speech=false"
+    expected_result: "Position 2 fields disabled when toggle is off"
+    priority: must_pass
+
+  - id: VC-19
+    description: "When toggle OFF: Confirmation dialog before deleting 2nd speech assignments"
+    type: functional
+    how_to_verify: "Check for Alert.alert confirmation before clearing speaker/topic for position 2"
+    expected_result: "Confirmation dialog shown before deleting 2nd speech data"
+    priority: must_pass
+
+  - id: VC-20
+    description: "Collapsed card hides 2nd speech row when toggle is off"
+    type: functional
+    how_to_verify: "Read SundayCard.tsx collapsed view - verify position 2 row is conditionally rendered"
+    expected_result: "Position 2 speech row not shown in collapsed card when has_second_speech=false"
+    priority: must_pass
+
+  - id: VC-21
+    description: "Agenda form shows disabled 2nd speech field with placeholder when toggle off"
+    type: functional
+    how_to_verify: "Read AgendaForm.tsx - verify speech position 2 area shows disabled field with message"
+    expected_result: "Placeholder 'Domingo configurado para nao ter 2o discurso' when disabled (or translated equivalent)"
+    priority: must_pass
+
+  - id: VC-22
+    description: "Label '3o Discurso' changed to 'Ultimo Discurso' in expanded card"
+    type: functional
+    how_to_verify: "Read SpeechSlot.tsx getPositionLabel or i18n keys - verify position 3 uses 'Ultimo Discurso'"
+    expected_result: "Position 3 label is 'Ultimo Discurso' (or translated key speeches.lastSpeech)"
+    priority: must_pass
+
+  - id: VC-23
+    description: "Collapsed card speech rows show only names (no '1o Discurso:' labels)"
+    type: functional
+    how_to_verify: "Read SundayCard.tsx collapsed view speechRow - verify posLabel removed from collapsed display"
+    expected_result: "Collapsed card shows only speaker names with LEDs, no ordinal labels"
+    priority: must_pass
+
+  - id: VC-24
+    description: "Presentation mode hides 2nd speech when toggle off"
+    type: functional
+    how_to_verify: "Read usePresentationMode.ts buildPresentationCards - verify speech2 is conditionally included"
+    expected_result: "When has_second_speech=false, 2nd speaker not shown in First Speeches card"
+    priority: must_pass
+
+  - id: VC-25
+    description: "Default toggle value is ON (has_second_speech=true)"
+    type: functional
+    how_to_verify: "Check migration default and UI default for new field"
+    expected_result: "Default is true - 2nd speech is on by default"
+    priority: must_pass
+
+  # ============================
+  # CR-191: Password reset plain-text HTML bug
+  # ============================
+  - id: VC-26
+    description: "reset-redirect Edge Function returns correct Content-Type with charset"
+    type: functional
+    how_to_verify: "Read reset-redirect/index.ts Response headers"
+    expected_result: "Content-Type is 'text/html; charset=utf-8' or 'text/html' with proper response"
+    priority: must_pass
+
+  - id: VC-27
+    description: "HTML is not escaped or double-encoded in the response"
+    type: functional
+    how_to_verify: "Read reset-redirect/index.ts - verify the HTML template literal is returned directly, not JSON.stringify'd or escaped"
+    expected_result: "HTML returned as raw string in Response body, not escaped"
+    priority: must_pass
+
+  - id: VC-28
+    description: "Response does not have conflicting Content-Type headers"
+    type: functional
+    how_to_verify: "Check if corsHeaders contains any Content-Type that would override the explicit one"
+    expected_result: "No conflicting Content-Type in corsHeaders"
+    priority: must_pass
+
+  - id: VC-29
+    description: "HTML meta-refresh and JavaScript redirect both use correct deep link"
+    type: functional
+    how_to_verify: "Read the HTML template for meta http-equiv=refresh and window.location.href"
+    expected_result: "Both point to sacrmeetplan://reset-password?token=...&type=..."
+    priority: must_pass
+
+  # ============================
+  # Cross-cutting
+  # ============================
+  - id: VC-30
+    description: "All test suites pass after changes"
+    type: regression
+    how_to_verify: "Run npx vitest run, verify all tests pass"
+    expected_result: "All tests pass with 0 failures"
+    priority: must_pass
+
+  - id: VC-31
+    description: "TypeScript compilation succeeds (no new errors)"
+    type: regression
+    how_to_verify: "Run npx tsc --noEmit, compare errors with baseline"
+    expected_result: "No new TypeScript errors introduced"
+    priority: should_pass
+
+# Para bugfix CR-191: passos exatos de reproducao
+reproduction_steps:
+  - step: "User clicks 'Redefinir Senha' button in recovery email (Gmail)"
+    expected: "Safari opens and renders the redirect HTML page, then auto-redirects to the app"
+    actual: "Safari shows the raw HTML source code as plain text instead of rendering it"
+
+  - step: "Examine reset-redirect Edge Function Response"
+    expected: "Content-Type: text/html; charset=utf-8"
+    actual: "Content-Type: text/html (missing charset) - may cause Safari to misinterpret on iOS"
+
+  - step: "Examine corsHeaders for Content-Type conflicts"
+    expected: "No Content-Type in corsHeaders"
+    actual: "corsHeaders does NOT contain Content-Type (lines 8-11) - no conflict, but charset missing"
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.

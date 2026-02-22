@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-02-21"
-  total_features: 106
-  total_change_requests: 172
+  last_updated: "2026-02-22"
+  total_features: 110
+  total_change_requests: 176
   implemented_crs: 96
-  pending_crs: 74
+  pending_crs: 78
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -61,6 +61,7 @@ metadata:
     - docs/specs/SPEC_F103_F109.yaml
     - docs/specs/SPEC_F110_F112.yaml
     - docs/specs/SPEC_F113_F115.yaml
+    - docs/specs/SPEC_F116_F119.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -178,7 +179,7 @@ permissions:
     description: "Acessar aba Configuracoes"
     bispado: true
     secretario: true
-    observador: false
+    observador: true  # limited: only app language, theme, about (CR-178/F116)
 
   settings_language:
     description: "Configurar idioma da Ala"
@@ -259,7 +260,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 106 features, 172 CRs, 96 implementados)
+# FEATURES (estado atual apos 110 features, 176 CRs, 96 implementados)
 # =============================================================================
 
 features:
@@ -2109,8 +2110,93 @@ features:
       - "1 arquivo modificado (SpeechSlot.tsx)"
       - "Move StatusLED de rightColumn para labelRow"
 
+  # ---------------------------------------------------------------------------
+  # Batch 19 Phase 1 (F116-F119): Language control, Pianist/Conductor split,
+  #   Optional 2nd speech, Password reset bug
+  # ---------------------------------------------------------------------------
+
+  - id: F116
+    name: "Separate language control: app language (per-user) vs ward language"
+    status: pending
+    rfs: []
+    description: >
+      Separar controle de idioma em dois: idioma do app (per-user, salvo em
+      auth.users.raw_user_meta_data via Supabase Auth) e idioma da ala
+      (wards.language, inalterado). Idioma do app controla UI e nomes de
+      placeholders do WhatsApp. Idioma da ala controla template WhatsApp,
+      colecoes de temas, e logs. Observer ganha aba Settings limitada (idioma
+      do app, tema, sobre). Fix do bug de reativacao de colecoes ao trocar
+      idioma da ala.
+    modified_by_crs: [178]
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    notes:
+      - "CR-178: Controle de idioma separado app vs ala"
+      - "Idioma do app salvo em Supabase Auth user_metadata"
+      - "Observer ganha Settings limitado (3 opcoes)"
+      - "Placeholders do WhatsApp traduzidos por idioma do APP"
+      - "Bug fix: reativacao de colecoes ao trocar idioma da ala"
+      - "11 acceptance criteria, 4 edge cases"
+      - "10+ arquivos impactados"
+
+  - id: F117
+    name: "Split Music actor type into Pianist and Conductor"
+    status: pending
+    rfs: []
+    description: >
+      Dividir can_music em can_pianist e can_conductor na tabela meeting_actors.
+      Constraint CHECK: ator nao pode ser pianista E regente ao mesmo tempo
+      (entradas separadas). Migracao: can_music=true vira can_pianist=true.
+      AgendaForm usa roleFilter separados. Designacoes existentes preservadas.
+    modified_by_crs: [180]
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    notes:
+      - "CR-180: Split Musica em Pianista + Regente"
+      - "CHECK constraint: NOT (can_pianist AND can_conductor)"
+      - "Migracao: can_music -> can_pianist"
+      - "12 acceptance criteria, 4 edge cases"
+      - "5 arquivos impactados + 1 migracao SQL"
+
+  - id: F118
+    name: "Optional 2nd speech toggle per Sunday"
+    status: pending
+    rfs: []
+    description: >
+      Toggle para tornar o 2o discurso opcional por domingo. Novo campo
+      has_second_speech na sunday_agendas (default true). Toggle pequeno no
+      SpeechSlot posicao 2 (Bispado only). Confirmacao ao desligar SO quando
+      ha designacoes. Card contraido: sem labels ordinais, sem linha pos 2
+      quando desligado. Label posicao 3 vira 'Ultimo Discurso'. Apresentacao:
+      secao 'Primeiros Discursos' mostra so 1o quando desligado.
+    modified_by_crs: [181]
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    notes:
+      - "CR-181: 2o discurso opcional por domingo"
+      - "Toggle por domingo, default ligado"
+      - "Sem confirmacao quando sem designacoes"
+      - "Labels ordinais removidos do card contraido"
+      - "'3o Discurso' -> 'Ultimo Discurso' no card expandido"
+      - "14 acceptance criteria, 4 edge cases"
+      - "10+ arquivos impactados + 1 migracao SQL"
+
+  - id: F119
+    name: "Fix password reset redirect showing HTML as plain-text"
+    status: pending
+    rfs: []
+    description: >
+      Bug: ao clicar 'Redefinir Senha' no email (Gmail->Safari iOS), browser
+      mostra plain-text do HTML. Requer investigacao profunda: charset fix +
+      Cache-Control como baseline, mas root cause deve ser identificado
+      (Supabase proxy, Deno runtime, browser-specific behavior).
+    modified_by_crs: [191]
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    notes:
+      - "CR-191: Reset senha mostra HTML como plain-text"
+      - "Investigacao profunda (nao apenas charset fix)"
+      - "7 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (reset-redirect/index.ts)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (74 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18)
+# PENDING CHANGE REQUESTS (78 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19)
 # =============================================================================
 
 pending_crs:
@@ -3658,6 +3744,121 @@ pending_crs:
     files_likely_impacted:
       - src/components/SpeechSlot.tsx
 
+  # --- Batch 19 Phase 1 (Language control, Pianist/Conductor split, Optional 2nd speech, Password reset bug) ---
+
+  - id: 178
+    type: feature
+    area: "i18n / Settings (F002, F005, F006, F020)"
+    feature_id: F116
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    related_crs: [2, 11, 41, 59, 94, 140]
+    description: >
+      Separar controle de idioma em: idioma do app (per-user, Supabase Auth
+      user_metadata) e idioma da ala (wards.language). Idioma do app controla
+      UI e nomes de placeholders WhatsApp. Idioma da ala controla template
+      WhatsApp e colecoes. Observer ganha Settings limitado (idioma app, tema,
+      sobre). Fix bug reativacao de colecoes ao trocar idioma da ala.
+    acceptance_criteria:
+      - "App language saved per-user in auth.users.raw_user_meta_data"
+      - "Ward language unchanged in wards.language"
+      - "Observer sees limited Settings (3 options)"
+      - "WhatsApp placeholder names translated per app language"
+      - "Collection reactivation bug fixed"
+      - "Settings shows 'Idioma do App' + 'Idioma da Ala' for bishopric/secretary"
+      - "Login loads user language from metadata"
+    files_likely_impacted:
+      - src/contexts/AuthContext.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - src/app/(tabs)/settings/topics.tsx
+      - src/app/(tabs)/_layout.tsx
+      - src/hooks/useTopics.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 180
+    type: feature
+    area: "Actors / Agenda (F012, F013)"
+    feature_id: F117
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    related_crs: [26, 34, 70, 71, 72, 73, 151]
+    description: >
+      Dividir can_music em can_pianist + can_conductor com CHECK constraint
+      de exclusividade mutua. Migracao: can_music=true vira can_pianist=true.
+      AgendaForm usa roleFilter separados. Designacoes existentes preservadas.
+    acceptance_criteria:
+      - "can_pianist and can_conductor columns exist, can_music removed"
+      - "CHECK constraint: NOT (can_pianist AND can_conductor)"
+      - "Migration: can_music=true -> can_pianist=true"
+      - "Pianist field filters by can_pianist"
+      - "Conductor field filters by can_conductor"
+      - "Creating from pianist field sets can_pianist=true"
+      - "Creating from conductor field sets can_conductor=true"
+      - "No can_music references in production code"
+    files_likely_impacted:
+      - supabase/migrations/NNN_split_music_actor.sql
+      - src/types/database.ts
+      - src/hooks/useActors.ts
+      - src/components/AgendaForm.tsx
+      - src/components/ActorSelector.tsx
+
+  - id: 181
+    type: feature
+    area: "Speeches (F007, F008, F009, F012)"
+    feature_id: F118
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    related_crs: [4, 56, 99, 122, 160]
+    description: >
+      Toggle para 2o discurso opcional por domingo. has_second_speech na
+      sunday_agendas (default true). Confirmacao ao desligar so quando ha
+      designacoes. Card contraido sem labels ordinais. '3o Discurso' vira
+      'Ultimo Discurso'. Apresentacao mostra so 1o discurso quando desligado.
+    acceptance_criteria:
+      - "has_second_speech BOOLEAN DEFAULT true in sunday_agendas"
+      - "Toggle visible for Bispado on position 2"
+      - "Confirmation only when assignments exist"
+      - "Collapsed card: no ordinal labels, hides pos 2 when off"
+      - "Position 3 label: 'Ultimo Discurso'"
+      - "Presentation: only speech 1 in 'Primeiros Discursos' when off"
+      - "Agenda: disabled placeholder when off"
+      - "Invite management: hides pos 2 when off"
+    files_likely_impacted:
+      - supabase/migrations/NNN_add_has_second_speech.sql
+      - src/types/database.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/SundayCard.tsx
+      - src/hooks/usePresentationMode.ts
+      - src/components/AgendaForm.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/components/NextSundaysSection.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 191
+    type: bug
+    area: "Password Reset (F001, F088, F114)"
+    feature_id: F119
+    spec_file: "docs/specs/SPEC_F116_F119.yaml"
+    related_crs: [67, 145, 155, 176]
+    description: >
+      Ao clicar 'Redefinir Senha' no email (Gmail->Safari iOS), browser
+      mostra plain-text do HTML. Requer investigacao profunda: charset fix
+      + Cache-Control como baseline, mas root cause deve ser identificado
+      (Supabase proxy, Deno runtime, browser-specific behavior).
+    acceptance_criteria:
+      - "Content-Type: 'text/html; charset=utf-8'"
+      - "Cache-Control header set"
+      - "HTML not escaped or double-encoded"
+      - "No conflicting Content-Type in corsHeaders"
+      - "Deep link uses sacrmeetplan:// scheme"
+      - "HTML renders properly in Safari on iOS"
+      - "Root cause identified and documented"
+    files_likely_impacted:
+      - supabase/functions/reset-redirect/index.ts
+
 # =============================================================================
 
 design_decisions:
@@ -4840,3 +5041,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F113_F115.yaml (CR-175 to CR-177 - Deep link scheme fix, Email reset HTTPS redirect, Status circle right-alignment)"
     summary: "Change deep link scheme from sacrmeetman:// to sacrmeetplan:// in 3 files, create HTTPS redirect Edge Function (reset-redirect) so email reset button is clickable in email clients, align right edge of StatusLED circle with right edge of speaker name field (supersedes F112 center-to-center approach)."
+
+  batch_19:
+    range: "CR-178, CR-180, CR-181, CR-191"
+    status: "4 pendentes (178, 180, 181, 191)"
+    files:
+      - "docs/specs/SPEC_F116_F119.yaml (CR-178, CR-180, CR-181, CR-191 - Language control, Pianist/Conductor split, Optional 2nd speech, Password reset bug)"
+    summary: "Separate app language (per-user, Supabase Auth metadata) from ward language (wards.language). Split can_music into can_pianist + can_conductor with mutual exclusivity constraint. Optional 2nd speech toggle per Sunday with conditional confirmation. Password reset HTML-as-plaintext bug fix with deep investigation."

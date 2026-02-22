@@ -1,36 +1,54 @@
 project:
-  name: "Batch 18 - Deep link scheme fix, Email reset redirect, Status circle alignment"
+  name: "Batch 19 - Language control, Pianist/Conductor split, Optional 2nd speech, Home redesign, Navigation improvements"
   type: feature_request
   created_at: "2026-02-21"
   user_request: |
-    1. Convite para adicionar usuário está vindo com o domínio wardmanager:// tem que ser sacrmeetplan:// Verifique todo o código e toda configuração do supabase e toda a configuração dos pacotes iOS e Android. Lembrando que esse domínio também é usado na recuperação de senha.
-    2. O email de recuperação de senha vem com o link montado, mas o botão não é clicável, eu tive que abrir o codigo HTML para achar o link lá dentro.
-    3. No card expandido de domingo para designação de discursos, alinhar a direita do circulo de status com a direita do campo do nome do discursante
+    14 pedidos agrupados:
+    1. Controle de idioma separado app vs ala. Ala controla template WhatsApp e coleções de temas. App controla UI. Idioma da ala alterável por Bispado/Secretário, salvo na tabela wards. Idioma do app por usuário, salvo no banco. Ao trocar idioma da ala, reabilitar automaticamente coleções (Temas especiais, Força dos jovens, Princípios do evangelho) no novo idioma.
+    2. Clear buttons (X) em todos os campos não-texto-livre e não-switch do card de agenda.
+    3. Split ator Música em Pianista e Regente. Migração: todos Music→Pianista. Designações existentes de Regente mantêm ator.
+    4. 2º discurso opcional via toggle por domingo. Default: ligado. Desligado: desabilita campos, apaga designações com confirmação, card contraído sem linha. Independente do toggle: '3º Discurso'→'Último Discurso', remover labels do card contraído.
+    5. Speech read-only na agenda + botão lápis→aba Discursos.
+    6. Rename 'Próximas Designações'→'Próximos Discursos' (i18n).
+    7. Ícone lápis na tela de apresentação→aba Agenda.
+    8. Botão play no card expandido da agenda→tela de apresentação.
+    9. Home: card de agenda não-expansível abaixo do botão Iniciar + botão lápis. Botão Iniciar com ícone play.
+    10. Rename aba 'Agenda'→'Agendas' (i18n).
+    11. Home: cards de discursos não-expansíveis + botão lápis→aba Discursos.
+    12. Alinhar ícones X de limpar designação com centro dos campos.
+    13. Explorar suporte a fontes maiores do sistema (accessibility). Se fácil, implementar.
+    14. Bug reset senha: Gmail→Safari mostra HTML como plain-text.
 
 phases:
-  total: 1
+  total: 3
   current: 1
   summary:
     - phase: 1
-      description: "Deep link scheme fix, HTTPS email redirect, status circle alignment (CR-175 to CR-177, F113-F115)"
+      description: "Data model & architecture: language control, pianist/conductor split, optional 2nd speech, password reset bug (CR-178, CR-180, CR-181, CR-191)"
       status: completed
+    - phase: 2
+      description: "Card UI/UX: clear buttons, speech read-only in agenda, X alignment, rename labels, push notifications bug (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192)"
+      status: pending
+    - phase: 3
+      description: "Navigation & Home redesign: edit/play icons, Home agenda card, Home speeches non-expandable (CR-184, CR-185, CR-186, CR-188)"
+      status: pending
 
 current_phase:
   id: 1
   started_at: "2026-02-21"
-  features: [F113, F114, F115]
-  change_requests: [CR-175, CR-176, CR-177]
+  features: []
+  change_requests: [CR-178, CR-180, CR-181, CR-191]
   current_agent: "none"
-  current_step: "PROJECT DONE"
+  current_step: "Phase 1 DONE"
   completed_steps:
-    - "QA PRE validation (validated=true, QA_PLAN_020, 15 checks)"
-    - "Requirements extraction (F113-F115, 22 ACs, 0 OQs, status=complete)"
-    - "Architecture definition (ARCH_M031, ADR-077/078, 5 components, 1 new file)"
-    - "Implementation plan (PLAN_P031, 5 steps, 22 ACs, 12 ECs)"
-    - "Code implementation (8 commits, 10 files, S01-S05 complete, 4732/4732 tests pass)"
-    - "Testing (83 new tests, 4732/4732 passing, verdict approved)"
-    - "Code review (verdict: approved first iteration, 0 P0/P1/P2)"
-    - "QA POST validation (verdict: passed, 15/15 checks)"
+    - "QA PRE validation (validated=true, QA_PLAN_021, 31 checks)"
+    - "Requirements extraction (F116-F119, 44 ACs, 15 ECs, 0 OQs, status=complete)"
+    - "Architecture definition (ARCH_M032, ADR-079/080, 22 components, 2 migrations)"
+    - "Implementation plan (PLAN_P032, 10 steps, 44 ACs, 15 ECs, 100% coverage)"
+    - "Code implementation (10 commits + 5 fix commits, S01-S10 complete)"
+    - "Testing (166 new tests, 4902/4902 passing, verdict approved)"
+    - "Code review (verdict: approved iteration 2, 3 P0 + 1 P1 fixed)"
+    - "QA POST validation (verdict: passed, 31/31 checks)"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -42,8 +60,10 @@ artifacts:
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
 pending_deploys:
-  - type: "Supabase Dashboard"
-    description: "Update Redirect URLs: remove sacrmeetman://, add sacrmeetplan://invite/* and sacrmeetplan://reset-password"
+  - type: "Supabase Migration"
+    description: "Run 017_split_music_actor.sql (destructive - drops can_music, backup first)"
+  - type: "Supabase Migration"
+    description: "Run 018_add_has_second_speech.sql (additive, safe)"
   - type: "Edge Function deployment"
-    description: "Deploy reset-redirect (verify_jwt: false), redeploy send-reset-email and create-invitation"
+    description: "Deploy reset-redirect, create-invitation, update-user-role, register-first-user (AFTER migrations)"
 last_updated: "2026-02-22"

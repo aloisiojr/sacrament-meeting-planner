@@ -52,6 +52,7 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     speaker_1_override: null,
     speaker_2_override: null,
     speaker_3_override: null,
+    has_second_speech: true,
     closing_hymn_id: 'h-4',
     closing_prayer_member_id: 'm-p2',
     closing_prayer_name: 'Brother White',

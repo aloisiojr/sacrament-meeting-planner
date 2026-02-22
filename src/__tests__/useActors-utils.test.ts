@@ -15,7 +15,8 @@ function makeActor(overrides: Partial<MeetingActor> & { name: string }): Meeting
     can_preside: overrides.can_preside ?? false,
     can_conduct: overrides.can_conduct ?? false,
     can_recognize: overrides.can_recognize ?? false,
-    can_music: overrides.can_music ?? false,
+    can_pianist: overrides.can_pianist ?? false,
+    can_conductor: overrides.can_conductor ?? false,
     created_at: overrides.created_at ?? '2026-01-01T00:00:00Z',
     updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
   };
@@ -58,12 +59,12 @@ describe('useActors utilities', () => {
         name: 'Test Actor',
         can_conduct: true,
         can_recognize: true,
-        can_music: true,
+        can_pianist: true,
       };
       const result = enforceActorRules(input);
       expect(result.name).toBe('Test Actor');
       expect(result.can_recognize).toBe(true);
-      expect(result.can_music).toBe(true);
+      expect(result.can_pianist).toBe(true);
     });
 
     it('should return input unchanged for UpdateActorInput', () => {
@@ -91,7 +92,7 @@ describe('useActors utilities', () => {
     const actors = [
       makeActor({ name: 'Bishop', can_preside: true, can_conduct: true }),
       makeActor({ name: 'Counselor', can_preside: true, can_conduct: false }),
-      makeActor({ name: 'Pianist', can_music: true }),
+      makeActor({ name: 'Pianist', can_pianist: true }),
       makeActor({ name: 'Secretary', can_recognize: true }),
     ];
 
@@ -117,15 +118,15 @@ describe('useActors utilities', () => {
       expect(result[0].name).toBe('Secretary');
     });
 
-    it('should filter by can_music', () => {
-      const result = filterActorsByRole(actors, 'can_music');
+    it('should filter by can_pianist', () => {
+      const result = filterActorsByRole(actors, 'can_pianist');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Pianist');
     });
 
     it('should return empty array when no actors match', () => {
       const noMusicActors = [makeActor({ name: 'Bob' })];
-      expect(filterActorsByRole(noMusicActors, 'can_music')).toHaveLength(0);
+      expect(filterActorsByRole(noMusicActors, 'can_pianist')).toHaveLength(0);
     });
   });
 

@@ -53,7 +53,8 @@ function makeActor(overrides: Partial<MeetingActor> & { name: string }): Meeting
     can_preside: overrides.can_preside ?? false,
     can_conduct: overrides.can_conduct ?? false,
     can_recognize: overrides.can_recognize ?? false,
-    can_music: overrides.can_music ?? false,
+    can_pianist: overrides.can_pianist ?? false,
+    can_conductor: overrides.can_conductor ?? false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   };
@@ -150,15 +151,15 @@ describe('PHASE-02: Cross-cutting validation', () => {
         makeActor({ name: 'Bishop', can_preside: true, can_conduct: true }),
         makeActor({ name: 'Counselor', can_preside: true }),
         makeActor({ name: 'Secretary', can_recognize: true }),
-        makeActor({ name: 'Pianist', can_music: true }),
-        makeActor({ name: 'AllRoles', can_preside: true, can_conduct: true, can_recognize: true, can_music: true }),
+        makeActor({ name: 'Pianist', can_pianist: true }),
+        makeActor({ name: 'AllRoles', can_preside: true, can_conduct: true, can_recognize: true, can_pianist: true, can_conductor: true }),
       ];
 
       expect(filterActorsByRole(actors, 'all')).toHaveLength(5);
       expect(filterActorsByRole(actors, 'can_preside')).toHaveLength(3); // Bishop, Counselor, AllRoles
       expect(filterActorsByRole(actors, 'can_conduct')).toHaveLength(2); // Bishop, AllRoles
       expect(filterActorsByRole(actors, 'can_recognize')).toHaveLength(2); // Secretary, AllRoles
-      expect(filterActorsByRole(actors, 'can_music')).toHaveLength(2); // Pianist, AllRoles
+      expect(filterActorsByRole(actors, 'can_pianist')).toHaveLength(2); // Pianist, AllRoles
     });
   });
 

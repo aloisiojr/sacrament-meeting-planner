@@ -135,7 +135,7 @@ describe('PHASE-02: Database type validation', () => {
   });
 
   describe('MeetingActor type', () => {
-    it('should have name and four role boolean flags', () => {
+    it('should have name and five role boolean flags', () => {
       const actor: MeetingActor = {
         id: 'uuid-1',
         ward_id: 'ward-1',
@@ -143,14 +143,15 @@ describe('PHASE-02: Database type validation', () => {
         can_preside: true,
         can_conduct: true,
         can_recognize: false,
-        can_music: false,
+        can_pianist: false,
+        can_conductor: false,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
       expect(actor.can_preside).toBe(true);
       expect(actor.can_conduct).toBe(true);
       expect(actor.can_recognize).toBe(false);
-      expect(actor.can_music).toBe(false);
+      expect(actor.can_pianist).toBe(false);
     });
   });
 
@@ -211,6 +212,7 @@ describe('PHASE-02: Database type validation', () => {
         closing_hymn_id: 'hymn-3',
         closing_prayer_member_id: 'member-2',
         closing_prayer_name: 'Sister Closing',
+        has_second_speech: true,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
@@ -258,6 +260,7 @@ describe('PHASE-02: Database type validation', () => {
         closing_hymn_id: null,
         closing_prayer_member_id: null,
         closing_prayer_name: null,
+        has_second_speech: true,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
@@ -309,7 +312,8 @@ describe('PHASE-02: Database type validation', () => {
         can_preside: true,
         can_conduct: true,
         can_recognize: false,
-        can_music: false,
+        can_pianist: false,
+        can_conductor: false,
       };
       expect(full.can_preside).toBe(true);
     });

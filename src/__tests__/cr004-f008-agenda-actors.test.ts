@@ -171,10 +171,11 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain(".update({ can_preside: true, can_conduct: true })");
     });
 
-    it('should set can_recognize=false and can_music=false for new actors', () => {
+    it('should set can_recognize=false and can_pianist=false, can_conductor=false for new actors', () => {
       const source = readEdgeFn('supabase/functions/create-invitation/index.ts');
       expect(source).toContain('can_recognize: false');
-      expect(source).toContain('can_music: false');
+      expect(source).toContain('can_pianist: false');
+      expect(source).toContain('can_conductor: false');
     });
 
     it('should only create actor when actorName is non-empty', () => {

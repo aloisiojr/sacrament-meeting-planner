@@ -4046,3 +4046,25 @@ batch15_phase2_test_results:
     tests_added: 104
     acs_covered: [AC-138-01, AC-138-02, AC-138-03, AC-138-04, AC-138-05, AC-138-06, AC-138-07, AC-138-08, AC-138-09, AC-138-10, AC-138-11, AC-138-12, AC-139-01, AC-139-02, AC-139-03, AC-139-04, AC-139-05, AC-139-06, AC-139-07, AC-139-08, AC-139-09, AC-139-10, AC-139-11, AC-139-12, AC-139-13]
     ecs_covered: [EC-138-01, EC-138-02, EC-138-03, EC-138-04, EC-138-05, EC-139-01, EC-139-02, EC-139-03, EC-139-04, EC-139-05, EC-139-06, EC-139-07]
+
+  - step: REVIEW-FIX
+    cr: [CR-202, CR-203]
+    plan_ref: plans/PLAN_P037.yaml
+    plan_step: REVIEW-FIX
+    hash: cd660ee
+    message: "fix(security): validate token/type input formats to prevent XSS (R-1, R-2)"
+    files_changed:
+      - supabase/functions/reset-redirect/index.ts
+      - supabase/functions/invite-redirect/index.ts
+      - src/__tests__/batch22-f138-f139.test.ts
+    changes:
+      - id: CHG-600
+        description: "R-1 fix: Added regex validation for token (hex-only /^[a-fA-F0-9]+$/) and type (lowercase alpha/underscore /^[a-z_]+$/) in reset-redirect before embedding in HTML template"
+      - id: CHG-601
+        description: "R-2 fix: Added UUID regex validation for token in invite-redirect before embedding in HTML template"
+      - id: CHG-602
+        description: "Added 6 tests verifying XSS input validation (4 for R-1: hex regex, alpha regex, invalid token 400, invalid type 400; 2 for R-2: UUID regex, invalid token 400)"
+    tests_added: 6
+    acs_covered: []
+    ecs_covered: []
+    review_issues_fixed: [R-1, R-2]

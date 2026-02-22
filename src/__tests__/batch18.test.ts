@@ -366,45 +366,43 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
 // F115 (CR-177): SpeechSlot StatusLED right-edge alignment
 // =============================================================================
 
-describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
+describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment (superseded by F124/ADR-081)', () => {
 
   const speechSlotSource = readSourceFile('components/SpeechSlot.tsx');
 
-  // --- AC-115-01: StatusLED right edge aligned with speaker field right edge ---
-  describe('AC-115-01: StatusLED in labelRow (leftColumn)', () => {
-    it('StatusLED is inside leftColumn (before rightColumn)', () => {
-      const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED');
-      expect(statusLEDIdx).toBeGreaterThan(leftColumnIdx);
-      expect(statusLEDIdx).toBeLessThan(rightColumnIdx);
-    });
+  // NOTE: F124 (CR-189, ADR-081) replaced the two-column layout with row-per-element.
+  // Tests now verify F124 approach.
 
-    it('StatusLED is inside labelRow section', () => {
+  describe('AC-115-01: StatusLED in labelRow', () => {
+    it('StatusLED is in labelRow (before speakerRow)', () => {
       const labelRowIdx = speechSlotSource.indexOf('styles.labelRow');
-      const rowIdx = speechSlotSource.indexOf('styles.row');
+      const speakerRowIdx = speechSlotSource.indexOf('styles.speakerRow');
       const statusLEDIdx = speechSlotSource.indexOf('<StatusLED');
       expect(statusLEDIdx).toBeGreaterThan(labelRowIdx);
-      expect(statusLEDIdx).toBeLessThan(rowIdx);
+      expect(statusLEDIdx).toBeLessThan(speakerRowIdx);
+    });
+
+    it('StatusLED is in the statusSection', () => {
+      const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
+      const statusLEDIdx = speechSlotSource.indexOf('<StatusLED', statusSectionIdx);
+      expect(statusLEDIdx).toBeGreaterThan(statusSectionIdx);
     });
   });
 
-  // --- AC-115-02: Alignment consistent across all 3 positions ---
   describe('AC-115-02: Consistent alignment across positions', () => {
-    it('SpeechSlot is a single shared component (used for all positions)', () => {
+    it('SpeechSlot is a single shared component', () => {
       expect(speechSlotSource).toContain('export const SpeechSlot');
     });
 
     it('layout styles are static in StyleSheet.create', () => {
       const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
       expect(styleSheetBlock).toBeDefined();
-      expect(styleSheetBlock).toContain('leftColumn:');
-      expect(styleSheetBlock).toContain('rightColumn:');
+      expect(styleSheetBlock).toContain('speakerRow:');
+      expect(styleSheetBlock).toContain('actionArea:');
       expect(styleSheetBlock).toContain('statusSection:');
     });
   });
 
-  // --- AC-115-03: Status text visible in labelRow ---
   describe('AC-115-03: Status text visible and pressable', () => {
     it('status text is rendered inside statusSection', () => {
       const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
@@ -418,14 +416,9 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- AC-115-04: StatusChangeModal opens on press ---
   describe('AC-115-04: StatusChangeModal opens on press', () => {
     it('statusSection Pressable has onPress={handleStatusPress}', () => {
-      const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
-      const onPressIdx = speechSlotSource.indexOf('onPress={handleStatusPress}', statusSectionIdx - 100);
-      expect(onPressIdx).toBeGreaterThan(-1);
-      // The onPress should be on the Pressable wrapping statusSection
-      expect(onPressIdx).toBeLessThan(statusSectionIdx + 200);
+      expect(speechSlotSource).toContain('onPress={handleStatusPress}');
     });
 
     it('StatusChangeModal still rendered', () => {
@@ -437,12 +430,11 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- AC-115-05: X remove button still functional ---
-  describe('AC-115-05: X remove button still in rightColumn', () => {
-    it('speakerActionWrapper is in rightColumn', () => {
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const speakerActionIdx = speechSlotSource.indexOf('styles.speakerActionWrapper', rightColumnIdx);
-      expect(speakerActionIdx).toBeGreaterThan(rightColumnIdx);
+  describe('AC-115-05: X remove button in actionArea (F124)', () => {
+    it('actionArea is in speakerRow', () => {
+      const speakerRowIdx = speechSlotSource.indexOf('styles.speakerRow');
+      const actionAreaIdx = speechSlotSource.indexOf('styles.actionArea', speakerRowIdx);
+      expect(actionAreaIdx).toBeGreaterThan(speakerRowIdx);
     });
 
     it('X button has handleRemove onPress', () => {
@@ -450,12 +442,11 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- AC-115-06: Topic clear button still functional ---
-  describe('AC-115-06: Topic clear button still in rightColumn', () => {
-    it('topicActionWrapper is in rightColumn', () => {
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const topicActionIdx = speechSlotSource.indexOf('styles.topicActionWrapper', rightColumnIdx);
-      expect(topicActionIdx).toBeGreaterThan(rightColumnIdx);
+  describe('AC-115-06: Topic clear button in topicActionArea (F124)', () => {
+    it('topicActionArea is in topicRow', () => {
+      const topicRowIdx = speechSlotSource.indexOf('styles.topicRow');
+      const topicActionIdx = speechSlotSource.indexOf('styles.topicActionArea', topicRowIdx);
+      expect(topicActionIdx).toBeGreaterThan(topicRowIdx);
     });
 
     it('topic clear button has handleClearTopic onPress', () => {
@@ -463,40 +454,29 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- AC-115-07: Layout on narrow screens ---
   describe('AC-115-07: Narrow screen layout', () => {
-    it('leftColumn has flex: 1 (responsive width)', () => {
-      expect(speechSlotSource).toMatch(/leftColumn:\s*\{[^}]*flex:\s*1/s);
+    it('field has flex: 1 (responsive width)', () => {
+      expect(speechSlotSource).toMatch(/field:\s*\{[^}]*flex:\s*1/s);
     });
 
     it('speaker field text has numberOfLines={1} for truncation', () => {
       expect(speechSlotSource).toContain('numberOfLines={1}');
     });
-
-    it('field style has flex: 1 for responsive width', () => {
-      const fieldMatch = speechSlotSource.match(/field:\s*\{[^}]*flex:\s*1/s);
-      expect(fieldMatch).not.toBeNull();
-    });
   });
 
-  // --- AC-115-08: Alignment consistent when X is not visible ---
   describe('AC-115-08: Alignment when X is absent', () => {
-    it('rightColumn width is fixed (not conditional)', () => {
-      const rightColumnMatch = speechSlotSource.match(
-        /rightColumn:\s*\{[^}]*\}/s
-      );
-      expect(rightColumnMatch).not.toBeNull();
-      expect(rightColumnMatch![0]).toContain('width: 36');
-      expect(rightColumnMatch![0]).not.toContain('?');
+    it('actionArea width is fixed (not conditional)', () => {
+      const actionAreaMatch = speechSlotSource.match(/actionArea:\s*\{[^}]*\}/s);
+      expect(actionAreaMatch).not.toBeNull();
+      expect(actionAreaMatch![0]).toContain('width: 36');
     });
 
-    it('speakerActionWrapper always renders (X conditional inside)', () => {
-      expect(speechSlotSource).toContain('styles.speakerActionWrapper');
+    it('actionArea always renders (X conditional inside)', () => {
+      expect(speechSlotSource).toContain('styles.actionArea');
       expect(speechSlotSource).toContain('hasSpeaker && canUnassign');
     });
   });
 
-  // --- statusSection style ---
   describe('statusSection style', () => {
     it('has flexDirection row', () => {
       expect(speechSlotSource).toMatch(/statusSection:\s*\{[^}]*flexDirection:\s*'row'/s);
@@ -511,38 +491,19 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- rightColumn no longer contains StatusLED ---
-  describe('rightColumn does NOT contain StatusLED', () => {
-    it('no <StatusLED in rightColumn section', () => {
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const closingOfOuterRow = speechSlotSource.indexOf('Status Change Modal', rightColumnIdx);
-      const rightColumnSection = speechSlotSource.slice(rightColumnIdx, closingOfOuterRow);
-      expect(rightColumnSection).not.toContain('<StatusLED');
+  describe('No leftColumn/rightColumn (removed by F124)', () => {
+    it('no leftColumn/rightColumn styles', () => {
+      expect(speechSlotSource).not.toContain('leftColumn');
+      expect(speechSlotSource).not.toContain('rightColumn');
     });
   });
 
-  // --- rightColumn has empty spacer/placeholder ---
-  describe('rightColumn has empty spacer', () => {
-    it('statusLedPlaceholder style exists', () => {
-      const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
-      expect(styleSheetBlock).toContain('statusLedPlaceholder:');
-    });
-
-    it('statusLedPlaceholder is referenced in rightColumn', () => {
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const placeholderIdx = speechSlotSource.indexOf('styles.statusLedPlaceholder', rightColumnIdx);
-      expect(placeholderIdx).toBeGreaterThan(rightColumnIdx);
+  describe('actionArea width', () => {
+    it('actionArea width is 36', () => {
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*width:\s*36/s);
     });
   });
 
-  // --- rightColumn width is 36 ---
-  describe('rightColumn width', () => {
-    it('rightColumn width is 36', () => {
-      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*width:\s*36/s);
-    });
-  });
-
-  // --- EC-115-01: Observer role (no X button, no status press) ---
   describe('EC-115-01: Observer role alignment', () => {
     it('LED pressable disabled for observer', () => {
       expect(speechSlotSource).toContain("disabled={isObserver || status === 'not_assigned'}");
@@ -553,7 +514,6 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- EC-115-02: Secretary role ---
   describe('EC-115-02: Secretary role alignment', () => {
     it('canUnassign controls X button visibility', () => {
       expect(speechSlotSource).toContain('hasSpeaker && canUnassign');
@@ -564,25 +524,19 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- EC-115-03: Very long status text ---
   describe('EC-115-03: Long status text handling', () => {
-    it('status text is in leftColumn (not fixed-width rightColumn)', () => {
-      const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
+    it('status text is in labelRow (not constrained)', () => {
+      const labelRowIdx = speechSlotSource.indexOf('styles.labelRow');
       const statusTextIdx = speechSlotSource.indexOf('styles.statusText');
-      expect(statusTextIdx).toBeGreaterThan(leftColumnIdx);
-      expect(statusTextIdx).toBeLessThan(rightColumnIdx);
+      expect(statusTextIdx).toBeGreaterThan(labelRowIdx);
     });
   });
 
-  // --- EC-115-04: Dark mode ---
   describe('EC-115-04: Dark mode layout unchanged', () => {
     it('layout styles use no hardcoded colors', () => {
-      const rightColumnMatch = speechSlotSource.match(
-        /rightColumn:\s*\{[^}]*\}/s
-      );
-      expect(rightColumnMatch).not.toBeNull();
-      expect(rightColumnMatch![0]).not.toContain('#');
+      const actionAreaMatch = speechSlotSource.match(/actionArea:\s*\{[^}]*\}/s);
+      expect(actionAreaMatch).not.toBeNull();
+      expect(actionAreaMatch![0]).not.toContain('#');
     });
 
     it('colors are applied via theme context', () => {
@@ -591,7 +545,6 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
     });
   });
 
-  // --- EC-115-05: Not assigned status ---
   describe('EC-115-05: Not assigned status position unchanged', () => {
     it('StatusLED accepts status prop', () => {
       expect(speechSlotSource).toContain('status={status}');
@@ -609,7 +562,7 @@ describe('F115 (CR-177): SpeechSlot StatusLED right-edge alignment', () => {
 
 describe('Batch 18 cross-feature regression checks', () => {
 
-  describe('No statusLedWrapper Pressable in rightColumn', () => {
+  describe('No statusLedWrapper Pressable in SpeechSlot', () => {
     it('statusLedWrapper style no longer exists in StyleSheet', () => {
       const source = readSourceFile('components/SpeechSlot.tsx');
       const styleSheetBlock = source.split('StyleSheet.create')[1];

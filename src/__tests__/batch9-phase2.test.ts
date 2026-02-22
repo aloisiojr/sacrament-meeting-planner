@@ -543,38 +543,37 @@ describe('F062 (CR-116): LED click shows confirmed and gave_up options directly'
 // F063 (CR-119): Redesign speech cards layout (LED left, X right)
 // =============================================================================
 
-describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () => {
+describe('F063 (CR-119): Redesign speech cards layout (superseded by F124/ADR-081)', () => {
   const getSpeechSlot = () => readSourceFile('components/SpeechSlot.tsx');
 
-  // --- AC-F063-01: LED positioned on label row (redesigned by F100/CR-162, restructured by F112/CR-174) ---
-  describe('AC-F063-01: LED is on label row (redesigned by F100, restructured by F112)', () => {
-    it('StatusLED appears in rightColumn (F112 moved LED to fixed-width rightColumn)', () => {
+  // NOTE: F124 (CR-189, ADR-081) replaced the two-column layout with row-per-element.
+
+  describe('AC-F063-01: LED is on label row (F124 row-per-element)', () => {
+    it('StatusLED appears in labelRow (before speakerRow)', () => {
       const content = getSpeechSlot();
       expect(content).toContain('styles.labelRow');
-      expect(content).toContain('styles.rightColumn');
+      expect(content).toContain('styles.speakerRow');
       expect(content).toContain('<StatusLED');
     });
 
-    it('label row contains status text in leftColumn', () => {
+    it('label row contains status text', () => {
       const content = getSpeechSlot();
-      const leftColumnIdx = content.indexOf('styles.leftColumn');
-      expect(leftColumnIdx).toBeGreaterThan(-1);
-      const statusTextIdx = content.indexOf('styles.statusText', leftColumnIdx);
+      const labelRowIdx = content.indexOf('styles.labelRow');
+      expect(labelRowIdx).toBeGreaterThan(-1);
+      const statusTextIdx = content.indexOf('styles.statusText', labelRowIdx);
       expect(statusTextIdx).toBeGreaterThan(-1);
     });
   });
 
-  // --- AC-F063-02: X button in rightColumn (F112 moved X from row to rightColumn) ---
-  describe('AC-F063-02: X button is in rightColumn (F112 restructure)', () => {
-    it('Remove button appears in rightColumn (F112 moved X buttons to rightColumn)', () => {
+  describe('AC-F063-02: X button in speakerRow actionArea (F124)', () => {
+    it('Remove button appears in actionArea within speakerRow', () => {
       const content = getSpeechSlot();
-      const rightColumnIdx = content.indexOf('styles.rightColumn');
-      const speakerActionIdx = content.indexOf('speakerActionWrapper', rightColumnIdx);
-      expect(speakerActionIdx).toBeGreaterThan(rightColumnIdx);
+      const speakerRowIdx = content.indexOf('styles.speakerRow');
+      const actionAreaIdx = content.indexOf('styles.actionArea', speakerRowIdx);
+      expect(actionAreaIdx).toBeGreaterThan(speakerRowIdx);
     });
   });
 
-  // --- AC-F063-03: Speaker field has flex:1 ---
   describe('AC-F063-03: Speaker field has flex:1', () => {
     it('field style has flex: 1', () => {
       const content = getSpeechSlot();
@@ -585,9 +584,8 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
     });
   });
 
-  // --- AC-F063-04: Topic field aligned with speaker field ---
   describe('AC-F063-04: Topic field aligned with speaker field', () => {
-    it('topicRow no longer has marginLeft: 28 (removed by F100/CR-162)', () => {
+    it('topicRow no longer has marginLeft: 28', () => {
       const content = getSpeechSlot();
       const topicRowIdx = content.indexOf('topicRow:');
       const topicRowEnd = content.indexOf('},', topicRowIdx);
@@ -595,34 +593,27 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
       expect(section).not.toContain('marginLeft: 28');
     });
 
-    it('LED moved to rightColumn, fields use full width in leftColumn (F112/CR-174)', () => {
+    it('StatusLED size is 14, actionArea has width: 36 (F124 layout)', () => {
       const content = getSpeechSlot();
-      // StatusLED size is 14
       expect(content).toContain('size={14}');
-      // rightColumn has width: 36 for center alignment
-      expect(content).toMatch(/rightColumn:\s*\{[^}]*width:\s*36/s);
+      expect(content).toMatch(/actionArea:\s*\{[^}]*width:\s*36/s);
     });
   });
 
-  // --- AC-F063-05: All 3 positions use the same SpeechSlot component ---
   describe('AC-F063-05: All positions use same SpeechSlot', () => {
     it('speeches.tsx renders SpeechSlot for positions 1, 2, 3', () => {
       const content = readSourceFile('app/(tabs)/speeches.tsx');
-      // All positions use the same SpeechSlot component
       expect(content).toContain('SpeechSlot');
-      // Uses map over positions [1, 2, 3]
       expect(content).toContain('[1, 2, 3]');
     });
 
     it('SpeechSlot is a single component (not separate per position)', () => {
       const content = getSpeechSlot();
-      // Should have exactly one export of SpeechSlot
       const exportCount = content.split('export const SpeechSlot').length - 1;
       expect(exportCount).toBe(1);
     });
   });
 
-  // --- AC-F063-06: LED continues to be functional ---
   describe('AC-F063-06: LED continues to be pressable', () => {
     it('StatusLED has onPress={handleStatusPress}', () => {
       const content = getSpeechSlot();
@@ -635,7 +626,6 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
     });
   });
 
-  // --- AC-F063-07: Secretary and Observer do not see X button ---
   describe('AC-F063-07: Secretary/Observer do not see X', () => {
     it('X button conditional includes canUnassign', () => {
       const content = getSpeechSlot();
@@ -648,19 +638,15 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
     });
   });
 
-  // --- EC-F063-01: SpeechSlot without speaker ---
   describe('EC-F063-01: SpeechSlot without speaker', () => {
-    it('LED still renders in rightColumn when no speaker (F112 rightColumn layout)', () => {
+    it('StatusLED still renders when no speaker (in labelRow, not in actionArea)', () => {
       const content = getSpeechSlot();
-      // StatusLED is in the rightColumn, always rendered
-      expect(content).toContain('styles.rightColumn');
+      expect(content).toContain('styles.labelRow');
       expect(content).toContain('<StatusLED');
-      // X button is conditional on hasSpeaker
       expect(content).toContain('hasSpeaker && canUnassign');
     });
   });
 
-  // --- EC-F063-02: Narrow screen ---
   describe('EC-F063-02: Layout handles narrow screens', () => {
     it('speaker field text has numberOfLines={1} for truncation', () => {
       const content = getSpeechSlot();
@@ -681,127 +667,70 @@ describe('F063 (CR-119): Redesign speech cards layout (LED left, X right)', () =
 // F064 (CR-121): "(Last-minute assignment)" label in agenda
 // =============================================================================
 
-describe('F064 (CR-121): Last-minute assignment label in agenda', () => {
+describe('F064 (CR-121): Last-minute assignment label (superseded by F121/CR-182: SpeakerField removed)', () => {
   const getAgendaForm = () => readSourceFile('components/AgendaForm.tsx');
 
-  // --- AC-F064-01: Label shown when override is active ---
-  describe('AC-F064-01: Label shown when hasOverride && !isEditing', () => {
-    it('lastMinuteAssignment label rendered when hasOverride and not editing', () => {
+  // NOTE: F121 (CR-182) removed SpeakerField (and with it, the lastMinuteLabel).
+  // Override fields still exist in DB and are used by Presentation Mode, but
+  // the label and inline editing UI are gone from AgendaForm.
+
+  describe('AC-F064-01..03: lastMinuteLabel removed with SpeakerField (F121)', () => {
+    it('no lastMinuteLabel in AgendaForm', () => {
       const content = getAgendaForm();
-      expect(content).toContain('hasOverride && !isEditing');
-      expect(content).toContain("t('agenda.lastMinuteAssignment')");
+      expect(content).not.toContain('lastMinuteLabel');
     });
 
-    it('label uses lastMinuteLabel style', () => {
+    it('no hasOverride in AgendaForm', () => {
       const content = getAgendaForm();
-      expect(content).toContain('styles.lastMinuteLabel');
+      expect(content).not.toContain('hasOverride');
     });
-  });
 
-  // --- AC-F064-02: Label NOT shown when no override ---
-  describe('AC-F064-02: Label NOT shown when no override', () => {
-    it('hasOverride is false when overrideName is null', () => {
+    it('no handleRevert in AgendaForm', () => {
       const content = getAgendaForm();
-      expect(content).toContain('const hasOverride = overrideName !== null && overrideName !== speakerName');
-    });
-  });
-
-  // --- AC-F064-03: Label disappears when override is reverted ---
-  describe('AC-F064-03: Label disappears on revert', () => {
-    it('handleRevert calls onEditOverride(null)', () => {
-      const content = getAgendaForm();
-      const revertIdx = content.indexOf('const handleRevert');
-      const revertEnd = content.indexOf('}, [', revertIdx);
-      const revertBody = content.substring(revertIdx, revertEnd);
-      expect(revertBody).toContain('onEditOverride(null)');
+      expect(content).not.toContain('handleRevert');
     });
   });
 
-  // --- AC-F064-04: Label translated in pt-BR ---
-  describe('AC-F064-04: Label translated in pt-BR', () => {
+  describe('AC-F064-04..06: i18n keys for lastMinuteAssignment still in locale files', () => {
     it('pt-BR has agenda.lastMinuteAssignment', () => {
       const locale = readLocale('pt-BR') as { agenda: Record<string, string> };
       expect(locale.agenda.lastMinuteAssignment).toContain('ltima hora');
     });
-  });
 
-  // --- AC-F064-05: Label translated in English ---
-  describe('AC-F064-05: Label translated in English', () => {
-    it('en has agenda.lastMinuteAssignment = "(Last-minute assignment)"', () => {
+    it('en has agenda.lastMinuteAssignment', () => {
       const locale = readLocale('en') as { agenda: Record<string, string> };
       expect(locale.agenda.lastMinuteAssignment).toBe('(Last-minute assignment)');
     });
-  });
 
-  // --- AC-F064-06: Label translated in Spanish ---
-  describe('AC-F064-06: Label translated in Spanish', () => {
     it('es has agenda.lastMinuteAssignment', () => {
       const locale = readLocale('es') as { agenda: Record<string, string> };
       expect(locale.agenda.lastMinuteAssignment).toContain('ltima hora');
     });
   });
 
-  // --- AC-F064-07: Label has subtle visual style ---
-  describe('AC-F064-07: Label style is subtle (fontSize, italic, tertiary color)', () => {
-    it('lastMinuteLabel has fontSize 11', () => {
+  describe('AC-F064-07: lastMinuteLabel style removed', () => {
+    it('no lastMinuteLabel style in AgendaForm stylesheet', () => {
       const content = getAgendaForm();
-      const styleIdx = content.indexOf('lastMinuteLabel:');
-      const styleEnd = content.indexOf('},', styleIdx);
-      const section = content.substring(styleIdx, styleEnd);
-      expect(section).toContain('fontSize: 11');
-    });
-
-    it('lastMinuteLabel has fontStyle italic', () => {
-      const content = getAgendaForm();
-      const styleIdx = content.indexOf('lastMinuteLabel:');
-      const styleEnd = content.indexOf('},', styleIdx);
-      const section = content.substring(styleIdx, styleEnd);
-      expect(section).toContain("fontStyle: 'italic'");
-    });
-
-    it('label uses textTertiary color', () => {
-      const content = getAgendaForm();
-      // The label's color is set to colors.textTertiary
-      expect(content).toContain('styles.lastMinuteLabel, { color: colors.textTertiary }');
+      expect(content).not.toContain('lastMinuteLabel:');
     });
   });
 
-  // --- AC-F064-08: Label NOT shown during editing ---
-  describe('AC-F064-08: Label NOT shown during editing mode', () => {
-    it('label condition includes !isEditing', () => {
+  describe('AC-F064-08: No editing mode (removed by F121)', () => {
+    it('no isEditing state in AgendaForm', () => {
       const content = getAgendaForm();
-      // The rendering condition is: {hasOverride && !isEditing && (
-      expect(content).toContain('hasOverride && !isEditing');
+      expect(content).not.toContain('function SpeakerField');
     });
   });
 
-  // --- EC-F064-01: Override with same name as speaker ---
-  describe('EC-F064-01: Override with same name as speaker', () => {
-    it('hasOverride is false when overrideName equals speakerName', () => {
+  describe('EC-F064-01..02: Override comparison logic removed from AgendaForm (F121)', () => {
+    it('no overrideName comparison in AgendaForm', () => {
       const content = getAgendaForm();
-      // The condition: overrideName !== null && overrideName !== speakerName
-      expect(content).toContain('overrideName !== speakerName');
+      expect(content).not.toContain('overrideName');
     });
 
-    it('handleSave clears override when trimmed equals speakerName', () => {
+    it('no handleSave function in AgendaForm', () => {
       const content = getAgendaForm();
-      const saveIdx = content.indexOf('const handleSave');
-      const saveEnd = content.indexOf('}, [', saveIdx);
-      const saveBody = content.substring(saveIdx, saveEnd);
-      expect(saveBody).toContain('trimmed === speakerName');
-      expect(saveBody).toContain('onEditOverride(null)');
-    });
-  });
-
-  // --- EC-F064-02: Override with empty name ---
-  describe('EC-F064-02: Override with empty name', () => {
-    it('handleSave clears override when input is empty', () => {
-      const content = getAgendaForm();
-      const saveIdx = content.indexOf('const handleSave');
-      const saveEnd = content.indexOf('}, [', saveIdx);
-      const saveBody = content.substring(saveIdx, saveEnd);
-      expect(saveBody).toContain('!trimmed');
-      expect(saveBody).toContain('onEditOverride(null)');
+      expect(content).not.toContain('const handleSave');
     });
   });
 

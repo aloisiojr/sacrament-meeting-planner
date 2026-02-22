@@ -291,35 +291,41 @@ describe('F111 (CR-173): AgendaForm last speech label fix', () => {
 // F112 (CR-174): SpeechSlot fixed-width right column for center alignment
 // =============================================================================
 
-describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
+describe('F112 (CR-174): SpeechSlot alignment (superseded by F124/ADR-081 row-per-element layout)', () => {
 
   const speechSlotSource = readSourceFile('components/SpeechSlot.tsx');
 
-  // --- AC-112-01: StatusLED circle center aligned with X button center ---
+  // NOTE: F124 (CR-189, ADR-081) superseded F112 (CR-174). The two-column layout
+  // (outerRow/leftColumn/rightColumn) was replaced by row-per-element layout
+  // (speakerRow/actionArea, topicRow/topicActionArea). These tests verify the
+  // F124 approach which achieves alignment by placing field and X button as
+  // siblings in the same flex row.
+
+  // --- AC-112-01: X button center-to-center alignment ---
   describe('AC-112-01: StatusLED and X button center-to-center alignment', () => {
-    it('SpeechSlot has outerRow style (two-column layout)', () => {
-      expect(speechSlotSource).toContain('styles.outerRow');
+    it('SpeechSlot has speakerRow style (row-per-element layout, F124/ADR-081)', () => {
+      expect(speechSlotSource).toContain('styles.speakerRow');
     });
 
-    it('outerRow style has flexDirection row', () => {
-      expect(speechSlotSource).toMatch(/outerRow:\s*\{[^}]*flexDirection:\s*'row'/s);
+    it('speakerRow style has flexDirection row', () => {
+      expect(speechSlotSource).toMatch(/speakerRow:\s*\{[^}]*flexDirection:\s*'row'/s);
     });
 
-    it('rightColumn has width: 36', () => {
-      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*width:\s*36/s);
+    it('actionArea has width: 36', () => {
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*width:\s*36/s);
     });
 
-    it('rightColumn has alignItems center', () => {
-      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
+    it('actionArea has alignItems center', () => {
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('StatusLED is inside the leftColumn/labelRow (F115 supersedes F112 LED placement)', () => {
-      const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
+    it('StatusLED is in labelRow (before speakerRow)', () => {
+      const labelRowIdx = speechSlotSource.indexOf('styles.labelRow');
       const statusLEDIdx = speechSlotSource.indexOf('<StatusLED');
-      expect(leftColumnIdx).toBeGreaterThan(-1);
-      expect(statusLEDIdx).toBeGreaterThan(leftColumnIdx);
-      expect(statusLEDIdx).toBeLessThan(rightColumnIdx);
+      const speakerRowIdx = speechSlotSource.indexOf('styles.speakerRow');
+      expect(labelRowIdx).toBeGreaterThan(-1);
+      expect(statusLEDIdx).toBeGreaterThan(labelRowIdx);
+      expect(statusLEDIdx).toBeLessThan(speakerRowIdx);
     });
   });
 
@@ -329,53 +335,51 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).toContain('export const SpeechSlot');
     });
 
-    it('rightColumn style is in StyleSheet.create (static, same for all positions)', () => {
+    it('actionArea style is in StyleSheet.create (static, same for all positions)', () => {
       const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
       expect(styleSheetBlock).toBeDefined();
-      expect(styleSheetBlock).toContain('rightColumn:');
+      expect(styleSheetBlock).toContain('actionArea:');
     });
   });
 
   // --- AC-112-03: Topic clear button also aligned ---
-  describe('AC-112-03: Topic clear button aligned in same right column', () => {
-    it('topicActionWrapper style exists', () => {
-      expect(speechSlotSource).toContain('topicActionWrapper');
+  describe('AC-112-03: Topic clear button aligned in same topicRow', () => {
+    it('topicActionArea style exists', () => {
+      expect(speechSlotSource).toContain('topicActionArea');
     });
 
-    it('topicActionWrapper has height: 34', () => {
-      expect(speechSlotSource).toMatch(/topicActionWrapper:\s*\{[^}]*height:\s*34/s);
+    it('topicActionArea has height: 34', () => {
+      expect(speechSlotSource).toMatch(/topicActionArea:\s*\{[^}]*height:\s*34/s);
     });
 
-    it('topicActionWrapper has marginTop: 6', () => {
-      expect(speechSlotSource).toMatch(/topicActionWrapper:\s*\{[^}]*marginTop:\s*6/s);
+    it('topicRow has marginTop: 6', () => {
+      expect(speechSlotSource).toMatch(/topicRow:\s*\{[^}]*marginTop:\s*6/s);
     });
 
-    it('topicActionWrapper has alignItems center', () => {
-      expect(speechSlotSource).toMatch(/topicActionWrapper:\s*\{[^}]*alignItems:\s*'center'/s);
+    it('topicActionArea has alignItems center', () => {
+      expect(speechSlotSource).toMatch(/topicActionArea:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('topic clear button is inside rightColumn (after rightColumn style ref)', () => {
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
-      const topicActionIdx = speechSlotSource.indexOf('styles.topicActionWrapper');
-      expect(topicActionIdx).toBeGreaterThan(rightColumnIdx);
+    it('topic clear button is in topicRow (same row as topicField)', () => {
+      const topicRowIdx = speechSlotSource.indexOf('styles.topicRow');
+      const topicActionIdx = speechSlotSource.indexOf('styles.topicActionArea');
+      expect(topicActionIdx).toBeGreaterThan(topicRowIdx);
     });
   });
 
   // --- AC-112-04: Alignment consistent when X is not visible ---
   describe('AC-112-04: Alignment when X button is absent', () => {
-    it('rightColumn width is fixed (not dependent on X button visibility)', () => {
-      const rightColumnMatch = speechSlotSource.match(
-        /rightColumn:\s*\{[^}]*\}/s
+    it('actionArea width is fixed (not dependent on X button visibility)', () => {
+      const actionAreaMatch = speechSlotSource.match(
+        /actionArea:\s*\{[^}]*\}/s
       );
-      expect(rightColumnMatch).not.toBeNull();
-      expect(rightColumnMatch![0]).toContain('width: 36');
-      // Width is static, no conditional
-      expect(rightColumnMatch![0]).not.toContain('?');
+      expect(actionAreaMatch).not.toBeNull();
+      expect(actionAreaMatch![0]).toContain('width: 36');
+      expect(actionAreaMatch![0]).not.toContain('?');
     });
 
-    it('speakerActionWrapper always renders (X button conditional inside)', () => {
-      // The View with speakerActionWrapper always renders, X is conditional inside
-      expect(speechSlotSource).toContain('styles.speakerActionWrapper');
+    it('actionArea always renders (X button conditional inside)', () => {
+      expect(speechSlotSource).toContain('styles.actionArea');
       expect(speechSlotSource).toContain('hasSpeaker && canUnassign');
     });
   });
@@ -398,8 +402,7 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).toContain('const handleStatusPress = useCallback');
     });
 
-    it('StatusLED is in statusSection Pressable with handleStatusPress (F115 layout)', () => {
-      // In F115, StatusLED is inside statusSection in labelRow (leftColumn)
+    it('StatusLED is in statusSection Pressable with handleStatusPress', () => {
       const statusSectionIdx = speechSlotSource.indexOf('styles.statusSection');
       const statusLEDIdx = speechSlotSource.indexOf('<StatusLED', statusSectionIdx);
       expect(statusSectionIdx).toBeGreaterThan(-1);
@@ -409,8 +412,8 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
 
   // --- AC-112-06: Layout does not break on narrow screens ---
   describe('AC-112-06: Narrow screen layout', () => {
-    it('leftColumn has flex: 1 (shrinks to accommodate rightColumn)', () => {
-      expect(speechSlotSource).toMatch(/leftColumn:\s*\{[^}]*flex:\s*1/s);
+    it('field has flex: 1 (fills remaining space after actionArea)', () => {
+      expect(speechSlotSource).toMatch(/field:\s*\{[^}]*flex:\s*1/s);
     });
 
     it('speaker field text has numberOfLines={1} for truncation', () => {
@@ -423,11 +426,11 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
     });
   });
 
-  // --- EC-112-01: Observer role (no X button, no status press) ---
+  // --- EC-112-01: Observer role ---
   describe('EC-112-01: Observer role alignment', () => {
-    it('rightColumn width is static (not dependent on role)', () => {
+    it('actionArea width is static (not dependent on role)', () => {
       const staticStyles = speechSlotSource.split('StyleSheet.create')[1];
-      expect(staticStyles).toContain('rightColumn:');
+      expect(staticStyles).toContain('actionArea:');
       expect(staticStyles).toContain('width: 36');
     });
 
@@ -436,7 +439,7 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
     });
   });
 
-  // --- EC-112-02: Secretary role (no X button for assignment, status pressable) ---
+  // --- EC-112-02: Secretary role ---
   describe('EC-112-02: Secretary role alignment', () => {
     it('canUnassign controls X button visibility', () => {
       expect(speechSlotSource).toContain('hasSpeaker && canUnassign');
@@ -449,25 +452,21 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
 
   // --- EC-112-03: Very long status text ---
   describe('EC-112-03: Long status text handling', () => {
-    it('status text is in leftColumn labelRow (not in fixed-width rightColumn)', () => {
-      // Status text is in the labelRow inside leftColumn, so it can expand
-      const leftColumnIdx = speechSlotSource.indexOf('styles.leftColumn');
-      const rightColumnIdx = speechSlotSource.indexOf('styles.rightColumn');
+    it('status text is in labelRow (which has full width, not constrained by actionArea)', () => {
+      const labelRowIdx = speechSlotSource.indexOf('styles.labelRow');
       const statusTextIdx = speechSlotSource.indexOf('styles.statusText');
-      expect(statusTextIdx).toBeGreaterThan(leftColumnIdx);
-      expect(statusTextIdx).toBeLessThan(rightColumnIdx);
+      expect(statusTextIdx).toBeGreaterThan(labelRowIdx);
     });
   });
 
   // --- EC-112-04: Dark mode ---
   describe('EC-112-04: Dark mode layout unchanged', () => {
-    it('layout styles use no color values (colors from theme)', () => {
-      const rightColumnMatch = speechSlotSource.match(
-        /rightColumn:\s*\{[^}]*\}/s
+    it('layout styles use no hardcoded color values (colors from theme)', () => {
+      const actionAreaMatch = speechSlotSource.match(
+        /actionArea:\s*\{[^}]*\}/s
       );
-      expect(rightColumnMatch).not.toBeNull();
-      expect(rightColumnMatch![0]).not.toContain('color');
-      expect(rightColumnMatch![0]).not.toContain('#');
+      expect(actionAreaMatch).not.toBeNull();
+      expect(actionAreaMatch![0]).not.toContain('#');
     });
 
     it('colors are applied via theme context, not inline', () => {
@@ -482,46 +481,35 @@ describe('F112 (CR-174): SpeechSlot fixed-width right column alignment', () => {
       expect(speechSlotSource).not.toContain('paddingRight: 5');
     });
 
-    it('statusSection style exists (restored by F115, superseding F112 removal)', () => {
+    it('statusSection style exists (restored by F115)', () => {
       const styleSheetBlock = speechSlotSource.split('StyleSheet.create')[1];
       expect(styleSheetBlock).toContain('statusSection:');
     });
 
-    it('styles.statusSection is referenced in component (F115 layout)', () => {
+    it('styles.statusSection is referenced in component', () => {
       expect(speechSlotSource).toContain('styles.statusSection');
     });
   });
 
-  // --- speakerActionWrapper style ---
-  describe('speakerActionWrapper style', () => {
+  // --- actionArea style (replaces speakerActionWrapper) ---
+  describe('actionArea style (replaces speakerActionWrapper from F112)', () => {
     it('has height: 38', () => {
-      expect(speechSlotSource).toMatch(/speakerActionWrapper:\s*\{[^}]*height:\s*38/s);
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*height:\s*38/s);
     });
 
     it('has justifyContent center', () => {
-      expect(speechSlotSource).toMatch(/speakerActionWrapper:\s*\{[^}]*justifyContent:\s*'center'/s);
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*justifyContent:\s*'center'/s);
     });
 
     it('has alignItems center', () => {
-      expect(speechSlotSource).toMatch(/speakerActionWrapper:\s*\{[^}]*alignItems:\s*'center'/s);
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*alignItems:\s*'center'/s);
     });
   });
 
-  // --- statusLedPlaceholder style (was statusLedWrapper, updated by F115) ---
-  describe('statusLedPlaceholder style (F115 replaces statusLedWrapper)', () => {
-    it('has justifyContent center', () => {
-      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*justifyContent:\s*'center'/s);
-    });
-
-    it('has alignItems center', () => {
-      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*alignItems:\s*'center'/s);
-    });
-  });
-
-  // --- row and topicRow no longer have gap:12 ---
-  describe('Row styles updated (gap:12 removed)', () => {
-    it('row style does not have gap: 12', () => {
-      const rowMatch = speechSlotSource.match(/\brow:\s*\{[^}]*\}/s);
+  // --- Row styles ---
+  describe('Row styles', () => {
+    it('speakerRow style does not have gap: 12', () => {
+      const rowMatch = speechSlotSource.match(/speakerRow:\s*\{[^}]*\}/s);
       expect(rowMatch).not.toBeNull();
       expect(rowMatch![0]).not.toContain('gap: 12');
     });
@@ -571,9 +559,9 @@ describe('Batch 17 cross-feature regression checks', () => {
       expect(source).toContain('AgendaForm');
     });
 
-    it('AgendaForm still has SpeakerField components', () => {
+    it('AgendaForm has ReadOnlySpeakerRow for speech fields (F121 replaces SpeakerField)', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      expect(source).toContain('SpeakerField');
+      expect(source).toContain('ReadOnlySpeakerRow');
     });
 
     it('Section 4 header uses sectionLastSpeech key', () => {

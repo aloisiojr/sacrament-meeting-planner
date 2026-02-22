@@ -500,18 +500,18 @@ describe('F054 (CR-111): SpeechSlot spacing and X size', () => {
 
   const getSpeechSlot = () => readSourceFile('components/SpeechSlot.tsx');
 
-  describe('AC-F054-01: Row gap removed (F112 moved X buttons to rightColumn)', () => {
-    it('should NOT have gap: 12 in row style (removed by F112/CR-174 rightColumn layout)', () => {
+  describe('AC-F054-01: Row gap removed (F124 uses row-per-element layout)', () => {
+    it('should NOT have gap: 12 in speakerRow style (F124 row-per-element layout)', () => {
       const content = getSpeechSlot();
-      const rowMatch = content.match(/\brow:\s*\{[^}]*\}/s);
+      const rowMatch = content.match(/speakerRow:\s*\{[^}]*\}/s);
       expect(rowMatch).not.toBeNull();
       expect(rowMatch![0]).not.toContain('gap: 12');
     });
 
-    // F118 (CR-181): gap: 8 now exists in new labelWithToggle style, but NOT in row style
-    it('should NOT have gap: 8 in row style', () => {
+    // F118 (CR-181): gap: 8 now exists in new labelWithToggle style, but NOT in speakerRow style
+    it('should NOT have gap: 8 in speakerRow style', () => {
       const content = getSpeechSlot();
-      const rowMatch = content.match(/\brow:\s*\{[^}]*\}/s);
+      const rowMatch = content.match(/speakerRow:\s*\{[^}]*\}/s);
       expect(rowMatch).not.toBeNull();
       expect(rowMatch![0]).not.toContain('gap: 8');
     });

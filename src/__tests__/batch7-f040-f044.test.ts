@@ -609,17 +609,22 @@ describe('F043 (CR-99): Change speech labels from Orador to Discurso', () => {
 // F044 (CR-100): Read-only speaker field with last-minute swap
 // =============================================================================
 
-describe('F044 (CR-100): Read-only speaker field with last-minute swap', () => {
+describe('F044 (CR-100): Read-only speaker field (superseded by F121/CR-182: inline editing removed)', () => {
 
   const getAgendaForm = () => readSourceFile('components/AgendaForm.tsx');
   const getPresentationMode = () => readSourceFile('hooks/usePresentationMode.ts');
   const getDatabaseTypes = () => readSourceFile('types/database.ts');
   const getMigration014 = () => readProjectFile('supabase/migrations/014_add_speaker_overrides.sql');
 
-  describe('AC-F044-01: Campo de discursante mostra nome designado como read-only', () => {
-    it('should have SpeakerField component in AgendaForm', () => {
+  // NOTE: F121 (CR-182) superseded F044 (CR-100). SpeakerField with inline
+  // override editing was replaced by ReadOnlySpeakerRow with pencil navigation
+  // to the Speeches tab. Override fields still exist in the database but are
+  // no longer edited from AgendaForm.
+
+  describe('AC-F044-01: Speaker name shown read-only (F121 ReadOnlySpeakerRow)', () => {
+    it('should have ReadOnlySpeakerRow component in AgendaForm', () => {
       const content = getAgendaForm();
-      expect(content).toContain('function SpeakerField');
+      expect(content).toContain('function ReadOnlySpeakerRow');
     });
 
     it('should display speakerName as read-only text', () => {
@@ -628,105 +633,46 @@ describe('F044 (CR-100): Read-only speaker field with last-minute swap', () => {
       expect(content).toContain('speakerReadRow');
     });
 
-    it('should show displayName which is overrideName or speakerName', () => {
+    it('should show speakerName or label as fallback', () => {
       const content = getAgendaForm();
-      expect(content).toContain('overrideName ?? speakerName');
+      expect(content).toContain('{speakerName || label}');
     });
   });
 
-  describe('AC-F044-02: Icone de edicao (lapis) visivel ao lado do nome', () => {
-    it('should render pencil icon (U+270F) for edit', () => {
+  describe('AC-F044-02: Pencil icon navigates to Speeches tab (F121)', () => {
+    it('should render pencil icon (U+270F)', () => {
       const content = getAgendaForm();
-      // SpeakerField should use pencil icon (escape sequence in source code)
       expect(content).toContain('\\u270F');
     });
 
-    it('should only show pencil when hasSpeaker is true', () => {
+    it('should always show pencil (navigation, not editing)', () => {
       const content = getAgendaForm();
-      expect(content).toContain('hasSpeaker && !disabled');
+      expect(content).toContain('onNavigate');
     });
   });
 
-  describe('AC-F044-03: Clicar no lapis ativa modo de edicao com TextInput', () => {
-    it('should have isEditing state in SpeakerField', () => {
+  describe('AC-F044-03..06: Inline editing removed by F121', () => {
+    it('no isEditing state in AgendaForm', () => {
       const content = getAgendaForm();
-      // SpeakerField should have isEditing state
-      expect(content).toMatch(/const\s*\[isEditing,\s*setIsEditing\]/);
+      expect(content).not.toContain('function SpeakerField');
     });
 
-    it('should have handleStartEdit that sets isEditing to true', () => {
+    it('no handleStartEdit function', () => {
       const content = getAgendaForm();
-      expect(content).toContain('handleStartEdit');
-      expect(content).toContain('setIsEditing(true)');
+      expect(content).not.toContain('handleStartEdit');
     });
 
-    it('should render TextInput when isEditing is true', () => {
+    it('no handleRevert function', () => {
       const content = getAgendaForm();
-      expect(content).toContain('isEditing ?');
-      expect(content).toContain('speakerEditInput');
+      expect(content).not.toContain('handleRevert');
     });
   });
 
-  describe('AC-F044-04: Usuario pode digitar nome manual no TextInput', () => {
-    it('should have editValue state for text input', () => {
-      const content = getAgendaForm();
-      expect(content).toMatch(/const\s*\[editValue,\s*setEditValue\]/);
-    });
-
-    it('should have onChangeText that updates editValue', () => {
-      const content = getAgendaForm();
-      expect(content).toContain('onChangeText={setEditValue}');
-    });
-
-    it('should call onEditOverride with trimmed value on save', () => {
-      const content = getAgendaForm();
-      expect(content).toContain('onEditOverride(trimmed)');
-    });
-  });
-
-  describe('AC-F044-05: Icone X visivel quando nome foi sobrescrito', () => {
-    it('should render X icon (U+2716) when hasOverride is true', () => {
-      const content = getAgendaForm();
-      // Source code contains the escape sequence \\u2716 in string literal
-      expect(content).toContain('\\u2716');
-    });
-
-    it('should compute hasOverride based on overrideName vs speakerName', () => {
-      const content = getAgendaForm();
-      expect(content).toMatch(/hasOverride\s*=\s*overrideName\s*!==\s*null\s*&&\s*overrideName\s*!==\s*speakerName/);
-    });
-
-    it('should only show X when hasOverride and not disabled', () => {
-      const content = getAgendaForm();
-      expect(content).toContain('hasOverride && !disabled');
-    });
-  });
-
-  describe('AC-F044-06: Clicar X reverte ao nome originalmente designado', () => {
-    it('should have handleRevert that sets override to null', () => {
-      const content = getAgendaForm();
-      expect(content).toContain('handleRevert');
-      expect(content).toContain('onEditOverride(null)');
-    });
-
-    it('should set isEditing to false on revert', () => {
-      const content = getAgendaForm();
-      // handleRevert should call setIsEditing(false)
-      const revertSection = content.substring(
-        content.indexOf('handleRevert'),
-        content.indexOf('handleRevert') + 200
-      );
-      expect(revertSection).toContain('setIsEditing(false)');
-    });
-  });
-
-  describe('AC-F044-07: Override e persistido no banco', () => {
+  describe('AC-F044-07: Override fields still in database (not in AgendaForm UI)', () => {
     it('should have migration 014 for speaker override fields', () => {
       const content = getMigration014();
       expect(content).toContain('ALTER TABLE sunday_agendas');
       expect(content).toContain('speaker_1_override');
-      expect(content).toContain('speaker_2_override');
-      expect(content).toContain('speaker_3_override');
     });
 
     it('should have speaker_1_override in SundayAgenda type', () => {
@@ -743,34 +689,9 @@ describe('F044 (CR-100): Read-only speaker field with last-minute swap', () => {
       const content = getDatabaseTypes();
       expect(content).toContain('speaker_3_override: string | null');
     });
-
-    it('should use updateField for speaker_1_override in AgendaForm', () => {
-      const content = getAgendaForm();
-      expect(content).toContain("updateField('speaker_1_override'");
-    });
-
-    it('should use updateField for speaker_2_override in AgendaForm', () => {
-      const content = getAgendaForm();
-      expect(content).toContain("updateField('speaker_2_override'");
-    });
-
-    it('should use updateField for speaker_3_override in AgendaForm', () => {
-      const content = getAgendaForm();
-      expect(content).toContain("updateField('speaker_3_override'");
-    });
-
-    it('should have TEXT DEFAULT NULL in migration', () => {
-      const content = getMigration014();
-      expect(content).toContain('TEXT DEFAULT NULL');
-    });
-
-    it('should have COMMENT ON COLUMN for documentation', () => {
-      const content = getMigration014();
-      expect(content).toContain('COMMENT ON COLUMN');
-    });
   });
 
-  describe('AC-F044-08: Modo Apresentacao usa override quando existir', () => {
+  describe('AC-F044-08: Presentation mode still uses override when available', () => {
     it('should use speaker_1_override from agenda in buildPresentationCards', () => {
       const content = getPresentationMode();
       expect(content).toContain('speaker_1_override');
@@ -788,78 +709,42 @@ describe('F044 (CR-100): Read-only speaker field with last-minute swap', () => {
 
     it('should fallback to speech.speaker_name when override is null', () => {
       const content = getPresentationMode();
-      // Should use ?? pattern: agenda?.speaker_N_override ?? speech?.speaker_name
       expect(content).toMatch(/speaker_1_override\s*\?\?\s*speech/);
     });
   });
 
-  describe('AC-F044-09: Campo desabilitado para Observador', () => {
-    it('should pass disabled={isObserver} to SpeakerField', () => {
+  describe('AC-F044-09: All roles can navigate via pencil (F121)', () => {
+    it('pencil is not role-gated in ReadOnlySpeakerRow', () => {
       const content = getAgendaForm();
-      expect(content).toContain('disabled={isObserver}');
-    });
-
-    it('should not show pencil icon when disabled', () => {
-      const content = getAgendaForm();
-      // hasSpeaker && !disabled condition for pencil
-      expect(content).toContain('hasSpeaker && !disabled');
-    });
-  });
-
-  describe('AC-F044-10: Campo vazio quando nao ha discursante designado', () => {
-    it('should show placeholder when no speaker name', () => {
-      const content = getAgendaForm();
-      // SpeakerField should show label as fallback when no displayName
-      expect(content).toContain('displayName || label');
-    });
-
-    it('should not show pencil when no speaker is assigned', () => {
-      const content = getAgendaForm();
-      // hasSpeaker is computed from !!speakerName
-      expect(content).toContain('!!speakerName');
+      // ReadOnlySpeakerRow has no isObserver check
+      const readOnlyFn = content.substring(
+        content.indexOf('function ReadOnlySpeakerRow'),
+        content.indexOf('function ReadOnlySpeakerRow') + 500
+      );
+      expect(readOnlyFn).not.toContain('isObserver');
     });
   });
 
-  describe('EC-F044-01: Novo designado substitui override', () => {
-    it('should read override from agenda.speaker_N_override (null clears it)', () => {
+  describe('AC-F044-10: Empty state shows label as placeholder (F121)', () => {
+    it('should show label when no speaker name', () => {
       const content = getAgendaForm();
-      expect(content).toContain('agenda.speaker_1_override');
-      expect(content).toContain('agenda.speaker_2_override');
-      expect(content).toContain('agenda.speaker_3_override');
+      expect(content).toContain('{speakerName || label}');
     });
   });
 
-  describe('EC-F044-02: Override com string vazia tratado como reverter', () => {
-    it('should clear override when trimmed value is empty', () => {
+  describe('EC-F044-01..03: Override editing removed from AgendaForm (F121)', () => {
+    it('no speaker_N_override updateField calls in AgendaForm', () => {
       const content = getAgendaForm();
-      // handleSave should set null when empty
-      expect(content).toContain('onEditOverride(null)');
+      expect(content).not.toContain("updateField('speaker_1_override'");
+      expect(content).not.toContain("updateField('speaker_2_override'");
+      expect(content).not.toContain("updateField('speaker_3_override'");
     });
 
-    it('should clear override when value equals original speakerName', () => {
-      const content = getAgendaForm();
-      // Should compare trimmed with speakerName and set null
-      expect(content).toContain('trimmed === speakerName');
-    });
-  });
-
-  describe('EC-F044-03: Todas as 3 posicoes com override simultaneo', () => {
-    it('should have independent SpeakerField for position 1', () => {
+    it('AgendaForm uses getSpeech for all 3 positions', () => {
       const content = getAgendaForm();
       expect(content).toContain("getSpeech(1)?.speaker_name");
-      expect(content).toContain("agenda.speaker_1_override");
-    });
-
-    it('should have independent SpeakerField for position 2', () => {
-      const content = getAgendaForm();
       expect(content).toContain("getSpeech(2)?.speaker_name");
-      expect(content).toContain("agenda.speaker_2_override");
-    });
-
-    it('should have independent SpeakerField for position 3', () => {
-      const content = getAgendaForm();
       expect(content).toContain("getSpeech(3)?.speaker_name");
-      expect(content).toContain("agenda.speaker_3_override");
     });
   });
 });

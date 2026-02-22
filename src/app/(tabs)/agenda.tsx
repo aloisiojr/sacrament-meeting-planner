@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
@@ -48,6 +49,8 @@ function AgendaTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const locale = getCurrentLanguage();
+  const params = useLocalSearchParams<{ expandDate?: string }>();
+  const router = useRouter();
 
   const {
     sundays,
@@ -146,6 +149,33 @@ function AgendaTabContent() {
       }, 100);
     }
   }, [initialIndex, listItems.length]);
+
+  // ADR-082: Handle expandDate query param from Presentation pencil / Home preview card pencil
+  useEffect(() => {
+    if (!params.expandDate || listItems.length === 0) return;
+    const targetDate = params.expandDate;
+
+    // Expand the card and lazy-create agenda
+    setExpandedDate(targetDate);
+    lazyCreate.mutate(targetDate);
+
+    // Scroll to the target date
+    const index = listItems.findIndex(
+      (i) => i.type === 'sunday' && i.data.date === targetDate
+    );
+    if (index >= 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0,
+        });
+      }, 400);
+    }
+
+    // Clear param to prevent re-triggering on tab re-focus
+    router.setParams({ expandDate: undefined });
+  }, [params.expandDate, listItems.length]);
 
   const handleToggle = useCallback(
     (date: string) => {

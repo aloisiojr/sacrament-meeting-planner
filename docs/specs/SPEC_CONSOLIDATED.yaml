@@ -2387,6 +2387,88 @@ features:
       - "Pencil button identico ao de F128 (quadrado, 36x36)"
       - "NextAssignmentsSection nao afetada (Bishopric-only)"
 
+  - id: F130
+    name: "Fix TypeScript errors and actor role naming consistency after Pianist/Conductor split"
+    status: pending
+    rfs: []
+    description: >
+      Fix TS compilation errors after CR-180 (can_music -> can_pianist/can_conductor):
+      SundayAgenda mock missing fields, null-to-string assignments, undefined 'Member' type,
+      BlurEvent incompatibility, missing 'speeches' in SundayExceptionReason records.
+      Also fix documentation naming: can_piano -> can_pianist, can_music -> can_pianist/can_conductor.
+    modified_by_crs: [194]
+    spec_file: "docs/specs/SPEC_F130_F134.yaml"
+    notes:
+      - "CR-194: Regression of CR-180 (Pianist/Conductor split)"
+      - "12 acceptance criteria, 4 edge cases"
+      - "14 files impacted (10 code + 4 docs)"
+      - "Canonical roles: can_preside, can_conduct, can_recognize, can_pianist, can_conductor"
+
+  - id: F131
+    name: "Fix ward language switch not updating AuthContext state"
+    status: pending
+    rfs: []
+    description: >
+      wardLanguageChangeMutation onSuccess only invalidates topic cache but does NOT
+      update AuthContext.wardLanguage. UI remains stale after language change until
+      app restart. Fix: update AuthContext state in onSuccess handler.
+    modified_by_crs: [195]
+    spec_file: "docs/specs/SPEC_F130_F134.yaml"
+    notes:
+      - "CR-195: Regression of CR-178 (Separate app/ward language)"
+      - "5 acceptance criteria, 3 edge cases"
+      - "OQ-3 delegated to architect: verify setWardLanguage availability"
+
+  - id: F132
+    name: "Fix multiple bugs in 2nd speech toggle functionality"
+    status: pending
+    rfs: []
+    description: >
+      3 sub-bugs: (4.1) toggle off clears speaker but not topic fields - fix via
+      separate direct update; (4.2) Speeches tab replaces 2 fields with 1 warning
+      message - fix: show 2 visible disabled fields with placeholder text;
+      (4.3) Agenda tab desired behavior confirmed (visible+disabled+placeholder);
+      (4.4) collapsed card hardcodes X/3 - fix: dynamic X/2 when has_second_speech=false.
+    modified_by_crs: [196]
+    spec_file: "docs/specs/SPEC_F130_F134.yaml"
+    notes:
+      - "CR-196: Regression of CR-181 (Optional 2nd speech toggle)"
+      - "11 acceptance criteria, 4 edge cases"
+      - "4.1: separate direct update, NOT extend useRemoveAssignment"
+      - "4.2: 2 visible disabled fields with i18n placeholder"
+      - "4.3: desired behavior confirmed by user (NOT a bug)"
+      - "4.4: dynamic X/2 vs X/3 in agenda and home collapsed cards"
+
+  - id: F133
+    name: "Fix password reset email to use user's app language instead of ward language"
+    status: pending
+    rfs: []
+    description: >
+      send-reset-email Edge Function uses ward.language for email template.
+      After CR-178, should use user.user_metadata.language with fallback chain:
+      user_metadata.language -> ward.language -> pt-BR.
+    modified_by_crs: [197]
+    spec_file: "docs/specs/SPEC_F130_F134.yaml"
+    notes:
+      - "CR-197: Regression of CR-155 (Multilingual password reset email)"
+      - "5 acceptance criteria, 3 edge cases"
+      - "Supersedes F101 language selection behavior"
+
+  - id: F134
+    name: "Fix password reset redirect to work without JavaScript in sandboxed iframes"
+    status: pending
+    rfs: []
+    description: >
+      reset-redirect HTML has <script> tag blocked in sandboxed iframes without
+      allow-scripts. Fix: remove <script> tag entirely, rely on meta http-equiv
+      refresh and manual <a href> button fallback.
+    modified_by_crs: [198]
+    spec_file: "docs/specs/SPEC_F130_F134.yaml"
+    notes:
+      - "CR-198: Regression of CR-191 (Password reset redirect)"
+      - "5 acceptance criteria, 3 edge cases"
+      - "Remove script tag, keep meta refresh + manual button"
+
 # =============================================================================
 # PENDING CHANGE REQUESTS (88 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20)
 # =============================================================================
@@ -5156,8 +5238,8 @@ data_model:
 
     - name: meeting_actors
       description: "Atores da reuniao (gerenciados inline na agenda)"
-      key_columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_music]
-      notes: "can_conduct NAO implica can_preside (CR-71)"
+      key_columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_pianist, can_conductor]
+      notes: "can_conduct NAO implica can_preside (CR-71). can_music split into can_pianist + can_conductor (CR-180/F117). CHECK constraint: NOT (can_pianist AND can_conductor)."
 
     - name: hymns
       description: "Catalogo global de hinos por idioma (~300 por idioma)"
@@ -5464,3 +5546,17 @@ cr_history:
       - "docs/specs/SPEC_F116_F119.yaml (CR-178, CR-180, CR-181, CR-191 - Language control, Pianist/Conductor split, Optional 2nd speech, Password reset bug)"
       - "docs/specs/SPEC_F120_F125.yaml (CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 - Card UI/UX, Label renames, Push notifications bug)"
     summary: "Phase 1 (pending): Separate app/ward language control, split can_music into can_pianist/can_conductor, optional 2nd speech toggle, password reset HTML rendering fix. Phase 2 (pending): X clear buttons on agenda selector fields, remove speech editing from agenda card (pencil nav to Speeches tab), rename 'Proximas Designacoes' to 'Proximos Discursos', rename tab 'Agenda' to 'Agendas', fix X alignment in SpeechSlot, fix push notifications (projectId undefined)."
+
+  batch_20:
+    range: "CR-184, CR-185, CR-186, CR-188"
+    status: "4 pendentes (184, 185, 186, 188)"
+    files:
+      - "docs/specs/SPEC_F126_F129.yaml (CR-184, CR-185, CR-186, CR-188 - Navigation & Home redesign)"
+    summary: "X clear button for Speeches tab selectors, remove speech editing from agenda card (pencil nav to Speeches), rename 'Proximos Discursos' section, simplify NextSundaysSection to non-expandable cards with pencil navigation."
+
+  batch_21:
+    range: "CR-194, CR-195, CR-196, CR-197, CR-198"
+    status: "5 pendentes (194, 195, 196, 197, 198)"
+    files:
+      - "docs/specs/SPEC_F130_F134.yaml (CR-194-CR-198 - Bug fixes: TS errors, ward language, 2nd speech toggle, email language, reset redirect)"
+    summary: "Fix TS errors and actor role naming after Pianist/Conductor split (F130), fix ward language switch not updating AuthContext (F131), fix 2nd speech toggle bugs: topic clearing, disabled fields with placeholder, dynamic X/2 vs X/3 (F132), fix password reset email to use user app language (F133), remove script tag from reset-redirect (F134)."

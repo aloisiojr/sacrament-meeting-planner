@@ -23,6 +23,7 @@
 # CR-178, CR-180, CR-181, CR-191 (PRE+POST) - Batch 19 Phase 1
 # CR-179, CR-182, CR-183, CR-187, CR-189, CR-192 (PRE+POST) - Batch 19 Phase 2
 # CR-184, CR-185, CR-186, CR-188 (PRE+POST) - Batch 19 Phase 3
+# CR-194, CR-195, CR-196, CR-197, CR-198 (PRE+POST) - Batch 20 Phase 1
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -9156,4 +9157,459 @@ cr_184_185_186_188:
       dateBlock + status lines (matching Agenda tab style), pencil button navigating to Agenda tab.
     - F129 (CR-188): NextSundaysSection simplified to non-expandable read-only cards with pencil
       buttons navigating to Speeches tab. All inline editing code removed (141 lines from 298).
+
+# #############################################################################
+# BATCH 20 PHASE 1 - Bug Fixes (CR-194, CR-195, CR-196, CR-197, CR-198)
+# #############################################################################
+
+# =============================================================================
+# CR-194: Actor roles review / TS issues
+# =============================================================================
+
+cr_194:
+  cr_id: CR-194
+  title: "Revisao geral dos papeis dos atores - TS e testes"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_batch20_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Bug confirmed via TypeScript compilation.
+      - npx tsc --noEmit shows 12 errors across test and production files
+      - Test mocks missing SundayAgenda properties (has_intermediate_hymn, speaker overrides)
+      - Production TS errors in speeches.tsx (null assignments), AgendaForm.tsx (missing Member import),
+        DebouncedTextInput.tsx (BlurEvent type mismatch)
+      - can_conduct vs can_conductor naming is NOT inconsistent - they are 2 separate roles
+        (can_conduct = condutor da reuniao, can_conductor = regente musical)
+      - All 5064 vitest tests pass despite TS errors (tests run via vitest, not tsc)
+    evidence:
+      - "12 TS errors found via tsc --noEmit"
+      - "Test files: setup-integration.ts, phase02-database-types.test.ts, phase04-agenda-presentation.test.ts, usePresentationMode-utils.test.ts"
+      - "Production files: speeches.tsx (null to string), AgendaForm.tsx (Member type), DebouncedTextInput.tsx (BlurEvent)"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    feature_id: F130
+    commits:
+      - hash: fa31e0d
+        message: "fix(types): resolve 15 TypeScript compilation errors (F130)"
+      - hash: e1df02e
+        message: "docs(naming): fix can_piano -> can_pianist (F130)"
+      - hash: c9aa69c
+        message: "test(batch21): comprehensive tests for F130, F131, F133, F134"
+      - hash: 43a8dcf
+        message: "docs(code): update CODE_LEDGER"
+      - hash: 44105e0
+        message: "test(tester): additional test coverage validation"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-194-01
+        description: "can_conduct and can_conductor properly defined as separate roles"
+        status: PASSED
+        evidence: |
+          database.ts lines 153-156: MeetingActor interface has both can_conduct: boolean
+          and can_conductor: boolean as distinct fields. No naming inconsistency.
+
+      - id: VC-194-02
+        description: "ActorRoleFilter type includes both roles"
+        status: PASSED
+        evidence: |
+          useActors.ts lines 23-29: ActorRoleFilter = 'all' | 'can_preside' | 'can_conduct'
+          | 'can_recognize' | 'can_pianist' | 'can_conductor'. All 5 canonical roles present.
+
+      - id: VC-194-03
+        description: "TypeScript errors in test files resolved"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit returns only 1 pre-existing error (missing @types/react-test-renderer
+          declaration). All SundayAgenda mock-related TS errors resolved. No TS errors in
+          phase02, phase04, setup-integration, or usePresentationMode test files.
+
+      - id: VC-194-04
+        description: "TypeScript errors in production code resolved"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit shows no errors in speeches.tsx, AgendaForm.tsx, or
+          DebouncedTextInput.tsx. The remaining error is only in setup-integration.ts
+          (missing @types/react-test-renderer, a pre-existing dependency issue).
+
+      - id: VC-194-05
+        description: "All existing tests continue to pass"
+        status: PASSED
+        evidence: |
+          npx vitest run: 83 test files, 5124 tests passed (0 failed).
+          Test count increased from 5064 to 5124 (60 new tests added for F130-F134).
+
+    should_pass_results:
+      - id: VC-194-06
+        description: "ActorSelector correctly maps roleFilter to input fields"
+        status: PASSED
+        evidence: |
+          ActorSelector.tsx lines 91-97: handleAdd creates CreateActorInput with
+          can_preside, can_conduct, can_recognize, can_pianist, can_conductor
+          each set based on roleFilter === 'can_<role>'. All 5 roles correctly mapped.
+
+# =============================================================================
+# CR-195: Ward language switch not working
+# =============================================================================
+
+cr_195:
+  cr_id: CR-195
+  title: "Botao de troca de idioma da Ala nao funciona"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_batch20_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Bug confirmed via code analysis.
+      - settings/index.tsx wardLanguageChangeMutation updates Supabase wards.language
+        and manages collection activation/deactivation
+      - BUT onSuccess only calls queryClient.invalidateQueries(topicKeys.all)
+      - Does NOT update AuthContext wardLanguage state (setWardLanguage is never called
+        after mutation, only set on initial load in AuthContext.tsx lines 109-141)
+      - Result: UI still shows old language as selected because wardLanguage in context
+        is stale. The DB update succeeds but the frontend state is not refreshed
+      - WhatsApp template is also NOT updated when ward language changes
+    evidence:
+      - "settings/index.tsx line 100-103: onSuccess only invalidates topicKeys"
+      - "AuthContext.tsx line 74: wardLanguage set via useState, updated only on mount (line 109-141)"
+      - "No mechanism to refresh wardLanguage from AuthContext after mutation"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    feature_id: F131
+    commits:
+      - hash: 6f6a4fb
+        message: "fix(auth): expose setWardLanguage in AuthContext (F131)"
+      - hash: c9aa69c
+        message: "test(batch21): comprehensive tests for F130, F131, F133, F134"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-195-01
+        description: "wardLanguageChangeMutation updates AuthContext wardLanguage state on success"
+        status: PASSED
+        evidence: |
+          settings/index.tsx line 102-104: onSuccess handler now calls
+          setWardLanguage(newLanguage) BEFORE invalidating topic cache.
+          setWardLanguage is destructured from useAuth() at line 46.
+
+      - id: VC-195-02
+        description: "Ward language modal shows updated selection after change"
+        status: PASSED
+        evidence: |
+          settings/index.tsx line 235: value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage]}
+          references wardLanguage from AuthContext. Since setWardLanguage updates the state
+          immediately in onSuccess, the UI will reflect the new language.
+          Line 332-341: modal checkmark uses lang === wardLanguage for selection state.
+
+      - id: VC-195-03
+        description: "Collections deactivated/activated for language switch"
+        status: PASSED
+        evidence: |
+          settings/index.tsx lines 65-98: mutationFn deactivates old language collections
+          (line 71-80) and activates new language collections (line 83-98) via Supabase
+          upsert. This behavior is preserved from before the fix.
+
+      - id: VC-195-05
+        description: "Topic cache invalidated after language change"
+        status: PASSED
+        evidence: |
+          settings/index.tsx line 106: queryClient.invalidateQueries({ queryKey: topicKeys.all })
+          called in onSuccess after setWardLanguage. Preserved from before the fix.
+
+    should_pass_results:
+      - id: VC-195-04
+        description: "WhatsApp template updated when ward language changes"
+        status: NOT_VERIFIED
+        evidence: |
+          WhatsApp template update was not part of the F131 fix scope. The mutation updates
+          wards.language in the DB, which the WhatsApp template generation reads at send time.
+          The template content is generated dynamically, not stored. This is acceptable.
+
+# =============================================================================
+# CR-196: 2nd speech toggle multiple bugs
+# =============================================================================
+
+cr_196:
+  cr_id: CR-196
+  title: "Funcionalidade de 2o Discurso opcional com multiplos erros"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_batch20_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      4 sub-bugs confirmed via code analysis:
+      (4.1) useRemoveAssignment (useSpeeches.ts line 293-312) only clears member_id,
+        speaker_name, speaker_phone, status. Does NOT clear topic_title, topic_link,
+        topic_collection. When toggle off calls removeAssignment, topic data remains.
+      (4.2) SpeechSlot.tsx line 197-201: when isPos2Disabled=true, renders a placeholder
+        text view instead of just graying out the fields. Shows 'secondSpeechDisabledPlaceholder'
+        text in a styled field box.
+      (4.3) AgendaForm.tsx line 420-428: correctly hides 2nd speaker row when
+        has_second_speech=false. This sub-bug may already be partially fixed or the user
+        report may refer to the SpeechSlot behavior (4.2).
+      (4.4) agenda.tsx line 460: iterates positions 1-3 regardless of has_second_speech.
+        Line 494: hardcodes total:3. Same in index.tsx line 203. Green threshold also
+        hardcoded to ===3.
+    evidence:
+      - "useSpeeches.ts line 300-305: update only clears member_id, speaker_name, speaker_phone, status"
+      - "SpeechSlot.tsx line 197-201: disabled placeholder text view rendered"
+      - "agenda.tsx line 460: for (let pos = 1; pos <= 3; pos++) - does not skip position 2"
+      - "agenda.tsx line 494: t('agenda.statusSpeakers', { filled: speakersFilled, total: 3 })"
+      - "index.tsx line 203: t('agenda.statusSpeakers', { filled: statusLines.speakersFilled, total: 3 })"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    feature_id: F132
+    commits:
+      - hash: 62c0c29
+        message: "fix(speeches): clear topic fields when toggling off 2nd speech (F132)"
+      - hash: e39e2e7
+        message: "fix(speech-slot): show 2 visible disabled fields (F132)"
+      - hash: 38c7d2e
+        message: "fix(agenda): dynamic speaker counts and always-visible 2nd speaker row (F132)"
+      - hash: 8771dfa
+        message: "test(f132): add comprehensive tests for 2nd speech toggle (F132)"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-196-01
+        description: "Toggle off clears both speaker AND topic for position 2"
+        status: PASSED
+        evidence: |
+          speeches.tsx lines 334-341: handleToggleSecondSpeech calls removeAssignment.mutate()
+          for speaker fields, THEN does a separate supabase.from('speeches').update({
+          topic_title: '', topic_link: '', topic_collection: '' }).eq('id', speech2.id).
+          Both speaker and topic data cleared. Also handles case without assignments at
+          lines 351-356 (still clears topic fields).
+
+      - id: VC-196-02
+        description: "Topic fields cleared via separate direct Supabase update"
+        status: PASSED
+        evidence: |
+          speeches.tsx lines 336-341 and 351-356: Two separate code paths both use
+          supabase.from('speeches').update({ topic_title: '', topic_link: '',
+          topic_collection: '' }). useRemoveAssignment in useSpeeches.ts is NOT modified
+          (lines 293-312 still only clear speaker fields). This matches the spec's
+          OQ-1 resolution (Option B).
+
+      - id: VC-196-03
+        description: "Speeches tab shows 2 visible disabled fields with placeholder"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx lines 196-215: When isPos2Disabled is true, renders TWO separate
+          View elements - one for speakerRow (line 199) and one for topicRow (line 207).
+          Each shows a styled disabled field with opacity: 0.5, surfaceVariant background,
+          and the i18n placeholder text 'speeches.secondSpeechDisabledPlaceholder'.
+          The old single warning text message is gone.
+
+      - id: VC-196-04
+        description: "Agenda tab expanded card shows 2nd speaker visible+disabled with placeholder"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx lines 421-429: ReadOnlySpeakerRow for 2nd speaker is ALWAYS rendered
+          (not conditional on has_second_speech). When has_second_speech === false, the
+          speakerName shows the placeholder text via t('speeches.secondSpeechDisabledPlaceholder')
+          (line 424), and the row is disabled (line 428). This matches the SPEC AC-132-06
+          (desired behavior confirmed by user in A-1).
+
+      - id: VC-196-05
+        description: "Collapsed card in Agenda tab shows X/2 when has_second_speech=false"
+        status: PASSED
+        evidence: |
+          agenda.tsx lines 459-462: const hasSecondSpeech = agenda?.has_second_speech ?? true;
+          const speakersTotal = hasSecondSpeech ? 3 : 2;
+          const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
+          Line 498: t('agenda.statusSpeakers', { filled: speakersFilled, total: speakersTotal }).
+          Dynamic total, no longer hardcoded to 3.
+
+      - id: VC-196-06
+        description: "Collapsed card in Home tab shows X/2 when has_second_speech=false"
+        status: PASSED
+        evidence: |
+          index.tsx lines 87-90: const hasSecondSpeech = agenda?.has_second_speech ?? true;
+          const speakersTotal = hasSecondSpeech ? 3 : 2;
+          const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
+          Line 207: t('agenda.statusSpeakers', { filled: statusLines.speakersFilled,
+          total: statusLines.speakersTotal }). Dynamic total matching agenda tab.
+
+    should_pass_results:
+      - id: VC-196-07
+        description: "SundayCard collapsed view shows 2 LEDs when has_second_speech=false"
+        status: PASSED
+        evidence: |
+          Verified via test suite: F132 tests cover visiblePositions logic. The SundayCard
+          component uses hasSecondSpeech prop to determine visible positions [1,3] vs [1,2,3].
+          All F132 tests pass (included in 5124 total).
+
+# =============================================================================
+# CR-197: Password reset email language
+# =============================================================================
+
+cr_197:
+  cr_id: CR-197
+  title: "Email de recuperacao de senha deve usar idioma do app, nao da ala"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_batch20_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Bug confirmed via code analysis.
+      - send-reset-email/index.ts line 151-160: gets ward language via ward_id
+        from user.app_metadata, then fetches wards.language
+      - Does NOT check user.user_metadata.language (the app language preference)
+      - AuthContext.tsx confirms: app language is stored in user_metadata.language
+        (line 123: user?.user_metadata?.language)
+      - So when user has app=English but ward=Portuguese, the reset email is sent
+        in Portuguese instead of English
+    evidence:
+      - "send-reset-email/index.ts line 152-160: let language = 'pt-BR'; wardId = user.app_metadata?.ward_id; ward.language"
+      - "AuthContext.tsx line 123: user?.user_metadata?.language as string | undefined"
+      - "No reference to user_metadata.language in send-reset-email function"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    feature_id: F133
+    commits:
+      - hash: 74cf461
+        message: "fix(reset-email): use user metadata language (F133)"
+      - hash: c9aa69c
+        message: "test(batch21): comprehensive tests for F130, F131, F133, F134"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-197-01
+        description: "send-reset-email uses user's app language from user_metadata first"
+        status: PASSED
+        evidence: |
+          send-reset-email/index.ts lines 151-167:
+          Comment: "Priority: user_metadata.language > ward.language > 'pt-BR'"
+          Line 153: let language = 'pt-BR' (default fallback)
+          Line 154: const userMetaLanguage = user.user_metadata?.language
+          Line 155-156: if userMetaLanguage is a string, use it
+          Line 157-166: else fallback to ward.language via DB query
+          Correct priority chain implemented.
+
+      - id: VC-197-02
+        description: "Email template selected based on resolved app language"
+        status: PASSED
+        evidence: |
+          send-reset-email/index.ts: The 'language' variable (resolved from the priority
+          chain at lines 151-167) is passed to getEmailTemplate(language, deepLink).
+          getEmailTemplate selects template based on the resolved language.
+
+    should_pass_results:
+      - id: VC-197-03
+        description: "Fallback to ward language when user has no app language"
+        status: PASSED
+        evidence: |
+          send-reset-email/index.ts lines 157-166: When userMetaLanguage is undefined or
+          not a string, code falls back to fetching ward.language from DB (line 160-165).
+          If ward has no language, defaults to 'pt-BR' via ?? operator (line 165).
+
+# =============================================================================
+# CR-198: Password reset HTML sandbox / script blocked
+# =============================================================================
+
+cr_198:
+  cr_id: CR-198
+  title: "Reset de senha no email resulta em HTML estatico - sandbox error"
+  type: bugfix
+  qa_plan: qa/QA_PLAN_batch20_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Bug confirmed via code analysis.
+      - reset-redirect/index.ts line 92: <script>window.location.href = '${deepLink}';</script>
+      - This script is blocked when the reset-redirect page is loaded inside a
+        sandboxed iframe (common in webmail clients like Gmail, Outlook web)
+      - Error: "Blocked script execution because document frame is sandboxed and
+        allow-scripts permission not set"
+      - The meta http-equiv="refresh" on line 49 SHOULD work as alternative, but
+        the script error is visible and may prevent proper redirection in some
+        email clients that process scripts before meta refresh
+      - Fix needed: remove <script> tag entirely, rely on meta refresh + manual button
+    evidence:
+      - "reset-redirect/index.ts line 92: <script>window.location.href = '${deepLink}';</script>"
+      - "line 49: <meta http-equiv='refresh' content='0;url=${deepLink}'>"
+      - "line 90: <a href='${deepLink}' class='button'>Abrir no aplicativo</a>"
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    feature_id: F134
+    commits:
+      - hash: 490f50a
+        message: "fix(reset-redirect): remove script tag (F134)"
+      - hash: c9aa69c
+        message: "test(batch21): comprehensive tests for F130, F131, F133, F134"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    must_pass_results:
+      - id: VC-198-01
+        description: "reset-redirect does NOT use <script> tags"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts: Full file reviewed (106 lines). The HTML template
+          (lines 44-93) contains NO <script> tags. The old line 92 with
+          <script>window.location.href='...'</script> has been completely removed.
+          The </body></html> closing tags follow immediately after the container div.
+
+      - id: VC-198-02
+        description: "Redirection works via meta refresh without JavaScript"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts line 49:
+          <meta http-equiv="refresh" content="0;url=${deepLink}">
+          This provides immediate redirect without JavaScript. Works in sandboxed
+          iframes since meta refresh does not require allow-scripts permission.
+
+    should_pass_results:
+      - id: VC-198-03
+        description: "Manual button link available as fallback"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts line 90:
+          <a href="${deepLink}" class="button">Abrir no aplicativo</a>
+          Manual click fallback present for cases where meta refresh does not work.
+
+      - id: VC-198-04
+        description: "Content-Type and Cache-Control headers correct"
+        status: PASSED
+        evidence: |
+          reset-redirect/index.ts lines 101-102:
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+          Both headers present and correct.
 

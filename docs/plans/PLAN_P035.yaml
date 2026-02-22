@@ -1,0 +1,555 @@
+# =============================================================================
+# PLAN_P035.yaml
+# Batch 21 Phase 1: Bug Fixes (CR-194, CR-195, CR-196, CR-197, CR-198)
+# Features: F130, F131, F132, F133, F134
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Fix 5 regressions from recent batches: TypeScript compilation errors and doc
+  naming inconsistencies (CR-194/F130), ward language switch not updating
+  AuthContext (CR-195/F131), multiple 2nd speech toggle bugs including topic
+  clearing, disabled field rendering, and dynamic collapsed card counts
+  (CR-196/F132), password reset email using wrong language (CR-197/F133), and
+  password reset redirect script blocked in sandboxed iframes (CR-198/F134).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # ---------------------------------------------------------------------------
+  # STEP-01: F130 - Fix TypeScript compilation errors in test mocks + production
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Fix all 16 TypeScript compilation errors identified by npx tsc --noEmit:
+      (1) Add has_intermediate_hymn, speaker_1_override, speaker_2_override,
+      speaker_3_override to SundayAgenda mock objects in 5 test files
+      (cr001-qa-extended, cr001-qa, database-types, phase02-database-types,
+      usePresentationMode-utils) and 1 integration file (setup-integration.ts
+      createMockSundayAgenda).
+      (2) Make wardLanguage a required string (not optional) in
+      setup-integration.ts createMockAuthContext.
+      (3) Add 'speeches' key to Record<SundayExceptionReason, boolean> in
+      phase04-agenda-presentation.test.ts (2 occurrences).
+      (4) In speeches.tsx, replace null with empty string '' for string-typed
+      fields (topic_title, topic_link) when clearing position 2 data.
+      (5) In AgendaForm.tsx, import MeetingMember (or correct type) from
+      database.ts to replace undefined 'Member' reference.
+      (6) In DebouncedTextInput.tsx, change handleBlur parameter type to accept
+      BlurEvent (TargetedEvent) from react-native instead of
+      NativeSyntheticEvent<TextInputFocusEventData>.
+    files:
+      - src/__tests__/cr001-qa-extended.test.ts
+      - src/__tests__/cr001-qa.test.ts
+      - src/__tests__/database-types.test.ts
+      - src/__tests__/integration/setup-integration.ts
+      - src/__tests__/phase02-database-types.test.ts
+      - src/__tests__/phase04-agenda-presentation.test.ts
+      - src/__tests__/usePresentationMode-utils.test.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/DebouncedTextInput.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-08", "STEP-09"]
+    done_when:
+      - "npx tsc --noEmit returns 0 errors"
+      - "npx vitest run passes all existing tests"
+    tests:
+      - type: unit
+        description: "Verify TypeScript compilation succeeds with npx tsc --noEmit (zero errors)"
+      - type: unit
+        description: "Verify all existing tests still pass with npx vitest run"
+    covers:
+      acceptance_criteria: [AC-130-01, AC-130-02, AC-130-03, AC-130-04, AC-130-05, AC-130-06, AC-130-07, AC-130-08, AC-130-09]
+      edge_cases: [EC-130-01, EC-130-02, EC-130-03]
+    risks:
+      - risk: "Changing handleBlur type in DebouncedTextInput could break callers"
+        mitigation: "BlurEvent is the correct type for TextInput onBlur in RN; verify no caller passes NativeSyntheticEvent explicitly"
+      - risk: "Mock objects missing newly added fields could cause test failures"
+        mitigation: "Add fields with sensible defaults (has_intermediate_hymn: true, speaker_*_override: null)"
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: F130 - Fix documentation naming (can_piano -> can_pianist, can_music cleanup)
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Fix documentation naming inconsistencies:
+      (1) Replace all 'can_piano' references with 'can_pianist' in SPEC_F083.yaml,
+      ARCH_M024.yaml, and PLAN_P024.yaml.
+      (2) Update SPEC_CONSOLIDATED.yaml meeting_actors key_columns to replace
+      can_music with can_pianist, can_conductor where needed (verify line ~5159
+      and any other occurrences of can_music in key_columns or active specs,
+      but NOT in historical/changelog references that describe the migration).
+      (3) Do NOT modify REVIEW_CONSOLIDATED.yaml (historical review comments,
+      per EC-130-04).
+    files:
+      - docs/specs/SPEC_F083.yaml
+      - docs/arch/ARCH_M024.yaml
+      - docs/plans/PLAN_P024.yaml
+      - docs/specs/SPEC_CONSOLIDATED.yaml
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-08", "STEP-09"]
+    done_when:
+      - "grep -r 'can_piano[^i]' docs/ returns no results (excluding REVIEW_CONSOLIDATED.yaml and ARCH_M035.yaml/SPEC_F130_F134.yaml which reference the fix)"
+      - "SPEC_CONSOLIDATED.yaml key_columns for meeting_actors lists can_pianist and can_conductor instead of can_music"
+      - "No 'can_piano' (without 'ist' suffix) found in SPEC_F083, ARCH_M024, PLAN_P024"
+    tests:
+      - type: unit
+        description: "Verify grep -r 'can_piano[^i]' docs/specs/SPEC_F083.yaml returns no results"
+      - type: unit
+        description: "Verify grep -r 'can_piano[^i]' docs/arch/ARCH_M024.yaml returns no results"
+      - type: unit
+        description: "Verify grep -r 'can_piano[^i]' docs/plans/PLAN_P024.yaml returns no results"
+    covers:
+      acceptance_criteria: [AC-130-10, AC-130-11, AC-130-12]
+      edge_cases: [EC-130-04]
+    risks:
+      - risk: "Accidentally modifying historical changelog entries"
+        mitigation: "Only modify active spec/arch/plan sections, not changelog or review narratives"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: F131 - Fix ward language switch not updating AuthContext
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Fix ward language switch:
+      (1) In AuthContext.tsx, add setWardLanguage to the AuthContextValue
+      interface (the useState setter already exists at line ~74, it just needs
+      to be exposed in the interface at line ~17-29 and included in the context
+      value object at line ~184).
+      (2) In settings/index.tsx, in wardLanguageChangeMutation onSuccess handler,
+      call setWardLanguage(newLanguage) to update AuthContext state immediately
+      after cache invalidation.
+    files:
+      - src/contexts/AuthContext.tsx
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-04", "STEP-08", "STEP-09"]
+    done_when:
+      - "AuthContextValue interface includes setWardLanguage: (lang: string) => void"
+      - "setWardLanguage is included in the context value object"
+      - "wardLanguageChangeMutation.onSuccess calls setWardLanguage with the new language"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+    tests:
+      - type: unit
+        description: "Test that AuthContext exposes setWardLanguage and calling it updates wardLanguage state"
+      - type: unit
+        description: "Test that ward language mutation onSuccess calls setWardLanguage with the new language value"
+    covers:
+      acceptance_criteria: [AC-131-01, AC-131-02, AC-131-03, AC-131-04, AC-131-05]
+      edge_cases: [EC-131-01, EC-131-02, EC-131-03]
+    risks:
+      - risk: "Exposing setWardLanguage could be called from unexpected locations"
+        mitigation: "setWardLanguage is a standard React setState pattern; only Settings will use it for ward language changes"
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: F132 sub-bug 4.1 - Toggle off clears both speaker AND topic
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Fix handleToggleSecondSpeech in speeches.tsx to clear topic fields when
+      toggling off 2nd speech:
+      After removeAssignment.mutate completes (or alongside it), add a separate
+      direct supabase.from('speeches').update() call to set topic_title=null,
+      topic_link=null, topic_collection=null for the speech record at position 2.
+      Do NOT modify useRemoveAssignment hook (per ADR-085, user confirmed Option B).
+      Use empty string '' instead of null for string-typed fields if TypeScript
+      requires it (consistent with STEP-01 fix).
+    files:
+      - src/app/(tabs)/speeches.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-05"]
+    done_when:
+      - "handleToggleSecondSpeech clears topic_title, topic_link, topic_collection in addition to speaker fields"
+      - "useRemoveAssignment hook is NOT modified"
+      - "Clearing is done via separate direct supabase update (not extending removeAssignment)"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Test that toggling off 2nd speech clears both speaker and topic fields for position 2"
+      - type: unit
+        description: "Test that toggling off when only topic is assigned (no speaker) still clears topic fields (EC-132-01)"
+      - type: unit
+        description: "Test that toggling off when no speech record exists does not throw error (EC-132-02)"
+    covers:
+      acceptance_criteria: [AC-132-01, AC-132-02]
+      edge_cases: [EC-132-01, EC-132-02]
+    risks:
+      - risk: "Two separate DB operations could leave data in inconsistent state if second fails"
+        mitigation: "Toggle off is an infrequent user action; if topic clear fails, user can toggle off again. Cache invalidation will refresh data."
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: F132 sub-bug 4.2 - SpeechSlot disabled fields with placeholder
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Fix SpeechSlot.tsx to show 2 visible disabled fields with placeholder text
+      when isPos2Disabled (isSecondSpeechEnabled=false for position 2):
+      (1) Remove the current single-warning-message replacement pattern.
+      (2) Render both speaker field and topic field as visible but disabled
+      (non-interactive, grayed out with opacity or dimmed colors).
+      (3) Show placeholder text from i18n key 'speeches.secondSpeechDisabledPlaceholder'
+      in each field.
+      (4) Toggle switch remains functional to re-enable the fields.
+    files:
+      - src/components/SpeechSlot.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-04"]
+    done_when:
+      - "SpeechSlot position 2 with isSecondSpeechEnabled=false renders 2 visible disabled fields"
+      - "Each field shows placeholder text from 'speeches.secondSpeechDisabledPlaceholder'"
+      - "Fields are non-interactive (disabled state)"
+      - "Toggle switch re-enables both fields when turned on"
+      - "The old single warning message pattern is removed"
+    tests:
+      - type: unit
+        description: "Test SpeechSlot position 2 renders 2 disabled fields with placeholder when isSecondSpeechEnabled=false"
+      - type: unit
+        description: "Test placeholder text uses correct i18n key in pt-BR, en, es (AC-132-04)"
+      - type: unit
+        description: "Test toggle on re-enables the fields (AC-132-05)"
+    covers:
+      acceptance_criteria: [AC-132-03, AC-132-04, AC-132-05]
+      edge_cases: []
+    risks:
+      - risk: "Disabled fields layout could look different than expected"
+        mitigation: "Use opacity 0.5 and pointerEvents:'none' for consistent disabled appearance"
+
+  # ---------------------------------------------------------------------------
+  # STEP-06: F132 sub-bug 4.3 + 4.4 - AgendaForm disabled speaker + collapsed card counts
+  # ---------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Fix AgendaForm and collapsed card counts:
+      (1) AgendaForm.tsx (sub-bug 4.3): Change conditional hiding of 2nd speaker
+      ReadOnlySpeakerRow to always render it. When has_second_speech===false,
+      show it with disabled=true and placeholder text from i18n key
+      'speeches.secondSpeechDisabledPlaceholder'.
+      (2) agenda.tsx (sub-bug 4.4): In collapsed card speeches status computation,
+      use agenda.has_second_speech to determine speakersTotal (2 when false, 3
+      when true/undefined). Loop only positions [1,3] when has_second_speech===false.
+      Apply green color when speakersFilled===speakersTotal.
+      (3) index.tsx (sub-bug 4.4): Same dynamic count logic for Home tab status
+      lines. Determine speakersTotal from agenda.has_second_speech. Loop only
+      positions [1,3] when false. Green color when speakersFilled===speakersTotal.
+      (4) Verify SundayCard LEDs visiblePositions=[1,3] when hasSecondSpeech=false
+      is preserved (AC-132-10, already implemented per A-2).
+    files:
+      - src/components/AgendaForm.tsx
+      - src/app/(tabs)/agenda.tsx
+      - src/app/(tabs)/index.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-04", "STEP-05"]
+    done_when:
+      - "AgendaForm 2nd speaker row always renders; shows disabled+placeholder when has_second_speech=false"
+      - "Agenda collapsed card shows 'Discursantes X/2' when has_second_speech=false"
+      - "Agenda collapsed card shows 'Discursantes X/3' when has_second_speech=true or undefined"
+      - "Home collapsed card shows 'Discursantes X/2' when has_second_speech=false"
+      - "Home collapsed card shows 'Discursantes X/3' when has_second_speech=true or undefined"
+      - "Green color applied when speakersFilled===speakersTotal in both tabs"
+      - "SundayCard visiblePositions=[1,3] when hasSecondSpeech=false (preserved)"
+      - "npx tsc --noEmit passes"
+    tests:
+      - type: unit
+        description: "Test AgendaForm shows disabled ReadOnlySpeakerRow with placeholder when has_second_speech=false (AC-132-06)"
+      - type: unit
+        description: "Test agenda.tsx collapsed card shows X/2 speakers when has_second_speech=false (AC-132-07)"
+      - type: unit
+        description: "Test index.tsx Home card shows X/2 speakers when has_second_speech=false (AC-132-08)"
+      - type: unit
+        description: "Test collapsed cards show X/3 speakers when has_second_speech=true (AC-132-09)"
+      - type: unit
+        description: "Test SundayCard LEDs show only 2 when hasSecondSpeech=false (AC-132-10)"
+      - type: unit
+        description: "Test agenda.tsx has access to has_second_speech from agenda data (EC-132-03)"
+      - type: unit
+        description: "Test index.tsx has access to has_second_speech from agenda data (EC-132-04)"
+    covers:
+      acceptance_criteria: [AC-132-06, AC-132-07, AC-132-08, AC-132-09, AC-132-10]
+      edge_cases: [EC-132-03, EC-132-04]
+    risks:
+      - risk: "has_second_speech could be null/undefined for old records"
+        mitigation: "Default to true when undefined (has_second_speech ?? true) to match DB default"
+
+  # ---------------------------------------------------------------------------
+  # STEP-07: F132 - Tests for all 2nd speech toggle fixes
+  # ---------------------------------------------------------------------------
+  - id: STEP-07
+    description: >
+      Write comprehensive tests for all F132 fixes:
+      (1) Test handleToggleSecondSpeech clears both speaker and topic fields.
+      (2) Test SpeechSlot disabled fields rendering with correct placeholder text.
+      (3) Test AgendaForm disabled ReadOnlySpeakerRow.
+      (4) Test collapsed card dynamic X/2 vs X/3 for both Agenda and Home tabs.
+      (5) Verify all existing tests still pass (AC-132-11).
+      Add tests to new test file or existing batch test file as appropriate.
+    files:
+      - src/__tests__/batch21-f130-f134.test.ts
+    dependencies: ["STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "New test file contains tests for all F132 sub-bugs"
+      - "All new tests pass"
+      - "All existing tests pass (AC-132-11)"
+      - "npx vitest run passes with 100% of tests"
+    tests:
+      - type: unit
+        description: "Test suite for F132 with coverage of AC-132-01 through AC-132-11"
+    covers:
+      acceptance_criteria: [AC-132-11]
+      edge_cases: []
+    risks:
+      - risk: "Test file could be too large"
+        mitigation: "Group tests by sub-bug (4.1, 4.2, 4.3, 4.4) with describe blocks"
+
+  # ---------------------------------------------------------------------------
+  # STEP-08: F133 - Password reset email uses user's app language
+  # ---------------------------------------------------------------------------
+  - id: STEP-08
+    description: >
+      Fix send-reset-email Edge Function to use user's app language preference:
+      (1) After looking up the user, read user.user_metadata?.language as
+      first priority for email template language.
+      (2) Fall back to ward.language (existing behavior) if user_metadata.language
+      is not set.
+      (3) Fall back to 'pt-BR' as last resort default.
+      (4) Pass the resolved language to getEmailTemplate(resolvedLanguage, deepLink).
+      (5) Handle null/empty user_metadata safely with optional chaining.
+    files:
+      - supabase/functions/send-reset-email/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-09"]
+    done_when:
+      - "send-reset-email resolves language as: user.user_metadata?.language || ward.language || 'pt-BR'"
+      - "getEmailTemplate receives the resolved language"
+      - "Optional chaining used for null-safe access to user_metadata"
+      - "Existing behavior preserved when user has no app language preference"
+    tests:
+      - type: unit
+        description: "Test email uses user_metadata.language when available (AC-133-01)"
+      - type: unit
+        description: "Test fallback to ward.language when user has no metadata.language (AC-133-03)"
+      - type: unit
+        description: "Test fallback to pt-BR when neither user nor ward language set (AC-133-04)"
+      - type: unit
+        description: "Test getEmailTemplate receives correct resolved language (AC-133-05)"
+      - type: unit
+        description: "Test handling of unsupported language in user_metadata (EC-133-01)"
+      - type: unit
+        description: "Test null user_metadata handled safely (EC-133-03)"
+    covers:
+      acceptance_criteria: [AC-133-01, AC-133-02, AC-133-03, AC-133-04, AC-133-05]
+      edge_cases: [EC-133-01, EC-133-02, EC-133-03]
+    risks:
+      - risk: "user_metadata might not be available from listUsers"
+        mitigation: "Supabase Auth admin API returns raw_user_meta_data which is exposed as user_metadata (per A-6)"
+
+  # ---------------------------------------------------------------------------
+  # STEP-09: F134 - Remove <script> tag from reset-redirect HTML
+  # ---------------------------------------------------------------------------
+  - id: STEP-09
+    description: >
+      Fix reset-redirect Edge Function to work without JavaScript:
+      (1) Remove the <script>window.location.href='...'</script> tag (line ~92)
+      from the HTML response.
+      (2) Verify meta http-equiv="refresh" tag (line ~49) is preserved for
+      automatic redirection.
+      (3) Verify <a href> button for manual redirect is preserved.
+      (4) Verify Content-Type: text/html; charset=utf-8 and Cache-Control
+      headers remain correct.
+    files:
+      - supabase/functions/reset-redirect/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-08"]
+    done_when:
+      - "reset-redirect HTML response does NOT contain <script> tags"
+      - "meta http-equiv='refresh' tag is preserved"
+      - "<a href> button is preserved"
+      - "Content-Type and Cache-Control headers unchanged"
+      - "grep '<script' supabase/functions/reset-redirect/index.ts returns no results"
+    tests:
+      - type: unit
+        description: "Test reset-redirect HTML does not contain <script> tag (AC-134-01)"
+      - type: unit
+        description: "Test meta refresh tag is present with correct URL (AC-134-02)"
+      - type: unit
+        description: "Test manual button link (<a href>) is present (AC-134-03)"
+      - type: unit
+        description: "Test response headers are correct (AC-134-04)"
+    covers:
+      acceptance_criteria: [AC-134-01, AC-134-02, AC-134-03, AC-134-04, AC-134-05]
+      edge_cases: [EC-134-01, EC-134-02, EC-134-03]
+    risks:
+      - risk: "Some browsers might not support meta refresh"
+        mitigation: "The <a href> button serves as fallback (per A-5); meta refresh is universally supported in modern browsers"
+
+  # ---------------------------------------------------------------------------
+  # STEP-10: Comprehensive tests + final validation
+  # ---------------------------------------------------------------------------
+  - id: STEP-10
+    description: >
+      Write comprehensive tests for F130, F131, F133, F134 and run final validation:
+      (1) Add tests for F131 (ward language switch state update).
+      (2) Add tests for F133 (email language resolution priority chain).
+      (3) Add tests for F134 (no <script> tag, meta refresh preserved).
+      (4) Run npx tsc --noEmit to verify zero TypeScript errors.
+      (5) Run npx vitest run to verify all tests pass.
+      (6) Update existing test consolidated documentation if needed.
+    files:
+      - src/__tests__/batch21-f130-f134.test.ts
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-07", "STEP-08", "STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "Test file batch21-f130-f134.test.ts exists with tests for F130, F131, F132, F133, F134"
+      - "npx tsc --noEmit returns 0 errors"
+      - "npx vitest run passes 100% of tests"
+      - "All 5 features have at least 1 test per AC"
+    tests:
+      - type: integration
+        description: "Full test suite validation: all existing + new tests pass"
+    covers:
+      acceptance_criteria: [AC-130-07, AC-130-08, AC-131-05, AC-132-11]
+      edge_cases: []
+    risks:
+      - risk: "New tests could conflict with existing test patterns"
+        mitigation: "Follow existing test file naming convention (batch21-f130-f134.test.ts) and mock patterns"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  # F130: TypeScript errors + doc naming
+  - ac_id: AC-130-01
+    how_to_verify: "npx tsc --noEmit: no errors about missing SundayAgenda fields in test mocks"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-02
+    how_to_verify: "npx tsc --noEmit: no error for wardLanguage in setup-integration.ts"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-03
+    how_to_verify: "npx tsc --noEmit: no TS2322 errors in speeches.tsx"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-04
+    how_to_verify: "npx tsc --noEmit: no TS2304 error for 'Member' in AgendaForm.tsx"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-05
+    how_to_verify: "npx tsc --noEmit: no TS2769 overload error in DebouncedTextInput.tsx"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-06
+    how_to_verify: "npx tsc --noEmit: no TS2741 error about 'speeches' missing in SundayExceptionReason"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-07
+    how_to_verify: "npx tsc --noEmit exits with code 0"
+    covered_by_steps: ["STEP-01", "STEP-10"]
+  - ac_id: AC-130-08
+    how_to_verify: "npx vitest run shows all tests passing"
+    covered_by_steps: ["STEP-01", "STEP-10"]
+  - ac_id: AC-130-09
+    how_to_verify: "grep for can_conduct and can_conductor in database.ts and useActors.ts confirms both exist as separate fields"
+    covered_by_steps: ["STEP-01"]
+  - ac_id: AC-130-10
+    how_to_verify: "grep -r 'can_piano[^i]' docs/specs/SPEC_F083.yaml docs/arch/ARCH_M024.yaml docs/plans/PLAN_P024.yaml returns no results"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-130-11
+    how_to_verify: "grep 'can_music' docs/specs/SPEC_CONSOLIDATED.yaml key_columns section shows can_pianist, can_conductor instead"
+    covered_by_steps: ["STEP-02"]
+  - ac_id: AC-130-12
+    how_to_verify: "grep -rn 'can_music\\|can_piano[^i]' src/ returns no results in production code"
+    covered_by_steps: ["STEP-01", "STEP-02"]
+
+  # F131: Ward language switch
+  - ac_id: AC-131-01
+    how_to_verify: "AuthContext code review: setWardLanguage called in wardLanguageChangeMutation.onSuccess"
+    covered_by_steps: ["STEP-03"]
+  - ac_id: AC-131-02
+    how_to_verify: "Test: after mutation success, AuthContext.wardLanguage reflects new value"
+    covered_by_steps: ["STEP-03", "STEP-10"]
+  - ac_id: AC-131-03
+    how_to_verify: "Code review: queryClient.invalidateQueries still called in onSuccess (existing behavior)"
+    covered_by_steps: ["STEP-03"]
+  - ac_id: AC-131-04
+    how_to_verify: "Code review: mutationFn logic unchanged (deactivate/activate collections)"
+    covered_by_steps: ["STEP-03"]
+  - ac_id: AC-131-05
+    how_to_verify: "npx vitest run passes all tests"
+    covered_by_steps: ["STEP-03", "STEP-10"]
+
+  # F132: 2nd speech toggle bugs
+  - ac_id: AC-132-01
+    how_to_verify: "Test: toggle off position 2 results in null/empty for both speaker AND topic fields"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+  - ac_id: AC-132-02
+    how_to_verify: "Code review: separate supabase.update() for topic fields, useRemoveAssignment unchanged"
+    covered_by_steps: ["STEP-04"]
+  - ac_id: AC-132-03
+    how_to_verify: "Test: SpeechSlot position 2 renders 2 visible disabled fields with placeholder"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-132-04
+    how_to_verify: "Test: placeholder text matches i18n key in all 3 languages"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-132-05
+    how_to_verify: "Test: toggle switch re-enables fields when turned on"
+    covered_by_steps: ["STEP-05", "STEP-07"]
+  - ac_id: AC-132-06
+    how_to_verify: "Test: AgendaForm shows disabled ReadOnlySpeakerRow with placeholder when has_second_speech=false"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-132-07
+    how_to_verify: "Test: agenda collapsed card shows X/2 when has_second_speech=false"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-132-08
+    how_to_verify: "Test: Home collapsed card shows X/2 when has_second_speech=false"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-132-09
+    how_to_verify: "Test: collapsed card shows X/3 when has_second_speech=true or undefined"
+    covered_by_steps: ["STEP-06", "STEP-07"]
+  - ac_id: AC-132-10
+    how_to_verify: "Code review: SundayCard visiblePositions=[1,3] when hasSecondSpeech=false preserved"
+    covered_by_steps: ["STEP-06"]
+  - ac_id: AC-132-11
+    how_to_verify: "npx vitest run passes all tests"
+    covered_by_steps: ["STEP-07", "STEP-10"]
+
+  # F133: Password reset email language
+  - ac_id: AC-133-01
+    how_to_verify: "Code review: user.user_metadata?.language checked first"
+    covered_by_steps: ["STEP-08", "STEP-10"]
+  - ac_id: AC-133-02
+    how_to_verify: "Code review: priority chain user_metadata.language -> ward.language -> 'pt-BR'"
+    covered_by_steps: ["STEP-08"]
+  - ac_id: AC-133-03
+    how_to_verify: "Test: without user_metadata.language, ward.language used"
+    covered_by_steps: ["STEP-08", "STEP-10"]
+  - ac_id: AC-133-04
+    how_to_verify: "Test: without either, defaults to pt-BR"
+    covered_by_steps: ["STEP-08", "STEP-10"]
+  - ac_id: AC-133-05
+    how_to_verify: "Code review: getEmailTemplate(resolvedLanguage, deepLink)"
+    covered_by_steps: ["STEP-08"]
+
+  # F134: Password reset script blocked
+  - ac_id: AC-134-01
+    how_to_verify: "grep '<script' supabase/functions/reset-redirect/index.ts returns no results"
+    covered_by_steps: ["STEP-09", "STEP-10"]
+  - ac_id: AC-134-02
+    how_to_verify: "grep 'http-equiv' reset-redirect/index.ts confirms meta refresh present"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-134-03
+    how_to_verify: "grep '<a href' reset-redirect/index.ts confirms button link present"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-134-04
+    how_to_verify: "Code review: Content-Type and Cache-Control headers in Response constructor"
+    covered_by_steps: ["STEP-09"]
+  - ac_id: AC-134-05
+    how_to_verify: "No <script> tag means no script execution error possible"
+    covered_by_steps: ["STEP-09"]

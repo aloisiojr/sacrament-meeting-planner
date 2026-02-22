@@ -45,13 +45,12 @@ export interface AgendaFormProps {
   customReason?: string | null;
 }
 
-type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer' | 'speaker';
+type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer';
 
 interface SelectorState {
   type: FieldSelectorType;
   field: string;
   roleFilter?: string;
-  speechPosition?: number;
 }
 
 // --- Component ---
@@ -415,14 +414,18 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             speakerName={getSpeech(1)?.speaker_name ?? ''}
             onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}
+            disabled={isObserver}
           />
 
-          <ReadOnlySpeakerRow
-            label={`2\u00BA ${t('speeches.speaker')}`}
-            speakerName={getSpeech(2)?.speaker_name ?? ''}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
-            colors={colors}
-          />
+          {agenda.has_second_speech !== false && (
+            <ReadOnlySpeakerRow
+              label={`2\u00BA ${t('speeches.speaker')}`}
+              speakerName={getSpeech(2)?.speaker_name ?? ''}
+              onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+              colors={colors}
+              disabled={isObserver}
+            />
+          )}
 
           <ToggleField
             label={t('agenda.musicalNumber')}
@@ -477,6 +480,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             speakerName={getSpeech(3)?.speaker_name ?? ''}
             onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}
+            disabled={isObserver}
           />
         </>
       ) : (
@@ -688,11 +692,13 @@ function ReadOnlySpeakerRow({
   speakerName,
   onNavigate,
   colors,
+  disabled,
 }: {
   label: string;
   speakerName: string;
   onNavigate: () => void;
   colors: ThemeColors;
+  disabled?: boolean;
 }) {
   return (
     <FieldRow label={label} colors={colors}>
@@ -706,9 +712,11 @@ function ReadOnlySpeakerRow({
         >
           {speakerName || label}
         </Text>
-        <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
-          <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
-        </Pressable>
+        {!disabled && (
+          <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
+            <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
+          </Pressable>
+        )}
       </View>
     </FieldRow>
   );

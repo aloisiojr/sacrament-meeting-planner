@@ -322,8 +322,8 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
       expect(agendaFormSource).toContain("getSpeech(2)?.speaker_name ?? ''");
     });
 
-    it('has_second_speech toggle is NOT referenced in AgendaForm (handled by SpeechSlot)', () => {
-      expect(agendaFormSource).not.toContain('has_second_speech');
+    it('has_second_speech conditional hides position 2 ReadOnlySpeakerRow when false', () => {
+      expect(agendaFormSource).toContain('agenda.has_second_speech !== false');
     });
   });
 
@@ -363,22 +363,23 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
       expect(agendaFormSource).toContain('onNavigate');
     });
 
-    it('ReadOnlySpeakerRow has no isObserver or disabled prop for hiding pencil', () => {
-      // Implementation decision: pencil is always visible because it navigates,
-      // not edits. All roles can navigate to Speeches tab for viewing.
+    it('ReadOnlySpeakerRow has disabled prop that hides pencil for Observer', () => {
       const readOnlyProps = agendaFormSource.substring(
         agendaFormSource.indexOf('function ReadOnlySpeakerRow'),
-        agendaFormSource.indexOf('function ReadOnlySpeakerRow') + 300
+        agendaFormSource.indexOf('function ReadOnlySpeakerRow') + 400
       );
-      expect(readOnlyProps).not.toContain('disabled');
-      expect(readOnlyProps).not.toContain('isObserver');
+      expect(readOnlyProps).toContain('disabled');
+    });
+
+    it('Observer is passed as disabled to ReadOnlySpeakerRow', () => {
+      expect(agendaFormSource).toContain('disabled={isObserver}');
     });
   });
 
   // --- Speeches tab expandDate handling ---
   describe('Speeches tab: expandDate query param (ADR-082)', () => {
-    it('useLocalSearchParams imported from expo-router', () => {
-      expect(speechesTabSource).toContain("import { useLocalSearchParams } from 'expo-router'");
+    it('useLocalSearchParams and useRouter imported from expo-router', () => {
+      expect(speechesTabSource).toContain("import { useLocalSearchParams, useRouter } from 'expo-router'");
     });
 
     it('params reads expandDate from search params', () => {
@@ -393,6 +394,10 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
 
     it('expandDate triggers scroll to target card', () => {
       expect(speechesTabSource).toContain('scrollToIndex');
+    });
+
+    it('expandDate param is cleared after handling to prevent re-triggering', () => {
+      expect(speechesTabSource).toContain('router.setParams({ expandDate: undefined })');
     });
   });
 

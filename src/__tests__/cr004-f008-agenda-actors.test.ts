@@ -602,7 +602,7 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
 
     it('FieldSelectorType should include prayer type', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      expect(source).toContain("type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer' | 'speaker'");
+      expect(source).toContain("type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer'");
     });
 
     it('SelectorState should have optional roleFilter', () => {

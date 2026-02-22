@@ -41,6 +41,8 @@ export interface SundayCardProps {
   isPast?: boolean;
   /** Whether the card is expanded. */
   expanded?: boolean;
+  /** F118: Whether the 2nd speech is enabled for this sunday. */
+  hasSecondSpeech?: boolean;
   /** Called when the card header is pressed (expand/collapse). */
   onToggle?: () => void;
   /** Called when a speech LED is pressed. */
@@ -286,6 +288,7 @@ export const SundayCard = React.memo(function SundayCard({
   isNext = false,
   isPast = false,
   expanded = false,
+  hasSecondSpeech = true,
   onToggle,
   onStatusPress,
   onTypeChange,
@@ -303,8 +306,11 @@ export const SundayCard = React.memo(function SundayCard({
 
   const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES;
 
-  // Build speech statuses for the 3 LEDs
-  const speechStatuses: SpeechStatus[] = [1, 2, 3].map((pos) => {
+  // F118: Determine which positions to show based on has_second_speech
+  const visiblePositions = hasSecondSpeech ? [1, 2, 3] : [1, 3];
+
+  // Build speech statuses for the visible LEDs
+  const speechStatuses: SpeechStatus[] = visiblePositions.map((pos) => {
     const speech = speeches.find((s) => s.position === pos);
     return speech?.status ?? 'not_assigned';
   });
@@ -354,10 +360,10 @@ export const SundayCard = React.memo(function SundayCard({
           )}
           {isSpeechesType && !expanded && (
             <>
-              {[1, 2, 3].map((pos, idx) => {
+              {/* F118: Show only visible positions; no ordinal labels (AC-118-08) */}
+              {visiblePositions.map((pos, idx) => {
                 const speech = speeches.find((s) => s.position === pos);
                 const name = speech?.speaker_name ?? '';
-                const posLabel = t('speeches.slot', { number: `${pos}\u00BA` });
                 const status = speechStatuses[idx] ?? 'not_assigned';
                 return (
                   <View key={pos} style={styles.speechRow}>
@@ -377,7 +383,7 @@ export const SundayCard = React.memo(function SundayCard({
                         numberOfLines={1}
                         ellipsizeMode="tail"
                       >
-                        {`${posLabel}: ${name}`}
+                        {name}
                       </Text>
                     ) : (
                       <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>

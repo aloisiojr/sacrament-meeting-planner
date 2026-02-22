@@ -13,6 +13,7 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -25,6 +26,7 @@ import { SpeechSlot } from '../../components/SpeechSlot';
 import { MemberSelectorModal } from '../../components/MemberSelectorModal';
 import { TopicSelectorModal } from '../../components/TopicSelectorModal';
 import { useSundayList } from '../../hooks/useSundayList';
+import { useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
 import {
   useSpeeches,
   useLazyCreateSpeeches,
@@ -105,6 +107,19 @@ function SpeechesTabContent() {
   // Fetch speeches and exceptions for the visible range
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
+
+  // F118: Fetch agenda range for has_second_speech data
+  const { data: agendaRange } = useAgendaRange(startDate, endDate);
+  const updateAgenda = useUpdateAgendaByDate();
+
+  // F118: Build agenda map for quick lookup
+  const agendaMap = useMemo(() => {
+    const map = new Map<string, { has_second_speech: boolean }>();
+    for (const a of agendaRange ?? []) {
+      map.set(a.sunday_date, { has_second_speech: a.has_second_speech });
+    }
+    return map;
+  }, [agendaRange]);
 
   // Auto-assign sunday types on load
   const autoAssign = useAutoAssignSundayTypes();
@@ -264,6 +279,47 @@ function SpeechesTabContent() {
     [deleteSpeechesByDate]
   );
 
+  // F118: Handle toggle of 2nd speech for a specific date
+  const handleToggleSecondSpeech = useCallback(
+    (date: string, enabled: boolean) => {
+      if (!enabled) {
+        // Check if position 2 has existing assignments
+        const sundayData = speechMap.get(date);
+        const speech2 = sundayData?.speeches?.find((s) => s.position === 2);
+        const hasAssignments = !!(speech2?.speaker_name || speech2?.topic_title);
+
+        if (hasAssignments) {
+          // Show confirmation dialog
+          Alert.alert(
+            t('speeches.secondSpeechToggleConfirmTitle'),
+            t('speeches.secondSpeechToggleConfirmMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('common.confirm'),
+                style: 'destructive',
+                onPress: () => {
+                  // Clear speech position 2 data and disable
+                  if (speech2) {
+                    removeAssignment.mutate({ speechId: speech2.id });
+                  }
+                  updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
+                },
+              },
+            ]
+          );
+          return;
+        }
+        // No assignments: toggle immediately
+        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
+      } else {
+        // Enable: no confirmation needed
+        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: true } });
+      }
+    },
+    [speechMap, t, removeAssignment, updateAgenda]
+  );
+
   // Infinite scroll handlers
   const handleEndReached = useCallback(() => {
     if (hasMoreFuture) {
@@ -292,6 +348,10 @@ function SpeechesTabContent() {
       const isPast = item.date < today;
       const isExpanded = expandedDate === item.date;
 
+      // F118: Get has_second_speech from agenda data (default true)
+      const agendaData = agendaMap.get(item.date);
+      const hasSecondSpeech = agendaData?.has_second_speech ?? true;
+
       return (
         <SundayCard
           date={item.date}
@@ -300,6 +360,7 @@ function SpeechesTabContent() {
           isNext={isNext}
           isPast={isPast}
           expanded={isExpanded}
+          hasSecondSpeech={hasSecondSpeech}
           onToggle={() => handleToggle(item.date)}
           onStatusPress={(speech) => {
             // Status press handled within SpeechSlot
@@ -323,6 +384,8 @@ function SpeechesTabContent() {
                   onClearTopic={handleClearTopic}
                   onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
                   onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
+                  isSecondSpeechEnabled={pos === 2 ? hasSecondSpeech : undefined}
+                  onToggleSecondSpeech={pos === 2 ? (enabled) => handleToggleSecondSpeech(item.date, enabled) : undefined}
                 />
               );
             })}
@@ -334,10 +397,12 @@ function SpeechesTabContent() {
       nextSunday,
       today,
       expandedDate,
+      agendaMap,
       handleToggle,
       handleTypeChange,
       handleRemoveException,
       handleDeleteSpeeches,
+      handleToggleSecondSpeech,
       canWriteSundayType,
       handleChangeStatus,
       handleRemoveAssignment,

@@ -21,7 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SundayCard } from '../../components/SundayCard';
 import { SpeechSlot } from '../../components/SpeechSlot';
 import { MemberSelectorModal } from '../../components/MemberSelectorModal';
@@ -94,6 +94,7 @@ function SpeechesTabContent() {
   const { hasPermission, role } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{ expandDate?: string }>();
+  const router = useRouter();
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [speakerModalSpeechId, setSpeakerModalSpeechId] = useState<string | null>(null);
@@ -195,6 +196,9 @@ function SpeechesTabContent() {
         });
       }, 400);
     }
+
+    // Clear param to prevent re-triggering on tab re-focus
+    router.setParams({ expandDate: undefined });
   }, [params.expandDate, listItems.length]);
 
   // Toggle expand/collapse

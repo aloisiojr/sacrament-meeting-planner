@@ -456,8 +456,12 @@ function AgendaSundayCard({
             if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
             if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
 
+            // F132: Dynamic speaker count based on has_second_speech
+            const hasSecondSpeech = agenda?.has_second_speech ?? true;
+            const speakersTotal = hasSecondSpeech ? 3 : 2;
+            const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
             let speakersFilled = 0;
-            for (let pos = 1; pos <= 3; pos++) {
+            for (const pos of positionsToCheck) {
               const overrideField = `speaker_${pos}_override` as keyof SundayAgenda;
               const overrideVal = agenda?.[overrideField] as string | null;
               const speech = speeches.find((s) => s.position === pos);
@@ -488,10 +492,10 @@ function AgendaSundayCard({
                   </Text>
                 )}
                 <Text
-                  style={[styles.statusLine, { color: speakersFilled === 3 ? GREEN : colors.textSecondary }]}
+                  style={[styles.statusLine, { color: speakersFilled === speakersTotal ? GREEN : colors.textSecondary }]}
                   numberOfLines={1}
                 >
-                  {t('agenda.statusSpeakers', { filled: speakersFilled, total: 3 })}
+                  {t('agenda.statusSpeakers', { filled: speakersFilled, total: speakersTotal })}
                 </Text>
                 <Text
                   style={[styles.statusLine, { color: prayersFilled === 2 ? GREEN : colors.textSecondary }]}

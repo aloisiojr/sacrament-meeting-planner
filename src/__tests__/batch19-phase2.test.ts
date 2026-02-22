@@ -322,8 +322,8 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
       expect(agendaFormSource).toContain("getSpeech(2)?.speaker_name ?? ''");
     });
 
-    it('has_second_speech conditional hides position 2 ReadOnlySpeakerRow when false', () => {
-      expect(agendaFormSource).toContain('agenda.has_second_speech !== false');
+    it('has_second_speech conditional disables position 2 ReadOnlySpeakerRow when false', () => {
+      expect(agendaFormSource).toContain('agenda.has_second_speech === false');
     });
   });
 

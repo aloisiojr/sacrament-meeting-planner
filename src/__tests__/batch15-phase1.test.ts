@@ -682,12 +682,11 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
 
   // --- AC-100-04: Speaker field uses full width ---
   describe('AC-100-04: Speaker field full width', () => {
-    it('no StatusLED in speaker row (row style)', () => {
-      // The row View should not contain StatusLED - LED is now in labelRow
-      const rowSection = speechSlotSource.match(/<View style={styles\.row}>[\s\S]*?<\/View>/);
-      expect(rowSection).not.toBeNull();
-      // StatusLED should NOT be inside styles.row
-      const rowContent = rowSection![0];
+    it('no StatusLED in speaker row (F124/ADR-081 row-per-element layout)', () => {
+      // F124 replaced two-column layout with row-per-element; speakerRow only has field + actionArea
+      const speakerRowSection = speechSlotSource.match(/<View style={styles\.speakerRow}>[\s\S]*?<\/View>/);
+      expect(speakerRowSection).not.toBeNull();
+      const rowContent = speakerRowSection![0];
       expect(rowContent).not.toContain('StatusLED');
     });
 
@@ -763,14 +762,14 @@ describe('F100 (CR-162): Expanded speech card status on label row', () => {
     });
   });
 
-  // --- statusSection restored by F115 (LED moved back to labelRow) ---
-  describe('statusSection restored by F115 (replaces F112 rightColumn LED)', () => {
-    it('rightColumn has alignItems center (X buttons centered)', () => {
-      expect(speechSlotSource).toMatch(/rightColumn:\s*\{[^}]*alignItems:\s*'center'/s);
+  // --- F124/ADR-081: row-per-element layout replaces two-column layout ---
+  describe('F124/ADR-081: row-per-element layout (replaces F112/F115 rightColumn)', () => {
+    it('actionArea has alignItems center (X buttons centered)', () => {
+      expect(speechSlotSource).toMatch(/actionArea:\s*\{[^}]*alignItems:\s*'center'/s);
     });
 
-    it('statusLedPlaceholder has justifyContent center (empty spacer in rightColumn)', () => {
-      expect(speechSlotSource).toMatch(/statusLedPlaceholder:\s*\{[^}]*justifyContent:\s*'center'/s);
+    it('speakerRow has flexDirection row for inline X alignment', () => {
+      expect(speechSlotSource).toMatch(/speakerRow:\s*\{[^}]*flexDirection:\s*'row'/s);
     });
   });
 

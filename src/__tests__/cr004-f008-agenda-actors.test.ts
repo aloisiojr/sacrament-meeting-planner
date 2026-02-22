@@ -338,14 +338,14 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
       expect(source).toContain("type: 'prayer', field: 'closing_prayer'");
     });
 
-    it('speaker fields should use inline SpeakerField with override support', () => {
+    it('speaker fields should use ReadOnlySpeakerRow with pencil navigation (F121)', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      // SpeakerField now uses read-only display with inline override editing
-      expect(source).toContain('overrideName');
-      expect(source).toContain('onEditOverride');
-      expect(source).toContain('speaker_1_override');
-      expect(source).toContain('speaker_2_override');
-      expect(source).toContain('speaker_3_override');
+      // F121 replaced SpeakerField with ReadOnlySpeakerRow
+      expect(source).toContain('ReadOnlySpeakerRow');
+      expect(source).toContain('onNavigate');
+      expect(source).toContain("getSpeech(1)?.speaker_name");
+      expect(source).toContain("getSpeech(2)?.speaker_name");
+      expect(source).toContain("getSpeech(3)?.speaker_name");
     });
   });
 

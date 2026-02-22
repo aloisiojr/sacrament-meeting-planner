@@ -432,10 +432,10 @@ describe('F095 (CR-152): Intermediate Hymn toggle', () => {
 
   // --- EC-095-01: Toggle off but hymn previously selected ---
   describe('EC-095-01: Hymn preserved when toggle off', () => {
-    it('intermediate_hymn_id NOT cleared in toggle handler (only has_intermediate_hymn updated)', () => {
+    it('intermediate_hymn_id NOT cleared in toggle handler (only has_intermediate_hymn updated; F120 adds separate X clear)', () => {
       expect(agendaFormSource).toContain("updateField('has_intermediate_hymn', val)");
-      // No code clearing intermediate_hymn_id when toggle changes
-      expect(agendaFormSource).not.toContain("updateField('intermediate_hymn_id', null)");
+      // The toggle handler itself only changes has_intermediate_hymn.
+      // F120 (CR-179) adds a separate X clear button that CAN set intermediate_hymn_id to null.
     });
   });
 
@@ -960,11 +960,12 @@ describe('F095 Additional Tests: toggle behavior and special meeting types', () 
     });
   });
 
-  // --- EC-095-01 strengthening: intermediate_hymn_id preserved ---
+  // --- EC-095-01 strengthening: intermediate_hymn_id preserved by toggle ---
   describe('EC-095-01 (additional): hymn ID preserved when toggle turned off', () => {
-    it('no code clears intermediate_hymn_id anywhere in AgendaForm', () => {
-      // Ensure we never set intermediate_hymn_id to null when toggling
-      expect(agendaFormSource).not.toMatch(/updateField\('intermediate_hymn_id',\s*null\)/);
+    it('toggle handler only sets has_intermediate_hymn (F120 X clear is a separate onClear handler)', () => {
+      // The toggle handler should only set has_intermediate_hymn
+      // F120 (CR-179) adds a separate X clear button (onClear) for intermediate_hymn_id
+      expect(agendaFormSource).toContain("updateField('has_intermediate_hymn', val)");
     });
   });
 

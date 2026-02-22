@@ -58,6 +58,14 @@ describe('F120 (CR-179): X clear buttons in AgendaForm', () => {
       expect(agendaFormSource).toContain('hasValue');
     });
 
+    it('SelectorField sub-component defines onClear as optional prop', () => {
+      expect(agendaFormSource).toContain('onClear?: () => void');
+    });
+
+    it('SelectorField sub-component defines hasValue as optional prop', () => {
+      expect(agendaFormSource).toContain('hasValue?: boolean');
+    });
+
     it('presiding field passes onClear handler', () => {
       expect(agendaFormSource).toContain('presiding_name: null, presiding_actor_id: null');
     });
@@ -208,6 +216,14 @@ describe('F120 (CR-179): X clear buttons in AgendaForm', () => {
       expect(agendaFormSource).toContain("fontSize: 20");
       expect(agendaFormSource).toContain("fontWeight: '300'");
     });
+
+    it('X button uses hitSlop=8 for comfortable touch target', () => {
+      expect(agendaFormSource).toContain('hitSlop={8}');
+    });
+
+    it('X button uses colors.error for visual consistency', () => {
+      expect(agendaFormSource).toContain('color: colors.error');
+    });
   });
 });
 
@@ -291,13 +307,23 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
   });
 
   // --- AC-121-05: Position 2 hidden when has_second_speech is false ---
-  // Note: This is handled by SpeechSlot in the Speeches tab, not AgendaForm directly
-  // AgendaForm shows read-only speaker name regardless
+  // Note: Position 2 toggle (has_second_speech) is handled by SpeechSlot in the
+  // Speeches tab, not in AgendaForm. AgendaForm renders all 3 positions as
+  // read-only display. When has_second_speech=false, position 2 speech may
+  // not exist (getSpeech(2) returns undefined), showing the placeholder label.
   describe('AC-121-05: Position 2 handling in AgendaForm', () => {
     it('all 3 positions rendered with ReadOnlySpeakerRow', () => {
       const matches = agendaFormSource.match(/ReadOnlySpeakerRow/g);
       expect(matches).not.toBeNull();
       expect(matches!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('position 2 uses getSpeech(2) which returns undefined when speech not created', () => {
+      expect(agendaFormSource).toContain("getSpeech(2)?.speaker_name ?? ''");
+    });
+
+    it('has_second_speech toggle is NOT referenced in AgendaForm (handled by SpeechSlot)', () => {
+      expect(agendaFormSource).not.toContain('has_second_speech');
     });
   });
 
@@ -309,14 +335,43 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
     });
   });
 
-  // --- AC-121-07: Presentation Mode unchanged ---
-  // Not directly testable in source code test; presentation mode reads from DB
+  // --- AC-121-07: Presentation Mode still uses overrides ---
+  describe('AC-121-07: Presentation Mode unchanged', () => {
+    const presentationSource = readSourceFile('hooks/usePresentationMode.ts');
+
+    it('usePresentationMode.ts still reads speaker_1_override', () => {
+      expect(presentationSource).toContain('speaker_1_override');
+    });
+
+    it('usePresentationMode.ts still reads speaker_2_override', () => {
+      expect(presentationSource).toContain('speaker_2_override');
+    });
+
+    it('usePresentationMode.ts still reads speaker_3_override', () => {
+      expect(presentationSource).toContain('speaker_3_override');
+    });
+
+    it('overrides fall back to speech speaker_name via nullish coalescing', () => {
+      expect(presentationSource).toMatch(/speaker_1_override.*\?\?.*speaker_name/);
+    });
+  });
 
   // --- AC-121-08: Observer sees no pencil button ---
   describe('AC-121-08: Observer and pencil button', () => {
     it('ReadOnlySpeakerRow always shows pencil (navigation is not editing)', () => {
       // pencil navigates, not edits - all roles can navigate to Speeches tab
       expect(agendaFormSource).toContain('onNavigate');
+    });
+
+    it('ReadOnlySpeakerRow has no isObserver or disabled prop for hiding pencil', () => {
+      // Implementation decision: pencil is always visible because it navigates,
+      // not edits. All roles can navigate to Speeches tab for viewing.
+      const readOnlyProps = agendaFormSource.substring(
+        agendaFormSource.indexOf('function ReadOnlySpeakerRow'),
+        agendaFormSource.indexOf('function ReadOnlySpeakerRow') + 300
+      );
+      expect(readOnlyProps).not.toContain('disabled');
+      expect(readOnlyProps).not.toContain('isObserver');
     });
   });
 
@@ -460,8 +515,9 @@ describe('F124 (CR-189): SpeechSlot X alignment fix', () => {
       expect(speechSlotSource).not.toContain('rightColumn');
     });
 
-    it('speakerRow uses flexDirection row', () => {
+    it('speakerRow uses flexDirection row and alignItems center', () => {
       expect(speechSlotSource).toMatch(/speakerRow.*?flexDirection:.*?'row'/s);
+      expect(speechSlotSource).toMatch(/speakerRow.*?alignItems:.*?'center'/s);
     });
 
     it('actionArea is sibling of field in speakerRow', () => {
@@ -600,7 +656,15 @@ describe('F125 (CR-192): Fix push notifications projectId', () => {
   });
 
   // --- AC-125-07: Server-side Edge Function not modified ---
-  // Not applicable in source tests; this is a deployment concern
+  describe('AC-125-07: Server-side process-notifications unchanged', () => {
+    it('process-notifications Edge Function does not reference Constants or expoConfig', () => {
+      const edgeFnPath = path.resolve(__dirname, '..', '..', 'supabase', 'functions', 'process-notifications', 'index.ts');
+      const edgeFnSource = fs.readFileSync(edgeFnPath, 'utf-8');
+      // Server-side should not have client-side Constants import
+      expect(edgeFnSource).not.toContain('expo-constants');
+      expect(edgeFnSource).not.toContain('expoConfig');
+    });
+  });
 
   // --- EC-125-01: Permission denied ---
   describe('EC-125-01: Permission denied handling', () => {

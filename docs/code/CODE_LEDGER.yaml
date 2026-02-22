@@ -3733,3 +3733,131 @@ batch15_phase2_test_results:
         description: "Updated cr001-qa-extended CR-07 tests (SpeechSlot replaced by pencil navigation per F129)"
     acs_covered: [AC-126-01, AC-126-02, AC-126-03, AC-126-04, AC-126-05, AC-126-06, AC-126-07, AC-127-01, AC-127-02, AC-127-03, AC-127-04, AC-127-05, AC-127-06, AC-127-07, AC-128-01, AC-128-02, AC-128-03, AC-128-04, AC-128-05, AC-128-06, AC-128-07, AC-128-08, AC-128-09, AC-128-10, AC-129-01, AC-129-02, AC-129-03, AC-129-04, AC-129-05, AC-129-06, AC-129-07, AC-129-08, AC-129-09, AC-129-10, AC-129-11]
     ecs_covered: [EC-126-01, EC-126-02, EC-126-03, EC-127-01, EC-127-02, EC-127-03, EC-128-01, EC-128-02, EC-128-03, EC-129-01, EC-129-02, EC-129-03]
+
+  # ===========================================================================
+  # Batch 21 Phase 1: Bug Fixes (CR-194, CR-195, CR-196, CR-197, CR-198)
+  # Features: F130, F131, F132, F133, F134
+  # ===========================================================================
+
+  - batch: 21
+    phase: 1
+    plan: PLAN_P035
+    features: [F130, F131, F132, F133, F134]
+    change_requests: [CR-194, CR-195, CR-196, CR-197, CR-198]
+    commits:
+      - hash: fa31e0d
+        step: STEP-01
+        message: "fix(types): resolve 15 TypeScript compilation errors in test mocks and production code (F130)"
+        files:
+          - src/__tests__/cr001-qa-extended.test.ts
+          - src/__tests__/cr001-qa.test.ts
+          - src/__tests__/database-types.test.ts
+          - src/__tests__/integration/setup-integration.ts
+          - src/__tests__/phase02-database-types.test.ts
+          - src/__tests__/phase04-agenda-presentation.test.ts
+          - src/__tests__/usePresentationMode-utils.test.ts
+          - src/app/(tabs)/speeches.tsx
+          - src/components/AgendaForm.tsx
+          - src/components/DebouncedTextInput.tsx
+          - src/__tests__/batch9-phase2.test.ts
+      - hash: e1df02e
+        step: STEP-02
+        message: "docs(naming): fix can_piano -> can_pianist and can_music -> can_pianist/can_conductor (F130)"
+        files:
+          - docs/specs/SPEC_F083.yaml
+          - docs/arch/ARCH_M024.yaml
+          - docs/plans/PLAN_P024.yaml
+      - hash: 6f6a4fb
+        step: STEP-03
+        message: "fix(auth): expose setWardLanguage in AuthContext and call it on ward language switch (F131)"
+        files:
+          - src/contexts/AuthContext.tsx
+          - src/app/(tabs)/settings/index.tsx
+          - src/__tests__/integration/setup-integration.ts
+      - hash: 62c0c29
+        step: STEP-04
+        message: "fix(speeches): clear topic fields when toggling off 2nd speech (F132)"
+        files:
+          - src/app/(tabs)/speeches.tsx
+          - src/__tests__/batch19-phase1.test.ts
+      - hash: e39e2e7
+        step: STEP-05
+        message: "fix(speech-slot): show 2 visible disabled fields when 2nd speech is off (F132)"
+        files:
+          - src/components/SpeechSlot.tsx
+      - hash: 38c7d2e
+        step: STEP-06
+        message: "fix(agenda): dynamic speaker counts and always-visible 2nd speaker row (F132)"
+        files:
+          - src/components/AgendaForm.tsx
+          - src/app/(tabs)/agenda.tsx
+          - src/app/(tabs)/index.tsx
+          - src/__tests__/batch14-phase2.test.ts
+          - src/__tests__/batch19-phase2.test.ts
+      - hash: 8771dfa
+        step: STEP-07
+        message: "test(f132): add comprehensive tests for 2nd speech toggle bug fixes (F132)"
+        files:
+          - src/__tests__/batch21-f130-f134.test.ts
+      - hash: 74cf461
+        step: STEP-08
+        message: "fix(reset-email): use user metadata language for password reset emails (F133)"
+        files:
+          - supabase/functions/send-reset-email/index.ts
+      - hash: 490f50a
+        step: STEP-09
+        message: "fix(reset-redirect): remove script tag blocked in sandboxed iframes (F134)"
+        files:
+          - supabase/functions/reset-redirect/index.ts
+      - hash: c9aa69c
+        step: STEP-10
+        message: "test(batch21): add comprehensive tests for F130, F131, F133, F134 and update superseded tests"
+        files:
+          - src/__tests__/batch21-f130-f134.test.ts
+          - src/__tests__/batch18.test.ts
+          - src/__tests__/batch19-phase1.test.ts
+    tests_added: 43
+    tests_fixed: 8
+    changes:
+      - id: CHG-548
+        description: "Added missing SundayAgenda fields (has_intermediate_hymn, speaker_*_override) to 6 test mock factories"
+      - id: CHG-549
+        description: "Fixed wardLanguage/updateAppLanguage/setWardLanguage defaults in setup-integration.ts mock"
+      - id: CHG-550
+        description: "Added 'speeches' to SundayExceptionReason records in phase04 tests"
+      - id: CHG-551
+        description: "Replaced null with '' for string-typed topic fields in speeches.tsx handleClearTopic"
+      - id: CHG-552
+        description: "Imported Member type in AgendaForm.tsx to fix TS2304"
+      - id: CHG-553
+        description: "Fixed handleBlur parameter type in DebouncedTextInput.tsx to use TextInputProps onBlur type"
+      - id: CHG-554
+        description: "Fixed can_piano -> can_pianist and can_music -> can_pianist/can_conductor in SPEC_F083, ARCH_M024, PLAN_P024"
+      - id: CHG-555
+        description: "Exposed setWardLanguage in AuthContextValue interface and context value object"
+      - id: CHG-556
+        description: "Added setWardLanguage(newLanguage) call in settings wardLanguageChangeMutation onSuccess"
+      - id: CHG-557
+        description: "Added separate direct Supabase update for topic fields in handleToggleSecondSpeech"
+      - id: CHG-558
+        description: "Replaced single disabled warning with 2 visible disabled fields (speaker+topic) in SpeechSlot"
+      - id: CHG-559
+        description: "AgendaForm always renders 2nd speaker ReadOnlySpeakerRow (disabled with placeholder when off)"
+      - id: CHG-560
+        description: "Dynamic speaker counts (X/2 or X/3) in agenda.tsx and index.tsx collapsed cards"
+      - id: CHG-561
+        description: "Changed send-reset-email language priority: user_metadata.language > ward.language > pt-BR"
+      - id: CHG-562
+        description: "Removed <script> tag from reset-redirect HTML (meta refresh + button fallback remain)"
+      - id: CHG-563
+        description: "Created batch21-f130-f134.test.ts with 43 tests covering F130-F134"
+      - id: CHG-564
+        description: "Updated batch18 tests for F134 script removal (EC-114-03, EC-114-04)"
+      - id: CHG-565
+        description: "Updated batch19 tests for F134 script removal and F132 comment changes"
+      - id: CHG-566
+        description: "Updated batch9-phase2 test for topicTitle: null -> '' change"
+      - id: CHG-567
+        description: "Updated batch14-phase2 tests for dynamic speakersTotal instead of hardcoded 3"
+    acs_covered: [AC-130-01, AC-130-02, AC-130-03, AC-130-04, AC-130-05, AC-130-06, AC-130-07, AC-130-08, AC-130-09, AC-130-10, AC-130-11, AC-130-12, AC-131-01, AC-131-02, AC-131-03, AC-131-04, AC-131-05, AC-132-01, AC-132-02, AC-132-03, AC-132-04, AC-132-05, AC-132-06, AC-132-07, AC-132-08, AC-132-09, AC-132-10, AC-132-11, AC-133-01, AC-133-02, AC-133-03, AC-133-04, AC-133-05, AC-134-01, AC-134-02, AC-134-03, AC-134-04, AC-134-05]
+    ecs_covered: [EC-130-01, EC-130-02, EC-130-03, EC-130-04, EC-131-01, EC-131-02, EC-131-03, EC-132-01, EC-132-02, EC-132-03, EC-132-04, EC-133-01, EC-133-02, EC-133-03, EC-134-01, EC-134-02, EC-134-03]

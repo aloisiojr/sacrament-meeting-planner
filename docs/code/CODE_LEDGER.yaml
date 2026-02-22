@@ -17,13 +17,14 @@
 # CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163,
 # CR-155, CR-164,
 # CR-172, CR-173, CR-174,
-# CR-175, CR-176, CR-177
+# CR-175, CR-176, CR-177,
+# CR-178, CR-180, CR-181, CR-191
 # Generated: 2026-02-21
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -3156,3 +3157,206 @@ batch15_phase2_test_results:
         description: "Updated batch15-phase1 F103 tests for F115 layout change: StatusLED now in statusSection (leftColumn), statusLedWrapper renamed to statusLedPlaceholder"
     acs_covered: [AC-115-01]
     ecs_covered: []
+
+  # =============================================================================
+  # Batch 19 - Phase 1 (CR-178, CR-180, CR-181, CR-191 / F116-F119)
+  # =============================================================================
+
+  - step: S01
+    cr: CR-180
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S01
+    hash: 59023f2
+    message: "feat(db): migration 017 to split can_music into can_pianist and can_conductor with CHECK constraint (F117, CR-180)"
+    files_changed:
+      - supabase/migrations/017_split_music_actor.sql
+    changes:
+      - id: CHG-443
+        description: "Added can_pianist and can_conductor boolean columns to meeting_actors"
+      - id: CHG-444
+        description: "Migrated existing can_music=true data to can_pianist=true"
+      - id: CHG-445
+        description: "Dropped old can_music column"
+      - id: CHG-446
+        description: "Added chk_pianist_conductor_exclusive CHECK constraint for mutual exclusivity"
+    acs_covered: [AC-117-01, AC-117-02]
+    ecs_covered: []
+
+  - step: S02
+    cr: CR-181
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S02
+    hash: 07e499f
+    message: "feat(db): migration 018 to add has_second_speech column to sunday_agendas (F118, CR-181)"
+    files_changed:
+      - supabase/migrations/018_add_has_second_speech.sql
+    changes:
+      - id: CHG-447
+        description: "Added has_second_speech boolean column to sunday_agendas with DEFAULT true"
+    acs_covered: [AC-118-01]
+    ecs_covered: []
+
+  - step: S03
+    cr: [CR-180, CR-181]
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S03
+    hash: 1ee6c93
+    message: "feat(types): update MeetingActor, CreateActorInput, UpdateActorInput for pianist/conductor split and SundayAgenda for has_second_speech (F117+F118, CR-180+CR-181)"
+    files_changed:
+      - src/types/database.ts
+    changes:
+      - id: CHG-448
+        description: "Replaced can_music with can_pianist and can_conductor in MeetingActor"
+      - id: CHG-449
+        description: "Replaced can_music with can_pianist and can_conductor in CreateActorInput and UpdateActorInput"
+      - id: CHG-450
+        description: "Added has_second_speech: boolean to SundayAgenda"
+    acs_covered: [AC-117-03, AC-117-04, AC-118-01]
+    ecs_covered: []
+
+  - step: S04
+    cr: CR-178
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S04
+    hash: b3602d9
+    message: "feat(auth): separate app/ward language control, Observer limited Settings, fix collection reactivation (F116, CR-178)"
+    files_changed:
+      - src/contexts/AuthContext.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/_layout.tsx
+    changes:
+      - id: CHG-451
+        description: "AuthContext: added wardLanguage state, updateAppLanguage function, language priority user_metadata > device locale > ward language"
+      - id: CHG-452
+        description: "Settings: split language picker into App Language (all roles) and Ward Language (Bispado/Secretario only)"
+      - id: CHG-453
+        description: "Settings: Observer role sees limited Settings (Language, Theme, About, Sign Out)"
+      - id: CHG-454
+        description: "Settings: Ward language change deactivates old language collections and activates new language collections"
+      - id: CHG-455
+        description: "_layout.tsx: Removed href=null for Observer on Settings tab"
+    acs_covered: [AC-116-01, AC-116-02, AC-116-03, AC-116-04, AC-116-05, AC-116-06, AC-116-07, AC-116-08]
+    ecs_covered: [EC-116-01, EC-116-02, EC-116-03]
+
+  - step: S05
+    cr: CR-180
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S05
+    hash: ae974a5
+    message: "feat(actors): update useActors, ActorSelector, AgendaForm for can_pianist/can_conductor split (F117, CR-180)"
+    files_changed:
+      - src/hooks/useActors.ts
+      - src/components/ActorSelector.tsx
+      - src/components/AgendaForm.tsx
+      - src/lib/activityLog.ts
+    changes:
+      - id: CHG-456
+        description: "useActors: ActorRoleFilter type now includes can_pianist and can_conductor instead of can_music"
+      - id: CHG-457
+        description: "useActors: getPrimaryRole updated for pianist/conductor priority"
+      - id: CHG-458
+        description: "ActorSelector: CreateActorInput uses can_pianist/can_conductor based on roleFilter"
+      - id: CHG-459
+        description: "AgendaForm: pianist field uses can_pianist filter, conductor field uses can_conductor filter"
+      - id: CHG-460
+        description: "activityLog: ACTOR_ROLE_I18N_KEYS updated with pianist and conductor keys"
+    acs_covered: [AC-117-05, AC-117-06, AC-117-07, AC-117-08, AC-117-09]
+    ecs_covered: []
+
+  - step: S06
+    cr: CR-178
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S06
+    hash: edee1fc
+    message: "feat(i18n): translate WhatsApp placeholders per app language, use ward language for topics/collections (F116, CR-178)"
+    files_changed:
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - src/app/(tabs)/settings/topics.tsx
+      - src/hooks/useTopics.ts
+    changes:
+      - id: CHG-461
+        description: "WhatsApp: placeholder labels displayed via i18n keys (app language), template default from ward language"
+      - id: CHG-462
+        description: "Topics: collections filtered by wardLanguage from AuthContext instead of getCurrentLanguage()"
+      - id: CHG-463
+        description: "useTopics: wardTopics label uses t('topics.wardTopics') instead of hardcoded 'Temas da Ala'"
+    acs_covered: [AC-116-08, AC-116-09, AC-116-10]
+    ecs_covered: []
+
+  - step: S07
+    cr: CR-181
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S07
+    hash: 02f6dcc
+    message: "feat(speeches): add 2nd speech toggle (position 2), update collapsed card, filter invite items, presentation mode (F118, CR-181)"
+    files_changed:
+      - src/components/SpeechSlot.tsx
+      - src/components/SundayCard.tsx
+      - src/hooks/usePresentationMode.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/components/NextSundaysSection.tsx
+      - src/hooks/useAgenda.ts
+    changes:
+      - id: CHG-464
+        description: "SpeechSlot: added Switch toggle for position 2 with isSecondSpeechEnabled/onToggleSecondSpeech props"
+      - id: CHG-465
+        description: "SpeechSlot: position 3 uses t('speeches.lastSpeech') label"
+      - id: CHG-466
+        description: "SpeechSlot: disabled state for position 2 when has_second_speech=false"
+      - id: CHG-467
+        description: "SundayCard: collapsed view filters positions based on hasSecondSpeech, removed ordinal labels"
+      - id: CHG-468
+        description: "usePresentationMode: filters speech 2 from 'Primeiros Discursos' card when has_second_speech=false"
+      - id: CHG-469
+        description: "speeches.tsx: passes hasSecondSpeech to SundayCard, handles toggle with confirmation dialog"
+      - id: CHG-470
+        description: "InviteManagementSection: filters position 2 invite items when has_second_speech=false"
+      - id: CHG-471
+        description: "NextSundaysSection: passes hasSecondSpeech and toggle handler to SundayCard/SpeechSlot"
+      - id: CHG-472
+        description: "useAgenda: added useUpdateAgendaByDate hook for upserting agenda by date"
+    acs_covered: [AC-118-02, AC-118-03, AC-118-04, AC-118-05, AC-118-06, AC-118-07, AC-118-08, AC-118-09, AC-118-10, AC-118-11, AC-118-12, AC-118-13, AC-118-14]
+    ecs_covered: [EC-118-01, EC-118-02, EC-118-03, EC-118-04]
+
+  - step: S08
+    cr: [CR-178, CR-180, CR-181]
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S08
+    hash: 1c05840
+    message: "feat(i18n): add keys for app/ward language, WhatsApp placeholders, speech toggle, pianist/conductor roles (F116+F117+F118, CR-178+CR-180+CR-181)"
+    files_changed:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    changes:
+      - id: CHG-473
+        description: "Added settings.appLanguage, settings.wardLanguage, settings.whatsapp.* keys to all 3 locales"
+      - id: CHG-474
+        description: "Added whatsapp.placeholder* keys to all 3 locales"
+      - id: CHG-475
+        description: "Added speeches.secondSpeechToggleConfirm*, speeches.secondSpeechDisabledPlaceholder to all 3 locales"
+      - id: CHG-476
+        description: "Updated actorRoles: replaced music with pianist and conductor in all 3 locales"
+    acs_covered: [AC-116-02, AC-116-03, AC-116-05, AC-116-08, AC-116-09, AC-118-03, AC-118-08, AC-118-09, AC-118-12]
+    ecs_covered: []
+
+  - step: S09
+    cr: CR-191
+    plan_ref: plans/PLAN_P032.yaml
+    plan_step: S09
+    hash: b7329ca
+    message: "fix(edge): add charset=utf-8 and Cache-Control to reset-redirect response headers (F119, CR-191)"
+    files_changed:
+      - supabase/functions/reset-redirect/index.ts
+    changes:
+      - id: CHG-477
+        description: "Added charset=utf-8 to Content-Type header to fix plain-text HTML rendering"
+      - id: CHG-478
+        description: "Added Cache-Control: no-cache, no-store, must-revalidate header"
+      - id: CHG-479
+        description: "Added console.log for successful redirect debugging"
+      - id: CHG-480
+        description: "Documented root cause investigation in code comments"
+    acs_covered: [AC-119-01, AC-119-02, AC-119-03, AC-119-04, AC-119-05]
+    ecs_covered: [EC-119-01, EC-119-02]

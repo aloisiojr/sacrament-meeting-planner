@@ -311,8 +311,11 @@ describe('F132 (CR-196): 2nd speech toggle bugs', () => {
       expect(agendaFormSource).toContain('agenda.has_second_speech === false');
     });
 
-    it('AC-132-06: shows empty string for disabled speaker (updated by F150/CR-214)', () => {
-      expect(agendaFormSource).toContain("agenda.has_second_speech === false\n              ? ''");
+    it('[SUPERSEDED by F156] AC-132-06: disabled speaker now shows i18n placeholder instead of empty string', () => {
+      // F156 (CR-220) changed the disabled 2nd speaker from '' to
+      // t('speeches.secondSpeechDisabledPlaceholder'). The old pattern ? '' is gone.
+      expect(agendaFormSource).toContain("agenda.has_second_speech === false");
+      expect(agendaFormSource).toContain("t('speeches.secondSpeechDisabledPlaceholder')");
     });
   });
 

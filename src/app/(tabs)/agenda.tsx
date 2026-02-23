@@ -29,6 +29,7 @@ import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../..
 import { AgendaForm } from '../../components/AgendaForm';
 import { formatDate, toISODateString, zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
+import { PlayIcon, ChevronUpIcon, ChevronDownIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
 
 // --- Types ---
@@ -520,16 +521,18 @@ function AgendaSundayCard({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Open presentation"
+            style={styles.playButton}
           >
-            <Text style={[styles.playButton, { color: colors.textSecondary }]}>
-              {'\u25B6'}
-            </Text>
+            <PlayIcon size={18} color={colors.textSecondary} />
           </Pressable>
         )}
         {expandable && (
-          <Text style={[styles.chevron, { color: colors.textSecondary }]}>
-            {isExpanded ? '\u25B2' : '\u25BC'}
-          </Text>
+          <View style={styles.chevron}>
+            {isExpanded
+              ? <ChevronUpIcon size={12} color={colors.textSecondary} />
+              : <ChevronDownIcon size={12} color={colors.textSecondary} />
+            }
+          </View>
         )}
       </Pressable>
 

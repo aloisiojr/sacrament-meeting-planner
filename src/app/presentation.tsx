@@ -25,6 +25,7 @@ import {
 import { AccordionCard } from '../components/AccordionCard';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
+import { PencilIcon, XIcon } from '../components/icons';
 import type { PresentationField } from '../hooks/usePresentationMode';
 
 const FONT_SIZES = {
@@ -102,9 +103,7 @@ export default function PresentationScreen() {
           accessibilityRole="button"
           accessibilityLabel="Edit agenda"
         >
-          <Text style={[styles.pencilText, { color: colors.text }]}>
-            {'\u270F'}
-          </Text>
+          <PencilIcon size={16} color={colors.text} />
         </Pressable>
         <Pressable
           style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
@@ -122,9 +121,7 @@ export default function PresentationScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('common.close')}
         >
-          <Text style={[styles.closeText, { color: colors.text }]}>
-            {'\u2715'}
-          </Text>
+          <XIcon size={18} color={colors.text} />
         </Pressable>
       </View>
 

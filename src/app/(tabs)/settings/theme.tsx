@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, type ThemeMode } from '../../../contexts/ThemeContext';
+import { CheckIcon } from '../../../components/icons';
 
 const THEME_OPTIONS: ThemeMode[] = ['automatic', 'light', 'dark'];
 
@@ -58,9 +59,7 @@ export default function ThemeScreen() {
                 {t(`theme.${mode}`)}
               </Text>
               {isSelected && (
-                <Text style={[styles.checkmark, { color: colors.primary }]}>
-                  {'\u2713'}
-                </Text>
+                <CheckIcon size={18} color={colors.primary} />
               )}
             </Pressable>
           );

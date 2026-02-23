@@ -31,8 +31,8 @@ describe('F126 (CR-184): Pencil icon in Presentation screen to Agenda tab', () =
 
   // --- AC-126-01: Pencil button visible in Presentation header ---
   describe('AC-126-01: Pencil button in Presentation header', () => {
-    it('renders pencil icon U+270F in Presentation header', () => {
-      expect(presentationSource).toContain("{'\\u270F'}");
+    it('renders PencilIcon SVG component in Presentation header', () => {
+      expect(presentationSource).toContain('PencilIcon');
     });
 
     it('pencil button uses pencilButton style', () => {
@@ -154,8 +154,8 @@ describe('F127 (CR-185): Play button in Agenda card to Presentation', () => {
 
   // --- AC-127-01: Play button visible when expanded ---
   describe('AC-127-01: Play button visible when expanded', () => {
-    it('play button U+25B6 rendered in AgendaSundayCard header', () => {
-      expect(agendaSource).toContain("{'\\u25B6'}");
+    it('PlayIcon SVG component rendered in AgendaSundayCard header', () => {
+      expect(agendaSource).toContain('PlayIcon');
     });
 
     it('play button only visible when expandable && isExpanded', () => {
@@ -167,7 +167,7 @@ describe('F127 (CR-185): Play button in Agenda card to Presentation', () => {
   describe('AC-127-02: Play button hidden when collapsed', () => {
     it('play button is gated by isExpanded condition', () => {
       // The play button is inside {expandable && isExpanded && (...)} block
-      const playIndex = agendaSource.indexOf("'\\u25B6'");
+      const playIndex = agendaSource.indexOf('<PlayIcon');
       const nearbyCode = agendaSource.substring(Math.max(0, playIndex - 500), playIndex);
       expect(nearbyCode).toContain('isExpanded');
     });
@@ -250,20 +250,17 @@ describe('F128 (CR-186): Home preview card and play icon', () => {
 
   // --- AC-128-01: Play icon before Iniciar text ---
   describe('AC-128-01: Play icon in Iniciar button', () => {
-    it('play icon U+25B6 rendered before button text', () => {
-      expect(homeSource).toContain("{'\\u25B6'}");
+    it('PlayIcon SVG component rendered before button text', () => {
+      expect(homeSource).toContain('PlayIcon');
     });
 
     it('play icon uses onPrimary color', () => {
-      expect(homeSource).toContain('styles.playIcon, { color: colors.onPrimary }');
+      expect(homeSource).toContain('color={colors.onPrimary}');
     });
 
-    it('play icon uses fontSize >= 17 (F137 increased to 20)', () => {
-      const playStyle = homeSource.match(/playIcon:\s*\{[^}]+\}/s);
-      expect(playStyle).not.toBeNull();
-      const fontSizeMatch = playStyle![0].match(/fontSize:\s*(\d+)/);
-      expect(fontSizeMatch).not.toBeNull();
-      expect(parseInt(fontSizeMatch![1], 10)).toBeGreaterThanOrEqual(17);
+    it('play icon uses size >= 17 (F137 increased to 20)', () => {
+      // PlayIcon now uses size prop directly
+      expect(homeSource).toContain('<PlayIcon size={20}');
     });
   });
 
@@ -378,8 +375,8 @@ describe('F128 (CR-186): Home preview card and play icon', () => {
       expect(pencilStyle![0]).toContain('borderRadius: 8');
     });
 
-    it('pencil icon is U+270F', () => {
-      expect(homeSource).toContain("{'\\u270F'}");
+    it('pencil icon uses PencilIcon SVG component', () => {
+      expect(homeSource).toContain('PencilIcon');
     });
   });
 
@@ -446,8 +443,8 @@ describe('F129 (CR-188): NextSundaysSection non-expandable cards with pencil', (
 
   // --- AC-129-03: Pencil button on each card ---
   describe('AC-129-03: Pencil button on each card', () => {
-    it('pencil icon U+270F rendered in NextSundaysSection', () => {
-      expect(nextSundaysSource).toContain("{'\\u270F'}");
+    it('PencilIcon SVG component rendered in NextSundaysSection', () => {
+      expect(nextSundaysSource).toContain('PencilIcon');
     });
 
     it('pencil uses renderHeaderRight prop', () => {

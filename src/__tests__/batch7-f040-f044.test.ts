@@ -640,9 +640,9 @@ describe('F044 (CR-100): Read-only speaker field (superseded by F121/CR-182: inl
   });
 
   describe('AC-F044-02: Pencil icon navigates to Speeches tab (F121)', () => {
-    it('should render pencil icon (U+270F)', () => {
+    it('should render PencilIcon SVG component', () => {
       const content = getAgendaForm();
-      expect(content).toContain('\\u270F');
+      expect(content).toContain('PencilIcon');
     });
 
     it('should always show pencil (navigation, not editing)', () => {

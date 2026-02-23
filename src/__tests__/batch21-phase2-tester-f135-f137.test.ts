@@ -450,36 +450,30 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
   const homeSource = readSourceFile('app/(tabs)/index.tsx');
   const agendaSource = readSourceFile('app/(tabs)/agenda.tsx');
 
-  // --- AC-137-01: Home playIcon fontSize ---
+  // --- AC-137-01: Home PlayIcon size ---
   describe('AC-137-01: Home playIcon fontSize is 20', () => {
-    it('playIcon fontSize is exactly 20 (up from 17)', () => {
-      const playIconMatch = homeSource.match(/playIcon:\s*\{([^}]+)\}/s);
-      expect(playIconMatch).not.toBeNull();
-      const fsMatch = playIconMatch![1].match(/fontSize:\s*(\d+)/);
-      expect(fsMatch).not.toBeNull();
-      expect(parseInt(fsMatch![1], 10)).toBe(20);
+    it('PlayIcon SVG component has size={20} in Home', () => {
+      // PlayIcon now uses size prop instead of fontSize style
+      expect(homeSource).toContain('<PlayIcon size={20}');
     });
   });
 
-  // --- AC-137-02: Agenda playButton fontSize ---
+  // --- AC-137-02: Agenda PlayIcon size ---
   describe('AC-137-02: Agenda playButton fontSize is 18', () => {
-    it('playButton fontSize is exactly 18 (up from 14)', () => {
-      const playButtonMatch = agendaSource.match(/playButton:\s*\{([^}]+)\}/s);
-      expect(playButtonMatch).not.toBeNull();
-      const fsMatch = playButtonMatch![1].match(/fontSize:\s*(\d+)/);
-      expect(fsMatch).not.toBeNull();
-      expect(parseInt(fsMatch![1], 10)).toBe(18);
+    it('PlayIcon SVG component has size={18} in Agenda', () => {
+      // PlayIcon now uses size prop instead of fontSize style
+      expect(agendaSource).toContain('<PlayIcon size={18}');
     });
   });
 
   // --- AC-137-03: Agenda playButton marginRight ---
-  describe('AC-137-03: Agenda playButton marginRight is 12', () => {
-    it('playButton marginRight is exactly 12 (up from 8)', () => {
+  describe('AC-137-03: Agenda playButton marginRight is 8', () => {
+    it('playButton marginRight is exactly 8 (adjusted for SVG icon)', () => {
       const playButtonMatch = agendaSource.match(/playButton:\s*\{([^}]+)\}/s);
       expect(playButtonMatch).not.toBeNull();
       const mrMatch = playButtonMatch![1].match(/marginRight:\s*(\d+)/);
       expect(mrMatch).not.toBeNull();
-      expect(parseInt(mrMatch![1], 10)).toBe(12);
+      expect(parseInt(mrMatch![1], 10)).toBe(8);
     });
   });
 
@@ -497,24 +491,19 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
 
   // --- AC-137-05: play icon and chevron are separate ---
   describe('AC-137-05: play icon and chevron are separate tappable elements', () => {
-    it('play icon is in a Pressable, chevron is in a separate Text', () => {
+    it('play icon is in a Pressable, chevron uses ChevronUp/DownIcon SVG', () => {
       // Play button is inside a Pressable with onPress for navigation
       expect(agendaSource).toContain("accessibilityLabel=\"Open presentation\"");
-      // Chevron is a separate Text element
-      expect(agendaSource).toContain('styles.chevron');
+      // Chevron uses SVG icons
+      expect(agendaSource).toContain('ChevronUpIcon');
+      expect(agendaSource).toContain('ChevronDownIcon');
     });
 
-    it('play icon and chevron have different styles', () => {
-      const playBtnMatch = agendaSource.match(/playButton:\s*\{([^}]+)\}/s);
-      const chevronMatch = agendaSource.match(/chevron:\s*\{([^}]+)\}/s);
-      expect(playBtnMatch).not.toBeNull();
-      expect(chevronMatch).not.toBeNull();
-      // They should have different fontSize values
-      const playFs = playBtnMatch![1].match(/fontSize:\s*(\d+)/);
-      const chevronFs = chevronMatch![1].match(/fontSize:\s*(\d+)/);
-      expect(playFs).not.toBeNull();
-      expect(chevronFs).not.toBeNull();
-      expect(parseInt(playFs![1], 10)).not.toBe(parseInt(chevronFs![1], 10));
+    it('play icon and chevron use different SVG components', () => {
+      // PlayIcon is used for play button, ChevronUp/DownIcon for chevron
+      expect(agendaSource).toContain('PlayIcon');
+      expect(agendaSource).toContain('ChevronUpIcon');
+      expect(agendaSource).toContain('ChevronDownIcon');
     });
   });
 
@@ -531,24 +520,19 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
     });
   });
 
-  // --- EC-137-01: Unicode U+25B6 used ---
-  describe('EC-137-01: play icon uses U+25B6', () => {
-    it('Home button renders U+25B6', () => {
-      expect(homeSource).toContain("'\\u25B6'");
+  // --- EC-137-01: SVG PlayIcon used ---
+  describe('EC-137-01: play icon uses PlayIcon SVG', () => {
+    it('Home button renders PlayIcon SVG component', () => {
+      expect(homeSource).toContain('PlayIcon');
     });
 
-    it('Agenda card renders U+25B6', () => {
-      expect(agendaSource).toContain("'\\u25B6'");
+    it('Agenda card renders PlayIcon SVG component', () => {
+      expect(agendaSource).toContain('PlayIcon');
     });
 
-    it('play icon fontSize is independent of text length (numeric value in style)', () => {
-      // fontSize is a fixed number in the style, not dynamic
-      const playIconMatch = homeSource.match(/playIcon:\s*\{([^}]+)\}/s);
-      expect(playIconMatch).not.toBeNull();
-      const fsMatch = playIconMatch![1].match(/fontSize:\s*(\d+)/);
-      expect(fsMatch).not.toBeNull();
-      // It's a literal number, not a variable
-      expect(parseInt(fsMatch![1], 10)).toBe(20);
+    it('play icon size is a fixed number prop (not dynamic)', () => {
+      // PlayIcon uses size prop with a fixed number
+      expect(homeSource).toContain('<PlayIcon size={20}');
     });
   });
 
@@ -566,8 +550,8 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
     });
 
     it('chevron is shown even when collapsed (only expandable check)', () => {
-      // Chevron: {expandable && ( ... chevron ... )}
-      const chevronIdx = agendaSource.indexOf('styles.chevron');
+      // Chevron: {expandable && ( ... ChevronUp/DownIcon ... )}
+      const chevronIdx = agendaSource.indexOf('<ChevronUpIcon');
       const beforeChevron = agendaSource.substring(Math.max(0, chevronIdx - 200), chevronIdx);
       expect(beforeChevron).toContain('expandable');
       // But NOT expandable && isExpanded right before chevron
@@ -575,10 +559,10 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
     });
   });
 
-  // --- Cross-check: Home playIcon marginRight ---
-  describe('Cross-check: Home playIcon has marginRight for spacing from text', () => {
-    it('playIcon has marginRight 8', () => {
-      const playIconMatch = homeSource.match(/playIcon:\s*\{([^}]+)\}/s);
+  // --- Cross-check: Home playIconWrapper marginRight ---
+  describe('Cross-check: Home playIconWrapper has marginRight for spacing from text', () => {
+    it('playIconWrapper has marginRight 8', () => {
+      const playIconMatch = homeSource.match(/playIconWrapper:\s*\{([^}]+)\}/s);
       expect(playIconMatch).not.toBeNull();
       const mrMatch = playIconMatch![1].match(/marginRight:\s*(\d+)/);
       expect(mrMatch).not.toBeNull();

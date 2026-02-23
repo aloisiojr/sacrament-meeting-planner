@@ -471,7 +471,7 @@ describe('CR-10: Theme screen (extended)', () => {
   });
 
   it('has checkmark for selected option', () => {
-    expect(themeContent).toContain('\\u2713'); // Unicode checkmark
+    expect(themeContent).toContain('CheckIcon'); // SVG CheckIcon component
   });
 
   it('uses translated labels via t()', () => {

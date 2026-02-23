@@ -40,15 +40,17 @@ describe('F097 (CR-156): AccordionCard directional arrows', () => {
 
   // --- AC-097-01: Cards above expanded show down-arrow ---
   describe('AC-097-01: Cards above expanded show down-arrow', () => {
-    it('uses index < expandedIndex for down-arrow U+25BC', () => {
-      expect(accordionSource).toContain("index < expandedIndex ? '\\u25BC' : '\\u25B2'");
+    it('uses index < expandedIndex for ChevronDownIcon (down-arrow)', () => {
+      expect(accordionSource).toContain('index < expandedIndex');
+      expect(accordionSource).toContain('ChevronDownIcon');
     });
   });
 
   // --- AC-097-02: Cards below expanded show up-arrow ---
   describe('AC-097-02: Cards below expanded show up-arrow', () => {
-    it('uses else branch for up-arrow U+25B2', () => {
-      expect(accordionSource).toContain("index < expandedIndex ? '\\u25BC' : '\\u25B2'");
+    it('uses else branch for ChevronUpIcon (up-arrow)', () => {
+      expect(accordionSource).toContain('ChevronUpIcon');
+      expect(accordionSource).toContain('index < expandedIndex');
     });
   });
 
@@ -59,25 +61,25 @@ describe('F097 (CR-156): AccordionCard directional arrows', () => {
     });
 
     it('no chevron rendered for expanded card', () => {
-      // The whole chevron Text is inside {!isExpanded && (...)}
-      const chevronBlock = accordionSource.match(/\{!isExpanded && \(\s*<Text[\s\S]*?chevron/);
+      // The whole chevron icon is inside {!isExpanded && (...)}
+      const chevronBlock = accordionSource.match(/\{!isExpanded && \(\s*[\s\S]*?ChevronDownIcon/);
       expect(chevronBlock).not.toBeNull();
     });
   });
 
   // --- AC-097-04: First card expanded - no arrow on card 1, up-arrows on rest ---
   describe('AC-097-04: First card expanded', () => {
-    it('when expandedIndex=0, all other cards have index > expandedIndex so show up-arrow', () => {
-      // This is a logic consequence of index < expandedIndex ? down : up
-      // When expandedIndex=0, no card has index < 0, so all collapsed cards show up-arrow
-      expect(accordionSource).toContain("index < expandedIndex ? '\\u25BC' : '\\u25B2'");
+    it('when expandedIndex=0, all other cards have index > expandedIndex so show ChevronUpIcon', () => {
+      // This is a logic consequence of index < expandedIndex ? ChevronDown : ChevronUp
+      // When expandedIndex=0, no card has index < 0, so all collapsed cards show ChevronUpIcon
+      expect(accordionSource).toContain('index < expandedIndex');
     });
   });
 
   // --- AC-097-05: Last card expanded - down-arrows on all preceding ---
   describe('AC-097-05: Last card expanded', () => {
-    it('when expandedIndex=last, all other cards have index < expandedIndex so show down-arrow', () => {
-      expect(accordionSource).toContain("index < expandedIndex ? '\\u25BC' : '\\u25B2'");
+    it('when expandedIndex=last, all other cards have index < expandedIndex so show ChevronDownIcon', () => {
+      expect(accordionSource).toContain('index < expandedIndex');
     });
   });
 

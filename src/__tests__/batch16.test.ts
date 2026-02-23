@@ -101,8 +101,9 @@ describe('F103 (CR-165): StatusLED/X button vertical alignment in SpeechSlot (su
       expect(topicRowMatch![0]).not.toContain('marginLeft');
     });
 
-    it('remove button uses same style for both speaker and topic rows', () => {
-      expect(speechSlotSource).toContain('styles.removeButton');
+    it('remove button uses XIcon SVG component for both speaker and topic rows', () => {
+      // XIcon is used as the clear button in both speaker and topic action areas
+      expect(speechSlotSource).toContain('XIcon');
     });
   });
 

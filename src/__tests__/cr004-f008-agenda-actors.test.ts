@@ -432,12 +432,12 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
     it('chevron should only render when expandable', () => {
       const source = readSourceFile('app/(tabs)/agenda.tsx');
       expect(source).toContain('{expandable && (');
-      // Should have chevron inside the expandable check
+      // Should have ChevronUp/DownIcon inside the expandable check
       const chevronSection = source.slice(
         source.indexOf('{expandable && ('),
         source.indexOf('{expandable && (') + 200
       );
-      expect(chevronSection).toContain('chevron');
+      expect(chevronSection).toContain('Chevron');
     });
 
     it('onPress should be undefined when not expandable', () => {

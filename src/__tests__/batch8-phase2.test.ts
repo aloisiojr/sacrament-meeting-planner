@@ -36,18 +36,16 @@ describe('F050 (CR-105): Replace text buttons with icons', () => {
   const getInviteManagement = () => readSourceFile('components/InviteManagementSection.tsx');
 
   describe('AC-F050-01: WhatsApp icon button for assigned_not_invited', () => {
-    it('should import Svg and Path from react-native-svg', () => {
+    it('should import WhatsAppIcon from centralized icons module', () => {
       const content = getInviteManagement();
-      expect(content).toContain("from 'react-native-svg'");
-      expect(content).toContain('Svg');
-      expect(content).toContain('Path');
+      expect(content).toContain("from './icons'");
+      expect(content).toContain('WhatsAppIcon');
     });
 
-    it('should define WhatsAppIcon component', () => {
+    it('should import WhatsAppIcon (not define locally)', () => {
       const content = getInviteManagement();
-      expect(content).toContain('function WhatsAppIcon');
-      expect(content).toContain('size');
-      expect(content).toContain('color');
+      expect(content).not.toContain('function WhatsAppIcon');
+      expect(content).toContain('WhatsAppIcon');
     });
 
     it('should render WhatsAppIcon for isNotInvited button', () => {
@@ -67,15 +65,15 @@ describe('F050 (CR-105): Replace text buttons with icons', () => {
   });
 
   describe('AC-F050-02: Three dots button for assigned_invited', () => {
-    it('should render Unicode U+22EE (vertical ellipsis) for non-isNotInvited button', () => {
+    it('should render MoreVerticalIcon SVG component for non-isNotInvited button', () => {
       const content = getInviteManagement();
-      expect(content).toContain("'\\u22EE'");
+      expect(content).toContain('MoreVerticalIcon');
     });
 
-    it('should use actionIcon style instead of text content', () => {
+    it('should import MoreVerticalIcon from centralized icons module', () => {
       const content = getInviteManagement();
-      // The actionIcon style is used for three dots, not actionText
-      expect(content).toContain('styles.actionIcon');
+      expect(content).toContain('MoreVerticalIcon');
+      expect(content).toContain("from './icons'");
     });
   });
 

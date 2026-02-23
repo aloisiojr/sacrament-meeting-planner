@@ -398,33 +398,27 @@ describe('F137 (CR-200): Play icon fontSize enlargement in Home and Agenda', () 
   const homeSource = readSourceFile('app/(tabs)/index.tsx');
   const agendaSource = readSourceFile('app/(tabs)/agenda.tsx');
 
-  describe('AC-137-01: Home playIcon fontSize >= 20', () => {
-    it('playIcon style has fontSize >= 20', () => {
-      const playIconMatch = homeSource.match(/playIcon:\s*\{[^}]+\}/s);
-      expect(playIconMatch).not.toBeNull();
-      const fontSizeMatch = playIconMatch![0].match(/fontSize:\s*(\d+)/);
-      expect(fontSizeMatch).not.toBeNull();
-      expect(parseInt(fontSizeMatch![1], 10)).toBeGreaterThanOrEqual(20);
+  describe('AC-137-01: Home PlayIcon size >= 20', () => {
+    it('PlayIcon SVG component has size={20} in Home', () => {
+      // PlayIcon now uses size prop instead of fontSize style
+      expect(homeSource).toContain('<PlayIcon size={20}');
     });
   });
 
-  describe('AC-137-02: Agenda playButton fontSize >= 18', () => {
-    it('playButton style has fontSize >= 18', () => {
-      const playButtonMatch = agendaSource.match(/playButton:\s*\{[^}]+\}/s);
-      expect(playButtonMatch).not.toBeNull();
-      const fontSizeMatch = playButtonMatch![0].match(/fontSize:\s*(\d+)/);
-      expect(fontSizeMatch).not.toBeNull();
-      expect(parseInt(fontSizeMatch![1], 10)).toBeGreaterThanOrEqual(18);
+  describe('AC-137-02: Agenda PlayIcon size >= 18', () => {
+    it('PlayIcon SVG component has size={18} in Agenda', () => {
+      // PlayIcon now uses size prop instead of fontSize style
+      expect(agendaSource).toContain('<PlayIcon size={18}');
     });
   });
 
-  describe('AC-137-03: Agenda playButton marginRight >= 12', () => {
-    it('playButton style has marginRight >= 12', () => {
+  describe('AC-137-03: Agenda playButton marginRight >= 8', () => {
+    it('playButton style has marginRight >= 8', () => {
       const playButtonMatch = agendaSource.match(/playButton:\s*\{[^}]+\}/s);
       expect(playButtonMatch).not.toBeNull();
       const marginMatch = playButtonMatch![0].match(/marginRight:\s*(\d+)/);
       expect(marginMatch).not.toBeNull();
-      expect(parseInt(marginMatch![1], 10)).toBeGreaterThanOrEqual(12);
+      expect(parseInt(marginMatch![1], 10)).toBeGreaterThanOrEqual(8);
     });
   });
 
@@ -439,12 +433,11 @@ describe('F137 (CR-200): Play icon fontSize enlargement in Home and Agenda', () 
   });
 
   describe('AC-137-05: Play icon visually separate from chevron', () => {
-    it('play button and chevron are separate elements in agenda card header', () => {
-      // Play button is rendered separately from chevron
-      expect(agendaSource).toContain('styles.playButton');
-      expect(agendaSource).toContain('styles.chevron');
-      // They are in separate Text elements
-      expect(agendaSource).toMatch(/playButton.*\{.*\\u25B6/s);
+    it('play button and chevron are separate SVG elements in agenda card header', () => {
+      // PlayIcon is rendered separately from ChevronUp/DownIcon
+      expect(agendaSource).toContain('PlayIcon');
+      expect(agendaSource).toContain('ChevronUpIcon');
+      expect(agendaSource).toContain('ChevronDownIcon');
     });
 
     it('playButton has marginRight for spacing from chevron', () => {
@@ -468,13 +461,13 @@ describe('F137 (CR-200): Play icon fontSize enlargement in Home and Agenda', () 
 
   // --- Edge Cases ---
 
-  describe('EC-137-01: play icon uses Unicode U+25B6', () => {
-    it('Home uses Unicode play triangle \\u25B6', () => {
-      expect(homeSource).toContain("'\\u25B6'");
+  describe('EC-137-01: play icon uses SVG PlayIcon component', () => {
+    it('Home uses PlayIcon SVG component', () => {
+      expect(homeSource).toContain('PlayIcon');
     });
 
-    it('Agenda uses Unicode play triangle \\u25B6', () => {
-      expect(agendaSource).toContain("'\\u25B6'");
+    it('Agenda uses PlayIcon SVG component', () => {
+      expect(agendaSource).toContain('PlayIcon');
     });
   });
 

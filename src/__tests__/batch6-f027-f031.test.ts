@@ -647,9 +647,9 @@ describe('F028 (CR-84): Search Clear Button (X) for All Search Fields', () => {
       expect(source).toContain("accessibilityLabel=\"Clear search\"");
     });
 
-    it('X button should display unicode multiplication sign', () => {
+    it('X button should display SVG XIcon component', () => {
       const source = readSourceFile('components/SearchInput.tsx');
-      expect(source).toContain("'\\u00D7'");
+      expect(source).toContain('XIcon');
     });
   });
 
@@ -669,9 +669,9 @@ describe('F028 (CR-84): Search Clear Button (X) for All Search Fields', () => {
       expect(inputStyle).toContain('paddingRight: 36');
     });
 
-    it('X button text should use textSecondary color', () => {
+    it('X button icon should use textSecondary color', () => {
       const source = readSourceFile('components/SearchInput.tsx');
-      expect(source).toContain('color: colors.textSecondary');
+      expect(source).toContain('colors.textSecondary');
     });
 
     it('X button should have hitSlop for easier touch', () => {

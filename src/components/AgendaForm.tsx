@@ -708,7 +708,8 @@ function ReadOnlySpeakerRow({
         <Text
           style={[
             styles.speakerReadText,
-            { color: speakerName ? colors.text : colors.textTertiary },
+            { color: speakerName ? colors.textSecondary : colors.textTertiary },
+            speakerName ? { fontStyle: 'italic' } : undefined,
           ]}
           numberOfLines={1}
         >

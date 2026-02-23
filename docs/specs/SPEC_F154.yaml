@@ -1,0 +1,199 @@
+# =============================================================================
+# SPEC_F154.yaml
+# Batch 24 Phase 1: Uniform collapsed card height for all types (CR-219)
+# Created: 2026-02-23
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 24
+phase: 1
+created: "2026-02-23"
+last_updated: "2026-02-23"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on F152 or F153"
+execution_rationale: >
+  F154 modifies the collapsed card height in SundayCard.tsx. This supersedes
+  the approach from F151 (CR-215) which only applied minHeight to speech-type
+  cards. F154 applies uniform height to ALL collapsed card types.
+
+# =============================================================================
+# F154: Uniform collapsed card height for all types (CR-219)
+# =============================================================================
+
+features:
+
+  - id: F154
+    name: "Make all collapsed SundayCard cards the same height regardless of type"
+    cr_id: 219
+    type: ui_improvement
+    supersedes: [F151]
+    related_crs: [215]
+    related_features: [F151, F093, F118, F132]
+    description: >
+      CR-219 reports that the F151 change (CR-215, minHeight: 62 on speech-type
+      collapsed cards only) made the problem WORSE: speech-type cards are now
+      MUCH thicker than exception-type cards. The user wants ALL collapsed
+      cards to have the same height, and says there is no need for cards to
+      be thicker than exception cards.
+
+      CURRENT STATE (after F151):
+      - SundayCard.tsx:350: headerCenter View has conditional
+        style: [styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]
+      - This means speech-type collapsed cards have minHeight: 62 on headerCenter.
+      - Exception-type collapsed cards have NO minHeight, so they are their
+        natural height (~18px for 1 line of exceptionText).
+      - The height difference is: speech cards ~82px total (62 + padding) vs
+        exception cards ~38px total (18 + padding). This is a drastic difference.
+
+      DESIRED STATE (user decision): Fixed equal height for ALL collapsed cards
+      (both speech and exception types).
+
+      APPROACH: Remove the conditional `!expanded && isSpeechesType` from the
+      minHeight application, and apply the same minHeight to ALL collapsed cards
+      regardless of type. Change the condition from
+      `!expanded && isSpeechesType && { minHeight: 62 }` to
+      `!expanded && { minHeight: 62 }`.
+
+      This means:
+      - Speech-type collapsed cards: minHeight: 62 on headerCenter (unchanged)
+      - Exception-type collapsed cards: minHeight: 62 on headerCenter (NEW)
+      - Expanded cards (any type): no minHeight (unchanged)
+
+      Exception cards will have extra vertical space in the headerCenter area
+      since their content (single line of exception text) is shorter than 62px.
+      This is acceptable because the user explicitly wants uniform height.
+
+    acceptance_criteria:
+      - id: AC-154-01
+        description: "Collapsed speech card (3 positions) height unchanged from F151"
+        given: "A speech-type sunday with has_second_speech=true (3 positions)"
+        when: "The SundayCard is collapsed in the Speeches tab"
+        then: "The headerCenter has minHeight: 62. The natural content height of 3 speechRows (~62px) matches the minHeight, so the card height is unchanged from F151."
+        status: pending
+
+      - id: AC-154-02
+        description: "Collapsed speech card (2 positions) has same height as 3-position card"
+        given: "A speech-type sunday with has_second_speech=false (2 positions)"
+        when: "The SundayCard is collapsed in the Speeches tab"
+        then: "The headerCenter has minHeight: 62, making the 2-position card match the 3-position card height. Same as F151."
+        status: pending
+
+      - id: AC-154-03
+        description: "Collapsed exception card has same height as speech cards"
+        given: "A sunday with exception type (testimony meeting, conference, etc.)"
+        when: "The SundayCard is collapsed in the Speeches tab"
+        then: "The headerCenter has minHeight: 62. The exception text content is shorter than 62px, so the extra space creates vertical padding. The card height matches the collapsed speech cards."
+        status: pending
+
+      - id: AC-154-04
+        description: "All collapsed cards have visually identical height"
+        given: "Multiple sundays in the Speeches tab list with mixed types (speeches, testimony meeting, conference, etc.)"
+        when: "All cards are collapsed"
+        then: "All cards appear with the same height, creating a uniform, aligned list."
+        status: pending
+
+      - id: AC-154-05
+        description: "Expanded cards not affected by minHeight"
+        given: "Any SundayCard type"
+        when: "The card is expanded"
+        then: "The minHeight is not applied (condition !expanded). Expanded cards show their full content without height constraint."
+        status: pending
+
+      - id: AC-154-06
+        description: "Exception text vertically positioned correctly in taller card"
+        given: "A collapsed exception card with minHeight applied"
+        when: "The card is displayed"
+        then: "The exception text is positioned at the top of the headerCenter (default flex alignment). The extra space appears below the text. The header row uses alignItems: 'center' so the entire headerCenter is vertically centered relative to the dateBlock."
+        status: pending
+
+      - id: AC-154-07
+        description: "Uniform height works in both light and dark themes"
+        given: "App is in either light or dark theme"
+        when: "Collapsed cards of mixed types are visible"
+        then: "All cards have identical heights in both themes."
+        status: pending
+
+    edge_cases:
+      - id: EC-154-01
+        case: "Non-expandable cards (Gen Conf, Stake Conf)"
+        expected: "These cards are always 'collapsed' (never expandable). They show exception text and the minHeight: 62 applies, making them the same height as speech cards."
+        status: pending
+
+      - id: EC-154-02
+        case: "Card transitions from collapsed to expanded and back"
+        expected: "On expansion, the minHeight is removed. On collapse, the minHeight is re-applied. The card returns to the uniform height."
+        status: pending
+
+      - id: EC-154-03
+        case: "'Other' exception type with long custom reason text"
+        expected: "The exceptionText has numberOfLines={1} so long text is truncated. The minHeight: 62 still applies, creating the uniform height. The truncated text appears at the top of the headerCenter."
+        status: pending
+
+      - id: EC-154-04
+        case: "Font size accessibility scaling"
+        expected: "With larger fonts, the natural content height may exceed minHeight: 62. In that case, all card types grow proportionally with font scaling. The uniform effect is maintained because minHeight becomes a no-op when content is taller."
+        status: pending
+
+    files_impacted:
+      - src/components/SundayCard.tsx
+
+    files_not_modified:
+      - src/app/(tabs)/agenda.tsx (Agenda tab cards have their own height logic, not part of this CR)
+      - src/app/(tabs)/index.tsx (Home tab preview cards are different)
+
+    implementation_details:
+      - location: "src/components/SundayCard.tsx:350"
+        current_code: >
+          <View style={[styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]}>
+        new_code: >
+          <View style={[styles.headerCenter, !expanded && { minHeight: 62 }]}>
+        rationale: >
+          Remove the isSpeechesType condition so minHeight: 62 applies to ALL
+          collapsed cards, not just speech-type cards. This creates uniform
+          height across all card types. The change is a single condition removal.
+
+    supersedes_details:
+      feature: F151
+      cr: 215
+      reason: >
+        F151 applied minHeight: 62 only to speech-type collapsed cards. This
+        created a height mismatch where speech cards were much taller than
+        exception cards. F154 extends the minHeight to ALL collapsed card types,
+        achieving the original goal of uniform card heights but applying it
+        universally rather than only to one card type.
+      what_changes: >
+        The implementation from F151 (minHeight: 62 on headerCenter) is
+        preserved, but the condition is relaxed from
+        `!expanded && isSpeechesType` to just `!expanded`.
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The minHeight: 62 value is preserved from F151. It was calculated
+        to match the natural height of 3 speechRow items (3 x ~18px content
+        + 2 x 4px marginBottom = 62px). Exception cards with less content
+        will have extra vertical space but maintain the same overall card height.
+
+    - id: A-02
+      text: >
+        The header style has alignItems: 'center' (SundayCard.tsx:437), which
+        vertically centers all children including headerCenter. This means the
+        exception text will appear vertically centered within the taller
+        headerCenter area, not top-aligned. This is visually acceptable.
+
+    - id: A-03
+      text: >
+        This change only affects SundayCard.tsx used in the Speeches tab.
+        The AgendaSundayCard in agenda.tsx uses its own styles.cardCenter
+        and is NOT affected by this change.
+
+  inconsistencies: []

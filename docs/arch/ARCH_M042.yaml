@@ -1,0 +1,286 @@
+# =============================================================================
+# ARCH_M042.yaml
+# Architecture for Batch 24 Phase 1: F152, F153, F154
+# CR-216 (WhatsApp no-phone dialog with mark-as-invited option)
+# CR-217 (Play button circle outline and spacing in Agenda cards)
+# CR-219 (Uniform collapsed card height for all types)
+# Created: 2026-02-23
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Apply 3 independent UX/UI refinements: WhatsApp no-phone dialog, play button circle outline, and uniform collapsed card height for all types"
+  principles:
+    - "No new components: all changes modify existing components within existing modules"
+    - "No data model changes: purely behavioral (F152) and visual (F153, F154) updates"
+    - "No new dependencies: uses existing Alert.alert, i18n, theme colors, and style patterns"
+    - "Each feature is independent: no cross-feature dependencies within this batch"
+    - "Follow established patterns: Alert.alert confirmations (SundayCard, ActorSelector, SpeechSlot), borderRadius circles, minHeight for uniform cards"
+    - "F154 supersedes F151: extends minHeight from speech-type-only to ALL collapsed card types"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F152 (CR-216): WhatsApp no-phone dialog
+    InviteManagementSection.tsx: handleNotInvitedAction
+      if(speaker_phone) -> open WhatsApp + mutate status (existing)
+      else -> Alert.alert(title, message, [Cancel, Mark as invited])
+             Cancel -> no-op
+             Confirm -> changeStatus.mutate(assigned_invited)
+    i18n keys: invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited
+
+  F153 (CR-217): Play button circle outline + spacing
+    agenda.tsx: Pressable (playButton)
+      + width:30, height:30, borderRadius:15, borderWidth:1.5
+      + borderColor: colors.textSecondary, center alignment
+    agenda.tsx: styles.playButton
+      marginRight: 8 -> 16
+
+  F154 (CR-219): Uniform collapsed card height for ALL types
+    SundayCard.tsx: headerCenter inline style
+      !expanded && isSpeechesType && { minHeight: 62 }
+      ->  !expanded && { minHeight: 62 }
+    SUPERSEDES F151 (removes isSpeechesType condition)
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "WhatsAppNoPhoneDialog"
+    responsibility: "Show Alert.alert when WhatsApp button pressed and speaker has no phone number, offering mark-as-invited or cancel (F152)"
+    file: "src/components/InviteManagementSection.tsx"
+    changes:
+      - "Restructure handleNotInvitedAction: move changeStatus.mutate inside if(speaker_phone) block"
+      - "Add else block with Alert.alert showing no-phone dialog"
+      - "Dialog has Cancel button (style: 'cancel', no-op) and Mark as invited button (calls changeStatus.mutate)"
+      - "Add Alert to import from 'react-native'"
+      - "Add t to useCallback dependency array"
+    dependencies: []
+
+  - name: "WhatsAppNoPhoneI18n"
+    responsibility: "Add i18n keys for the no-phone dialog in all 3 locales (F152)"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    changes:
+      - "pt-BR.json: invite.noPhoneTitle='Sem numero cadastrado', invite.noPhoneMessage='Este discursante nao tem numero de telefone cadastrado. Deseja marcar como convidado ou cancelar?', invite.markAsInvited='Marcar como convidado'"
+      - "en.json: invite.noPhoneTitle='No phone number', invite.noPhoneMessage='This speaker has no registered phone number. Do you want to mark as invited or cancel?', invite.markAsInvited='Mark as invited'"
+      - "es.json: invite.noPhoneTitle='Sin numero registrado', invite.noPhoneMessage='Este orador no tiene numero de telefono registrado. Desea marcar como invitado o cancelar?', invite.markAsInvited='Marcar como invitado'"
+    dependencies: []
+
+  - name: "PlayButtonCircleOutline"
+    responsibility: "Add outlined circle around play icon and increase spacing from chevron in Agenda cards (F153)"
+    file: "src/app/(tabs)/agenda.tsx"
+    changes:
+      - "Add inline style to playButton Pressable: width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary, justifyContent:'center', alignItems:'center'"
+      - "Change styles.playButton marginRight from 8 to 16"
+    dependencies: []
+
+  - name: "UniformCollapsedCardHeightAllTypes"
+    responsibility: "Apply minHeight:62 to ALL collapsed card types, not just speech-type (F154, supersedes F151)"
+    file: "src/components/SundayCard.tsx"
+    changes:
+      - "Remove isSpeechesType from the minHeight condition on headerCenter View"
+      - "Change from: !expanded && isSpeechesType && { minHeight: 62 }"
+      - "Change to:   !expanded && { minHeight: 62 }"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "whatsapp_no_phone_dialog"
+    component: "WhatsAppNoPhoneDialog"
+    methods:
+      - name: "handleNotInvitedAction (with phone)"
+        input: "speech.speaker_phone is truthy"
+        output: "Opens WhatsApp with pre-filled message. Calls changeStatus.mutate({ speechId, status: 'assigned_invited' }). No dialog shown."
+        notes: "Existing behavior preserved, but mutate is now INSIDE the if block"
+      - name: "handleNotInvitedAction (without phone)"
+        input: "speech.speaker_phone is null or empty string"
+        output: "Shows Alert.alert with title t('invite.noPhoneTitle'), message t('invite.noPhoneMessage'), Cancel button (no-op), and Mark as invited button (calls changeStatus.mutate)."
+        notes: "Prevents silent status change. User must explicitly confirm to mark as invited."
+
+  - name: "play_button_circle_style"
+    component: "PlayButtonCircleOutline"
+    methods:
+      - name: "playButton Pressable inline style"
+        input: "colors.textSecondary from useTheme()"
+        output: "Pressable style: [styles.playButton, { width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary, justifyContent:'center', alignItems:'center' }]"
+        notes: "Circle contains 18px PlayIcon with ~6px visual padding. Pressable serves as both tap target and visual circle."
+      - name: "playButton stylesheet marginRight"
+        input: "none"
+        output: "marginRight: 16 (increased from 8)"
+        notes: "Creates more visual separation between play button circle and collapse chevron"
+
+  - name: "uniform_card_height_all_types"
+    component: "UniformCollapsedCardHeightAllTypes"
+    methods:
+      - name: "headerCenter conditional minHeight (all types)"
+        input: "expanded (boolean)"
+        output: "When !expanded: style includes { minHeight: 62 }. When expanded: no minHeight constraint."
+        notes: "Simplified condition: isSpeechesType removed. ALL collapsed cards (speech-type AND exception-type) now have same minHeight. Exception cards have extra vertical space since their content is shorter than 62px."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  changes: []
+  notes: "No data model changes. No new tables, columns, or schema changes. F152 is behavioral (Alert.alert + i18n). F153 and F154 are purely visual."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    - No security impact. F152 adds user confirmation before status change (improved UX safety).
+    - F152 prevents accidental silent status mutation when speaker has no phone.
+    - F153 and F154 are purely visual changes (border, spacing, minHeight).
+    - No new user input, no network calls, no data access changes.
+    - Existing permission checks (isObserver, canAssign) are unchanged.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - No observability changes needed.
+    - F152: test with speakers with and without phone numbers. Verify dialog appears/doesn't appear.
+    - F153: test in both light and dark themes. Verify circle color matches PlayIcon color.
+    - F154: test with mixed card types (speech, testimony_meeting, conference). Verify uniform height.
+    - i18n verification: test all 3 languages (pt-BR, en, es) for F152 dialog text.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-099
+    title: "Alert.alert for no-phone WhatsApp confirmation and pattern reuse for visual refinements (Batch 24 Phase 1)"
+    context: >
+      F152 needs a confirmation dialog when WhatsApp is pressed but speaker has no
+      phone number. The Alert.alert pattern is already used in SundayCard.tsx
+      (type change confirmation), ActorSelector.tsx (delete confirmation), and
+      SpeechSlot.tsx (removal confirmation). F153 adds a circular border to the
+      play button using standard React Native border styles. F154 extends the
+      F151 minHeight approach from speech-type-only to all collapsed card types.
+    decision: >
+      Use Alert.alert for F152 dialog (consistent with existing confirmation
+      patterns). Move changeStatus.mutate inside the if(phone) block to prevent
+      silent status changes. For F153, apply circle border directly on the
+      Pressable (no extra wrapper View). For F154, simplify the minHeight
+      condition by removing isSpeechesType (F154 supersedes F151).
+    decided_in: "CR-216/CR-217/CR-219"
+    consequences:
+      - "F152: No silent status change when speaker has no phone"
+      - "F152: User gets clear feedback and explicit choice"
+      - "F152: Follows existing Alert.alert pattern in the codebase"
+      - "F153: Circle border uses theme-aware color (colors.textSecondary)"
+      - "F153: No extra View wrapper; Pressable is both tap target and visual container"
+      - "F154: ALL collapsed cards now have identical height regardless of type"
+      - "F154: Exception cards have extra vertical space (acceptable per user decision)"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+  - features: [F154, F151]
+    interaction: >
+      F154 supersedes F151. F151 (CR-215) applied minHeight:62 only to
+      speech-type collapsed cards (condition: !expanded && isSpeechesType).
+      F154 (CR-219) removes the isSpeechesType condition, extending minHeight
+      to ALL collapsed card types. The F151 code change is preserved but the
+      condition is relaxed. The implementation is a single condition removal.
+
+  - features: [F152, F140]
+    interaction: >
+      F140 (CR-206) modified InviteManagementSection button layout. F152
+      modifies handleNotInvitedAction in the same file but in a different
+      code location (handler function, not button layout). No conflict.
+
+  - features: [F153, F146]
+    interaction: >
+      F146 (CR-210) adjusted play icon placement with marginRight:8 and
+      colors.textSecondary. F153 modifies the same playButton style but
+      adds circle border and changes marginRight from 8 to 16. F153 builds
+      on F146's color choice (reuses colors.textSecondary for the circle border).
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/components/InviteManagementSection.tsx
+    feature: F152
+    changes:
+      - "Add Alert to import from 'react-native'"
+      - "Restructure handleNotInvitedAction: move changeStatus.mutate inside if(speaker_phone)"
+      - "Add else block with Alert.alert (no-phone dialog with Cancel and Mark as invited buttons)"
+      - "Add t to useCallback dependency array"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F152
+    changes:
+      - "Add invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited keys"
+
+  - file: src/i18n/locales/en.json
+    feature: F152
+    changes:
+      - "Add invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited keys"
+
+  - file: src/i18n/locales/es.json
+    feature: F152
+    changes:
+      - "Add invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited keys"
+
+  - file: src/app/(tabs)/agenda.tsx
+    feature: F153
+    changes:
+      - "Add inline circle border style to playButton Pressable (width, height, borderRadius, borderWidth, borderColor, center alignment)"
+      - "Change styles.playButton marginRight from 8 to 16"
+
+  - file: src/components/SundayCard.tsx
+    feature: F154
+    changes:
+      - "Remove isSpeechesType from headerCenter minHeight condition"
+      - "Change from: !expanded && isSpeechesType && { minHeight: 62 }"
+      - "Change to:   !expanded && { minHeight: 62 }"
+
+files_not_modified:
+  - "src/components/InviteActionDropdown.tsx (handles assigned_invited state, not initial invite flow)"
+  - "src/components/icons/index.ts (PlayIcon already outlined, no change)"
+  - "src/app/(tabs)/index.tsx (Home tab play icon not part of this CR)"
+  - "src/app/(tabs)/agenda.tsx AgendaSundayCard collapsed height (not part of this CR, uses own cardCenter style)"
+  - "package.json (no new dependencies)"
+  - "supabase/migrations/* (no schema changes)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # Each component has exactly one responsibility
+  GATE-03_contracts_defined: true        # Contracts defined for each component integration
+  GATE-04_adrs_recorded: true           # ADR-099 covers pattern reuse and supersession for all 3 features
+  GATE-05_arch_saved: true              # ARCH_M042.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED to be updated below
+  GATE-07_arch_summary_filled: true     # Summary provided
+  GATE-08_max_components: true          # 4 components, under 10 limit

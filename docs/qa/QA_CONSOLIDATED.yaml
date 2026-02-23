@@ -30,7 +30,8 @@
 # CR-204, CR-208 (PRE+POST) - Batch 22 Phase 2
 # CR-209, CR-210 (PRE+POST) - Batch 23 Phase 1
 # CR-211, CR-212, CR-213, CR-214, CR-215 (PRE+POST) - Batch 23 Phase 2
-# Updated: 2026-02-22
+# CR-216, CR-217, CR-219 (PRE+POST) - Batch 24 Phase 1
+# Updated: 2026-02-23
 # =============================================================================
 
 # #############################################################################
@@ -11444,3 +11445,259 @@ cr_215:
         evidence: |
           92 test files, 6100 tests passed, 49 skipped, 0 failures.
 
+
+# #############################################################################
+# CR-216: WhatsApp button dialog when speaker has no phone number
+# Batch 24 Phase 1 (F152)
+# #############################################################################
+
+cr_216:
+  cr_id: CR-216
+  title: "WhatsApp button - dialog when speaker has no phone number"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_024.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      Validated handleNotInvitedAction in InviteManagementSection.tsx:97-123.
+      Current behavior: silently marks as invited when no phone number. Needs
+      Alert.alert dialog with cancel/confirm options. i18n keys needed in 3 locales.
+
+  post_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 195c0a7
+        message: "feat(i18n): add invite.noPhoneTitle, noPhoneMessage, markAsInvited keys in 3 locales (F152, CR-216)"
+      - hash: a704d51
+        message: "feat(invite): show Alert.alert when WhatsApp pressed without phone number (F152, CR-216)"
+      - hash: b6f2d7b
+        message: "test(batch24): add 77 tests for F152-F154 (CR-216, CR-217, CR-219)"
+
+    tester_verdict: approved
+    tester_tests_passed: 6177
+    tester_tests_total: 6177
+    tester_suite_files: 93
+
+    must_pass_results:
+      - id: VC-216-01
+        description: "handleNotInvitedAction shows Alert.alert when no phone"
+        status: PASSED
+        evidence: "InviteManagementSection.tsx:121-137: else block with Alert.alert"
+
+      - id: VC-216-02
+        description: "Dialog has cancel and mark-as-invited buttons"
+        status: PASSED
+        evidence: "Alert.alert third arg: [{cancel}, {markAsInvited with onPress}]"
+
+      - id: VC-216-03
+        description: "Cancel does NOT change status"
+        status: PASSED
+        evidence: "Cancel button has style:'cancel', no onPress/changeStatus"
+
+      - id: VC-216-04
+        description: "Confirm calls changeStatus with assigned_invited"
+        status: PASSED
+        evidence: "Confirm onPress: changeStatus.mutate({speechId, status:'assigned_invited'})"
+
+      - id: VC-216-05
+        description: "Speaker WITH phone preserves existing behavior"
+        status: PASSED
+        evidence: "if(speech.speaker_phone) block: openWhatsApp + changeStatus unchanged"
+
+      - id: VC-216-06
+        description: "i18n keys in pt-BR.json"
+        status: PASSED
+        evidence: "invite.noPhoneTitle, noPhoneMessage, markAsInvited present"
+
+      - id: VC-216-07
+        description: "i18n keys in en.json"
+        status: PASSED
+        evidence: "invite.noPhoneTitle, noPhoneMessage, markAsInvited present"
+
+      - id: VC-216-08
+        description: "i18n keys in es.json"
+        status: PASSED
+        evidence: "invite.noPhoneTitle, noPhoneMessage, markAsInvited present"
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: VC-216-09
+        description: "changeStatus NOT called unconditionally"
+        status: PASSED
+        evidence: "Exactly 2 mutate calls: one in if(phone), one in Alert confirm"
+
+      - id: VC-216-10
+        description: "Alert imported from react-native"
+        status: PASSED
+        evidence: "Line 14: import { ...Alert } from 'react-native'"
+
+      - id: VC-216-11
+        description: "Test coverage for no-phone dialog"
+        status: PASSED
+        evidence: "35 tests in batch24-phase1.test.ts for F152, all passing"
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+# #############################################################################
+# CR-217: Play button outlined circle + more spacing from chevron
+# Batch 24 Phase 1 (F153)
+# #############################################################################
+
+cr_217:
+  cr_id: CR-217
+  title: "Agenda play button - outlined circle + spacing from chevron"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_024.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      PlayIcon in agenda.tsx:518-528 has no circle. playButton style only has
+      marginRight:8. PlayIcon already outlined (stroke, no fill). Need circular
+      border and increased margin.
+
+  post_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: 351e616
+        message: "feat(agenda): add outlined circle around play icon and increase chevron spacing (F153, CR-217)"
+      - hash: b6f2d7b
+        message: "test(batch24): add 77 tests for F152-F154 (CR-216, CR-217, CR-219)"
+
+    tester_verdict: approved
+
+    must_pass_results:
+      - id: VC-217-01
+        description: "Circular border (width:30, height:30, borderRadius:15)"
+        status: PASSED
+        evidence: "agenda.tsx:525-527: width:30, height:30, borderRadius:15"
+
+      - id: VC-217-02
+        description: "Circle is outlined (borderWidth, no backgroundColor)"
+        status: PASSED
+        evidence: "agenda.tsx:528-529: borderWidth:1.5, borderColor:colors.textSecondary"
+
+      - id: VC-217-03
+        description: "marginRight increased from 8 to 16"
+        status: PASSED
+        evidence: "agenda.tsx:640: playButton { marginRight: 16 }"
+
+      - id: VC-217-04
+        description: "PlayIcon size=18 and color unchanged"
+        status: PASSED
+        evidence: "agenda.tsx:534: <PlayIcon size={18} color={colors.textSecondary} />"
+
+    must_pass_total: 4
+    must_pass_passed: 4
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: VC-217-05
+        description: "Circle visually centered"
+        status: PASSED
+        evidence: "justifyContent:'center', alignItems:'center' on Pressable"
+
+      - id: VC-217-06
+        description: "hitSlop still appropriate"
+        status: PASSED
+        evidence: "hitSlop={8} retained. 30+16=46px effective touch target"
+
+      - id: VC-217-07
+        description: "Test coverage for play button styling"
+        status: PASSED
+        evidence: "24 tests in batch24-phase1.test.ts for F153, all passing"
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0
+
+# #############################################################################
+# CR-219: Regression fix - uniform card height (supersedes CR-215)
+# Batch 24 Phase 1 (F154)
+# #############################################################################
+
+cr_219:
+  cr_id: CR-219
+  title: "SundayCard collapsed height - uniform for ALL card types"
+  type: bugfix
+  regression_from: "CR-215 (F151)"
+  qa_plan: qa/QA_PLAN_024.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      CR-215 added minHeight:62 only to speech-type cards (isSpeechesType guard).
+      Exception cards had no minHeight, causing large visual mismatch. User wants
+      all collapsed cards same height.
+
+  post_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: fca3f3d
+        message: "feat(speeches): apply uniform minHeight to ALL collapsed card types (F154, CR-219)"
+      - hash: b6f2d7b
+        message: "test(batch24): add 77 tests for F152-F154 (CR-216, CR-217, CR-219)"
+
+    tester_verdict: approved
+
+    implementation_note: |
+      Instead of removing minHeight:62 entirely, the implementation applied it to
+      ALL collapsed card types by removing the isSpeechesType guard. This achieves
+      truly uniform height for all cards (speech + exception).
+      Change: !expanded && isSpeechesType && { minHeight: 62 }
+           -> !expanded && { minHeight: 62 }
+
+    must_pass_results:
+      - id: VC-219-01
+        description: "isSpeechesType removed from minHeight condition"
+        status: PASSED
+        evidence: "SundayCard.tsx:350: !expanded && { minHeight: 62 } (no isSpeechesType)"
+
+      - id: VC-219-02
+        description: "Uniform minHeight for all collapsed cards"
+        status: PASSED
+        evidence: "Same style applies to speech and exception cards"
+
+      - id: VC-219-03
+        description: "No height discrimination between card types"
+        status: PASSED
+        evidence: "Single condition !expanded controls minHeight for all types"
+
+    must_pass_total: 3
+    must_pass_passed: 3
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: VC-219-04
+        description: "Speech row rendering unchanged"
+        status: PASSED
+        evidence: "speechRow with StatusLED + name unmodified"
+
+      - id: VC-219-05
+        description: "CR-215 tests superseded"
+        status: PASSED
+        evidence: "batch23-phase2.test.ts updated; F154 tests verify no isSpeechesType"
+
+      - id: VC-219-06
+        description: "Agenda tab cards not affected"
+        status: PASSED
+        evidence: "agenda.tsx cardCenter has no minHeight, separate from SundayCard"
+
+    should_pass_total: 3
+    should_pass_passed: 3
+    should_pass_failed: 0

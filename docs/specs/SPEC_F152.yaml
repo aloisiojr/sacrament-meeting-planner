@@ -1,0 +1,252 @@
+# =============================================================================
+# SPEC_F152.yaml
+# Batch 24 Phase 1: WhatsApp no-phone dialog with mark-as-invited option (CR-216)
+# Created: 2026-02-23
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 24
+phase: 1
+created: "2026-02-23"
+last_updated: "2026-02-23"
+request_type: ux_improvement
+execution_order: "Independent - no dependency on F153 or F154"
+execution_rationale: >
+  F152 modifies handleNotInvitedAction in InviteManagementSection.tsx to check
+  for speaker_phone before deciding the flow. Independent of F153 (play icon)
+  and F154 (card heights).
+
+# =============================================================================
+# F152: WhatsApp no-phone dialog with mark-as-invited option (CR-216)
+# =============================================================================
+
+features:
+
+  - id: F152
+    name: "Show dialog when WhatsApp button pressed and speaker has no phone number"
+    cr_id: 216
+    type: ux_improvement
+    related_crs: []
+    related_features: [F140, F142]
+    description: >
+      CR-216 requests a check when the WhatsApp button is pressed in the
+      InviteManagementSection: if the speaker has no phone number registered,
+      show a dialog informing the user and offering two options: mark as
+      invited or cancel.
+
+      CURRENT STATE: In InviteManagementSection.tsx:97-123, handleNotInvitedAction
+      checks if(speech.speaker_phone) to decide whether to open WhatsApp, but
+      changeStatus.mutate ALWAYS executes (line 117-120), marking the speaker
+      as 'assigned_invited' regardless of whether WhatsApp was opened. This
+      means when a speaker has no phone number, the WhatsApp button silently
+      marks them as invited without any user feedback.
+
+      DESIRED STATE: When the WhatsApp button is pressed:
+      1. If speech.speaker_phone EXISTS: open WhatsApp AND mark as invited
+         (current behavior, unchanged).
+      2. If speech.speaker_phone is NULL/empty: show an Alert.alert dialog with:
+         - Title: i18n key for "No phone number" (e.g., "Sem numero cadastrado")
+         - Message: i18n key for "This speaker has no registered phone number.
+           Do you want to mark as invited or cancel?"
+         - Button 1 (cancel): "Cancel" - does nothing, dialog closes.
+         - Button 2 (confirm): "Mark as invited" - calls changeStatus.mutate
+           to set status to 'assigned_invited'.
+
+      The Alert.alert pattern is already used extensively in the codebase:
+      - SundayCard.tsx:124-142 (sunday type change confirmation)
+      - ActorSelector.tsx:128 (actor delete confirmation)
+      - SpeechSlot.tsx:128 (speech removal confirmation)
+
+      IMPLEMENTATION: Restructure handleNotInvitedAction to:
+      1. Check if speech.speaker_phone exists.
+      2. If yes: open WhatsApp + mutate status (existing flow).
+      3. If no: show Alert.alert with two buttons (Cancel / Mark as invited).
+         Only mutate status on confirm.
+
+    acceptance_criteria:
+      - id: AC-152-01
+        description: "Speaker WITH phone: WhatsApp opens and status changes to invited"
+        given: "A speech with status 'assigned_not_invited' and speaker_phone is a valid phone number"
+        when: "User presses the WhatsApp button in InviteManagementSection"
+        then: "WhatsApp opens with the pre-filled message (existing behavior). The status is changed to 'assigned_invited'. No dialog is shown."
+        status: pending
+
+      - id: AC-152-02
+        description: "Speaker WITHOUT phone: dialog appears with title and message"
+        given: "A speech with status 'assigned_not_invited' and speaker_phone is null or empty"
+        when: "User presses the WhatsApp button in InviteManagementSection"
+        then: "An Alert.alert dialog appears with: title from t('invite.noPhoneTitle'), message from t('invite.noPhoneMessage'), and two buttons."
+        status: pending
+
+      - id: AC-152-03
+        description: "Dialog cancel button does nothing"
+        given: "The no-phone dialog is visible"
+        when: "User presses the Cancel button"
+        then: "The dialog closes. No status change occurs. The speech remains 'assigned_not_invited'."
+        status: pending
+
+      - id: AC-152-04
+        description: "Dialog confirm button marks as invited"
+        given: "The no-phone dialog is visible"
+        when: "User presses the 'Mark as invited' button"
+        then: "changeStatus.mutate is called with { speechId: speech.id, status: 'assigned_invited' }. The speech status changes to 'assigned_invited'."
+        status: pending
+
+      - id: AC-152-05
+        description: "i18n: dialog text in pt-BR"
+        given: "App language is pt-BR"
+        when: "The no-phone dialog appears"
+        then: "Title: 'Sem numero cadastrado'. Message: 'Este discursante nao tem numero de telefone cadastrado. Deseja marcar como convidado ou cancelar?'. Cancel button: 'Cancelar'. Confirm button: 'Marcar como convidado'."
+        status: pending
+
+      - id: AC-152-06
+        description: "i18n: dialog text in en"
+        given: "App language is en"
+        when: "The no-phone dialog appears"
+        then: "Title: 'No phone number'. Message: 'This speaker has no registered phone number. Do you want to mark as invited or cancel?'. Cancel button: 'Cancel'. Confirm button: 'Mark as invited'."
+        status: pending
+
+      - id: AC-152-07
+        description: "i18n: dialog text in es"
+        given: "App language is es"
+        when: "The no-phone dialog appears"
+        then: "Title: 'Sin numero registrado'. Message: 'Este orador no tiene numero de telefono registrado. Desea marcar como invitado o cancelar?'. Cancel button: 'Cancelar'. Confirm button: 'Marcar como invitado'."
+        status: pending
+
+      - id: AC-152-08
+        description: "No silent status change when no phone"
+        given: "A speech with speaker_phone null"
+        when: "User presses WhatsApp button"
+        then: "changeStatus.mutate is NOT called immediately. It is only called if the user confirms via the dialog. This prevents the previous behavior where status silently changed without user awareness."
+        status: pending
+
+    edge_cases:
+      - id: EC-152-01
+        case: "Speaker phone is empty string instead of null"
+        expected: "Empty string is falsy in JavaScript, so the same no-phone dialog flow applies. The check if(speech.speaker_phone) correctly handles both null and empty string."
+        status: pending
+
+      - id: EC-152-02
+        case: "User opens dialog then presses hardware back button (Android)"
+        expected: "Alert.alert on Android dismisses on back press by default, equivalent to cancel. No status change."
+        status: pending
+
+      - id: EC-152-03
+        case: "Multiple rapid taps on WhatsApp button when no phone"
+        expected: "Alert.alert is modal and blocks further interaction. Second tap has no effect while dialog is shown."
+        status: pending
+
+    files_impacted:
+      - src/components/InviteManagementSection.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/InviteActionDropdown.tsx (handles 'assigned_invited' state, not the initial invite flow)
+
+    implementation_details:
+      - location: "src/components/InviteManagementSection.tsx:97-123 (handleNotInvitedAction)"
+        current_code: >
+          const handleNotInvitedAction = useCallback(
+            async (speech: Speech) => {
+              if (speech.speaker_phone) {
+                const url = buildWhatsAppUrl(...);
+                await openWhatsApp(url);
+              }
+              changeStatus.mutate({
+                speechId: speech.id,
+                status: 'assigned_invited',
+              });
+            },
+            [changeStatus, locale, ward?.whatsapp_template]
+          );
+        new_code: >
+          const handleNotInvitedAction = useCallback(
+            async (speech: Speech) => {
+              if (speech.speaker_phone) {
+                const url = buildWhatsAppUrl(...);
+                await openWhatsApp(url);
+                changeStatus.mutate({
+                  speechId: speech.id,
+                  status: 'assigned_invited',
+                });
+              } else {
+                Alert.alert(
+                  t('invite.noPhoneTitle'),
+                  t('invite.noPhoneMessage'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                      text: t('invite.markAsInvited'),
+                      onPress: () => {
+                        changeStatus.mutate({
+                          speechId: speech.id,
+                          status: 'assigned_invited',
+                        });
+                      },
+                    },
+                  ]
+                );
+              }
+            },
+            [changeStatus, locale, ward?.whatsapp_template, t]
+          );
+        rationale: "Move changeStatus.mutate inside the if block so it only fires after WhatsApp opens. In the else block, show Alert.alert with cancel/confirm options."
+
+      - location: "src/i18n/locales/pt-BR.json (invite section)"
+        new_keys:
+          invite.noPhoneTitle: "Sem numero cadastrado"
+          invite.noPhoneMessage: "Este discursante nao tem numero de telefone cadastrado. Deseja marcar como convidado ou cancelar?"
+          invite.markAsInvited: "Marcar como convidado"
+        rationale: "New i18n keys for the no-phone dialog in Portuguese"
+
+      - location: "src/i18n/locales/en.json (invite section)"
+        new_keys:
+          invite.noPhoneTitle: "No phone number"
+          invite.noPhoneMessage: "This speaker has no registered phone number. Do you want to mark as invited or cancel?"
+          invite.markAsInvited: "Mark as invited"
+        rationale: "New i18n keys for the no-phone dialog in English"
+
+      - location: "src/i18n/locales/es.json (invite section)"
+        new_keys:
+          invite.noPhoneTitle: "Sin numero registrado"
+          invite.noPhoneMessage: "Este orador no tiene numero de telefono registrado. Desea marcar como invitado o cancelar?"
+          invite.markAsInvited: "Marcar como invitado"
+        rationale: "New i18n keys for the no-phone dialog in Spanish"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The Alert.alert import already exists in InviteManagementSection.tsx
+        if used elsewhere, or needs to be added to the import from 'react-native'.
+        Currently Alert is NOT imported in InviteManagementSection.tsx, so it
+        must be added to the import statement.
+
+    - id: A-02
+      text: >
+        The i18n keys will be placed under an "invite" namespace in the locale
+        files. If an "invite" namespace already exists, the keys will be added
+        to it. If not, a new "invite" object will be created.
+
+    - id: A-03
+      text: >
+        The cancel button uses style: 'cancel' which on iOS places it on the
+        left side and makes it bold. On Android, Alert buttons are displayed
+        in order. This matches the existing Alert.alert patterns in the codebase.
+
+    - id: A-04
+      text: >
+        The 't' function from useTranslation() needs to be added to the
+        useCallback dependency array since it is now used inside the callback.
+
+  inconsistencies: []

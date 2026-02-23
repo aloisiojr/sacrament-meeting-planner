@@ -1,0 +1,213 @@
+# =============================================================================
+# SPEC_F153.yaml
+# Batch 24 Phase 1: Play button circle outline and spacing in Agenda cards (CR-217)
+# Created: 2026-02-23
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 24
+phase: 1
+created: "2026-02-23"
+last_updated: "2026-02-23"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on F152 or F154"
+execution_rationale: >
+  F153 modifies the play button visual in agenda.tsx. It only touches the
+  playButton area in the AgendaSundayCard header. Independent of F152
+  (WhatsApp dialog) and F154 (card heights).
+
+# =============================================================================
+# F153: Play button circle outline and spacing in Agenda cards (CR-217)
+# =============================================================================
+
+features:
+
+  - id: F153
+    name: "Add outlined circle around play icon and increase distance from collapse chevron"
+    cr_id: 217
+    type: ui_improvement
+    related_crs: [200]
+    related_features: [F137]
+    description: >
+      CR-217 requests two changes to the play button in expanded Agenda cards:
+      1. Add a circle around the PlayIcon (outlined/stroke only, no fill).
+      2. Move the play button further from the collapse/expand chevron indicator.
+
+      User decision: both the play icon and the circle should be outlined
+      (stroke only, no fill).
+
+      CURRENT STATE:
+      - agenda.tsx:518-528: The PlayIcon is rendered with size=18, color=textSecondary,
+        inside a Pressable with style={styles.playButton}.
+      - agenda.tsx:631-633: playButton style has only marginRight: 8.
+      - agenda.tsx:529-533: The chevron (ChevronUpIcon) is rendered immediately
+        after the play button Pressable, with no additional spacing.
+      - The PlayIcon (icons/index.tsx:200-211) is already outlined (stroke only,
+        fill="none") per user decision and existing code.
+
+      DESIRED STATE:
+      1. Wrap the PlayIcon in a circular border (outlined circle). This is
+         achieved by adding a View or styling the Pressable with:
+         - width/height to create a square container
+         - borderRadius: half of width/height (to make it circular)
+         - borderWidth: 1.5 (matching the outlined aesthetic)
+         - borderColor: colors.textSecondary (same as icon color)
+         - justifyContent/alignItems: center (to center the icon)
+      2. Increase marginRight on the playButton to push it further from
+         the chevron. Change from marginRight: 8 to marginRight: 16.
+
+      SIZING: The PlayIcon is size=18. The circle container should be slightly
+      larger to provide visual padding. A container of 30x30 with borderRadius: 15
+      provides ~6px padding around the 18px icon.
+
+    acceptance_criteria:
+      - id: AC-153-01
+        description: "Play icon has outlined circle around it"
+        given: "An Agenda card is expanded"
+        when: "The play button is visible in the card header"
+        then: "The PlayIcon is surrounded by a circular border (stroke only, no fill). The circle has borderWidth: 1.5, borderColor matching colors.textSecondary, borderRadius: 15 (half of 30), width: 30, height: 30."
+        status: pending
+
+      - id: AC-153-02
+        description: "Play icon remains outlined (stroke only, no fill)"
+        given: "An Agenda card is expanded"
+        when: "The play button is visible"
+        then: "The PlayIcon SVG has fill='none' and uses stroke rendering. This is the existing behavior in icons/index.tsx:200-211 and remains unchanged."
+        status: pending
+
+      - id: AC-153-03
+        description: "Play button has increased distance from chevron"
+        given: "An Agenda card is expanded"
+        when: "Both the play button and chevron are visible"
+        then: "The marginRight on the play button container is 16 (increased from 8), creating more visual separation between the play button and the collapse chevron."
+        status: pending
+
+      - id: AC-153-04
+        description: "Play button circle uses theme-appropriate color"
+        given: "The app is in light or dark theme"
+        when: "An Agenda card is expanded"
+        then: "The circle borderColor uses colors.textSecondary, matching the PlayIcon color. In dark theme, both the icon and circle appear in the dark-theme textSecondary color. In light theme, both use light-theme textSecondary color."
+        status: pending
+
+      - id: AC-153-05
+        description: "Play button circle centered within tap target"
+        given: "An Agenda card is expanded"
+        when: "The play button circle is rendered"
+        then: "The PlayIcon is centered within the 30x30 circular container using justifyContent: 'center' and alignItems: 'center'."
+        status: pending
+
+      - id: AC-153-06
+        description: "Play button tap target includes the circle"
+        given: "An Agenda card is expanded"
+        when: "User taps anywhere within the circle"
+        then: "The navigation to presentation mode is triggered. The Pressable wraps the circle container, and hitSlop={8} extends the touch area beyond the circle."
+        status: pending
+
+      - id: AC-153-07
+        description: "Collapsed cards do not show play button"
+        given: "An Agenda card is collapsed"
+        when: "Viewing the card header"
+        then: "The play button (with circle) is not rendered. The existing condition (expandable && isExpanded) still guards the play button rendering (agenda.tsx:518)."
+        status: pending
+
+    edge_cases:
+      - id: EC-153-01
+        case: "Card transitions from collapsed to expanded"
+        expected: "The play button with its circle appears smoothly as the card expands. No layout jump."
+        status: pending
+
+      - id: EC-153-02
+        case: "Non-expandable cards (Gen Conf, Stake Conf)"
+        expected: "These cards never show the play button, so the circle is never rendered. The expandable guard prevents rendering."
+        status: pending
+
+    files_impacted:
+      - src/app/(tabs)/agenda.tsx
+
+    files_not_modified:
+      - src/components/icons/index.tsx (PlayIcon already outlined, no change needed)
+      - src/app/(tabs)/index.tsx (Home tab play icon not part of this CR)
+
+    implementation_details:
+      - location: "src/app/(tabs)/agenda.tsx:518-528 (play button JSX)"
+        current_code: >
+          {expandable && isExpanded && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open presentation"
+              style={styles.playButton}
+            >
+              <PlayIcon size={18} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        new_code: >
+          {expandable && isExpanded && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open presentation"
+              style={[styles.playButton, {
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                borderWidth: 1.5,
+                borderColor: colors.textSecondary,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }]}
+            >
+              <PlayIcon size={18} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        rationale: "Add circular border to the Pressable itself. The Pressable becomes the circle container, avoiding extra nesting."
+
+      - location: "src/app/(tabs)/agenda.tsx:631-633 (playButton style)"
+        current_code: >
+          playButton: {
+            marginRight: 8,
+          },
+        new_code: >
+          playButton: {
+            marginRight: 16,
+          },
+        rationale: "Increase spacing between play button and chevron from 8 to 16."
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The circle dimensions (30x30 with borderRadius 15) provide appropriate
+        visual padding around the 18px PlayIcon. The icon is visually centered
+        due to justifyContent and alignItems on the container.
+
+    - id: A-02
+      text: >
+        The inline style for the circle is applied directly on the Pressable
+        alongside styles.playButton. This avoids creating an extra wrapping
+        View. The Pressable serves as both the tap target and the visual
+        circle container.
+
+    - id: A-03
+      text: >
+        The marginRight increase from 8 to 16 is sufficient to create visible
+        separation between the play button circle and the collapse chevron.
+        If the user requests more or less spacing, the value can be adjusted.
+
+    - id: A-04
+      text: >
+        The borderWidth: 1.5 creates a visible but not overly thick circle
+        outline. This matches the outlined aesthetic of the PlayIcon SVG
+        which uses strokeWidth={2}.
+
+  inconsistencies: []

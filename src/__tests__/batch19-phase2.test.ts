@@ -119,8 +119,8 @@ describe('F120 (CR-179): X clear buttons in AgendaForm', () => {
       expect(agendaFormSource).toContain("updateField('recognized_names', null)");
     });
 
-    it('recognizing clear button uses U+00D7 character', () => {
-      expect(agendaFormSource).toContain("{'\\u00D7'}");
+    it('recognizing clear button uses XIcon SVG component', () => {
+      expect(agendaFormSource).toContain('XIcon');
     });
   });
 
@@ -222,7 +222,7 @@ describe('F120 (CR-179): X clear buttons in AgendaForm', () => {
     });
 
     it('X button uses colors.error for visual consistency', () => {
-      expect(agendaFormSource).toContain('color: colors.error');
+      expect(agendaFormSource).toContain('color={colors.error}');
     });
   });
 });
@@ -262,8 +262,8 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
 
   // --- AC-121-02: Pencil button visible ---
   describe('AC-121-02: Pencil button next to each speaker name', () => {
-    it('ReadOnlySpeakerRow renders pencil icon (U+270F)', () => {
-      expect(agendaFormSource).toContain("{'\\u270F'}");
+    it('ReadOnlySpeakerRow renders PencilIcon SVG component', () => {
+      expect(agendaFormSource).toContain('PencilIcon');
     });
 
     it('pencil button has onNavigate callback', () => {

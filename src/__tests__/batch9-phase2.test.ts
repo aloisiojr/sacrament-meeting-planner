@@ -43,12 +43,12 @@ describe('F060 (CR-114): Add X button to remove topic assignment', () => {
 
   // --- AC-F060-01: X button appears next to topic field when topic is assigned ---
   describe('AC-F060-01: X button appears when topic is assigned', () => {
-    it('should render X button (U+00D7) in topic field when topicDisplay exists and canAssign', () => {
+    it('should render XIcon SVG component in topic field when topicDisplay exists and canAssign', () => {
       const content = getSpeechSlot();
       // X button should be conditioned on topicDisplay && canAssign
       expect(content).toContain('topicDisplay && canAssign');
-      // The X button uses U+00D7 character
-      expect(content).toContain("'\\u00D7'");
+      // The X button uses XIcon SVG component
+      expect(content).toContain('XIcon');
     });
 
     it('should have X button as sibling of topicField Pressable inside topicRow', () => {
@@ -61,7 +61,7 @@ describe('F060 (CR-114): Add X button to remove topic assignment', () => {
       const topicSection = jsxContent.substring(topicRowIdx, topicRowEnd);
       // Should contain the clear topic button within topicRow
       expect(topicSection).toContain('handleClearTopic');
-      expect(topicSection).toContain("'\\u00D7'");
+      expect(topicSection).toContain('XIcon');
     });
 
     it('X button should be after topicField Pressable (as sibling in topicRow)', () => {

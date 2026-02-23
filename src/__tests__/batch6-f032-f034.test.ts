@@ -29,16 +29,16 @@ function readSourceFile(relativePath: string): string {
 describe('F032 (CR-87): Swipe Action Icons (pencil/trash) instead of Text', () => {
 
   describe('AC-F032-01: Edit button shows pencil icon, Delete button shows wastebasket icon', () => {
-    it('should render pencil Unicode character (U+270F) in Edit button', () => {
+    it('should render PencilIcon SVG component in Edit button', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // The Edit button Text should contain the pencil character
-      expect(source).toContain("{'\\u270F'}");
+      // The Edit button should use the PencilIcon SVG component
+      expect(source).toContain('PencilIcon');
     });
 
-    it('should render wastebasket Unicode character (U+1F5D1) in Delete button', () => {
+    it('should render TrashIcon SVG component in Delete button', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // The Delete button Text should contain the wastebasket character (surrogate pair)
-      expect(source).toContain("{'\\uD83D\\uDDD1'}");
+      // The Delete button should use the TrashIcon SVG component
+      expect(source).toContain('TrashIcon');
     });
 
     it('should NOT render editLabel text inside Edit button content', () => {
@@ -137,36 +137,28 @@ describe('F032 (CR-87): Swipe Action Icons (pencil/trash) instead of Text', () =
       expect(actionIconMatch![1]).toContain("textAlign: 'center'");
     });
 
-    it('should use styles.actionIcon for Edit button icon (not actionText)', () => {
+    it('should use PencilIcon with size 20 for Edit button', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // Find the Edit button section and verify it uses actionIcon
-      const editSection = source.match(/onPress=\{handleEdit\}[\s\S]*?<Text style=\{([^}]+\}[^}]*\})/);
-      expect(editSection).not.toBeNull();
-      expect(editSection![1]).toContain('styles.actionIcon');
+      // Edit button uses PencilIcon SVG component with size=20
+      expect(source).toContain('PencilIcon size={20}');
     });
 
-    it('should use styles.actionIcon for Delete button icon (not actionText)', () => {
+    it('should use TrashIcon with size 20 for Delete button', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // Find the Delete button section and verify it uses actionIcon
-      const deleteSection = source.match(/onPress=\{handleDelete\}[\s\S]*?<Text style=\{([^}]+\}[^}]*\})/);
-      expect(deleteSection).not.toBeNull();
-      expect(deleteSection![1]).toContain('styles.actionIcon');
+      // Delete button uses TrashIcon SVG component with size=20
+      expect(source).toContain('TrashIcon size={20}');
     });
 
     it('should use colors.onPrimary for Edit icon color', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // The Edit button icon Text should have color: colors.onPrimary
-      const editPressable = source.match(/onPress=\{handleEdit\}[\s\S]*?<Text[^>]*>[\s\S]*?<\/Text>/);
-      expect(editPressable).not.toBeNull();
-      expect(editPressable![0]).toContain('colors.onPrimary');
+      // The Edit button PencilIcon should have color={colors.onPrimary}
+      expect(source).toContain('<PencilIcon size={20} color={colors.onPrimary}');
     });
 
     it('should use #FFFFFF for Delete icon color', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      // The Delete button icon Text should have color: '#FFFFFF'
-      const deletePressable = source.match(/onPress=\{handleDelete\}[\s\S]*?<Text[^>]*>[\s\S]*?<\/Text>/);
-      expect(deletePressable).not.toBeNull();
-      expect(deletePressable![0]).toContain("'#FFFFFF'");
+      // The Delete button TrashIcon should have color="#FFFFFF"
+      expect(source).toContain('<TrashIcon size={20} color="#FFFFFF"');
     });
 
     it('should use colors.primary as Edit button background', () => {
@@ -571,22 +563,24 @@ describe('F034 (CR-89): Collection Topics View (expand/collapse read-only list)'
   });
 
   describe('AC-F034-08: Visual nesting and styling of expanded topics', () => {
-    it('should have chevron showing right-pointing triangle when collapsed', () => {
+    it('should have chevron showing ChevronRightIcon when collapsed', () => {
       const source = readSourceFile('app/(tabs)/settings/topics.tsx');
-      // U+25B6 for collapsed (right-pointing triangle)
-      expect(source).toContain("'\\u25B6'");
+      // ChevronRightIcon for collapsed (right-pointing)
+      expect(source).toContain('ChevronRightIcon');
     });
 
-    it('should have chevron showing down-pointing triangle when expanded', () => {
+    it('should have chevron showing ChevronDownIcon when expanded', () => {
       const source = readSourceFile('app/(tabs)/settings/topics.tsx');
-      // U+25BC for expanded (down-pointing triangle)
-      expect(source).toContain("'\\u25BC'");
+      // ChevronDownIcon for expanded (down-pointing)
+      expect(source).toContain('ChevronDownIcon');
     });
 
     it('should toggle chevron based on isExpanded prop', () => {
       const source = readSourceFile('app/(tabs)/settings/topics.tsx');
-      // Ternary: isExpanded ? down : right
-      expect(source).toMatch(/isExpanded \? '\\u25BC' : '\\u25B6'/);
+      // Ternary: isExpanded ? ChevronDownIcon : ChevronRightIcon
+      expect(source).toContain('isExpanded');
+      expect(source).toContain('ChevronDownIcon');
+      expect(source).toContain('ChevronRightIcon');
     });
 
     it('should have chevron style with fontSize 10 and width 16', () => {
@@ -645,14 +639,14 @@ describe('F034 (CR-89): Collection Topics View (expand/collapse read-only list)'
 describe('Edge Cases (EC-01 to EC-05)', () => {
 
   describe('EC-01: Unicode emoji rendering (widely supported characters)', () => {
-    it('should use U+270F (Pencil) which is widely supported', () => {
+    it('should use PencilIcon SVG component (widely supported vector graphics)', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      expect(source).toContain("'\\u270F'");
+      expect(source).toContain('PencilIcon');
     });
 
-    it('should use U+1F5D1 (Wastebasket) which is widely supported', () => {
+    it('should use TrashIcon SVG component (widely supported vector graphics)', () => {
       const source = readSourceFile('components/SwipeableCard.tsx');
-      expect(source).toContain("'\\uD83D\\uDDD1'");
+      expect(source).toContain('TrashIcon');
     });
   });
 

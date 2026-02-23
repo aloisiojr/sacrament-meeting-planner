@@ -91,12 +91,12 @@ describe('F073 (CR-128): Topic X button positioning - outside dropdown field', (
   });
 
   // --- AC-073-03: Dropdown arrow stays inside topicField ---
-  describe('AC-073-03: Dropdown arrow (U+25BC) remains inside topicField', () => {
-    it('arrow U+25BC is inside topicField Pressable (before its close)', () => {
+  describe('AC-073-03: Dropdown arrow (ChevronDownIcon) remains inside topicField', () => {
+    it('ChevronDownIcon is inside topicField Pressable (before its close)', () => {
       const content = getSpeechSlot();
       const topicFieldIdx = content.indexOf("accessibilityLabel={t('speeches.selectTopic')}");
       const topicFieldClose = content.indexOf('</Pressable>', topicFieldIdx);
-      const arrowInTopic = content.indexOf("'\\u25BC'", topicFieldIdx);
+      const arrowInTopic = content.indexOf('ChevronDownIcon', topicFieldIdx);
       // Arrow should be before topicField closes
       expect(arrowInTopic).toBeGreaterThan(topicFieldIdx);
       expect(arrowInTopic).toBeLessThan(topicFieldClose);

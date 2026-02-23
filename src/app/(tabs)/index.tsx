@@ -144,7 +144,7 @@ function HomeTabContent() {
           <View
             style={[
               styles.previewCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
+              { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 },
             ]}
           >
             <View style={styles.previewCardHeader}>

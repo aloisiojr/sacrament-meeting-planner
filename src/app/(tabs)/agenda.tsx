@@ -527,12 +527,9 @@ function AgendaSundayCard({
           </Pressable>
         )}
         {expandable && (
-          <View style={styles.chevron}>
-            {isExpanded
-              ? <ChevronUpIcon size={12} color={colors.textSecondary} />
-              : <ChevronDownIcon size={12} color={colors.textSecondary} />
-            }
-          </View>
+          isExpanded
+            ? <ChevronUpIcon size={12} color={colors.textSecondary} />
+            : <ChevronDownIcon size={12} color={colors.textSecondary} />
         )}
       </Pressable>
 
@@ -631,12 +628,8 @@ const styles = StyleSheet.create({
   statusLine: {
     fontSize: 11,
   },
-  chevron: {
-    fontSize: 12,
-  },
   playButton: {
-    fontSize: 18,
-    marginRight: 12,
+    marginRight: 8,
   },
   expandedContent: {
     paddingHorizontal: 12,

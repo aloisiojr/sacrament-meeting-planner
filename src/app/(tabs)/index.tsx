@@ -131,7 +131,9 @@ function HomeTabContent() {
             accessibilityRole="button"
           >
             <View style={styles.meetingButtonContent}>
-              <PlayIcon size={20} color={colors.onPrimary} />
+              <View style={styles.playIconWrapper}>
+                <PlayIcon size={20} color={colors.onPrimary} />
+              </View>
               <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
                 {t('home.startMeeting')}
               </Text>
@@ -275,8 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playIcon: {
-    fontSize: 20,
+  playIconWrapper: {
     marginRight: 8,
   },
   meetingButtonText: {

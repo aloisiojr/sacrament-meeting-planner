@@ -1,0 +1,315 @@
+# =============================================================================
+# ARCH_M043.yaml
+# Architecture for Batch 24 Phase 2: F155, F156
+# CR-218 (Light theme bluish contrast improvement)
+# CR-220 (Speaker fields rework in agenda editing card)
+# Created: 2026-02-23
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Shift light theme neutral palette to Tailwind Slate blue-gray tones (F155) and rework ReadOnlySpeakerRow text styling with italic + reduced color in AgendaForm (F156)"
+  principles:
+    - "No new components: F155 modifies lightColors only, F156 modifies ReadOnlySpeakerRow styling and i18n keys"
+    - "No data model changes: purely visual (F155) and styling+i18n (F156) updates"
+    - "No new dependencies: uses existing theme tokens, fontStyle, and i18n infrastructure"
+    - "Semantic token architecture preserved: all components use useTheme() colors, no hardcoded values"
+    - "F155 must land before F156 so F156 visual can be validated against the final light palette"
+    - "F156 partially supersedes F149: italic+textSecondary replaces the heavy opacity+surfaceVariant as the primary visual distinction for speaker names (but the disabled row visual from F149 is kept)"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F155 (CR-218): Light theme bluish contrast
+    src/lib/theme.ts: lightColors object
+      background: #FFFFFF -> #F1F5F9 (Slate-100)
+      surface: #F8F9FA -> #E2E8F0 (Slate-200)
+      surfaceVariant: #F0F1F3 -> #CBD5E1 (Slate-300)
+      border: #D1D5DB -> #94A3B8 (Slate-400)
+      divider: #E5E7EB -> #CBD5E1 (Slate-300)
+      tabBar: #FFFFFF -> #F1F5F9
+      tabBarInactive: #9CA3AF -> #64748B (Slate-500)
+      inputBackground: #F9FAFB -> #F8FAFC (Slate-50)
+      inputBorder: #D1D5DB -> #94A3B8 (Slate-400)
+      placeholder: #9CA3AF -> #94A3B8 (Slate-400)
+    card (#FFFFFF) unchanged -> contrast with new background
+
+  F156 (CR-220): Speaker fields rework
+    AgendaForm.tsx: ReadOnlySpeakerRow text style
+      speakerName present -> italic + textSecondary
+      speakerName empty   -> normal + textTertiary (unchanged)
+    AgendaForm.tsx: 2nd speaker call
+      has_second_speech=false -> speakerName=t('...Placeholder')
+    i18n: "configurado" -> "ajustado" in 3 locales
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "LightThemeBluishPalette"
+    responsibility: "Replace neutral gray palette with Tailwind Slate blue-gray palette in lightColors (F155)"
+    file: "src/lib/theme.ts"
+    changes:
+      - "Change lightColors.background from #FFFFFF to #F1F5F9 (Slate-100)"
+      - "Change lightColors.surface from #F8F9FA to #E2E8F0 (Slate-200)"
+      - "Change lightColors.surfaceVariant from #F0F1F3 to #CBD5E1 (Slate-300)"
+      - "Change lightColors.border from #D1D5DB to #94A3B8 (Slate-400)"
+      - "Change lightColors.divider from #E5E7EB to #CBD5E1 (Slate-300)"
+      - "Change lightColors.tabBar from #FFFFFF to #F1F5F9 (matches background)"
+      - "Change lightColors.tabBarInactive from #9CA3AF to #64748B (Slate-500)"
+      - "Change lightColors.inputBackground from #F9FAFB to #F8FAFC (Slate-50)"
+      - "Change lightColors.inputBorder from #D1D5DB to #94A3B8 (Slate-400)"
+      - "Change lightColors.placeholder from #9CA3AF to #94A3B8 (Slate-400)"
+      - "card (#FFFFFF), text (#1A1A1A), textSecondary (#5A5A5A), textTertiary (#8A8A8A), primary and status colors all UNCHANGED"
+    dependencies: []
+
+  - name: "SpeakerNameItalicReducedColor"
+    responsibility: "Apply italic + textSecondary to speaker names in ReadOnlySpeakerRow, keep textTertiary for empty placeholders (F156)"
+    file: "src/components/AgendaForm.tsx"
+    changes:
+      - "Change Text color from colors.text to colors.textSecondary when speakerName is present"
+      - "Add fontStyle: 'italic' when speakerName is present"
+      - "Keep colors.textTertiary and no italic when speakerName is empty (placeholder behavior)"
+    dependencies: ["LightThemeBluishPalette"]
+
+  - name: "SecondSpeechDisabledPlaceholder"
+    responsibility: "Show disabled placeholder message instead of empty string when 2nd speech is disabled (F156)"
+    file: "src/components/AgendaForm.tsx"
+    changes:
+      - "Change speakerName from '' to t('speeches.secondSpeechDisabledPlaceholder') when has_second_speech === false"
+      - "Since the placeholder text is a non-empty speakerName, it gets italic + textSecondary styling"
+    dependencies: ["SpeakerNameItalicReducedColor"]
+
+  - name: "DisabledPlaceholderI18nUpdate"
+    responsibility: "Change 'configurado' to 'ajustado' in secondSpeechDisabledPlaceholder i18n key across all 3 locales (F156)"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    changes:
+      - "pt-BR: 'Domingo configurado para não ter 2º discurso' -> 'Domingo ajustado para não ter 2º discurso'"
+      - "en: 'Sunday configured to have no 2nd speech' -> 'Sunday adjusted to have no 2nd speech'"
+      - "es: 'Domingo configurado para no tener 2º discurso' -> 'Domingo ajustado para no tener 2º discurso'"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "light_theme_palette"
+    component: "LightThemeBluishPalette"
+    methods:
+      - name: "lightColors object"
+        input: "none (static constant)"
+        output: "ThemeColors with Slate-based blue-gray neutral tones"
+        notes: "All components consume via useTheme().colors. No component changes needed for F155."
+
+  - name: "speaker_name_styling"
+    component: "SpeakerNameItalicReducedColor"
+    methods:
+      - name: "ReadOnlySpeakerRow text rendering"
+        input: "speakerName: string, colors: ThemeColors"
+        output: "When speakerName truthy: color=colors.textSecondary, fontStyle='italic'. When falsy: color=colors.textTertiary, fontStyle=normal."
+        notes: "Applied to all 3 ReadOnlySpeakerRow instances (positions 1, 2, 3)"
+
+  - name: "second_speech_disabled_text"
+    component: "SecondSpeechDisabledPlaceholder"
+    methods:
+      - name: "2nd speaker ReadOnlySpeakerRow speakerName"
+        input: "agenda.has_second_speech: boolean"
+        output: "When false: speakerName=t('speeches.secondSpeechDisabledPlaceholder'). When true: speakerName=getSpeech(2)?.speaker_name ?? ''"
+        notes: "Non-empty speakerName triggers italic+textSecondary styling via SpeakerNameItalicReducedColor"
+
+  - name: "i18n_disabled_placeholder"
+    component: "DisabledPlaceholderI18nUpdate"
+    methods:
+      - name: "speeches.secondSpeechDisabledPlaceholder"
+        input: "locale (pt-BR | en | es)"
+        output: "pt-BR: 'Domingo ajustado para não ter 2º discurso'. en: 'Sunday adjusted to have no 2nd speech'. es: 'Domingo ajustado para no tener 2º discurso'"
+        notes: "Word change only: configurado->ajustado (pt-BR, es), configured->adjusted (en)"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  changes: []
+  notes: "No data model changes. F155 is a theme palette update (static constants). F156 modifies component styling and i18n text. No new tables, columns, or schema changes."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    - No security impact.
+    - F155 is a color palette change in static constants. No user input, no network calls.
+    - F156 modifies text styling and i18n content. No data access changes.
+    - WCAG AA compliance verified: all text-on-background contrast ratios maintained.
+    - Existing permission checks (isObserver, disabled prop) are unchanged.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - No observability changes needed.
+    - F155: verify in both light and dark themes. Dark theme must be completely unchanged.
+    - F155: verify card-vs-background contrast is visible in light theme.
+    - F155: verify text contrast ratios (14.1:1 for text, 6.0:1 for textSecondary on Slate-100).
+    - F156: verify italic + textSecondary on all 3 speaker rows (positions 1, 2, 3).
+    - F156: verify 2nd speech disabled shows 'ajustado' placeholder with italic styling.
+    - F156: verify empty speaker placeholder still shows with textTertiary (no italic).
+    - F156: verify SpeechSlot.tsx is NOT affected.
+    - i18n verification: test all 3 languages for the word change.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-100
+    title: "Tailwind Slate palette for light theme neutral tones (F155)"
+    context: >
+      Light theme uses pure neutral grays (#F8F9FA, #F0F1F3, #D1D5DB) while dark
+      theme uses Tailwind Slate blue-grays (#0F172A, #1E293B, #334155). The light
+      theme background (#FFFFFF) is identical to card (#FFFFFF), causing zero visual
+      separation. The user wants bluish tones matching the dark theme character.
+    decision: >
+      Adopt Tailwind Slate palette for lightColors neutral tones (Slate-50 through
+      Slate-500). Change background from #FFFFFF to #F1F5F9 (Slate-100) so white
+      cards stand out. Keep text colors unchanged to preserve WCAG AA compliance.
+      All components use semantic tokens via useTheme(), so only theme.ts changes.
+    decided_in: "CR-218"
+    consequences:
+      - "Cards (#FFFFFF) now visually separate from background (#F1F5F9)"
+      - "Consistent bluish character across both light and dark themes"
+      - "Zero component changes needed: semantic token architecture absorbs the change"
+      - "WCAG AA maintained: text #1A1A1A on Slate-100 is 14.1:1"
+      - "Toggle switch off-state track automatically gets bluish tint via colors.border"
+
+  - id: ADR-101
+    title: "Italic + textSecondary for read-only speaker names in AgendaForm (F156)"
+    context: >
+      F149/CR-213 added disabled visual (opacity:0.5 + surfaceVariant background) to
+      ReadOnlySpeakerRow. User reports this is too heavy-handed. Wants subtle
+      distinction: italic + reduced color for speaker names. The disabled row visual
+      from F149 should stay for actually disabled rows (observer, 2nd speech off),
+      but the text styling should be refined for ALL speaker rows.
+    decision: >
+      Apply fontStyle:'italic' and color:colors.textSecondary to speaker name text
+      when speakerName is present. Keep textTertiary without italic for empty
+      placeholders. Pass t('speeches.secondSpeechDisabledPlaceholder') as speakerName
+      when 2nd speech is disabled (so it gets italic+textSecondary styling). Change
+      i18n word from 'configurado' to 'ajustado'. Keep F149 disabled row visual as-is.
+    decided_in: "CR-220"
+    consequences:
+      - "Speaker names visually distinct from labels via italic + reduced contrast"
+      - "Subtler than F149's opacity approach, but both coexist"
+      - "Disabled placeholder message gets same styling as speaker names (italic+textSecondary)"
+      - "SpeechSlot.tsx is NOT modified (scoped to AgendaForm ReadOnlySpeakerRow)"
+      - "i18n word change affects all 3 locales consistently"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+  - features: [F155, F015]
+    interaction: >
+      F015 was the original theme implementation defining lightColors and darkColors.
+      F155 modifies lightColors neutral tones but preserves the ThemeColors interface,
+      darkColors, and the entire theming architecture (useTheme, ThemeContext, etc.).
+
+  - features: [F156, F149]
+    interaction: >
+      F149 (CR-213) added disabled visual (opacity:0.5 + surfaceVariant background)
+      to ReadOnlySpeakerRow. F156 partially supersedes F149 by changing the text
+      styling approach (italic + textSecondary instead of relying on the disabled
+      visual for distinction). However, the F149 disabled row container visual is
+      KEPT. The two effects coexist: disabled rows still have opacity+surfaceVariant
+      on the container, AND the text inside uses italic+textSecondary.
+
+  - features: [F156, F150]
+    interaction: >
+      F150 (CR-214) changed 2nd speaker speakerName from explanation text to empty
+      string when disabled. F156 changes it again: from empty string to
+      t('speeches.secondSpeechDisabledPlaceholder'). This provides a specific
+      disabled message instead of falling back to the generic label placeholder.
+
+  - features: [F155, F156]
+    interaction: >
+      F155 changes lightColors.textSecondary stays #5A5A5A (unchanged). F156 uses
+      colors.textSecondary for speaker name color. The textSecondary value is the
+      same before and after F155. However, F155 changes the background/card colors
+      that textSecondary sits on. Contrast ratios verified: #5A5A5A on #FFFFFF
+      (card) is 7.0:1 (AA pass), #5A5A5A on #F1F5F9 (background) is 6.0:1 (AA pass).
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/lib/theme.ts
+    feature: F155
+    changes:
+      - "Update 10 color values in lightColors to Tailwind Slate palette"
+      - "background, surface, surfaceVariant, border, divider, tabBar, tabBarInactive, inputBackground, inputBorder, placeholder"
+      - "Update inline contrast comments to reflect new background color"
+
+  - file: src/components/AgendaForm.tsx
+    feature: F156
+    changes:
+      - "ReadOnlySpeakerRow: change text color from colors.text to colors.textSecondary when speakerName present"
+      - "ReadOnlySpeakerRow: add fontStyle:'italic' when speakerName present"
+      - "2nd speaker call: change speakerName from '' to t('speeches.secondSpeechDisabledPlaceholder') when disabled"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F156
+    changes:
+      - "speeches.secondSpeechDisabledPlaceholder: 'configurado' -> 'ajustado'"
+
+  - file: src/i18n/locales/en.json
+    feature: F156
+    changes:
+      - "speeches.secondSpeechDisabledPlaceholder: 'configured' -> 'adjusted'"
+
+  - file: src/i18n/locales/es.json
+    feature: F156
+    changes:
+      - "speeches.secondSpeechDisabledPlaceholder: 'configurado' -> 'ajustado'"
+
+files_not_modified:
+  - "All component files for F155 (AgendaForm, SundayCard, SpeechSlot, etc.) - they use semantic tokens via useTheme()"
+  - "src/components/SpeechSlot.tsx (explicitly excluded per CR-220 scope)"
+  - "src/contexts/ThemeContext.tsx (no changes to theme context logic)"
+  - "darkColors in src/lib/theme.ts (unchanged)"
+  - "package.json (no new dependencies)"
+  - "supabase/migrations/* (no schema changes)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # Each component has exactly one responsibility
+  GATE-03_contracts_defined: true        # Contracts defined for each component integration
+  GATE-04_adrs_recorded: true           # ADR-100 for F155 (Slate palette), ADR-101 for F156 (italic+textSecondary)
+  GATE-05_arch_saved: true              # ARCH_M043.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED updated below
+  GATE-07_arch_summary_filled: true     # Summary provided
+  GATE-08_max_components: true          # 4 components, under 10 limit

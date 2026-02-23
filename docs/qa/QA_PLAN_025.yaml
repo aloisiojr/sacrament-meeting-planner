@@ -1,0 +1,435 @@
+# =============================================================================
+# QA_PLAN_025.yaml - PRE Validation for Batch 24 Phase 2
+# CRs: CR-218, CR-220
+# Generated: 2026-02-23
+# Mode: PRE (initial validation)
+# Type: feature_request
+# =============================================================================
+
+metadata:
+  batch: 24
+  phase: 2
+  plan_id: "QA_PLAN_025"
+  crs: ["CR-218", "CR-220"]
+  type: "feature_request"
+  validated: true
+
+# =============================================================================
+# CR-218: Light theme - improve overall contrast with bluish tones
+# Request: "Tema claro - melhorar contraste geral com tons azulados. Cards vs
+#           fundo, toggles, revisar como um todo."
+# =============================================================================
+
+cr_218:
+  feature_id: "F155"
+  title: "Light theme - improve overall contrast with bluish tones"
+  status: "PRE_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/lib/theme.ts"
+      - "src/contexts/ThemeContext.tsx"
+      - "src/components/AccordionCard.tsx"
+      - "src/components/SundayCard.tsx"
+      - "src/components/AgendaForm.tsx"
+      - "src/components/SpeechSlot.tsx"
+      - "src/app/(tabs)/settings/theme.tsx"
+      - "src/app/(tabs)/index.tsx"
+
+    current_behavior:
+      description: |
+        The light theme is defined in src/lib/theme.ts:57-86 (lightColors object).
+        Current light theme uses neutral gray tones throughout:
+
+        BACKGROUNDS:
+        - background: '#FFFFFF' (pure white)
+        - surface: '#F8F9FA' (very light gray)
+        - surfaceVariant: '#F0F1F3' (light gray)
+        - card: '#FFFFFF' (pure white, SAME as background)
+
+        KEY ISSUE: card (#FFFFFF) is identical to background (#FFFFFF).
+        This means cards have NO visual distinction from the page background
+        unless borders are used. The user wants cards to stand out from the
+        background with bluish tones.
+
+        TEXT:
+        - text: '#1A1A1A' (near-black, contrast 16.6:1 on white - GOOD)
+        - textSecondary: '#5A5A5A' (gray, contrast 7.0:1 on white - GOOD)
+        - textTertiary: '#8A8A8A' (lighter gray, contrast 3.5:1 - large text only)
+        - textInverse: '#FFFFFF'
+
+        PRIMARY:
+        - primary: '#2563EB' (blue, contrast 4.6:1 on white - GOOD)
+        - primaryContainer: '#DBEAFE' (light blue)
+        - onPrimary: '#FFFFFF'
+
+        BORDERS & DIVIDERS:
+        - border: '#D1D5DB' (light gray)
+        - divider: '#E5E7EB' (very light gray)
+
+        TAB BAR:
+        - tabBar: '#FFFFFF' (same as background)
+        - tabBarInactive: '#9CA3AF' (gray)
+
+        INPUT:
+        - inputBackground: '#F9FAFB' (off-white)
+        - inputBorder: '#D1D5DB' (light gray)
+        - placeholder: '#9CA3AF'
+
+        USAGE IN COMPONENTS:
+        - AccordionCard.tsx:77: collapsed header uses colors.surfaceVariant bg
+        - AccordionCard.tsx:69: card border uses colors.border
+        - SundayCard.tsx:335: card bg=colors.card, borderColor=colors.border
+        - AgendaForm.tsx:747: toggle trackColor false=colors.border, true=colors.primary
+        - SpeechSlot.tsx:173: toggle trackColor false=colors.divider, true=colors.primary
+
+        The dark theme (darkColors, lines 88-117) already uses a cohesive
+        bluish-gray slate palette (#0F172A, #1E293B, #334155). The user wants
+        the light theme to also have a bluish character rather than pure
+        neutral grays.
+
+        CONTRAST CONCERNS:
+        - Card (#FFFFFF) vs Background (#FFFFFF): ratio 1:1 (no contrast!)
+        - Surface (#F8F9FA) vs Background (#FFFFFF): ratio ~1.02:1 (nearly invisible)
+        - SurfaceVariant (#F0F1F3) vs Background (#FFFFFF): ratio ~1.05:1 (barely visible)
+        - Toggle OFF state uses border/divider colors which are light gray
+          on white background, potentially hard to see
+
+        DARK THEME IS NOT IN SCOPE. Only lightColors should be modified.
+
+      evidence_lines:
+        - "src/lib/theme.ts:57-86 - lightColors definition"
+        - "src/lib/theme.ts:58 - background: '#FFFFFF'"
+        - "src/lib/theme.ts:61 - card: '#FFFFFF' (same as background)"
+        - "src/lib/theme.ts:77 - border: '#D1D5DB'"
+        - "src/lib/theme.ts:88-117 - darkColors with bluish slate palette"
+        - "src/components/AccordionCard.tsx:69 - card border from colors.border"
+        - "src/components/AccordionCard.tsx:77 - collapsed header bg from colors.surfaceVariant"
+        - "src/components/SundayCard.tsx:335 - card uses colors.card + colors.border"
+        - "src/components/AgendaForm.tsx:747 - toggle trackColor uses colors.border"
+        - "src/components/SpeechSlot.tsx:173 - toggle trackColor uses colors.divider"
+
+    implementation_scope:
+      files_to_change:
+        - "src/lib/theme.ts"
+      change_description: |
+        Modify the lightColors object in src/lib/theme.ts:57-86 to use bluish-tinted
+        tones instead of pure neutral grays. This is a palette-only change; no
+        component code needs modification because all components already reference
+        the theme colors via useTheme().
+
+        Recommended adjustments:
+        1. BACKGROUND: Change from pure white (#FFFFFF) to a very subtle blue-white
+           (e.g., '#F8FAFC' or '#F0F4F8') to give the overall app a bluish character.
+        2. CARD: Change from '#FFFFFF' to a brighter tone that contrasts with the
+           background (e.g., '#FFFFFF' if background is tinted, or a slightly blue-tinted
+           white like '#FAFCFF'). The key is card !== background for visual separation.
+        3. SURFACE/SURFACE_VARIANT: Shift to blue-gray tones (e.g., '#EEF2F7', '#E2E8F0')
+           to match the bluish palette and improve contrast with cards.
+        4. BORDERS/DIVIDERS: Shift to blue-gray (e.g., '#CBD5E1', '#E2E8F0') for
+           consistency with the bluish palette. This also improves toggle visibility.
+        5. INPUT_BACKGROUND/INPUT_BORDER: Update to match the new bluish palette.
+        6. TAB_BAR: Consider matching the tinted card or background color.
+        7. PLACEHOLDER/INACTIVE: May benefit from a subtle blue tint.
+
+        CRITICAL: All text contrast ratios must remain WCAG AA compliant:
+        - Normal text: >= 4.5:1 contrast ratio
+        - Large text: >= 3:1 contrast ratio
+        - Primary on background: >= 4.5:1
+
+        The implementation should document contrast ratios in comments (current pattern).
+        The dark theme (darkColors) must NOT be modified.
+
+        No component files need changes because all components use the semantic
+        color tokens from useTheme(). Changing lightColors propagates automatically.
+
+  validation_checks:
+    must_pass:
+      - id: "VC-218-01"
+        description: "lightColors.card is different from lightColors.background"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "card and background have different hex values for visual contrast"
+
+      - id: "VC-218-02"
+        description: "lightColors uses bluish tones instead of pure neutral grays"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "background, surface, surfaceVariant, card use blue-tinted values (not pure gray #F0F0F0 style)"
+
+      - id: "VC-218-03"
+        description: "lightColors.text contrast ratio >= 4.5:1 against background"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "text color maintains WCAG AA contrast on new background"
+
+      - id: "VC-218-04"
+        description: "lightColors.primary contrast ratio >= 4.5:1 against background"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "primary color maintains WCAG AA contrast on new background"
+
+      - id: "VC-218-05"
+        description: "lightColors.textSecondary contrast ratio >= 4.5:1 against background"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "textSecondary maintains adequate contrast on new background"
+
+      - id: "VC-218-06"
+        description: "darkColors object unchanged"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "darkColors (lines 88-117) remain identical to pre-CR-218"
+
+      - id: "VC-218-07"
+        description: "Only src/lib/theme.ts modified (no component changes needed)"
+        check_type: "code_inspection"
+        target: "git diff"
+        expected: "Only theme.ts changed; components use semantic color tokens via useTheme()"
+
+      - id: "VC-218-08"
+        description: "Border and divider colors updated for bluish consistency"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "border and divider colors have blue tint matching the new palette"
+
+    should_pass:
+      - id: "VC-218-09"
+        description: "Contrast ratios documented in comments (matching existing pattern)"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "Comments document contrast ratios for key color pairs (existing pattern: lines 63-65)"
+
+      - id: "VC-218-10"
+        description: "Toggle OFF state visually distinct on new background"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "border/divider colors have adequate contrast against card/surface for toggle visibility"
+
+      - id: "VC-218-11"
+        description: "ThemeColors interface unchanged (same property names)"
+        check_type: "code_inspection"
+        target: "src/lib/theme.ts"
+        expected: "ThemeColors interface at lines 6-42 has the same properties"
+
+      - id: "VC-218-12"
+        description: "Test coverage for light theme contrast"
+        check_type: "test_run"
+        expected: "Tests validate new lightColors values and contrast ratios"
+
+# =============================================================================
+# CR-220: Rework CR-213 - speaker fields in agenda edit card with italic + reduced color
+# Request: "Retrabalho CR-213 - campos de discursante no card de edicao de agenda
+#           com italico + cor reduzida. 2o discurso desabilitado: label 'Domingo
+#           ajustado para nao ter 2o discurso'. Apenas nos cards de edicao de agenda."
+# =============================================================================
+
+cr_220:
+  feature_id: "F156"
+  title: "Rework CR-213 - speaker fields with italic + reduced color + custom disabled label"
+  status: "PRE_VALIDATED"
+  rework_of: "CR-213 (F149)"
+
+  pre_evidence:
+    searched_paths:
+      - "src/components/AgendaForm.tsx"
+      - "src/components/SpeechSlot.tsx"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+
+    current_behavior:
+      description: |
+        CR-213 (F149) added a basic disabled visual style to ReadOnlySpeakerRow
+        in AgendaForm.tsx. The current implementation (AgendaForm.tsx:692-725):
+
+        ReadOnlySpeakerRow component:
+        - Lines 706-707: Main container uses:
+            style={[styles.speakerReadRow, { borderColor: colors.border },
+            disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}
+        - When disabled=true: applies surfaceVariant background + opacity: 0.5
+        - When enabled: standard border only, no distinct styling
+
+        Three instances in AgendaForm:
+        1. Position 1 (line 414-420): label="1o Discursante", disabled={isObserver}
+        2. Position 2 (line 422-430): label="2o Discursante",
+           disabled={isObserver || agenda.has_second_speech === false}
+           speakerName shows '' when has_second_speech===false
+        3. Position 3 (line 480-486): label="Ultimo Discurso", disabled={isObserver}
+
+        The speaker name text (lines 709-715):
+        - Uses styles.speakerReadText (fontSize: 15)
+        - Color: speakerName ? colors.text : colors.textTertiary
+        - No fontStyle (defaults to 'normal')
+
+        The pencil icon (lines 717-721):
+        - Hidden when disabled=true
+
+        CR-220 REQUIREMENTS:
+        1. ITALIC: Speaker name text in ReadOnlySpeakerRow should use fontStyle: 'italic'
+        2. REDUCED COLOR: Instead of colors.text for filled speaker name, use a
+           lighter/reduced contrast color (like colors.textSecondary) to make these
+           read-only fields clearly different from editable fields
+        3. When 2nd speech is disabled (has_second_speech===false):
+           - The label changes to "Domingo ajustado para nao ter 2o discurso"
+           - Currently, the label stays as "2o Discursante" and speakerName becomes ''
+           - CR-220 wants the LABEL to change to explain WHY it's disabled
+        4. These changes are ONLY in AgendaForm cards, NOT in SpeechSlot (the
+           speeches tab edit cards)
+
+        EXISTING i18n KEY:
+        - speeches.secondSpeechDisabledPlaceholder already exists in all 3 locales:
+          pt-BR: "Domingo configurado para nao ter 2o discurso"
+          en: "Sunday configured to have no 2nd speech"
+          es: "Domingo configurado para no tener 2o discurso"
+        But the user wants "Domingo ajustado para nao ter 2o discurso" (with "ajustado")
+        so a new key or update to the existing key may be needed.
+
+        SpeechSlot.tsx (speeches tab) must NOT be modified - CR-220 is explicitly
+        scoped to "apenas nos cards de edicao de agenda" (only in agenda edit cards).
+
+      evidence_lines:
+        - "src/components/AgendaForm.tsx:692-725 - ReadOnlySpeakerRow component definition"
+        - "src/components/AgendaForm.tsx:706-707 - disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }"
+        - "src/components/AgendaForm.tsx:709-715 - speakerReadText styling (no italic)"
+        - "src/components/AgendaForm.tsx:414-420 - Position 1 ReadOnlySpeakerRow"
+        - "src/components/AgendaForm.tsx:422-430 - Position 2 with has_second_speech conditional"
+        - "src/components/AgendaForm.tsx:480-486 - Position 3 (last speech)"
+        - "src/components/AgendaForm.tsx:968-971 - speakerReadText style: fontSize: 15, no fontStyle"
+        - "src/i18n/locales/pt-BR.json:216 - secondSpeechDisabledPlaceholder exists"
+        - "src/i18n/locales/en.json:216 - secondSpeechDisabledPlaceholder exists"
+        - "src/i18n/locales/es.json:216 - secondSpeechDisabledPlaceholder exists"
+        - "src/components/SpeechSlot.tsx - NOT in scope (speeches tab only)"
+
+    implementation_scope:
+      files_to_change:
+        - "src/components/AgendaForm.tsx"
+        - "src/i18n/locales/pt-BR.json"
+        - "src/i18n/locales/en.json"
+        - "src/i18n/locales/es.json"
+      change_description: |
+        1. AgendaForm.tsx - ReadOnlySpeakerRow component:
+           a) Add fontStyle: 'italic' to speakerReadText when displaying speaker name
+           b) Change color from colors.text to colors.textSecondary when speaker name
+              is filled (reduced contrast to distinguish from editable fields)
+           c) Both italic and reduced color should apply to ALL ReadOnlySpeakerRow
+              instances (positions 1, 2, and 3)
+
+        2. AgendaForm.tsx - Position 2 when disabled:
+           a) When has_second_speech===false, change the label from
+              "2o Discursante" to "Domingo ajustado para nao ter 2o discurso"
+           b) This can be done at the call site (line 423) by conditionally
+              changing the label prop
+           c) The disabled visual (surfaceVariant + opacity) should remain
+
+        3. i18n keys:
+           a) Add or update a key for the disabled 2nd speech label
+           b) The user wants "ajustado" specifically:
+              pt-BR: "Domingo ajustado para nao ter 2o discurso"
+              en: "Sunday adjusted to have no 2nd speech"
+              es: "Domingo ajustado para no tener 2o discurso"
+           c) Could reuse/update secondSpeechDisabledPlaceholder or add a new key
+              like "speeches.secondSpeechAdjustedLabel" or "agenda.noSecondSpeechLabel"
+
+        4. SpeechSlot.tsx MUST NOT be changed.
+
+  validation_checks:
+    must_pass:
+      - id: "VC-220-01"
+        description: "ReadOnlySpeakerRow speaker name text has fontStyle: 'italic'"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "speakerReadText or inline style includes fontStyle: 'italic' for speaker name"
+
+      - id: "VC-220-02"
+        description: "ReadOnlySpeakerRow uses reduced color for filled speaker name"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "Speaker name uses colors.textSecondary (or similar reduced contrast) instead of colors.text"
+
+      - id: "VC-220-03"
+        description: "Position 2 disabled label shows 'Domingo ajustado...' text"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "When has_second_speech===false, position 2 label uses a dedicated i18n key with 'ajustado' wording"
+
+      - id: "VC-220-04"
+        description: "i18n key added/updated in pt-BR for disabled 2nd speech label"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/pt-BR.json"
+        expected: "Key contains 'Domingo ajustado para nao ter 2o discurso' (or similar)"
+
+      - id: "VC-220-05"
+        description: "i18n key added/updated in en.json for disabled 2nd speech label"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/en.json"
+        expected: "Corresponding English translation for adjusted 2nd speech label"
+
+      - id: "VC-220-06"
+        description: "i18n key added/updated in es.json for disabled 2nd speech label"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/es.json"
+        expected: "Corresponding Spanish translation for adjusted 2nd speech label"
+
+      - id: "VC-220-07"
+        description: "SpeechSlot.tsx is NOT modified"
+        check_type: "code_inspection"
+        target: "src/components/SpeechSlot.tsx"
+        expected: "No changes to SpeechSlot.tsx (CR-220 only applies to agenda edit cards)"
+
+      - id: "VC-220-08"
+        description: "All 3 ReadOnlySpeakerRow instances (positions 1, 2, 3) get italic + reduced color"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "The ReadOnlySpeakerRow component itself applies italic+color, so all instances inherit"
+
+    should_pass:
+      - id: "VC-220-09"
+        description: "Disabled visual style (surfaceVariant + opacity) preserved from CR-213"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 } still present"
+
+      - id: "VC-220-10"
+        description: "Pencil icon behavior unchanged (hidden when disabled)"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "{!disabled && (<Pressable...><PencilIcon.../></Pressable>)} still present"
+
+      - id: "VC-220-11"
+        description: "Empty speaker name placeholder still shows label text (not italic)"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "When speakerName is empty, shows label as placeholder (textTertiary, no italic)"
+
+      - id: "VC-220-12"
+        description: "Test coverage for italic style, reduced color, and adjusted label"
+        check_type: "test_run"
+        expected: "Tests validate fontStyle: 'italic', textSecondary color, and i18n key for disabled label"
+
+# =============================================================================
+# PRE Summary
+# =============================================================================
+
+pre_summary:
+  total_crs: 2
+  validated_crs: 2
+  failed_crs: 0
+
+  scope_assessment:
+    total_files_to_change: 5
+    files:
+      - "src/lib/theme.ts"                  # CR-218
+      - "src/components/AgendaForm.tsx"      # CR-220
+      - "src/i18n/locales/pt-BR.json"        # CR-220
+      - "src/i18n/locales/en.json"           # CR-220
+      - "src/i18n/locales/es.json"           # CR-220
+
+  risk_notes:
+    - "CR-218: Pure palette change in theme.ts. All components already use semantic tokens via useTheme(). Zero risk of breaking component logic. Risk is only in visual appearance (WCAG contrast compliance)."
+    - "CR-218: Must NOT modify darkColors. Only lightColors should change."
+    - "CR-218: Card vs background contrast (currently 1:1) is the most critical fix."
+    - "CR-220: Changes to ReadOnlySpeakerRow affect all 3 instances (positions 1, 2, 3). Must ensure italic applies to filled names only, not to empty placeholders."
+    - "CR-220: SpeechSlot.tsx MUST NOT be modified. CR-220 scope is explicitly 'apenas nos cards de edicao de agenda'."
+    - "CR-220: The existing secondSpeechDisabledPlaceholder i18n key uses 'configurado' but user wants 'ajustado'. Need new key or update."
+    - "CR-220: Tests from CR-213 (batch23-phase2.test.ts) may need updates or superseding for the italic/color changes."

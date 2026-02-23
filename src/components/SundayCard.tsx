@@ -347,7 +347,7 @@ export const SundayCard = React.memo(function SundayCard({
       >
         <DateBlock date={date} locale={locale} />
 
-        <View style={styles.headerCenter}>
+        <View style={[styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]}>
           {!isSpeechesType && (
             <Text
               style={[styles.exceptionText, { color: colors.warning }]}

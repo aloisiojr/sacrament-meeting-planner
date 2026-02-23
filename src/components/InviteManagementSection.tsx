@@ -11,6 +11,7 @@ import {
   Text,
   StyleSheet,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -113,13 +114,30 @@ export function InviteManagementSection() {
           locale
         );
         await openWhatsApp(url);
+        changeStatus.mutate({
+          speechId: speech.id,
+          status: 'assigned_invited',
+        });
+      } else {
+        Alert.alert(
+          t('invite.noPhoneTitle'),
+          t('invite.noPhoneMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('invite.markAsInvited'),
+              onPress: () => {
+                changeStatus.mutate({
+                  speechId: speech.id,
+                  status: 'assigned_invited',
+                });
+              },
+            },
+          ]
+        );
       }
-      changeStatus.mutate({
-        speechId: speech.id,
-        status: 'assigned_invited',
-      });
     },
-    [changeStatus, locale, ward?.whatsapp_template]
+    [changeStatus, locale, ward?.whatsapp_template, t]
   );
 
   const handleInvitedAction = useCallback(

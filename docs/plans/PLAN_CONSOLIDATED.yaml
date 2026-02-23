@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-22"
-  version: 30
-  last_updated_by: "batch-23-phase-2-ui-i18n"
+  last_updated: "2026-02-23"
+  version: 31
+  last_updated_by: "batch-24-phase-1-ux-ui"
   total_phases: 6
-  total_cr_plans: 47
+  total_cr_plans: 48
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -912,6 +912,27 @@ cr_plans:
       S02+S03+S04 parallelizaveis (todos dependem de S01), S05 depende de S02+S03+S04,
       S06 depende de S04, S07 depende de todos.
 
+  - id: PLAN_P042
+    title: "Batch 24 Phase 1: WhatsApp No-Phone Dialog, Play Button Circle, Uniform Card Height"
+    status: pending
+    crs_covered: [216, 217, 219]
+    total_steps: 5
+    plan_ref: "docs/plans/PLAN_P042.yaml"
+    summary: >
+      3 UX/UI refinements independentes: dialogo Alert.alert quando botao WhatsApp pressionado
+      e discursante nao tem telefone cadastrado, oferecendo marcar como convidado ou cancelar,
+      com 3 novas keys i18n (invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited)
+      em 3 idiomas e restructuring de handleNotInvitedAction para evitar mudanca silenciosa de
+      status (F152/CR-216). Circulo delineado (borderWidth:1.5, borderRadius:15) ao redor do
+      PlayIcon na aba Agenda com container 30x30, borderColor:colors.textSecondary, e aumento
+      de marginRight de 8 para 16 para maior separacao do chevron (F153/CR-217). Altura uniforme
+      de cards contraidos para TODOS os tipos (nao apenas speech-type) removendo condicao
+      isSpeechesType do minHeight:62 no headerCenter do SundayCard, supersedendo F151/CR-215
+      (F154/CR-219). 3 features, 22 ACs, 9 ECs, 6 arquivos impactados (0 novos + 6 modificados
+      + 1 teste), zero migracoes SQL, zero dependencias novas. 1 ADR: ADR-099 (Alert.alert
+      pattern reuse, circle border, F151 supersession). S01, S03, S04 parallelizaveis
+      (independentes), S02 depende de S01, S05 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1307,6 +1328,15 @@ pending_with_plan:
   - cr_id: 215
     plan_id: PLAN_P041
     description: "Collapsed speech cards uniform height via minHeight: 62 on headerCenter when !expanded && isSpeechesType"
+  - cr_id: 216
+    plan_id: PLAN_P042
+    description: "WhatsApp no-phone dialog: Alert.alert quando speaker sem telefone com opcao marcar como convidado"
+  - cr_id: 217
+    plan_id: PLAN_P042
+    description: "Play button circle outline (borderRadius:15, borderWidth:1.5) e aumento de spacing do chevron"
+  - cr_id: 219
+    plan_id: PLAN_P042
+    description: "Uniform collapsed card height para TODOS os tipos (supersede F151 removendo isSpeechesType)"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1328,6 +1358,43 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 31
+    phase: "batch-24-phase-1-ux-ui"
+    changes:
+      - "Added PLAN_P042 for Batch 24 Phase 1 (F152-F154, CRs 216/217/219)"
+      - "3 UX/UI refinements: WhatsApp no-phone dialog with mark-as-invited option, play button circle outline + spacing, uniform collapsed card height for all types"
+      - "5 steps, 22 ACs, 9 ECs, 6 arquivos impactados (0 novos + 6 modificados + 1 teste)"
+      - "Zero migracoes SQL, zero dependencias novas"
+      - "1 ADR: ADR-099 (Alert.alert pattern reuse, circle border, F151 supersession)"
+      - "F152 restructures handleNotInvitedAction: mutate inside if(phone), Alert.alert in else block with Cancel/Mark as invited buttons"
+      - "F152 adds 3 i18n keys (invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited) in 3 locales"
+      - "F153 adds circular border (30x30, borderRadius:15, borderWidth:1.5, borderColor:textSecondary) to playButton Pressable in agenda.tsx"
+      - "F153 changes playButton marginRight from 8 to 16"
+      - "F154 supersedes F151: removes isSpeechesType from minHeight condition in SundayCard.tsx headerCenter"
+      - "F154 changes from !expanded && isSpeechesType && { minHeight: 62 } to !expanded && { minHeight: 62 }"
+      - "S01, S03, S04 parallelizaveis (independentes), S02 depende de S01 (i18n keys needed), S05 depende de todos"
+
+  - id: PLAN_P041
+    title: "Batch 23 Phase 2: Blue Border, i18n Swap, Disabled Visual, Standard Placeholders, Uniform Height"
+    status: pending
+    crs_covered: [211, 212, 213, 214, 215]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P041.yaml"
+    summary: >
+      5 UI/i18n refinements independentes: borda azul (colors.primary, borderWidth: 2) no card
+      preview da Home tab seguindo padrao SundayCard isNext (F147/CR-211), swap de 5 valores
+      i18n de wardBusiness e stakeAnnouncements em 3 locales com terminologia LDS correta
+      (Desobrigacoes/Relevos ao inves de Agradecimentos, adicao de Anuncios em stakeAnnouncements)
+      sem alterar en.wardBusiness (F148/CR-212), estilo visual disabled (opacity: 0.5 +
+      backgroundColor: surfaceVariant) no ReadOnlySpeakerRow do AgendaForm quando disabled=true
+      seguindo padrao SpeechSlot:201 (F149/CR-213), substituicao de t('speeches.secondSpeechDisabledPlaceholder')
+      por t('speeches.selectSpeaker') e t('speeches.selectTopic') no SpeechSlot e string vazia
+      no AgendaForm para fallback ao label via {speakerName || label} (F150/CR-214), e minHeight: 62
+      no headerCenter do SundayCard quando !expanded && isSpeechesType para igualar altura de cards
+      contraidos com 2 vs 3 posicoes (F151/CR-215). 5 features, 31 ACs, 9 ECs, 7 arquivos impactados
+      (0 novos + 7 modificados + 1 teste), zero migracoes SQL, zero dependencias novas. 1 ADR:
+      ADR-098 (reuse existing visual patterns). S01-S05 totalmente parallelizaveis (todos
+      independentes), S06 (testes) depende de todos.
   - version: 30
     phase: "batch-23-phase-2-ui-i18n"
     changes:

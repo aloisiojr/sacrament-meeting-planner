@@ -1,0 +1,303 @@
+# =============================================================================
+# PLAN_P042.yaml
+# Plan for Batch 24 Phase 1: F152, F153, F154
+# CR-216 (WhatsApp no-phone dialog with mark-as-invited option)
+# CR-217 (Play button circle outline and spacing in Agenda cards)
+# CR-219 (Uniform collapsed card height for all types)
+# Created: 2026-02-23
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement 3 independent UX/UI refinements: (1) show Alert.alert dialog when
+  WhatsApp button pressed and speaker has no phone number, with option to mark
+  as invited or cancel (F152), (2) add outlined circle around play icon and
+  increase spacing from collapse chevron in Agenda cards (F153), (3) extend
+  uniform collapsed card height from speech-type-only to ALL collapsed card
+  types, superseding F151 (F154).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-01: F152 - WhatsApp no-phone dialog i18n keys (3 locales)
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Add 3 new i18n keys (invite.noPhoneTitle, invite.noPhoneMessage,
+      invite.markAsInvited) to all 3 locale files (pt-BR.json, en.json,
+      es.json). These keys are needed by the Alert.alert dialog in STEP-02.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-03", "STEP-04"]
+    done_when:
+      - "pt-BR.json contains invite.noPhoneTitle='Sem numero cadastrado'"
+      - "pt-BR.json contains invite.noPhoneMessage='Este discursante nao tem numero de telefone cadastrado. Deseja marcar como convidado ou cancelar?'"
+      - "pt-BR.json contains invite.markAsInvited='Marcar como convidado'"
+      - "en.json contains invite.noPhoneTitle='No phone number'"
+      - "en.json contains invite.noPhoneMessage='This speaker has no registered phone number. Do you want to mark as invited or cancel?'"
+      - "en.json contains invite.markAsInvited='Mark as invited'"
+      - "es.json contains invite.noPhoneTitle='Sin numero registrado'"
+      - "es.json contains invite.noPhoneMessage='Este orador no tiene numero de telefono registrado. Desea marcar como invitado o cancelar?'"
+      - "es.json contains invite.markAsInvited='Marcar como invitado'"
+    tests:
+      - type: unit
+        description: "Verify i18n keys exist in all 3 locales and match expected values"
+    covers:
+      acceptance_criteria: ["AC-152-05", "AC-152-06", "AC-152-07"]
+      edge_cases: []
+    risks:
+      - risk: "invite namespace may not exist in locale files"
+        mitigation: "Check if invite section exists; if not, create it. If it exists, add keys to it."
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: F152 - Restructure handleNotInvitedAction with Alert.alert dialog
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Restructure handleNotInvitedAction in InviteManagementSection.tsx:
+      (1) Add Alert to import from 'react-native'.
+      (2) Move changeStatus.mutate inside the if(speech.speaker_phone) block
+      so it only fires after WhatsApp opens.
+      (3) Add else block with Alert.alert showing no-phone dialog with Cancel
+      (style:'cancel', no-op) and Mark as invited (calls changeStatus.mutate).
+      (4) Add t to useCallback dependency array.
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Alert is imported from 'react-native' in InviteManagementSection.tsx"
+      - "When speech.speaker_phone is truthy: WhatsApp opens AND changeStatus.mutate is called (both inside if block)"
+      - "When speech.speaker_phone is falsy: Alert.alert appears with title t('invite.noPhoneTitle'), message t('invite.noPhoneMessage'), Cancel button (style:'cancel', no-op), and Mark as invited button (calls changeStatus.mutate)"
+      - "changeStatus.mutate is NOT called outside the if/else blocks (no silent status change)"
+      - "t is in the useCallback dependency array"
+    tests:
+      - type: unit
+        description: "Test handleNotInvitedAction with phone: WhatsApp opens + status changes"
+      - type: unit
+        description: "Test handleNotInvitedAction without phone: Alert.alert is called with correct args"
+      - type: unit
+        description: "Test cancel button does not call changeStatus.mutate"
+      - type: unit
+        description: "Test confirm button calls changeStatus.mutate with correct args"
+    covers:
+      acceptance_criteria: ["AC-152-01", "AC-152-02", "AC-152-03", "AC-152-04", "AC-152-08"]
+      edge_cases: ["EC-152-01", "EC-152-02", "EC-152-03"]
+    risks:
+      - risk: "Alert import may already exist partially in the file"
+        mitigation: "Check existing imports from 'react-native' and add Alert to the destructured list if not present"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: F153 - Play button circle outline + spacing
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      In agenda.tsx: (1) Add inline style to the playButton Pressable to
+      create a circular border around the PlayIcon: width:30, height:30,
+      borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary,
+      justifyContent:'center', alignItems:'center'. (2) Change styles.playButton
+      marginRight from 8 to 16 to increase spacing from the collapse chevron.
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04"]
+    done_when:
+      - "PlayIcon Pressable has inline style with width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary"
+      - "PlayIcon Pressable has justifyContent:'center' and alignItems:'center'"
+      - "styles.playButton marginRight is 16 (was 8)"
+      - "PlayIcon is still rendered with size=18 and color=colors.textSecondary (unchanged)"
+      - "Circle only appears when card is expanded (expandable && isExpanded guard unchanged)"
+    tests:
+      - type: unit
+        description: "Verify playButton Pressable has circular border styles"
+      - type: unit
+        description: "Verify marginRight is 16 in playButton style"
+      - type: unit
+        description: "Verify circle not rendered when card collapsed"
+    covers:
+      acceptance_criteria: ["AC-153-01", "AC-153-02", "AC-153-03", "AC-153-04", "AC-153-05", "AC-153-06", "AC-153-07"]
+      edge_cases: ["EC-153-01", "EC-153-02"]
+    risks:
+      - risk: "Inline style array may conflict with existing styles.playButton"
+        mitigation: "Use style={[styles.playButton, { ...circleStyles }]} to merge. Existing marginRight in styles.playButton is overridden by the updated value."
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: F154 - Uniform collapsed card height (supersedes F151)
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      In SundayCard.tsx: Remove the isSpeechesType condition from the
+      minHeight application on the headerCenter View. Change from
+      !expanded && isSpeechesType && { minHeight: 62 } to
+      !expanded && { minHeight: 62 }. This extends uniform collapsed card
+      height to ALL card types, not just speech-type. Supersedes F151 (CR-215).
+    files:
+      - "src/components/SundayCard.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03"]
+    done_when:
+      - "SundayCard.tsx headerCenter style is [styles.headerCenter, !expanded && { minHeight: 62 }]"
+      - "isSpeechesType is NOT in the minHeight condition"
+      - "Expanded cards have no minHeight constraint (unchanged)"
+      - "All collapsed card types (speech, testimony_meeting, general_conference, stake_conference, primary_presentation, other) have minHeight: 62"
+    tests:
+      - type: unit
+        description: "Verify collapsed speech card has minHeight: 62"
+      - type: unit
+        description: "Verify collapsed exception card has minHeight: 62"
+      - type: unit
+        description: "Verify expanded card does NOT have minHeight"
+    covers:
+      acceptance_criteria: ["AC-154-01", "AC-154-02", "AC-154-03", "AC-154-04", "AC-154-05", "AC-154-06", "AC-154-07"]
+      edge_cases: ["EC-154-01", "EC-154-02", "EC-154-03", "EC-154-04"]
+    risks:
+      - risk: "Existing test assertions may check for isSpeechesType in the condition"
+        mitigation: "Update any existing test assertions from F151 that reference isSpeechesType in the minHeight condition. The test should now verify the condition is !expanded only."
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: Tests for F152, F153, F154
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Create or update test file for Batch 24 Phase 1 covering all 3 features:
+      F152 tests for handleNotInvitedAction with/without phone, dialog buttons,
+      i18n keys in 3 locales. F153 tests for playButton circle styles, marginRight,
+      collapsed guard. F154 tests for uniform minHeight on all collapsed card
+      types, expanded cards without minHeight. Update any superseded F151 test
+      assertions to remove isSpeechesType condition.
+    files:
+      - "__tests__/batch24-phase1.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "Test file exists with tests for F152, F153, F154"
+      - "F152 tests: handleNotInvitedAction with phone opens WhatsApp + mutates status"
+      - "F152 tests: handleNotInvitedAction without phone shows Alert.alert"
+      - "F152 tests: cancel button does not call mutate"
+      - "F152 tests: confirm button calls mutate with assigned_invited"
+      - "F152 tests: i18n keys exist in all 3 locales"
+      - "F153 tests: playButton has circular border styles"
+      - "F153 tests: marginRight is 16"
+      - "F153 tests: circle not rendered when collapsed"
+      - "F154 tests: collapsed speech card has minHeight 62"
+      - "F154 tests: collapsed exception card has minHeight 62"
+      - "F154 tests: expanded card has no minHeight"
+      - "F154 tests: isSpeechesType NOT in minHeight condition (supersedes F151)"
+      - "All tests pass (vitest)"
+    tests:
+      - type: unit
+        description: "All test assertions pass with vitest"
+    covers:
+      acceptance_criteria: ["AC-152-01", "AC-152-02", "AC-152-03", "AC-152-04", "AC-152-05", "AC-152-06", "AC-152-07", "AC-152-08", "AC-153-01", "AC-153-02", "AC-153-03", "AC-153-04", "AC-153-05", "AC-153-06", "AC-153-07", "AC-154-01", "AC-154-02", "AC-154-03", "AC-154-04", "AC-154-05", "AC-154-06", "AC-154-07"]
+      edge_cases: ["EC-152-01", "EC-152-02", "EC-152-03", "EC-153-01", "EC-153-02", "EC-154-01", "EC-154-02", "EC-154-03", "EC-154-04"]
+    risks:
+      - risk: "Test file naming may not match project conventions"
+        mitigation: "Check existing test files in __tests__/ directory for naming convention and follow it"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  - ac_id: AC-152-01
+    how_to_verify: "Call handleNotInvitedAction with speech.speaker_phone set to a valid phone number. Verify openWhatsApp is called AND changeStatus.mutate is called with { speechId, status: 'assigned_invited' }. Verify Alert.alert is NOT called."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-152-02
+    how_to_verify: "Call handleNotInvitedAction with speech.speaker_phone = null. Verify Alert.alert is called with title t('invite.noPhoneTitle'), message t('invite.noPhoneMessage'), and 2 buttons array."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-152-03
+    how_to_verify: "In the Alert.alert call, verify the first button has style:'cancel' and its onPress either does nothing or is undefined."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-152-04
+    how_to_verify: "In the Alert.alert call, verify the second button's onPress calls changeStatus.mutate with { speechId: speech.id, status: 'assigned_invited' }."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-152-05
+    how_to_verify: "Read pt-BR.json and verify invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited exist with correct Portuguese values."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-152-06
+    how_to_verify: "Read en.json and verify invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited exist with correct English values."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-152-07
+    how_to_verify: "Read es.json and verify invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited exist with correct Spanish values."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-152-08
+    how_to_verify: "Inspect handleNotInvitedAction code: changeStatus.mutate must only appear inside the if(speaker_phone) block and inside the Alert.alert confirm button onPress. It must NOT appear at the top level of the function."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-153-01
+    how_to_verify: "Inspect the Pressable style array for the playButton. Verify it includes width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-02
+    how_to_verify: "Inspect icons/index.tsx PlayIcon component: fill='none' and stroke-based rendering. No changes from current state."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-03
+    how_to_verify: "Inspect styles.playButton: marginRight is 16 (was 8)."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-04
+    how_to_verify: "borderColor uses colors.textSecondary (same variable as PlayIcon color prop)."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-05
+    how_to_verify: "Pressable inline style includes justifyContent:'center' and alignItems:'center'."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-06
+    how_to_verify: "Pressable wraps the PlayIcon and has hitSlop={8}. The onPress handler navigates to presentation mode."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-153-07
+    how_to_verify: "The play button JSX is guarded by {expandable && isExpanded && (...)}. Collapsed cards do not render the Pressable."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-154-01
+    how_to_verify: "Render SundayCard with isSpeechesType=true, has_second_speech=true, expanded=false. Verify headerCenter style includes { minHeight: 62 }."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-02
+    how_to_verify: "Render SundayCard with isSpeechesType=true, has_second_speech=false, expanded=false. Verify headerCenter style includes { minHeight: 62 }."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-03
+    how_to_verify: "Render SundayCard with isSpeechesType=false (exception type), expanded=false. Verify headerCenter style includes { minHeight: 62 }."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-04
+    how_to_verify: "Render multiple SundayCards with mixed types all collapsed. All have minHeight: 62, so all headerCenter areas have the same minimum height."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-05
+    how_to_verify: "Render SundayCard with expanded=true. Verify headerCenter style does NOT include { minHeight: 62 }."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-06
+    how_to_verify: "Exception text is positioned using default flex alignment within headerCenter. The parent header row has alignItems:'center', centering the entire headerCenter vertically."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-154-07
+    how_to_verify: "minHeight: 62 is a numeric value, not theme-dependent. It applies identically in both light and dark themes."
+    covered_by_steps: ["STEP-04", "STEP-05"]

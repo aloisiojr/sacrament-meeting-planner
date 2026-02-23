@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 import { SundayCard } from './SundayCard';
+import { PencilIcon } from './icons';
 import { QueryErrorView } from './QueryErrorView';
 import {
   useSpeeches,
@@ -104,9 +105,7 @@ export function NextSundaysSection() {
                 accessibilityRole="button"
                 accessibilityLabel="Edit speeches"
               >
-                <Text style={[styles.pencilText, { color: colors.text }]}>
-                  {'\u270F'}
-                </Text>
+                <PencilIcon size={16} color={colors.text} />
               </Pressable>
             )}
           />

@@ -272,9 +272,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                   {topicDisplay ?? t('speeches.selectTopic')}
                 </Text>
                 {canAssign && (
-                  <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-                    {'\u25BC'}
-                  </Text>
+                  <ChevronDownIcon size={8} color={colors.textSecondary} />
                 )}
               </Pressable>
               <View style={styles.topicActionArea}>
@@ -284,7 +282,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                     onPress={handleClearTopic}
                     accessibilityLabel={t('common.delete')}
                   >
-                    <Text style={[styles.removeButton, { color: colors.error }]}>{'\u00D7'}</Text>
+                    <XIcon size={20} color={colors.error} />
                   </Pressable>
                 )}
               </View>

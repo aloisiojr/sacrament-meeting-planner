@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { ChevronDownIcon } from './icons';
 import { StatusLED } from './StatusLED';
 import {
   SUNDAY_TYPE_SPEECHES,
@@ -178,9 +179,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
         >
           {getTypeLabel(currentType)}
         </Text>
-        <Text style={[styles.dropdownArrow, { color: colors.textSecondary }]}>
-          {'\u25BC'}
-        </Text>
+        <ChevronDownIcon size={10} color={colors.textSecondary} />
       </Pressable>
 
       <Modal

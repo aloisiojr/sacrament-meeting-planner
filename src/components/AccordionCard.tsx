@@ -17,6 +17,7 @@ import {
   UIManager,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { ChevronDownIcon, ChevronUpIcon } from './icons';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -90,14 +91,9 @@ export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }:
                 {card.title}
               </Text>
               {!isExpanded && (
-                <Text
-                  style={[
-                    styles.chevron,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {index < expandedIndex ? '\u25BC' : '\u25B2'}
-                </Text>
+                index < expandedIndex
+                  ? <ChevronDownIcon size={12} color={colors.textSecondary} />
+                  : <ChevronUpIcon size={12} color={colors.textSecondary} />
               )}
             </Pressable>
 

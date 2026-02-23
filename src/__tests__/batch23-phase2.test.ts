@@ -451,47 +451,52 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
   // --- AC-151-01: 3-position cards are unaffected (minHeight <= natural) ---
 
   describe('AC-151-01: minHeight does not affect 3-position cards', () => {
-    it('minHeight is 62 which matches 3 speechRow natural height', () => {
-      expect(sundayCardSource).toContain('minHeight: 62');
+    it('[SUPERSEDED by F154] headerCenter uses justifyContent center instead of minHeight', () => {
+      // F154 (CR-219) final implementation removed minHeight: 62 and replaced
+      // with justifyContent: 'center' for vertical centering of content.
+      const headerCenterStyle = sundayCardSource.match(/headerCenter:\s*\{[^}]*\}/s);
+      expect(headerCenterStyle).toBeTruthy();
+      expect(headerCenterStyle![0]).toContain("justifyContent: 'center'");
     });
   });
 
   // --- AC-151-02: 2-position cards match 3-position card height ---
 
   describe('AC-151-02: 2-position cards padded to match 3-position cards', () => {
-    it('headerCenter has conditional minHeight style', () => {
-      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
-      // Was: "!expanded && isSpeechesType && { minHeight: 62 }"
-      // Now: "!expanded && { minHeight: 62 }"
-      expect(sundayCardSource).toContain("!expanded && { minHeight: 62 }");
+    it('[SUPERSEDED by F154] headerCenter uses justifyContent center for vertical alignment', () => {
+      // F154 (CR-219) final implementation replaced minHeight with justifyContent: 'center'
+      // on headerCenter style. No conditional minHeight is used anymore.
+      const headerCenterStyle = sundayCardSource.match(/headerCenter:\s*\{[^}]*\}/s);
+      expect(headerCenterStyle).toBeTruthy();
+      expect(headerCenterStyle![0]).toContain("justifyContent: 'center'");
+      expect(headerCenterStyle![0]).not.toContain('minHeight');
     });
   });
 
   // --- AC-151-03: Expanded cards not affected ---
 
   describe('AC-151-03: Expanded cards have no minHeight', () => {
-    it('minHeight only applies when !expanded', () => {
-      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
-      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+    it('[SUPERSEDED by F154] no minHeight used; justifyContent center handles alignment', () => {
+      // F154 (CR-219) removed minHeight entirely. Expanded vs collapsed
+      // distinction is handled by conditional rendering of speech rows,
+      // not by minHeight.
+      expect(sundayCardSource).not.toContain('minHeight: 62');
     });
 
-    it('conditional uses !expanded as first guard', () => {
-      // SUPERSEDED by F154 (CR-219): condition simplified to !expanded only
-      // Was: /!expanded\s*&&\s*isSpeechesType\s*&&/
-      // Now: /!expanded\s*&&\s*\{/
-      const match = sundayCardSource.match(/!expanded\s*&&\s*\{\s*minHeight/);
-      expect(match).toBeTruthy();
+    it('[SUPERSEDED by F154] headerCenter uses justifyContent center', () => {
+      const headerCenterStyle = sundayCardSource.match(/headerCenter:\s*\{[^}]*\}/s);
+      expect(headerCenterStyle).toBeTruthy();
+      expect(headerCenterStyle![0]).toContain("justifyContent: 'center'");
     });
   });
 
   // --- AC-151-04: Non-speech type cards not affected ---
 
   describe('AC-151-04: Non-speech cards have no minHeight', () => {
-    it('minHeight applies to ALL collapsed cards (F154 supersedes F151)', () => {
-      // SUPERSEDED by F154 (CR-219): minHeight now applies to ALL card types
-      // Was: isSpeechesType && { minHeight: 62 } (only speech cards)
-      // Now: !expanded && { minHeight: 62 } (all card types)
-      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+    it('[SUPERSEDED by F154] minHeight removed; justifyContent center used for all cards', () => {
+      // F154 (CR-219) final implementation removed minHeight for all cards.
+      // justifyContent: 'center' on headerCenter handles uniform alignment.
+      expect(sundayCardSource).not.toContain('minHeight: 62');
     });
 
     it('isSpeechesType is derived from currentType === SUNDAY_TYPE_SPEECHES', () => {
@@ -502,21 +507,22 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
   // --- AC-151-05 / AC-151-06: Uniform height works with both themes ---
 
   describe('AC-151-05 / AC-151-06: minHeight is theme-independent', () => {
-    it('minHeight uses a fixed pixel value (not theme-dependent)', () => {
-      const minHeightMatch = sundayCardSource.match(/minHeight:\s*(\d+)/);
-      expect(minHeightMatch).toBeTruthy();
-      expect(parseInt(minHeightMatch![1])).toBe(62);
+    it('[SUPERSEDED by F154] justifyContent center is not theme-dependent', () => {
+      // F154 (CR-219) replaced minHeight with justifyContent: 'center'
+      // which is a fixed CSS value, not theme-dependent.
+      const headerCenterStyle = sundayCardSource.match(/headerCenter:\s*\{[^}]*\}/s);
+      expect(headerCenterStyle).toBeTruthy();
+      expect(headerCenterStyle![0]).toContain("justifyContent: 'center'");
     });
   });
 
   // --- EC-151-01: Card with fewer positions still padded ---
 
   describe('EC-151-01: minHeight applies regardless of position count', () => {
-    it('minHeight is on headerCenter View not on individual speechRows', () => {
-      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
-      // Was: 'styles.headerCenter, !expanded && isSpeechesType'
-      // Now: 'styles.headerCenter, !expanded && { minHeight: 62 }'
-      expect(sundayCardSource).toContain('styles.headerCenter, !expanded && { minHeight: 62 }');
+    it('[SUPERSEDED by F154] headerCenter uses justifyContent center (no inline minHeight)', () => {
+      // F154 (CR-219) removed inline minHeight from headerCenter View.
+      // The View now uses only style={styles.headerCenter} with justifyContent: 'center'.
+      expect(sundayCardSource).toContain('style={styles.headerCenter}');
     });
   });
 

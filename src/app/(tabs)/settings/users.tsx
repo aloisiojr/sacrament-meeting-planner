@@ -21,6 +21,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
+import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons';
 import type { Role } from '../../../types/database';
 
 const ROLES: Role[] = ['bishopric', 'secretary', 'observer'];
@@ -361,9 +362,12 @@ export default function UserManagementScreen() {
                     {isSelf ? ` (${t('common.you') || 'you'})` : ''}
                   </Text>
                 </View>
-                <Text style={[styles.expandIcon, { color: colors.textSecondary }]}>
-                  {isExpanded ? '\u25B2' : '\u25BC'}
-                </Text>
+                <View style={styles.expandIcon}>
+                  {isExpanded
+                    ? <ChevronUpIcon size={12} color={colors.textSecondary} />
+                    : <ChevronDownIcon size={12} color={colors.textSecondary} />
+                  }
+                </View>
               </View>
 
               {isExpanded && (

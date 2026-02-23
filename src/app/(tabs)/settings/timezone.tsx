@@ -16,6 +16,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { SearchInput } from '../../../components/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
+import { CheckIcon } from '../../../components/icons';
 
 /**
  * Common IANA timezone list covering major regions.
@@ -168,9 +169,7 @@ export default function TimezoneScreen() {
         >
           <Text style={[styles.itemText, { color: colors.text }]}>{item}</Text>
           {isSelected && (
-            <Text style={[styles.checkmark, { color: colors.primary }]}>
-              {'\u2713'}
-            </Text>
+            <CheckIcon size={18} color={colors.primary} />
           )}
         </Pressable>
       );

@@ -15,6 +15,7 @@ import {
 } from '../../../i18n';
 import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
+import { ChevronRightIcon, CheckIcon } from '../../../components/icons';
 
 interface SettingsItemProps {
   label: string;
@@ -35,7 +36,7 @@ const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, c
         {value ? (
           <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value}</Text>
         ) : null}
-        <Text style={[styles.itemArrow, { color: colors.textSecondary }]}>{'\u203A'}</Text>
+        <ChevronRightIcon size={18} color={colors.textSecondary} />
       </View>
     </Pressable>
   );
@@ -301,9 +302,7 @@ export default function SettingsScreen() {
                   {LANGUAGE_LABELS[lang]}
                 </Text>
                 {lang === currentAppLanguage && (
-                  <Text style={[styles.checkmark, { color: colors.primary }]}>
-                    {'\u2713'}
-                  </Text>
+                  <CheckIcon size={18} color={colors.primary} />
                 )}
               </Pressable>
             ))}
@@ -342,9 +341,7 @@ export default function SettingsScreen() {
                   {LANGUAGE_LABELS[lang]}
                 </Text>
                 {lang === wardLanguage && (
-                  <Text style={[styles.checkmark, { color: colors.primary }]}>
-                    {'\u2713'}
-                  </Text>
+                  <CheckIcon size={18} color={colors.primary} />
                 )}
               </Pressable>
             ))}

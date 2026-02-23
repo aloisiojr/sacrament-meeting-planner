@@ -24,6 +24,7 @@ import { useSpeeches } from '../../hooks/useSpeeches';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
 import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage } from '../../i18n';
+import { PlayIcon, PencilIcon } from '../../components/icons';
 import type { SundayAgenda } from '../../types/database';
 
 function HomeTabContent() {
@@ -130,9 +131,7 @@ function HomeTabContent() {
             accessibilityRole="button"
           >
             <View style={styles.meetingButtonContent}>
-              <Text style={[styles.playIcon, { color: colors.onPrimary }]}>
-                {'\u25B6'}
-              </Text>
+              <PlayIcon size={20} color={colors.onPrimary} />
               <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
                 {t('home.startMeeting')}
               </Text>
@@ -229,9 +228,7 @@ function HomeTabContent() {
                 accessibilityRole="button"
                 accessibilityLabel="Edit agenda"
               >
-                <Text style={[styles.pencilText, { color: colors.text }]}>
-                  {'\u270F'}
-                </Text>
+                <PencilIcon size={16} color={colors.text} />
               </Pressable>
             </View>
           </View>

@@ -354,15 +354,16 @@ describe('F150 (CR-214): Standard placeholders when 2nd speech disabled', () => 
   });
 
   // --- AC-150-03: AgendaForm disabled 2nd speaker passes empty string ---
+  // [SUPERSEDED by F156 (CR-220)]: F156 changed the disabled 2nd speaker from '' to
+  // t('speeches.secondSpeechDisabledPlaceholder'). The assertions below are inverted.
 
-  describe('AC-150-03: AgendaForm passes empty string for disabled 2nd speaker', () => {
-    it('passes empty string when has_second_speech is false', () => {
-      expect(agendaFormSource).toContain("agenda.has_second_speech === false\n              ? ''");
+  describe('AC-150-03: AgendaForm passes empty string for disabled 2nd speaker [SUPERSEDED by F156]', () => {
+    it('[SUPERSEDED by F156] now uses i18n placeholder when has_second_speech is false', () => {
+      expect(agendaFormSource).toContain("t('speeches.secondSpeechDisabledPlaceholder')");
     });
 
-    it('does NOT use secondSpeechDisabledPlaceholder for 2nd speaker speakerName', () => {
-      // The AgendaForm should not reference secondSpeechDisabledPlaceholder at all
-      expect(agendaFormSource).not.toContain('secondSpeechDisabledPlaceholder');
+    it('[SUPERSEDED by F156] AgendaForm now references secondSpeechDisabledPlaceholder', () => {
+      expect(agendaFormSource).toContain('secondSpeechDisabledPlaceholder');
     });
   });
 

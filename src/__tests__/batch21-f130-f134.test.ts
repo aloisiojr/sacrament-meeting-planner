@@ -289,8 +289,9 @@ describe('F132 (CR-196): 2nd speech toggle bugs', () => {
       expect(speechSlotSource).toContain('topicRow');
     });
 
-    it('AC-132-04: uses correct i18n key for disabled placeholder', () => {
-      expect(speechSlotSource).toContain("t('speeches.secondSpeechDisabledPlaceholder')");
+    it('AC-132-04: uses standard i18n keys for disabled placeholders (updated by F150/CR-214)', () => {
+      expect(speechSlotSource).toContain("t('speeches.selectSpeaker')");
+      expect(speechSlotSource).toContain("t('speeches.selectTopic')");
     });
 
     it('AC-132-05: toggle switch remains functional', () => {
@@ -310,8 +311,8 @@ describe('F132 (CR-196): 2nd speech toggle bugs', () => {
       expect(agendaFormSource).toContain('agenda.has_second_speech === false');
     });
 
-    it('AC-132-06: shows placeholder text when disabled', () => {
-      expect(agendaFormSource).toContain("t('speeches.secondSpeechDisabledPlaceholder')");
+    it('AC-132-06: shows empty string for disabled speaker (updated by F150/CR-214)', () => {
+      expect(agendaFormSource).toContain("agenda.has_second_speech === false\n              ? ''");
     });
   });
 

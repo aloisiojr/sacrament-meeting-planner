@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ExitConfirmation } from '../../components/ExitConfirmation';
-import { Text } from 'react-native';
+import { HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon } from '../../components/icons';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>&#x1F3E0;</Text>
+            <HomeIcon color={color} size={size} />
           ),
         }}
       />
@@ -40,7 +40,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.agenda'),
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>&#x1F4CB;</Text>
+            <ClipboardListIcon color={color} size={size} />
           ),
         }}
       />
@@ -49,7 +49,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.speeches'),
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>&#x1F399;</Text>
+            <MicIcon color={color} size={size} />
           ),
         }}
       />
@@ -58,7 +58,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.settings'),
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ color, fontSize: size }}>&#x2699;</Text>
+            <SettingsIcon color={color} size={size} />
           ),
           // F116: Observer now has access to Settings tab (limited options rendered in settings/index.tsx)
         }}

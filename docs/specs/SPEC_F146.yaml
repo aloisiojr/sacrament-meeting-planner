@@ -1,0 +1,147 @@
+# =============================================================================
+# SPEC_F146.yaml
+# Batch 23 Phase 1: Play icon placement adjustments (CR-210)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "F145 first (CR-209), then F146 (CR-210)"
+execution_rationale: >
+  F146 depends on F145 because it requires the PlayIcon SVG component created
+  in F145. The play icon placement changes in F146 use the PlayIcon component
+  from src/components/icons/index.ts.
+
+# =============================================================================
+# F146: Play icon placement adjustments (CR-210)
+# =============================================================================
+
+features:
+
+  - id: F146
+    name: "Adjust play icon placement in Home tab and Agenda tab sunday cards"
+    cr_id: 210
+    type: ui_improvement
+    related_crs: [209]
+    related_features: [F145]
+    description: >
+      CR-210 requests specific placement adjustments for the play icon (formerly
+      U+25B6, now PlayIcon SVG from F145) in two locations:
+
+      1. HOME TAB (index.tsx): The play icon stays inside the "Start Sacrament
+         Meeting" button. No position change -- just the SVG replacement done
+         by F145. The play icon remains part of the meetingButtonContent row
+         with marginRight: 8 before the button text.
+
+      2. AGENDA TAB (agenda.tsx): The play icon in expanded sunday cards needs
+         to be positioned next to (but slightly separated from) the expand/collapse
+         chevron indicator. Currently the play icon is rendered before the chevron
+         in the card header (lines 517-528). The play icon should be visually
+         separated from the chevron with a small gap (marginRight: 8).
+
+      THEME COMPATIBILITY: The play icon must work with both light and dark themes.
+      Since SVG icons accept a color prop, the icon color is set to
+      colors.textSecondary (same as the chevron), which is defined per theme.
+      No separate icon variant per theme is needed -- the same PlayIcon component
+      with different color props handles both themes.
+
+      NOTE: The user mentioned "pode ser um icone para cada tema" (can be one icon
+      per theme), but since SVG icons are dynamically colored via the color prop,
+      a single PlayIcon component suffices. Using colors.textSecondary ensures
+      the icon is sober and matches both light and dark themes.
+
+    acceptance_criteria:
+      - id: AC-146-01
+        description: "Home tab play icon stays inside the 'Start Meeting' button"
+        given: "User opens the Home tab"
+        when: "The 'Start Sacrament Meeting' button is rendered"
+        then: "PlayIcon is rendered inside the meetingButtonContent View, before the button text, with size appropriate for the button (matching the previous fontSize: 20) and color={colors.onPrimary}. Position is unchanged from the current layout -- icon + text centered in the button."
+        status: pending
+
+      - id: AC-146-02
+        description: "Agenda tab play icon positioned next to chevron with gap"
+        given: "User expands a sunday card in the Agenda tab"
+        when: "The card header shows the play icon and chevron"
+        then: "PlayIcon is rendered to the left of the chevron icon with marginRight: 8 separating them. The play icon uses color={colors.textSecondary} to match the chevron's sober appearance. Both icons are vertically centered in the card header row."
+        status: pending
+
+      - id: AC-146-03
+        description: "Play icon works with light theme"
+        given: "App is set to light theme"
+        when: "Play icon is rendered in Home tab button and Agenda tab card header"
+        then: "Home tab: PlayIcon uses colors.onPrimary (white on primary-colored button). Agenda tab: PlayIcon uses colors.textSecondary (gray on light background). Both are sober and monochromatic."
+        status: pending
+
+      - id: AC-146-04
+        description: "Play icon works with dark theme"
+        given: "App is set to dark theme"
+        when: "Play icon is rendered in Home tab button and Agenda tab card header"
+        then: "Home tab: PlayIcon uses colors.onPrimary (contrasts with primary-colored button). Agenda tab: PlayIcon uses colors.textSecondary (light gray on dark background). Both are sober and monochromatic."
+        status: pending
+
+      - id: AC-146-05
+        description: "Play icon in Agenda tab only visible when card is expanded"
+        given: "A sunday card in the Agenda tab"
+        when: "Card is collapsed vs expanded"
+        then: "PlayIcon is only rendered when expandable && isExpanded is true (current behavior preserved). When collapsed, only the chevron is visible. When expanded, play icon appears to the left of the up chevron."
+        status: pending
+
+      - id: AC-146-06
+        description: "Play icon is not colorful/emoji-styled"
+        given: "Play icon rendered anywhere in the app"
+        when: "Examining the icon visually"
+        then: "The icon is a monochromatic SVG stroke icon (from Lucide via F145). It is not a colored emoji or a platform-specific character. It matches the sober theme of the app."
+        status: pending
+
+    edge_cases:
+      - id: EC-146-01
+        case: "Non-expandable cards in Agenda tab (e.g., past sundays not yet expanded)"
+        expected: "No play icon shown. The play icon only appears for expandable && isExpanded cards. Non-expandable cards show no play icon or chevron."
+        status: pending
+
+      - id: EC-146-02
+        case: "Very narrow screen where play icon and chevron might overlap"
+        expected: "The play icon and chevron are inside a row with flexDirection: 'row'. With the gap (marginRight: 8), they remain separated. On very narrow screens, the headerCenter flex area shrinks, but the icons maintain their fixed sizes."
+        status: pending
+
+    files_impacted:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+
+    files_not_modified:
+      - src/components/icons/index.ts (created by F145, used by F146 without changes)
+      - src/app/presentation.tsx (no play icon in presentation mode)
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        A single PlayIcon SVG component with dynamic color prop is sufficient
+        for both light and dark themes. No need for separate icon variants per
+        theme. The color prop receives theme-aware colors from useTheme().
+
+    - id: A-02
+      text: >
+        The play icon in the Agenda tab card header uses colors.textSecondary
+        (same as the chevron) to maintain visual consistency. This is a sober,
+        muted color that works in both themes.
+
+    - id: A-03
+      text: >
+        The play icon size in the Home tab button matches the previous fontSize
+        of 20 (from the Text style). The play icon size in the Agenda tab matches
+        the chevron size for visual balance.
+
+  inconsistencies: []

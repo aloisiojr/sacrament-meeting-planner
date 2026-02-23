@@ -1,0 +1,412 @@
+# QA_PLAN_040 - PRE Validation for CR-209 + CR-210
+# Generated: 2026-02-22
+# Mode: PRE
+# Status: validated=true
+
+meta:
+  plan_id: QA_PLAN_040
+  cr_ids: [CR-209, CR-210]
+  type: feature_request
+  mode: PRE
+  validated: true
+  created: "2026-02-22"
+
+# ============================================================
+# PRE VALIDATION EVIDENCE
+# ============================================================
+
+pre_validation:
+  cr_209_evidence:
+    problem_confirmed: true
+    description: >
+      All tab bar icons use emoji/Unicode characters rendered via Text components.
+      These emojis (house, clipboard, microphone, gear) render with platform-native
+      colors on iOS/Android and ignore the color prop, breaking the monochromatic theme.
+      Additionally, many Unicode characters used as icons throughout the app
+      (arrows, play, edit, delete, checkmark, close, chevron) vary in size/weight
+      between platforms.
+
+    unicode_emoji_tab_icons_found:
+      - file: src/app/(tabs)/_layout.tsx
+        line: 34
+        char: "&#x1F3E0;"
+        description: "House emoji (Home tab icon)"
+      - file: src/app/(tabs)/_layout.tsx
+        line: 43
+        char: "&#x1F4CB;"
+        description: "Clipboard emoji (Agenda tab icon)"
+      - file: src/app/(tabs)/_layout.tsx
+        line: 52
+        char: "&#x1F399;"
+        description: "Microphone emoji (Speeches tab icon)"
+      - file: src/app/(tabs)/_layout.tsx
+        line: 61
+        char: "&#x2699;"
+        description: "Gear emoji (Settings tab icon)"
+
+    unicode_icons_found:
+      - char: "\\u25B6"
+        description: "Play triangle - used in Home and Agenda"
+        locations:
+          - src/app/(tabs)/index.tsx:134
+          - src/app/(tabs)/agenda.tsx:525
+          - src/app/(tabs)/settings/topics.tsx:193 (as expand indicator)
+      - char: "\\u25BC"
+        description: "Down-pointing triangle (chevron down)"
+        locations:
+          - src/app/(tabs)/agenda.tsx:531
+          - src/components/AccordionCard.tsx:99
+          - src/components/HymnSelector.tsx:92
+          - src/components/PrayerSelector.tsx:125
+          - src/components/SundayCard.tsx:182
+          - src/components/SpeechSlot.tsx:238
+          - src/components/SpeechSlot.tsx:279
+          - src/app/(tabs)/settings/users.tsx:365
+          - src/app/(tabs)/settings/topics.tsx:193
+      - char: "\\u25B2"
+        description: "Up-pointing triangle (chevron up)"
+        locations:
+          - src/app/(tabs)/agenda.tsx:531
+          - src/components/AccordionCard.tsx:99
+          - src/app/(tabs)/settings/users.tsx:365
+      - char: "\\u270F"
+        description: "Pencil / Edit icon"
+        locations:
+          - src/components/NextSundaysSection.tsx:108
+          - src/components/SwipeableCard.tsx:161
+          - src/app/presentation.tsx:106
+          - src/app/(tabs)/index.tsx:233
+          - src/components/AgendaForm.tsx:718
+      - char: "\\u270E"
+        description: "Pencil (variant) / Edit icon"
+        locations:
+          - src/components/ActorSelector.tsx:182
+      - char: "\\u00D7"
+        description: "Multiplication sign / Close icon"
+        locations:
+          - src/components/SearchInput.tsx:53
+          - src/components/SpeechSlot.tsx:251
+          - src/components/SpeechSlot.tsx:290
+          - src/components/AgendaForm.tsx:229
+          - src/components/AgendaForm.tsx:684
+      - char: "\\u2715"
+        description: "Multiplication X / Close icon"
+        locations:
+          - src/app/presentation.tsx:126
+      - char: "\\u2713"
+        description: "Checkmark"
+        locations:
+          - src/app/(tabs)/settings/timezone.tsx:172
+          - src/app/(tabs)/settings/theme.tsx:62
+          - src/app/(tabs)/settings/index.tsx:305
+          - src/app/(tabs)/settings/index.tsx:346
+      - char: "\\u2716"
+        description: "Heavy multiplication X / Delete"
+        locations:
+          - src/components/ActorSelector.tsx:185
+      - char: "\\u2611 / \\u2610"
+        description: "Checkbox checked/unchecked"
+        locations:
+          - src/components/ActorSelector.tsx:165
+      - char: "\\uD83D\\uDDD1"
+        description: "Wastebasket emoji / Delete icon"
+        locations:
+          - src/components/SwipeableCard.tsx:173
+      - char: "\\u22EE"
+        description: "Vertical ellipsis / More options"
+        locations:
+          - src/components/InviteManagementSection.tsx:241
+      - char: "\\u203A"
+        description: "Single right-pointing angle quotation / Chevron right"
+        locations:
+          - src/app/(tabs)/settings/index.tsx:38
+      - char: "\\u26A0"
+        description: "Warning sign"
+        locations:
+          - src/components/QueryErrorView.tsx:18
+
+    existing_svg_pattern:
+      description: >
+        WhatsAppIcon is already implemented as an inline SVG component using
+        react-native-svg (Svg + Path) in two files. This is the pattern to follow.
+      examples:
+        - file: src/components/InviteActionDropdown.tsx
+          line: 38
+          pattern: "function WhatsAppIcon({ size, color }) -> <Svg><Path/></Svg>"
+        - file: src/components/InviteManagementSection.tsx
+          line: 40
+          pattern: "function WhatsAppIcon({ size, color }) -> <Svg><Path/></Svg>"
+
+    dependency_check:
+      react_native_svg: "^15.12.1 (already installed in package.json)"
+      icons_directory_exists: false
+      target_directory: "src/components/icons/index.ts"
+
+  cr_210_evidence:
+    problem_confirmed: true
+    description: >
+      Play icon uses UTF-8 character U+25B6 (Black Right-Pointing Triangle).
+      In Home (index.tsx:134), it's inside a button with meetingButtonContent layout.
+      In Agenda (agenda.tsx:525), it's shown when a card is expanded, placed
+      right before the chevron (up/down arrow), with marginRight: 12.
+      The request asks to replace with SVG icon and in Agenda,
+      separate it more from the collapse chevron.
+
+    play_icon_locations:
+      - file: src/app/(tabs)/index.tsx
+        line: 134
+        context: "Inside meetingButton with meetingButtonContent flexDirection row"
+        style: "playIcon: { fontSize: 20, marginRight: 8 }"
+        requirement: "Keep in same position (inside Start Meeting button)"
+
+      - file: src/app/(tabs)/agenda.tsx
+        line: 525
+        context: "Inside cardHeader, shown when expandable && isExpanded, before chevron"
+        style: "playButton: { fontSize: 18, marginRight: 12 }"
+        requirement: "Separate more from collapse chevron (increase spacing)"
+
+    theme_compatibility:
+      home_play: "Uses colors.onPrimary (works for both themes)"
+      agenda_play: "Uses colors.textSecondary (works for both themes)"
+
+# ============================================================
+# VALIDATION CHECKS (for POST validation)
+# ============================================================
+
+validation_checks:
+  must_pass:
+    # --- CR-209: SVG Icon Components ---
+    - id: MP-01
+      description: "src/components/icons/index.ts exists and exports SVG icon components"
+      check: "File exists and contains exports for all icon components"
+
+    - id: MP-02
+      description: "All 4 tab bar icons replaced with SVG components (no emoji HTML entities)"
+      check: >
+        src/app/(tabs)/_layout.tsx must NOT contain &#x1F3E0; &#x1F4CB; &#x1F399; &#x2699;
+        Must import and use SVG components from src/components/icons/
+        Each tabBarIcon must render an SVG component with color and size props
+
+    - id: MP-03
+      description: "All Unicode icon characters replaced with SVG components across the app"
+      check: >
+        The following Unicode chars must NOT appear as rendered icon text in .tsx files
+        (excluding test files and non-icon uses like \\u00BA ordinal):
+        \\u25B6, \\u25BC, \\u25B2, \\u270F, \\u270E, \\u00D7, \\u2715, \\u2713,
+        \\u2716, \\u2611, \\u2610, \\uD83D\\uDDD1, \\u22EE, \\u203A, \\u26A0
+
+    - id: MP-04
+      description: "SVG icon components accept size and color props following WhatsAppIcon pattern"
+      check: >
+        Each icon component in src/components/icons/index.ts must accept
+        { size?: number; color?: string } props and render <Svg> with <Path>
+
+    - id: MP-05
+      description: "Duplicate WhatsAppIcon definitions consolidated into shared icons module"
+      check: >
+        WhatsAppIcon should be in src/components/icons/index.ts
+        InviteActionDropdown.tsx and InviteManagementSection.tsx must import from icons/
+        No duplicate inline WhatsAppIcon function definitions
+
+    - id: MP-06
+      description: "react-native-svg imports used correctly in icon components"
+      check: "Icons use Svg, Path (and optionally Circle, Rect, etc.) from react-native-svg"
+
+    # --- CR-210: Play Icon SVG + Positioning ---
+    - id: MP-07
+      description: "Play icon in Home (index.tsx) replaced with SVG component"
+      check: >
+        src/app/(tabs)/index.tsx must import PlayIcon (or similar) from icons/
+        Must render SVG component with color={colors.onPrimary} and appropriate size
+        Must remain in same position (inside meetingButtonContent)
+
+    - id: MP-08
+      description: "Play icon in Agenda (agenda.tsx) replaced with SVG component"
+      check: >
+        src/app/(tabs)/agenda.tsx must import PlayIcon (or similar) from icons/
+        Must render SVG component with color={colors.textSecondary} and appropriate size
+
+    - id: MP-09
+      description: "Play icon in Agenda has increased spacing from collapse chevron"
+      check: >
+        The play icon in agenda.tsx card header must have increased marginRight
+        (was 12, should be larger) to visually separate from the collapse arrow
+
+    - id: MP-10
+      description: "Play icon is monochromatic (not colorful) and works with both themes"
+      check: >
+        PlayIcon SVG must use fill={color} prop (not hardcoded colors).
+        Must look appropriate in both light and dark themes.
+
+    # --- General Quality ---
+    - id: MP-11
+      description: "No TypeScript errors after icon replacement"
+      check: "npx tsc --noEmit passes without errors related to icon changes"
+
+    - id: MP-12
+      description: "All existing tests pass after icon replacement"
+      check: "npm test passes (tests may need updates for new icon component names)"
+
+  should_pass:
+    - id: SP-01
+      description: "Icon sizes are consistent with previous Unicode character sizes"
+      check: >
+        SVG icon sizes should approximate the fontSize values from the replaced
+        Unicode characters (e.g., tab icons ~size from tabBarIcon, play ~18-20)
+
+    - id: SP-02
+      description: "Icons visually match the sober/monochromatic theme of the app"
+      check: >
+        SVG paths should use simple, clean outlines (not filled/heavy).
+        Should look like standard mobile UI icons, similar to WhatsAppIcon style.
+
+    - id: SP-03
+      description: "topics.tsx expand/collapse indicator updated from \\u25B6/\\u25BC to SVG"
+      check: >
+        settings/topics.tsx:193 currently uses \\u25B6 as expand indicator.
+        Should be replaced with ChevronRight/ChevronDown SVG or similar.
+
+    - id: SP-04
+      description: "Icon components are tree-shakeable (named exports from index.ts)"
+      check: "Each icon is a named export, not a default export"
+
+    - id: SP-05
+      description: "No regressions in accessibility labels for icon buttons"
+      check: >
+        All Pressable/TouchableOpacity wrapping icons must retain
+        accessibilityRole and accessibilityLabel props
+
+# ============================================================
+# FILES TO MONITOR
+# ============================================================
+
+files_to_monitor:
+  new_files:
+    - src/components/icons/index.ts
+
+  modified_files:
+    # Tab bar
+    - src/app/(tabs)/_layout.tsx
+
+    # Play icon locations (CR-210)
+    - src/app/(tabs)/index.tsx
+    - src/app/(tabs)/agenda.tsx
+
+    # Chevron/arrow icons
+    - src/components/AccordionCard.tsx
+    - src/components/HymnSelector.tsx
+    - src/components/PrayerSelector.tsx
+    - src/components/SundayCard.tsx
+    - src/components/SpeechSlot.tsx
+    - src/app/(tabs)/settings/users.tsx
+    - src/app/(tabs)/settings/topics.tsx
+
+    # Edit/pencil icons
+    - src/components/NextSundaysSection.tsx
+    - src/components/SwipeableCard.tsx
+    - src/app/presentation.tsx
+    - src/components/AgendaForm.tsx
+    - src/components/ActorSelector.tsx
+
+    # Close/delete icons
+    - src/components/SearchInput.tsx
+    - src/components/AgendaForm.tsx
+
+    # Checkmark icons
+    - src/app/(tabs)/settings/timezone.tsx
+    - src/app/(tabs)/settings/theme.tsx
+    - src/app/(tabs)/settings/index.tsx
+
+    # Other icons
+    - src/components/InviteManagementSection.tsx
+    - src/components/InviteActionDropdown.tsx
+    - src/components/QueryErrorView.tsx
+
+  test_files:
+    - src/__tests__/batch20-phase1.test.ts
+    - src/__tests__/batch15-phase1.test.ts
+    - src/__tests__/batch6-f032-f034.test.ts
+    - src/__tests__/batch8-phase2.test.ts
+    - src/__tests__/batch21-phase2-f135-f137.test.ts
+    - src/__tests__/batch21-phase2-tester-f135-f137.test.ts
+    - src/__tests__/batch10-phase2.test.ts
+
+# ============================================================
+# ICON INVENTORY (complete list to implement)
+# ============================================================
+
+icon_inventory:
+  emoji_icons:
+    - name: HomeIcon
+      replaces: "&#x1F3E0; (U+1F3E0 House Building)"
+      used_in: [_layout.tsx tab bar]
+
+    - name: ClipboardIcon
+      replaces: "&#x1F4CB; (U+1F4CB Clipboard)"
+      used_in: [_layout.tsx tab bar]
+
+    - name: MicrophoneIcon
+      replaces: "&#x1F399; (U+1F399 Studio Microphone)"
+      used_in: [_layout.tsx tab bar]
+
+    - name: GearIcon
+      replaces: "&#x2699; (U+2699 Gear)"
+      used_in: [_layout.tsx tab bar]
+
+    - name: TrashIcon
+      replaces: "\\uD83D\\uDDD1 (U+1F5D1 Wastebasket)"
+      used_in: [SwipeableCard.tsx]
+
+  unicode_icons:
+    - name: PlayIcon
+      replaces: "\\u25B6 (Black Right-Pointing Triangle)"
+      used_in: [index.tsx, agenda.tsx]
+
+    - name: ChevronDownIcon
+      replaces: "\\u25BC (Down-Pointing Triangle)"
+      used_in: [agenda.tsx, AccordionCard.tsx, HymnSelector.tsx, PrayerSelector.tsx, SundayCard.tsx, SpeechSlot.tsx, settings/users.tsx, settings/topics.tsx]
+
+    - name: ChevronUpIcon
+      replaces: "\\u25B2 (Up-Pointing Triangle)"
+      used_in: [agenda.tsx, AccordionCard.tsx, settings/users.tsx]
+
+    - name: EditIcon
+      replaces: "\\u270F / \\u270E (Pencil)"
+      used_in: [NextSundaysSection.tsx, SwipeableCard.tsx, presentation.tsx, index.tsx, AgendaForm.tsx, ActorSelector.tsx]
+
+    - name: CloseIcon
+      replaces: "\\u00D7 / \\u2715 (Multiplication sign / X)"
+      used_in: [SearchInput.tsx, SpeechSlot.tsx, AgendaForm.tsx, presentation.tsx]
+
+    - name: CheckIcon
+      replaces: "\\u2713 (Check mark)"
+      used_in: [settings/timezone.tsx, settings/theme.tsx, settings/index.tsx]
+
+    - name: DeleteIcon
+      replaces: "\\u2716 (Heavy multiplication X)"
+      used_in: [ActorSelector.tsx]
+
+    - name: CheckboxCheckedIcon
+      replaces: "\\u2611 (Ballot box with check)"
+      used_in: [ActorSelector.tsx]
+
+    - name: CheckboxUncheckedIcon
+      replaces: "\\u2610 (Ballot box)"
+      used_in: [ActorSelector.tsx]
+
+    - name: MoreVerticalIcon
+      replaces: "\\u22EE (Vertical ellipsis)"
+      used_in: [InviteManagementSection.tsx]
+
+    - name: ChevronRightIcon
+      replaces: "\\u203A (Single right-pointing angle quotation mark)"
+      used_in: [settings/index.tsx]
+
+    - name: WarningIcon
+      replaces: "\\u26A0 (Warning sign)"
+      used_in: [QueryErrorView.tsx]
+
+  already_svg:
+    - name: WhatsAppIcon
+      status: "Already SVG, duplicated in 2 files - needs consolidation"
+      used_in: [InviteActionDropdown.tsx, InviteManagementSection.tsx]

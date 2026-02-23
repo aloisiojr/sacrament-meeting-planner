@@ -1,0 +1,620 @@
+# =============================================================================
+# PLAN_P040.yaml
+# Batch 23 Phase 1: Replace all Unicode/emoji icons with inline SVG (F145/CR-209),
+# Play icon placement adjustments (F146/CR-210)
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Replace all Unicode characters and emoji icons across 16 files with inline SVG
+  components from a centralized icons module (src/components/icons/index.ts),
+  achieving cross-platform visual consistency and monochromatic theme compliance
+  (CR-209/F145). Adjust play icon placement in Home tab button and Agenda tab
+  card header with proper spacing from chevron (CR-210/F146). Zero new
+  dependencies -- uses react-native-svg (^15.12.1 already present) with Lucide
+  Icons path data copied as string constants (ISC license).
+
+strategy:
+  order: "Icons module first -> Tab bar -> Components -> Screens -> Placement -> Tests"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # -------------------------------------------------------------------------
+  # STEP-01: F145 - Create the SVG icons module
+  # -------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Create src/components/icons/index.ts with all 14 SVG icon component
+      exports. This is the foundation for all other steps.
+
+      1. Create directory src/components/icons/ (if not exists).
+
+      2. Create index.ts with:
+         - ISC license attribution comment in file header referencing Lucide Icons
+         - Import Svg, Path from 'react-native-svg'
+         - Define and export IconProps interface: { size?: number; color?: string }
+         - Export 13 stroke-based Lucide icon components, each following:
+           const IconName = ({ size = 24, color = 'currentColor' }: IconProps) => (
+             <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+               <Path d={PATH_DATA} stroke={color} strokeWidth={2}
+                     strokeLinecap="round" strokeLinejoin="round" fill="none" />
+             </Svg>
+           )
+         - Icons: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon,
+           PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon,
+           ChevronRightIcon, CheckIcon, MoreVerticalIcon
+         - Some icons have multiple Path elements (e.g., HomeIcon has roof + house
+           body, SettingsIcon has gear + center circle, ClipboardListIcon has
+           clipboard + lines). Each Path uses the same stroke props.
+         - Export WhatsAppIcon (fill-based): same path data from existing
+           InviteManagementSection.tsx / InviteActionDropdown.tsx inline definition.
+           Default size=24, default color='#25D366'.
+           Svg viewBox='0 0 24 24' fill='none', Path with fill={color} (no stroke).
+         - Path data strings are Lucide Icons path data constants (copied, not imported).
+           Source URLs in comments for each icon.
+
+    files:
+      - src/components/icons/index.ts (NEW)
+
+    dependencies: []
+    parallelizable_with: []
+
+    done_when:
+      - "src/components/icons/index.ts exists"
+      - "File exports exactly 14 named components: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, MoreVerticalIcon, WhatsAppIcon"
+      - "File exports IconProps interface"
+      - "ISC license attribution comment present in file header"
+      - "All stroke-based icons use Svg with viewBox='0 0 24 24' fill='none' and Path with stroke={color} strokeWidth={2} strokeLinecap='round' strokeLinejoin='round' fill='none'"
+      - "WhatsAppIcon uses Path with fill={color} (no stroke), default color '#25D366'"
+      - "Default size=24, default color='currentColor' for stroke-based icons"
+      - "No new packages added to package.json"
+
+    tests:
+      - type: unit
+        description: >
+          Test that each of the 14 icon components renders without crashing.
+          Test that size and color props are passed through to the Svg element.
+          Test default values (size=24, color='currentColor' for stroke-based,
+          '#25D366' for WhatsAppIcon). Test edge cases: size=0 renders Svg with
+          width=0, large size (200) renders proportionally, undefined color falls
+          back to default.
+
+    covers:
+      acceptance_criteria: ["AC-145-01", "AC-145-02", "AC-145-15", "AC-145-16"]
+      edge_cases: ["EC-145-01", "EC-145-02", "EC-145-03"]
+
+    risks:
+      - risk: "Wrong Lucide path data produces incorrect visual icons"
+        mitigation: "Path data verified against Lucide Icons website (lucide.dev). Visual review in simulator during QA."
+
+  # -------------------------------------------------------------------------
+  # STEP-02: F145 - Migrate tab bar icons (_layout.tsx)
+  # -------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Replace 4 emoji tab bar icons in _layout.tsx with SVG icon components.
+
+      1. Add import: import { HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon }
+         from '../../components/icons'
+
+      2. Replace each tabBarIcon callback:
+         - 'index' tab: replace <Text style={{ fontSize: size }}>{'\U0001F3E0'}</Text>
+           with <HomeIcon color={color} size={size} />
+         - 'agenda' tab: replace <Text style={{ fontSize: size }}>{'\U0001F4CB'}</Text>
+           with <ClipboardListIcon color={color} size={size} />
+         - 'speeches' tab: replace <Text style={{ fontSize: size }}>{'\U0001F399'}</Text>
+           with <MicIcon color={color} size={size} />
+         - 'settings' tab: replace <Text style={{ fontSize: size }}>{'\u2699'}</Text>
+           with <SettingsIcon color={color} size={size} />
+
+      3. The tabBarIcon callback from Expo Router provides { color, size }.
+         Pass these directly to the icon component.
+
+      4. Remove Text import from react-native if no longer used in this file
+         (check other usages first).
+
+    files:
+      - src/app/(tabs)/_layout.tsx
+
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-03", "STEP-04", "STEP-05"]
+
+    done_when:
+      - "_layout.tsx imports HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon from icons module"
+      - "All 4 tabBarIcon callbacks render SVG icon components instead of emoji Text elements"
+      - "color and size props from Expo Router callback passed directly to icon components"
+      - "No emoji characters remain in tab bar icon rendering code"
+
+    tests:
+      - type: unit
+        description: >
+          Test that tab bar renders 4 SVG icon components. Test that
+          color and size props are forwarded correctly from tabBarIcon callback.
+
+    covers:
+      acceptance_criteria: ["AC-145-03"]
+      edge_cases: ["EC-145-04"]
+
+    risks:
+      - risk: "Tab bar icon sizing differs from emoji sizing"
+        mitigation: "Expo Router provides the same size prop (typically 24-28). SVG icons use this directly."
+
+  # -------------------------------------------------------------------------
+  # STEP-03: F145 - Migrate component icons (SwipeableCard, SpeechSlot,
+  # SearchInput, SundayCard, AccordionCard, AgendaForm,
+  # InviteManagementSection, InviteActionDropdown)
+  # -------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Replace Unicode/emoji icons in 8 component files with SVG icon components.
+      All changes follow the same pattern: remove Text+Unicode, add Icon component
+      with size matching the previous fontSize and color from the existing style.
+
+      1. SwipeableCard.tsx:
+         - Import { PencilIcon, TrashIcon } from '../components/icons'
+         - Edit button: replace <Text style={actionIcon}>{'\u270F'}</Text>
+           with <PencilIcon size={20} color={colors.onPrimary} />
+         - Delete button: replace <Text style={actionIcon}>{'\U0001F5D1'}</Text>
+           with <TrashIcon size={20} color='#FFFFFF' />
+
+      2. SpeechSlot.tsx:
+         - Import { ChevronDownIcon, XIcon } from '../components/icons'
+         - Replace U+25BC (down arrow) with <ChevronDownIcon> (2 locations)
+         - Replace U+00D7 (multiply X) with <XIcon> (2 locations)
+         - Match existing fontSize for size prop, existing color for color prop
+
+      3. SearchInput.tsx:
+         - Import { XIcon } from '../components/icons'
+         - Replace U+00D7 with <XIcon>
+
+      4. SundayCard.tsx:
+         - Import { ChevronDownIcon } from '../components/icons'
+         - Replace U+25BC with <ChevronDownIcon>
+
+      5. AccordionCard.tsx:
+         - Import { ChevronDownIcon, ChevronUpIcon } from '../components/icons'
+         - Replace U+25BC/U+25B2 with <ChevronDownIcon>/<ChevronUpIcon>
+
+      6. AgendaForm.tsx:
+         - Import { XIcon, PencilIcon } from '../components/icons'
+         - Replace U+00D7 with <XIcon> (2 locations: SelectorField clear, recognizing clear)
+         - Replace U+270F with <PencilIcon> (ReadOnlySpeakerRow)
+
+      7. InviteManagementSection.tsx:
+         - Remove local WhatsAppIcon function definition (lines ~39-49)
+         - Import { WhatsAppIcon, MoreVerticalIcon } from '../components/icons'
+         - Replace U+22EE (vertical ellipsis) with <MoreVerticalIcon size={18}
+           color={colors.primary} />
+         - Remove Svg/Path imports from react-native-svg if no longer used locally
+         - Existing WhatsAppIcon call sites unchanged (same props pass through)
+
+      8. InviteActionDropdown.tsx:
+         - Remove local WhatsAppIcon function definition (lines ~38-47)
+         - Import { WhatsAppIcon } from '../components/icons'
+         - Remove Svg/Path imports from react-native-svg if no longer used locally
+         - Existing WhatsAppIcon call sites unchanged (same props pass through)
+
+    files:
+      - src/components/SwipeableCard.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/SearchInput.tsx
+      - src/components/SundayCard.tsx
+      - src/components/AccordionCard.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/components/InviteActionDropdown.tsx
+
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-04", "STEP-05"]
+
+    done_when:
+      - "SwipeableCard.tsx renders PencilIcon and TrashIcon instead of U+270F and U+1F5D1"
+      - "SpeechSlot.tsx renders ChevronDownIcon and XIcon instead of U+25BC and U+00D7"
+      - "SearchInput.tsx renders XIcon instead of U+00D7"
+      - "SundayCard.tsx renders ChevronDownIcon instead of U+25BC"
+      - "AccordionCard.tsx renders ChevronDownIcon and ChevronUpIcon instead of U+25BC and U+25B2"
+      - "AgendaForm.tsx renders XIcon and PencilIcon instead of U+00D7 and U+270F"
+      - "InviteManagementSection.tsx imports WhatsAppIcon and MoreVerticalIcon from icons module; local WhatsAppIcon definition removed; U+22EE replaced"
+      - "InviteActionDropdown.tsx imports WhatsAppIcon from icons module; local WhatsAppIcon definition removed"
+      - "Svg/Path imports from react-native-svg removed from InviteManagementSection.tsx and InviteActionDropdown.tsx if unused locally"
+
+    tests:
+      - type: unit
+        description: >
+          Test that each component renders the expected SVG icon component instead
+          of Unicode Text. Test that WhatsAppIcon consolidation works (same render
+          output from both InviteManagementSection and InviteActionDropdown).
+          Test XIcon works for both close (U+2715) and clear (U+00D7) use cases
+          with different sizes.
+
+    covers:
+      acceptance_criteria: ["AC-145-04", "AC-145-05", "AC-145-09", "AC-145-10", "AC-145-13", "AC-145-14"]
+      edge_cases: ["EC-145-05"]
+
+    risks:
+      - risk: "Removing WhatsAppIcon local definitions breaks existing call sites"
+        mitigation: "The consolidated WhatsAppIcon has the same interface (size, color with same defaults). No call-site changes needed."
+
+  # -------------------------------------------------------------------------
+  # STEP-04: F145 - Migrate screen icons (index.tsx, agenda.tsx,
+  # presentation.tsx, settings/*, users.tsx, timezone.tsx, theme.tsx)
+  # -------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Replace Unicode/emoji icons in 7 screen files with SVG icon components.
+      All changes follow the same Text->Icon replacement pattern.
+
+      1. index.tsx (Home tab):
+         - Import { PlayIcon, PencilIcon } from '../../components/icons'
+         - Replace U+25B6 (play) in meetingButton with <PlayIcon size={20}
+           color={colors.onPrimary} />
+         - Replace U+270F (pencil) in pencilButton with <PencilIcon size={16}
+           color={colors.text} />
+
+      2. agenda.tsx:
+         - Import { PlayIcon, ChevronDownIcon, ChevronUpIcon } from '../../components/icons'
+         - Replace U+25B6 (play) in playButton with <PlayIcon>
+         - Replace U+25B2/U+25BC in chevron with <ChevronUpIcon>/<ChevronDownIcon>
+
+      3. presentation.tsx:
+         - Import { PencilIcon, XIcon } from '../../components/icons'
+         - Replace U+270F (pencil) with <PencilIcon>
+         - Replace U+2715 (close X) with <XIcon>
+
+      4. settings/index.tsx:
+         - Import { ChevronRightIcon, CheckIcon } from '../../../components/icons'
+         - Replace U+203A (right arrow) with <ChevronRightIcon>
+         - Replace U+2713 (checkmark) with <CheckIcon> (2 locations: app language, ward language)
+
+      5. settings/users.tsx:
+         - Import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons'
+         - Replace U+25B2/U+25BC with <ChevronUpIcon>/<ChevronDownIcon>
+
+      6. settings/timezone.tsx:
+         - Import { CheckIcon } from '../../../components/icons'
+         - Replace U+2713 with <CheckIcon>
+
+      7. settings/theme.tsx:
+         - Import { CheckIcon } from '../../../components/icons'
+         - Replace U+2713 with <CheckIcon>
+
+    files:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+      - src/app/presentation.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(tabs)/settings/timezone.tsx
+      - src/app/(tabs)/settings/theme.tsx
+
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-05"]
+
+    done_when:
+      - "index.tsx renders PlayIcon and PencilIcon instead of U+25B6 and U+270F"
+      - "agenda.tsx renders PlayIcon, ChevronDownIcon, ChevronUpIcon instead of U+25B6, U+25BC, U+25B2"
+      - "presentation.tsx renders PencilIcon and XIcon instead of U+270F and U+2715"
+      - "settings/index.tsx renders ChevronRightIcon and CheckIcon instead of U+203A and U+2713"
+      - "settings/users.tsx renders ChevronDownIcon and ChevronUpIcon instead of U+25BC and U+25B2"
+      - "settings/timezone.tsx renders CheckIcon instead of U+2713"
+      - "settings/theme.tsx renders CheckIcon instead of U+2713"
+      - "No Unicode icon characters remain in these files"
+
+    tests:
+      - type: unit
+        description: >
+          Test that each screen renders the expected SVG icon component.
+          Test Play icon in Home and Agenda with correct size and color props.
+          Test Pencil icon in Home, presentation, and AgendaForm.
+          Test CheckIcon in settings, timezone, theme screens.
+
+    covers:
+      acceptance_criteria: ["AC-145-06", "AC-145-07", "AC-145-08", "AC-145-11", "AC-145-12"]
+      edge_cases: []
+
+    risks:
+      - risk: "Icon size mismatch with previous fontSize causes layout shift"
+        mitigation: "Size prop set to match the previous fontSize from the Text style. Visual review confirms consistent sizing."
+
+  # -------------------------------------------------------------------------
+  # STEP-05: F145 - Update DD-25 and verify no Unicode icons remain
+  # -------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Update DD-25 in documentation to reflect SVG icon pattern instead of
+      Unicode. Verify no Unicode/emoji icon characters remain in UI-rendering
+      production code.
+
+      1. Find DD-25 in the documentation (DECISIONS or similar file).
+         Update from "Unicode icons para swipe buttons (sem icon library)" to
+         "Inline SVG icons via react-native-svg (sem icon library). Path data
+         copied from Lucide Icons (ISC license) as string constants."
+
+      2. Search codebase for the 14 replaced Unicode characters in UI-rendering
+         code to verify none remain:
+         - U+1F3E0 (house emoji)
+         - U+1F4CB (clipboard emoji)
+         - U+1F399 (microphone emoji)
+         - U+2699 (gear emoji)
+         - U+1F5D1 (wastebasket emoji)
+         - U+25B6 (play triangle)
+         - U+270F (pencil)
+         - U+2715 (close X)
+         - U+00D7 (multiply X)
+         - U+25BC (down arrow)
+         - U+25B2 (up arrow)
+         - U+203A (right arrow)
+         - U+2713 (checkmark)
+         - U+22EE (vertical ellipsis)
+         Note: U+00BA (masculine ordinal) in SpeechSlot.tsx is NOT an icon and
+         must NOT be removed.
+
+    files:
+      - docs/decisions.yaml (or wherever DD-25 is defined)
+
+    dependencies: ["STEP-02", "STEP-03", "STEP-04"]
+    parallelizable_with: []
+
+    done_when:
+      - "DD-25 text updated to reflect inline SVG icons pattern instead of Unicode"
+      - "DD-25 still preserves 'no icon library' principle"
+      - "Zero occurrences of the 14 replaced Unicode characters in UI-rendering production code"
+      - "U+00BA in SpeechSlot.tsx is preserved (not an icon)"
+
+    tests:
+      - type: verification
+        description: >
+          Grep codebase for each of the 14 Unicode characters. Verify zero
+          matches in production src/ files (test files and documentation
+          files may still reference them for historical context).
+
+    covers:
+      acceptance_criteria: ["AC-145-17", "AC-145-18"]
+      edge_cases: []
+
+    risks:
+      - risk: "Missing a Unicode icon occurrence in an obscure file"
+        mitigation: "Comprehensive grep for all 14 characters. The SPEC provides exact file:line locations for every occurrence."
+
+  # -------------------------------------------------------------------------
+  # STEP-06: F146 - Adjust play icon placement in Home and Agenda
+  # -------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Adjust play icon placement per CR-210/F146. F145 (STEP-04) already replaced
+      the Unicode play icon with PlayIcon SVG component. This step fine-tunes the
+      layout and ensures correct color/size props.
+
+      1. index.tsx (Home tab):
+         - PlayIcon is already inside meetingButtonContent View (from STEP-04).
+         - Verify PlayIcon has size={20} color={colors.onPrimary}.
+         - Verify PlayIcon has marginRight: 8 before the button text (existing
+           playIcon style should already provide this; verify and adjust if needed).
+         - No position change from current layout -- icon + text centered in button.
+
+      2. agenda.tsx (Agenda tab):
+         - PlayIcon is already rendered in the card header (from STEP-04).
+         - Add/verify marginRight: 8 on PlayIcon or its wrapping View to create
+           visual gap from the chevron icon.
+         - Set PlayIcon color={colors.textSecondary} (matching chevron's sober
+           appearance for both light and dark themes).
+         - Ensure PlayIcon only renders when expandable && isExpanded (preserve
+           current conditional rendering behavior).
+         - Both PlayIcon and ChevronUp/DownIcon should be vertically centered in
+           the card header row (alignItems: 'center' on parent).
+
+    files:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+
+    done_when:
+      - "Home tab: PlayIcon inside meetingButtonContent with size=20, color=onPrimary, marginRight: 8"
+      - "Agenda tab: PlayIcon has marginRight: 8 separating it from chevron icon"
+      - "Agenda tab: PlayIcon uses color={colors.textSecondary}"
+      - "Agenda tab: PlayIcon only rendered when expandable && isExpanded"
+      - "Agenda tab: PlayIcon and chevron vertically centered in header row"
+      - "Play icon works correctly with light theme (Home: onPrimary, Agenda: textSecondary gray)"
+      - "Play icon works correctly with dark theme (Home: onPrimary contrast, Agenda: textSecondary light gray)"
+      - "Play icon is monochromatic SVG, not colored emoji"
+
+    tests:
+      - type: unit
+        description: >
+          Test PlayIcon in Home tab renders with correct size and color.
+          Test PlayIcon in Agenda tab renders with marginRight: 8 and
+          textSecondary color. Test PlayIcon in Agenda only renders when
+          expandable && isExpanded. Test PlayIcon renders correctly in
+          both light and dark theme contexts.
+
+    covers:
+      acceptance_criteria: ["AC-146-01", "AC-146-02", "AC-146-03", "AC-146-04", "AC-146-05", "AC-146-06"]
+      edge_cases: ["EC-146-01", "EC-146-02"]
+
+    risks:
+      - risk: "Play icon and chevron overlap on very narrow screens"
+        mitigation: "Both icons are in a flex row with fixed sizes. The marginRight: 8 provides consistent separation regardless of screen width."
+
+  # -------------------------------------------------------------------------
+  # STEP-07: Tests for all steps
+  # -------------------------------------------------------------------------
+  - id: STEP-07
+    description: >
+      Create/update test file(s) for F145 and F146 changes:
+
+      1. Test icons module (F145):
+         - Verify all 14 icon components render without crashing
+         - Verify each renders an Svg element with correct viewBox
+         - Verify size prop maps to width/height on Svg
+         - Verify color prop maps to stroke (stroke-based) or fill (WhatsAppIcon)
+         - Verify default values: size=24, color='currentColor' (stroke), '#25D366' (WhatsApp)
+         - Verify edge cases: size=0, size=200, undefined color
+
+      2. Test tab bar icons (F145):
+         - Verify _layout.tsx renders SVG icons, not emoji Text elements
+         - Verify color and size from Expo Router callback are passed through
+
+      3. Test component icon replacements (F145):
+         - Verify SwipeableCard renders PencilIcon/TrashIcon
+         - Verify SpeechSlot renders ChevronDownIcon/XIcon
+         - Verify SearchInput renders XIcon
+         - Verify SundayCard renders ChevronDownIcon
+         - Verify AccordionCard renders ChevronDownIcon/ChevronUpIcon
+         - Verify AgendaForm renders XIcon/PencilIcon
+         - Verify InviteManagementSection renders WhatsAppIcon/MoreVerticalIcon from shared module
+         - Verify InviteActionDropdown renders WhatsAppIcon from shared module
+
+      4. Test screen icon replacements (F145):
+         - Verify index.tsx renders PlayIcon/PencilIcon
+         - Verify agenda.tsx renders PlayIcon/ChevronDownIcon/ChevronUpIcon
+         - Verify presentation.tsx renders PencilIcon/XIcon
+         - Verify settings screens render correct icons
+
+      5. Test play icon placement (F146):
+         - Verify Home tab PlayIcon has size=20, color=onPrimary
+         - Verify Agenda tab PlayIcon has marginRight: 8, color=textSecondary
+         - Verify Agenda tab PlayIcon only renders when expanded
+
+      Test files follow the project's existing test naming convention.
+
+    files:
+      - "__tests__/batch23-phase1.test.tsx (NEW)"
+
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+
+    done_when:
+      - "Icons module tests verify all 14 components render correctly"
+      - "Icons module tests verify default props and prop forwarding"
+      - "Icons module tests verify edge cases (size=0, size=200, undefined color)"
+      - "Tab bar test verifies SVG icons replace emoji"
+      - "Component tests verify icon replacements in all 8 component files"
+      - "Screen tests verify icon replacements in all 7 screen files"
+      - "Play icon placement tests verify Home and Agenda positioning"
+      - "WhatsAppIcon consolidation test verifies shared import works"
+      - "All tests pass with 'pnpm test'"
+
+    tests:
+      - type: unit
+        description: "Comprehensive unit tests covering icons module, all replacements, and play icon placement"
+
+    covers:
+      acceptance_criteria: ["AC-145-01", "AC-145-02", "AC-145-03", "AC-145-04", "AC-145-05", "AC-145-06", "AC-145-07", "AC-145-08", "AC-145-09", "AC-145-10", "AC-145-11", "AC-145-12", "AC-145-13", "AC-145-14", "AC-145-15", "AC-145-16", "AC-145-17", "AC-146-01", "AC-146-02", "AC-146-03", "AC-146-04", "AC-146-05", "AC-146-06"]
+      edge_cases: ["EC-145-01", "EC-145-02", "EC-145-03", "EC-145-04", "EC-145-05", "EC-146-01", "EC-146-02"]
+
+    risks:
+      - risk: "react-native-svg mocking complexity in test environment"
+        mitigation: "Follow existing test patterns. Use vi.mock for react-native-svg. Mock Svg and Path as simple View components for render verification."
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  # F145 ACs
+  - ac_id: AC-145-01
+    how_to_verify: "Import all 14 icons from src/components/icons/index.ts. Verify each is a valid React component. Verify IconProps interface is exported."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-145-02
+    how_to_verify: "Render each icon with size=32 and color='#FF0000'. Verify Svg has width=32 height=32 viewBox='0 0 24 24' fill='none'. Verify stroke-based icons have Path with stroke='#FF0000'. Verify WhatsAppIcon has Path with fill='#FF0000'."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-145-03
+    how_to_verify: "View _layout.tsx tab bar. Verify HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon receive color and size from tabBarIcon callback. Verify no emoji Text elements in tab bar."
+    covered_by_steps: ["STEP-02", "STEP-07"]
+
+  - ac_id: AC-145-04
+    how_to_verify: "Swipe a card in the app. Verify TrashIcon with color=#FFFFFF on delete button. No U+1F5D1 emoji."
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-145-05
+    how_to_verify: "Swipe a card. Verify PencilIcon with color=onPrimary on edit button. No U+270F Unicode."
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-145-06
+    how_to_verify: "View Home tab button and Agenda tab expanded card. Verify PlayIcon SVG renders instead of U+25B6."
+    covered_by_steps: ["STEP-04", "STEP-06", "STEP-07"]
+
+  - ac_id: AC-145-07
+    how_to_verify: "View pencil edit buttons in Home, presentation, and AgendaForm. Verify PencilIcon SVG renders instead of U+270F."
+    covered_by_steps: ["STEP-03", "STEP-04", "STEP-07"]
+
+  - ac_id: AC-145-08
+    how_to_verify: "Open presentation mode. Verify XIcon SVG on close button instead of U+2715."
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-145-09
+    how_to_verify: "View clear/remove buttons in SpeechSlot, SearchInput, AgendaForm. Verify XIcon SVG instead of U+00D7."
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-145-10
+    how_to_verify: "View dropdown arrows in SpeechSlot, SundayCard, AccordionCard, agenda.tsx, users.tsx. Verify ChevronDownIcon/ChevronUpIcon SVG instead of U+25BC/U+25B2."
+    covered_by_steps: ["STEP-03", "STEP-04", "STEP-07"]
+
+  - ac_id: AC-145-11
+    how_to_verify: "View Settings screen items. Verify ChevronRightIcon SVG instead of U+203A."
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-145-12
+    how_to_verify: "View language, timezone, theme selectors. Verify CheckIcon SVG instead of U+2713."
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-145-13
+    how_to_verify: "View invite management three-dots button. Verify MoreVerticalIcon SVG instead of U+22EE."
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-145-14
+    how_to_verify: "Verify InviteManagementSection.tsx and InviteActionDropdown.tsx import WhatsAppIcon from icons module. Verify local definitions removed. Verify same rendering output."
+    covered_by_steps: ["STEP-03", "STEP-07"]
+
+  - ac_id: AC-145-15
+    how_to_verify: "Compare package.json before and after. Verify zero new dependencies. Only react-native-svg (^15.12.1) used."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-145-16
+    how_to_verify: "Run app on iOS and Android simulators. Verify icons render identically on both platforms. SVG rendering via react-native-svg is platform-independent."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-145-17
+    how_to_verify: "Grep codebase for all 14 Unicode characters. Verify zero occurrences in UI-rendering production code. U+00BA in SpeechSlot.tsx preserved."
+    covered_by_steps: ["STEP-05", "STEP-07"]
+
+  - ac_id: AC-145-18
+    how_to_verify: "Read DD-25 text. Verify it says 'inline SVG icons via react-native-svg (no icon library)' instead of 'Unicode icons'."
+    covered_by_steps: ["STEP-05"]
+
+  # F146 ACs
+  - ac_id: AC-146-01
+    how_to_verify: "View Home tab. Verify PlayIcon inside meetingButtonContent with size=20, color=onPrimary, before button text."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-146-02
+    how_to_verify: "Expand a sunday card in Agenda tab. Verify PlayIcon left of chevron with marginRight: 8 and color=textSecondary."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-146-03
+    how_to_verify: "Set app to light theme. Verify Home PlayIcon uses onPrimary (white on primary button). Verify Agenda PlayIcon uses textSecondary (gray)."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-146-04
+    how_to_verify: "Set app to dark theme. Verify Home PlayIcon uses onPrimary (contrasts button). Verify Agenda PlayIcon uses textSecondary (light gray)."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-146-05
+    how_to_verify: "Collapse and expand a sunday card. Verify PlayIcon only appears when expanded. When collapsed, only chevron visible."
+    covered_by_steps: ["STEP-06", "STEP-07"]
+
+  - ac_id: AC-146-06
+    how_to_verify: "Visually inspect PlayIcon. Verify it is a monochromatic SVG stroke icon, not a colored emoji or platform-specific character."
+    covered_by_steps: ["STEP-01", "STEP-06", "STEP-07"]

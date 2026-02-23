@@ -4,9 +4,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  total_crs: 208
-  implemented: 206
-  pending: 2
+  total_crs: 215
+  implemented: 208
+  pending: 7
   last_updated: "2026-02-22"
 
 change_requests:
@@ -1944,3 +1944,139 @@ change_requests:
     regression_of: 205
     related_crs: [93, 203, 205]
     implemented_in: "PLAN_P039"
+
+  - id: 209
+    type: ui
+    status: implemented
+    batch: 23
+    description: >
+      Substituir todos os icones Unicode/emoji por componentes SVG inline
+      (react-native-svg) para consistencia visual com o tema sobrio do app.
+
+      PROBLEMA: Emojis Unicode (casa, clipboard, microfone, engrenagem, lixeira)
+      sao renderizados com cores proprias de cada plataforma (iOS/Android),
+      ignorando completamente a prop color do Text. Caracteres Unicode simples
+      (setas, X, checkmark, pencil) respeitam a cor mas variam em tamanho,
+      peso e posicionamento entre plataformas. O resultado e um visual
+      inconsistente que destoa do tema monocromatico do app.
+
+      REFERENCIA: O icone de WhatsApp (SVG inline via react-native-svg) ja
+      usa o padrao ideal -- monocromatico, escalavel, aceita props size/color,
+      consistente em todas as plataformas.
+
+      SOLUCAO: Criar src/components/icons/index.ts com componentes SVG inline
+      seguindo o padrao do WhatsAppIcon. Path data do Lucide Icons (MIT,
+      24x24 viewBox, stroke-based). Zero dependencias novas (usa react-native-svg
+      ja presente). Respeita DD-25 (sem biblioteca de icones).
+
+      INVENTARIO COMPLETO DE ICONES A SUBSTITUIR:
+
+      Prioridade 1 - Emojis (coloridos, ignoram cor do tema):
+        - U+1F3E0 (casa)       -> HomeIcon          | _layout.tsx:34
+        - U+1F4CB (clipboard)  -> ClipboardListIcon  | _layout.tsx:43
+        - U+1F399 (microfone)  -> MicIcon            | _layout.tsx:52
+        - U+2699  (engrenagem) -> SettingsIcon        | _layout.tsx:61
+        - U+1F5D1 (lixeira)   -> TrashIcon           | SwipeableCard.tsx:173
+
+      Prioridade 2 - Unicode (inconsistentes entre plataformas):
+        - U+25B6 (play)        -> PlayIcon           | index.tsx:134
+        - U+270F (pencil)      -> PencilIcon         | index.tsx:233, presentation.tsx:106, AgendaForm.tsx:718
+        - U+2715 (close X)     -> XIcon              | presentation.tsx:126
+        - U+00D7 (multiply X)  -> XIcon              | SpeechSlot.tsx:251,290, SearchInput.tsx:53, AgendaForm.tsx:229,684
+        - U+25BC (seta baixo)  -> ChevronDownIcon    | SpeechSlot.tsx:238,279, SundayCard.tsx:182, AccordionCard.tsx:99, agenda.tsx:531, users.tsx:365
+        - U+25B2 (seta cima)   -> ChevronUpIcon      | AccordionCard.tsx:99, agenda.tsx:531, users.tsx:365
+        - U+203A (seta direita)-> ChevronRightIcon   | settings/index.tsx:38
+        - U+2713 (checkmark)   -> CheckIcon          | settings/index.tsx:305,346, timezone.tsx:172, theme.tsx:62
+        - U+22EE (ellipsis v)  -> MoreVerticalIcon   | InviteManagementSection.tsx:241
+
+      Consolidacao:
+        - WhatsAppIcon (duplicado em InviteManagementSection.tsx:40-48 e
+          InviteActionDropdown.tsx:38-47) -> mover para icons/index.ts,
+          importar de la em ambos os arquivos.
+
+      ARQUIVOS IMPACTADOS:
+        Novo: src/components/icons/index.ts
+        Modificados (componentes):
+          _layout.tsx, index.tsx, agenda.tsx, presentation.tsx,
+          settings/index.tsx, settings/timezone.tsx, settings/theme.tsx,
+          settings/users.tsx, SwipeableCard.tsx, SpeechSlot.tsx,
+          SearchInput.tsx, AgendaForm.tsx, AccordionCard.tsx, SundayCard.tsx,
+          InviteManagementSection.tsx, InviteActionDropdown.tsx
+        Modificados (testes que verificam Unicode):
+          batch8-phase2.test.ts, batch6-f027-f031.test.ts,
+          batch9-phase2.test.ts, batch11.test.ts, batch15-phase1.test.ts,
+          batch19-phase2.test.ts, batch20-phase1.test.ts,
+          cr001-qa-extended.test.ts
+
+      PADRAO DO COMPONENTE SVG:
+        function XxxIcon({ size = 24, color = '#000' }) {
+          return (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Path d="..." stroke={color} strokeWidth={2}
+                strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          );
+        }
+        Excecao: WhatsAppIcon usa fill={color} (icone de marca, nao Lucide).
+
+      FONTE DOS PATHS SVG: https://github.com/lucide-icons/lucide (MIT license)
+    regression_of: null
+    related_crs: []
+    implemented_in: "PLAN_P040"
+
+  # ============================================================
+  # BATCH 23 (CRs 210-215)
+  # ============================================================
+  - id: 210
+    type: ui
+    status: implemented
+    batch: 23
+    description: "Play icon: trocar caractere UTF-8 (U+25B6) por icone SVG sobrio (como WhatsApp). No Home, manter no mesmo lugar. No card de domingo (agenda), afastar da seta de contracao. Usar icones que combinem com temas claro/escuro (pode ser um icone por tema). Nao usar icone colorido"
+    regression_of: null
+    related_crs: [185, 186, 200, 209]
+    implemented_in: "PLAN_P040"
+
+  - id: 211
+    type: ui
+    status: in_progress
+    batch: 23
+    description: "Home: adicionar borda azul no card contraido de agenda, igual ao que ja existe no card de proximo discurso (SundayCard isNext com borderColor: colors.primary, borderWidth: 2)"
+    regression_of: null
+    related_crs: [186]
+    implemented_in: null
+
+  - id: 212
+    type: ui
+    status: in_progress
+    batch: 23
+    description: "Trocar textos i18n: 'Apoios e Agradecimentos' -> 'Apoios e Desobrigacoes' (pt-BR/en/es). 'Apoios e Agradecimentos da Estaca' -> 'Anuncios, Apoios e Desobrigacoes da Estaca' (pt-BR/en/es). Tanto no card de edicao da agenda quanto no card de apresentacao"
+    regression_of: null
+    related_crs: [172]
+    implemented_in: null
+
+  - id: 213
+    type: ux
+    status: in_progress
+    batch: 23
+    description: "No card de edicao da agenda, campos de discurso (discursante read-only) devem ter visual que deixe obvio que estao indisponiveis para edicao (ex: opacidade reduzida, cor de fundo diferente)"
+    regression_of: null
+    related_crs: [182]
+    implemented_in: null
+
+  - id: 214
+    type: bug
+    status: in_progress
+    batch: 23
+    description: "No card de edicao de discursos, quando 2o discurso esta desabilitado, manter placeholders originais nos campos: 'Selecionar Discursante' e 'Selecionar Tema', ao inves de 'Domingo configurado para nao ter 2o discurso'"
+    regression_of: 181
+    related_crs: [181, 196]
+    implemented_in: null
+
+  - id: 215
+    type: ui
+    status: in_progress
+    batch: 23
+    description: "Cards contraidos de edicao de discursos devem ter mesma altura independente do conteudo (1, 2 ou 3 linhas). Usar a altura do card mais alto (3 linhas) para todos"
+    regression_of: null
+    related_crs: [150, 161]
+    implemented_in: null

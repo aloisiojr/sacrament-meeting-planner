@@ -1,0 +1,316 @@
+# =============================================================================
+# ARCH_M041.yaml
+# Architecture for Batch 23 Phase 2: F147, F148, F149, F150, F151
+# CR-211 (Blue border on collapsed agenda preview card)
+# CR-212 (i18n text swap for wardBusiness and stakeAnnouncements)
+# CR-213 (Disabled speech fields visual in AgendaForm)
+# CR-214 (Original placeholders when 2nd speech disabled)
+# CR-215 (Collapsed speech cards uniform height)
+# Created: 2026-02-22
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Apply 5 independent UI/i18n refinements to Home tab, AgendaForm, SpeechSlot, SundayCard, and locale files"
+  principles:
+    - "No new components: all changes modify existing components within existing modules"
+    - "No data model changes: purely visual and i18n text updates"
+    - "No new dependencies: uses only existing theme colors, styles, and i18n infrastructure"
+    - "Each feature is independent: no cross-feature dependencies within this batch"
+    - "Follow established patterns: disabled visual (SpeechSlot pattern), border styling (SundayCard isNext pattern), minHeight for uniform cards"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F147 (CR-211): Home tab preview card blue border
+    index.tsx: previewCard style
+      borderColor: colors.border -> colors.primary
+      borderWidth: 1 -> 2
+
+  F148 (CR-212): i18n label updates (5 values across 3 locales)
+    pt-BR.json: wardBusiness, stakeAnnouncements
+    en.json:    stakeAnnouncements
+    es.json:    wardBusiness, stakeAnnouncements
+
+  F149 (CR-213): Disabled visual on ReadOnlySpeakerRow
+    AgendaForm.tsx: ReadOnlySpeakerRow
+      speakerReadRow + disabled -> { opacity: 0.5, bg: surfaceVariant }
+
+  F150 (CR-214): Standard placeholders when 2nd speech disabled
+    SpeechSlot.tsx:  secondSpeechDisabledPlaceholder -> selectSpeaker / selectTopic
+    AgendaForm.tsx:  secondSpeechDisabledPlaceholder -> '' (fallback to label)
+
+  F151 (CR-215): Uniform collapsed card height
+    SundayCard.tsx: headerCenter
+      !expanded && isSpeechesType -> { minHeight: 62 }
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  - name: "HomePreviewCardBorder"
+    responsibility: "Apply blue primary border to Home tab agenda preview card (F147)"
+    file: "src/app/(tabs)/index.tsx"
+    changes:
+      - "Change inline style on previewCard View (line ~147): borderColor from colors.border to colors.primary"
+      - "Add inline style borderWidth: 2 (overrides styles.previewCard borderWidth: 1)"
+    dependencies: []
+
+  - name: "I18nLabelUpdates"
+    responsibility: "Update wardBusiness and stakeAnnouncements i18n labels across 3 locales (F148)"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    changes:
+      - "pt-BR.json: agenda.wardBusiness 'Apoios e Agradecimentos' -> 'Apoios e Desobrigacoes' (with proper diacritics)"
+      - "pt-BR.json: agenda.stakeAnnouncements 'Apoios e Agradecimentos da Estaca' -> 'Anuncios, Apoios e Desobrigacoes da Estaca' (with proper diacritics)"
+      - "en.json: agenda.stakeAnnouncements 'Stake Sustainings and Releases' -> 'Stake Announcements, Sustainings and Releases'"
+      - "en.json: agenda.wardBusiness stays unchanged ('Sustainings and Releases' is correct English LDS terminology)"
+      - "es.json: agenda.wardBusiness 'Apoyos y Agradecimientos' -> 'Apoyos y Relevos'"
+      - "es.json: agenda.stakeAnnouncements 'Apoyos y Agradecimientos de Estaca' -> 'Anuncios, Apoyos y Relevos de Estaca'"
+    dependencies: []
+
+  - name: "DisabledSpeakerRowVisual"
+    responsibility: "Add opacity and background visual cue to disabled ReadOnlySpeakerRow in AgendaForm (F149)"
+    file: "src/components/AgendaForm.tsx"
+    changes:
+      - "In ReadOnlySpeakerRow component (line ~707): add conditional style on speakerReadRow View"
+      - "When disabled=true: apply { backgroundColor: colors.surfaceVariant, opacity: 0.5 }"
+      - "When disabled=false: no change to current appearance"
+      - "Pattern matches SpeechSlot.tsx:201 disabled 2nd speech fields"
+    dependencies: []
+
+  - name: "StandardPlaceholdersForDisabledSpeech"
+    responsibility: "Show standard field placeholders instead of explanation text when 2nd speech disabled (F150)"
+    files:
+      - "src/components/SpeechSlot.tsx"
+      - "src/components/AgendaForm.tsx"
+    changes:
+      - "SpeechSlot.tsx (line ~203): replace t('speeches.secondSpeechDisabledPlaceholder') with t('speeches.selectSpeaker') in speaker field"
+      - "SpeechSlot.tsx (line ~211): replace t('speeches.secondSpeechDisabledPlaceholder') with t('speeches.selectTopic') in topic field"
+      - "AgendaForm.tsx (line ~424-425): replace t('speeches.secondSpeechDisabledPlaceholder') with empty string '' when has_second_speech===false"
+      - "Empty string in AgendaForm causes ReadOnlySpeakerRow to fall through to label prop via {speakerName || label} at line ~715"
+      - "i18n key speeches.secondSpeechDisabledPlaceholder is NOT removed from locale files"
+    dependencies: []
+
+  - name: "UniformCollapsedCardHeight"
+    responsibility: "Ensure all collapsed speech-type cards have same height regardless of position count (F151)"
+    file: "src/components/SundayCard.tsx"
+    changes:
+      - "Add conditional minHeight to headerCenter View inline style (line ~350)"
+      - "Style: [styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]"
+      - "minHeight 62px calculated from: 3 speechRows x ~18px lineHeight + 2 x 4px marginBottom = 62px"
+      - "Only applied when card is collapsed (!expanded) AND is speech-type (isSpeechesType)"
+      - "Does not affect expanded cards or non-speech type cards"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+  - name: "preview_card_border_style"
+    component: "HomePreviewCardBorder"
+    methods:
+      - name: "previewCard inline style"
+        input: "colors.primary from useTheme()"
+        output: "View style: { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 }"
+        notes: "Unconditional: preview card always shows the next sunday, so it always gets the primary border (same logic as SundayCard isNext=true)"
+
+  - name: "disabled_speaker_row_style"
+    component: "DisabledSpeakerRowVisual"
+    methods:
+      - name: "speakerReadRow conditional disabled style"
+        input: "disabled prop (boolean), colors.surfaceVariant from theme"
+        output: "When disabled=true: style includes { backgroundColor: colors.surfaceVariant, opacity: 0.5 }. When disabled=false: no additional style."
+        notes: "Matches existing pattern in SpeechSlot.tsx:201 for disabled fields"
+
+  - name: "disabled_speech_placeholder"
+    component: "StandardPlaceholdersForDisabledSpeech"
+    methods:
+      - name: "SpeechSlot disabled speaker placeholder"
+        input: "isPos2Disabled=true"
+        output: "Text shows t('speeches.selectSpeaker') instead of t('speeches.secondSpeechDisabledPlaceholder')"
+      - name: "SpeechSlot disabled topic placeholder"
+        input: "isPos2Disabled=true"
+        output: "Text shows t('speeches.selectTopic') instead of t('speeches.secondSpeechDisabledPlaceholder')"
+      - name: "AgendaForm disabled 2nd speaker"
+        input: "agenda.has_second_speech===false"
+        output: "speakerName='' passed to ReadOnlySpeakerRow, which displays label as placeholder via {speakerName || label}"
+
+  - name: "uniform_card_height"
+    component: "UniformCollapsedCardHeight"
+    methods:
+      - name: "headerCenter conditional minHeight"
+        input: "expanded (boolean), isSpeechesType (boolean)"
+        output: "When !expanded && isSpeechesType: style includes { minHeight: 62 }. Otherwise: no minHeight constraint."
+        notes: "62px = 3 rows x (18px text + 4px margin) - 4px last margin. Cards with 3 positions naturally meet this height. Cards with 2 positions are padded to match."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  changes: []
+  notes: "No data model changes. No new tables, columns, or schema changes. F147-F151 are purely UI/i18n changes."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    - No security impact. All changes are visual (border color, opacity, background, minHeight) or i18n text updates.
+    - No new user input, no network calls, no data access changes.
+    - Existing permission checks (isObserver, canAssign) are unchanged.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - No observability changes needed. All changes are visual or i18n text.
+    - Visual verification: test both light and dark themes for F147, F149, F151.
+    - i18n verification: test all 3 languages (pt-BR, en, es) for F148.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-098
+    title: "Reuse existing visual patterns for disabled fields and primary borders"
+    context: >
+      F147 needs a blue border on the Home preview card. F149 needs a disabled
+      visual on ReadOnlySpeakerRow. Both patterns already exist in the codebase:
+      SundayCard isNext uses borderColor: colors.primary + borderWidth: 2.
+      SpeechSlot disabled 2nd speech fields use opacity: 0.5 + backgroundColor:
+      colors.surfaceVariant. F150 replaces explanation text with standard
+      placeholders in disabled fields. F151 uses minHeight for uniform card
+      heights. All are minimal style changes.
+    decision: >
+      Apply existing visual patterns from the codebase to new locations rather
+      than introducing new patterns. F147 copies SundayCard isNext style to
+      Home preview card. F149 copies SpeechSlot disabled field style to
+      ReadOnlySpeakerRow. F150 replaces custom placeholder text with existing
+      i18n keys (selectSpeaker, selectTopic). F151 uses minHeight calculated
+      from existing speechRow dimensions. No new ADR is needed for individual
+      features as they all follow the same principle: reuse existing patterns.
+    decided_in: "CR-211/CR-212/CR-213/CR-214/CR-215"
+    consequences:
+      - "Visual consistency: disabled fields look the same in SpeechSlot and AgendaForm"
+      - "Visual consistency: primary border on Home preview matches SundayCard isNext"
+      - "No new style constants or patterns introduced"
+      - "i18n keys not duplicated: existing selectSpeaker/selectTopic reused"
+      - "minHeight 62px is a hardcoded value that may not adapt to font scaling, but this is acceptable for the default case (same approach as existing speechRow dimensions)"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+  - features: [F149, F150]
+    interaction: >
+      F149 and F150 both modify AgendaForm.tsx but in different locations.
+      F149 adds disabled visual style to ReadOnlySpeakerRow (line ~707).
+      F150 changes the speakerName value passed to ReadOnlySpeakerRow (line ~424-425).
+      The changes are in separate code locations and do not conflict.
+      When combined: the 2nd speaker row shows the label as placeholder text
+      (from F150) with the disabled visual style applied (from F149).
+
+  - features: [F149, F132]
+    interaction: >
+      F132 (CR-196) established the disabled prop on ReadOnlySpeakerRow and
+      the has_second_speech conditional logic. F149 adds the missing visual
+      feedback for that disabled state. F132's behavioral logic is unchanged.
+
+  - features: [F150, F118]
+    interaction: >
+      F118 (CR-181) introduced the has_second_speech toggle and the
+      secondSpeechDisabledPlaceholder text. F150 replaces that placeholder
+      with standard field placeholders while keeping the toggle logic unchanged.
+
+  - features: [F151, F099]
+    interaction: >
+      F099 (CR-161) redesigned the collapsed speech card layout (LEDs inline,
+      font size 13, marginBottom 4). F151 adds minHeight based on those
+      dimensions to ensure uniform height across cards with different position counts.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/app/(tabs)/index.tsx
+    feature: F147
+    changes:
+      - "Change borderColor from colors.border to colors.primary in previewCard inline style"
+      - "Add borderWidth: 2 to previewCard inline style (overrides stylesheet borderWidth: 1)"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F148
+    changes:
+      - "Update agenda.wardBusiness value"
+      - "Update agenda.stakeAnnouncements value"
+
+  - file: src/i18n/locales/en.json
+    feature: F148
+    changes:
+      - "Update agenda.stakeAnnouncements value (wardBusiness unchanged)"
+
+  - file: src/i18n/locales/es.json
+    feature: F148
+    changes:
+      - "Update agenda.wardBusiness value"
+      - "Update agenda.stakeAnnouncements value"
+
+  - file: src/components/AgendaForm.tsx
+    feature: F149, F150
+    changes:
+      - "F149: Add disabled conditional style to ReadOnlySpeakerRow speakerReadRow View"
+      - "F150: Change speakerName for disabled 2nd speech from t('speeches.secondSpeechDisabledPlaceholder') to empty string"
+
+  - file: src/components/SpeechSlot.tsx
+    feature: F150
+    changes:
+      - "Replace t('speeches.secondSpeechDisabledPlaceholder') with t('speeches.selectSpeaker') in disabled speaker field"
+      - "Replace t('speeches.secondSpeechDisabledPlaceholder') with t('speeches.selectTopic') in disabled topic field"
+
+  - file: src/components/SundayCard.tsx
+    feature: F151
+    changes:
+      - "Add conditional minHeight: 62 to headerCenter View when !expanded && isSpeechesType"
+
+files_not_modified:
+  - "src/hooks/usePresentationMode.ts (F148 labels consumed via i18n, no code change)"
+  - "src/components/StatusLED.tsx (no changes)"
+  - "src/components/SpeechSlot.tsx disabled visual style (already exists, F149 only changes AgendaForm)"
+  - "package.json (no new dependencies)"
+  - "supabase/migrations/* (no schema changes)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # Each component has exactly one responsibility
+  GATE-03_contracts_defined: true        # Contracts defined for each change
+  GATE-04_adrs_recorded: true           # ADR-098 covers the pattern-reuse principle for all 5 features
+  GATE-05_arch_saved: true              # ARCH_M041.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED to be updated
+  GATE-07_arch_summary_filled: true     # Summary provided
+  GATE-08_max_components: true          # 5 components, under 10 limit

@@ -1,0 +1,185 @@
+# =============================================================================
+# SPEC_F148.yaml
+# Batch 23 Phase 2: i18n text swap for wardBusiness and stakeAnnouncements (CR-212)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: i18n_update
+execution_order: "Independent - no dependency on other Phase 2 features"
+execution_rationale: >
+  F148 is an i18n text change only. It modifies 3 JSON locale files.
+  No code logic changes. Does not depend on or affect F147/F149/F150/F151.
+
+# =============================================================================
+# F148: i18n text swap for wardBusiness and stakeAnnouncements (CR-212)
+# =============================================================================
+
+features:
+
+  - id: F148
+    name: "Swap i18n texts: wardBusiness and stakeAnnouncements labels"
+    cr_id: 212
+    type: i18n_update
+    related_crs: []
+    related_features: []
+    description: >
+      CR-212 requests two i18n label changes across all 3 languages:
+
+      1. agenda.wardBusiness:
+         - pt-BR: "Apoios e Agradecimentos" -> "Apoios e Desobrigacoes"
+         - en: "Sustainings and Releases" -> (already correct, no change needed)
+         - es: "Apoyos y Agradecimientos" -> "Apoyos y Relevos"
+
+      2. agenda.stakeAnnouncements:
+         - pt-BR: "Apoios e Agradecimentos da Estaca" -> "Anuncios, Apoios e Desobrigacoes da Estaca"
+         - en: "Stake Sustainings and Releases" -> "Stake Announcements, Sustainings and Releases"
+         - es: "Apoyos y Agradecimientos de Estaca" -> "Anuncios, Apoyos y Relevos de Estaca"
+
+      These labels appear in two UI contexts:
+        a) AgendaForm (editing mode): used via t('agenda.wardBusiness') at
+           AgendaForm.tsx:336,341 and t('agenda.stakeAnnouncements') at
+           AgendaForm.tsx:385
+        b) Presentation mode: used via t('agenda.wardBusiness') at
+           usePresentationMode.ts:108 and t('agenda.stakeAnnouncements') at
+           usePresentationMode.ts:129
+
+      No code changes are needed. Only the i18n JSON values change.
+
+      NOTE on English: The user specified "Apoios e Desobrigacoes" for pt-BR.
+      The current English "Sustainings and Releases" is already the standard
+      LDS English term for this concept ("Releases" = "Desobrigacoes").
+      So English wardBusiness does NOT need a change. However, the
+      stakeAnnouncements label in English should be updated to include
+      "Announcements" to match the pt-BR pattern that adds "Anuncios".
+
+      NOTE on Spanish: "Agradecimientos" is not the correct Spanish for
+      "Releases/Desobrigacoes". The correct LDS Spanish term is "Relevos".
+      So Spanish wardBusiness changes from "Apoyos y Agradecimientos" to
+      "Apoyos y Relevos". Spanish stakeAnnouncements changes from
+      "Apoyos y Agradecimientos de Estaca" to
+      "Anuncios, Apoyos y Relevos de Estaca".
+
+    acceptance_criteria:
+      - id: AC-148-01
+        description: "pt-BR wardBusiness label updated"
+        given: "App language is pt-BR"
+        when: "AgendaForm or Presentation mode shows the wardBusiness label"
+        then: "The label reads 'Apoios e Desobrigacoes' instead of 'Apoios e Agradecimentos'."
+        status: pending
+
+      - id: AC-148-02
+        description: "pt-BR stakeAnnouncements label updated"
+        given: "App language is pt-BR"
+        when: "AgendaForm or Presentation mode shows the stakeAnnouncements label"
+        then: "The label reads 'Anuncios, Apoios e Desobrigacoes da Estaca' instead of 'Apoios e Agradecimentos da Estaca'."
+        status: pending
+
+      - id: AC-148-03
+        description: "en stakeAnnouncements label updated"
+        given: "App language is en"
+        when: "AgendaForm or Presentation mode shows the stakeAnnouncements label"
+        then: "The label reads 'Stake Announcements, Sustainings and Releases' instead of 'Stake Sustainings and Releases'."
+        status: pending
+
+      - id: AC-148-04
+        description: "es wardBusiness label updated"
+        given: "App language is es"
+        when: "AgendaForm or Presentation mode shows the wardBusiness label"
+        then: "The label reads 'Apoyos y Relevos' instead of 'Apoyos y Agradecimientos'."
+        status: pending
+
+      - id: AC-148-05
+        description: "es stakeAnnouncements label updated"
+        given: "App language is es"
+        when: "AgendaForm or Presentation mode shows the stakeAnnouncements label"
+        then: "The label reads 'Anuncios, Apoyos y Relevos de Estaca' instead of 'Apoyos y Agradecimientos de Estaca'."
+        status: pending
+
+      - id: AC-148-06
+        description: "en wardBusiness label unchanged"
+        given: "App language is en"
+        when: "AgendaForm or Presentation mode shows the wardBusiness label"
+        then: "The label remains 'Sustainings and Releases' (already correct English LDS terminology)."
+        status: pending
+
+      - id: AC-148-07
+        description: "Labels correct in AgendaForm editing card"
+        given: "User opens an agenda for editing"
+        when: "The wardBusiness field (line 336) and stakeAnnouncements field (line 385) are rendered"
+        then: "Both fields show the updated i18n labels for the current language."
+        status: pending
+
+      - id: AC-148-08
+        description: "Labels correct in Presentation mode"
+        given: "User starts presentation mode for a sunday with wardBusiness and stakeAnnouncements data"
+        when: "Presentation mode card 2 (Designations) is rendered"
+        then: "The wardBusiness label (usePresentationMode.ts:108) and stakeAnnouncements label (usePresentationMode.ts:129) show the updated i18n labels."
+        status: pending
+
+    edge_cases:
+      - id: EC-148-01
+        case: "Language switch while AgendaForm is open"
+        expected: "The labels update immediately to reflect the new language, as react-i18next re-renders on language change via the useTranslation hook."
+        status: pending
+
+    files_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/AgendaForm.tsx (no code changes, only i18n values change)
+      - src/hooks/usePresentationMode.ts (no code changes, only i18n values change)
+
+    implementation_details:
+      - location: "src/i18n/locales/pt-BR.json:231"
+        current_value: '"wardBusiness": "Apoios e Agradecimentos"'
+        new_value: '"wardBusiness": "Apoios e Desobrigações"'
+      - location: "src/i18n/locales/pt-BR.json:235"
+        current_value: '"stakeAnnouncements": "Apoios e Agradecimentos da Estaca"'
+        new_value: '"stakeAnnouncements": "Anúncios, Apoios e Desobrigações da Estaca"'
+      - location: "src/i18n/locales/en.json:235"
+        current_value: '"stakeAnnouncements": "Stake Sustainings and Releases"'
+        new_value: '"stakeAnnouncements": "Stake Announcements, Sustainings and Releases"'
+      - location: "src/i18n/locales/es.json:231"
+        current_value: '"wardBusiness": "Apoyos y Agradecimientos"'
+        new_value: '"wardBusiness": "Apoyos y Relevos"'
+      - location: "src/i18n/locales/es.json:235"
+        current_value: '"stakeAnnouncements": "Apoyos y Agradecimientos de Estaca"'
+        new_value: '"stakeAnnouncements": "Anuncios, Apoyos y Relevos de Estaca"'
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        English wardBusiness "Sustainings and Releases" is already the standard
+        LDS English term and does not need changing. Only the stakeAnnouncements
+        label needs updating to add "Announcements" at the beginning.
+
+    - id: A-02
+      text: >
+        Spanish "Agradecimientos" is not the correct translation for
+        "Releases/Desobrigacoes" in LDS context. The correct Spanish term is
+        "Relevos". The spec uses "Relevos" for the Spanish translations.
+
+    - id: A-03
+      text: >
+        The pt-BR text uses proper accents: "Desobrigacoes" in the YAML
+        (ASCII-safe for the spec) but the actual JSON file will use
+        "Desobrigações" with proper Portuguese diacritics, matching the
+        existing pattern in the locale file.
+
+  inconsistencies: []

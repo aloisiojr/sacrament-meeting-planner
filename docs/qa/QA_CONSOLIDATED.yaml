@@ -29,6 +29,7 @@
 # CR-205, CR-206, CR-207 (PRE+POST) - Batch 23 Phase 1
 # CR-204, CR-208 (PRE+POST) - Batch 22 Phase 2
 # CR-209, CR-210 (PRE+POST) - Batch 23 Phase 1
+# CR-211, CR-212, CR-213, CR-214, CR-215 (PRE+POST) - Batch 23 Phase 2
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -11054,4 +11055,392 @@ cr_210:
         status: PASSED
         evidence: |
           91 test files, 6032 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-211: Home - blue border on collapsed agenda card (F147)
+# #############################################################################
+
+cr_211:
+  cr_id: CR-211
+  title: "Home agenda preview card - blue border matching SundayCard isNext style"
+  type: feature_request
+  spec: specs/SPEC_F147.yaml
+  qa_plan: qa/QA_PLAN_041.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Current Home preview card (index.tsx:144-148) uses borderColor: colors.border
+      without primary blue border. SundayCard.tsx:334-336 already has the pattern
+      isNext && { borderColor: colors.primary, borderWidth: 2 }. Change is
+      straightforward: update inline style on previewCard View.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-211-01
+        description: "Home preview card has borderColor: colors.primary"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/index.tsx:147: { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 }
+          The previewCard inline style now uses colors.primary instead of colors.border.
+
+      - id: VC-211-02
+        description: "Home preview card has borderWidth: 2"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/index.tsx:147: borderWidth: 2 in inline style.
+          Base style previewCard has borderWidth: 1, but inline style overrides to 2.
+
+      - id: VC-211-03
+        description: "Border style matches SundayCard isNext styling"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:336 uses { borderColor: colors.primary, borderWidth: 2 }.
+          index.tsx:147 uses identical values { borderColor: colors.primary, borderWidth: 2 }.
+          Both patterns match exactly.
+
+    should_pass_results:
+      - id: VC-211-04
+        description: "No regression on existing SundayCard isNext border"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:336 isNext border logic unchanged: isNext && { borderColor: colors.primary, borderWidth: 2 }.
+
+      - id: VC-211-05
+        description: "Test coverage for new border style"
+        status: PASSED
+        evidence: |
+          Tests validate previewCard border properties in batch test files.
+
+    regression_checks:
+      - id: REG-211-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          92 test files, 6100 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-212: Rename wardBusiness and stakeAnnouncements i18n (F148)
+# #############################################################################
+
+cr_212:
+  cr_id: CR-212
+  title: "Rename wardBusiness and stakeAnnouncements i18n keys"
+  type: feature_request
+  spec: specs/SPEC_F148.yaml
+  qa_plan: qa/QA_PLAN_041.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Current i18n values use "Apoios e Agradecimentos" (pt-BR), "Sustainings and
+      Releases" (en), "Apoyos y Agradecimientos" (es). Change is i18n-only: update
+      values in all 3 locale files. No code logic changes needed.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-212-01
+        description: "pt-BR wardBusiness updated to 'Apoios e Desobrigacoes'"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/pt-BR.json:231: "wardBusiness": "Apoios e Desobrigações"
+          Contains "Desobrigações" as required.
+
+      - id: VC-212-02
+        description: "pt-BR stakeAnnouncements updated"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/pt-BR.json:235: "stakeAnnouncements": "Anúncios, Apoios e Desobrigações da Estaca"
+          Contains "Anúncios, Apoios e Desobrigações da Estaca" as required.
+
+      - id: VC-212-03
+        description: "en wardBusiness value updated"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/en.json:231: "wardBusiness": "Sustainings and Releases"
+          English value kept as "Sustainings and Releases" (already correct).
+
+      - id: VC-212-04
+        description: "en stakeAnnouncements value updated"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/en.json:235: "stakeAnnouncements": "Stake Announcements, Sustainings and Releases"
+          Updated from "Stake Sustainings and Releases" to include "Announcements".
+
+      - id: VC-212-05
+        description: "es wardBusiness value updated"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/es.json:231: "wardBusiness": "Apoyos y Relevos"
+          Updated from "Apoyos y Agradecimientos" to "Apoyos y Relevos".
+
+      - id: VC-212-06
+        description: "es stakeAnnouncements value updated"
+        status: PASSED
+        evidence: |
+          src/i18n/locales/es.json:235: "stakeAnnouncements": "Anuncios, Apoyos y Relevos de Estaca"
+          Updated from "Apoyos y Agradecimientos de Estaca" to include "Anuncios" prefix.
+
+    should_pass_results:
+      - id: VC-212-07
+        description: "Labels appear correctly in AgendaForm editing card"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:336 still uses t('agenda.wardBusiness') and AgendaForm.tsx:385
+          still uses t('agenda.stakeAnnouncements'). No key changes, only value changes.
+
+      - id: VC-212-08
+        description: "Labels appear correctly in presentation mode"
+        status: PASSED
+        evidence: |
+          usePresentationMode.ts uses t('agenda.wardBusiness') at line 108 and
+          t('agenda.stakeAnnouncements') at line 129. Keys unchanged, values propagate.
+
+      - id: VC-212-09
+        description: "Test coverage validates new i18n values"
+        status: PASSED
+        evidence: |
+          Tests validate updated text values in batch test files.
+
+    regression_checks:
+      - id: REG-212-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          92 test files, 6100 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-213: AgendaForm read-only speech fields - disabled visual (F149)
+# #############################################################################
+
+cr_213:
+  cr_id: CR-213
+  title: "AgendaForm read-only speech fields - obvious disabled visual styling"
+  type: feature_request
+  spec: specs/SPEC_F149.yaml
+  qa_plan: qa/QA_PLAN_041.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      ReadOnlySpeakerRow in AgendaForm.tsx:692-724 currently uses same styling as
+      editable fields. Need to add distinct disabled visual (opacity, background)
+      matching the SpeechSlot.tsx disabled pattern.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-213-01
+        description: "ReadOnlySpeakerRow has visually distinct disabled styling"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:707: <View style={[styles.speakerReadRow, { borderColor: colors.border },
+          disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+          When disabled=true, applies surfaceVariant background and 0.5 opacity,
+          clearly distinguishing from editable fields.
+
+      - id: VC-213-02
+        description: "All 3 speech positions use the updated styling"
+        status: PASSED
+        evidence: |
+          All ReadOnlySpeakerRow instances receive the disabled prop:
+          - Position 1 (line ~414): disabled={isObserver}
+          - Position 2 (line 429): disabled={isObserver || agenda.has_second_speech === false}
+          - Position 3 (last speech, line ~480): disabled={isObserver}
+          The disabled && {...} conditional in ReadOnlySpeakerRow applies to all instances.
+
+      - id: VC-213-03
+        description: "Disabled 2nd speech also has distinct visual"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:429: disabled={isObserver || agenda.has_second_speech === false}
+          When has_second_speech=false, 2nd speech row receives disabled=true,
+          triggering surfaceVariant background and 0.5 opacity.
+
+    should_pass_results:
+      - id: VC-213-04
+        description: "Pencil icon still visible and functional"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:717-721: {!disabled && (<Pressable...><PencilIcon.../></Pressable>)}
+          Pencil icon is hidden when disabled=true, shown when disabled=false.
+          For observer role: disabled=true, icon hidden (correct - observers can't navigate).
+          For non-observer with enabled speech: disabled=false, icon visible and functional.
+
+      - id: VC-213-05
+        description: "Test coverage for disabled visual style"
+        status: PASSED
+        evidence: |
+          Tests validate ReadOnlySpeakerRow disabled styling props in batch test files.
+
+    regression_checks:
+      - id: REG-213-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          92 test files, 6100 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-214: SpeechSlot - keep original placeholders when 2nd speech disabled (F150)
+# #############################################################################
+
+cr_214:
+  cr_id: CR-214
+  title: "SpeechSlot - keep original placeholders when 2nd speech is disabled"
+  type: feature_request
+  spec: specs/SPEC_F150.yaml
+  qa_plan: qa/QA_PLAN_041.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      SpeechSlot.tsx:198-216 currently shows t('speeches.secondSpeechDisabledPlaceholder')
+      for both fields when 2nd speech disabled. User wants original placeholders
+      selectSpeaker/selectTopic instead.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-214-01
+        description: "Speaker field shows 'Selecionar Discursante' when 2nd speech disabled"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:203: {t('speeches.selectSpeaker')}
+          When isPos2Disabled=true, speaker field shows the original selectSpeaker
+          placeholder instead of secondSpeechDisabledPlaceholder.
+
+      - id: VC-214-02
+        description: "Topic field shows 'Selecionar Tema' when 2nd speech disabled"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:211: {t('speeches.selectTopic')}
+          When isPos2Disabled=true, topic field shows the original selectTopic
+          placeholder instead of secondSpeechDisabledPlaceholder.
+
+      - id: VC-214-03
+        description: "Fields still visually disabled (opacity + background)"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:201: { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+          SpeechSlot.tsx:209: { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+          Both fields maintain the disabled visual styling with surfaceVariant background and 0.5 opacity.
+
+    should_pass_results:
+      - id: VC-214-04
+        description: "AgendaForm also updated if it uses secondSpeechDisabledPlaceholder"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:424-425: shows empty speakerName '' when has_second_speech=false.
+          AgendaForm.tsx:429: passes disabled={isObserver || agenda.has_second_speech === false}.
+          The ReadOnlySpeakerRow shows the label as placeholder when speakerName is empty,
+          and applies disabled visual styling. No secondSpeechDisabledPlaceholder used.
+
+      - id: VC-214-05
+        description: "Test coverage for updated placeholders"
+        status: PASSED
+        evidence: |
+          Tests validate correct placeholder text in disabled state in batch test files.
+
+    regression_checks:
+      - id: REG-214-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          92 test files, 6100 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-215: SundayCard collapsed - uniform height for speech cards (F151)
+# #############################################################################
+
+cr_215:
+  cr_id: CR-215
+  title: "SundayCard collapsed - uniform height for speech cards"
+  type: feature_request
+  spec: specs/SPEC_F151.yaml
+  qa_plan: qa/QA_PLAN_041.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      SundayCard collapsed view renders 2 or 3 speech rows depending on hasSecondSpeech,
+      causing different card heights. Need to add minHeight to ensure uniform height
+      matching 3-line cards.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-215-01
+        description: "Collapsed cards have uniform height regardless of speech count"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:350: <View style={[styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]}>
+          When collapsed (!expanded) and is speech type (isSpeechesType), applies
+          minHeight: 62 to headerCenter. This ensures uniform height for all speech cards.
+
+      - id: VC-215-02
+        description: "Cards with 2 speeches same height as 3-speech cards"
+        status: PASSED
+        evidence: |
+          minHeight: 62 is calculated as 3 rows x ~18px content + 2 x 4px marginBottom = ~62px.
+          Whether visiblePositions is [1,2,3] or [1,3] (2 rows), the minHeight: 62 ensures
+          the container is at least as tall as a 3-row card.
+
+    should_pass_results:
+      - id: VC-215-03
+        description: "Exception cards not affected by height change"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:350: condition uses isSpeechesType which is false for exception
+          cards (cards with exceptionText). The minHeight is only applied when
+          !expanded && isSpeechesType, so exception cards are not affected.
+
+      - id: VC-215-04
+        description: "Test coverage for uniform height"
+        status: PASSED
+        evidence: |
+          Tests validate collapsed card height consistency in batch test files.
+
+    regression_checks:
+      - id: REG-215-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          92 test files, 6100 tests passed, 49 skipped, 0 failures.
 

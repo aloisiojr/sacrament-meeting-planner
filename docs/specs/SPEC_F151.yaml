@@ -1,0 +1,180 @@
+# =============================================================================
+# SPEC_F151.yaml
+# Batch 23 Phase 2: Collapsed speech cards uniform height (CR-215)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on other Phase 2 features"
+execution_rationale: >
+  F151 is a style change on SundayCard collapsed state. It does not depend
+  on or affect F147/F148/F149/F150.
+
+# =============================================================================
+# F151: Collapsed speech cards uniform height (CR-215)
+# =============================================================================
+
+features:
+
+  - id: F151
+    name: "Make collapsed speech cards have uniform height regardless of content lines"
+    cr_id: 215
+    type: ui_improvement
+    related_crs: [150]
+    related_features: [F093, F118, F132]
+    description: >
+      CR-215 requests that collapsed speech cards in the Speeches tab should
+      all have the same height, regardless of whether they display 1, 2, or 3
+      speaker name lines. The target height is that of the tallest card
+      (3 visible positions / 3 lines).
+
+      CURRENT STATE: SundayCard.tsx:363-397 renders visiblePositions.map()
+      inside the headerCenter View when the card is collapsed (isSpeechesType
+      && !expanded). Each visible position creates a speechRow with a StatusLED
+      and speaker name. The number of visible positions varies:
+        - 2 positions when has_second_speech=false (positions 1, 3)
+        - 3 positions when has_second_speech=true (positions 1, 2, 3)
+        - 0-1 positions for special meeting types (non-speeches)
+
+      Cards with 2 positions are shorter than cards with 3 positions. This
+      creates inconsistent card heights in the scrollable list.
+
+      DESIRED STATE: All collapsed speech-type cards should have the same height.
+      The approach is to set a fixed minHeight on the headerCenter View when the
+      card is collapsed and is a speech-type card.
+
+      CALCULATION: Each speechRow has marginBottom: 4 (styles.speechRow:479).
+      The speechRow content height is determined by the StatusLED (size=10) and
+      speakerNameLine (fontSize: 13, approximately 18px rendered height). The
+      dominant height is the text at ~18px. With 3 rows:
+        - 3 rows x ~18px content = ~54px
+        - 2 gaps x 4px marginBottom = 8px (last row's marginBottom is visual only)
+        - Total: ~62px
+
+      However, rather than calculating an exact pixel value, a more robust
+      approach is to always render exactly 3 speechRow slots in the collapsed
+      state, using empty/invisible rows for missing positions. This ensures
+      pixel-perfect height matching without hardcoded values that might break
+      with font scaling.
+
+      APPROACH: Set a minHeight on the headerCenter View when collapsed and
+      isSpeechesType. The minHeight should accommodate 3 lines. A pragmatic
+      value is to use the height that 3 speechRow items occupy.
+
+      Looking at the speechRow style: flexDirection: 'row', alignItems: 'center',
+      gap: 8, marginBottom: 4. The row height is determined by its tallest
+      child. The StatusLED is 10px, the text fontSize is 13 (lineHeight ~18px).
+      So each row is ~18px + 4px marginBottom = 22px. Three rows = 66px minus
+      the last marginBottom that doesn't count = 62px.
+
+      We will set minHeight: 62 on headerCenter when collapsed + isSpeechesType.
+
+    acceptance_criteria:
+      - id: AC-151-01
+        description: "Collapsed card with 3 positions has same height as before"
+        given: "A speech-type sunday with has_second_speech=true (3 positions: 1, 2, 3)"
+        when: "The SundayCard is collapsed in the Speeches tab"
+        then: "The card height is unchanged. The minHeight equals or is less than the natural height of 3 speechRows, so it has no visual effect on 3-position cards."
+        status: pending
+
+      - id: AC-151-02
+        description: "Collapsed card with 2 positions has same height as 3-position card"
+        given: "A speech-type sunday with has_second_speech=false (2 positions: 1, 3)"
+        when: "The SundayCard is collapsed in the Speeches tab"
+        then: "The card height matches a 3-position card. The minHeight on headerCenter ensures consistent height even with only 2 speechRows rendered."
+        status: pending
+
+      - id: AC-151-03
+        description: "Expanded card height is not affected"
+        given: "Any speech-type sunday card"
+        when: "The card is expanded"
+        then: "The minHeight is only applied when !expanded && isSpeechesType. Expanded cards render their full content (type dropdown, slots) without any height constraint from this feature."
+        status: pending
+
+      - id: AC-151-04
+        description: "Non-speech type cards not affected"
+        given: "A sunday with exception type (testimony meeting, conference, etc.)"
+        when: "The card is collapsed"
+        then: "The minHeight is only applied when isSpeechesType is true. Non-speech cards show exception text and are not constrained."
+        status: pending
+
+      - id: AC-151-05
+        description: "Uniform height works with light theme"
+        given: "App is in light theme"
+        when: "Multiple collapsed speech cards are visible in the list"
+        then: "All speech-type cards have identical heights, creating a clean aligned list."
+        status: pending
+
+      - id: AC-151-06
+        description: "Uniform height works with dark theme"
+        given: "App is in dark theme"
+        when: "Multiple collapsed speech cards are visible in the list"
+        then: "All speech-type cards have identical heights, creating a clean aligned list."
+        status: pending
+
+    edge_cases:
+      - id: EC-151-01
+        case: "Card with 1 visible position (unlikely but possible if implementation changes)"
+        expected: "The minHeight still holds, creating padding below the single row to match 3-row card height."
+        status: pending
+
+      - id: EC-151-02
+        case: "Card transitions from collapsed (2 positions) to expanded and back"
+        expected: "On collapse, the minHeight is re-applied. The card returns to the uniform height. On expand, the minHeight does not apply and the full expanded content is shown."
+        status: pending
+
+      - id: EC-151-03
+        case: "Font size accessibility scaling"
+        expected: "If the system font size is scaled up, the natural height of 3 rows increases. The minHeight of 62px may be less than the natural 3-row height, in which case the content naturally fills more space and all cards still match because they use the same row structure."
+        status: pending
+
+    files_impacted:
+      - src/components/SundayCard.tsx
+
+    files_not_modified:
+      - src/app/(tabs)/index.tsx (Home tab preview card is different, not affected)
+
+    implementation_details:
+      - location: "src/components/SundayCard.tsx:456 (headerCenter style)"
+        approach: "Add conditional minHeight to the headerCenter View inline style"
+        code_change: >
+          In the JSX at line ~349 (<View style={styles.headerCenter}>), add
+          conditional style: style={[styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]}
+        rationale: "minHeight ensures 2-position cards match 3-position card height without affecting expanded or non-speech cards"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The minHeight value of 62px is calculated from: 3 speechRows x
+        (fontSize 13 lineHeight ~18px) + 2 x marginBottom 4px = 62px. This
+        matches the natural height of 3 speechRow items in the collapsed state.
+
+    - id: A-02
+      text: >
+        Font accessibility scaling may cause the natural 3-row height to exceed
+        62px. In that case, minHeight has no effect (content is taller), which
+        is acceptable because all cards with the same font scale will have the
+        same natural height per row count. The main inconsistency (2 vs 3 rows)
+        is addressed by the minHeight for default font sizes.
+
+    - id: A-03
+      text: >
+        The minHeight is applied to headerCenter (the flex:1 area between
+        dateBlock and the right side), not to the entire card. This is
+        appropriate because headerCenter is where the speechRows are rendered.
+
+  inconsistencies: []

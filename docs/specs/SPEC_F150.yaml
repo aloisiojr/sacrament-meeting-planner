@@ -1,0 +1,165 @@
+# =============================================================================
+# SPEC_F150.yaml
+# Batch 23 Phase 2: Original placeholders when 2nd speech disabled (CR-214)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on other Phase 2 features"
+execution_rationale: >
+  F150 changes placeholder text in SpeechSlot and AgendaForm when 2nd speech
+  is disabled. Does not depend on or affect F147/F148/F149/F151.
+
+# =============================================================================
+# F150: Original placeholders when 2nd speech disabled (CR-214)
+# =============================================================================
+
+features:
+
+  - id: F150
+    name: "Show original field placeholders when 2nd speech is disabled instead of explanation text"
+    cr_id: 214
+    type: ui_improvement
+    related_crs: [181]
+    related_features: [F118, F132]
+    description: >
+      CR-214 requests that when the 2nd speech is disabled (has_second_speech=false),
+      the disabled fields should show the original placeholder text ("Select Speaker"
+      / "Select Topic") instead of the current explanation text ("Sunday configured
+      to have no 2nd speech").
+
+      CURRENT STATE:
+      1. SpeechSlot.tsx:198-216 (isPos2Disabled block): Both the speaker field
+         (line 203) and topic field (line 211) use the same i18n key
+         t('speeches.secondSpeechDisabledPlaceholder') which shows:
+         - pt-BR: "Domingo configurado para nao ter 2o discurso"
+         - en: "Sunday configured to have no 2nd speech"
+         - es: "Domingo configurado para no tener 2o discurso"
+
+      2. AgendaForm.tsx:424-425: The 2nd speaker ReadOnlySpeakerRow receives
+         speakerName={t('speeches.secondSpeechDisabledPlaceholder')} when
+         has_second_speech is false.
+
+      DESIRED STATE:
+      1. SpeechSlot.tsx: The speaker field (line 203) should show
+         t('speeches.selectSpeaker') ("Select Speaker" / "Selecionar Discursante").
+         The topic field (line 211) should show t('speeches.selectTopic')
+         ("Select Topic" / "Selecionar tema").
+
+      2. AgendaForm.tsx: The 2nd speaker ReadOnlySpeakerRow (line 424-425)
+         should show the speaker label (the label prop value which is
+         "2o Discursante") when disabled, matching the existing behavior
+         where an empty speakerName falls through to show the label
+         (AgendaForm.tsx:715: {speakerName || label}).
+
+      The fields are already visually disabled (opacity: 0.5, surfaceVariant
+      background in SpeechSlot; and will have disabled visual from F149 in
+      AgendaForm). The placeholder text just needs to be the standard field
+      placeholder instead of the explanation.
+
+    acceptance_criteria:
+      - id: AC-150-01
+        description: "SpeechSlot disabled speaker field shows 'Select Speaker' placeholder"
+        given: "A Sunday has has_second_speech=false"
+        when: "SpeechSlot renders the disabled 2nd position fields"
+        then: "The speaker field (isPos2Disabled block, first field) shows t('speeches.selectSpeaker') instead of t('speeches.secondSpeechDisabledPlaceholder'). In pt-BR this reads 'Selecionar Discursante' instead of 'Domingo configurado para nao ter 2o discurso'."
+        status: pending
+
+      - id: AC-150-02
+        description: "SpeechSlot disabled topic field shows 'Select Topic' placeholder"
+        given: "A Sunday has has_second_speech=false"
+        when: "SpeechSlot renders the disabled 2nd position fields"
+        then: "The topic field (isPos2Disabled block, second field) shows t('speeches.selectTopic') instead of t('speeches.secondSpeechDisabledPlaceholder'). In pt-BR this reads 'Selecionar tema' instead of 'Domingo configurado para nao ter 2o discurso'."
+        status: pending
+
+      - id: AC-150-03
+        description: "AgendaForm disabled 2nd speaker shows label placeholder"
+        given: "An agenda has has_second_speech=false"
+        when: "AgendaForm renders the 2nd speaker ReadOnlySpeakerRow"
+        then: "The speakerName is empty string ('') instead of t('speeches.secondSpeechDisabledPlaceholder'). This causes the ReadOnlySpeakerRow to fall through to show the label prop ('2o Discursante') as placeholder text at AgendaForm.tsx:715."
+        status: pending
+
+      - id: AC-150-04
+        description: "Placeholders correct in all 3 languages"
+        given: "2nd speech is disabled"
+        when: "Viewing SpeechSlot fields in pt-BR, en, or es"
+        then: "Speaker field shows: pt-BR 'Selecionar Discursante', en 'Select Speaker', es 'Seleccionar Discursante'. Topic field shows: pt-BR 'Selecionar tema', en 'Select topic', es 'Seleccionar tema'."
+        status: pending
+
+      - id: AC-150-05
+        description: "Disabled visual style preserved"
+        given: "2nd speech is disabled"
+        when: "SpeechSlot renders the disabled fields"
+        then: "The fields still have opacity: 0.5 and backgroundColor: colors.surfaceVariant (existing disabled visual style from SpeechSlot.tsx:201). Only the text content changes."
+        status: pending
+
+      - id: AC-150-06
+        description: "Enabled 2nd speech fields unchanged"
+        given: "has_second_speech is true (default)"
+        when: "SpeechSlot renders the 2nd position fields normally"
+        then: "The speaker field shows t('speeches.selectSpeaker') and topic field shows t('speeches.selectTopic') as interactive placeholders (existing behavior, no change)."
+        status: pending
+
+    edge_cases:
+      - id: EC-150-01
+        case: "Toggle 2nd speech from enabled to disabled"
+        expected: "The speaker and topic fields transition from interactive (with actual speaker name/topic if assigned) to disabled showing the standard placeholders ('Select Speaker' / 'Select Topic') with reduced opacity."
+        status: pending
+
+      - id: EC-150-02
+        case: "Toggle 2nd speech from disabled back to enabled"
+        expected: "The fields return to the interactive state showing 'Select Speaker' / 'Select Topic' as tappable placeholders (speech data was cleared on disable per F132)."
+        status: pending
+
+    files_impacted:
+      - src/components/SpeechSlot.tsx
+      - src/components/AgendaForm.tsx
+
+    files_not_modified:
+      - src/i18n/locales/pt-BR.json (existing keys used, no new keys)
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    implementation_details:
+      - location: "src/components/SpeechSlot.tsx:203"
+        current_code: "{t('speeches.secondSpeechDisabledPlaceholder')}"
+        new_code: "{t('speeches.selectSpeaker')}"
+        rationale: "Show standard speaker placeholder instead of explanation"
+      - location: "src/components/SpeechSlot.tsx:211"
+        current_code: "{t('speeches.secondSpeechDisabledPlaceholder')}"
+        new_code: "{t('speeches.selectTopic')}"
+        rationale: "Show standard topic placeholder instead of explanation"
+      - location: "src/components/AgendaForm.tsx:424-425"
+        current_code: "speakerName={agenda.has_second_speech === false\n              ? t('speeches.secondSpeechDisabledPlaceholder')"
+        new_code: "speakerName={agenda.has_second_speech === false\n              ? ''"
+        rationale: "Empty string causes ReadOnlySpeakerRow to fall through to label prop as placeholder"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        For AgendaForm, passing empty string as speakerName when 2nd speech is
+        disabled will cause ReadOnlySpeakerRow to display the label prop
+        ("2o Discursante") as placeholder. This is the existing fallback behavior
+        at AgendaForm.tsx:715 ({speakerName || label}).
+
+    - id: A-02
+      text: >
+        The i18n key speeches.secondSpeechDisabledPlaceholder is NOT removed
+        from the locale files. It may be used elsewhere or could be useful for
+        future reference. It simply is no longer used in SpeechSlot or AgendaForm.
+
+  inconsistencies: []

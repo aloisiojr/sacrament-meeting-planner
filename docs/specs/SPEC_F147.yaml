@@ -1,0 +1,119 @@
+# =============================================================================
+# SPEC_F147.yaml
+# Batch 23 Phase 2: Blue border on collapsed agenda preview card (CR-211)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on other Phase 2 features"
+execution_rationale: >
+  F147 is a simple style change on the Home tab's agenda preview card.
+  It does not depend on or affect F148-F151.
+
+# =============================================================================
+# F147: Blue border on collapsed agenda preview card (CR-211)
+# =============================================================================
+
+features:
+
+  - id: F147
+    name: "Add blue border on Home tab collapsed agenda preview card"
+    cr_id: 211
+    type: ui_improvement
+    related_crs: []
+    related_features: []
+    description: >
+      CR-211 requests that the collapsed agenda preview card on the Home tab
+      should have a blue (primary) border, matching the style already used by
+      the SundayCard when isNext=true in the Speeches tab.
+
+      CURRENT STATE: The agenda preview card at src/app/(tabs)/index.tsx:144-148
+      uses borderColor: colors.border (a neutral/gray color) and borderWidth: 1
+      (from styles.previewCard at line 287-288).
+
+      REFERENCE STYLE: SundayCard.tsx:335-336 applies the isNext style:
+        isNext && { borderColor: colors.primary, borderWidth: 2 }
+      This gives the "next sunday" card a prominent blue border.
+
+      CHANGE: Apply the same style to the Home tab preview card:
+        - borderColor: colors.primary (instead of colors.border)
+        - borderWidth: 2 (instead of 1)
+
+      This is a purely visual change. No logic, no new props, no new components.
+
+    acceptance_criteria:
+      - id: AC-147-01
+        description: "Home tab agenda preview card has blue (primary) border"
+        given: "User opens the Home tab"
+        when: "The agenda preview card is rendered below the 'Start Meeting' button"
+        then: "The previewCard View has borderColor: colors.primary (blue/primary theme color) instead of colors.border (gray). The border is visually prominent and matches the SundayCard isNext style."
+        status: pending
+
+      - id: AC-147-02
+        description: "Home tab agenda preview card has borderWidth 2"
+        given: "User opens the Home tab"
+        when: "The agenda preview card is rendered"
+        then: "The previewCard View has borderWidth: 2 (matching SundayCard isNext) instead of the previous borderWidth: 1 from styles.previewCard."
+        status: pending
+
+      - id: AC-147-03
+        description: "Blue border works with light theme"
+        given: "App is set to light theme"
+        when: "Home tab agenda preview card is rendered"
+        then: "The border uses colors.primary from the light theme palette. The blue border is clearly visible against the light card background (colors.card)."
+        status: pending
+
+      - id: AC-147-04
+        description: "Blue border works with dark theme"
+        given: "App is set to dark theme"
+        when: "Home tab agenda preview card is rendered"
+        then: "The border uses colors.primary from the dark theme palette. The blue border is clearly visible against the dark card background (colors.card)."
+        status: pending
+
+    edge_cases:
+      - id: EC-147-01
+        case: "No agenda data available for the next sunday"
+        expected: "The preview card still renders with the blue border regardless of whether agenda data has been loaded or is empty. The border style is unconditional."
+        status: pending
+
+    files_impacted:
+      - src/app/(tabs)/index.tsx
+
+    files_not_modified:
+      - src/components/SundayCard.tsx (reference only, not changed)
+
+    implementation_details:
+      - location: "src/app/(tabs)/index.tsx:147"
+        current_code: "{ backgroundColor: colors.card, borderColor: colors.border }"
+        new_code: "{ backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 }"
+        rationale: "Apply same visual treatment as SundayCard isNext style"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The blue border should always be applied to the Home tab preview card,
+        unconditionally. The Home tab always shows the next upcoming sunday's
+        agenda, so it is logically equivalent to the "isNext" card in the
+        Speeches tab. No conditional logic is needed.
+
+    - id: A-02
+      text: >
+        borderWidth: 2 is the correct thickness to match SundayCard isNext
+        style. The previewCard style in StyleSheet has borderWidth: 1, but the
+        inline style override with borderWidth: 2 takes precedence.
+
+  inconsistencies: []

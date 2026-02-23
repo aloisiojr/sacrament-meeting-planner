@@ -1,0 +1,157 @@
+# =============================================================================
+# SPEC_F149.yaml
+# Batch 23 Phase 2: Disabled speech fields visual in AgendaForm (CR-213)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 2
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "Independent - no dependency on other Phase 2 features"
+execution_rationale: >
+  F149 is a visual-only change to AgendaForm's ReadOnlySpeakerRow component.
+  Does not depend on or affect F147/F148/F150/F151.
+
+# =============================================================================
+# F149: Disabled speech fields visual in AgendaForm (CR-213)
+# =============================================================================
+
+features:
+
+  - id: F149
+    name: "Add disabled visual style to read-only speech fields in AgendaForm"
+    cr_id: 213
+    type: ui_improvement
+    related_crs: []
+    related_features: [F132]
+    description: >
+      CR-213 requests that the read-only speech fields in the AgendaForm editing
+      card should have a visual treatment that makes it obvious they are not
+      editable. Currently, the ReadOnlySpeakerRow component (AgendaForm.tsx:692-724)
+      shows speaker names with a border but no visual cue that the field is
+      read-only or disabled.
+
+      CURRENT STATE: ReadOnlySpeakerRow renders a View with
+      borderColor: colors.border and no background color or opacity change.
+      When disabled=true (e.g., for observers or when 2nd speech is off),
+      the pencil icon is hidden, but the field itself looks the same.
+
+      DESIRED STATE: When the disabled prop is true, the field should have:
+        - opacity: 0.5 (reduced opacity, matching the existing pattern used in
+          SpeechSlot.tsx:201 for disabled pos2 fields)
+        - backgroundColor: colors.surfaceVariant (subtle background color change,
+          also matching SpeechSlot.tsx:201 pattern)
+
+      This visual treatment is already established in the codebase:
+      SpeechSlot.tsx:201 uses { backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+      for disabled 2nd speech position fields. The same pattern should be applied
+      to ReadOnlySpeakerRow when disabled=true.
+
+      IMPORTANT: The disabled visual should apply to the ENTIRE row (the
+      speakerReadRow View), not just the text. When disabled=true:
+        - The row gets opacity: 0.5 and backgroundColor: colors.surfaceVariant
+        - The pencil icon is already hidden (existing behavior)
+        - The text color stays the same (the opacity handles the visual dimming)
+
+      When disabled=false (normal state), the row looks exactly as it does today.
+
+    acceptance_criteria:
+      - id: AC-149-01
+        description: "Disabled ReadOnlySpeakerRow has reduced opacity"
+        given: "AgendaForm shows speech fields and disabled=true (observer or 2nd speech off)"
+        when: "The ReadOnlySpeakerRow is rendered with disabled=true"
+        then: "The speakerReadRow View has opacity: 0.5 applied, making the entire field visually dimmed."
+        status: pending
+
+      - id: AC-149-02
+        description: "Disabled ReadOnlySpeakerRow has surfaceVariant background"
+        given: "AgendaForm shows speech fields and disabled=true"
+        when: "The ReadOnlySpeakerRow is rendered with disabled=true"
+        then: "The speakerReadRow View has backgroundColor: colors.surfaceVariant, giving it a subtle different background from enabled fields."
+        status: pending
+
+      - id: AC-149-03
+        description: "Enabled ReadOnlySpeakerRow unchanged"
+        given: "AgendaForm shows speech fields and disabled=false (bishopric/clerk role)"
+        when: "The ReadOnlySpeakerRow is rendered with disabled=false"
+        then: "The speakerReadRow View has no opacity change and no backgroundColor override. It looks exactly as it does currently. The pencil icon is visible."
+        status: pending
+
+      - id: AC-149-04
+        description: "2nd speech disabled shows disabled visual on 2nd speaker row"
+        given: "Agenda has has_second_speech=false"
+        when: "AgendaForm renders the 2nd speaker ReadOnlySpeakerRow"
+        then: "The 2nd speaker row has disabled=true (already passed at AgendaForm.tsx:429), and now also shows the disabled visual style (opacity: 0.5, backgroundColor: colors.surfaceVariant)."
+        status: pending
+
+      - id: AC-149-05
+        description: "Observer role shows disabled visual on all speech rows"
+        given: "User has observer (convidado) role"
+        when: "AgendaForm renders both speaker ReadOnlySpeakerRows"
+        then: "Both speaker rows have disabled=true (already passed at AgendaForm.tsx:419,429), and both show the disabled visual style."
+        status: pending
+
+      - id: AC-149-06
+        description: "Disabled visual works with light theme"
+        given: "App is in light theme"
+        when: "A disabled ReadOnlySpeakerRow is rendered"
+        then: "The surfaceVariant background and opacity: 0.5 produce a clearly dimmed appearance against the light card background."
+        status: pending
+
+      - id: AC-149-07
+        description: "Disabled visual works with dark theme"
+        given: "App is in dark theme"
+        when: "A disabled ReadOnlySpeakerRow is rendered"
+        then: "The surfaceVariant background and opacity: 0.5 produce a clearly dimmed appearance against the dark card background."
+        status: pending
+
+    edge_cases:
+      - id: EC-149-01
+        case: "ReadOnlySpeakerRow with empty speaker name and disabled=true"
+        expected: "The row shows the label as placeholder text (existing behavior) with the disabled visual style applied. The dimmed appearance makes it clear the field is not interactive."
+        status: pending
+
+      - id: EC-149-02
+        case: "ReadOnlySpeakerRow with speaker name and disabled=true"
+        expected: "The row shows the speaker name with the disabled visual style. The name is still readable despite the opacity reduction."
+        status: pending
+
+    files_impacted:
+      - src/components/AgendaForm.tsx
+
+    files_not_modified:
+      - src/components/SpeechSlot.tsx (reference pattern only, not changed)
+
+    implementation_details:
+      - location: "src/components/AgendaForm.tsx:707"
+        current_code: "<View style={[styles.speakerReadRow, { borderColor: colors.border }]}>"
+        new_code: "<View style={[styles.speakerReadRow, { borderColor: colors.border }, disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>"
+        rationale: "Apply conditional disabled visual matching SpeechSlot pattern"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The disabled visual uses opacity: 0.5 and backgroundColor:
+        colors.surfaceVariant, matching the existing pattern in SpeechSlot.tsx:201
+        for disabled 2nd speech fields. This ensures visual consistency across
+        the app.
+
+    - id: A-02
+      text: >
+        The disabled prop already exists on ReadOnlySpeakerRow and is already
+        passed as true for observers (isObserver) and when 2nd speech is
+        disabled (has_second_speech === false). No new prop is needed.
+
+  inconsistencies: []

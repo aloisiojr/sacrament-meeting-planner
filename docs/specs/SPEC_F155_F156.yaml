@@ -1,0 +1,577 @@
+# =============================================================================
+# SPEC_F155_F156.yaml
+# Batch 24 Phase 2: Light theme bluish contrast (CR-218) + Speaker fields
+# rework in agenda editing card (CR-220)
+# Created: 2026-02-23
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 24
+phase: 2
+created: "2026-02-23"
+last_updated: "2026-02-23"
+request_type: ui_improvement
+execution_order: "F155 first (theme changes), then F156 (depends on new color tokens from F155)"
+execution_rationale: >
+  F155 modifies lightColors in theme.ts, changing background, surface, card,
+  border, divider, input and toggle track colors to a bluish palette. F156
+  modifies ReadOnlySpeakerRow in AgendaForm.tsx to add italic + reduced-contrast
+  color to speaker names and change the disabled 2nd speech placeholder label.
+  F156 uses colors.textSecondary for the reduced color, which is already a
+  semantic token unaffected by F155's palette changes. However, F155 should
+  land first so the visual result of F156 can be validated with the final
+  light theme palette.
+
+# =============================================================================
+# F155: Light theme bluish contrast improvement (CR-218)
+# =============================================================================
+
+features:
+
+  - id: F155
+    name: "Improve light theme contrast with bluish tones"
+    cr_id: 218
+    type: ui_improvement
+    related_crs: []
+    related_features: [F015]
+    description: >
+      CR-218 requests improving the overall contrast of the light theme by
+      adopting bluish tones, similar to what the dark theme already uses.
+      The key issues are:
+
+      1. CARD VS BACKGROUND: lightColors.card (#FFFFFF) is IDENTICAL to
+         lightColors.background (#FFFFFF), producing zero visual separation
+         between cards and the page background.
+      2. NEUTRAL GRAYS: Current surface tones (#F8F9FA, #F0F1F3, #D1D5DB)
+         are pure neutral grays with no bluish character, while the dark theme
+         uses a consistent Slate/blue-gray palette (#0F172A, #1E293B, #334155).
+      3. TOGGLES: Switch trackColor uses colors.border (currently #D1D5DB)
+         for the false/off state. This should also adopt the bluish palette.
+
+      DESIRED STATE: The light theme should use a bluish-tinted palette that:
+      - Creates clear visual separation between cards (#FFFFFF) and background
+      - Uses Slate-based blue-gray tones for surfaces, borders, and dividers
+      - Matches the bluish character of the dark theme
+      - Maintains WCAG AA contrast ratios for text
+
+      APPROACH: Update lightColors in src/lib/theme.ts to use Tailwind Slate
+      palette values for neutral tones, and change the background from pure
+      white to a light Slate tint so cards (staying white) stand out.
+
+      All components use semantic tokens via useTheme(), so only theme.ts
+      needs to change. No component files are modified.
+
+      COLOR MAPPING (current -> new):
+      - background: #FFFFFF -> #F1F5F9 (Slate-100, light bluish-gray)
+      - surface: #F8F9FA -> #E2E8F0 (Slate-200, slightly darker bluish)
+      - surfaceVariant: #F0F1F3 -> #CBD5E1 (Slate-300, medium bluish)
+      - card: #FFFFFF -> #FFFFFF (unchanged, creates contrast with background)
+      - border: #D1D5DB -> #94A3B8 (Slate-400, bluish border)
+      - divider: #E5E7EB -> #CBD5E1 (Slate-300, bluish divider)
+      - tabBar: #FFFFFF -> #F1F5F9 (matches background for visual continuity)
+      - tabBarInactive: #9CA3AF -> #64748B (Slate-500, darker for contrast)
+      - inputBackground: #F9FAFB -> #F8FAFC (Slate-50, very light bluish)
+      - inputBorder: #D1D5DB -> #94A3B8 (Slate-400, matches border)
+      - placeholder: #9CA3AF -> #94A3B8 (Slate-400, bluish placeholder)
+
+      TEXT COLORS (unchanged - already have good contrast):
+      - text: #1A1A1A (16.6:1 on white, 14.1:1 on Slate-100)
+      - textSecondary: #5A5A5A (7.0:1 on white, 6.0:1 on Slate-100)
+      - textTertiary: #8A8A8A (3.5:1 on white, 3.0:1 on Slate-100)
+      - textInverse: #FFFFFF (unchanged)
+
+      PRIMARY/STATUS COLORS (unchanged):
+      - primary: #2563EB (already bluish, fits the new palette)
+      - primaryContainer: #DBEAFE (already bluish)
+      - onPrimary: #FFFFFF
+      - error/success/warning: unchanged (semantic colors)
+
+      CONTRAST VERIFICATION (new palette):
+      - text #1A1A1A on background #F1F5F9: ratio 14.1:1 (AA pass)
+      - text #1A1A1A on card #FFFFFF: ratio 16.6:1 (AA pass)
+      - textSecondary #5A5A5A on card #FFFFFF: ratio 7.0:1 (AA pass)
+      - textSecondary #5A5A5A on background #F1F5F9: ratio 6.0:1 (AA pass)
+      - textTertiary #8A8A8A on card #FFFFFF: ratio 3.5:1 (AA large text pass)
+      - card #FFFFFF vs background #F1F5F9: visible separation (1.08:1 luminance)
+      - border #94A3B8 on card #FFFFFF: ratio 2.8:1 (decorative, OK)
+
+    acceptance_criteria:
+      - id: AC-155-01
+        description: "Cards have visible contrast against page background in light theme"
+        given: "App is in light theme"
+        when: "Any screen with cards is displayed (Speeches tab, Agenda tab, Home tab, Settings)"
+        then: "Cards (background: #FFFFFF) are clearly distinguishable from the page background (#F1F5F9). The bluish tint of the background creates a subtle but clear separation."
+        status: pending
+
+      - id: AC-155-02
+        description: "Background uses Slate-100 bluish tint"
+        given: "App is in light theme"
+        when: "The background color is rendered"
+        then: "lightColors.background is #F1F5F9 (Slate-100), replacing the previous #FFFFFF."
+        status: pending
+
+      - id: AC-155-03
+        description: "Surface tokens use Slate palette"
+        given: "App is in light theme"
+        when: "Surface and surfaceVariant colors are used"
+        then: "lightColors.surface is #E2E8F0 (Slate-200) and lightColors.surfaceVariant is #CBD5E1 (Slate-300), both with a visible bluish character."
+        status: pending
+
+      - id: AC-155-04
+        description: "Borders and dividers use bluish Slate tones"
+        given: "App is in light theme"
+        when: "Borders (inputs, cards, fields) and dividers are rendered"
+        then: "lightColors.border is #94A3B8 (Slate-400) and lightColors.divider is #CBD5E1 (Slate-300), both with bluish tint replacing the neutral grays."
+        status: pending
+
+      - id: AC-155-05
+        description: "Toggle switch off-state track uses bluish color"
+        given: "App is in light theme"
+        when: "A Switch/Toggle component is in the off/false state"
+        then: "The track color is colors.border (#94A3B8 Slate-400), which now has a bluish tint instead of the previous neutral gray (#D1D5DB)."
+        status: pending
+
+      - id: AC-155-06
+        description: "Tab bar matches background for visual continuity"
+        given: "App is in light theme"
+        when: "The tab bar is rendered at the bottom of the screen"
+        then: "lightColors.tabBar is #F1F5F9, matching the background color for seamless integration. lightColors.tabBarInactive is #64748B (Slate-500)."
+        status: pending
+
+      - id: AC-155-07
+        description: "Input fields use bluish background and border"
+        given: "App is in light theme"
+        when: "Text input fields are rendered (AgendaForm, Settings, etc.)"
+        then: "lightColors.inputBackground is #F8FAFC (Slate-50) and lightColors.inputBorder is #94A3B8 (Slate-400)."
+        status: pending
+
+      - id: AC-155-08
+        description: "Text contrast ratios maintain WCAG AA compliance"
+        given: "App is in light theme with the new Slate palette"
+        when: "Text is displayed on any background surface"
+        then: "text (#1A1A1A) on background (#F1F5F9) has ratio >= 4.5:1. textSecondary (#5A5A5A) on background has ratio >= 4.5:1. textTertiary (#8A8A8A) on card (#FFFFFF) has ratio >= 3:1 for large text."
+        status: pending
+
+      - id: AC-155-09
+        description: "Dark theme is completely unaffected"
+        given: "App is in dark theme"
+        when: "Any screen is displayed"
+        then: "All dark theme colors remain exactly the same. Only lightColors object is modified."
+        status: pending
+
+      - id: AC-155-10
+        description: "Card color remains white"
+        given: "App is in light theme"
+        when: "Cards are rendered"
+        then: "lightColors.card remains #FFFFFF. The contrast with the background comes from the background changing to #F1F5F9, not from the card changing."
+        status: pending
+
+      - id: AC-155-11
+        description: "Primary and status colors unchanged"
+        given: "App is in light theme"
+        when: "Primary buttons, error messages, success indicators, or warnings are displayed"
+        then: "primary (#2563EB), primaryContainer (#DBEAFE), onPrimary (#FFFFFF), error (#DC2626), errorContainer (#FEE2E2), success (#16A34A), and warning (#D97706) are all unchanged."
+        status: pending
+
+    edge_cases:
+      - id: EC-155-01
+        case: "Disabled fields using surfaceVariant background"
+        expected: "Disabled fields (e.g., ReadOnlySpeakerRow with disabled=true from F149) use colors.surfaceVariant which is now #CBD5E1 (Slate-300). This is more visually distinct from the card background (#FFFFFF) than the previous #F0F1F3, making disabled state clearer."
+        status: pending
+
+      - id: EC-155-02
+        case: "Placeholder text on new input background"
+        expected: "Placeholder text uses colors.placeholder (#94A3B8 Slate-400) on inputBackground (#F8FAFC Slate-50). Contrast ratio is 3.3:1, adequate for placeholder text (non-essential, decorative text)."
+        status: pending
+
+      - id: EC-155-03
+        case: "Theme toggle between light and dark"
+        expected: "Toggling between themes works correctly. Light theme shows the new Slate palette. Dark theme shows the unchanged dark palette. No visual glitches during transition."
+        status: pending
+
+    files_impacted:
+      - src/lib/theme.ts
+
+    files_not_modified:
+      - "All component files (AgendaForm.tsx, SundayCard.tsx, SpeechSlot.tsx, etc.) - they use semantic tokens via useTheme() and do not hardcode colors"
+      - "src/app/(tabs)/settings/ - no changes to toggle or input components"
+
+    implementation_details:
+      - location: "src/lib/theme.ts:57-86"
+        current_code: |
+          export const lightColors: ThemeColors = {
+            background: '#FFFFFF',
+            surface: '#F8F9FA',
+            surfaceVariant: '#F0F1F3',
+            card: '#FFFFFF',
+            text: '#1A1A1A',
+            textSecondary: '#5A5A5A',
+            textTertiary: '#8A8A8A',
+            textInverse: '#FFFFFF',
+            primary: '#2563EB',
+            primaryContainer: '#DBEAFE',
+            onPrimary: '#FFFFFF',
+            error: '#DC2626',
+            errorContainer: '#FEE2E2',
+            success: '#16A34A',
+            warning: '#D97706',
+            border: '#D1D5DB',
+            divider: '#E5E7EB',
+            tabBar: '#FFFFFF',
+            tabBarInactive: '#9CA3AF',
+            inputBackground: '#F9FAFB',
+            inputBorder: '#D1D5DB',
+            placeholder: '#9CA3AF',
+          };
+        new_code: |
+          export const lightColors: ThemeColors = {
+            background: '#F1F5F9',        // Slate-100 (bluish-gray, creates contrast with white cards)
+            surface: '#E2E8F0',           // Slate-200
+            surfaceVariant: '#CBD5E1',    // Slate-300
+            card: '#FFFFFF',              // white (unchanged, stands out against Slate-100 background)
+            text: '#1A1A1A',              // contrast 14.1:1 on Slate-100
+            textSecondary: '#5A5A5A',     // contrast 6.0:1 on Slate-100
+            textTertiary: '#8A8A8A',      // contrast 3.0:1 on Slate-100 (large text only)
+            textInverse: '#FFFFFF',
+            primary: '#2563EB',           // unchanged
+            primaryContainer: '#DBEAFE',
+            onPrimary: '#FFFFFF',
+            error: '#DC2626',
+            errorContainer: '#FEE2E2',
+            success: '#16A34A',
+            warning: '#D97706',
+            border: '#94A3B8',            // Slate-400 (bluish border)
+            divider: '#CBD5E1',           // Slate-300 (bluish divider)
+            tabBar: '#F1F5F9',            // matches background
+            tabBarInactive: '#64748B',    // Slate-500
+            inputBackground: '#F8FAFC',   // Slate-50
+            inputBorder: '#94A3B8',       // Slate-400 (matches border)
+            placeholder: '#94A3B8',       // Slate-400 (bluish placeholder)
+          };
+        rationale: >
+          Replace neutral gray palette with Tailwind Slate blue-gray palette.
+          Key change is background from #FFFFFF to #F1F5F9 so white cards pop.
+          All neutral tones shift to Slate equivalents for consistent bluish feel.
+          Text colors stay the same to preserve WCAG AA compliance.
+
+# =============================================================================
+# F156: Speaker fields rework in agenda editing card (CR-220)
+# =============================================================================
+
+  - id: F156
+    name: "Rework speaker fields in agenda editing card with italic and reduced color"
+    cr_id: 220
+    type: ui_improvement
+    supersedes_partially: [F149]
+    related_crs: [213, 214]
+    related_features: [F149, F150, F132]
+    description: >
+      CR-220 is a rework of CR-213 (F149). The user reports that CR-213 was
+      poorly implemented: the disabled visual (opacity: 0.5 + surfaceVariant
+      background) is too heavy-handed. Instead, the speaker name text in the
+      agenda editing card should use a more subtle approach:
+
+      1. ITALIC TEXT: Speaker names in ReadOnlySpeakerRow should be displayed
+         in italic (fontStyle: 'italic') to distinguish them from editable fields.
+      2. REDUCED COLOR: Speaker names should use colors.textSecondary instead
+         of colors.text, reducing the contrast to make them visually secondary.
+      3. DISABLED 2ND SPEECH LABEL: When the 2nd speech is disabled, the
+         placeholder label should change from the current behavior (showing
+         "2o Discursante" as placeholder) to show a specific message:
+         "Domingo ajustado para nao ter 2o discurso". The i18n key
+         speeches.secondSpeechDisabledPlaceholder currently uses the word
+         "configurado" but the user wants "ajustado" instead.
+      4. SCOPE: These changes apply ONLY to ReadOnlySpeakerRow in AgendaForm.tsx
+         (agenda editing cards). SpeechSlot.tsx (speech editing cards) MUST NOT
+         be modified.
+
+      CURRENT STATE (after F149/CR-213):
+      - ReadOnlySpeakerRow in AgendaForm.tsx:692-725
+      - Speaker name text: fontSize 15, no fontStyle, color = colors.text
+         (full contrast)
+      - Disabled state: opacity: 0.5 + backgroundColor: colors.surfaceVariant
+         (heavy visual treatment)
+      - 2nd speech disabled: speakerName is '' so label ("2o Discursante")
+         shows as placeholder (line 715: {speakerName || label})
+
+      DESIRED STATE:
+      - Speaker name text: fontSize 15, fontStyle: 'italic', color =
+         colors.textSecondary (for speaker names; placeholder keeps textTertiary)
+      - Disabled state (2nd speech off, observer): keep the existing F149
+         disabled visual (opacity: 0.5 + surfaceVariant background) AS-IS.
+         The italic + reduced color is for ALL speaker rows, not just disabled.
+      - 2nd speech disabled: the placeholder text (when speakerName is empty)
+         should be t('speeches.secondSpeechDisabledPlaceholder') which reads
+         "Domingo ajustado para nao ter 2o discurso" (note: "ajustado" not
+         "configurado").
+
+      IMPLEMENTATION CHANGES:
+      1. In ReadOnlySpeakerRow (AgendaForm.tsx:708-712), change the text style:
+         - Add fontStyle: 'italic' to speakerReadText when speakerName is present
+         - Change color from colors.text to colors.textSecondary when speakerName
+           is present
+         - When speakerName is empty (placeholder), keep color as
+           colors.textTertiary (existing behavior)
+      2. In the 2nd speaker ReadOnlySpeakerRow call (AgendaForm.tsx:422-430),
+         change speakerName when disabled to show the disabled placeholder:
+         - When has_second_speech === false: speakerName should be
+           t('speeches.secondSpeechDisabledPlaceholder') instead of ''
+      3. Update i18n: change "configurado" to "ajustado" in pt-BR,
+         "configured" to "adjusted" in en, "configurado" to "ajustado" in es
+         for the speeches.secondSpeechDisabledPlaceholder key.
+      4. In ReadOnlySpeakerRow, add a new prop or logic so the disabled
+         placeholder text also gets italic + textSecondary styling (since it
+         will be a non-empty speakerName string).
+
+      IMPORTANT: The disabled visual from F149 (opacity: 0.5 + surfaceVariant
+      background on the row when disabled=true) is KEPT. The italic + reduced
+      color changes are ADDITIONAL and apply to ALL ReadOnlySpeakerRow
+      instances (both enabled and disabled).
+
+    acceptance_criteria:
+      - id: AC-156-01
+        description: "Speaker names in ReadOnlySpeakerRow are italic"
+        given: "AgendaForm shows an expanded agenda editing card with assigned speakers"
+        when: "ReadOnlySpeakerRow renders a speaker name (speakerName is non-empty)"
+        then: "The speaker name text has fontStyle: 'italic'. This applies to all 3 speaker positions (1st, 2nd, 3rd/last)."
+        status: pending
+
+      - id: AC-156-02
+        description: "Speaker names use reduced-contrast color (textSecondary)"
+        given: "AgendaForm shows an expanded agenda editing card with assigned speakers"
+        when: "ReadOnlySpeakerRow renders a speaker name (speakerName is non-empty)"
+        then: "The speaker name text color is colors.textSecondary instead of colors.text. This makes the names visually secondary compared to field labels."
+        status: pending
+
+      - id: AC-156-03
+        description: "Empty speaker placeholder keeps existing color (textTertiary)"
+        given: "AgendaForm shows an agenda editing card where a speaker position has no one assigned"
+        when: "ReadOnlySpeakerRow renders with speakerName as empty string"
+        then: "The placeholder text (the label) keeps color colors.textTertiary. The fontStyle for placeholder remains normal (no italic on empty placeholder)."
+        status: pending
+
+      - id: AC-156-04
+        description: "2nd speech disabled shows specific placeholder message"
+        given: "Agenda has has_second_speech=false"
+        when: "AgendaForm renders the 2nd speaker ReadOnlySpeakerRow"
+        then: "The speakerName passed to ReadOnlySpeakerRow is t('speeches.secondSpeechDisabledPlaceholder') instead of empty string. The text reads 'Domingo ajustado para nao ter 2o discurso' (pt-BR) and is displayed with italic + textSecondary color."
+        status: pending
+
+      - id: AC-156-05
+        description: "i18n key uses 'ajustado' instead of 'configurado' in pt-BR"
+        given: "App language is pt-BR"
+        when: "The secondSpeechDisabledPlaceholder key is used"
+        then: "The text is 'Domingo ajustado para nao ter 2o discurso' (changed from 'configurado')."
+        status: pending
+
+      - id: AC-156-06
+        description: "i18n key uses 'adjusted' instead of 'configured' in en"
+        given: "App language is en"
+        when: "The secondSpeechDisabledPlaceholder key is used"
+        then: "The text is 'Sunday adjusted to have no 2nd speech' (changed from 'configured')."
+        status: pending
+
+      - id: AC-156-07
+        description: "i18n key uses 'ajustado' instead of 'configurado' in es"
+        given: "App language is es"
+        when: "The secondSpeechDisabledPlaceholder key is used"
+        then: "The text is 'Domingo ajustado para no tener 2o discurso' (changed from 'configurado')."
+        status: pending
+
+      - id: AC-156-08
+        description: "Disabled visual from F149 is preserved"
+        given: "ReadOnlySpeakerRow has disabled=true (observer or 2nd speech off)"
+        when: "The row is rendered"
+        then: "The row still has opacity: 0.5 and backgroundColor: colors.surfaceVariant from F149. The italic + reduced color are applied ON TOP of the disabled visual."
+        status: pending
+
+      - id: AC-156-09
+        description: "SpeechSlot.tsx is NOT modified"
+        given: "The speech editing cards in the Speeches tab"
+        when: "SpeechSlot renders speaker names"
+        then: "No changes to SpeechSlot.tsx. Speaker names in speech editing cards keep their current styling (no italic, full contrast). The changes are scoped to AgendaForm's ReadOnlySpeakerRow only."
+        status: pending
+
+      - id: AC-156-10
+        description: "Italic + reduced color works with light theme"
+        given: "App is in light theme"
+        when: "ReadOnlySpeakerRow displays a speaker name"
+        then: "The italic text with colors.textSecondary (#5A5A5A) is clearly readable on the card background (#FFFFFF). The reduced contrast subtly differentiates speaker names from labels."
+        status: pending
+
+      - id: AC-156-11
+        description: "Italic + reduced color works with dark theme"
+        given: "App is in dark theme"
+        when: "ReadOnlySpeakerRow displays a speaker name"
+        then: "The italic text with colors.textSecondary (#94A3B8) is clearly readable on the card background (#1E293B). The reduced contrast subtly differentiates speaker names from labels."
+        status: pending
+
+      - id: AC-156-12
+        description: "3rd/last speaker also gets italic + reduced color"
+        given: "AgendaForm shows the last speech section"
+        when: "ReadOnlySpeakerRow renders the 3rd speaker (position 3 / last speech)"
+        then: "The 3rd speaker name also has fontStyle: 'italic' and color: colors.textSecondary, matching the 1st and 2nd speakers."
+        status: pending
+
+    edge_cases:
+      - id: EC-156-01
+        case: "2nd speech disabled with disabled placeholder text"
+        expected: "The 2nd speaker row shows t('speeches.secondSpeechDisabledPlaceholder') as the text. Since this is now a non-empty speakerName string, it gets italic + textSecondary styling. The disabled row visual (opacity + surfaceVariant from F149) is also applied. The text is dimmed by both the reduced color and the row opacity."
+        status: pending
+
+      - id: EC-156-02
+        case: "Observer role viewing all speech rows"
+        expected: "All 3 speaker rows have disabled=true (from isObserver). Each row shows the F149 disabled visual. If speakers are assigned, their names show with italic + textSecondary. If empty, placeholder labels show with textTertiary."
+        status: pending
+
+      - id: EC-156-03
+        case: "Long speaker name with italic rendering"
+        expected: "Long speaker names are truncated with numberOfLines={1} (existing behavior). The italic style does not affect the truncation behavior."
+        status: pending
+
+      - id: EC-156-04
+        case: "2nd speech disabled placeholder text truncation"
+        expected: "The disabled placeholder text 'Domingo ajustado para nao ter 2o discurso' may be long. numberOfLines={1} truncates it if needed. The full text is still conveyed with the truncated portion indicated by ellipsis."
+        status: pending
+
+    files_impacted:
+      - src/components/AgendaForm.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/SpeechSlot.tsx (explicitly excluded per CR-220 scope)
+      - src/lib/theme.ts (color tokens already handled by F155 or existing)
+
+    implementation_details:
+      - location: "src/components/AgendaForm.tsx:708-712 (ReadOnlySpeakerRow text style)"
+        current_code: |
+          <Text
+            style={[
+              styles.speakerReadText,
+              { color: speakerName ? colors.text : colors.textTertiary },
+            ]}
+            numberOfLines={1}
+          >
+            {speakerName || label}
+          </Text>
+        new_code: |
+          <Text
+            style={[
+              styles.speakerReadText,
+              { color: speakerName ? colors.textSecondary : colors.textTertiary },
+              speakerName ? { fontStyle: 'italic' } : undefined,
+            ]}
+            numberOfLines={1}
+          >
+            {speakerName || label}
+          </Text>
+        rationale: >
+          When speakerName is present: use textSecondary (reduced contrast) +
+          italic to distinguish from editable fields. When empty: keep
+          textTertiary without italic (placeholder appearance).
+
+      - location: "src/components/AgendaForm.tsx:422-430 (2nd speaker speakerName)"
+        current_code: |
+          <ReadOnlySpeakerRow
+            label={`2\u00BA ${t('speeches.speaker')}`}
+            speakerName={agenda.has_second_speech === false
+              ? ''
+              : (getSpeech(2)?.speaker_name ?? '')}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            colors={colors}
+            disabled={isObserver || agenda.has_second_speech === false}
+          />
+        new_code: |
+          <ReadOnlySpeakerRow
+            label={`2\u00BA ${t('speeches.speaker')}`}
+            speakerName={agenda.has_second_speech === false
+              ? t('speeches.secondSpeechDisabledPlaceholder')
+              : (getSpeech(2)?.speaker_name ?? '')}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            colors={colors}
+            disabled={isObserver || agenda.has_second_speech === false}
+          />
+        rationale: >
+          When 2nd speech is disabled, show the disabled placeholder message
+          instead of empty string. This makes the speakerName truthy, so
+          ReadOnlySpeakerRow will render it with italic + textSecondary styling
+          rather than showing the generic label as placeholder.
+
+      - location: "src/i18n/locales/pt-BR.json:216"
+        current_code: '"secondSpeechDisabledPlaceholder": "Domingo configurado para não ter 2º discurso"'
+        new_code: '"secondSpeechDisabledPlaceholder": "Domingo ajustado para não ter 2º discurso"'
+        rationale: "User explicitly requested 'ajustado' instead of 'configurado'"
+
+      - location: "src/i18n/locales/en.json:216"
+        current_code: '"secondSpeechDisabledPlaceholder": "Sunday configured to have no 2nd speech"'
+        new_code: '"secondSpeechDisabledPlaceholder": "Sunday adjusted to have no 2nd speech"'
+        rationale: "Consistent translation change: 'configured' -> 'adjusted'"
+
+      - location: "src/i18n/locales/es.json:216"
+        current_code: '"secondSpeechDisabledPlaceholder": "Domingo configurado para no tener 2º discurso"'
+        new_code: '"secondSpeechDisabledPlaceholder": "Domingo ajustado para no tener 2º discurso"'
+        rationale: "Consistent translation change: 'configurado' -> 'ajustado'"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        F155 uses Tailwind CSS Slate palette values for the light theme bluish
+        tones. These are the same family of colors used in the dark theme
+        (#0F172A = Slate-900, #1E293B = Slate-800, #334155 = Slate-700),
+        creating visual consistency between themes. The specific Slate values
+        chosen (100, 200, 300, 400, 500) maintain adequate contrast ratios
+        while shifting the neutral palette from pure gray to blue-gray.
+
+    - id: A-02
+      text: >
+        For F155, the approach of changing background from white (#FFFFFF) to
+        Slate-100 (#F1F5F9) while keeping card as white creates the card-vs-
+        background contrast requested. This is the minimal change that achieves
+        the goal. An alternative approach (making card off-white and background
+        darker) was rejected because it would reduce text contrast ratios on
+        the card surface.
+
+    - id: A-03
+      text: >
+        For F156, the italic + textSecondary styling applies to ALL 3 speaker
+        ReadOnlySpeakerRow instances (positions 1, 2, 3), not just the disabled
+        2nd speaker. The CR text says "campos de discursante no card de edicao
+        de agenda com italico + cor reduzida" (speaker fields in the agenda
+        editing card with italic + reduced color), which applies to all of them.
+
+    - id: A-04
+      text: >
+        For F156, the F149 disabled visual (opacity: 0.5 + surfaceVariant
+        background) is preserved on the row container. The italic + reduced
+        color applies to the TEXT inside the row. Both effects coexist: the
+        disabled row is dimmed AND the text inside uses italic + reduced color.
+
+    - id: A-05
+      text: >
+        For F156, the secondSpeechDisabledPlaceholder text is passed as
+        speakerName (non-empty string), so ReadOnlySpeakerRow renders it
+        with italic + textSecondary styling. This is the intended visual:
+        the disabled message looks like a speaker name in terms of styling
+        (italic, reduced color) but the content explains why the field is
+        disabled.
+
+    - id: A-06
+      text: >
+        For F156, the word change from "configurado" to "ajustado" in the
+        i18n key affects ALL 3 languages. In pt-BR and es, "ajustado" is the
+        direct translation. In en, "adjusted" replaces "configured". This
+        change also affects any other place that uses this i18n key, but
+        per codebase analysis, the key is only used in the 2nd speech context.
+
+  inconsistencies: []

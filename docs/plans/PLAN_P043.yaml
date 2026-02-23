@@ -1,0 +1,361 @@
+# =============================================================================
+# PLAN_P043.yaml
+# Plan for Batch 24 Phase 2: F155, F156
+# CR-218 (Light theme bluish contrast improvement)
+# CR-220 (Speaker fields rework in agenda editing card)
+# Created: 2026-02-23
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement 2 visual improvements: (1) shift light theme neutral palette from
+  pure grays to Tailwind Slate blue-gray tones, creating card-vs-background
+  contrast and matching the dark theme's bluish character (F155), and (2) rework
+  ReadOnlySpeakerRow text styling in AgendaForm with italic + textSecondary for
+  speaker names, change 2nd speech disabled placeholder to use i18n message
+  with 'ajustado', all scoped to AgendaForm only (F156).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-01: F155 - Update lightColors to Tailwind Slate palette
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Update lightColors object in src/lib/theme.ts to use Tailwind Slate
+      blue-gray palette for all neutral tones. Change 10 color values:
+      background (#FFFFFF -> #F1F5F9 Slate-100), surface (#F8F9FA -> #E2E8F0
+      Slate-200), surfaceVariant (#F0F1F3 -> #CBD5E1 Slate-300), border
+      (#D1D5DB -> #94A3B8 Slate-400), divider (#E5E7EB -> #CBD5E1 Slate-300),
+      tabBar (#FFFFFF -> #F1F5F9), tabBarInactive (#9CA3AF -> #64748B Slate-500),
+      inputBackground (#F9FAFB -> #F8FAFC Slate-50), inputBorder (#D1D5DB ->
+      #94A3B8 Slate-400), placeholder (#9CA3AF -> #94A3B8 Slate-400). Keep
+      card (#FFFFFF), all text colors, primary, and status colors unchanged.
+      Update inline contrast comments to reflect Slate-100 background instead
+      of white.
+    files:
+      - "src/lib/theme.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "lightColors.background is '#F1F5F9'"
+      - "lightColors.surface is '#E2E8F0'"
+      - "lightColors.surfaceVariant is '#CBD5E1'"
+      - "lightColors.card is '#FFFFFF' (unchanged)"
+      - "lightColors.border is '#94A3B8'"
+      - "lightColors.divider is '#CBD5E1'"
+      - "lightColors.tabBar is '#F1F5F9'"
+      - "lightColors.tabBarInactive is '#64748B'"
+      - "lightColors.inputBackground is '#F8FAFC'"
+      - "lightColors.inputBorder is '#94A3B8'"
+      - "lightColors.placeholder is '#94A3B8'"
+      - "lightColors.text is '#1A1A1A' (unchanged)"
+      - "lightColors.textSecondary is '#5A5A5A' (unchanged)"
+      - "lightColors.textTertiary is '#8A8A8A' (unchanged)"
+      - "lightColors.primary is '#2563EB' (unchanged)"
+      - "darkColors object is completely unchanged"
+      - "Inline contrast comments updated to reflect Slate-100 background ratios"
+    tests:
+      - type: unit
+        description: "Verify all 10 updated lightColors values match Slate palette"
+      - type: unit
+        description: "Verify card stays #FFFFFF while background is #F1F5F9"
+      - type: unit
+        description: "Verify text, textSecondary, textTertiary are unchanged"
+      - type: unit
+        description: "Verify primary, error, success, warning colors unchanged"
+      - type: unit
+        description: "Verify darkColors is completely unchanged"
+    covers:
+      acceptance_criteria: ["AC-155-01", "AC-155-02", "AC-155-03", "AC-155-04", "AC-155-05", "AC-155-06", "AC-155-07", "AC-155-08", "AC-155-09", "AC-155-10", "AC-155-11"]
+      edge_cases: ["EC-155-01", "EC-155-02", "EC-155-03"]
+    risks:
+      - risk: "Existing tests may assert old lightColors values"
+        mitigation: "Update any test assertions that check specific lightColors hex values to match the new Slate palette"
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: F156 - Update i18n key 'configurado' -> 'ajustado' in 3 locales
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Update the speeches.secondSpeechDisabledPlaceholder i18n key in all 3
+      locale files: pt-BR.json change 'configurado' to 'ajustado', en.json
+      change 'configured' to 'adjusted', es.json change 'configurado' to
+      'ajustado'. This is a word-only change, no structural modification.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "pt-BR.json speeches.secondSpeechDisabledPlaceholder is 'Domingo ajustado para não ter 2º discurso'"
+      - "en.json speeches.secondSpeechDisabledPlaceholder is 'Sunday adjusted to have no 2nd speech'"
+      - "es.json speeches.secondSpeechDisabledPlaceholder is 'Domingo ajustado para no tener 2º discurso'"
+    tests:
+      - type: unit
+        description: "Verify pt-BR secondSpeechDisabledPlaceholder contains 'ajustado' not 'configurado'"
+      - type: unit
+        description: "Verify en secondSpeechDisabledPlaceholder contains 'adjusted' not 'configured'"
+      - type: unit
+        description: "Verify es secondSpeechDisabledPlaceholder contains 'ajustado' not 'configurado'"
+    covers:
+      acceptance_criteria: ["AC-156-05", "AC-156-06", "AC-156-07"]
+      edge_cases: []
+    risks:
+      - risk: "Existing tests may assert the old wording"
+        mitigation: "Search test files for 'configurado' or 'configured' in the context of secondSpeechDisabledPlaceholder and update to new wording"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: F156 - Add italic + textSecondary to ReadOnlySpeakerRow text
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      In src/components/AgendaForm.tsx, modify the ReadOnlySpeakerRow function's
+      Text style (lines 708-716):
+      1. Change color from colors.text to colors.textSecondary when speakerName
+         is present (truthy).
+      2. Add fontStyle: 'italic' when speakerName is present (truthy).
+      3. Keep colors.textTertiary and no italic when speakerName is empty/falsy
+         (placeholder behavior).
+      The change is:
+        - Old: { color: speakerName ? colors.text : colors.textTertiary }
+        - New: { color: speakerName ? colors.textSecondary : colors.textTertiary },
+               speakerName ? { fontStyle: 'italic' } : undefined,
+      This applies to ALL 3 ReadOnlySpeakerRow instances (positions 1, 2, 3)
+      since they all use the same function.
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "ReadOnlySpeakerRow Text color is colors.textSecondary when speakerName is truthy"
+      - "ReadOnlySpeakerRow Text color is colors.textTertiary when speakerName is falsy (unchanged)"
+      - "ReadOnlySpeakerRow Text has fontStyle: 'italic' when speakerName is truthy"
+      - "ReadOnlySpeakerRow Text has no fontStyle when speakerName is falsy"
+      - "The change applies via the shared ReadOnlySpeakerRow function to all 3 speaker positions"
+      - "Disabled visual (opacity: 0.5 + surfaceVariant background from F149) is preserved on the View container"
+    tests:
+      - type: unit
+        description: "Verify Text color is textSecondary when speakerName is non-empty"
+      - type: unit
+        description: "Verify Text color is textTertiary when speakerName is empty"
+      - type: unit
+        description: "Verify fontStyle is 'italic' when speakerName is non-empty"
+      - type: unit
+        description: "Verify no fontStyle when speakerName is empty"
+      - type: unit
+        description: "Verify disabled row container still has opacity: 0.5 and surfaceVariant bg"
+    covers:
+      acceptance_criteria: ["AC-156-01", "AC-156-02", "AC-156-03", "AC-156-08", "AC-156-10", "AC-156-11", "AC-156-12"]
+      edge_cases: ["EC-156-02", "EC-156-03"]
+    risks:
+      - risk: "Style array ordering may cause unexpected cascade"
+        mitigation: "Place the italic style as a separate element in the style array after the color, so React Native merges them correctly"
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: F156 - Change 2nd speech disabled speakerName to i18n placeholder
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      In src/components/AgendaForm.tsx, modify the 2nd speaker ReadOnlySpeakerRow
+      call (lines 422-430): change speakerName from empty string ('') to
+      t('speeches.secondSpeechDisabledPlaceholder') when has_second_speech is
+      false. This makes the disabled placeholder text render as a non-empty
+      speakerName, so it gets italic + textSecondary styling from STEP-03.
+      The change is:
+        - Old: speakerName={agenda.has_second_speech === false ? '' : ...}
+        - New: speakerName={agenda.has_second_speech === false
+                ? t('speeches.secondSpeechDisabledPlaceholder') : ...}
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-02", "STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "2nd speaker ReadOnlySpeakerRow speakerName is t('speeches.secondSpeechDisabledPlaceholder') when has_second_speech === false"
+      - "2nd speaker ReadOnlySpeakerRow speakerName is getSpeech(2)?.speaker_name ?? '' when has_second_speech is true (unchanged)"
+      - "The placeholder text ('Domingo ajustado para nao ter 2o discurso') renders with italic + textSecondary styling"
+      - "SpeechSlot.tsx is NOT modified"
+    tests:
+      - type: unit
+        description: "Verify 2nd speaker speakerName is t('speeches.secondSpeechDisabledPlaceholder') when has_second_speech=false"
+      - type: unit
+        description: "Verify 2nd speaker speakerName is speech data when has_second_speech=true"
+      - type: unit
+        description: "Verify disabled placeholder text gets italic + textSecondary styling (truthy speakerName)"
+      - type: unit
+        description: "Verify SpeechSlot.tsx file is unmodified"
+    covers:
+      acceptance_criteria: ["AC-156-04", "AC-156-09"]
+      edge_cases: ["EC-156-01", "EC-156-04"]
+    risks:
+      - risk: "The placeholder text may be too long and truncate"
+        mitigation: "numberOfLines={1} already handles truncation with ellipsis. Verify visually that the truncated text is acceptable."
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: Tests for F155 and F156
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Create or update test file for Batch 24 Phase 2 covering both features:
+      F155 tests for all 10 updated lightColors values matching Slate palette,
+      card remaining #FFFFFF, text colors unchanged, primary/status unchanged,
+      darkColors unchanged, WCAG contrast ratios. F156 tests for
+      ReadOnlySpeakerRow text color/fontStyle with present vs empty speakerName,
+      disabled row container visual preserved, 2nd speech disabled placeholder
+      text, i18n word change in 3 locales, SpeechSlot.tsx unmodified. Update
+      any existing test assertions that reference old lightColors values or
+      old i18n wording ('configurado'/'configured').
+    files:
+      - "__tests__/batch24-phase2.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "Test file exists with tests for F155 and F156"
+      - "F155 tests: lightColors.background is '#F1F5F9'"
+      - "F155 tests: lightColors.surface is '#E2E8F0'"
+      - "F155 tests: lightColors.surfaceVariant is '#CBD5E1'"
+      - "F155 tests: lightColors.border is '#94A3B8'"
+      - "F155 tests: lightColors.divider is '#CBD5E1'"
+      - "F155 tests: lightColors.tabBar is '#F1F5F9'"
+      - "F155 tests: lightColors.tabBarInactive is '#64748B'"
+      - "F155 tests: lightColors.inputBackground is '#F8FAFC'"
+      - "F155 tests: lightColors.inputBorder is '#94A3B8'"
+      - "F155 tests: lightColors.placeholder is '#94A3B8'"
+      - "F155 tests: lightColors.card is '#FFFFFF' (unchanged)"
+      - "F155 tests: lightColors.text, textSecondary, textTertiary unchanged"
+      - "F155 tests: primary, error, success, warning unchanged"
+      - "F155 tests: darkColors is not modified (snapshot or exact values)"
+      - "F156 tests: ReadOnlySpeakerRow text color is textSecondary when speakerName present"
+      - "F156 tests: ReadOnlySpeakerRow text color is textTertiary when speakerName empty"
+      - "F156 tests: fontStyle is 'italic' when speakerName present"
+      - "F156 tests: no fontStyle when speakerName empty"
+      - "F156 tests: disabled row has opacity 0.5 and surfaceVariant background"
+      - "F156 tests: 2nd speech disabled shows t('speeches.secondSpeechDisabledPlaceholder')"
+      - "F156 tests: pt-BR contains 'ajustado' not 'configurado'"
+      - "F156 tests: en contains 'adjusted' not 'configured'"
+      - "F156 tests: es contains 'ajustado' not 'configurado'"
+      - "F156 tests: SpeechSlot.tsx is unmodified (file content check or import check)"
+      - "All tests pass (vitest)"
+    tests:
+      - type: unit
+        description: "All test assertions pass with vitest"
+    covers:
+      acceptance_criteria: ["AC-155-01", "AC-155-02", "AC-155-03", "AC-155-04", "AC-155-05", "AC-155-06", "AC-155-07", "AC-155-08", "AC-155-09", "AC-155-10", "AC-155-11", "AC-156-01", "AC-156-02", "AC-156-03", "AC-156-04", "AC-156-05", "AC-156-06", "AC-156-07", "AC-156-08", "AC-156-09", "AC-156-10", "AC-156-11", "AC-156-12"]
+      edge_cases: ["EC-155-01", "EC-155-02", "EC-155-03", "EC-156-01", "EC-156-02", "EC-156-03", "EC-156-04"]
+    risks:
+      - risk: "Test file naming may not match project conventions"
+        mitigation: "Check existing test files in __tests__/ directory for naming convention and follow it"
+      - risk: "Existing test assertions from previous batches may need updating"
+        mitigation: "Search for assertions referencing old color values or old i18n wording and update them"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # F155 ACs
+  - ac_id: AC-155-01
+    how_to_verify: "Compare lightColors.card (#FFFFFF) with lightColors.background (#F1F5F9). They are different values, creating visual separation. Verify in test that card !== background."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-02
+    how_to_verify: "Read lightColors.background from theme.ts. Verify it is '#F1F5F9' (Slate-100)."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-03
+    how_to_verify: "Read lightColors.surface and lightColors.surfaceVariant from theme.ts. Verify surface is '#E2E8F0' (Slate-200) and surfaceVariant is '#CBD5E1' (Slate-300)."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-04
+    how_to_verify: "Read lightColors.border and lightColors.divider. Verify border is '#94A3B8' (Slate-400) and divider is '#CBD5E1' (Slate-300)."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-05
+    how_to_verify: "lightColors.border is '#94A3B8' which is used as Switch trackColor for false state. The bluish tint comes from Slate-400 replacing neutral gray #D1D5DB."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-06
+    how_to_verify: "Read lightColors.tabBar and lightColors.tabBarInactive. Verify tabBar is '#F1F5F9' (matches background) and tabBarInactive is '#64748B' (Slate-500)."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-07
+    how_to_verify: "Read lightColors.inputBackground and lightColors.inputBorder. Verify inputBackground is '#F8FAFC' (Slate-50) and inputBorder is '#94A3B8' (Slate-400)."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-08
+    how_to_verify: "Verify text (#1A1A1A) on background (#F1F5F9) contrast ratio >= 4.5:1 (actual 14.1:1). Verify textSecondary (#5A5A5A) on background >= 4.5:1 (actual 6.0:1). Both pass WCAG AA."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-09
+    how_to_verify: "Read darkColors from theme.ts. Verify all values are identical to their pre-change state. Only lightColors was modified."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-10
+    how_to_verify: "Read lightColors.card. Verify it is '#FFFFFF' (unchanged). The contrast comes from background changing to #F1F5F9."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-155-11
+    how_to_verify: "Read lightColors.primary, primaryContainer, onPrimary, error, errorContainer, success, warning. Verify all are unchanged from original values."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  # F156 ACs
+  - ac_id: AC-156-01
+    how_to_verify: "Inspect ReadOnlySpeakerRow Text style array. When speakerName is non-empty, verify fontStyle: 'italic' is applied. Applies to all 3 positions (1st, 2nd, 3rd)."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-02
+    how_to_verify: "Inspect ReadOnlySpeakerRow Text style. When speakerName is non-empty, verify color is colors.textSecondary (not colors.text)."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-03
+    how_to_verify: "Inspect ReadOnlySpeakerRow Text style. When speakerName is empty, verify color is colors.textTertiary (unchanged) and no fontStyle: 'italic' is applied."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-04
+    how_to_verify: "Inspect the 2nd speaker ReadOnlySpeakerRow call. When has_second_speech is false, verify speakerName is t('speeches.secondSpeechDisabledPlaceholder'). Since this is a non-empty string, it gets italic + textSecondary styling."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-156-05
+    how_to_verify: "Read pt-BR.json. Verify speeches.secondSpeechDisabledPlaceholder is 'Domingo ajustado para não ter 2º discurso'."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-156-06
+    how_to_verify: "Read en.json. Verify speeches.secondSpeechDisabledPlaceholder is 'Sunday adjusted to have no 2nd speech'."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-156-07
+    how_to_verify: "Read es.json. Verify speeches.secondSpeechDisabledPlaceholder is 'Domingo ajustado para no tener 2º discurso'."
+    covered_by_steps: ["STEP-02", "STEP-05"]
+
+  - ac_id: AC-156-08
+    how_to_verify: "Inspect ReadOnlySpeakerRow View container style. When disabled=true, verify opacity: 0.5 and backgroundColor: colors.surfaceVariant are still applied. The italic + textSecondary is on the Text element, not the View."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-09
+    how_to_verify: "Verify SpeechSlot.tsx file has no changes. The modifications are scoped to AgendaForm.tsx ReadOnlySpeakerRow only."
+    covered_by_steps: ["STEP-04", "STEP-05"]
+
+  - ac_id: AC-156-10
+    how_to_verify: "In light theme, textSecondary is #5A5A5A on card #FFFFFF: contrast 7.0:1 (AA pass). Italic rendering does not affect contrast ratios."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-11
+    how_to_verify: "In dark theme, textSecondary is #94A3B8 on card #1E293B: contrast ratio is adequate. Italic rendering works in both themes."
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-156-12
+    how_to_verify: "ReadOnlySpeakerRow is used for all 3 positions (1st, 2nd, 3rd). The 3rd speaker at line 480 uses the same ReadOnlySpeakerRow function, so it inherits italic + textSecondary when speakerName is present."
+    covered_by_steps: ["STEP-03", "STEP-05"]

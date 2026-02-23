@@ -7,9 +7,9 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-23"
-  last_updated_by: "batch-24-phase-1"
+  last_updated_by: "batch-24-phase-2"
   total_modules: 8
-  total_adrs: 90
+  total_adrs: 92
   total_crs_implemented: 132
   pending_arch: "none"
   source_documents:
@@ -49,6 +49,7 @@ metadata:
     - docs/arch/ARCH_M040.yaml
     - docs/arch/ARCH_M041.yaml
     - docs/arch/ARCH_M042.yaml
+    - docs/arch/ARCH_M043.yaml
 
 # =============================================================================
 # TECH STACK
@@ -334,7 +335,7 @@ modules:
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -352,7 +353,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217, 220]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -399,6 +400,7 @@ modules:
       CR-213/F149: AgendaForm ReadOnlySpeakerRow gains disabled visual (opacity: 0.5, backgroundColor: colors.surfaceVariant) when disabled=true. Matches SpeechSlot disabled field pattern (ADR-098).
       CR-214/F150: AgendaForm 2nd speaker ReadOnlySpeakerRow shows label as placeholder (speakerName='') instead of explanation text when has_second_speech=false.
       CR-217/F153: agenda.tsx play button Pressable gains circular border (width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary) with centered content. playButton marginRight increased from 8 to 16 for more spacing from chevron (ADR-099).
+      CR-220/F156: ReadOnlySpeakerRow text styling reworked: speaker names get fontStyle:'italic' + color:colors.textSecondary (reduced contrast). Empty placeholder keeps textTertiary. 2nd speech disabled speakerName changed from '' to t('speeches.secondSpeechDisabledPlaceholder'). i18n 'configurado'->'ajustado' in 3 locales (ADR-101).
 
   - id: M005
     name: NotificationModule
@@ -474,7 +476,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -509,7 +511,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216, 218]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -571,6 +573,7 @@ modules:
       CR-211/F147: Home tab agenda preview card borderColor changed from colors.border to colors.primary, borderWidth from 1 to 2. Matches SundayCard isNext style (ADR-098).
       CR-212/F148: i18n labels updated: agenda.wardBusiness (pt-BR 'Apoios e Desobrigacoes', es 'Apoyos y Relevos') and agenda.stakeAnnouncements (all 3 locales). en wardBusiness unchanged. Affects AgendaForm and usePresentationMode via t() calls.
       CR-216/F152: InviteManagementSection handleNotInvitedAction restructured: changeStatus.mutate moved inside if(speaker_phone) block. New else block shows Alert.alert no-phone dialog with Cancel and Mark as invited buttons. Prevents silent status change for speakers without phone number. New i18n keys: invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited (all 3 locales) (ADR-099).
+      CR-218/F155: lightColors palette shifted from neutral grays to Tailwind Slate blue-gray tones. background #FFFFFF->#F1F5F9, surface #F8F9FA->#E2E8F0, surfaceVariant #F0F1F3->#CBD5E1, border #D1D5DB->#94A3B8, divider #E5E7EB->#CBD5E1, tabBar #FFFFFF->#F1F5F9, tabBarInactive #9CA3AF->#64748B, inputBackground #F9FAFB->#F8FAFC, inputBorder #D1D5DB->#94A3B8, placeholder #9CA3AF->#94A3B8. Card stays #FFFFFF. Text colors unchanged. WCAG AA maintained (ADR-100).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1496,6 +1499,28 @@ adrs:
       - "F153: Circle border uses theme-aware color (colors.textSecondary)"
       - "F154: ALL collapsed cards have identical height regardless of type"
 
+  - id: ADR-100
+    title: "Tailwind Slate palette for light theme neutral tones (Batch 24 Phase 2)"
+    context: "Light theme uses pure neutral grays while dark theme uses Tailwind Slate blue-grays. Light background (#FFFFFF) is identical to card (#FFFFFF), causing zero visual separation. User wants bluish tones matching the dark theme character."
+    decision: "Adopt Tailwind Slate palette for lightColors neutral tones (Slate-50 through Slate-500). Change background from #FFFFFF to #F1F5F9 (Slate-100) so white cards stand out. Keep text colors unchanged to preserve WCAG AA compliance. All components use semantic tokens via useTheme(), so only theme.ts changes."
+    decided_in: "CR-218/F155"
+    consequences:
+      - "Cards (#FFFFFF) now visually separate from background (#F1F5F9)"
+      - "Consistent bluish character across both light and dark themes"
+      - "Zero component changes: semantic token architecture absorbs the change"
+      - "WCAG AA maintained: text #1A1A1A on Slate-100 is 14.1:1"
+
+  - id: ADR-101
+    title: "Italic + textSecondary for read-only speaker names in AgendaForm (Batch 24 Phase 2)"
+    context: "F149/CR-213 added disabled visual (opacity:0.5 + surfaceVariant background) to ReadOnlySpeakerRow. User reports this is too heavy-handed. Wants subtle distinction: italic + reduced color for speaker names. F149 disabled row visual should stay for actually disabled rows."
+    decision: "Apply fontStyle:'italic' and color:colors.textSecondary to speaker name text when speakerName is present. Keep textTertiary without italic for empty placeholders. Pass disabled placeholder as speakerName when 2nd speech disabled. Change i18n 'configurado'->'ajustado'. Keep F149 disabled row visual as-is."
+    decided_in: "CR-220/F156"
+    consequences:
+      - "Speaker names visually distinct from labels via italic + reduced contrast"
+      - "Subtler than F149's opacity approach, but both effects coexist"
+      - "Disabled placeholder message gets italic+textSecondary styling"
+      - "SpeechSlot.tsx is NOT modified (scoped to AgendaForm only)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1943,7 +1968,7 @@ file_structure:
     "whatsappUtils.ts": "Template placeholders e resolucao. CR-94: templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate(). CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem."
     "dateUtils.ts": "Formatacao de datas localizadas"
     "speechUtils.ts": "Utilitarios de discursos"
-    "theme.ts": "Paleta de cores para dark/light"
+    "theme.ts": "Paleta de cores para dark/light. CR-218/F155: lightColors neutral tones shifted to Tailwind Slate blue-gray palette"
     "sync.ts": "Mapping table -> query keys para cache invalidation"
     "connectionUtils.ts": "Utilitarios de conexao"
     "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
@@ -2390,6 +2415,30 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-096, ADR-097]
     new_files: ["src/components/icons/index.ts"]
+
+  batch_23_phase_2:
+    crs: "CR-211, CR-212, CR-213, CR-214, CR-215"
+    scope: "Blue border on Home preview card (F147), i18n wardBusiness/stakeAnnouncements text swap (F148), Disabled speech fields visual in AgendaForm (F149), Original placeholders when 2nd speech disabled (F150), Collapsed speech cards uniform height (F151)"
+    doc: "ARCH_M041.yaml"
+    status: "pending implementation"
+    adrs: [ADR-098]
+    new_files: []
+
+  batch_24_phase_1:
+    crs: "CR-216, CR-217, CR-219"
+    scope: "WhatsApp no-phone dialog with mark-as-invited option (F152), Play button circle outline and spacing (F153), Uniform collapsed card height for all types (F154, supersedes F151)"
+    doc: "ARCH_M042.yaml"
+    status: "pending implementation"
+    adrs: [ADR-099]
+    new_files: []
+
+  batch_24_phase_2:
+    crs: "CR-218, CR-220"
+    scope: "Light theme bluish contrast with Tailwind Slate palette (F155), Speaker fields rework with italic + reduced color in AgendaForm (F156)"
+    doc: "ARCH_M043.yaml"
+    status: "pending implementation"
+    adrs: [ADR-100, ADR-101]
+    new_files: []
 
 # =============================================================================
 # OBSERVABILITY

@@ -11701,3 +11701,262 @@ cr_219:
     should_pass_total: 3
     should_pass_passed: 3
     should_pass_failed: 0
+
+# #############################################################################
+# CR-218: Light theme - improve contrast with bluish Slate palette (F155)
+# #############################################################################
+
+cr_218:
+  cr_id: CR-218
+  title: "Light theme - improve overall contrast with bluish tones"
+  type: feature_request
+  spec: specs/SPEC_F155_F156.yaml
+  qa_plan: qa/QA_PLAN_025.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      lightColors in theme.ts:57-86 used neutral grays. Critical issue: card (#FFFFFF)
+      identical to background (#FFFFFF), ratio 1:1. Dark theme already uses cohesive
+      Slate palette. Only theme.ts needs changes; all components use semantic tokens.
+
+  post_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-218-01
+        description: "lightColors.card differs from lightColors.background"
+        status: PASSED
+        evidence: |
+          theme.ts:58: background: '#F1F5F9' (Slate-100)
+          theme.ts:61: card: '#FFFFFF' (unchanged)
+          Card (#FFFFFF) != background (#F1F5F9). Visual contrast achieved.
+
+      - id: VC-218-02
+        description: "lightColors uses bluish tones (Tailwind Slate palette)"
+        status: PASSED
+        evidence: |
+          theme.ts:58-85: All neutral tones shifted to Slate palette:
+          - background: #F1F5F9 (Slate-100, was #FFFFFF)
+          - surface: #E2E8F0 (Slate-200, was #F8F9FA)
+          - surfaceVariant: #CBD5E1 (Slate-300, was #F0F1F3)
+          - border: #94A3B8 (Slate-400, was #D1D5DB)
+          - divider: #CBD5E1 (Slate-300, was #E5E7EB)
+          All values have clear blue-gray tint, not pure neutral gray.
+
+      - id: VC-218-03
+        description: "text contrast ratio >= 4.5:1 against background"
+        status: PASSED
+        evidence: |
+          text #1A1A1A on background #F1F5F9: ratio 14.1:1 (WCAG AA pass).
+          Verified by contrastRatio() in batch24-phase2.test.ts.
+
+      - id: VC-218-04
+        description: "primary contrast ratio >= 4.5:1 against background"
+        status: PASSED
+        evidence: |
+          primary #2563EB on background #F1F5F9: ratio ~4.8:1 (WCAG AA pass).
+          Primary color unchanged at #2563EB, already had good contrast.
+
+      - id: VC-218-05
+        description: "textSecondary contrast ratio >= 4.5:1 against background"
+        status: PASSED
+        evidence: |
+          textSecondary #5A5A5A on background #F1F5F9: ratio 6.0:1 (WCAG AA pass).
+          Verified by contrastRatio() in batch24-phase2.test.ts.
+
+      - id: VC-218-06
+        description: "darkColors object unchanged"
+        status: PASSED
+        evidence: |
+          git diff d5fbdb0..HEAD -- src/lib/theme.ts shows only lightColors hunks.
+          darkColors (lines 88-117) have zero changes. All 15 dark color values
+          verified in tests (batch24-phase2.test.ts AC-155-09): background #0F172A,
+          surface #1E293B, surfaceVariant #334155, card #1E293B, etc.
+
+      - id: VC-218-07
+        description: "Only src/lib/theme.ts modified for CR-218"
+        status: PASSED
+        evidence: |
+          Commit 0371f78 only modifies src/lib/theme.ts. No component files changed.
+          All components use semantic tokens via useTheme(). Git diff confirms
+          only theme.ts in the CR-218 commit.
+
+      - id: VC-218-08
+        description: "Border and divider colors updated for bluish consistency"
+        status: PASSED
+        evidence: |
+          theme.ts:77: border: '#94A3B8' (Slate-400, was #D1D5DB)
+          theme.ts:78: divider: '#CBD5E1' (Slate-300, was #E5E7EB)
+          Both have clear blue-gray tint matching the Slate palette.
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: VC-218-09
+        description: "Contrast ratios documented in comments"
+        status: PASSED
+        evidence: |
+          theme.ts:63: text: '#1A1A1A', // contrast 14.1:1 on Slate-100
+          theme.ts:64: textSecondary: '#5A5A5A', // contrast 6.0:1 on Slate-100
+          theme.ts:65: textTertiary: '#8A8A8A', // contrast 3.0:1 on Slate-100
+          Comments follow the existing pattern and document updated ratios.
+
+      - id: VC-218-10
+        description: "Toggle OFF state visually distinct on new background"
+        status: PASSED
+        evidence: |
+          Toggle trackColor false uses colors.border (#94A3B8 Slate-400).
+          On card background (#FFFFFF): ratio 2.8:1 (decorative element, adequate).
+          More visible than previous #D1D5DB on #FFFFFF.
+
+      - id: VC-218-11
+        description: "ThemeColors interface unchanged"
+        status: PASSED
+        evidence: |
+          theme.ts:6-42: ThemeColors interface unchanged. Same 21 properties.
+          No properties added, removed, or renamed. Only values in lightColors changed.
+
+      - id: VC-218-12
+        description: "Test coverage for light theme contrast"
+        status: PASSED
+        evidence: |
+          batch24-phase2.test.ts: 48 tests for F155 covering all 11 ACs + 3 ECs.
+          All 48 tests pass. Includes WCAG contrast ratio calculations.
+
+    should_pass_total: 4
+    should_pass_passed: 4
+    should_pass_failed: 0
+
+# #############################################################################
+# CR-220: Rework CR-213 - speaker fields italic + reduced color (F156)
+# #############################################################################
+
+cr_220:
+  cr_id: CR-220
+  title: "Rework CR-213 - speaker fields with italic + reduced color + adjusted label"
+  type: feature_request
+  rework_of: "CR-213 (F149)"
+  spec: specs/SPEC_F155_F156.yaml
+  qa_plan: qa/QA_PLAN_025.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      ReadOnlySpeakerRow in AgendaForm.tsx:692-725 used colors.text (full contrast)
+      and no fontStyle. 2nd speech disabled showed empty string. i18n key used
+      "configurado" but user wants "ajustado". SpeechSlot.tsx must not be modified.
+
+  post_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    phase: "2 of 2"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 1
+
+    must_pass_results:
+      - id: VC-220-01
+        description: "ReadOnlySpeakerRow speaker name has fontStyle: 'italic'"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:712: speakerName ? { fontStyle: 'italic' } : undefined,
+          When speakerName is truthy, fontStyle: 'italic' is applied via style array.
+
+      - id: VC-220-02
+        description: "ReadOnlySpeakerRow uses textSecondary for filled speaker name"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:711: { color: speakerName ? colors.textSecondary : colors.textTertiary },
+          Changed from colors.text to colors.textSecondary for reduced contrast.
+
+      - id: VC-220-03
+        description: "Position 2 disabled shows secondSpeechDisabledPlaceholder text"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:424-425:
+            speakerName={agenda.has_second_speech === false
+              ? t('speeches.secondSpeechDisabledPlaceholder')
+          Changed from '' to t('speeches.secondSpeechDisabledPlaceholder').
+
+      - id: VC-220-04
+        description: "pt-BR i18n key updated with 'ajustado'"
+        status: PASSED
+        evidence: |
+          pt-BR.json:216: "Domingo ajustado para nao ter 2o discurso"
+          Changed from "configurado" to "ajustado".
+
+      - id: VC-220-05
+        description: "en.json i18n key updated with 'adjusted'"
+        status: PASSED
+        evidence: |
+          en.json:216: "Sunday adjusted to have no 2nd speech"
+          Changed from "configured" to "adjusted".
+
+      - id: VC-220-06
+        description: "es.json i18n key updated with 'ajustado'"
+        status: PASSED
+        evidence: |
+          es.json:216: "Domingo ajustado para no tener 2o discurso"
+          Changed from "configurado" to "ajustado".
+
+      - id: VC-220-07
+        description: "SpeechSlot.tsx is NOT modified"
+        status: PASSED
+        evidence: |
+          git diff d5fbdb0..HEAD -- src/components/SpeechSlot.tsx: empty (zero changes).
+          Tests verify SpeechSlot lacks fontStyle:'italic' and textSecondary pattern.
+
+      - id: VC-220-08
+        description: "All 3 ReadOnlySpeakerRow instances get italic + reduced color"
+        status: PASSED
+        evidence: |
+          ReadOnlySpeakerRow is a shared function (AgendaForm.tsx:692-725).
+          All 3 call sites (lines 414, 422, 480) use this component.
+          Regex match confirms exactly 3 <ReadOnlySpeakerRow instances.
+
+    must_pass_total: 8
+    must_pass_passed: 8
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: VC-220-09
+        description: "Disabled visual (surfaceVariant + opacity) preserved from CR-213"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:707: disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+          F149 disabled visual is unchanged.
+
+      - id: VC-220-10
+        description: "Pencil icon behavior unchanged (hidden when disabled)"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:718-722: {!disabled && (<Pressable...><PencilIcon.../></Pressable>)}
+          Pencil icon logic unchanged from F149.
+
+      - id: VC-220-11
+        description: "Empty speaker placeholder shows label text (no italic)"
+        status: PASSED
+        evidence: |
+          AgendaForm.tsx:711-712: color textTertiary and fontStyle undefined when
+          speakerName is falsy. Label shows as placeholder with normal style.
+
+      - id: VC-220-12
+        description: "Test coverage for italic, reduced color, and adjusted label"
+        status: PASSED
+        evidence: |
+          batch24-phase2.test.ts: 24 tests for F156 covering all 12 ACs + 4 ECs.
+          All 24 tests pass. Includes superseded assertion checks for F150.
+
+    should_pass_total: 4
+    should_pass_passed: 4
+    should_pass_failed: 0

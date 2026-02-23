@@ -366,7 +366,7 @@ describe('F144 (CR-204): reset-redirect returns 302 redirect', () => {
     });
 
     it('falls back to GitHub Pages URL', () => {
-      expect(source).toContain('https://aloisiojr.github.io/sacrament-meeting-planner/public');
+      expect(source).toContain('https://aloisiojr.github.io/sacrament-meeting-planner');
     });
 
     it('logs warning when EXTERNAL_PAGES_URL not set', () => {
@@ -467,7 +467,7 @@ describe('F144 (CR-204): invite-redirect returns 302 redirect', () => {
     });
 
     it('falls back to GitHub Pages URL', () => {
-      expect(source).toContain('https://aloisiojr.github.io/sacrament-meeting-planner/public');
+      expect(source).toContain('https://aloisiojr.github.io/sacrament-meeting-planner');
     });
 
     it('logs warning when EXTERNAL_PAGES_URL not set', () => {

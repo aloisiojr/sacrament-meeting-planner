@@ -1,0 +1,653 @@
+/**
+ * Batch 24 Phase 1 - Tests for F152, F153, F154 (CR-216, CR-217, CR-219).
+ *
+ * CR-216 (F152): WhatsApp no-phone dialog with mark-as-invited option
+ * CR-217 (F153): Play button circle outline and spacing in Agenda cards
+ * CR-219 (F154): Uniform collapsed card height for all types (supersedes F151)
+ *
+ * Testing strategy: Source code analysis (fs.readFileSync) following project conventions.
+ */
+
+import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// --- Helpers ---
+
+const ROOT = path.resolve(__dirname, '..', '..');
+
+function readSrcFile(relativePath: string): string {
+  return fs.readFileSync(path.resolve(ROOT, 'src', relativePath), 'utf-8');
+}
+
+// --- Source files ---
+const inviteMgmtSource = readSrcFile('components/InviteManagementSection.tsx');
+const agendaSource = readSrcFile('app/(tabs)/agenda.tsx');
+const sundayCardSource = readSrcFile('components/SundayCard.tsx');
+const iconsSource = readSrcFile('components/icons/index.tsx');
+
+// --- i18n locale files ---
+const ptBR = JSON.parse(readSrcFile('i18n/locales/pt-BR.json'));
+const en = JSON.parse(readSrcFile('i18n/locales/en.json'));
+const es = JSON.parse(readSrcFile('i18n/locales/es.json'));
+
+// ============================================================================
+// F152 (CR-216): WhatsApp no-phone dialog with mark-as-invited option
+// ============================================================================
+
+describe('F152 (CR-216): WhatsApp no-phone dialog', () => {
+
+  // --- AC-152-01: Speaker WITH phone: WhatsApp opens and status changes ---
+
+  describe('AC-152-01: Speaker WITH phone opens WhatsApp + marks invited', () => {
+    it('handleNotInvitedAction checks speech.speaker_phone before opening WhatsApp', () => {
+      expect(inviteMgmtSource).toContain('if (speech.speaker_phone)');
+    });
+
+    it('openWhatsApp is called inside the if(speaker_phone) block', () => {
+      // openWhatsApp should be inside the block where speaker_phone is truthy
+      const ifBlock = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('if (speech.speaker_phone)'),
+        inviteMgmtSource.indexOf('} else {', inviteMgmtSource.indexOf('if (speech.speaker_phone)'))
+      );
+      expect(ifBlock).toContain('await openWhatsApp(url)');
+    });
+
+    it('changeStatus.mutate is called inside the if(speaker_phone) block', () => {
+      const ifBlock = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('if (speech.speaker_phone)'),
+        inviteMgmtSource.indexOf('} else {', inviteMgmtSource.indexOf('if (speech.speaker_phone)'))
+      );
+      expect(ifBlock).toContain("changeStatus.mutate(");
+      expect(ifBlock).toContain("status: 'assigned_invited'");
+    });
+  });
+
+  // --- AC-152-02: Speaker WITHOUT phone: dialog appears ---
+
+  describe('AC-152-02: Speaker WITHOUT phone shows Alert.alert dialog', () => {
+    it('else block calls Alert.alert', () => {
+      const elseBlock = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('} else {', inviteMgmtSource.indexOf('if (speech.speaker_phone)')),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert('))
+      );
+      expect(elseBlock).toContain('Alert.alert(');
+    });
+
+    it('Alert.alert receives title from t("invite.noPhoneTitle")', () => {
+      expect(inviteMgmtSource).toContain("t('invite.noPhoneTitle')");
+    });
+
+    it('Alert.alert receives message from t("invite.noPhoneMessage")', () => {
+      expect(inviteMgmtSource).toContain("t('invite.noPhoneMessage')");
+    });
+
+    it('Alert.alert has two buttons array', () => {
+      // The Alert.alert call should have an array with 2 button objects
+      const alertCall = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('Alert.alert('),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert(')) + 2
+      );
+      expect(alertCall).toContain("t('common.cancel')");
+      expect(alertCall).toContain("t('invite.markAsInvited')");
+    });
+  });
+
+  // --- AC-152-03: Dialog cancel button does nothing ---
+
+  describe('AC-152-03: Cancel button does not change status', () => {
+    it('cancel button has style: "cancel"', () => {
+      const alertCall = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('Alert.alert('),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert(')) + 2
+      );
+      expect(alertCall).toContain("style: 'cancel'");
+    });
+
+    it('cancel button does not have onPress calling changeStatus.mutate', () => {
+      // The cancel button object ({ text: t('common.cancel'), style: 'cancel' })
+      // should NOT have an onPress that calls changeStatus.mutate
+      const cancelButton = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf("t('common.cancel')"),
+        inviteMgmtSource.indexOf('},', inviteMgmtSource.indexOf("t('common.cancel')"))
+      );
+      expect(cancelButton).not.toContain('changeStatus.mutate');
+    });
+  });
+
+  // --- AC-152-04: Dialog confirm button marks as invited ---
+
+  describe('AC-152-04: Confirm button calls changeStatus.mutate', () => {
+    it('confirm button has onPress that calls changeStatus.mutate', () => {
+      const confirmButton = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf("t('invite.markAsInvited')"),
+        inviteMgmtSource.indexOf('},', inviteMgmtSource.indexOf("t('invite.markAsInvited')")) + 2
+      );
+      expect(confirmButton).toContain('onPress');
+    });
+
+    it('confirm button mutates to assigned_invited status', () => {
+      const alertCall = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('Alert.alert('),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert(')) + 2
+      );
+      // The confirm button's onPress calls changeStatus.mutate with assigned_invited
+      expect(alertCall).toContain("status: 'assigned_invited'");
+    });
+
+    it('confirm button mutates with speech.id', () => {
+      const alertCall = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('Alert.alert('),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert(')) + 2
+      );
+      expect(alertCall).toContain('speechId: speech.id');
+    });
+  });
+
+  // --- AC-152-05: i18n pt-BR dialog text ---
+
+  describe('AC-152-05: i18n pt-BR dialog text', () => {
+    it('invite.noPhoneTitle = "Sem numero cadastrado"', () => {
+      expect(ptBR.invite.noPhoneTitle).toContain('Sem n');
+      expect(ptBR.invite.noPhoneTitle).toContain('mero cadastrado');
+    });
+
+    it('invite.noPhoneMessage contains "discursante" and "telefone"', () => {
+      expect(ptBR.invite.noPhoneMessage).toContain('discursante');
+      expect(ptBR.invite.noPhoneMessage).toContain('telefone');
+    });
+
+    it('invite.markAsInvited = "Marcar como convidado"', () => {
+      expect(ptBR.invite.markAsInvited).toBe('Marcar como convidado');
+    });
+  });
+
+  // --- AC-152-06: i18n en dialog text ---
+
+  describe('AC-152-06: i18n en dialog text', () => {
+    it('invite.noPhoneTitle = "No phone number"', () => {
+      expect(en.invite.noPhoneTitle).toBe('No phone number');
+    });
+
+    it('invite.noPhoneMessage contains "no registered phone number"', () => {
+      expect(en.invite.noPhoneMessage).toContain('no registered phone number');
+    });
+
+    it('invite.markAsInvited = "Mark as invited"', () => {
+      expect(en.invite.markAsInvited).toBe('Mark as invited');
+    });
+  });
+
+  // --- AC-152-07: i18n es dialog text ---
+
+  describe('AC-152-07: i18n es dialog text', () => {
+    it('invite.noPhoneTitle contains "Sin" and "registrado"', () => {
+      expect(es.invite.noPhoneTitle).toContain('Sin');
+      expect(es.invite.noPhoneTitle).toContain('registrado');
+    });
+
+    it('invite.noPhoneMessage contains "orador" and "invitado"', () => {
+      expect(es.invite.noPhoneMessage).toContain('orador');
+      expect(es.invite.noPhoneMessage).toContain('invitado');
+    });
+
+    it('invite.markAsInvited = "Marcar como invitado"', () => {
+      expect(es.invite.markAsInvited).toBe('Marcar como invitado');
+    });
+  });
+
+  // --- AC-152-08: No silent status change when no phone ---
+
+  describe('AC-152-08: No silent status change when no phone', () => {
+    it('changeStatus.mutate is NOT called outside if/else blocks', () => {
+      // Extract the handleNotInvitedAction function body
+      const fnStart = inviteMgmtSource.indexOf('const handleNotInvitedAction = useCallback(');
+      const fnEnd = inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf(']', inviteMgmtSource.indexOf('[changeStatus')));
+      const fnBody = inviteMgmtSource.substring(fnStart, fnEnd);
+
+      // Count occurrences of changeStatus.mutate - should be exactly 2
+      // (once in the if block for WhatsApp, once in the else block for dialog confirm)
+      const mutateCount = (fnBody.match(/changeStatus\.mutate\(/g) || []).length;
+      expect(mutateCount).toBe(2);
+    });
+
+    it('changeStatus.mutate calls are both inside conditional blocks', () => {
+      // First mutate is in if(speaker_phone) block, second in Alert.alert onPress
+      const fnStart = inviteMgmtSource.indexOf('const handleNotInvitedAction = useCallback(');
+      const elseStart = inviteMgmtSource.indexOf('} else {', fnStart);
+      const ifBlock = inviteMgmtSource.substring(fnStart, elseStart);
+      const elseBlock = inviteMgmtSource.substring(elseStart, inviteMgmtSource.indexOf('[changeStatus'));
+
+      expect(ifBlock).toContain('changeStatus.mutate(');
+      expect(elseBlock).toContain('changeStatus.mutate(');
+    });
+  });
+
+  // --- EC-152-01: Empty string instead of null ---
+
+  describe('EC-152-01: Speaker phone empty string treated as falsy', () => {
+    it('uses if(speech.speaker_phone) which is falsy for empty string', () => {
+      // The condition is if (speech.speaker_phone) not if (speech.speaker_phone !== null)
+      expect(inviteMgmtSource).toContain('if (speech.speaker_phone)');
+      // Should NOT use strict null check
+      const fnBody = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('const handleNotInvitedAction'),
+        inviteMgmtSource.indexOf('[changeStatus')
+      );
+      expect(fnBody).not.toContain('speaker_phone !== null');
+      expect(fnBody).not.toContain('speaker_phone != null');
+    });
+  });
+
+  // --- EC-152-02: Android back button dismisses dialog ---
+
+  describe('EC-152-02: Alert.alert is modal (default dismiss = cancel)', () => {
+    it('cancel button uses style: "cancel" (native platform dismiss behavior)', () => {
+      const alertCall = inviteMgmtSource.substring(
+        inviteMgmtSource.indexOf('Alert.alert('),
+        inviteMgmtSource.indexOf(');', inviteMgmtSource.indexOf('Alert.alert(')) + 2
+      );
+      expect(alertCall).toContain("style: 'cancel'");
+    });
+  });
+
+  // --- EC-152-03: Multiple rapid taps blocked by modal dialog ---
+
+  describe('EC-152-03: Alert.alert is modal and blocks further interaction', () => {
+    it('uses Alert.alert which is a native modal dialog', () => {
+      expect(inviteMgmtSource).toContain('Alert.alert(');
+    });
+
+    it('Alert is imported from react-native', () => {
+      expect(inviteMgmtSource).toMatch(/import\s*\{[^}]*Alert[^}]*\}\s*from\s*'react-native'/);
+    });
+  });
+
+  // --- Additional structural tests ---
+
+  describe('Structural: handleNotInvitedAction dependencies', () => {
+    it('useCallback dependency array includes t', () => {
+      expect(inviteMgmtSource).toContain('[changeStatus, locale, ward?.whatsapp_template, t]');
+    });
+
+    it('Alert is imported from react-native', () => {
+      const importLine = inviteMgmtSource.match(/import\s*\{[^}]*\}\s*from\s*'react-native'/);
+      expect(importLine).toBeTruthy();
+      expect(importLine![0]).toContain('Alert');
+    });
+  });
+
+  // --- i18n: all 3 locales have all 3 keys ---
+
+  describe('All locales have invite keys', () => {
+    it.each(['pt-BR', 'en', 'es'])('%s has invite.noPhoneTitle', (locale) => {
+      const data = { 'pt-BR': ptBR, en, es }[locale]!;
+      expect(data.invite.noPhoneTitle).toBeTruthy();
+    });
+
+    it.each(['pt-BR', 'en', 'es'])('%s has invite.noPhoneMessage', (locale) => {
+      const data = { 'pt-BR': ptBR, en, es }[locale]!;
+      expect(data.invite.noPhoneMessage).toBeTruthy();
+    });
+
+    it.each(['pt-BR', 'en', 'es'])('%s has invite.markAsInvited', (locale) => {
+      const data = { 'pt-BR': ptBR, en, es }[locale]!;
+      expect(data.invite.markAsInvited).toBeTruthy();
+    });
+  });
+});
+
+// ============================================================================
+// F153 (CR-217): Play button circle outline and spacing in Agenda cards
+// ============================================================================
+
+describe('F153 (CR-217): Play button circle outline and spacing', () => {
+
+  // --- AC-153-01: Play icon has outlined circle ---
+
+  describe('AC-153-01: Play icon has outlined circle around it', () => {
+    it('Pressable has width: 30', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('width: 30');
+    });
+
+    it('Pressable has height: 30', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('height: 30');
+    });
+
+    it('Pressable has borderRadius: 15 (half of 30)', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('borderRadius: 15');
+    });
+
+    it('Pressable has borderWidth: 1.5', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('borderWidth: 1.5');
+    });
+
+    it('Pressable has borderColor: colors.textSecondary', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('borderColor: colors.textSecondary');
+    });
+  });
+
+  // --- AC-153-02: Play icon remains outlined (stroke only) ---
+
+  describe('AC-153-02: PlayIcon is stroke-only (no fill)', () => {
+    it('PlayIcon SVG has fill="none"', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf(');', iconsSource.indexOf('export const PlayIcon')) + 2
+      );
+      expect(playIconBlock).toContain('fill="none"');
+    });
+
+    it('PlayIcon Path uses stroke rendering', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf(');', iconsSource.indexOf('export const PlayIcon')) + 2
+      );
+      expect(playIconBlock).toContain('stroke={color}');
+    });
+  });
+
+  // --- AC-153-03: Play button has increased distance from chevron ---
+
+  describe('AC-153-03: Play button marginRight is 16', () => {
+    it('playButton style has marginRight: 16', () => {
+      const playButtonStyle = agendaSource.match(/playButton:\s*\{[^}]*\}/s);
+      expect(playButtonStyle).toBeTruthy();
+      expect(playButtonStyle![0]).toContain('marginRight: 16');
+    });
+
+    it('playButton marginRight is NOT 8 (old value)', () => {
+      const playButtonStyle = agendaSource.match(/playButton:\s*\{[^}]*\}/s);
+      expect(playButtonStyle).toBeTruthy();
+      expect(playButtonStyle![0]).not.toContain('marginRight: 8');
+    });
+  });
+
+  // --- AC-153-04: Circle uses theme-appropriate color ---
+
+  describe('AC-153-04: Circle uses colors.textSecondary (theme-aware)', () => {
+    it('borderColor uses colors.textSecondary (same as PlayIcon color)', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain('borderColor: colors.textSecondary');
+    });
+
+    it('PlayIcon color is also colors.textSecondary', () => {
+      expect(agendaSource).toContain('<PlayIcon size={18} color={colors.textSecondary} />');
+    });
+
+    it('no hardcoded color in circle border', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    });
+  });
+
+  // --- AC-153-05: Play button circle centered ---
+
+  describe('AC-153-05: PlayIcon centered within circular container', () => {
+    it('Pressable has justifyContent: "center"', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain("justifyContent: 'center'");
+    });
+
+    it('Pressable has alignItems: "center"', () => {
+      const playButtonBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,'),
+        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+      );
+      expect(playButtonBlock).toContain("alignItems: 'center'");
+    });
+  });
+
+  // --- AC-153-06: Tap target includes circle ---
+
+  describe('AC-153-06: Play button tap target includes the circle', () => {
+    it('Pressable wraps the PlayIcon with hitSlop={8}', () => {
+      expect(agendaSource).toContain('hitSlop={8}');
+    });
+
+    it('Pressable onPress navigates to presentation mode', () => {
+      const pressableBlock = agendaSource.substring(
+        agendaSource.indexOf('styles.playButton,') - 200,
+        agendaSource.indexOf('styles.playButton,')
+      );
+      expect(pressableBlock).toContain("pathname: '/presentation'");
+    });
+  });
+
+  // --- AC-153-07: Collapsed cards do not show play button ---
+
+  describe('AC-153-07: Collapsed cards do not render play button', () => {
+    it('play button is guarded by expandable && isExpanded', () => {
+      expect(agendaSource).toContain('{expandable && isExpanded && (');
+    });
+
+    it('play button Pressable is inside the expandable && isExpanded guard', () => {
+      const guardIndex = agendaSource.indexOf('{expandable && isExpanded && (');
+      const nextPressable = agendaSource.indexOf('<Pressable', guardIndex);
+      const closingIndex = agendaSource.indexOf('</Pressable>', nextPressable);
+      const guardedBlock = agendaSource.substring(guardIndex, closingIndex + 12);
+      expect(guardedBlock).toContain('styles.playButton');
+      expect(guardedBlock).toContain('PlayIcon');
+    });
+  });
+
+  // --- EC-153-01: Card transitions ---
+
+  describe('EC-153-01: Play button appears on card expansion', () => {
+    it('isExpanded controls play button visibility (conditional rendering)', () => {
+      expect(agendaSource).toContain('expandable && isExpanded');
+    });
+  });
+
+  // --- EC-153-02: Non-expandable cards ---
+
+  describe('EC-153-02: Non-expandable cards never show play button', () => {
+    it('expandable guard prevents rendering on non-expandable cards', () => {
+      // The guard checks expandable first, so non-expandable cards never reach isExpanded
+      const match = agendaSource.match(/\{expandable && isExpanded && \(/);
+      expect(match).toBeTruthy();
+    });
+  });
+});
+
+// ============================================================================
+// F154 (CR-219): Uniform collapsed card height for all types
+//                (supersedes F151)
+// ============================================================================
+
+describe('F154 (CR-219): Uniform collapsed card height for all types', () => {
+
+  // --- AC-154-01: Collapsed speech card (3 positions) height ---
+
+  describe('AC-154-01: Collapsed speech card has minHeight: 62', () => {
+    it('headerCenter has minHeight: 62 when !expanded', () => {
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+    });
+  });
+
+  // --- AC-154-02: Collapsed speech card (2 positions) same height ---
+
+  describe('AC-154-02: 2-position cards have same minHeight as 3-position', () => {
+    it('minHeight is 62 regardless of position count', () => {
+      const minHeightMatch = sundayCardSource.match(/minHeight:\s*(\d+)/);
+      expect(minHeightMatch).toBeTruthy();
+      expect(parseInt(minHeightMatch![1])).toBe(62);
+    });
+  });
+
+  // --- AC-154-03: Collapsed exception card has same height ---
+
+  describe('AC-154-03: Collapsed exception card has minHeight: 62', () => {
+    it('minHeight condition does NOT include isSpeechesType', () => {
+      // The condition should be just !expanded, not !expanded && isSpeechesType
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+      expect(sundayCardSource).not.toContain('!expanded && isSpeechesType && { minHeight: 62 }');
+    });
+
+    it('headerCenter style array applies to all card types', () => {
+      expect(sundayCardSource).toContain("styles.headerCenter, !expanded && { minHeight: 62 }");
+    });
+  });
+
+  // --- AC-154-04: All collapsed cards visually identical height ---
+
+  describe('AC-154-04: Uniform height for all collapsed card types', () => {
+    it('single minHeight value applies universally', () => {
+      // Only one minHeight declaration on headerCenter
+      const headerCenterLine = sundayCardSource.match(
+        /styles\.headerCenter,\s*!expanded && \{ minHeight: 62 \}/
+      );
+      expect(headerCenterLine).toBeTruthy();
+    });
+
+    it('isSpeechesType is NOT in the minHeight condition (supersedes F151)', () => {
+      const headerLine = sundayCardSource.match(
+        /styles\.headerCenter[^>]*/
+      );
+      expect(headerLine).toBeTruthy();
+      expect(headerLine![0]).not.toContain('isSpeechesType');
+    });
+  });
+
+  // --- AC-154-05: Expanded cards not affected ---
+
+  describe('AC-154-05: Expanded cards have no minHeight', () => {
+    it('minHeight only applies when !expanded', () => {
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+    });
+
+    it('expanded cards do not get minHeight (the && short-circuits)', () => {
+      // When expanded=true, !expanded is false, && short-circuits, result is false
+      // React Native ignores false in style arrays
+      const match = sundayCardSource.match(/!expanded\s*&&\s*\{\s*minHeight:\s*62\s*\}/);
+      expect(match).toBeTruthy();
+    });
+  });
+
+  // --- AC-154-06: Exception text vertically positioned ---
+
+  describe('AC-154-06: Header row uses alignItems center', () => {
+    it('header style has alignItems: center for vertical centering', () => {
+      const headerStyle = sundayCardSource.match(/header:\s*\{[^}]*\}/s);
+      expect(headerStyle).toBeTruthy();
+      expect(headerStyle![0]).toContain("alignItems: 'center'");
+    });
+  });
+
+  // --- AC-154-07: Works in both themes ---
+
+  describe('AC-154-07: minHeight is theme-independent', () => {
+    it('minHeight uses fixed pixel value (not theme-dependent)', () => {
+      const minHeightMatch = sundayCardSource.match(/minHeight:\s*(\d+)/);
+      expect(minHeightMatch).toBeTruthy();
+      expect(parseInt(minHeightMatch![1])).toBe(62);
+    });
+  });
+
+  // --- EC-154-01: Non-expandable cards (always collapsed) ---
+
+  describe('EC-154-01: Non-expandable cards always get minHeight', () => {
+    it('non-expandable cards have expanded=false by default', () => {
+      expect(sundayCardSource).toContain('expanded = false');
+    });
+
+    it('when expanded is false, minHeight: 62 is applied', () => {
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+    });
+  });
+
+  // --- EC-154-02: Card transitions from collapsed to expanded ---
+
+  describe('EC-154-02: Card transitions remove/apply minHeight', () => {
+    it('expanded is a reactive prop that re-evaluates the condition', () => {
+      expect(sundayCardSource).toContain('expanded = false');
+    });
+
+    it('minHeight condition uses !expanded for toggle behavior', () => {
+      const match = sundayCardSource.match(/!expanded\s*&&\s*\{\s*minHeight:\s*62\s*\}/);
+      expect(match).toBeTruthy();
+    });
+  });
+
+  // --- EC-154-03: Other exception type with long text ---
+
+  describe('EC-154-03: Exception text truncated with numberOfLines={1}', () => {
+    it('exceptionText has numberOfLines={1}', () => {
+      expect(sundayCardSource).toContain('numberOfLines={1}');
+    });
+  });
+
+  // --- EC-154-04: Font size accessibility scaling ---
+
+  describe('EC-154-04: minHeight uses "min" (allows growth)', () => {
+    it('uses minHeight (not height) so content can grow beyond 62', () => {
+      expect(sundayCardSource).toContain('minHeight: 62');
+      // Should NOT use a fixed height (which would clip content)
+      const headerCenterStyleBlock = sundayCardSource.match(
+        /styles\.headerCenter[^>]*/
+      );
+      expect(headerCenterStyleBlock).toBeTruthy();
+      expect(headerCenterStyleBlock![0]).not.toContain('height: 62');
+    });
+  });
+
+  // --- F154 supersedes F151: isSpeechesType removed from condition ---
+
+  describe('F154 supersedes F151: isSpeechesType removed from minHeight condition', () => {
+    it('headerCenter style does NOT reference isSpeechesType', () => {
+      // Extract the style attribute for headerCenter View
+      const headerCenterIdx = sundayCardSource.indexOf('styles.headerCenter,');
+      expect(headerCenterIdx).toBeGreaterThan(-1);
+      // Get the text from styles.headerCenter to the closing bracket
+      const lineEnd = sundayCardSource.indexOf(']', headerCenterIdx);
+      const headerCenterStyleLine = sundayCardSource.substring(headerCenterIdx, lineEnd);
+      expect(headerCenterStyleLine).toContain('minHeight');
+      expect(headerCenterStyleLine).not.toContain('isSpeechesType');
+    });
+
+    it('isSpeechesType is still defined but NOT used in minHeight logic', () => {
+      // isSpeechesType still exists in the component for other purposes
+      expect(sundayCardSource).toContain('const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES');
+      // But NOT in the headerCenter style
+      const headerView = sundayCardSource.match(
+        /style=\{\[styles\.headerCenter[^\]]*\]/
+      );
+      expect(headerView).toBeTruthy();
+      expect(headerView![0]).not.toContain('isSpeechesType');
+    });
+
+    it('condition changed from !expanded && isSpeechesType to just !expanded', () => {
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
+      expect(sundayCardSource).not.toContain('!expanded && isSpeechesType && { minHeight: 62 }');
+    });
+  });
+});

@@ -422,7 +422,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <ReadOnlySpeakerRow
             label={`2\u00BA ${t('speeches.speaker')}`}
             speakerName={agenda.has_second_speech === false
-              ? t('speeches.secondSpeechDisabledPlaceholder')
+              ? ''
               : (getSpeech(2)?.speaker_name ?? '')}
             onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
             colors={colors}

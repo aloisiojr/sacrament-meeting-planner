@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 11
-last_updated: "2026-02-22T20:16:00"
+version: 12
+last_updated: "2026-02-23T00:04:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -495,3 +495,53 @@ deploy_history:
     verification:
       - "supabase functions list mostra create-invitation como ACTIVE v9"
       - "REST API health check: HTTP 200"
+
+  - date: "2026-02-23"
+    action: "Redeploy Edge Function create-invitation"
+    method: "supabase functions deploy create-invitation"
+    reason: "F143 (CR-208): Structured error codes, logging, and diagnostic mode for production debugging"
+    result: "Sucesso - Function redeployada e ACTIVE (version 10)"
+    verified: true
+    cr: "Batch 22 Phase 2 (F143, CR-208)"
+    verification:
+      - "supabase functions list mostra create-invitation como ACTIVE v10"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-23"
+    action: "Redeploy Edge Function reset-redirect"
+    method: "supabase functions deploy reset-redirect --no-verify-jwt"
+    reason: "F144 (CR-204): Converted from inline HTML to 302 redirect to external GitHub Pages to bypass Supabase Content-Type text/plain override"
+    result: "Sucesso - Function redeployada e ACTIVE (version 5)"
+    verified: true
+    cr: "Batch 22 Phase 2 (F144, CR-204)"
+    verification:
+      - "supabase functions list mostra reset-redirect como ACTIVE v5"
+      - "GET com token=test123abc&type=recovery retorna HTTP 302"
+      - "Location header aponta para https://aloisiojr.github.io/sacrament-meeting-planner/reset-password.html"
+      - "GitHub Pages retorna Content-Type: text/html; charset=utf-8 (CR-204 fix confirmado)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-23"
+    action: "Redeploy Edge Function invite-redirect"
+    method: "supabase functions deploy invite-redirect --no-verify-jwt"
+    reason: "F144 (CR-204): Converted from inline HTML to 302 redirect to external GitHub Pages to bypass Supabase Content-Type text/plain override"
+    result: "Sucesso - Function redeployada e ACTIVE (version 2)"
+    verified: true
+    cr: "Batch 22 Phase 2 (F144, CR-204)"
+    verification:
+      - "supabase functions list mostra invite-redirect como ACTIVE v2"
+      - "GET com token UUID retorna HTTP 302"
+      - "Location header aponta para https://aloisiojr.github.io/sacrament-meeting-planner/accept-invite.html"
+      - "GitHub Pages retorna Content-Type: text/html; charset=utf-8 (CR-204 fix confirmado)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-23"
+    action: "Verificacao GitHub Pages"
+    method: "curl HEAD request"
+    reason: "Confirmar que GitHub Pages esta servindo as paginas HTML externas com Content-Type correto"
+    result: "Sucesso - Ambas paginas servidas com Content-Type: text/html; charset=utf-8"
+    verified: true
+    cr: "Batch 22 Phase 2 (F144, CR-204)"
+    verification:
+      - "https://aloisiojr.github.io/sacrament-meeting-planner/reset-password.html - HTTP 200, Content-Type: text/html; charset=utf-8"
+      - "https://aloisiojr.github.io/sacrament-meeting-planner/accept-invite.html - HTTP 200, Content-Type: text/html; charset=utf-8"

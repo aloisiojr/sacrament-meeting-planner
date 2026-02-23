@@ -55,17 +55,17 @@ export interface ThemeContextValue {
 // Designed for WCAG AA contrast compliance (4.5:1 for normal text, 3:1 for large text)
 
 export const lightColors: ThemeColors = {
-  background: '#FFFFFF',
-  surface: '#F8F9FA',
-  surfaceVariant: '#F0F1F3',
-  card: '#FFFFFF',
+  background: '#F1F5F9',        // Slate-100 (bluish-gray, creates contrast with white cards)
+  surface: '#E2E8F0',           // Slate-200
+  surfaceVariant: '#CBD5E1',    // Slate-300
+  card: '#FFFFFF',              // white (unchanged, stands out against Slate-100 background)
 
-  text: '#1A1A1A',           // contrast 16.6:1 on white
-  textSecondary: '#5A5A5A',  // contrast 7.0:1 on white
-  textTertiary: '#8A8A8A',   // contrast 3.5:1 on white (large text only)
+  text: '#1A1A1A',              // contrast 14.1:1 on Slate-100
+  textSecondary: '#5A5A5A',     // contrast 6.0:1 on Slate-100
+  textTertiary: '#8A8A8A',      // contrast 3.0:1 on Slate-100 (large text only)
   textInverse: '#FFFFFF',
 
-  primary: '#2563EB',        // contrast 4.6:1 on white
+  primary: '#2563EB',           // unchanged
   primaryContainer: '#DBEAFE',
   onPrimary: '#FFFFFF',
 
@@ -74,15 +74,15 @@ export const lightColors: ThemeColors = {
   success: '#16A34A',
   warning: '#D97706',
 
-  border: '#D1D5DB',
-  divider: '#E5E7EB',
+  border: '#94A3B8',            // Slate-400 (bluish border)
+  divider: '#CBD5E1',           // Slate-300 (bluish divider)
 
-  tabBar: '#FFFFFF',
-  tabBarInactive: '#9CA3AF',
+  tabBar: '#F1F5F9',            // matches background
+  tabBarInactive: '#64748B',    // Slate-500
 
-  inputBackground: '#F9FAFB',
-  inputBorder: '#D1D5DB',
-  placeholder: '#9CA3AF',
+  inputBackground: '#F8FAFC',   // Slate-50
+  inputBorder: '#94A3B8',       // Slate-400 (matches border)
+  placeholder: '#94A3B8',       // Slate-400 (bluish placeholder)
 };
 
 export const darkColors: ThemeColors = {

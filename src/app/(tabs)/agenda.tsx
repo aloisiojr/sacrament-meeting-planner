@@ -521,7 +521,15 @@ function AgendaSundayCard({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Open presentation"
-            style={styles.playButton}
+            style={[styles.playButton, {
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              borderWidth: 1.5,
+              borderColor: colors.textSecondary,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }]}
           >
             <PlayIcon size={18} color={colors.textSecondary} />
           </Pressable>
@@ -629,7 +637,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   playButton: {
-    marginRight: 8,
+    marginRight: 16,
   },
   expandedContent: {
     paddingHorizontal: 12,

@@ -21,6 +21,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { ChevronDownIcon, XIcon } from './icons';
 import { StatusLED } from './StatusLED';
 import { StatusChangeModal } from './StatusChangeModal';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
@@ -234,9 +235,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 {speech?.speaker_name ?? t('speeches.selectSpeaker')}
               </Text>
               {canAssign && (
-                <Text style={[styles.fieldArrow, { color: colors.textSecondary }]}>
-                  {'\u25BC'}
-                </Text>
+                <ChevronDownIcon size={8} color={colors.textSecondary} />
               )}
             </Pressable>
             <View style={styles.actionArea}>
@@ -247,9 +246,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                   accessibilityRole="button"
                   accessibilityLabel={t('speeches.unassign')}
                 >
-                  <Text style={[styles.removeButton, { color: colors.error }]}>
-                    {'\u00D7'}
-                  </Text>
+                  <XIcon size={24} color={colors.error} />
                 </Pressable>
               )}
             </View>

@@ -7,12 +7,12 @@ import React from 'react';
 import {
   View,
   TextInput,
-  Text,
   Pressable,
   StyleSheet,
   type TextInputProps,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { XIcon } from './icons';
 
 export interface SearchInputProps extends Omit<TextInputProps, 'value' | 'onChangeText'> {
   value: string;
@@ -49,9 +49,7 @@ export function SearchInput({ value, onChangeText, style, ...rest }: SearchInput
           accessibilityLabel="Clear search"
           accessibilityRole="button"
         >
-          <Text style={[styles.clearText, { color: colors.textSecondary }]}>
-            {'\u00D7'}
-          </Text>
+          <XIcon size={18} color={colors.textSecondary} />
         </Pressable>
       )}
     </View>

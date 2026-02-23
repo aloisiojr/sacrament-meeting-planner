@@ -29,6 +29,7 @@ import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import { SearchInput } from './SearchInput';
+import { XIcon, PencilIcon } from './icons';
 import type {
   SundayAgenda,
   MeetingActor,
@@ -226,7 +227,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               </View>
               {!isObserver && (
                 <Pressable hitSlop={8} onPress={() => updateField('recognized_names', null)}>
-                  <Text style={[styles.clearButton, { color: colors.error }]}>{'\u00D7'}</Text>
+                  <XIcon size={20} color={colors.error} />
                 </Pressable>
               )}
             </View>
@@ -681,7 +682,7 @@ function SelectorField({
       </Text>
       {onClear && hasValue && (
         <Pressable hitSlop={8} onPress={onClear}>
-          <Text style={[styles.clearButton, { color: colors.error }]}>{'\u00D7'}</Text>
+          <XIcon size={20} color={colors.error} />
         </Pressable>
       )}
     </Pressable>
@@ -715,7 +716,7 @@ function ReadOnlySpeakerRow({
         </Text>
         {!disabled && (
           <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
-            <Text style={[styles.speakerIcon, { color: colors.textSecondary }]}>{'\u270F'}</Text>
+            <PencilIcon size={16} color={colors.textSecondary} />
           </Pressable>
         )}
       </View>

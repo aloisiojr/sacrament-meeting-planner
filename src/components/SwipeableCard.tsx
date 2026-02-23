@@ -10,7 +10,6 @@ import {
   View,
   StyleSheet,
   Pressable,
-  Text,
   AccessibilityInfo,
   LayoutAnimation,
   Platform,
@@ -27,6 +26,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
+import { PencilIcon, TrashIcon } from './icons';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -157,9 +157,7 @@ export function SwipeableCard({
             accessibilityRole="button"
             accessibilityLabel={editLabel ?? 'Edit'}
           >
-            <Text style={[styles.actionIcon, { color: colors.onPrimary }]}>
-              {'\u270F'}
-            </Text>
+            <PencilIcon size={20} color={colors.onPrimary} />
           </Pressable>
         )}
         {onDelete && (
@@ -169,9 +167,7 @@ export function SwipeableCard({
             accessibilityRole="button"
             accessibilityLabel={deleteLabel ?? 'Delete'}
           >
-            <Text style={[styles.actionIcon, { color: '#FFFFFF' }]}>
-              {'\uD83D\uDDD1'}
-            </Text>
+            <TrashIcon size={20} color="#FFFFFF" />
           </Pressable>
         )}
       </View>

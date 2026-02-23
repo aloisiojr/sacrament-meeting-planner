@@ -1,0 +1,527 @@
+# =============================================================================
+# PLAN_P041.yaml
+# Batch 23 Phase 2: Blue border on Home preview card (F147/CR-211),
+# i18n text swap wardBusiness/stakeAnnouncements (F148/CR-212),
+# Disabled speech fields visual in AgendaForm (F149/CR-213),
+# Original placeholders when 2nd speech disabled (F150/CR-214),
+# Collapsed speech cards uniform height (F151/CR-215)
+# Created: 2026-02-22
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Apply 5 independent UI/i18n refinements: blue primary border on Home tab
+  agenda preview card (CR-211/F147), swap i18n labels for wardBusiness and
+  stakeAnnouncements across 3 locales (CR-212/F148), add disabled visual
+  style (opacity + surfaceVariant background) to ReadOnlySpeakerRow in
+  AgendaForm (CR-213/F149), show standard field placeholders instead of
+  explanation text when 2nd speech is disabled in SpeechSlot and AgendaForm
+  (CR-214/F150), and set minHeight on collapsed speech-type cards for
+  uniform height regardless of position count (CR-215/F151). No new
+  components, no new dependencies, no data model changes. 7 files impacted.
+
+strategy:
+  order: "All 5 features independent -> parallel steps S01-S05 -> Tests S06"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  # -------------------------------------------------------------------------
+  # STEP-01: F147 - Blue border on Home tab preview card (CR-211)
+  # -------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Apply blue primary border to the Home tab agenda preview card, matching
+      the SundayCard isNext style (borderColor: colors.primary, borderWidth: 2).
+
+      1. Open src/app/(tabs)/index.tsx.
+
+      2. Find the previewCard View inline style at line ~147:
+         { backgroundColor: colors.card, borderColor: colors.border }
+
+      3. Change to:
+         { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 }
+
+      4. The borderWidth: 2 overrides the styles.previewCard borderWidth: 1
+         (line ~288). The borderColor: colors.primary replaces colors.border.
+
+      This is unconditional: the Home tab always shows the next upcoming
+      sunday, so the preview card always gets the primary border (same logic
+      as SundayCard isNext=true in the Speeches tab).
+
+    files:
+      - src/app/(tabs)/index.tsx
+
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+
+    done_when:
+      - "previewCard View inline style uses borderColor: colors.primary instead of colors.border"
+      - "previewCard View inline style includes borderWidth: 2"
+      - "Blue border is visible in both light and dark themes (uses theme-aware colors.primary)"
+      - "No other styling changes to the previewCard"
+
+    tests:
+      - type: unit
+        description: >
+          Test that previewCard View has borderColor matching colors.primary
+          and borderWidth: 2. Test both light and dark theme colors.
+
+    covers:
+      acceptance_criteria: ["AC-147-01", "AC-147-02", "AC-147-03", "AC-147-04"]
+      edge_cases: ["EC-147-01"]
+
+    risks:
+      - risk: "borderWidth: 2 causes slight layout shift compared to borderWidth: 1"
+        mitigation: "The 1px increase is negligible. SundayCard already uses this thickness for isNext cards."
+
+  # -------------------------------------------------------------------------
+  # STEP-02: F148 - i18n text swap for wardBusiness and stakeAnnouncements (CR-212)
+  # -------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Update 5 i18n label values across 3 locale files for wardBusiness and
+      stakeAnnouncements. No code changes needed, only JSON value updates.
+
+      1. src/i18n/locales/pt-BR.json:
+         - agenda.wardBusiness: "Apoios e Agradecimentos" -> "Apoios e Desobrigações"
+         - agenda.stakeAnnouncements: "Apoios e Agradecimentos da Estaca"
+           -> "Anúncios, Apoios e Desobrigações da Estaca"
+
+      2. src/i18n/locales/en.json:
+         - agenda.wardBusiness: UNCHANGED ("Sustainings and Releases" is correct)
+         - agenda.stakeAnnouncements: "Stake Sustainings and Releases"
+           -> "Stake Announcements, Sustainings and Releases"
+
+      3. src/i18n/locales/es.json:
+         - agenda.wardBusiness: "Apoyos y Agradecimientos" -> "Apoyos y Relevos"
+         - agenda.stakeAnnouncements: "Apoyos y Agradecimientos de Estaca"
+           -> "Anuncios, Apoyos y Relevos de Estaca"
+
+      NOTE: English wardBusiness does NOT change. 5 values change total.
+      The pt-BR values use proper diacritics (ç, ã, ú).
+
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04", "STEP-05"]
+
+    done_when:
+      - "pt-BR.json agenda.wardBusiness reads 'Apoios e Desobrigações'"
+      - "pt-BR.json agenda.stakeAnnouncements reads 'Anúncios, Apoios e Desobrigações da Estaca'"
+      - "en.json agenda.wardBusiness still reads 'Sustainings and Releases' (unchanged)"
+      - "en.json agenda.stakeAnnouncements reads 'Stake Announcements, Sustainings and Releases'"
+      - "es.json agenda.wardBusiness reads 'Apoyos y Relevos'"
+      - "es.json agenda.stakeAnnouncements reads 'Anuncios, Apoyos y Relevos de Estaca'"
+      - "No other i18n keys modified"
+
+    tests:
+      - type: unit
+        description: >
+          Test that each locale returns the correct updated value for
+          agenda.wardBusiness and agenda.stakeAnnouncements. Test that
+          en.wardBusiness is unchanged. Test all 3 languages for both keys.
+
+    covers:
+      acceptance_criteria: ["AC-148-01", "AC-148-02", "AC-148-03", "AC-148-04", "AC-148-05", "AC-148-06", "AC-148-07", "AC-148-08"]
+      edge_cases: ["EC-148-01"]
+
+    risks:
+      - risk: "Diacritics in pt-BR values could be garbled if file encoding is wrong"
+        mitigation: "The locale files already use UTF-8 with diacritics (existing values have ã, ç, etc.). Same encoding preserved."
+
+  # -------------------------------------------------------------------------
+  # STEP-03: F149 - Disabled visual style on ReadOnlySpeakerRow (CR-213)
+  # -------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Add disabled visual style (opacity: 0.5, backgroundColor: surfaceVariant)
+      to ReadOnlySpeakerRow in AgendaForm when disabled=true.
+
+      1. Open src/components/AgendaForm.tsx.
+
+      2. Find the ReadOnlySpeakerRow component (line ~707):
+         <View style={[styles.speakerReadRow, { borderColor: colors.border }]}>
+
+      3. Add conditional disabled style:
+         <View style={[styles.speakerReadRow, { borderColor: colors.border }, disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+
+      4. This pattern matches the existing disabled visual in SpeechSlot.tsx:201
+         which uses the same { backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+         for disabled 2nd speech fields.
+
+      The disabled prop already exists on ReadOnlySpeakerRow and is already
+      passed as true for observers (isObserver at line ~419) and when 2nd
+      speech is disabled (has_second_speech === false at line ~429). No new
+      prop is needed.
+
+    files:
+      - src/components/AgendaForm.tsx
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05"]
+
+    done_when:
+      - "ReadOnlySpeakerRow speakerReadRow View has conditional style: disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }"
+      - "When disabled=true: row shows opacity 0.5 and surfaceVariant background"
+      - "When disabled=false: row looks exactly as before (no opacity, no background change)"
+      - "Pencil icon still hidden when disabled=true (existing behavior unchanged)"
+      - "Disabled visual works with both light and dark themes"
+
+    tests:
+      - type: unit
+        description: >
+          Test ReadOnlySpeakerRow with disabled=true has opacity 0.5 and
+          backgroundColor matching surfaceVariant. Test with disabled=false
+          has no opacity or backgroundColor override. Test both with empty
+          speakerName and with a name. Test pencil icon hidden when disabled.
+
+    covers:
+      acceptance_criteria: ["AC-149-01", "AC-149-02", "AC-149-03", "AC-149-04", "AC-149-05", "AC-149-06", "AC-149-07"]
+      edge_cases: ["EC-149-01", "EC-149-02"]
+
+    risks:
+      - risk: "Opacity 0.5 makes text unreadable in dark mode"
+        mitigation: "Same opacity used in SpeechSlot disabled fields (tested in production). surfaceVariant background provides sufficient contrast."
+
+  # -------------------------------------------------------------------------
+  # STEP-04: F150 - Standard placeholders when 2nd speech disabled (CR-214)
+  # -------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Replace explanation text with standard field placeholders when 2nd
+      speech is disabled. Changes in SpeechSlot.tsx and AgendaForm.tsx.
+
+      1. SpeechSlot.tsx (line ~203):
+         Current: {t('speeches.secondSpeechDisabledPlaceholder')}
+         New:     {t('speeches.selectSpeaker')}
+         This is the speaker field in the isPos2Disabled block.
+
+      2. SpeechSlot.tsx (line ~211):
+         Current: {t('speeches.secondSpeechDisabledPlaceholder')}
+         New:     {t('speeches.selectTopic')}
+         This is the topic field in the isPos2Disabled block.
+
+      3. AgendaForm.tsx (line ~424-425):
+         Current: speakerName={agenda.has_second_speech === false
+                    ? t('speeches.secondSpeechDisabledPlaceholder')
+         New:     speakerName={agenda.has_second_speech === false
+                    ? ''
+         The empty string causes ReadOnlySpeakerRow to fall through to
+         the label prop via {speakerName || label} at line ~715, showing
+         "2o Discursante" as placeholder text.
+
+      NOTE: The i18n key speeches.secondSpeechDisabledPlaceholder is NOT
+      removed from locale files. It is simply no longer used in these
+      locations.
+
+    files:
+      - src/components/SpeechSlot.tsx
+      - src/components/AgendaForm.tsx
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-05"]
+
+    done_when:
+      - "SpeechSlot.tsx disabled speaker field shows t('speeches.selectSpeaker') instead of t('speeches.secondSpeechDisabledPlaceholder')"
+      - "SpeechSlot.tsx disabled topic field shows t('speeches.selectTopic') instead of t('speeches.secondSpeechDisabledPlaceholder')"
+      - "AgendaForm.tsx passes empty string '' instead of t('speeches.secondSpeechDisabledPlaceholder') when has_second_speech===false"
+      - "ReadOnlySpeakerRow shows label prop as placeholder when speakerName is empty"
+      - "Disabled visual style (opacity, surfaceVariant) on SpeechSlot fields is preserved"
+      - "i18n key speeches.secondSpeechDisabledPlaceholder not removed from locale files"
+
+    tests:
+      - type: unit
+        description: >
+          Test SpeechSlot with isPos2Disabled=true shows 'Select Speaker' and
+          'Select Topic' placeholders. Test AgendaForm with has_second_speech=false
+          passes empty speakerName to ReadOnlySpeakerRow. Test ReadOnlySpeakerRow
+          displays label when speakerName is empty. Test all 3 languages for
+          correct placeholder translations.
+
+    covers:
+      acceptance_criteria: ["AC-150-01", "AC-150-02", "AC-150-03", "AC-150-04", "AC-150-05", "AC-150-06"]
+      edge_cases: ["EC-150-01", "EC-150-02"]
+
+    risks:
+      - risk: "Empty string in AgendaForm could cause visual glitch if label prop is also empty"
+        mitigation: "The label prop is always set to '2o Discursante' (from the t() call at line ~423). The fallback {speakerName || label} is guaranteed to show the label."
+
+  # -------------------------------------------------------------------------
+  # STEP-05: F151 - Collapsed speech cards uniform height (CR-215)
+  # -------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Set minHeight on the headerCenter View in SundayCard when the card is
+      collapsed and is a speech-type card, ensuring uniform height regardless
+      of position count (2 vs 3 positions).
+
+      1. Open src/components/SundayCard.tsx.
+
+      2. Find the headerCenter View (line ~350):
+         <View style={styles.headerCenter}>
+
+      3. Change to:
+         <View style={[styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]}>
+
+      4. minHeight 62px is calculated from:
+         - 3 speechRows x ~18px line height (fontSize 13) = 54px
+         - 2 x 4px marginBottom (between rows) = 8px
+         - Total: 62px
+         This matches the natural height of 3 speechRow items.
+
+      5. The minHeight only applies when:
+         - !expanded: card is collapsed
+         - isSpeechesType: card is a speech-type card (not testimony, conference, etc.)
+
+      Cards with 3 positions naturally meet this height. Cards with 2
+      positions (has_second_speech=false) are padded to match.
+
+    files:
+      - src/components/SundayCard.tsx
+
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+
+    done_when:
+      - "headerCenter View has conditional style: [styles.headerCenter, !expanded && isSpeechesType && { minHeight: 62 }]"
+      - "3-position cards look the same as before (minHeight <= natural height)"
+      - "2-position cards now have same height as 3-position cards"
+      - "Expanded cards not affected (minHeight only when !expanded)"
+      - "Non-speech type cards not affected (minHeight only when isSpeechesType)"
+      - "Uniform height visible in both light and dark themes"
+
+    tests:
+      - type: unit
+        description: >
+          Test SundayCard collapsed with isSpeechesType=true renders
+          headerCenter with minHeight: 62. Test expanded card does not have
+          minHeight. Test non-speech type card does not have minHeight. Test
+          card with 2 positions and card with 3 positions have consistent
+          header height.
+
+    covers:
+      acceptance_criteria: ["AC-151-01", "AC-151-02", "AC-151-03", "AC-151-04", "AC-151-05", "AC-151-06"]
+      edge_cases: ["EC-151-01", "EC-151-02", "EC-151-03"]
+
+    risks:
+      - risk: "minHeight 62px may not match 3-row height exactly with different font scaling"
+        mitigation: "At default font size, 62px matches perfectly. With larger fonts, the natural height exceeds 62px and minHeight has no effect (content is taller). All cards still match because they use the same row structure."
+
+  # -------------------------------------------------------------------------
+  # STEP-06: Tests for all features
+  # -------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Create test file for F147-F151 changes:
+
+      1. Test F147 (Blue border):
+         - Verify previewCard has borderColor matching colors.primary
+         - Verify previewCard has borderWidth: 2
+         - Verify border renders in both light and dark themes
+         - EC-147-01: Blue border renders even when no agenda data loaded
+
+      2. Test F148 (i18n labels):
+         - Verify pt-BR agenda.wardBusiness = 'Apoios e Desobrigações'
+         - Verify pt-BR agenda.stakeAnnouncements = 'Anúncios, Apoios e Desobrigações da Estaca'
+         - Verify en agenda.wardBusiness = 'Sustainings and Releases' (unchanged)
+         - Verify en agenda.stakeAnnouncements = 'Stake Announcements, Sustainings and Releases'
+         - Verify es agenda.wardBusiness = 'Apoyos y Relevos'
+         - Verify es agenda.stakeAnnouncements = 'Anuncios, Apoyos y Relevos de Estaca'
+         - AC-148-07: Labels correct in AgendaForm
+         - AC-148-08: Labels correct in Presentation mode
+
+      3. Test F149 (Disabled visual):
+         - Verify disabled ReadOnlySpeakerRow has opacity: 0.5
+         - Verify disabled ReadOnlySpeakerRow has backgroundColor: surfaceVariant
+         - Verify enabled ReadOnlySpeakerRow has no opacity or background change
+         - Verify pencil icon hidden when disabled
+         - EC-149-01: Empty speakerName + disabled shows dimmed label
+         - EC-149-02: Speaker name + disabled still readable
+
+      4. Test F150 (Standard placeholders):
+         - Verify SpeechSlot disabled speaker shows selectSpeaker key
+         - Verify SpeechSlot disabled topic shows selectTopic key
+         - Verify AgendaForm passes empty string for disabled 2nd speaker
+         - Verify ReadOnlySpeakerRow shows label as fallback
+         - Verify placeholders correct in all 3 languages
+         - EC-150-01/02: Toggle from enabled to disabled and back
+
+      5. Test F151 (Uniform height):
+         - Verify collapsed speech-type card headerCenter has minHeight: 62
+         - Verify expanded card headerCenter has no minHeight
+         - Verify non-speech card headerCenter has no minHeight
+         - EC-151-01: Card with 1 position still padded to 3-row height
+         - EC-151-02: Expand/collapse preserves minHeight behavior
+
+      Test file follows the project's existing test naming convention.
+
+    files:
+      - "__tests__/batch23-phase2.test.tsx (NEW)"
+
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    parallelizable_with: []
+
+    done_when:
+      - "F147 tests verify borderColor: primary and borderWidth: 2 on previewCard"
+      - "F148 tests verify all 6 i18n values (5 changed + 1 unchanged) across 3 locales"
+      - "F149 tests verify disabled visual style (opacity, surfaceVariant) on ReadOnlySpeakerRow"
+      - "F150 tests verify standard placeholders replace explanation text"
+      - "F151 tests verify minHeight: 62 on collapsed speech-type headerCenter"
+      - "All edge cases covered: EC-147-01, EC-148-01, EC-149-01, EC-149-02, EC-150-01, EC-150-02, EC-151-01, EC-151-02, EC-151-03"
+      - "All tests pass with 'pnpm test'"
+
+    tests:
+      - type: unit
+        description: "Comprehensive unit tests covering F147-F151 changes, all ACs, and all ECs"
+
+    covers:
+      acceptance_criteria: ["AC-147-01", "AC-147-02", "AC-147-03", "AC-147-04", "AC-148-01", "AC-148-02", "AC-148-03", "AC-148-04", "AC-148-05", "AC-148-06", "AC-148-07", "AC-148-08", "AC-149-01", "AC-149-02", "AC-149-03", "AC-149-04", "AC-149-05", "AC-149-06", "AC-149-07", "AC-150-01", "AC-150-02", "AC-150-03", "AC-150-04", "AC-150-05", "AC-150-06", "AC-151-01", "AC-151-02", "AC-151-03", "AC-151-04", "AC-151-05", "AC-151-06"]
+      edge_cases: ["EC-147-01", "EC-148-01", "EC-149-01", "EC-149-02", "EC-150-01", "EC-150-02", "EC-151-01", "EC-151-02", "EC-151-03"]
+
+    risks:
+      - risk: "Test mocking complexity for 5 different components in one test file"
+        mitigation: "Follow existing batch test file patterns. Each feature's tests are independent describe blocks. Reuse mock patterns from previous batch tests."
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  # F147 ACs
+  - ac_id: AC-147-01
+    how_to_verify: "View Home tab. Verify previewCard has blue (primary) border instead of gray (border) color."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-147-02
+    how_to_verify: "Inspect previewCard View style. Verify borderWidth: 2 overrides styles.previewCard borderWidth: 1."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-147-03
+    how_to_verify: "Set light theme. Verify blue border visible against light card background."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-147-04
+    how_to_verify: "Set dark theme. Verify blue border visible against dark card background."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  # F148 ACs
+  - ac_id: AC-148-01
+    how_to_verify: "Set language to pt-BR. Verify wardBusiness shows 'Apoios e Desobrigações'."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-02
+    how_to_verify: "Set language to pt-BR. Verify stakeAnnouncements shows 'Anúncios, Apoios e Desobrigações da Estaca'."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-03
+    how_to_verify: "Set language to en. Verify stakeAnnouncements shows 'Stake Announcements, Sustainings and Releases'."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-04
+    how_to_verify: "Set language to es. Verify wardBusiness shows 'Apoyos y Relevos'."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-05
+    how_to_verify: "Set language to es. Verify stakeAnnouncements shows 'Anuncios, Apoyos y Relevos de Estaca'."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-06
+    how_to_verify: "Set language to en. Verify wardBusiness still shows 'Sustainings and Releases' (unchanged)."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-07
+    how_to_verify: "Open AgendaForm for a sunday. Verify wardBusiness and stakeAnnouncements fields show updated labels."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  - ac_id: AC-148-08
+    how_to_verify: "Start presentation mode. Verify Card 2 (Designations) shows updated labels for wardBusiness and stakeAnnouncements."
+    covered_by_steps: ["STEP-02", "STEP-06"]
+
+  # F149 ACs
+  - ac_id: AC-149-01
+    how_to_verify: "Open AgendaForm with disabled=true ReadOnlySpeakerRow. Verify opacity: 0.5 applied."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-02
+    how_to_verify: "Open AgendaForm with disabled=true ReadOnlySpeakerRow. Verify backgroundColor: surfaceVariant applied."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-03
+    how_to_verify: "Open AgendaForm with bishopric role. Verify enabled rows have no opacity or background changes. Pencil icon visible."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-04
+    how_to_verify: "Set has_second_speech=false. Verify 2nd speaker ReadOnlySpeakerRow shows disabled visual."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-05
+    how_to_verify: "Log in as observer. Verify both speaker ReadOnlySpeakerRows show disabled visual."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-06
+    how_to_verify: "Set light theme. Verify disabled ReadOnlySpeakerRow is clearly dimmed."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  - ac_id: AC-149-07
+    how_to_verify: "Set dark theme. Verify disabled ReadOnlySpeakerRow is clearly dimmed."
+    covered_by_steps: ["STEP-03", "STEP-06"]
+
+  # F150 ACs
+  - ac_id: AC-150-01
+    how_to_verify: "Set has_second_speech=false. Verify SpeechSlot speaker field shows t('speeches.selectSpeaker') placeholder."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-150-02
+    how_to_verify: "Set has_second_speech=false. Verify SpeechSlot topic field shows t('speeches.selectTopic') placeholder."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-150-03
+    how_to_verify: "Set has_second_speech=false. Verify AgendaForm 2nd speaker ReadOnlySpeakerRow shows label as placeholder."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-150-04
+    how_to_verify: "View SpeechSlot disabled fields in pt-BR, en, and es. Verify correct placeholder translations."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-150-05
+    how_to_verify: "View SpeechSlot disabled fields. Verify opacity: 0.5 and surfaceVariant background preserved."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  - ac_id: AC-150-06
+    how_to_verify: "Set has_second_speech=true (default). Verify 2nd position fields show interactive placeholders (unchanged behavior)."
+    covered_by_steps: ["STEP-04", "STEP-06"]
+
+  # F151 ACs
+  - ac_id: AC-151-01
+    how_to_verify: "View collapsed card with 3 positions. Verify height unchanged (minHeight <= natural height)."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-151-02
+    how_to_verify: "View collapsed card with 2 positions. Verify same height as 3-position card."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-151-03
+    how_to_verify: "Expand a card. Verify minHeight not applied to expanded card."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-151-04
+    how_to_verify: "View collapsed non-speech card (testimony, conference). Verify no minHeight constraint."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-151-05
+    how_to_verify: "Set light theme. View multiple collapsed speech cards. Verify uniform heights."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-151-06
+    how_to_verify: "Set dark theme. View multiple collapsed speech cards. Verify uniform heights."
+    covered_by_steps: ["STEP-05", "STEP-06"]

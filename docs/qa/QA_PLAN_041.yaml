@@ -1,0 +1,503 @@
+# =============================================================================
+# QA_PLAN_041.yaml - PRE Validation for Batch 23 Phase 2
+# CRs: CR-211, CR-212, CR-213, CR-214, CR-215
+# Generated: 2026-02-22
+# Mode: PRE (initial validation + plan creation)
+# Type: feature_request
+# =============================================================================
+
+metadata:
+  batch: 23
+  phase: 2
+  plan_id: "QA_PLAN_041"
+  crs: ["CR-211", "CR-212", "CR-213", "CR-214", "CR-215"]
+  type: "feature_request"
+  validated: true
+
+# =============================================================================
+# CR-211: Home - blue border on collapsed agenda card
+# Request: "Home: adicionar borda azul no card contraido de agenda, igual ao que
+#           ja existe no card de proximo discurso (SundayCard isNext com
+#           borderColor: colors.primary, borderWidth: 2)"
+# =============================================================================
+
+cr_211:
+  feature_id: "F147"
+  title: "Home agenda preview card - blue border matching SundayCard isNext style"
+  status: "POST_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/app/(tabs)/index.tsx"
+      - "src/components/SundayCard.tsx"
+      - "src/components/NextSundaysSection.tsx"
+
+    current_behavior:
+      description: |
+        In src/app/(tabs)/index.tsx:144-148, the Home preview card has:
+          style={[styles.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        This uses the default border color (colors.border), NOT the primary blue border.
+
+        In contrast, SundayCard.tsx:334-336 applies:
+          isNext && { borderColor: colors.primary, borderWidth: 2 }
+        when isNext is true, giving it a blue border.
+
+        The Home preview card (index.tsx) does NOT use SundayCard component - it's a custom
+        inline View. It does NOT apply any isNext / primary-color border.
+
+        The NextSundaysSection uses SundayCard with isNext={entry.date === nextSunday}
+        which does get the blue border. So the "next speech" card already has it.
+        The Home "agenda preview" card does NOT have it.
+      evidence_lines:
+        - "src/app/(tabs)/index.tsx:144-148 - previewCard with borderColor: colors.border"
+        - "src/components/SundayCard.tsx:334-336 - isNext && { borderColor: colors.primary, borderWidth: 2 }"
+        - "src/app/(tabs)/index.tsx:287-293 - styles.previewCard: { borderWidth: 1 }"
+
+    implementation_scope:
+      files_to_change:
+        - "src/app/(tabs)/index.tsx"
+      change_description: |
+        Add borderColor: colors.primary and borderWidth: 2 to the previewCard style
+        in the Home tab, matching the SundayCard isNext border style.
+
+  validation_checks:
+    must_pass:
+      - id: "VC-211-01"
+        description: "Home preview card has borderColor: colors.primary"
+        check_type: "code_inspection"
+        target: "src/app/(tabs)/index.tsx"
+        expected: "previewCard style includes borderColor: colors.primary"
+
+      - id: "VC-211-02"
+        description: "Home preview card has borderWidth: 2"
+        check_type: "code_inspection"
+        target: "src/app/(tabs)/index.tsx"
+        expected: "previewCard style includes borderWidth: 2"
+
+      - id: "VC-211-03"
+        description: "Border style matches SundayCard isNext styling"
+        check_type: "code_inspection"
+        target: "src/app/(tabs)/index.tsx"
+        expected: "Same borderColor and borderWidth values as SundayCard.tsx line 336"
+
+    should_pass:
+      - id: "VC-211-04"
+        description: "No regression on existing SundayCard isNext border"
+        check_type: "code_inspection"
+        target: "src/components/SundayCard.tsx"
+        expected: "isNext border logic unchanged"
+
+      - id: "VC-211-05"
+        description: "Test coverage for new border style"
+        check_type: "test_run"
+        expected: "Tests validate previewCard border properties"
+
+# =============================================================================
+# CR-212: Rename i18n texts for ward business & stake announcements
+# Request: "'Apoios e Agradecimentos' -> 'Apoios e Desobrigacoes' (pt-BR/en/es).
+#           'Apoios e Agradecimentos da Estaca' -> 'Anuncios, Apoios e
+#           Desobrigacoes da Estaca' (pt-BR/en/es). Both in the editing card
+#           and in the presentation card"
+# =============================================================================
+
+cr_212:
+  feature_id: "F148"
+  title: "Rename wardBusiness and stakeAnnouncements i18n keys"
+  status: "POST_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+      - "src/components/AgendaForm.tsx"
+      - "src/hooks/usePresentationMode.ts"
+      - "src/app/(tabs)/agenda.tsx"
+      - "src/app/presentation.tsx"
+
+    current_behavior:
+      description: |
+        Current i18n values:
+        - pt-BR: agenda.wardBusiness = "Apoios e Agradecimentos"
+        - pt-BR: agenda.stakeAnnouncements = "Apoios e Agradecimentos da Estaca"
+        - en: agenda.wardBusiness = "Sustainings and Releases"
+        - en: agenda.stakeAnnouncements = "Stake Sustainings and Releases"
+        - es: agenda.wardBusiness = "Apoyos y Agradecimientos"
+        - es: agenda.stakeAnnouncements = "Apoyos y Agradecimientos de Estaca"
+
+        These keys are used in:
+        - AgendaForm.tsx:336 - FieldRow label for wardBusiness editing card
+        - AgendaForm.tsx:385 - ToggleField label for stakeAnnouncements editing card
+        - usePresentationMode.ts:108 - wardBusiness in presentation card
+        - usePresentationMode.ts:129 - stakeAnnouncements in presentation card
+        - agenda.tsx:452+ - collapsed card (no direct usage, but data flows through)
+      evidence_lines:
+        - "src/i18n/locales/pt-BR.json:231 - \"wardBusiness\": \"Apoios e Agradecimentos\""
+        - "src/i18n/locales/pt-BR.json:235 - \"stakeAnnouncements\": \"Apoios e Agradecimentos da Estaca\""
+        - "src/i18n/locales/en.json:231 - \"wardBusiness\": \"Sustainings and Releases\""
+        - "src/i18n/locales/en.json:235 - \"stakeAnnouncements\": \"Stake Sustainings and Releases\""
+        - "src/i18n/locales/es.json:231 - \"wardBusiness\": \"Apoyos y Agradecimientos\""
+        - "src/i18n/locales/es.json:235 - \"stakeAnnouncements\": \"Apoyos y Agradecimientos de Estaca\""
+
+    implementation_scope:
+      files_to_change:
+        - "src/i18n/locales/pt-BR.json"
+        - "src/i18n/locales/en.json"
+        - "src/i18n/locales/es.json"
+      change_description: |
+        Update the i18n values (not the keys):
+        - pt-BR: wardBusiness -> "Apoios e Desobrigacoes"
+        - pt-BR: stakeAnnouncements -> "Anuncios, Apoios e Desobrigacoes da Estaca"
+        - en: wardBusiness -> "Sustainings and Releases" (keep as-is or update to English equivalent)
+        - en: stakeAnnouncements -> "Announcements, Sustainings and Releases from the Stake"
+        - es: wardBusiness -> "Apoyos y Relevos" (or equivalent)
+        - es: stakeAnnouncements -> "Anuncios, Apoyos y Relevos de Estaca"
+
+        No code changes needed - just i18n value updates. The existing code already
+        uses t('agenda.wardBusiness') and t('agenda.stakeAnnouncements') in both
+        the editing card (AgendaForm) and presentation card (usePresentationMode).
+
+  validation_checks:
+    must_pass:
+      - id: "VC-212-01"
+        description: "pt-BR wardBusiness value updated to 'Apoios e Desobrigacoes'"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/pt-BR.json"
+        expected: "agenda.wardBusiness contains 'Desobrigacoes'"
+
+      - id: "VC-212-02"
+        description: "pt-BR stakeAnnouncements value updated to 'Anuncios, Apoios e Desobrigacoes da Estaca'"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/pt-BR.json"
+        expected: "agenda.stakeAnnouncements contains 'Anuncios, Apoios e Desobrigacoes da Estaca'"
+
+      - id: "VC-212-03"
+        description: "en wardBusiness value updated"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/en.json"
+        expected: "agenda.wardBusiness updated to equivalent English"
+
+      - id: "VC-212-04"
+        description: "en stakeAnnouncements value updated"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/en.json"
+        expected: "agenda.stakeAnnouncements updated to equivalent English"
+
+      - id: "VC-212-05"
+        description: "es wardBusiness value updated"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/es.json"
+        expected: "agenda.wardBusiness updated to equivalent Spanish"
+
+      - id: "VC-212-06"
+        description: "es stakeAnnouncements value updated"
+        check_type: "code_inspection"
+        target: "src/i18n/locales/es.json"
+        expected: "agenda.stakeAnnouncements updated to equivalent Spanish"
+
+    should_pass:
+      - id: "VC-212-07"
+        description: "Labels appear correctly in AgendaForm editing card"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "t('agenda.wardBusiness') and t('agenda.stakeAnnouncements') still used"
+
+      - id: "VC-212-08"
+        description: "Labels appear correctly in presentation mode"
+        check_type: "code_inspection"
+        target: "src/hooks/usePresentationMode.ts"
+        expected: "t('agenda.wardBusiness') and t('agenda.stakeAnnouncements') still used"
+
+      - id: "VC-212-09"
+        description: "Test coverage validates new i18n values"
+        check_type: "test_run"
+        expected: "Tests check for updated text values"
+
+# =============================================================================
+# CR-213: Read-only speech fields in agenda editing card - visual disabled state
+# Request: "No card de edicao da agenda, campos de discurso (discursante
+#           read-only) devem ter visual que deixe obvio que estao indisponiveis
+#           para edicao (ex: opacidade reduzida, cor de fundo diferente)"
+# =============================================================================
+
+cr_213:
+  feature_id: "F149"
+  title: "AgendaForm read-only speech fields - obvious disabled visual styling"
+  status: "POST_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/components/AgendaForm.tsx"
+
+    current_behavior:
+      description: |
+        In AgendaForm.tsx:692-724, the ReadOnlySpeakerRow component renders a View
+        with styles.speakerReadRow. The current styling is:
+        - View with borderColor: colors.border, borderWidth: 1, borderRadius: 6
+        - Text with color: colors.text (if speaker assigned) or colors.textTertiary (placeholder)
+        - A pencil icon to navigate to Speeches tab
+
+        The issue: these read-only fields look nearly identical to editable fields
+        (same border, same background). Users cannot easily tell these fields are
+        not directly editable from the agenda form.
+
+        Used at lines 414-429 for speech positions 1, 2, and 3 (last speech at 480-486).
+        The ReadOnlySpeakerRow at line 707 uses styles.speakerReadRow which has:
+        - flexDirection: 'row', alignItems: 'center'
+        - borderWidth: 1, borderRadius: 6
+        - paddingHorizontal: 10, paddingVertical: 8
+        No distinct backgroundColor or opacity to indicate read-only state.
+      evidence_lines:
+        - "src/components/AgendaForm.tsx:692-724 - ReadOnlySpeakerRow component"
+        - "src/components/AgendaForm.tsx:707 - styles.speakerReadRow with borderColor: colors.border"
+        - "src/components/AgendaForm.tsx:960-967 - speakerReadRow style definition"
+        - "src/components/AgendaForm.tsx:414-429 - speech 1 and 2 usage"
+        - "src/components/AgendaForm.tsx:480-486 - speech 3 (last speech) usage"
+
+    implementation_scope:
+      files_to_change:
+        - "src/components/AgendaForm.tsx"
+      change_description: |
+        Update the ReadOnlySpeakerRow visual styling to make it obviously non-editable:
+        - Add reduced opacity (e.g., opacity: 0.6) or distinct background color
+          (e.g., backgroundColor: colors.surfaceVariant)
+        - Optionally use a different border color (colors.divider instead of colors.border)
+        - This matches the existing pattern in SpeechSlot.tsx:201 where disabled fields
+          use { backgroundColor: colors.surfaceVariant, opacity: 0.5 }
+
+  validation_checks:
+    must_pass:
+      - id: "VC-213-01"
+        description: "ReadOnlySpeakerRow has visually distinct disabled styling"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "speakerReadRow has opacity or backgroundColor that distinguishes it from editable fields"
+
+      - id: "VC-213-02"
+        description: "All 3 speech positions use the updated styling"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "All ReadOnlySpeakerRow instances have disabled visual"
+
+      - id: "VC-213-03"
+        description: "Disabled 2nd speech also has distinct visual"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "When has_second_speech=false, speech 2 row also visually distinct"
+
+    should_pass:
+      - id: "VC-213-04"
+        description: "Pencil icon still visible and functional"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "PencilIcon still rendered for non-observer roles"
+
+      - id: "VC-213-05"
+        description: "Test coverage for disabled visual style"
+        check_type: "test_run"
+        expected: "Tests validate ReadOnlySpeakerRow has appropriate disabled styling props"
+
+# =============================================================================
+# CR-214: Keep original placeholders when 2nd speech is disabled
+# Request: "No card de edicao de discursos, quando 2o discurso esta desabilitado,
+#           manter placeholders originais nos campos: 'Selecionar Discursante' e
+#           'Selecionar Tema', ao inves de 'Domingo configurado para nao ter 2o
+#           discurso'"
+# =============================================================================
+
+cr_214:
+  feature_id: "F150"
+  title: "SpeechSlot - keep original placeholders when 2nd speech is disabled"
+  status: "POST_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/components/SpeechSlot.tsx"
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+
+    current_behavior:
+      description: |
+        In SpeechSlot.tsx:198-216, when isPos2Disabled is true, both the speaker
+        field and topic field show the same placeholder:
+          t('speeches.secondSpeechDisabledPlaceholder')
+        Which is:
+          pt-BR: "Domingo configurado para nao ter 2o discurso"
+          en: "Sunday configured to have no 2nd speech"
+          es: "Domingo configurado para no tener 2o discurso"
+
+        The user wants these to instead show the original placeholders:
+        - Speaker field: t('speeches.selectSpeaker') = "Selecionar Discursante"
+        - Topic field: t('speeches.selectTopic') = "Selecionar tema"
+
+        The fields should still be visually disabled (opacity 0.5 + surfaceVariant bg)
+        but show the original placeholder text.
+      evidence_lines:
+        - "src/components/SpeechSlot.tsx:198-216 - isPos2Disabled block with secondSpeechDisabledPlaceholder"
+        - "src/components/SpeechSlot.tsx:202 - speaker field placeholder"
+        - "src/components/SpeechSlot.tsx:210 - topic field placeholder"
+        - "src/i18n/locales/pt-BR.json:216 - secondSpeechDisabledPlaceholder value"
+
+    implementation_scope:
+      files_to_change:
+        - "src/components/SpeechSlot.tsx"
+      change_description: |
+        In the isPos2Disabled block (lines 198-216):
+        - Change speaker field placeholder from t('speeches.secondSpeechDisabledPlaceholder')
+          to t('speeches.selectSpeaker')
+        - Change topic field placeholder from t('speeches.secondSpeechDisabledPlaceholder')
+          to t('speeches.selectTopic')
+        - Keep the disabled visual style (opacity 0.5, surfaceVariant background)
+
+  validation_checks:
+    must_pass:
+      - id: "VC-214-01"
+        description: "Speaker field shows 'Selecionar Discursante' when 2nd speech disabled"
+        check_type: "code_inspection"
+        target: "src/components/SpeechSlot.tsx"
+        expected: "isPos2Disabled speaker field uses t('speeches.selectSpeaker')"
+
+      - id: "VC-214-02"
+        description: "Topic field shows 'Selecionar Tema' when 2nd speech disabled"
+        check_type: "code_inspection"
+        target: "src/components/SpeechSlot.tsx"
+        expected: "isPos2Disabled topic field uses t('speeches.selectTopic')"
+
+      - id: "VC-214-03"
+        description: "Fields still visually disabled (opacity + background)"
+        check_type: "code_inspection"
+        target: "src/components/SpeechSlot.tsx"
+        expected: "opacity: 0.5 and backgroundColor: colors.surfaceVariant still applied"
+
+    should_pass:
+      - id: "VC-214-04"
+        description: "AgendaForm also updated if it uses secondSpeechDisabledPlaceholder"
+        check_type: "code_inspection"
+        target: "src/components/AgendaForm.tsx"
+        expected: "Check if AgendaForm:424-425 also needs update for has_second_speech=false"
+
+      - id: "VC-214-05"
+        description: "Test coverage for updated placeholders"
+        check_type: "test_run"
+        expected: "Tests validate correct placeholder text in disabled state"
+
+# =============================================================================
+# CR-215: Collapsed speech cards uniform height (3-line max)
+# Request: "Cards contraidos de edicao de discursos devem ter mesma altura
+#           independente do conteudo (1, 2 ou 3 linhas). Usar a altura do card
+#           mais alto (3 linhas) para todos"
+# =============================================================================
+
+cr_215:
+  feature_id: "F151"
+  title: "SundayCard collapsed - uniform height for speech cards"
+  status: "POST_VALIDATED"
+
+  pre_evidence:
+    searched_paths:
+      - "src/components/SundayCard.tsx"
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/app/(tabs)/agenda.tsx"
+      - "src/components/NextSundaysSection.tsx"
+
+    current_behavior:
+      description: |
+        In SundayCard.tsx:363-397, the collapsed view shows speech rows:
+          {visiblePositions.map((pos, idx) => {
+            ...
+            return (
+              <View key={pos} style={styles.speechRow}>
+                <StatusLED .../>
+                {name ? <Text .../> : <Text>{' '}</Text>}
+              </View>
+            );
+          })}
+
+        The issue: when a sunday has 2 speeches (has_second_speech=false), it shows
+        only 2 rows. When it has 3 speeches, it shows 3 rows. This causes different
+        collapsed card heights depending on content (2 vs 3 lines).
+
+        The user wants ALL collapsed speech cards to have the same height, equal to
+        the tallest (3 lines). This means even when only 2 positions are visible,
+        the card height should match a 3-line card.
+
+        Current styles:
+        - speechRow: marginBottom: 4 (SundayCard.tsx:476-480)
+        - card height is determined dynamically by content
+
+        The same pattern applies in:
+        - Speeches tab (speeches.tsx) - uses SundayCard with hasSecondSpeech
+        - NextSundaysSection - uses SundayCard with hasSecondSpeech
+        - Agenda tab (agenda.tsx) - uses its own card but with similar status lines
+
+        NOTE: The Agenda tab collapsed cards show status summary lines (Discursantes X/Y,
+        Oracoes X/Y, etc.) not individual speech rows, so CR-215 primarily affects
+        the Speeches tab and NextSundaysSection which use SundayCard.
+      evidence_lines:
+        - "src/components/SundayCard.tsx:312 - visiblePositions = hasSecondSpeech ? [1,2,3] : [1,3]"
+        - "src/components/SundayCard.tsx:363-397 - collapsed speech rows rendering"
+        - "src/components/SundayCard.tsx:476-480 - speechRow style with marginBottom: 4"
+        - "src/components/SundayCard.tsx:424-430 - card style (no fixed height)"
+
+    implementation_scope:
+      files_to_change:
+        - "src/components/SundayCard.tsx"
+      change_description: |
+        Set a fixed minimum height on the headerCenter or the collapsed speech area
+        so that all cards have the same height as a 3-line card. Options:
+        - Set a minHeight on styles.headerCenter that equals 3 speechRow heights
+        - Or always render 3 speechRow elements (with empty third if only 2 visible)
+        - Each speechRow: ~18px text + 4px margin = ~22px per row. 3 rows = ~66px.
+          Plus the header padding. Set minHeight accordingly.
+
+  validation_checks:
+    must_pass:
+      - id: "VC-215-01"
+        description: "Collapsed cards have uniform height regardless of speech count"
+        check_type: "code_inspection"
+        target: "src/components/SundayCard.tsx"
+        expected: "minHeight or fixed height on collapsed content area for 3-line size"
+
+      - id: "VC-215-02"
+        description: "Cards with 2 speeches (no second speech) same height as 3-speech cards"
+        check_type: "code_inspection"
+        target: "src/components/SundayCard.tsx"
+        expected: "Height mechanism ensures 2-line and 3-line cards are equal height"
+
+    should_pass:
+      - id: "VC-215-03"
+        description: "Exception cards not affected by height change"
+        check_type: "code_inspection"
+        target: "src/components/SundayCard.tsx"
+        expected: "Cards with exceptionText not forced to 3-line height"
+
+      - id: "VC-215-04"
+        description: "Test coverage for uniform height"
+        check_type: "test_run"
+        expected: "Tests validate collapsed card height consistency"
+
+# =============================================================================
+# PRE Summary
+# =============================================================================
+
+pre_summary:
+  total_crs: 5
+  validated_crs: 5
+  failed_crs: 0
+
+  scope_assessment:
+    total_files_to_change: 5
+    files:
+      - "src/app/(tabs)/index.tsx"       # CR-211
+      - "src/i18n/locales/pt-BR.json"    # CR-212
+      - "src/i18n/locales/en.json"       # CR-212
+      - "src/i18n/locales/es.json"       # CR-212
+      - "src/components/AgendaForm.tsx"   # CR-213
+      - "src/components/SpeechSlot.tsx"   # CR-214
+      - "src/components/SundayCard.tsx"   # CR-215
+
+  risk_notes:
+    - "CR-212: Only i18n value changes, no code logic. Low risk. User should clarify exact English and Spanish translations."
+    - "CR-214: Also check AgendaForm.tsx:424-425 which uses secondSpeechDisabledPlaceholder for the agenda editing card's 2nd speech row when has_second_speech=false."
+    - "CR-215: Height calculation depends on font rendering. Use minHeight rather than fixed height to accommodate different screen sizes."

@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  last_updated_by: "batch-22-phase-2"
+  last_updated_by: "batch-23-phase-1"
   total_modules: 8
-  total_adrs: 86
-  total_crs_implemented: 127
+  total_adrs: 88
+  total_crs_implemented: 129
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -46,6 +46,7 @@ metadata:
     - docs/arch/ARCH_M037.yaml
     - docs/arch/ARCH_M038.yaml
     - docs/arch/ARCH_M039.yaml
+    - docs/arch/ARCH_M040.yaml
 
 # =============================================================================
 # TECH STACK
@@ -287,7 +288,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -323,11 +324,12 @@ modules:
       CR-194/F130: Fix TypeScript compilation errors in test mocks and production code. SundayAgenda mocks gain missing fields. speeches.tsx null-to-string fix. AgendaForm Member type import fix. Documentation can_piano -> can_pianist.
       CR-196/F132: Fix 2nd speech toggle: handleToggleSecondSpeech adds separate direct Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder (not single warning). AgendaForm shows disabled ReadOnlySpeakerRow. Agenda/Home collapsed cards use dynamic X/2 or X/3 based on has_second_speech.
       CR-199/F136: SpeechSlot labelRow gains paddingRight:36 to align StatusLED right edge with speaker field right edge. actionArea width is 36px, so labelRow content is offset to match (ADR-088).
+      CR-209/F145: SpeechSlot and SundayCard Unicode icons (chevron, X) replaced with SVG icon components from icons module (ChevronDownIcon, XIcon). SearchInput XIcon replaces Unicode (ADR-096).
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -345,7 +347,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -386,6 +388,8 @@ modules:
       CR-184/F126: Pencil button (U+270F) added to Presentation header. Navigates to Agenda tab with expandDate param (ADR-083). Agenda tab gains expandDate query param support (same ADR-082 pattern as speeches.tsx).
       CR-185/F127: Play button (U+25B6) in expanded agenda card header. Navigates to Presentation with date param. Presentation screen accepts optional date param (fallback getTodaySundayDate).
       CR-200/F137: Play icon fontSize increased in agenda.tsx (14->18) with marginRight 8->12 for better spacing from chevron.
+      CR-209/F145: All Unicode/emoji icons in agenda.tsx, presentation.tsx, AgendaForm.tsx, AccordionCard.tsx replaced with SVG icon components from icons module (ADR-096).
+      CR-210/F146: Play icon in agenda.tsx card header gets marginRight:8 for visual separation from chevron. Uses colors.textSecondary for sober appearance (ADR-097).
 
   - id: M005
     name: NotificationModule
@@ -461,7 +465,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -486,6 +490,7 @@ modules:
       - src/components/InviteActionDropdown.tsx
       - src/components/SwipeableCard.tsx
       - src/components/QueryErrorView.tsx
+      - src/components/icons/index.ts
     hooks:
       - useTheme
     screens:
@@ -495,7 +500,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -552,6 +557,8 @@ modules:
       CR-203/F139: New invite-redirect Edge Function serves self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. create-invitation deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (ADR-090).
       CR-208/F143: create-invitation Edge Function gains structured error codes (code field in JSON responses), console.error logging at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true }) (ADR-094).
       CR-204/F144: reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to docs/public/ for GitHub Pages hosting. EXTERNAL_PAGES_URL env var configurable (ADR-095).
+      CR-209/F145: All Unicode/emoji icons replaced with inline SVG components from centralized icons module (src/components/icons/index.ts). 14 icon exports using react-native-svg. WhatsAppIcon consolidated from 2 duplicate definitions. DD-25 updated to 'inline SVG (no icon library)' (ADR-096). 16 consumer files updated.
+      CR-210/F146: Play icon placement adjustments. Home tab: PlayIcon stays inside button (SVG drop-in). Agenda tab: PlayIcon separated from chevron with marginRight:8. Single component handles both themes via color prop (ADR-097).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -826,6 +833,7 @@ adrs:
     context: "User wants pencil/trash icons for swipe buttons. App has no icon library dependency."
     decision: "Use Unicode characters U+270F (Pencil) and U+1F5D1 (Wastebasket) as icon content. editLabel/deleteLabel props kept for accessibilityLabel only."
     decided_in: "CR-87"
+    superseded_by: "ADR-096 (CR-209/F145 -- swipe icons now use SVG inline instead of Unicode. No-icon-library principle preserved)"
     consequences:
       - "Zero new dependencies"
       - "Consistent with app's no-icon-library approach"
@@ -895,6 +903,7 @@ adrs:
     context: "F050 precisa de icone reconhecivel do WhatsApp. Nao existe glifo Unicode padrao. App segue DD-25 (sem icon library)."
     decision: "Usar SVG inline minimo do logo WhatsApp via react-native-svg (dependencia transitiva do Expo). Zero instalacao."
     decided_in: "CR-105"
+    extended_by: "ADR-096 (CR-209/F145 -- WhatsAppIcon pattern extended to all 14 icons, consolidated into shared icons module)"
     consequences:
       - "Icone reconhecivel e profissional"
       - "Zero dependencias novas (react-native-svg ja presente)"
@@ -1432,6 +1441,28 @@ adrs:
       - "Edge Functions become simpler (~30 lines instead of ~450 lines)"
       - "Dependency on GitHub Pages availability (acceptable risk)"
 
+  - id: ADR-096
+    title: "Centralized SVG icons module replacing all Unicode/emoji characters"
+    context: "App uses Unicode/emoji for all icons. Emojis ignore color prop (platform-specific colors). Unicode chars vary across platforms. WhatsAppIcon (inline SVG) duplicated in 2 files. DD-25 prohibits icon libraries."
+    decision: "Create src/components/icons/index.ts with 14 SVG icon components (13 Lucide stroke-based + 1 WhatsAppIcon fill-based). Path data copied as constants (no Lucide package). WhatsAppIcon consolidated. DD-25 updated to 'inline SVG (no icon library)'. ADR-033 partially superseded for swipe icons."
+    decided_in: "CR-209"
+    consequences:
+      - "Monochromatic icons consistent across iOS and Android"
+      - "All icons accept color prop and respect theme"
+      - "Zero new dependencies (react-native-svg already present)"
+      - "WhatsAppIcon consolidated from 2 duplicate definitions to 1 shared export"
+      - "16 consumer files updated"
+
+  - id: ADR-097
+    title: "Play icon placement: inside button (Home) and separated from chevron (Agenda)"
+    context: "CR-210 requests play icon placement adjustments. Home tab play icon stays inside button (SVG replaces Unicode). Agenda tab play icon needs visual separation from chevron."
+    decision: "Home: PlayIcon inside meetingButtonContent (same layout). Agenda: PlayIcon gets marginRight: 8 from chevron. Both use theme colors via color prop. Single PlayIcon handles both themes."
+    decided_in: "CR-210"
+    consequences:
+      - "Play icon visually separated from chevron in Agenda tab"
+      - "Single PlayIcon handles both light and dark themes via color prop"
+      - "Home tab layout unchanged (SVG drop-in for Unicode)"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1772,7 +1803,7 @@ cross_cutting:
 
   gestures:
     wrapper: "GestureHandlerRootView in root layout (CR-82)"
-    swipe: "SwipeableCard component for edit/delete actions (CR-87: Unicode icons, CR-90: pointerEvents='box-none' fix for Delete button)"
+    swipe: "SwipeableCard component for edit/delete actions (CR-87: originally Unicode icons, CR-209/F145: replaced with SVG icons via icons module. CR-90: pointerEvents='box-none' fix for Delete button)"
     animations: "react-native-reanimated for accordion, LED, presentation transitions"
 
   deep_links:
@@ -1850,22 +1881,25 @@ file_structure:
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
     "PrayerSelector.tsx": "Seletor de membro para oracoes. CR-125/F059: modalOnly prop suprime botao inline. CR-133/F076: hint text discoverability + pre-populate no re-edit de nomes customizados."
-    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. CR-181/F118: collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF."
-    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). CR-189/F124: row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn). CR-196/F132: disabled state shows 2 visible disabled fields with placeholder instead of single warning."
+    "SundayCard.tsx": "Card expandivel por domingo. CR-115/F061: SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. CR-127/F070: onDeleteSpeeches prop para limpar speeches ao mudar tipo. CR-160/F098: pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. CR-161/F099: collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. CR-181/F118: collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF. CR-209/F145: ChevronDownIcon SVG replaces Unicode."
+    "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). CR-114/F060: onClearTopic + botao X no tema. CR-116/F062: allowedStatuses para LED filtrado. CR-119/F063: layout [LED][Field][X]. CR-129/F071: LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. CR-128/F073: Topic X button extraido para fora do campo em topicRow container. CR-134/F077: LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). CR-160/F098: getPositionLabel unified (no pos 3 special case). CR-162/F100: LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. CR-174/F112: fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). CR-177/F115: StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). CR-189/F124: row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn). CR-196/F132: disabled state shows 2 visible disabled fields with placeholder instead of single warning. CR-209/F145: Unicode chevron and X replaced with ChevronDownIcon and XIcon SVG."
     "StatusLED.tsx": "LED flat circle animado de status de discurso. CR-126/F069: redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
-    "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop."
-    "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix)"
+    "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop. CR-209/F145: chevron Unicode replaced with ChevronDownIcon/ChevronUpIcon SVG."
+    "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix). CR-209/F145: Unicode/emoji icons replaced with SVG (PencilIcon, TrashIcon)."
     "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
-    "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84). flex:1 defensivo no container (CR-118/F065)."
+    "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84). flex:1 defensivo no container (CR-118/F065). CR-209/F145: XIcon SVG replaces Unicode."
     "OfflineBanner.tsx": "Banner vermelho de offline. CR-147/F090: useSafeAreaInsets para paddingTop, fontSize 14->15 / 12->13."
     "ErrorBoundary.tsx": "Error boundary do React"
     "QueryErrorView.tsx": "View de erro para queries"
     "ExitConfirmation.tsx": "Confirmacao ao sair do app"
     "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos. CR-114/F060: wiring de onClearTopic. CR-188/F129: cards become non-expandable; all inline editing removed (SpeechSlot, modals, mutation hooks); pencil button (U+270F) navigates to Speeches tab with expandDate."
     "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
-    "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary)"
-    "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus'). CR-134/F077: opcoes de status dinamicas via ALL_ASSIGNED_STATUSES.filter()."
+    "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary). CR-209/F145: WhatsAppIcon consolidated to icons module, MoreVerticalIcon SVG replaces Unicode."
+    "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus'). CR-134/F077: opcoes de status dinamicas via ALL_ASSIGNED_STATUSES.filter(). CR-209/F145: WhatsAppIcon imported from icons module (local definition removed)."
+
+  "src/components/icons/":
+    "index.ts": "Centralized SVG icon components (CR-209/F145). 14 exports: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, MoreVerticalIcon (Lucide stroke-based), WhatsAppIcon (brand fill-based). Shared IconProps { size?: number; color?: string }. Uses react-native-svg. No icon library (DD-25/ADR-096)."
 
   "src/lib/":
     "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
@@ -2315,6 +2349,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-094, ADR-095]
     new_files: ["docs/public/reset-password.html", "docs/public/accept-invite.html"]
+
+  batch_23_phase_1:
+    crs: "CR-209, CR-210"
+    scope: "Replace all Unicode/emoji icons with inline SVG components (F145), Play icon placement adjustments (F146)"
+    doc: "ARCH_M040.yaml"
+    status: "pending implementation"
+    adrs: [ADR-096, ADR-097]
+    new_files: ["src/components/icons/index.ts"]
 
 # =============================================================================
 # OBSERVABILITY

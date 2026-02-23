@@ -28,6 +28,7 @@
 # CR-202, CR-203 (PRE+POST) - Batch 22 Phase 1
 # CR-205, CR-206, CR-207 (PRE+POST) - Batch 23 Phase 1
 # CR-204, CR-208 (PRE+POST) - Batch 22 Phase 2
+# CR-209, CR-210 (PRE+POST) - Batch 23 Phase 1
 # Updated: 2026-02-22
 # =============================================================================
 
@@ -10804,4 +10805,253 @@ cr_204:
         status: PASSED
         evidence: |
           90 test files, 5699 tests passed, 49 skipped, 0 failures.
+
+# #############################################################################
+# CR-209: Replace all Unicode/emoji icons with inline SVG components (F145)
+# #############################################################################
+
+cr_209:
+  cr_id: CR-209
+  title: "Replace all Unicode/emoji icons with inline SVG components"
+  type: ui_improvement
+  spec: specs/SPEC_F145.yaml
+  qa_plan: qa/QA_PLAN_040.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Problem confirmed: 4 emoji HTML entities in tab bar and 15 distinct Unicode
+      characters used as icons across 22 source files. WhatsAppIcon SVG pattern
+      already exists as reference. react-native-svg ^15.12.1 already installed.
+      Target directory src/components/icons/index.ts does not exist (needs creation).
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 7cdf742
+        message: "feat(icons): create centralized SVG icons module with 14 components (CR-209)"
+      - hash: 10d427b
+        message: "refactor(layout): replace 4 emoji tab icons with SVG components (CR-209)"
+      - hash: 2165ae1
+        message: "refactor(components): replace Unicode/emoji icons with SVG in 8 components (CR-209)"
+      - hash: 1c2eea3
+        message: "refactor(screens): replace Unicode/emoji icons with SVG in 7 screens (CR-209)"
+      - hash: 48e82aa
+        message: "refactor(icons): replace remaining Unicode icons in 5 additional files (CR-209)"
+      - hash: 971e0a8
+        message: "fix(icons): rename icons module from .ts to .tsx for JSX support"
+      - hash: 146b276
+        message: "test(batch23): add tests for F145 (SVG icons) and F146 (play icon placement)"
+      - hash: 9674150
+        message: "fix(tests): update 56 assertions in 14 test files for SVG icon migration (CR-209)"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 2
+
+    must_pass_results:
+      - id: MP-01
+        description: "src/components/icons/index.tsx exists and exports SVG icon components"
+        status: PASSED
+        evidence: |
+          File exists at src/components/icons/index.tsx (renamed from .ts to .tsx for JSX).
+          Exports 14 named icon components: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon,
+          TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon,
+          ChevronRightIcon, CheckIcon, MoreVerticalIcon, WhatsAppIcon.
+
+      - id: MP-02
+        description: "All 4 tab bar icons replaced with SVG components (no emoji HTML entities)"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/_layout.tsx:6 imports HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon.
+          Lines 34, 43, 52, 61: Each tabBarIcon renders SVG component with color and size props.
+          Zero emoji HTML entities (&#x1F3E0; &#x1F4CB; &#x1F399; &#x2699;) remain in file.
+          grep for '&#x' in all .tsx files under src/ returns zero matches.
+
+      - id: MP-03
+        description: "All Unicode icon characters in SPEC scope replaced with SVG components"
+        status: PASSED
+        evidence: |
+          grep for \u25B6, \u25BC, \u25B2, \u270F, \u00D7, \u2715, \u2713,
+          \uD83D\uDDD1, \u22EE, \u203A in .tsx files under src/ returns zero matches.
+          Note: 4 Unicode chars remain in ActorSelector.tsx (\u2611, \u2610, \u270E, \u2716)
+          and 1 in QueryErrorView.tsx (\u26A0) -- these were intentionally scoped out of
+          SPEC_F145 (not in AC-145-01 icon list or files_impacted). The ordinal \u00BA
+          in SpeechSlot.tsx is correctly preserved (not an icon).
+
+      - id: MP-04
+        description: "SVG icon components accept size and color props following WhatsAppIcon pattern"
+        status: PASSED
+        evidence: |
+          All 14 components in src/components/icons/index.tsx accept { size?: number; color?: string }.
+          Stroke-based icons (13): default size=24, color='currentColor'. Render <Svg> with <Path>
+          using stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round".
+          Fill-based icon (WhatsAppIcon): default size=24, color='#25D366'. Uses fill={color}.
+          IconProps interface exported for reuse.
+
+      - id: MP-05
+        description: "Duplicate WhatsAppIcon definitions consolidated into shared icons module"
+        status: PASSED
+        evidence: |
+          WhatsAppIcon defined once in src/components/icons/index.tsx:325.
+          InviteManagementSection.tsx:18 imports from './icons'.
+          InviteActionDropdown.tsx:17 imports from './icons'.
+          grep for 'function WhatsAppIcon' in both files returns zero matches.
+          No duplicate inline definitions remain.
+
+      - id: MP-06
+        description: "react-native-svg imports used correctly in icon components"
+        status: PASSED
+        evidence: |
+          src/components/icons/index.tsx:12: import Svg, { Path, Circle } from 'react-native-svg';
+          Svg used as root element, Path for all icon shapes, Circle for SettingsIcon
+          and MoreVerticalIcon dots.
+
+      - id: MP-11
+        description: "No TypeScript errors after icon replacement"
+        status: PASSED
+        evidence: |
+          npx tsc --noEmit: Only 2 pre-existing errors unrelated to icons
+          (batch22-tester test valueOf, react-test-renderer types).
+          grep for 'icon' in tsc output returns zero matches.
+
+      - id: MP-12
+        description: "All existing tests pass after icon replacement"
+        status: PASSED
+        evidence: |
+          npx vitest run: 91 test files, 6032 tests passed, 49 skipped, 0 failures.
+          56 test assertions in 14 pre-existing test files updated for SVG icon migration
+          (commit 9674150). New batch23-f145-f146.test.ts added with dedicated tests.
+
+    should_pass_results:
+      - id: SP-01
+        description: "Icon sizes consistent with previous Unicode character sizes"
+        status: PASSED
+        evidence: |
+          Tab icons: use size from Expo Router tabBarIcon callback (typically 24-28).
+          Play icon Home: size={20} (was fontSize: 20). Play icon Agenda: size={18} (was fontSize: 18).
+          Chevrons: size={12} (consistent with previous small triangle chars).
+          Edit/close: size={16-20} matching context. All proportional to previous usage.
+
+      - id: SP-02
+        description: "Icons visually match the sober/monochromatic theme"
+        status: PASSED
+        evidence: |
+          All stroke-based icons use Lucide Icons path data (clean outlines, strokeWidth=2).
+          fill="none" on all paths ensures outline-only rendering.
+          WhatsAppIcon retains fill-based brand rendering (appropriate exception).
+
+      - id: SP-03
+        description: "topics.tsx expand/collapse indicator updated from Unicode to SVG"
+        status: PASSED
+        evidence: |
+          settings/topics.tsx:195-196: Uses ChevronDownIcon/ChevronRightIcon
+          (was \u25BC/\u25B6). Imported from icons module at line 25.
+
+      - id: SP-04
+        description: "Icon components are tree-shakeable (named exports)"
+        status: PASSED
+        evidence: |
+          All 14 icons are named exports (export const). No default export.
+          Each consuming file imports only the specific icons needed.
+
+      - id: SP-05
+        description: "No regressions in accessibility labels"
+        status: PASSED
+        evidence: |
+          All Pressable elements wrapping icons retain accessibilityRole and
+          accessibilityLabel props. Verified in index.tsx (button, "Edit agenda"),
+          agenda.tsx (button, "Open presentation"), presentation.tsx, etc.
+
+    notes: |
+      5 Unicode icon characters remain in 2 files not scoped by SPEC_F145:
+      - ActorSelector.tsx: \u2611, \u2610 (checkboxes), \u270E (pencil), \u2716 (delete X)
+      - QueryErrorView.tsx: \u26A0 (warning sign)
+      These were identified in QA_PLAN_040 icon_inventory but intentionally excluded
+      from SPEC_F145 (not in AC-145-01 icon list). They can be addressed in a follow-up CR.
+
+# #############################################################################
+# CR-210: Play icon placement adjustments (F146)
+# #############################################################################
+
+cr_210:
+  cr_id: CR-210
+  title: "Play icon placement adjustments in Home and Agenda tabs"
+  type: ui_improvement
+  spec: specs/SPEC_F146.yaml
+  qa_plan: qa/QA_PLAN_040.yaml
+
+  pre_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    summary: |
+      Play icon U+25B6 confirmed in 2 locations: index.tsx:134 (Home, inside
+      Start Meeting button) and agenda.tsx:525 (Agenda, in expanded card header
+      before chevron, marginRight: 12). Both use theme colors.
+
+  post_validation:
+    timestamp: "2026-02-22"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 85d8669
+        message: "fix(icons): adjust PlayIcon placement in Home and Agenda tabs (CR-210)"
+
+    reviewer_verdict: approved
+    reviewer_iteration: 2
+
+    must_pass_results:
+      - id: MP-07
+        description: "Play icon in Home (index.tsx) replaced with SVG component"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/index.tsx:27 imports PlayIcon from icons module.
+          Line 134-136: <View style={styles.playIconWrapper}><PlayIcon size={20}
+          color={colors.onPrimary} /></View> inside meetingButtonContent.
+          Position unchanged: icon + text centered in button, marginRight: 8 on wrapper.
+
+      - id: MP-08
+        description: "Play icon in Agenda (agenda.tsx) replaced with SVG component"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/agenda.tsx:32 imports PlayIcon from icons module.
+          Line 526: <PlayIcon size={18} color={colors.textSecondary} /> inside Pressable
+          with style={styles.playButton}. Renders only when expandable && isExpanded.
+
+      - id: MP-09
+        description: "Play icon in Agenda positioned with gap from chevron"
+        status: PASSED
+        evidence: |
+          styles.playButton: { marginRight: 8 } (line 631-633).
+          Per SPEC_F146 AC-146-02: "PlayIcon is rendered to the left of the chevron
+          icon with marginRight: 8 separating them." The SPEC explicitly defines
+          marginRight: 8 as the target spacing. The play icon Pressable has this margin
+          before the ChevronUpIcon/ChevronDownIcon that follows it.
+
+      - id: MP-10
+        description: "Play icon is monochromatic and works with both themes"
+        status: PASSED
+        evidence: |
+          PlayIcon in icons/index.tsx:200-211 uses stroke={color} (not hardcoded).
+          Home: color={colors.onPrimary} (adapts per theme).
+          Agenda: color={colors.textSecondary} (adapts per theme).
+          No fill on path (fill="none"), stroke-only rendering ensures monochromatic look.
+
+    should_pass_results:
+      - id: SP-146-01
+        description: "Play icon only visible when card is expanded in Agenda"
+        status: PASSED
+        evidence: |
+          agenda.tsx:518: condition {expandable && isExpanded && (...)} guards PlayIcon
+          rendering. When collapsed, only chevron is visible. Behavior preserved from
+          pre-implementation.
+
+    regression_checks:
+      - id: REG-210-01
+        description: "Full test suite passes"
+        status: PASSED
+        evidence: |
+          91 test files, 6032 tests passed, 49 skipped, 0 failures.
 

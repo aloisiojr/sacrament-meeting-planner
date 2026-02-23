@@ -1,0 +1,307 @@
+# =============================================================================
+# SPEC_F145.yaml
+# Batch 23 Phase 1: Replace all Unicode/emoji icons with inline SVG components
+# (CR-209)
+# Created: 2026-02-22
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 23
+phase: 1
+created: "2026-02-22"
+last_updated: "2026-02-22"
+request_type: ui_improvement
+execution_order: "F145 first (CR-209), then F146 (CR-210)"
+execution_rationale: >
+  F145 creates the icons module (src/components/icons/index.ts) that F146 depends
+  on. F146 adjusts play icon placement which requires the PlayIcon SVG component
+  created in F145. Without F145, F146 has no SVG icons to position.
+
+# =============================================================================
+# F145: Replace all Unicode/emoji icons with inline SVG components (CR-209)
+# =============================================================================
+
+features:
+
+  - id: F145
+    name: "Replace all Unicode/emoji icons with inline SVG components for cross-platform visual consistency"
+    cr_id: 209
+    type: ui_improvement
+    related_crs: [87, 105]
+    related_features: [F050, F051]
+    description: >
+      PROBLEM: The app uses Unicode characters and emoji for icons throughout the UI.
+      Emojis (house, clipboard, microphone, gear, wastebasket) are rendered with
+      platform-specific colors (iOS/Android), completely ignoring the `color` prop
+      of the parent Text component. Simple Unicode characters (arrows, X, checkmark,
+      pencil) respect the color prop but vary in size, weight, and positioning between
+      platforms. The result is a visually inconsistent UI that clashes with the app's
+      monochromatic sober theme.
+
+      REFERENCE: The WhatsApp icon (inline SVG via react-native-svg) in
+      InviteManagementSection.tsx and InviteActionDropdown.tsx already demonstrates
+      the ideal pattern -- monochromatic, scalable, accepts size/color props,
+      consistent across all platforms.
+
+      SOLUTION: Create src/components/icons/index.ts with inline SVG icon components
+      following the same pattern as WhatsAppIcon. Use path data from Lucide Icons
+      (MIT license, 24x24 viewBox, stroke-based). Zero new dependencies (uses
+      react-native-svg already present at ^15.12.1). Respects DD-25 (no icon library).
+
+      The WhatsAppIcon is currently duplicated in InviteManagementSection.tsx (lines
+      40-48) and InviteActionDropdown.tsx (lines 38-47). Both copies will be
+      consolidated into the shared icons module.
+
+      ICON COMPONENT INTERFACE (shared by all icons):
+        interface IconProps {
+          size?: number;   // default 24
+          color?: string;  // default 'currentColor'
+        }
+
+      LUCIDE ICONS PATH DATA SOURCE:
+        All icons use Lucide Icons (https://lucide.dev) path data.
+        License: ISC (MIT-compatible), 24x24 viewBox.
+        Stroke-based icons: strokeWidth=2, strokeLinecap="round", strokeLinejoin="round".
+        The WhatsAppIcon is NOT from Lucide; it uses fill-based path data and is kept as-is.
+
+    # -------------------------------------------------------------------------
+    # COMPLETE ICON INVENTORY
+    # -------------------------------------------------------------------------
+    #
+    # Priority 1 - Emojis (colored, ignore theme color):
+    #   U+1F3E0 (house emoji)      -> HomeIcon         | _layout.tsx:34
+    #   U+1F4CB (clipboard emoji)  -> ClipboardListIcon | _layout.tsx:43
+    #   U+1F399 (microphone emoji) -> MicIcon           | _layout.tsx:52
+    #   U+2699  (gear emoji)       -> SettingsIcon       | _layout.tsx:61
+    #   U+1F5D1 (wastebasket emoji)-> TrashIcon          | SwipeableCard.tsx:173
+    #
+    # Priority 2 - Unicode (inconsistent across platforms):
+    #   U+25B6  (play triangle)    -> PlayIcon           | index.tsx:134, agenda.tsx:525
+    #   U+270F  (pencil)           -> PencilIcon         | index.tsx:233, presentation.tsx:106, AgendaForm.tsx:718
+    #   U+2715  (close X)          -> XIcon              | presentation.tsx:126
+    #   U+00D7  (multiply X)       -> XIcon              | SpeechSlot.tsx:251,290, SearchInput.tsx:53, AgendaForm.tsx:229,684
+    #   U+25BC  (down arrow)       -> ChevronDownIcon    | SpeechSlot.tsx:238,279, SundayCard.tsx:182, AccordionCard.tsx:99, agenda.tsx:531, users.tsx:365
+    #   U+25B2  (up arrow)         -> ChevronUpIcon      | AccordionCard.tsx:99, agenda.tsx:531, users.tsx:365
+    #   U+203A  (right arrow)      -> ChevronRightIcon   | settings/index.tsx:38
+    #   U+2713  (checkmark)        -> CheckIcon          | settings/index.tsx:305,346, timezone.tsx:172, theme.tsx:62
+    #   U+22EE  (vertical ellipsis)-> MoreVerticalIcon   | InviteManagementSection.tsx:241
+    #
+    # Consolidation:
+    #   WhatsAppIcon (duplicated)  -> WhatsAppIcon       | InviteManagementSection.tsx:40-48, InviteActionDropdown.tsx:38-47
+    # -------------------------------------------------------------------------
+
+    acceptance_criteria:
+      - id: AC-145-01
+        description: "Icons module exports all 14 icon components"
+        given: "src/components/icons/index.ts file is created"
+        when: "Importing from the icons module"
+        then: "The following 14 named exports are available: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, MoreVerticalIcon, WhatsAppIcon. Each component accepts props { size?: number; color?: string }."
+        status: pending
+
+      - id: AC-145-02
+        description: "All icon components follow the WhatsAppIcon pattern using react-native-svg"
+        given: "Any icon component from the icons module"
+        when: "Rendered with size and color props"
+        then: "The component renders an Svg element with width={size} height={size} viewBox='0 0 24 24' fill='none'. Stroke-based icons (all except WhatsAppIcon) use Path with stroke={color} strokeWidth={2} strokeLinecap='round' strokeLinejoin='round' fill='none'. WhatsAppIcon uses Path with fill={color}. Default size is 24, default color is 'currentColor' (except WhatsAppIcon which defaults to '#25D366' for backward compat)."
+        status: pending
+
+      - id: AC-145-03
+        description: "Tab bar icons (Home, Agenda, Speeches, Settings) use SVG icons instead of emojis"
+        given: "User views the bottom tab bar on any platform"
+        when: "Tabs render their icons"
+        then: "_layout.tsx uses HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon from icons module. Each receives color and size from tabBarIcon callback. The icons are monochromatic and match the active/inactive tab color on both iOS and Android. No emoji rendering differences between platforms."
+        status: pending
+
+      - id: AC-145-04
+        description: "SwipeableCard delete button uses TrashIcon instead of wastebasket emoji"
+        given: "User swipes a card to reveal action buttons"
+        when: "Delete button is visible"
+        then: "SwipeableCard.tsx renders TrashIcon with color={colors.onPrimary} (for edit) and color='#FFFFFF' (for delete) instead of U+1F5D1 emoji. The icon respects the color prop and renders identically on iOS and Android."
+        status: pending
+
+      - id: AC-145-05
+        description: "SwipeableCard edit button uses PencilIcon instead of pencil Unicode"
+        given: "User swipes a card to reveal action buttons"
+        when: "Edit button is visible"
+        then: "SwipeableCard.tsx renders PencilIcon with color={colors.onPrimary} instead of U+270F Unicode. The icon renders consistently across platforms."
+        status: pending
+
+      - id: AC-145-06
+        description: "Play icon uses PlayIcon SVG in Home tab button and Agenda tab card header"
+        given: "User views the 'Start Sacrament Meeting' button (Home) or expanded agenda card header"
+        when: "Play icon is rendered"
+        then: "index.tsx and agenda.tsx render PlayIcon component instead of U+25B6 Unicode. PlayIcon accepts size and color props. The icon is monochromatic and consistent across platforms."
+        status: pending
+
+      - id: AC-145-07
+        description: "Pencil icon uses PencilIcon SVG in all locations"
+        given: "User views pencil edit buttons in Home preview card, presentation header, or AgendaForm speaker rows"
+        when: "Pencil icon is rendered"
+        then: "index.tsx:233, presentation.tsx:106, and AgendaForm.tsx:718 render PencilIcon component instead of U+270F Unicode. PencilIcon accepts size and color props."
+        status: pending
+
+      - id: AC-145-08
+        description: "Close X icon uses XIcon SVG in presentation header"
+        given: "User opens presentation mode"
+        when: "Close button is visible in header"
+        then: "presentation.tsx renders XIcon with color={colors.text} instead of U+2715 Unicode. The icon is consistent across platforms."
+        status: pending
+
+      - id: AC-145-09
+        description: "Multiply X (clear/remove) uses XIcon SVG in all locations"
+        given: "User views clear/remove buttons in SpeechSlot, SearchInput, or AgendaForm"
+        when: "X button is visible"
+        then: "SpeechSlot.tsx (lines 251,290), SearchInput.tsx (line 53), and AgendaForm.tsx (lines 229,684) render XIcon component instead of U+00D7 Unicode. XIcon accepts size and color props."
+        status: pending
+
+      - id: AC-145-10
+        description: "Chevron down/up icons use ChevronDownIcon/ChevronUpIcon SVG in all locations"
+        given: "User views dropdown arrows or expand/collapse indicators"
+        when: "Chevron icon is rendered"
+        then: "SpeechSlot.tsx (lines 238,279), SundayCard.tsx (line 182), AccordionCard.tsx (line 99), agenda.tsx (line 531), and users.tsx (line 365) render ChevronDownIcon or ChevronUpIcon instead of U+25BC/U+25B2 Unicode. Icons accept size and color props."
+        status: pending
+
+      - id: AC-145-11
+        description: "Chevron right icon uses ChevronRightIcon SVG in settings items"
+        given: "User views Settings screen"
+        when: "Settings items render their right arrow"
+        then: "settings/index.tsx (line 38) renders ChevronRightIcon instead of U+203A Unicode. The icon accepts size and color props."
+        status: pending
+
+      - id: AC-145-12
+        description: "Checkmark icon uses CheckIcon SVG in all selection screens"
+        given: "User views language selector, timezone selector, or theme selector"
+        when: "Selected item shows a checkmark"
+        then: "settings/index.tsx (lines 305,346), timezone.tsx (line 172), and theme.tsx (line 62) render CheckIcon instead of U+2713 Unicode. The icon accepts size and color props."
+        status: pending
+
+      - id: AC-145-13
+        description: "More vertical icon uses MoreVerticalIcon SVG in invite management"
+        given: "User views invite management section with already-invited speeches"
+        when: "Three-dots action button is rendered"
+        then: "InviteManagementSection.tsx (line 241) renders MoreVerticalIcon instead of U+22EE Unicode. The icon accepts size and color props."
+        status: pending
+
+      - id: AC-145-14
+        description: "WhatsAppIcon consolidated from duplicated definitions into icons module"
+        given: "InviteManagementSection.tsx and InviteActionDropdown.tsx need WhatsAppIcon"
+        when: "WhatsAppIcon is rendered in either component"
+        then: "Both files import WhatsAppIcon from '../../components/icons' (or '../icons' depending on relative path). The local inline WhatsAppIcon function definitions are removed from both files. The consolidated WhatsAppIcon in icons/index.ts has the same interface: { size?: number; color?: string } with defaults size=24, color='#25D366'."
+        status: pending
+
+      - id: AC-145-15
+        description: "Zero new dependencies added"
+        given: "package.json before and after F145"
+        when: "Comparing dependencies"
+        then: "No new packages are added. The implementation uses only react-native-svg (already at ^15.12.1 in package.json). No icon library (lucide-react-native, @expo/vector-icons, react-native-vector-icons, etc.) is installed. Only the path data strings from Lucide are used (copied as constants, not imported)."
+        status: pending
+
+      - id: AC-145-16
+        description: "All icons render identically on iOS and Android"
+        given: "Any icon from the icons module rendered on iOS and Android"
+        when: "Comparing visual output"
+        then: "SVG rendering via react-native-svg produces pixel-identical output on both platforms. No platform-specific emoji variations. No font-dependent sizing differences. Icons scale proportionally with the size prop."
+        status: pending
+
+      - id: AC-145-17
+        description: "No Unicode/emoji icon characters remain in production code after migration"
+        given: "All icon replacements are complete"
+        when: "Searching the codebase for the replaced Unicode characters"
+        then: "Zero occurrences of U+1F3E0, U+1F4CB, U+1F399, U+2699, U+1F5D1, U+25B6, U+270F, U+2715, U+00D7, U+25BC, U+25B2, U+203A, U+2713, U+22EE in UI-rendering code. Note: U+00BA (masculine ordinal) in SpeechSlot.tsx is NOT an icon and is NOT replaced."
+        status: pending
+
+      - id: AC-145-18
+        description: "DD-25 updated to reflect SVG icon pattern instead of Unicode"
+        given: "DD-25 currently says 'Unicode icons para swipe buttons (sem icon library)'"
+        when: "After F145 implementation"
+        then: "DD-25 is updated to reflect that icons now use inline SVG components (react-native-svg) instead of Unicode characters. The 'no icon library' principle is preserved -- the app still has zero icon library dependencies. Path data is copied from Lucide (MIT) as string constants."
+        status: pending
+
+    edge_cases:
+      - id: EC-145-01
+        case: "Icon rendered with size=0"
+        expected: "SVG renders with width=0 height=0, effectively invisible. No crash or layout break."
+        status: pending
+
+      - id: EC-145-02
+        case: "Icon rendered with very large size (e.g., 200)"
+        expected: "SVG scales proportionally. viewBox='0 0 24 24' ensures the icon maintains its aspect ratio. No pixelation since SVG is vector-based."
+        status: pending
+
+      - id: EC-145-03
+        case: "Icon rendered with undefined color"
+        expected: "Falls back to default color. Stroke-based icons use 'currentColor' (inherits from parent). WhatsAppIcon uses '#25D366'."
+        status: pending
+
+      - id: EC-145-04
+        case: "Tab bar icon receives numeric size from Expo Router tabBarIcon callback"
+        expected: "Icons use the size prop directly (Expo Router provides size as a number, typically 24-28). No conversion needed."
+        status: pending
+
+      - id: EC-145-05
+        case: "XIcon used for both close (U+2715) and clear/remove (U+00D7) with different sizes"
+        expected: "Single XIcon component used for both purposes. Size is controlled via the size prop at each call site. Close button in presentation.tsx uses larger size, clear buttons in SpeechSlot/SearchInput/AgendaForm use smaller size."
+        status: pending
+
+    files_impacted:
+      - src/components/icons/index.ts (NEW)
+      - src/app/(tabs)/_layout.tsx
+      - src/components/SwipeableCard.tsx
+      - src/app/(tabs)/index.tsx
+      - src/app/presentation.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/SearchInput.tsx
+      - src/components/SundayCard.tsx
+      - src/components/AccordionCard.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/components/InviteActionDropdown.tsx
+      - src/app/(tabs)/agenda.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(tabs)/settings/timezone.tsx
+      - src/app/(tabs)/settings/theme.tsx
+
+    files_not_modified:
+      - package.json (no new dependencies)
+      - src/components/StatusLED.tsx (uses View, not icon)
+      - src/components/StatusChangeModal.tsx (uses View circles, not icons)
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        Lucide Icons path data is used as static string constants copied into
+        the source code. No runtime dependency on Lucide. The path data is
+        licensed under ISC (MIT-compatible) and can be freely copied. Attribution
+        is included as a comment in the icons/index.ts file header.
+
+    - id: A-02
+      text: >
+        The existing WhatsAppIcon uses fill-based rendering (not stroke-based)
+        because it is a brand logo, not a UI icon. The consolidated WhatsAppIcon
+        keeps its fill-based rendering and '#25D366' default color for backward
+        compatibility. Other icons use stroke-based rendering per Lucide convention.
+
+    - id: A-03
+      text: >
+        The size and color props for icons match the existing usage patterns:
+        tab bar icons receive size from Expo Router (typically 24-28), other
+        icons use explicit size values matching the current fontSize of the
+        replaced Unicode Text elements.
+
+    - id: A-04
+      text: >
+        U+00BA (masculine ordinal indicator) used in SpeechSlot.tsx for ordinal
+        labels ("1o", "2o") is NOT an icon and is NOT replaced. It is a text
+        character used for grammatical purposes.
+
+  inconsistencies: []

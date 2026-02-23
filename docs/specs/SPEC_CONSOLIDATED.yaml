@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-22"
-  total_features: 130
-  total_change_requests: 194
+  total_features: 132
+  total_change_requests: 196
   implemented_crs: 96
-  pending_crs: 96
+  pending_crs: 98
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -69,6 +69,8 @@ metadata:
     - docs/specs/SPEC_F138_F139.yaml
     - docs/specs/SPEC_F140_F141_F142.yaml
     - docs/specs/SPEC_F143_F144.yaml
+    - docs/specs/SPEC_F145.yaml
+    - docs/specs/SPEC_F146.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -4799,6 +4801,74 @@ pending_crs:
       - supabase/functions/invite-redirect/index.ts
       - docs/public/reset-password.html (NEW)
       - docs/public/accept-invite.html (NEW)
+
+  # --- Batch 23 Phase 1 (SVG icons, Play icon placement) ---
+
+  - id: 209
+    type: ui_improvement
+    area: "Icons / UI (global)"
+    feature_id: F145
+    spec_file: "docs/specs/SPEC_F145.yaml"
+    related_crs: [87, 105]
+    description: >
+      Substituir todos os icones Unicode/emoji por componentes SVG inline
+      (react-native-svg) para consistencia visual cross-platform. Emojis
+      (casa, clipboard, microfone, engrenagem, lixeira) ignoram cor do tema.
+      Unicode (setas, X, checkmark, pencil) variam entre plataformas. Criar
+      src/components/icons/index.ts com 14 componentes SVG (padrao WhatsAppIcon).
+      Path data do Lucide Icons (MIT). Zero dependencias novas. Consolida
+      WhatsAppIcon duplicado.
+    acceptance_criteria:
+      - "14 icon components exportados de icons/index.ts"
+      - "Todos usam react-native-svg com props size/color"
+      - "Tab bar icons usam SVG (HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon)"
+      - "SwipeableCard usa TrashIcon e PencilIcon"
+      - "PlayIcon, PencilIcon, XIcon, ChevronDown/Up/Right, CheckIcon, MoreVerticalIcon"
+      - "WhatsAppIcon consolidado de 2 arquivos para icons/index.ts"
+      - "Zero caracteres Unicode/emoji para icones no codigo"
+      - "Zero dependencias novas no package.json"
+      - "Icones identicos em iOS e Android"
+    files_likely_impacted:
+      - src/components/icons/index.ts (NEW)
+      - src/app/(tabs)/_layout.tsx
+      - src/components/SwipeableCard.tsx
+      - src/app/(tabs)/index.tsx
+      - src/app/presentation.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/SearchInput.tsx
+      - src/components/SundayCard.tsx
+      - src/components/AccordionCard.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/InviteManagementSection.tsx
+      - src/components/InviteActionDropdown.tsx
+      - src/app/(tabs)/agenda.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/app/(tabs)/settings/users.tsx
+      - src/app/(tabs)/settings/timezone.tsx
+      - src/app/(tabs)/settings/theme.tsx
+
+  - id: 210
+    type: ui_improvement
+    area: "Home / Agenda (F044)"
+    feature_id: F146
+    spec_file: "docs/specs/SPEC_F146.yaml"
+    related_crs: [209]
+    description: >
+      Ajustar posicionamento do icone de play (agora PlayIcon SVG de F145).
+      Home tab: manter dentro do botao "Iniciar Reuniao Sacramental" (sem
+      mudanca de posicao). Agenda tab: posicionar ao lado do chevron de
+      expansao/contracao com gap (marginRight: 8). Icones sobrios que
+      funcionam com temas claro/escuro via prop color (colors.textSecondary).
+    acceptance_criteria:
+      - "Home tab: PlayIcon dentro do botao, sem mudanca de posicao"
+      - "Agenda tab: PlayIcon ao lado do chevron com marginRight: 8"
+      - "Play icon funciona com tema claro (colors.textSecondary)"
+      - "Play icon funciona com tema escuro (colors.textSecondary)"
+      - "Play icon so visivel quando card expandido"
+      - "Icone monocromatico, nao colorido"
+    files_likely_impacted:
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
 
 # =============================================================================
 

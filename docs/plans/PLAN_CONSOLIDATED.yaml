@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-22"
-  version: 28
-  last_updated_by: "batch-22-phase-2"
+  version: 29
+  last_updated_by: "batch-23-phase-1-svg"
   total_phases: 6
-  total_cr_plans: 45
+  total_cr_plans: 46
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -889,6 +889,29 @@ cr_plans:
       S04 e S05 parallelizaveis entre si (independentes), S06 depende de
       S01+S02+S03.
 
+  - id: PLAN_P040
+    title: "Batch 23 Phase 1: Replace All Unicode/Emoji Icons with Inline SVG, Play Icon Placement"
+    status: pending
+    crs_covered: [209, 210]
+    total_steps: 7
+    plan_ref: "docs/plans/PLAN_P040.yaml"
+    summary: >
+      2 features cobrindo consistencia visual cross-platform de icones: criacao de modulo
+      centralizado src/components/icons/index.ts com 14 componentes SVG inline (13
+      stroke-based Lucide + 1 fill-based WhatsApp) compartilhando interface { size?, color? },
+      migracao de todos os 16 arquivos consumidores de Unicode/emoji para importar do modulo,
+      consolidacao do WhatsAppIcon duplicado em InviteManagementSection/InviteActionDropdown,
+      atualizacao de DD-25 para refletir padrao SVG inline, verificacao de zero caracteres
+      Unicode restantes em codigo de producao (F145/CR-209). Ajuste de posicionamento do
+      PlayIcon: Home tab com size=20 color=onPrimary dentro do meetingButtonContent (sem
+      mudanca de layout), Agenda tab com marginRight:8 separando do chevron e
+      color=textSecondary para aparencia sober em ambos os temas (F146/CR-210). 2 features,
+      24 ACs, 7 ECs, 17 arquivos impactados (1 novo + 16 modificados + 1 teste), zero
+      migracoes SQL, zero dependencias novas. 2 ADRs: ADR-096 (modulo centralizado SVG
+      icons), ADR-097 (play icon placement Home/Agenda). S01 primeiro (cria modulo),
+      S02+S03+S04 parallelizaveis (todos dependem de S01), S05 depende de S02+S03+S04,
+      S06 depende de S04, S07 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1263,6 +1286,12 @@ pending_with_plan:
   - cr_id: 204
     plan_id: PLAN_P039
     description: "External hosting para HTML pages (GitHub Pages) bypass Supabase Content-Type override"
+  - cr_id: 209
+    plan_id: PLAN_P040
+    description: "Replace all Unicode/emoji icons with inline SVG components for cross-platform consistency"
+  - cr_id: 210
+    plan_id: PLAN_P040
+    description: "Play icon placement adjustments in Home tab button and Agenda tab card header"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1284,6 +1313,20 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 29
+    phase: "batch-23-phase-1-svg"
+    changes:
+      - "Added PLAN_P040 for Batch 23 Phase 1 SVG (F145-F146, CRs 209/210)"
+      - "2 UI improvements: replace all Unicode/emoji icons with inline SVG components, play icon placement adjustments"
+      - "7 steps, 24 ACs, 7 ECs, 17 arquivos impactados (1 novo + 16 modificados + 1 teste)"
+      - "Zero migracoes SQL, zero dependencias novas (react-native-svg ^15.12.1 ja presente)"
+      - "2 ADRs: ADR-096 (modulo centralizado SVG icons), ADR-097 (play icon placement Home/Agenda)"
+      - "F145 cria src/components/icons/index.ts com 14 componentes SVG (13 stroke-based Lucide + 1 fill-based WhatsApp)"
+      - "F145 migra 16 arquivos de Unicode/emoji para SVG icons: _layout.tsx, SwipeableCard, SpeechSlot, SearchInput, SundayCard, AccordionCard, AgendaForm, InviteManagementSection, InviteActionDropdown, index.tsx, agenda.tsx, presentation.tsx, settings/index, users, timezone, theme"
+      - "F145 consolida WhatsAppIcon duplicado de 2 arquivos para modulo compartilhado"
+      - "F145 atualiza DD-25 de Unicode para inline SVG"
+      - "F146 ajusta PlayIcon: Home tab (size=20, onPrimary, mesmo layout), Agenda tab (marginRight:8, textSecondary)"
+      - "S01 primeiro (cria modulo), S02+S03+S04 parallelizaveis (dependem de S01), S05 depende de S02+S03+S04, S06 depende de S04, S07 depende de todos"
   - version: 28
     phase: "batch-22-phase-2"
     changes:

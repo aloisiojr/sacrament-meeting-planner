@@ -457,7 +457,7 @@ function SpeechesTabContent() {
 
   if (speechesError || exceptionsError) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <QueryErrorView
           error={speechesErr ?? exceptionsErr ?? null}
           onRetry={() => { refetchSpeeches(); refetchExceptions(); }}
@@ -467,7 +467,7 @@ function SpeechesTabContent() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         ref={flatListRef}
         data={listItems}

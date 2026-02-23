@@ -192,7 +192,16 @@ export function buildPresentationCards(
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
       { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
     ];
-    cards.push({ title: t('agenda.closingHymn'), fields: specialFields });
+
+    let specialTitle: string;
+    if (exception?.reason === 'testimony_meeting') {
+      specialTitle = t('agenda.sectionTestimonies');
+    } else if (exception?.reason === 'primary_presentation') {
+      specialTitle = t('agenda.sectionPrimaryPresentation');
+    } else {
+      specialTitle = t('agenda.closingHymn');
+    }
+    cards.push({ title: specialTitle, fields: specialFields });
   }
 
   return cards;

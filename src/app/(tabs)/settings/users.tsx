@@ -278,7 +278,7 @@ export default function UserManagementScreen() {
   const currentUserId = currentUser?.id;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>

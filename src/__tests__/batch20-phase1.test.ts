@@ -167,8 +167,9 @@ describe('F127 (CR-185): Play button in Agenda card to Presentation', () => {
   describe('AC-127-02: Play button hidden when collapsed', () => {
     it('play button is gated by isExpanded condition', () => {
       // The play button is inside {expandable && isExpanded && (...)} block
+      // SUPERSEDED by F153 (CR-217): circle styles increased inline style length
       const playIndex = agendaSource.indexOf('<PlayIcon');
-      const nearbyCode = agendaSource.substring(Math.max(0, playIndex - 500), playIndex);
+      const nearbyCode = agendaSource.substring(Math.max(0, playIndex - 800), playIndex);
       expect(nearbyCode).toContain('isExpanded');
     });
   });

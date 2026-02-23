@@ -468,12 +468,13 @@ describe('F137 (CR-200) - Tester: Play icon fontSize enlargement', () => {
 
   // --- AC-137-03: Agenda playButton marginRight ---
   describe('AC-137-03: Agenda playButton marginRight is 8', () => {
-    it('playButton marginRight is exactly 8 (adjusted for SVG icon)', () => {
+    it('playButton marginRight is exactly 16 (increased from 8 by F153 CR-217)', () => {
       const playButtonMatch = agendaSource.match(/playButton:\s*\{([^}]+)\}/s);
       expect(playButtonMatch).not.toBeNull();
       const mrMatch = playButtonMatch![1].match(/marginRight:\s*(\d+)/);
       expect(mrMatch).not.toBeNull();
-      expect(parseInt(mrMatch![1], 10)).toBe(8);
+      // SUPERSEDED by F153 (CR-217): marginRight changed from 8 to 16
+      expect(parseInt(mrMatch![1], 10)).toBe(16);
     });
   });
 

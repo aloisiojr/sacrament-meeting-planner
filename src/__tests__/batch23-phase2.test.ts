@@ -459,7 +459,10 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
 
   describe('AC-151-02: 2-position cards padded to match 3-position cards', () => {
     it('headerCenter has conditional minHeight style', () => {
-      expect(sundayCardSource).toContain("!expanded && isSpeechesType && { minHeight: 62 }");
+      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
+      // Was: "!expanded && isSpeechesType && { minHeight: 62 }"
+      // Now: "!expanded && { minHeight: 62 }"
+      expect(sundayCardSource).toContain("!expanded && { minHeight: 62 }");
     });
   });
 
@@ -467,11 +470,15 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
 
   describe('AC-151-03: Expanded cards have no minHeight', () => {
     it('minHeight only applies when !expanded', () => {
-      expect(sundayCardSource).toContain('!expanded && isSpeechesType');
+      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
     });
 
     it('conditional uses !expanded as first guard', () => {
-      const match = sundayCardSource.match(/!expanded\s*&&\s*isSpeechesType\s*&&/);
+      // SUPERSEDED by F154 (CR-219): condition simplified to !expanded only
+      // Was: /!expanded\s*&&\s*isSpeechesType\s*&&/
+      // Now: /!expanded\s*&&\s*\{/
+      const match = sundayCardSource.match(/!expanded\s*&&\s*\{\s*minHeight/);
       expect(match).toBeTruthy();
     });
   });
@@ -479,8 +486,11 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
   // --- AC-151-04: Non-speech type cards not affected ---
 
   describe('AC-151-04: Non-speech cards have no minHeight', () => {
-    it('minHeight only applies when isSpeechesType is true', () => {
-      expect(sundayCardSource).toContain('isSpeechesType && { minHeight: 62 }');
+    it('minHeight applies to ALL collapsed cards (F154 supersedes F151)', () => {
+      // SUPERSEDED by F154 (CR-219): minHeight now applies to ALL card types
+      // Was: isSpeechesType && { minHeight: 62 } (only speech cards)
+      // Now: !expanded && { minHeight: 62 } (all card types)
+      expect(sundayCardSource).toContain('!expanded && { minHeight: 62 }');
     });
 
     it('isSpeechesType is derived from currentType === SUNDAY_TYPE_SPEECHES', () => {
@@ -502,7 +512,10 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
 
   describe('EC-151-01: minHeight applies regardless of position count', () => {
     it('minHeight is on headerCenter View not on individual speechRows', () => {
-      expect(sundayCardSource).toContain('styles.headerCenter, !expanded && isSpeechesType');
+      // SUPERSEDED by F154 (CR-219): isSpeechesType removed from condition
+      // Was: 'styles.headerCenter, !expanded && isSpeechesType'
+      // Now: 'styles.headerCenter, !expanded && { minHeight: 62 }'
+      expect(sundayCardSource).toContain('styles.headerCenter, !expanded && { minHeight: 62 }');
     });
   });
 

@@ -362,18 +362,21 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
       expect(inviteSectionSource).toContain('if (speech.speaker_phone)');
     });
 
-    it('changeStatus.mutate is called regardless of phone number', () => {
-      // The status change to assigned_invited happens outside the phone guard
+    it('changeStatus.mutate is called in both if and else blocks (F152 restructured)', () => {
+      // SUPERSEDED by F152 (CR-216): changeStatus.mutate is now inside both branches
+      // Was: called outside the phone guard (always)
+      // Now: inside if block (when phone exists) and inside Alert.alert confirm (when no phone)
       const handleBlock = inviteSectionSource.match(
-        /handleNotInvitedAction[\s\S]*?if\s*\(speech\.speaker_phone\)\s*\{[\s\S]*?\}[\s\S]*?changeStatus\.mutate/
+        /handleNotInvitedAction[\s\S]*?if\s*\(speech\.speaker_phone\)\s*\{[\s\S]*?changeStatus\.mutate/
       );
       expect(handleBlock).not.toBeNull();
     });
 
     it('ward?.whatsapp_template is in handleNotInvitedAction useCallback deps', () => {
       // The useCallback dependency array should include ward?.whatsapp_template
+      // SUPERSEDED by F152 (CR-216): deps now also include t
       const depsMatch = inviteSectionSource.match(
-        /handleNotInvitedAction[\s\S]*?\[\s*changeStatus[\s\S]*?ward\?\.whatsapp_template\s*\]/
+        /handleNotInvitedAction[\s\S]*?\[\s*changeStatus[\s\S]*?ward\?\.whatsapp_template[\s\S]*?\]/
       );
       expect(depsMatch).not.toBeNull();
     });

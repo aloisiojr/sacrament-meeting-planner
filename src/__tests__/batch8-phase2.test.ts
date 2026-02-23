@@ -138,11 +138,15 @@ describe('F051 (CR-106): Replace Alert with custom dropdown', () => {
   const getDropdown = () => readSourceFile('components/InviteActionDropdown.tsx');
 
   describe('AC-F051-01: Alert.alert not used in handleInvitedAction', () => {
-    it('should NOT import Alert from react-native', () => {
+    it('handleInvitedAction should NOT use Alert.alert (uses dropdown instead)', () => {
       const content = getInviteManagement();
-      expect(content).not.toContain("Alert,");
-      expect(content).not.toContain("Alert }");
-      expect(content).not.toContain('Alert.alert');
+      // SUPERSEDED by F152 (CR-216): Alert IS now imported for handleNotInvitedAction (no-phone dialog)
+      // But handleInvitedAction should still use setDropdownSpeech, not Alert.alert
+      const handleInvitedBlock = content.substring(
+        content.indexOf('const handleInvitedAction'),
+        content.indexOf(');', content.indexOf('[]', content.indexOf('const handleInvitedAction'))) + 2
+      );
+      expect(handleInvitedBlock).not.toContain('Alert.alert');
     });
 
     it('should set dropdownSpeech state instead of Alert', () => {

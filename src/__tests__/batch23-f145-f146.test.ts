@@ -721,10 +721,11 @@ describe('F146 (CR-210): Play icon placement', () => {
   // --- AC-146-02: Agenda tab play icon positioned next to chevron with gap ---
 
   describe('AC-146-02: Agenda tab PlayIcon near chevron with gap', () => {
-    it('PlayIcon has marginRight: 8 via playButton style', () => {
-      // PlayIcon uses style={styles.playButton} which has marginRight: 8
-      expect(agendaSource).toContain('style={styles.playButton}');
-      expect(agendaSource).toMatch(/playButton[^}]*\{[^}]*marginRight:\s*8/s);
+    it('PlayIcon has marginRight: 16 via playButton style (increased from 8 by F153 CR-217)', () => {
+      // SUPERSEDED by F153 (CR-217): style changed from style={styles.playButton} to style={[styles.playButton, {...circle styles}]}
+      // and marginRight changed from 8 to 16
+      expect(agendaSource).toContain('styles.playButton');
+      expect(agendaSource).toMatch(/playButton[^}]*\{[^}]*marginRight:\s*16/s);
     });
 
     it('PlayIcon uses color={colors.textSecondary}', () => {
@@ -824,8 +825,9 @@ describe('F146 (CR-210): Edge cases', () => {
   // --- EC-146-02: Narrow screen play icon and chevron maintain separation ---
 
   describe('EC-146-02: Play icon and chevron maintain separation on narrow screens', () => {
-    it('playButton style has fixed marginRight: 8', () => {
-      expect(agendaSource).toMatch(/playButton[^}]*\{[^}]*marginRight:\s*8/s);
+    it('playButton style has fixed marginRight: 16 (increased from 8 by F153 CR-217)', () => {
+      // SUPERSEDED by F153 (CR-217): marginRight changed from 8 to 16
+      expect(agendaSource).toMatch(/playButton[^}]*\{[^}]*marginRight:\s*16/s);
     });
 
     it('PlayIcon and chevron icons have fixed sizes (not percentage-based)', () => {

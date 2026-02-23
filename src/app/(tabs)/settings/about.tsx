@@ -18,7 +18,7 @@ export default function AboutScreen() {
   const supportUrl = t('about.supportUrl');
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
           <Text style={[styles.backButton, { color: colors.primary }]}>

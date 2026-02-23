@@ -266,7 +266,7 @@ function AgendaTabContent() {
 
   if (exceptionsError) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <QueryErrorView
           error={exceptionsErr ?? null}
           onRetry={refetchExceptions}
@@ -276,7 +276,7 @@ function AgendaTabContent() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         ref={flatListRef}
         data={listItems}

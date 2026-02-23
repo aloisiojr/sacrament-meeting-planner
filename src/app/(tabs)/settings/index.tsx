@@ -170,7 +170,7 @@ export default function SettingsScreen() {
   }, [t, signOut, queryClient]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
         <Text style={[styles.title, { color: colors.text }]}>
           {t('settings.title')}

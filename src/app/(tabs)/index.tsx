@@ -119,7 +119,7 @@ function HomeTabContent() {
   }, [agenda, speeches, exceptionLabel, isSpecialWithStatus, t]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>

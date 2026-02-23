@@ -133,14 +133,14 @@ describe('CR-004 F006: UI/UX Small Fixes', () => {
       expect(agenda.conducting).toBe('Dirigindo');
     });
 
-    it('pt-BR: wardBusiness should be "Apoios e Agradecimentos"', () => {
+    it('pt-BR: wardBusiness should be "Apoios e Desobrigações" (updated by F148/CR-212)', () => {
       const agenda = readLocale('pt-BR').agenda as Record<string, string>;
-      expect(agenda.wardBusiness).toBe('Apoios e Agradecimentos');
+      expect(agenda.wardBusiness).toBe('Apoios e Desobrigações');
     });
 
-    it('pt-BR: stakeAnnouncements should be "Apoios e Agradecimentos da Estaca"', () => {
+    it('pt-BR: stakeAnnouncements should be "Anúncios, Apoios e Desobrigações da Estaca" (updated by F148/CR-212)', () => {
       const agenda = readLocale('pt-BR').agenda as Record<string, string>;
-      expect(agenda.stakeAnnouncements).toBe('Apoios e Agradecimentos da Estaca');
+      expect(agenda.stakeAnnouncements).toBe('Anúncios, Apoios e Desobrigações da Estaca');
     });
 
     it('pt-BR: recognizing should contain "Reconhecendo" and "Presen"', () => {
@@ -159,9 +159,9 @@ describe('CR-004 F006: UI/UX Small Fixes', () => {
       expect(agenda.wardBusiness).toBe('Sustainings and Releases');
     });
 
-    it('en: stakeAnnouncements should be "Stake Sustainings and Releases"', () => {
+    it('en: stakeAnnouncements should be "Stake Announcements, Sustainings and Releases" (updated by F148/CR-212)', () => {
       const agenda = readLocale('en').agenda as Record<string, string>;
-      expect(agenda.stakeAnnouncements).toBe('Stake Sustainings and Releases');
+      expect(agenda.stakeAnnouncements).toBe('Stake Announcements, Sustainings and Releases');
     });
 
     it('en: recognizing should be "Recognizing Visitors"', () => {
@@ -169,14 +169,14 @@ describe('CR-004 F006: UI/UX Small Fixes', () => {
       expect(agenda.recognizing).toBe('Recognizing Visitors');
     });
 
-    it('es: wardBusiness should be "Apoyos y Agradecimientos"', () => {
+    it('es: wardBusiness should be "Apoyos y Relevos" (updated by F148/CR-212)', () => {
       const agenda = readLocale('es').agenda as Record<string, string>;
-      expect(agenda.wardBusiness).toBe('Apoyos y Agradecimientos');
+      expect(agenda.wardBusiness).toBe('Apoyos y Relevos');
     });
 
-    it('es: stakeAnnouncements should be "Apoyos y Agradecimientos de Estaca"', () => {
+    it('es: stakeAnnouncements should be "Anuncios, Apoyos y Relevos de Estaca" (updated by F148/CR-212)', () => {
       const agenda = readLocale('es').agenda as Record<string, string>;
-      expect(agenda.stakeAnnouncements).toBe('Apoyos y Agradecimientos de Estaca');
+      expect(agenda.stakeAnnouncements).toBe('Anuncios, Apoyos y Relevos de Estaca');
     });
 
     it('es: recognizing should be "Reconociendo la Presencia"', () => {

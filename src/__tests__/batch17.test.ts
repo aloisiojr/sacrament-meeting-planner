@@ -111,7 +111,7 @@ describe('F110 (CR-172): Stake announcements in Presentation Mode Card 2', () =>
 
     it('en.json agenda.stakeAnnouncements label is correct', () => {
       const locale = readLocale('en') as { agenda: Record<string, string> };
-      expect(locale.agenda.stakeAnnouncements).toBe('Stake Sustainings and Releases');
+      expect(locale.agenda.stakeAnnouncements).toBe('Stake Announcements, Sustainings and Releases');
     });
   });
 
@@ -129,7 +129,7 @@ describe('F110 (CR-172): Stake announcements in Presentation Mode Card 2', () =>
 
     it('es.json agenda.stakeAnnouncements label is correct', () => {
       const locale = readLocale('es') as { agenda: Record<string, string> };
-      expect(locale.agenda.stakeAnnouncements).toBe('Apoyos y Agradecimientos de Estaca');
+      expect(locale.agenda.stakeAnnouncements).toBe('Anuncios, Apoyos y Relevos de Estaca');
     });
   });
 

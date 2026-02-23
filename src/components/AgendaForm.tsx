@@ -704,7 +704,7 @@ function ReadOnlySpeakerRow({
 }) {
   return (
     <FieldRow label={label} colors={colors}>
-      <View style={[styles.speakerReadRow, { borderColor: colors.border }]}>
+      <View style={[styles.speakerReadRow, { borderColor: colors.border }, disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
         <Text
           style={[
             styles.speakerReadText,

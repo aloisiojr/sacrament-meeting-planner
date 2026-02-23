@@ -16,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { SearchInput } from './SearchInput';
+import { ChevronDownIcon, XIcon } from './icons';
 import { useMembers } from '../hooks/useMembers';
 import type { Member } from '../types/database';
 
@@ -119,10 +120,10 @@ export function PrayerSelector({
         </Text>
         {selected && !disabled && (
           <Pressable onPress={handleClear} hitSlop={8}>
-            <Text style={[styles.clearButton, { color: colors.textSecondary }]}>x</Text>
+            <XIcon size={16} color={colors.textSecondary} />
           </Pressable>
         )}
-        <Text style={[styles.arrow, { color: colors.textSecondary }]}>{'\u25BC'}</Text>
+        <ChevronDownIcon size={10} color={colors.textSecondary} />
       </Pressable>
       )}
 

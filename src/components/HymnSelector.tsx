@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { SearchInput } from './SearchInput';
+import { ChevronDownIcon, XIcon } from './icons';
 import { useHymns, useSacramentalHymns, formatHymnDisplay } from '../hooks/useHymns';
 import { getCurrentLanguage } from '../i18n';
 import type { Hymn } from '../types/database';
@@ -86,10 +87,10 @@ export function HymnSelector({
         </Text>
         {selectedHymn && !disabled && (
           <Pressable onPress={handleClear} hitSlop={8}>
-            <Text style={[styles.clearButton, { color: colors.textSecondary }]}>x</Text>
+            <XIcon size={16} color={colors.textSecondary} />
           </Pressable>
         )}
-        <Text style={[styles.arrow, { color: colors.textSecondary }]}>{'\u25BC'}</Text>
+        <ChevronDownIcon size={10} color={colors.textSecondary} />
       </Pressable>
 
       <Modal

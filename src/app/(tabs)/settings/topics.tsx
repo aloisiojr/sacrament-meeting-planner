@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ChevronDownIcon, ChevronRightIcon } from '../../../components/icons';
 import { SwipeableCard } from '../../../components/SwipeableCard';
 import { SearchInput } from '../../../components/SearchInput';
 import {
@@ -189,9 +190,12 @@ function CollectionRow({ name, active, isExpanded, onToggle, onPress, disabled, 
         onPress={onPress}
         accessibilityRole="button"
       >
-        <Text style={[styles.chevron, { color: colors.textSecondary }]}>
-          {isExpanded ? '\u25BC' : '\u25B6'}
-        </Text>
+        <View style={styles.chevron}>
+          {isExpanded
+            ? <ChevronDownIcon size={12} color={colors.textSecondary} />
+            : <ChevronRightIcon size={12} color={colors.textSecondary} />
+          }
+        </View>
         <Text style={[styles.collectionName, { color: colors.text }]} numberOfLines={1}>
           {name}
         </Text>

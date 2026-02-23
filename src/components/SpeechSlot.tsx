@@ -200,7 +200,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           <View style={styles.speakerRow}>
             <View style={[styles.field, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
               <Text style={[styles.fieldText, { color: colors.textSecondary }]} numberOfLines={1}>
-                {t('speeches.secondSpeechDisabledPlaceholder')}
+                {t('speeches.selectSpeaker')}
               </Text>
             </View>
             <View style={styles.actionArea} />
@@ -208,7 +208,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           <View style={styles.topicRow}>
             <View style={[styles.topicField, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
               <Text style={[styles.topicText, { color: colors.textSecondary }]} numberOfLines={1}>
-                {t('speeches.secondSpeechDisabledPlaceholder')}
+                {t('speeches.selectTopic')}
               </Text>
             </View>
             <View style={styles.topicActionArea} />

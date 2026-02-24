@@ -561,8 +561,8 @@ describe('F129 (CR-188): NextSundaysSection non-expandable cards with pencil', (
       expect(sundayCardSource).toContain('onToggle?:');
     });
 
-    it('header onPress uses onToggle (undefined = no action)', () => {
-      expect(sundayCardSource).toContain('onPress={onToggle}');
+    it('header uses View when onToggle is undefined, Pressable when defined (CR-232)', () => {
+      expect(sundayCardSource).toContain('onToggle ? Pressable : View');
     });
 
     it('SundayCard has renderHeaderRight optional prop', () => {

@@ -716,7 +716,8 @@ describe('F118 (CR-181): Optional 2nd speech toggle', () => {
     });
 
     it('SpeechSlot has disabled state for position 2', () => {
-      expect(speechSlotSource).toContain('const isPos2Disabled = position === 2 && isSecondSpeechEnabled === false');
+      // CR-221: condition now also requires !isPrayer
+      expect(speechSlotSource).toContain('const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false');
     });
   });
 

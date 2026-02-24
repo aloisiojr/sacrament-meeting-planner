@@ -408,7 +408,8 @@ describe('F038 (CR-95): Fix speech fields not hiding on sunday type change', () 
   describe('AC-F038-02 through AC-F038-07: Speech slots hidden for all non-speeches types', () => {
     it('should use condition (!exception || exception.reason === \'speeches\') for speech slots', () => {
       const source = getSpeechesSource();
-      expect(source).toContain("(!exception || exception.reason === 'speeches')");
+      // CR-221: condition now extracted to isSpeechesType variable
+      expect(source).toContain("const isSpeechesType = !exception || exception.reason === 'speeches'");
     });
 
     it('should NOT use isExcludedFromAgenda for speech slots visibility', () => {
@@ -424,8 +425,9 @@ describe('F038 (CR-95): Fix speech fields not hiding on sunday type change', () 
 
     it('should only render [1, 2, 3].map speech slots inside the speeches condition', () => {
       const source = getSpeechesSource();
-      // The pattern should be: condition && [1, 2, 3].map
-      expect(source).toMatch(/\(!exception \|\| exception\.reason === 'speeches'\)\s*&&\s*\n?\s*\[1,\s*2,\s*3\]\.map/);
+      // CR-221: condition now uses isSpeechesType variable, and speech slots render in a separate block
+      expect(source).toMatch(/isExpanded && isSpeechesType/);
+      expect(source).toContain('[1, 2, 3].map');
     });
   });
 

@@ -40,7 +40,8 @@ describe('F045 (CR-101): Hide status LEDs on non-speech Sundays', () => {
   describe('AC-F045-01: LEDs visible when type is speeches', () => {
     it('should wrap LEDs section with isSpeechesType conditional', () => {
       const content = getSundayCard();
-      expect(content).toContain('isSpeechesType && (');
+      // CR-221: condition now includes !expanded check
+      expect(content).toContain('isSpeechesType && !expanded && (');
     });
 
     it('should have isSpeechesType flag defined', () => {
@@ -162,7 +163,8 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
   describe('AC-F047-01: Default template shown when DB has null', () => {
     it('should import getDefaultTemplate from whatsappUtils', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("import { getDefaultTemplate } from '../../../lib/whatsappUtils'");
+      // CR-221: now also imports getDefaultPrayerTemplate
+      expect(content).toContain("import { getDefaultTemplate, getDefaultPrayerTemplate } from '../../../lib/whatsappUtils'");
     });
 
     // F116 (CR-178): Now uses wardLanguage from AuthContext instead of ward.language
@@ -213,7 +215,8 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
   describe('AC-F047-05: Consistency between Settings and WhatsApp send', () => {
     it('should include language field in ward query', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("'whatsapp_template, language'");
+      // CR-221: ward query now includes prayer template fields
+      expect(content).toContain("'whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language'");
     });
 
     it('should use same getDefaultTemplate function as whatsappUtils', () => {

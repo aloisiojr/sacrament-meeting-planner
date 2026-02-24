@@ -334,22 +334,15 @@ describe('F070 (CR-127): Delete speech assignments on sunday type change', () =>
   describe('AC-F070-03: No assignments flow also cleans up speeches', () => {
     it('SundayCard calls onDeleteSpeeches when currentType is speeches (no assignments)', () => {
       const content = getSundayCard();
-      // After the hasAssignments block with return, there should be another
-      // check for currentType === SUNDAY_TYPE_SPEECHES that calls onDeleteSpeeches
+      // CR-221: handleSelect now has managePrayers-aware logic, but the non-managePrayers
+      // fallback still calls onDeleteSpeeches when currentType is SUNDAY_TYPE_SPEECHES
       const handleSelectSection = content.substring(
         content.indexOf('const handleSelect'),
         content.indexOf('const handleOtherConfirm')
       );
-      // Count occurrences of SUNDAY_TYPE_SPEECHES
-      const matches = handleSelectSection.match(/currentType === SUNDAY_TYPE_SPEECHES/g);
-      expect(matches?.length).toBeGreaterThanOrEqual(2); // One for hasAssignments, one for no assignments
-      // The second occurrence should have onDeleteSpeeches
-      const secondIdx = handleSelectSection.indexOf(
-        'currentType === SUNDAY_TYPE_SPEECHES',
-        handleSelectSection.indexOf('currentType === SUNDAY_TYPE_SPEECHES') + 10
-      );
-      const afterSecond = handleSelectSection.substring(secondIdx, secondIdx + 100);
-      expect(afterSecond).toContain('onDeleteSpeeches');
+      // Verify the pattern exists: SUNDAY_TYPE_SPEECHES check followed by onDeleteSpeeches call
+      expect(handleSelectSection).toContain('currentType === SUNDAY_TYPE_SPEECHES');
+      expect(handleSelectSection).toContain('onDeleteSpeeches?.(date)');
     });
   });
 

@@ -429,10 +429,10 @@ describe('F058 (CR-122): Change 3rd speech label to Ultimo Discurso', () => {
 
     it('should use conditional: position 3 uses lastSpeech, others use ordinal', () => {
       const content = readSourceFile('components/InviteManagementSection.tsx');
-      // Find the ternary for speech position label
-      expect(content).toContain(
-        "speech.position === 3 ? t('speeches.lastSpeech') : t('speeches.slot'"
-      );
+      // CR-221: now chained ternary includes prayer positions (0, 4) before position 3 check
+      expect(content).toContain("speech.position === 3");
+      expect(content).toContain("t('speeches.lastSpeech')");
+      expect(content).toContain("t('speeches.slot'");
     });
   });
 

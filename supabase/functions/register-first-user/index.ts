@@ -85,17 +85,42 @@ Deno.serve(async (req) => {
     }
 
     // Create the ward
-    const defaultWhatsappTemplate =
-      'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o {posicao} discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título {titulo} {link}. Podemos confirmar o seu discurso?';
+    const wardLanguage = input.language || 'pt-BR';
+
+    // CR-231: Per-position default speech templates (3 per language)
+    let defaultSpeech1Template: string;
+    let defaultSpeech2Template: string;
+    let defaultSpeech3Template: string;
+
+    switch (wardLanguage) {
+      case 'en':
+        defaultSpeech1Template = 'Hi! The Bishopric would like to invite you to give the first speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultSpeech2Template = 'Hi! The Bishopric would like to invite you to give the second speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultSpeech3Template = 'Hi! The Bishopric would like to invite you to give the third speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        break;
+      case 'es':
+        defaultSpeech1Template = 'Hola, como estas? El Obispado te quiere invitar a dar el primer discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
+        defaultSpeech2Template = 'Hola, como estas? El Obispado te quiere invitar a dar el segundo discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
+        defaultSpeech3Template = 'Hola, como estas? El Obispado te quiere invitar a dar el tercer discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
+        break;
+      case 'pt-BR':
+      default:
+        defaultSpeech1Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o primeiro discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultSpeech2Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o segundo discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultSpeech3Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o terceiro discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        break;
+    }
 
     const { data: ward, error: wardError } = await supabaseAdmin
       .from('wards')
       .insert({
         name: input.wardName,
         stake_name: input.stakeName,
-        language: input.language || 'pt-BR',
+        language: wardLanguage,
         timezone: input.timezone || 'America/Sao_Paulo',
-        whatsapp_template: defaultWhatsappTemplate,
+        whatsapp_template_speech_1: defaultSpeech1Template,
+        whatsapp_template_speech_2: defaultSpeech2Template,
+        whatsapp_template_speech_3: defaultSpeech3Template,
       })
       .select()
       .single();

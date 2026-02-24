@@ -371,11 +371,11 @@ describe('STEP-02: i18n - New prayer strings (AC-157-61)', () => {
     });
   });
 
-  // --- whatsapp.tabSpeech / tabOpeningPrayer / tabClosingPrayer ---
+  // --- whatsapp.tabSpeech1/2/3 / tabOpeningPrayer / tabClosingPrayer ---
 
   describe('whatsapp tab keys', () => {
-    it('pt-BR has whatsapp.tabSpeech', () => {
-      expect(ptBR.whatsapp.tabSpeech).toBeDefined();
+    it('pt-BR has whatsapp.tabSpeech1', () => {
+      expect(ptBR.whatsapp.tabSpeech1).toBeDefined();
     });
 
     it('pt-BR has whatsapp.tabOpeningPrayer', () => {
@@ -386,8 +386,8 @@ describe('STEP-02: i18n - New prayer strings (AC-157-61)', () => {
       expect(ptBR.whatsapp.tabClosingPrayer).toBeDefined();
     });
 
-    it('en has whatsapp.tabSpeech = "Speech"', () => {
-      expect(en.whatsapp.tabSpeech).toBe('Speech');
+    it('en has whatsapp.tabSpeech1 = "1st Speech"', () => {
+      expect(en.whatsapp.tabSpeech1).toBe('1st Speech');
     });
 
     it('en has whatsapp.tabOpeningPrayer = "Opening"', () => {
@@ -398,8 +398,8 @@ describe('STEP-02: i18n - New prayer strings (AC-157-61)', () => {
       expect(en.whatsapp.tabClosingPrayer).toBe('Closing');
     });
 
-    it('es has whatsapp.tabSpeech', () => {
-      expect(es.whatsapp.tabSpeech).toBeDefined();
+    it('es has whatsapp.tabSpeech1', () => {
+      expect(es.whatsapp.tabSpeech1).toBeDefined();
     });
 
     it('es has whatsapp.tabOpeningPrayer', () => {

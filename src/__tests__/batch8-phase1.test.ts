@@ -18,10 +18,10 @@ import fs from 'fs';
 import path from 'path';
 import {
   resolveTemplate,
-  DEFAULT_TEMPLATE_PT_BR,
-  DEFAULT_TEMPLATE_EN,
-  DEFAULT_TEMPLATE_ES,
-  getDefaultTemplate,
+  DEFAULT_TEMPLATE_SPEECH_1_PT_BR,
+  DEFAULT_TEMPLATE_SPEECH_1_EN,
+  DEFAULT_TEMPLATE_SPEECH_1_ES,
+  getDefaultSpeechTemplate,
 } from '../lib/whatsappUtils';
 import { formatDateHumanReadable } from '../lib/dateUtils';
 
@@ -161,49 +161,50 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
   const getWhatsAppSettings = () => readSourceFile('app/(tabs)/settings/whatsapp.tsx');
 
   describe('AC-F047-01: Default template shown when DB has null', () => {
-    it('should import getDefaultTemplate from whatsappUtils', () => {
+    it('should import getDefaultSpeechTemplate from whatsappUtils', () => {
       const content = getWhatsAppSettings();
-      // CR-221: now also imports getDefaultPrayerTemplate
-      expect(content).toContain("import { getDefaultTemplate, getDefaultPrayerTemplate } from '../../../lib/whatsappUtils'");
+      // CR-231: now imports getDefaultSpeechTemplate and getDefaultPrayerTemplate
+      expect(content).toContain("import { getDefaultSpeechTemplate, getDefaultPrayerTemplate } from '../../../lib/whatsappUtils'");
     });
 
-    // F116 (CR-178): Now uses wardLanguage from AuthContext instead of ward.language
-    it('should call getDefaultTemplate when whatsapp_template is null', () => {
+    // CR-231: Now uses per-position speech template columns
+    it('should call getDefaultSpeechTemplate when speech template is null', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain('ward.whatsapp_template === null');
-      expect(content).toContain('getDefaultTemplate(wardLanguage');
+      expect(content).toContain('ward.whatsapp_template_speech_1');
+      expect(content).toContain("getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 1)");
     });
 
-    it('should handle undefined whatsapp_template as null', () => {
+    it('should handle undefined whatsapp_template_speech_1 as null', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain('ward.whatsapp_template === undefined');
+      // The pattern checks for null or undefined
+      expect(content).toContain('val === null || val === undefined');
     });
   });
 
   describe('AC-F047-02: Custom template from DB shown when has value', () => {
-    it('should set template from ward.whatsapp_template when it has value', () => {
+    it('should set template from ward template when it has value', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain('setTemplate(ward.whatsapp_template)');
+      expect(content).toContain('setSpeech1Template(val)');
     });
   });
 
   describe('AC-F047-03: Empty string respected (user cleared intentionally)', () => {
     it('should check for empty string explicitly', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("ward.whatsapp_template === ''");
+      expect(content).toContain("val === ''");
     });
 
     it('should set empty template for empty string', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("setTemplate('')");
+      expect(content).toContain("setSpeech1Template('')");
     });
   });
 
   // F116 (CR-178): Now uses wardLanguage from AuthContext instead of ward.language
   describe('AC-F047-04: Default template correct per ward language', () => {
-    it('should pass wardLanguage to getDefaultTemplate', () => {
+    it('should pass wardLanguage to getDefaultSpeechTemplate', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain("getDefaultTemplate(wardLanguage ?? 'pt-BR')");
+      expect(content).toContain("getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 1)");
     });
 
     it('should fallback to pt-BR when wardLanguage is null', () => {
@@ -213,31 +214,33 @@ describe('F047 (CR-103): Fix WhatsApp template initialization in Settings', () =
   });
 
   describe('AC-F047-05: Consistency between Settings and WhatsApp send', () => {
-    it('should include language field in ward query', () => {
+    it('should include speech template fields in ward query', () => {
       const content = getWhatsAppSettings();
-      // CR-221: ward query now includes prayer template fields
-      expect(content).toContain("'whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language'");
+      // CR-231: ward query now includes 3 speech template columns
+      expect(content).toContain('whatsapp_template_speech_1');
+      expect(content).toContain('whatsapp_template_speech_2');
+      expect(content).toContain('whatsapp_template_speech_3');
     });
 
-    it('should use same getDefaultTemplate function as whatsappUtils', () => {
+    it('should use getDefaultSpeechTemplate function from whatsappUtils', () => {
       const content = getWhatsAppSettings();
       expect(content).toContain("from '../../../lib/whatsappUtils'");
-      expect(content).toContain('getDefaultTemplate');
+      expect(content).toContain('getDefaultSpeechTemplate');
     });
   });
 
   describe('EC-F047-01: Query fails (network error)', () => {
     it('should guard initialization with ward check', () => {
       const content = getWhatsAppSettings();
-      expect(content).toContain('if (ward && !initialized)');
+      expect(content).toContain('if (ward && !speech1Initialized)');
     });
   });
 
   describe('EC-F047-02: Unsupported ward language fallback', () => {
-    it('getDefaultTemplate falls back to pt-BR for unknown language', () => {
-      expect(getDefaultTemplate('fr')).toBe(DEFAULT_TEMPLATE_PT_BR);
-      expect(getDefaultTemplate('de')).toBe(DEFAULT_TEMPLATE_PT_BR);
-      expect(getDefaultTemplate('ja')).toBe(DEFAULT_TEMPLATE_PT_BR);
+    it('getDefaultSpeechTemplate falls back to pt-BR for unknown language', () => {
+      expect(getDefaultSpeechTemplate('fr', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
+      expect(getDefaultSpeechTemplate('de', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
+      expect(getDefaultSpeechTemplate('ja', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
     });
   });
 });
@@ -294,15 +297,15 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
 
   describe('AC-F048-03: Title with quotes in WhatsApp message', () => {
     it('should have quotes around {titulo} in pt-BR template', () => {
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('"{titulo}"');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('"{titulo}"');
     });
 
     it('should have quotes around {titulo} in EN template', () => {
-      expect(DEFAULT_TEMPLATE_EN).toContain('"{titulo}"');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_EN).toContain('"{titulo}"');
     });
 
     it('should have quotes around {titulo} in ES template', () => {
-      expect(DEFAULT_TEMPLATE_ES).toContain('"{titulo}"');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_ES).toContain('"{titulo}"');
     });
   });
 
@@ -355,7 +358,6 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
         {
           speakerName: 'Test',
           date: '2026-02-22',
-          position: '1o',
           topic: 'Faith',
           collection: '',
           link: '',
@@ -371,8 +373,8 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
     it('should have quotes in pt-BR template source code', () => {
       const content = getWhatsAppUtils();
       const ptSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_PT_BR'),
-        content.indexOf('DEFAULT_TEMPLATE_EN')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_PT_BR'),
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_EN')
       );
       expect(ptSection).toContain('"{titulo}"');
     });
@@ -380,8 +382,8 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
     it('should have quotes in EN template source code', () => {
       const content = getWhatsAppUtils();
       const enSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_EN'),
-        content.indexOf('DEFAULT_TEMPLATE_ES')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_EN'),
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_ES')
       );
       expect(enSection).toContain('"{titulo}"');
     });
@@ -389,8 +391,8 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
     it('should have quotes in ES template source code', () => {
       const content = getWhatsAppUtils();
       const esSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_ES'),
-        content.indexOf('export function getDefaultTemplate')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_ES'),
+        content.indexOf('export function getDefaultSpeechTemplate')
       );
       expect(esSection).toContain('"{titulo}"');
     });
@@ -398,10 +400,9 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
 
   describe('EC-F048-01: Speech without collection', () => {
     it('resolveTemplate handles empty collection gracefully', () => {
-      const result = resolveTemplate(DEFAULT_TEMPLATE_PT_BR, {
+      const result = resolveTemplate(DEFAULT_TEMPLATE_SPEECH_1_PT_BR, {
         speakerName: 'Joao',
         date: '22 de Fevereiro de 2026',
-        position: '1o',
         topic: 'Fe',
         collection: '',
         link: 'https://example.com',
@@ -413,10 +414,9 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
 
   describe('EC-F048-02: Speech without link', () => {
     it('resolveTemplate handles empty link gracefully', () => {
-      const result = resolveTemplate(DEFAULT_TEMPLATE_PT_BR, {
+      const result = resolveTemplate(DEFAULT_TEMPLATE_SPEECH_1_PT_BR, {
         speakerName: 'Maria',
         date: '22 de Fevereiro de 2026',
-        position: '2o',
         topic: 'Esperanca',
         collection: 'Temas da Ala',
         link: '',
@@ -431,7 +431,6 @@ describe('F048 (CR-104, CR-108): Fix WhatsApp message variables', () => {
       const result = resolveTemplate('titled "{titulo}" more text', {
         speakerName: 'Test',
         date: '2026-03-01',
-        position: '1o',
         topic: '',
       });
       expect(result).toContain('""');
@@ -505,10 +504,9 @@ describe('F049 (CR-109): Fix speech slots in NextSundaysSection', () => {
 describe('Cross-cutting: WhatsApp template with quotes resolves correctly', () => {
 
   it('resolves pt-BR template with all variables including quotes', () => {
-    const result = resolveTemplate(DEFAULT_TEMPLATE_PT_BR, {
+    const result = resolveTemplate(DEFAULT_TEMPLATE_SPEECH_1_PT_BR, {
       speakerName: 'Joao Silva',
       date: '22 de Fevereiro de 2026',
-      position: '1\u00BA',
       topic: 'Fe em Jesus Cristo',
       collection: 'Temas da Ala',
       link: 'https://example.com/topic',
@@ -525,10 +523,9 @@ describe('Cross-cutting: WhatsApp template with quotes resolves correctly', () =
   });
 
   it('resolves EN template with all variables including quotes', () => {
-    const result = resolveTemplate(DEFAULT_TEMPLATE_EN, {
+    const result = resolveTemplate(DEFAULT_TEMPLATE_SPEECH_1_EN, {
       speakerName: 'John Smith',
       date: 'February 22, 2026',
-      position: '1st',
       topic: 'Faith in Jesus Christ',
       collection: 'Ward Topics',
       link: 'https://example.com/topic',
@@ -541,10 +538,9 @@ describe('Cross-cutting: WhatsApp template with quotes resolves correctly', () =
   });
 
   it('resolves ES template with all variables including quotes', () => {
-    const result = resolveTemplate(DEFAULT_TEMPLATE_ES, {
+    const result = resolveTemplate(DEFAULT_TEMPLATE_SPEECH_1_ES, {
       speakerName: 'Juan Perez',
       date: '22 de Febrero de 2026',
-      position: '1\u00BA',
       topic: 'Fe en Jesucristo',
       collection: 'Temas de la Estaca',
       link: 'https://example.com/topic',

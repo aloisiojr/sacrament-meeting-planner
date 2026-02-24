@@ -800,7 +800,7 @@ describe('STEP-22: Comprehensive F157 validation', () => {
     });
 
     it('AC-157-61: whatsapp tab keys exist in all locales', () => {
-      expect(ptBR.whatsapp.tabSpeech).toBeDefined();
+      expect(ptBR.whatsapp.tabSpeech1).toBeDefined();
       expect(ptBR.whatsapp.tabOpeningPrayer).toBeDefined();
       expect(ptBR.whatsapp.tabClosingPrayer).toBeDefined();
     });

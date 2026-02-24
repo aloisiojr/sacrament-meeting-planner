@@ -122,7 +122,8 @@ describe('CR-13: WhatsApp template default does not use {tema}', () => {
     expect(edgeFnContent).toContain('{titulo}');
     expect(edgeFnContent).toContain('{link}');
     expect(edgeFnContent).toContain('{data}');
-    expect(edgeFnContent).toContain('{posicao}');
+    // CR-231: {posicao} no longer used, templates use ordinal words instead
+    expect(edgeFnContent).toContain('primeiro discurso');
   });
 });
 

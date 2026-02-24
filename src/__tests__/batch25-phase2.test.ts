@@ -1066,24 +1066,27 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
       expect(whatsappSettingsSource).toMatch(/const\s*\{\s*managePrayers\s*\}\s*=\s*useWardManagePrayers\(\)/);
     });
 
-    it('defines ActiveTab type with speech, opening_prayer, closing_prayer', () => {
-      expect(whatsappSettingsSource).toContain("type ActiveTab = 'speech' | 'opening_prayer' | 'closing_prayer'");
+    it('defines ActiveTab type with speech_1, speech_2, speech_3, opening_prayer, closing_prayer', () => {
+      expect(whatsappSettingsSource).toContain("type ActiveTab = 'speech_1' | 'speech_2' | 'speech_3' | 'opening_prayer' | 'closing_prayer'");
     });
 
-    it('initializes activeTab state with default "speech"', () => {
-      expect(whatsappSettingsSource).toMatch(/useState<ActiveTab>\(['"]speech['"]\)/);
+    it('initializes activeTab state with default "speech_1"', () => {
+      expect(whatsappSettingsSource).toMatch(/useState<ActiveTab>\(['"]speech_1['"]\)/);
     });
 
-    it('segmented control is rendered when managePrayers is true', () => {
-      expect(whatsappSettingsSource).toContain('{managePrayers && (');
+    it('segmented control is always rendered (tabs array conditionally built)', () => {
+      // CR-231: segmented control is always shown, tabs array varies
+      expect(whatsappSettingsSource).toContain('managePrayers ? [...speechTabs, ...prayerTabs] : speechTabs');
     });
 
-    it('segmented control has 3 tab buttons', () => {
-      expect(whatsappSettingsSource).toContain("(['speech', 'opening_prayer', 'closing_prayer'] as ActiveTab[])");
+    it('segmented control has speech tab buttons', () => {
+      expect(whatsappSettingsSource).toContain("'speech_1'");
+      expect(whatsappSettingsSource).toContain("'speech_2'");
+      expect(whatsappSettingsSource).toContain("'speech_3'");
     });
 
     it('tab labels use i18n keys', () => {
-      expect(whatsappSettingsSource).toContain("t('whatsapp.tabSpeech')");
+      expect(whatsappSettingsSource).toContain("t('whatsapp.tabSpeech1')");
       expect(whatsappSettingsSource).toContain("t('whatsapp.tabOpeningPrayer')");
       expect(whatsappSettingsSource).toContain("t('whatsapp.tabClosingPrayer')");
     });
@@ -1104,23 +1107,23 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
   // --- AC-157-14: OFF - no segmented control ---
 
   describe('AC-157-14: No segmented control when managePrayers=false', () => {
-    it('segmented control is gated by managePrayers condition', () => {
-      expect(whatsappSettingsSource).toContain('{managePrayers && (');
+    it('tabs array excludes prayer tabs when managePrayers is false', () => {
+      // CR-231: segmented control always shown, but tabs array changes
+      expect(whatsappSettingsSource).toContain('managePrayers ? [...speechTabs, ...prayerTabs] : speechTabs');
     });
 
-    it('when managePrayers is false, only speech template is visible', () => {
-      // The speech template is the default (always rendered)
-      expect(whatsappSettingsSource).toContain("activeTab === 'speech' ? template");
+    it('when managePrayers is false, only speech templates are visible', () => {
+      // CR-231: speech_1 is the default active tab
+      expect(whatsappSettingsSource).toContain("activeTab === 'speech_1' ? speech1Template");
     });
   });
 
   // --- AC-157-56: Segmented control details ---
 
   describe('AC-157-56: Segmented control behavior details', () => {
-    it('speech tab shows all 6 placeholder tokens', () => {
+    it('speech tab shows all 5 placeholder tokens (no posicao)', () => {
       expect(whatsappSettingsSource).toContain("'{nome}'");
       expect(whatsappSettingsSource).toContain("'{data}'");
-      expect(whatsappSettingsSource).toContain("'{posicao}'");
       expect(whatsappSettingsSource).toContain("'{colecao}'");
       expect(whatsappSettingsSource).toContain("'{titulo}'");
       expect(whatsappSettingsSource).toContain("'{link}'");
@@ -1188,8 +1191,8 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
   // --- Independent template state per tab ---
 
   describe('Independent template state per tab', () => {
-    it('speech template has its own state', () => {
-      expect(whatsappSettingsSource).toContain("const [template, setTemplate] = useState('')");
+    it('speech 1 template has its own state', () => {
+      expect(whatsappSettingsSource).toContain("const [speech1Template, setSpeech1Template] = useState('')");
     });
 
     it('opening prayer template has its own state', () => {
@@ -1200,8 +1203,8 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
       expect(whatsappSettingsSource).toContain("const [closingTemplate, setClosingTemplate] = useState('')");
     });
 
-    it('speech template has initialized flag', () => {
-      expect(whatsappSettingsSource).toContain('const [initialized, setInitialized] = useState(false)');
+    it('speech 1 template has initialized flag', () => {
+      expect(whatsappSettingsSource).toContain('const [speech1Initialized, setSpeech1Initialized] = useState(false)');
     });
 
     it('opening template has initialized flag', () => {
@@ -1216,8 +1219,8 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
   // --- Independent auto-save mutations ---
 
   describe('Independent auto-save mutations per tab', () => {
-    it('speech template has saveMutation', () => {
-      expect(whatsappSettingsSource).toContain('const saveMutation = useMutation');
+    it('speech 1 template has saveSpeech1Mutation', () => {
+      expect(whatsappSettingsSource).toContain('const saveSpeech1Mutation = useMutation');
     });
 
     it('opening prayer has saveOpeningMutation', () => {
@@ -1236,8 +1239,8 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
       expect(whatsappSettingsSource).toContain("update({ whatsapp_template_closing_prayer: newTemplate })");
     });
 
-    it('speech mutation updates whatsapp_template column', () => {
-      expect(whatsappSettingsSource).toContain("update({ whatsapp_template: newTemplate })");
+    it('speech 1 mutation updates whatsapp_template_speech_1 column', () => {
+      expect(whatsappSettingsSource).toContain("update({ whatsapp_template_speech_1: newTemplate })");
     });
   });
 
@@ -1252,8 +1255,8 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
       expect(whatsappSettingsSource).toContain("getDefaultPrayerTemplate(wardLanguage ?? 'pt-BR', 'closing')");
     });
 
-    it('imports getDefaultPrayerTemplate', () => {
-      expect(whatsappSettingsSource).toContain("import { getDefaultTemplate, getDefaultPrayerTemplate }");
+    it('imports getDefaultSpeechTemplate and getDefaultPrayerTemplate', () => {
+      expect(whatsappSettingsSource).toContain("import { getDefaultSpeechTemplate, getDefaultPrayerTemplate }");
     });
 
     it('opening template reads from ward.whatsapp_template_opening_prayer', () => {
@@ -1279,17 +1282,17 @@ describe('STEP-17: WhatsApp settings - segmented control', () => {
     });
 
     it('currentHandleChange selects correct handler based on activeTab', () => {
-      expect(whatsappSettingsSource).toContain("activeTab === 'speech' ? handleChange");
+      expect(whatsappSettingsSource).toContain("activeTab === 'speech_1' ? handleSpeech1Change");
       expect(whatsappSettingsSource).toContain("activeTab === 'opening_prayer' ? handleOpeningChange");
     });
 
     it('currentTemplate selects correct template based on activeTab', () => {
-      expect(whatsappSettingsSource).toContain("activeTab === 'speech' ? template");
+      expect(whatsappSettingsSource).toContain("activeTab === 'speech_1' ? speech1Template");
       expect(whatsappSettingsSource).toContain("activeTab === 'opening_prayer' ? openingTemplate");
     });
 
     it('currentIsSaving selects correct saving state based on activeTab', () => {
-      expect(whatsappSettingsSource).toContain("activeTab === 'speech' ? saveMutation.isPending");
+      expect(whatsappSettingsSource).toContain("activeTab === 'speech_1' ? saveSpeech1Mutation.isPending");
     });
   });
 
@@ -1355,8 +1358,8 @@ describe('Cross-cutting: i18n keys for Phase 2', () => {
   });
 
   describe('whatsapp tab keys in all locales', () => {
-    it('pt-BR has whatsapp.tabSpeech', () => {
-      expect(ptBR.whatsapp?.tabSpeech).toBeDefined();
+    it('pt-BR has whatsapp.tabSpeech1', () => {
+      expect(ptBR.whatsapp?.tabSpeech1).toBeDefined();
     });
 
     it('pt-BR has whatsapp.tabOpeningPrayer', () => {
@@ -1367,8 +1370,8 @@ describe('Cross-cutting: i18n keys for Phase 2', () => {
       expect(ptBR.whatsapp?.tabClosingPrayer).toBeDefined();
     });
 
-    it('en has whatsapp.tabSpeech = "Speech"', () => {
-      expect(en.whatsapp?.tabSpeech).toBe('Speech');
+    it('en has whatsapp.tabSpeech1 = "1st Speech"', () => {
+      expect(en.whatsapp?.tabSpeech1).toBe('1st Speech');
     });
 
     it('en has whatsapp.tabOpeningPrayer = "Opening"', () => {

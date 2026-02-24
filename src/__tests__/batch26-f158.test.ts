@@ -515,20 +515,19 @@ describe('CR-229: Uniform card height for all collapsed cards', () => {
   // --- EC-158-02: Height recalculates on toggle change ---
 
   describe('EC-158-02: Height recalculates when managePrayers toggled', () => {
-    it('LINE_HEIGHT is 18', () => {
-      expect(sundayCardSource).toMatch(/LINE_HEIGHT\s*=\s*18/);
+    it('LINE_HEIGHT is 14 for managePrayers=true and 18 for managePrayers=false (CR-232)', () => {
+      expect(sundayCardSource).toMatch(/LINE_HEIGHT\s*=\s*managePrayers\s*\?\s*14\s*:\s*18/);
     });
 
     it('MARGIN_BOTTOM is 1 (matching CR-228)', () => {
       expect(sundayCardSource).toMatch(/MARGIN_BOTTOM\s*=\s*1/);
     });
 
-    it('when managePrayers=true: 5*18 + 4*1 = 94', () => {
-      // Verify constants enable: 5*18 + 4*1 = 94
-      const lineHeight = 18;
+    it('when managePrayers=true: 5*14 + 4*1 = 74 (CR-232)', () => {
+      const lineHeight = 14;
       const marginBottom = 1;
       const maxLines5 = 5;
-      expect(maxLines5 * lineHeight + (maxLines5 - 1) * marginBottom).toBe(94);
+      expect(maxLines5 * lineHeight + (maxLines5 - 1) * marginBottom).toBe(74);
     });
 
     it('when managePrayers=false: 3*18 + 2*1 = 56', () => {

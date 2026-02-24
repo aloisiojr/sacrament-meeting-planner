@@ -1,0 +1,268 @@
+# QA_PLAN_026.yaml - Batch 26: Ajustes UI Oracoes Gerenciadas (CRs 222-230)
+# Modo: PRE (validacao inicial antes do desenvolvimento)
+# Tipo: feature_request + bugfix (CR-230)
+
+batch: 26
+feature_id: F158
+crs: [222, 223, 224, 225, 226, 227, 228, 229, 230]
+validated: true
+validation_date: "2026-02-24"
+type: feature_request
+
+# ============================================================
+# PRE-VALIDATION EVIDENCE
+# ============================================================
+
+pre_validation:
+  codebase_analysis:
+    files_examined:
+      - path: src/components/SundayCard.tsx
+        findings:
+          - "Collapsed card speech rows (L527-558) show StatusLED for speech positions 1,2,3"
+          - "Prayer lines in collapsed view (L512-525, L560-573) have NO StatusLED - only text with prayerPrefix"
+          - "speechRow style has marginBottom: 4 (L658)"
+          - "No fixed height on collapsed card - varies by content"
+          - "Testimony/primary + managePrayers collapsed (L460-495): exception text immediately before prayer lines, no gap"
+          - "Prayer text always shows prayerPrefix even when no name: t('prayers.prayerPrefix') + empty string"
+      - path: src/components/NextSundaysSection.tsx
+        findings:
+          - "Does NOT pass managePrayers prop to SundayCard (L94-112)"
+          - "Home collapsed cards do not show prayer lines even when managePrayers is enabled"
+      - path: src/components/NextAssignmentsSection.tsx
+        findings:
+          - "Does NOT pass managePrayers prop to SundayCard (L155-163)"
+          - "Uses useWardManagePrayers (L51) but only for section title, not for SundayCard"
+      - path: src/app/(tabs)/speeches.tsx
+        findings:
+          - "DOES pass managePrayers={managePrayers} to SundayCard (L427)"
+          - "Speeches tab collapsed cards correctly show prayer lines"
+      - path: src/app/(tabs)/settings/index.tsx
+        findings:
+          - "managePrayers toggle is LAST item in Ward Settings group (L246-257)"
+          - "Uses t('settings.managePrayers') which shows 'Oracoes Gerenciadas'"
+          - "No explanatory text below the toggle"
+      - path: src/app/(tabs)/_layout.tsx
+        findings:
+          - "Tab title uses speechesTabTitle which can be long string 'Discursos e Oracoes' (L16-18, L55)"
+          - "No tabBarLabelStyle for multiline support"
+      - path: src/components/AgendaForm.tsx
+        findings:
+          - "Opening prayer (L299-328): FieldRow wraps ReadOnlySpeakerRow when managePrayers=true"
+          - "ReadOnlySpeakerRow component (L706-739) internally wraps itself in another FieldRow"
+          - "Result: DOUBLE label 'Oracao de Abertura' - confirmed bug"
+          - "Same issue for closing prayer (L525-553)"
+      - path: src/i18n/locales/pt-BR.json
+        findings:
+          - "settings.managePrayers = 'Oracoes Gerenciadas' (L143)"
+          - "prayers.prayerPrefix = '(Oracao)' (L398)"
+          - "tabs.speechesAndPrayers = 'Discursos e Oracoes' (L84)"
+      - path: src/components/StatusLED.tsx
+        findings:
+          - "StatusLED accepts size prop (default 16, collapsed cards use size=10)"
+          - "5 statuses with distinct colors"
+      - path: src/components/SpeechSlot.tsx
+        findings:
+          - "SpeechSlot uses isPrayer prop for positions 0/4"
+          - "Prayer slots use prayers.opening and prayers.closing as labels"
+
+  feasibility_assessment:
+    cr_222:
+      feasible: true
+      rationale: "Add StatusLED to prayer lines in collapsed SundayCard view. Straightforward."
+      affected_files:
+        - src/components/SundayCard.tsx
+    cr_223:
+      feasible: true
+      rationale: "Conditionally hide prayerPrefix label when no prayer name. Show only StatusLED circle."
+      affected_files:
+        - src/components/SundayCard.tsx
+    cr_224:
+      feasible: true
+      rationale: "Change i18n value, reorder settings items, add description text."
+      affected_files:
+        - src/app/(tabs)/settings/index.tsx
+        - src/i18n/locales/pt-BR.json
+        - src/i18n/locales/en.json
+        - src/i18n/locales/es.json
+    cr_225:
+      feasible: true
+      rationale: "Pass managePrayers prop to SundayCard in NextSundaysSection. Need to import and use useWardManagePrayers."
+      affected_files:
+        - src/components/NextSundaysSection.tsx
+    cr_226:
+      feasible: true
+      rationale: "Add tabBarLabelStyle to allow multiline or insert newline in i18n string."
+      affected_files:
+        - src/app/(tabs)/_layout.tsx
+        - src/i18n/locales/pt-BR.json
+        - src/i18n/locales/en.json
+        - src/i18n/locales/es.json
+    cr_227:
+      feasible: true
+      rationale: "Add marginTop/spacer between exception text and prayer lines in collapsed testimony/primary cards."
+      affected_files:
+        - src/components/SundayCard.tsx
+    cr_228:
+      feasible: true
+      rationale: "Reduce speechRow marginBottom from 4 to smaller value (e.g., 1 or 2)."
+      affected_files:
+        - src/components/SundayCard.tsx
+    cr_229:
+      feasible: true
+      rationale: "Set minHeight on collapsed card or ensure all cards render same number of lines. More complex - may need to render placeholder empty lines."
+      affected_files:
+        - src/components/SundayCard.tsx
+    cr_230:
+      feasible: true
+      type: bugfix
+      rationale: "ReadOnlySpeakerRow wraps in FieldRow, and is ALSO wrapped by outer FieldRow in AgendaForm. Fix: either remove outer FieldRow wrapper or change ReadOnlySpeakerRow to not use FieldRow internally."
+      affected_files:
+        - src/components/AgendaForm.tsx
+      reproduction_steps:
+        - "Enable managePrayers in Settings (Bispado role)"
+        - "Navigate to Agenda tab"
+        - "Open any sunday agenda form"
+        - "Observe 'Oracao de Abertura' label appears twice"
+        - "Scroll down to observe 'Oracao de Encerramento' label also appears twice"
+
+# ============================================================
+# VALIDATION CHECKS (for POST validation)
+# ============================================================
+
+validation_checks:
+  must_pass:
+    - id: F158-MP01
+      cr: 222
+      description: "Collapsed card in Speeches tab shows StatusLED circles for all 5 lines (opening prayer, 3 speeches, closing prayer) when managePrayers is enabled"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "Prayer lines in collapsed speechesType view have StatusLED component with appropriate status"
+
+    - id: F158-MP02
+      cr: 223
+      description: "When no prayer name assigned, collapsed card shows only StatusLED circle without prayer label text"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "prayerPrefix text is conditionally hidden when speaker_name is empty/null"
+
+    - id: F158-MP03
+      cr: 224
+      description: "Settings menu shows 'Usar Convites para Oracoes' (pt-BR) as 2nd item in Ward Settings with explanatory text"
+      verify_in:
+        - src/app/(tabs)/settings/index.tsx
+        - src/i18n/locales/pt-BR.json
+        - src/i18n/locales/en.json
+        - src/i18n/locales/es.json
+      check: "i18n key value changed, item repositioned to 2nd slot, description text added with proper i18n"
+
+    - id: F158-MP04
+      cr: 225
+      description: "Home tab collapsed cards (NextSundaysSection) show same content as Speeches tab collapsed cards"
+      verify_in:
+        - src/components/NextSundaysSection.tsx
+      check: "managePrayers prop is passed to SundayCard"
+
+    - id: F158-MP05
+      cr: 226
+      description: "Tab text 'Discursos e Oracoes' displays without truncation (either multiline or shorter text)"
+      verify_in:
+        - src/app/(tabs)/_layout.tsx
+      check: "tabBarLabelStyle allows multiline or text adapted to fit"
+
+    - id: F158-MP06
+      cr: 227
+      description: "Space between exception text (testimony/primary) and prayer lines in collapsed card"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "marginTop or spacer View exists between exceptionText and first prayer speechRow"
+
+    - id: F158-MP07
+      cr: 228
+      description: "Reduced spacing between name lines in collapsed cards"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "speechRow marginBottom reduced from current value (4)"
+
+    - id: F158-MP08
+      cr: 229
+      description: "All collapsed cards have same height regardless of content variations"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "Fixed minHeight on headerCenter or consistent number of rows rendered"
+
+    - id: F158-MP09
+      cr: 230
+      description: "No duplicate prayer labels in expanded agenda form when managePrayers is enabled"
+      verify_in:
+        - src/components/AgendaForm.tsx
+      check: "Opening prayer and closing prayer labels appear exactly once each"
+
+  should_pass:
+    - id: F158-SP01
+      cr: 222
+      description: "NextAssignmentsSection also passes managePrayers to SundayCard"
+      verify_in:
+        - src/components/NextAssignmentsSection.tsx
+      check: "managePrayers prop passed through to SundayCard"
+
+    - id: F158-SP02
+      cr: 222
+      description: "Testimony/primary collapsed cards with managePrayers also show StatusLED for prayer lines"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "Prayer lines in testimony/primary collapsed view have StatusLED"
+
+    - id: F158-SP03
+      cr: 224
+      description: "Explanatory text for managed prayers toggle uses i18n and appears in all 3 languages"
+      verify_in:
+        - src/i18n/locales/pt-BR.json
+        - src/i18n/locales/en.json
+        - src/i18n/locales/es.json
+      check: "New i18n key for explanatory text exists in all locale files"
+
+    - id: F158-SP04
+      cr: 229
+      description: "Cards with 2 speech positions (has_second_speech=false) still match height of cards with 3 positions"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "Height consistency even with variable number of speech rows"
+
+    - id: F158-SP05
+      cr: 228
+      description: "Reduced spacing applies equally in both Home tab and Speeches tab collapsed cards"
+      verify_in:
+        - src/components/SundayCard.tsx
+      check: "Style is shared (not tab-specific), applied universally"
+
+    - id: F158-SP06
+      cr: 226
+      description: "Tab text wrapping works correctly in both pt-BR and es (longer strings)"
+      verify_in:
+        - src/app/(tabs)/_layout.tsx
+      check: "No truncation in any supported language"
+
+# ============================================================
+# REGRESSION AREAS
+# ============================================================
+
+regression_areas:
+  - area: "Collapsed card rendering for normal speeches (non-managePrayers)"
+    risk: "Changes to speechRow styles may affect cards when managePrayers is off"
+    files:
+      - src/components/SundayCard.tsx
+
+  - area: "Settings screen layout and functionality"
+    risk: "Reordering items may affect keyboard navigation or accessibility"
+    files:
+      - src/app/(tabs)/settings/index.tsx
+
+  - area: "Tab bar rendering on all screen sizes"
+    risk: "Multiline tab labels may look odd on small screens or landscape"
+    files:
+      - src/app/(tabs)/_layout.tsx
+
+  - area: "AgendaForm prayer fields (non-managePrayers mode)"
+    risk: "Fix for duplicate labels must not break prayer field when managePrayers is off"
+    files:
+      - src/components/AgendaForm.tsx

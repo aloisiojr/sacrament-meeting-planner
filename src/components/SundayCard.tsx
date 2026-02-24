@@ -452,20 +452,14 @@ export const SundayCard = React.memo(function SundayCard({
         isPast && !expanded && { opacity: 0.6 },
       ]}
     >
-      {/* Header - CR-232: Use View instead of Pressable when no onToggle to avoid
-           nested <button> on web (HTML spec: button cannot contain button) */}
-      {React.createElement(
-        onToggle ? Pressable : View,
-        onToggle
-          ? {
-              style: styles.header,
-              onPress: onToggle,
-              accessibilityRole: 'button' as const,
-              accessibilityLabel: `Sunday ${formatDate(date, locale)}`,
-              accessibilityState: { expanded },
-            }
-          : { style: styles.header },
-        <>
+      {/* Header */}
+      <Pressable
+        style={styles.header}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={`Sunday ${formatDate(date, locale)}`}
+        accessibilityState={{ expanded }}
+      >
         <DateBlock date={date} locale={locale} />
 
         <View style={[styles.headerCenter, !expanded && { minHeight: collapsedMinHeight }]}>
@@ -628,8 +622,7 @@ export const SundayCard = React.memo(function SundayCard({
         </View>
 
         {!onToggle && renderHeaderRight && renderHeaderRight()}
-        </>
-      )}
+      </Pressable>
 
       {/* Type dropdown (shown when expanded) */}
       {expanded && (

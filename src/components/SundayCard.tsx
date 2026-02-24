@@ -436,6 +436,12 @@ export const SundayCard = React.memo(function SundayCard({
     onRemoveException?.(date);
   }, [date, onRemoveException]);
 
+  // CR-229: Dynamic minHeight for uniform collapsed card height (ADR-110)
+  const LINE_HEIGHT = 18;
+  const MARGIN_BOTTOM = 1;
+  const maxLines = managePrayers ? 5 : 3;
+  const collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines - 1) * MARGIN_BOTTOM;
+
   return (
     <View
       style={[
@@ -455,7 +461,7 @@ export const SundayCard = React.memo(function SundayCard({
       >
         <DateBlock date={date} locale={locale} />
 
-        <View style={styles.headerCenter}>
+        <View style={[styles.headerCenter, !expanded && { minHeight: collapsedMinHeight }]}>
           {/* CR-221: For testimony/primary with managePrayers: show prayer lines instead of just exception text */}
           {!isSpeechesType && isTestimonyOrPrimary && managePrayers && !expanded && (() => {
             const openingPrayer = speeches.find((s) => s.position === 0);

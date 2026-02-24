@@ -472,7 +472,7 @@ export const SundayCard = React.memo(function SundayCard({
                         : t(`sundayExceptions.${currentType}`))
                     : ''}
                 </Text>
-                <View style={styles.speechRow}>
+                <View style={[styles.speechRow, { marginTop: 6 }]}>
                   <StatusLED
                     status={openingPrayer?.status ?? 'not_assigned'}
                     size={10}

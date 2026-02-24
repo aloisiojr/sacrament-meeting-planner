@@ -36,6 +36,7 @@ import {
   useChangeStatus,
   useRemoveAssignment,
   useDeleteSpeechesByDate,
+  useWardManagePrayers,
   groupSpeechesBySunday,
 } from '../../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
@@ -107,6 +108,9 @@ function SpeechesTabContent() {
 
   const isObserver = role === 'observer';
   const canWriteSundayType = hasPermission('sunday_type:write');
+
+  // CR-221: Check if manage_prayers is enabled
+  const { managePrayers } = useWardManagePrayers();
 
   // Fetch speeches and exceptions for the visible range
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
@@ -182,7 +186,9 @@ function SpeechesTabContent() {
 
     // Expand the card and lazy-create speeches
     setExpandedDate(targetDate);
-    lazyCreate.mutate({ sundayDate: targetDate });
+    const targetException = (exceptions ?? []).find((e) => e.date === targetDate);
+    const targetSundayType = targetException?.reason as SundayExceptionReason | undefined;
+    lazyCreate.mutate({ sundayDate: targetDate, sundayType: targetSundayType });
 
     // Scroll to the target date
     const index = listItems.findIndex(
@@ -209,8 +215,10 @@ function SpeechesTabContent() {
         setExpandedDate(null);
       } else {
         setExpandedDate(date);
-        // Lazy-create speeches on first expand
-        lazyCreate.mutate({ sundayDate: date });
+        // Lazy-create speeches on first expand, passing sundayType
+        const entry = speechMap.get(date);
+        const sundayType = entry?.exception?.reason as SundayExceptionReason | undefined;
+        lazyCreate.mutate({ sundayDate: date, sundayType });
         // Auto-scroll to expanded card (ADR-047)
         const index = listItems.findIndex(
           (i) => i.type === 'sunday' && i.key === date
@@ -226,21 +234,28 @@ function SpeechesTabContent() {
         }
       }
     },
-    [expandedDate, lazyCreate, listItems]
+    [expandedDate, lazyCreate, speechMap, listItems]
   );
 
   // Speaker assignment
   const handleAssignSpeaker = useCallback(
     (speechId: string, member: Member) => {
+      // CR-221: When managePrayers=false and position is 0/4, auto-confirm
+      const speech = (speeches ?? []).find((s) => s.id === speechId);
+      const statusOverride = !managePrayers && speech && (speech.position === 0 || speech.position === 4)
+        ? 'assigned_confirmed' as SpeechStatus
+        : undefined;
+
       assignSpeaker.mutate({
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
         speakerPhone: member.phone ?? null,
+        status: statusOverride,
       });
       setSpeakerModalSpeechId(null);
     },
-    [assignSpeaker]
+    [assignSpeaker, speeches, managePrayers]
   );
 
   // Topic assignment
@@ -397,6 +412,9 @@ function SpeechesTabContent() {
       const agendaData = agendaMap.get(item.date);
       const hasSecondSpeech = agendaData?.has_second_speech ?? true;
 
+      const isSpeechesType = !exception || exception.reason === 'speeches';
+      const isTestimonyOrPrimary = exception && (exception.reason === 'testimony_meeting' || exception.reason === 'primary_presentation');
+
       return (
         <SundayCard
           date={item.date}
@@ -406,6 +424,7 @@ function SpeechesTabContent() {
           isPast={isPast}
           expanded={isExpanded}
           hasSecondSpeech={hasSecondSpeech}
+          managePrayers={managePrayers}
           onToggle={() => handleToggle(item.date)}
           onStatusPress={(speech) => {
             // Status press handled within SpeechSlot
@@ -415,25 +434,92 @@ function SpeechesTabContent() {
           onDeleteSpeeches={handleDeleteSpeeches}
           typeDisabled={!canWriteSundayType}
         >
-          {isExpanded &&
-            (!exception || exception.reason === 'speeches') &&
-            [1, 2, 3].map((pos) => {
-              const speech = speechesForDay.find((s) => s.position === pos) ?? null;
-              return (
-                <SpeechSlot
-                  key={pos}
-                  speech={speech}
-                  position={pos}
-                  onChangeStatus={handleChangeStatus}
-                  onRemoveAssignment={handleRemoveAssignment}
-                  onClearTopic={handleClearTopic}
-                  onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
-                  onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
-                  isSecondSpeechEnabled={pos === 2 ? hasSecondSpeech : undefined}
-                  onToggleSecondSpeech={pos === 2 ? (enabled) => handleToggleSecondSpeech(item.date, enabled) : undefined}
-                />
-              );
-            })}
+          {/* CR-221: Prayer + Speech slots when expanded */}
+          {isExpanded && isSpeechesType && (
+            <>
+              {/* Opening prayer slot (position 0) - only when managePrayers */}
+              {managePrayers && (() => {
+                const prayerSpeech = speechesForDay.find((s) => s.position === 0) ?? null;
+                return (
+                  <SpeechSlot
+                    key={0}
+                    speech={prayerSpeech}
+                    position={0}
+                    isPrayer
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                  />
+                );
+              })()}
+              {/* Speech slots (positions 1, 2, 3) */}
+              {[1, 2, 3].map((pos) => {
+                const speech = speechesForDay.find((s) => s.position === pos) ?? null;
+                return (
+                  <SpeechSlot
+                    key={pos}
+                    speech={speech}
+                    position={pos}
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onClearTopic={handleClearTopic}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                    onOpenTopicSelector={(id) => setTopicModalSpeechId(id)}
+                    isSecondSpeechEnabled={pos === 2 ? hasSecondSpeech : undefined}
+                    onToggleSecondSpeech={pos === 2 ? (enabled) => handleToggleSecondSpeech(item.date, enabled) : undefined}
+                  />
+                );
+              })}
+              {/* Closing prayer slot (position 4) - only when managePrayers */}
+              {managePrayers && (() => {
+                const prayerSpeech = speechesForDay.find((s) => s.position === 4) ?? null;
+                return (
+                  <SpeechSlot
+                    key={4}
+                    speech={prayerSpeech}
+                    position={4}
+                    isPrayer
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                  />
+                );
+              })()}
+            </>
+          )}
+          {/* CR-221: For testimony/primary with managePrayers: only prayer slots */}
+          {isExpanded && isTestimonyOrPrimary && managePrayers && (
+            <>
+              {(() => {
+                const openingPrayer = speechesForDay.find((s) => s.position === 0) ?? null;
+                return (
+                  <SpeechSlot
+                    key={0}
+                    speech={openingPrayer}
+                    position={0}
+                    isPrayer
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                  />
+                );
+              })()}
+              {(() => {
+                const closingPrayer = speechesForDay.find((s) => s.position === 4) ?? null;
+                return (
+                  <SpeechSlot
+                    key={4}
+                    speech={closingPrayer}
+                    position={4}
+                    isPrayer
+                    onChangeStatus={handleChangeStatus}
+                    onRemoveAssignment={handleRemoveAssignment}
+                    onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
+                  />
+                );
+              })()}
+            </>
+          )}
         </SundayCard>
       );
     },
@@ -443,6 +529,7 @@ function SpeechesTabContent() {
       today,
       expandedDate,
       agendaMap,
+      managePrayers,
       handleToggle,
       handleTypeChange,
       handleRemoveException,

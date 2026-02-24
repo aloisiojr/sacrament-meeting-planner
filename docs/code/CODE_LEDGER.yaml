@@ -5052,3 +5052,128 @@ batch23_phase2_test_results:
     changes:
       - id: CHG-747
         description: "Updated 17 superseded assertions across 10 legacy test files to match Phase 2 code patterns"
+
+  # =============================================================================
+  # Phase 3: F157 CR-221 - Managed Prayers (Steps 11-22)
+  # =============================================================================
+
+  - step: S11
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    plan_step: STEP-11
+    hash: 3ca6a1d
+    message: "feat(agenda-form): change prayer data source to speeches and add conditional editing (CR-221, STEP-11)"
+    files_changed:
+      - src/components/AgendaForm.tsx
+    changes:
+      - id: CHG-748
+        description: "Added imports for useWardManagePrayers, useAssignSpeaker, useRemoveAssignment from useSpeeches"
+      - id: CHG-749
+        description: "Opening/closing prayer fields now read from getSpeech(0)/getSpeech(4)?.speaker_name instead of agenda columns"
+      - id: CHG-750
+        description: "When managePrayers=true: renders ReadOnlySpeakerRow with pencil icon navigating to Speeches tab"
+      - id: CHG-751
+        description: "When managePrayers=false: PrayerSelector writes to speeches via assignSpeaker.mutate with status='assigned_confirmed'"
+      - id: CHG-752
+        description: "Removed handlePrayerSelect callback and unused Member import (no more agenda prayer column writes)"
+      - id: CHG-753
+        description: "Clear button uses removeAssignment.mutate on speech record instead of setting agenda fields to null"
+    acs_covered: [AC-157-13, AC-157-22, AC-157-37, AC-157-38, AC-157-39, AC-157-40]
+    ecs_covered: [EC-157-03, EC-157-05, EC-157-06]
+
+  - step: S12
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    plan_step: STEP-12
+    hash: c471b27
+    message: "feat(agenda): change collapsed card prayer count to read from speeches positions 0/4 (CR-221, STEP-12)"
+    files_changed:
+      - src/app/(tabs)/agenda.tsx
+    changes:
+      - id: CHG-754
+        description: "Special meeting collapsed card: prayersFilled computed from speeches.filter(s.position===0 || s.position===4)"
+      - id: CHG-755
+        description: "Normal meeting collapsed card: prayersFilled computed from speeches loop instead of agenda.opening_prayer_name/closing_prayer_name"
+    acs_covered: [AC-157-41]
+    ecs_covered: [EC-157-02]
+
+  - step: S13
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    plan_step: STEP-13
+    hash: fd885ad
+    message: "feat(home): dynamic section title and prayer count from speeches (CR-221, STEP-13)"
+    files_changed:
+      - src/app/(tabs)/index.tsx
+      - src/components/NextAssignmentsSection.tsx
+    changes:
+      - id: CHG-756
+        description: "Home tab imports useWardManagePrayers, prayer count from speeches positions 0/4 instead of agenda columns"
+      - id: CHG-757
+        description: "NextAssignmentsSection imports useWardManagePrayers, title is t('home.nextSpeechesAndPrayers') when ON, t('home.nextAssignments') when OFF"
+    acs_covered: [AC-157-16, AC-157-25, AC-157-42, AC-157-43, AC-157-44]
+
+  - step: S15
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    plan_step: STEP-15
+    hash: 7369378
+    message: "feat(layout): dynamic Speeches tab label based on manage_prayers toggle (CR-221, STEP-15)"
+    files_changed:
+      - src/app/(tabs)/_layout.tsx
+    changes:
+      - id: CHG-758
+        description: "Imported useWardManagePrayers, speechesTabTitle ternary: t('tabs.speechesAndPrayers') when ON, t('tabs.speeches') when OFF"
+    acs_covered: [AC-157-15, AC-157-24]
+
+  - step: S19
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    plan_step: STEP-19
+    hash: 1fd2899
+    message: "feat(presentation): read prayer data from speeches positions 0/4 (CR-221, STEP-19)"
+    files_changed:
+      - src/hooks/usePresentationMode.ts
+    changes:
+      - id: CHG-759
+        description: "Opening prayer reads speeches.find(s => s.position === 0)?.speaker_name instead of agenda.opening_prayer_name"
+      - id: CHG-760
+        description: "Closing prayer reads speeches.find(s => s.position === 4)?.speaker_name instead of agenda.closing_prayer_name (both normal and special meeting)"
+    acs_covered: [AC-157-45]
+    ecs_covered: [EC-157-10, EC-157-13]
+
+  - step: S22-tests
+    cr: CR-221
+    plan_ref: plans/PLAN_P046.yaml
+    hash: 4efc613
+    message: "test(batch25): add 156 tests for F157 CR-221 Phase 3 (Steps 11-22)"
+    files_changed:
+      - src/__tests__/batch25-phase3.test.ts
+    tests_added: 156
+
+  - step: S-R3-fix
+    cr: CR-221
+    hash: 1498c4f
+    message: "fix(tests): update superseded assertions for Phase 3 code changes (R-3)"
+    files_changed:
+      - src/__tests__/batch14-phase2.test.ts
+      - src/__tests__/batch16.test.ts
+      - src/__tests__/batch19-phase2.test.ts
+      - src/__tests__/batch20-phase1.test.ts
+      - src/__tests__/batch21-f130-f134.test.ts
+      - src/__tests__/batch24-phase2.test.ts
+      - src/__tests__/cr004-f008-agenda-actors.test.ts
+      - src/__tests__/phase04-agenda-presentation.test.ts
+    changes:
+      - id: CHG-761
+        description: "Updated 12 superseded assertions across 8 legacy test files to match Phase 3 code patterns (prayer from speeches instead of agenda)"
+
+batch25_phase3_test_results:
+  new_tests: 156
+  new_tests_passing: 156
+  full_suite_tests: 6801
+  full_suite_passing: 6801
+  full_suite_files: 97
+  regressions: 0
+  pre_existing_failures_fixed: 12
+  pre_existing_failure_fix_details: "12 tests across 8 files updated for Phase 3 prayer data source change"

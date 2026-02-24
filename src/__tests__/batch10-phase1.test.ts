@@ -442,7 +442,8 @@ describe('F070 (CR-127): Delete speech assignments on sunday type change', () =>
     it('useDeleteSpeechesByDate throws on error', () => {
       const content = getUseSpeeches();
       const hookStart = content.indexOf('useDeleteSpeechesByDate');
-      const hookSection = content.substring(hookStart, hookStart + 400);
+      // CR-221 expanded input type, so function is longer; use 600 chars (superseded by batch25-phase1)
+      const hookSection = content.substring(hookStart, hookStart + 600);
       expect(hookSection).toContain('if (error) throw error');
     });
   });

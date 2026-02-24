@@ -630,7 +630,9 @@ describe('F108 (CR-170): Last speech label in presentation mode', () => {
   // --- EC-108-01: Special meeting (no last speech card) ---
   describe('EC-108-01: Special meeting has no last speech', () => {
     it('special meeting path uses closingHymn title, not lastSpeech', () => {
-      expect(hookSource).toContain("title: t('agenda.closingHymn')");
+      // 1e1d906 refactored to use specialTitle variable for testimony/primary differentiation
+      // (superseded by batch25-phase1: the default specialTitle is closingHymn)
+      expect(hookSource).toContain("specialTitle = t('agenda.closingHymn')");
     });
   });
 });

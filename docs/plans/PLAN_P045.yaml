@@ -1,0 +1,550 @@
+# =============================================================================
+# PLAN_P045.yaml
+# Plan for Batch 25 Phase 2: F157 - Managed Prayers (CR-221)
+# Speeches tab prayer slots, collapsed card prayer lines, invite management,
+# WhatsApp prayer templates, WhatsApp settings segmented control
+# Created: 2026-02-24
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement Phase 2 of managed prayers (CR-221): extend SpeechSlot with isPrayer
+  prop (no topic field, prayer labels), render prayer SpeechSlots in Speeches tab
+  expanded cards (positions 0/4 before/after speech slots), add prayer lines to
+  collapsed SundayCard (italic + prefix), update InviteManagementSection to
+  include/exclude prayer positions with correct labels and templates, add default
+  WhatsApp prayer templates to whatsappUtils.ts, and add 3-tab segmented control
+  to WhatsApp settings screen. 20 ACs, 3 ECs.
+
+strategy:
+  order: "SpeechSlot isPrayer -> Speeches tab prayer rendering -> SundayCard collapsed prayers + type change -> InviteManagement prayers -> WhatsApp templates -> WhatsApp settings segmented control -> tests"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# Phase 1 completed steps (for reference):
+# STEP-01: DB migration (019_managed_prayers.sql)
+# STEP-02: i18n strings
+# STEP-03: TypeScript type updates
+# STEP-04: useWardManagePrayers hook
+# STEP-05: useLazyCreateSpeeches type-aware positions
+# STEP-06: useDeleteSpeechesByDate optional positions filter
+# STEP-07: Settings toggle manage_prayers
+
+# Phase 2 maps to PLAN_P044 steps: STEP-08, STEP-09, STEP-10, STEP-14, STEP-16, STEP-17
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-08: SpeechSlot - isPrayer prop
+  # ---------------------------------------------------------------------------
+  - id: STEP-08
+    description: >
+      Add isPrayer prop to SpeechSlot in src/components/SpeechSlot.tsx:
+      - New optional prop isPrayer?: boolean (default false) in SpeechSlotProps interface
+      - Accept isPrayer in the component destructuring
+      - When isPrayer=true: hide topic row entirely (do not render the topic field,
+        topic action area, or onOpenTopicSelector/onClearTopic interactions)
+      - When isPrayer=true: hide 2nd speech toggle (the position === 2 && isSecondSpeechEnabled
+        check must also require !isPrayer)
+      - Update getPositionLabel function: add cases for position 0 returning
+        t('prayers.opening') and position 4 returning t('prayers.closing')
+      - When isPrayer=false (default): no changes to current behavior whatsoever
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-16"]
+    done_when:
+      - "SpeechSlotProps interface has isPrayer?: boolean"
+      - "Component destructures isPrayer with default false"
+      - "When isPrayer=true, topic row (topic field + topic action area) is not rendered"
+      - "When isPrayer=true and position=2, 2nd speech toggle is not rendered"
+      - "getPositionLabel returns t('prayers.opening') for position 0"
+      - "getPositionLabel returns t('prayers.closing') for position 4"
+      - "When isPrayer=false or undefined, behavior identical to current"
+    tests:
+      - type: unit
+        description: "Verify topic row hidden when isPrayer=true"
+      - type: unit
+        description: "Verify 2nd speech toggle hidden when isPrayer=true"
+      - type: unit
+        description: "Verify prayer labels for positions 0 and 4"
+      - type: unit
+        description: "Verify unchanged behavior when isPrayer=false or undefined"
+    covers:
+      acceptance_criteria: ["AC-157-28", "AC-157-29"]
+      edge_cases: []
+    risks:
+      - risk: "Conditional rendering may break existing layout"
+        mitigation: "isPrayer defaults to false, so existing usage is unaffected"
+
+  # ---------------------------------------------------------------------------
+  # STEP-09: Speeches tab - render prayer SpeechSlots
+  # ---------------------------------------------------------------------------
+  - id: STEP-09
+    description: >
+      Extend src/app/(tabs)/speeches.tsx to render prayer slots when managePrayers=true:
+      - Import useWardManagePrayers from '../../hooks/useSpeeches'
+      - Call useWardManagePrayers() at component top level to get managePrayers flag
+      - In renderItem expanded card section (currently [1, 2, 3].map):
+        - When managePrayers=true AND card is speeches type (no exception):
+          render SpeechSlot(isPrayer=true, position=0) BEFORE the [1,2,3] map,
+          then the existing [1,2,3] map, then SpeechSlot(isPrayer=true, position=4)
+          AFTER the last speech slot
+        - When managePrayers=true AND card is testimony_meeting or primary_presentation:
+          render only SpeechSlot(isPrayer=true, position=0) and
+          SpeechSlot(isPrayer=true, position=4), no speech slots (1,2,3)
+        - When managePrayers=false: do NOT render positions 0/4 (current behavior preserved)
+        - For testimony/primary without managePrayers: show nothing (current behavior)
+      - handleAssignSpeaker callback: when managePrayers=false and the speech position
+        is 0 or 4, override status to 'assigned_confirmed' in the assignSpeaker.mutate call
+      - Pass managePrayers to SundayCard component (for STEP-10)
+      - Update lazyCreate.mutate calls to pass sundayType when available (already done in Phase 1)
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "useWardManagePrayers imported and called"
+      - "Prayer SpeechSlots render for positions 0/4 when managePrayers=true and speeches type"
+      - "Position 0 slot renders BEFORE speech slots (positions 1,2,3)"
+      - "Position 4 slot renders AFTER speech slots (positions 1,2,3)"
+      - "Positions 0/4 NOT rendered when managePrayers=false"
+      - "Testimony/primary shows only prayer slots (0,4) when managePrayers=true"
+      - "Testimony/primary shows nothing when managePrayers=false"
+      - "Prayer SpeechSlots use isPrayer=true prop"
+      - "MemberSelectorModal used for prayer assignment (via SpeechSlot) when managePrayers=true"
+      - "Prayer status is 'assigned_not_invited' when managePrayers=true (default SpeechSlot behavior)"
+      - "Prayer status is 'assigned_confirmed' when managePrayers=false and assigned via this tab"
+      - "managePrayers prop passed to SundayCard"
+    tests:
+      - type: unit
+        description: "Verify prayer slots render before/after speech slots when managePrayers=true"
+      - type: unit
+        description: "Verify prayer slots hidden when managePrayers=false"
+      - type: unit
+        description: "Verify testimony/primary shows only prayer slots when managePrayers=true"
+      - type: unit
+        description: "Verify status override to assigned_confirmed when managePrayers=false for pos 0/4"
+    covers:
+      acceptance_criteria: ["AC-157-18", "AC-157-27", "AC-157-30"]
+      edge_cases: ["EC-157-04"]
+    risks:
+      - risk: "Visible positions logic may conflict with has_second_speech"
+        mitigation: "Prayer slots are rendered separately, not through visiblePositions array"
+
+  # ---------------------------------------------------------------------------
+  # STEP-10: SundayCard collapsed - prayer lines + Sunday type change logic
+  # ---------------------------------------------------------------------------
+  - id: STEP-10
+    description: >
+      Modify src/components/SundayCard.tsx for two areas:
+
+      (A) Collapsed card prayer lines:
+      - New prop managePrayers?: boolean (default false) in SundayCardProps
+      - When managePrayers=true and isSpeechesType and NOT expanded:
+        - Render prayer line for position 0 BEFORE the speech lines,
+          using italic fontStyle and t('prayers.prayerPrefix') prefix, NO StatusLED
+        - Render prayer line for position 4 AFTER the speech lines,
+          same italic + prefix format
+        - Prayer line format: "(Oracao) MemberName" or "(Oracao) ---" if not assigned
+      - When managePrayers=true and testimony_meeting or primary_presentation (not expanded):
+        - Render 2 prayer lines (pos 0, pos 4) INSTEAD OF the exception text
+        - Same italic + prefix format
+      - When managePrayers=false: no change to current collapsed layout
+      - visiblePositions logic: when managePrayers=true, the prayer lines are rendered
+        separately (not through visiblePositions which stays [1,2,3] or [1,3])
+      - Adjust minHeight if needed for 5-line cards (currently 62px from F154)
+
+      (B) Sunday type change logic in SundayTypeDropdown:
+      - Update handleSelect to consider prayer preservation:
+        - FROM speeches TO testimony/primary: delete positions [1,2,3] only (preserve 0,4)
+          using onDeleteSpeeches with positions parameter
+        - FROM speeches TO conference/other: delete positions [0,1,2,3,4] (delete all)
+        - FROM testimony/primary TO conference/other: delete positions [0,4]
+        - FROM testimony TO primary (or vice versa): preserve [0,4], no deletion
+        - FROM testimony/primary TO speeches: preserve [0,4], create [1,2,3]
+          (creation handled by lazyCreate on card expand)
+      - Dynamic confirmation dialog text based on what will be deleted:
+        - Only speeches being deleted: t('sundayExceptions.changeConfirmMessage') (existing)
+        - Only prayers being deleted: t('sundayExceptions.confirmDeletePrayers')
+        - Both speeches and prayers: t('sundayExceptions.confirmDeleteBoth')
+        - Nothing to delete: no dialog shown
+      - SundayTypeDropdown needs additional props: onDeleteSpeeches now accepts
+        optional positions parameter via updated signature
+      - hasAssignments check should also check prayer positions when applicable
+    files:
+      - "src/components/SundayCard.tsx"
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "SundayCardProps has managePrayers?: boolean"
+      - "Collapsed speeches card shows opening prayer line before speech lines when managePrayers=true"
+      - "Collapsed speeches card shows closing prayer line after speech lines when managePrayers=true"
+      - "Collapsed speeches card shows 5 lines when managePrayers=true and has_second_speech=true"
+      - "Collapsed speeches card shows 4 lines when managePrayers=true and has_second_speech=false"
+      - "Collapsed testimony/primary card shows 2 prayer lines when managePrayers=true"
+      - "Prayer lines use fontStyle:'italic'"
+      - "Prayer lines have t('prayers.prayerPrefix') prefix"
+      - "Prayer lines do NOT have StatusLED indicators"
+      - "Conference/other cards unchanged (1 line of exception text)"
+      - "When managePrayers=false, collapsed layout identical to current"
+      - "speeches.tsx passes managePrayers prop to SundayCard"
+      - "speeches->testimony/primary deletes only positions [1,2,3]"
+      - "speeches->conference/other deletes all positions [0,1,2,3,4]"
+      - "testimony/primary->conference/other deletes positions [0,4]"
+      - "testimony<->primary preserves positions [0,4]"
+      - "Confirmation dialog text varies based on deletion scope"
+      - "No dialog shown when nothing to delete"
+    tests:
+      - type: unit
+        description: "Verify 5-line card for speeches type with managePrayers=true and has_second_speech"
+      - type: unit
+        description: "Verify 4-line card for speeches type with managePrayers=true and no 2nd speech"
+      - type: unit
+        description: "Verify 2-line card for testimony/primary with managePrayers=true"
+      - type: unit
+        description: "Verify prayer lines are italic with prefix, no LED"
+      - type: unit
+        description: "Verify no change when managePrayers=false"
+      - type: unit
+        description: "Verify speeches->testimony deletes only positions 1,2,3"
+      - type: unit
+        description: "Verify speeches->conference deletes all positions"
+      - type: unit
+        description: "Verify testimony<->primary preserves prayers"
+      - type: unit
+        description: "Verify dynamic confirmation dialog text"
+    covers:
+      acceptance_criteria: ["AC-157-31", "AC-157-32", "AC-157-33", "AC-157-34", "AC-157-35", "AC-157-36"]
+      edge_cases: ["EC-157-11"]
+    risks:
+      - risk: "Card height may not accommodate 5 lines"
+        mitigation: "Increase minHeight from 62px if needed, test visually"
+      - risk: "Type change logic complexity"
+        mitigation: "Implement as lookup table mapping (oldType, newType) -> { deletePositions, dialogKey }"
+
+  # ---------------------------------------------------------------------------
+  # STEP-14: InviteManagementSection - prayer positions
+  # ---------------------------------------------------------------------------
+  - id: STEP-14
+    description: >
+      Modify src/components/InviteManagementSection.tsx and src/app/(tabs)/index.tsx:
+
+      InviteManagementSection.tsx:
+      - Accept new prop managePrayers?: boolean (default false)
+      - Update ward query to also fetch whatsapp_template_opening_prayer and
+        whatsapp_template_closing_prayer columns
+      - When managePrayers=true: do NOT filter out positions 0/4 in inviteItems
+        (currently getInviteItems only returns speeches with invite-relevant statuses,
+        which already includes all positions - the filtering is done by has_second_speech
+        for position 2). Since getInviteItems in speechUtils.ts does not filter by position,
+        prayer positions will automatically appear IF they have status 'assigned_not_invited'
+        or 'assigned_invited'. But position label needs updating.
+      - When managePrayers=false: filter OUT positions 0/4 from inviteItems
+        (add filter: item.speech.position !== 0 && item.speech.position !== 4)
+      - Position label display: In the invite row, add logic to show prayer-specific labels
+        - Position 0: use t('speeches.openingPrayer') instead of ordinal
+        - Position 4: use t('speeches.closingPrayer') instead of ordinal
+        - Positions 1,2,3: keep existing ordinal label
+      - WhatsApp template selection in handleNotInvitedAction:
+        - Position 0: use ward?.whatsapp_template_opening_prayer
+        - Position 4: use ward?.whatsapp_template_closing_prayer
+        - Positions 1,2,3: use ward?.whatsapp_template (existing behavior)
+        - For prayer positions, use getDefaultPrayerTemplate as fallback instead of
+          getDefaultTemplate
+        - Prayer WhatsApp variables: only speakerName and date (no topic, position, collection, link)
+
+      index.tsx (Home tab):
+      - Import useWardManagePrayers
+      - Pass managePrayers prop to InviteManagementSection
+    files:
+      - "src/components/InviteManagementSection.tsx"
+      - "src/app/(tabs)/index.tsx"
+      - "src/lib/speechUtils.ts"
+    dependencies: ["STEP-08"]
+    parallelizable_with: ["STEP-10"]
+    done_when:
+      - "InviteManagementSection accepts managePrayers?: boolean prop"
+      - "Positions 0/4 appear in invite items when managePrayers=true and have invite-relevant status"
+      - "Positions 0/4 excluded from invite items when managePrayers=false"
+      - "Position 0 labeled t('speeches.openingPrayer') in invite row"
+      - "Position 4 labeled t('speeches.closingPrayer') in invite row"
+      - "Ward query fetches whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"
+      - "WhatsApp URL uses correct template per position (opening/closing/speech)"
+      - "Prayer WhatsApp message uses only {nome} and {data} variables"
+      - "Home tab imports useWardManagePrayers and passes to InviteManagementSection"
+    tests:
+      - type: unit
+        description: "Verify positions 0/4 included in invite items when managePrayers=true"
+      - type: unit
+        description: "Verify positions 0/4 excluded when managePrayers=false"
+      - type: unit
+        description: "Verify prayer labels for positions 0 and 4 in invite rows"
+      - type: unit
+        description: "Verify correct WhatsApp template selection by position"
+      - type: unit
+        description: "Verify prayer WhatsApp message uses only {nome} and {data}"
+    covers:
+      acceptance_criteria: ["AC-157-17", "AC-157-26"]
+      edge_cases: ["EC-157-12"]
+    risks:
+      - risk: "Template resolution may use wrong template for prayer"
+        mitigation: "Explicit position-to-template mapping in handleNotInvitedAction"
+
+  # ---------------------------------------------------------------------------
+  # STEP-16: WhatsApp prayer templates - defaults + utility
+  # ---------------------------------------------------------------------------
+  - id: STEP-16
+    description: >
+      Update src/lib/whatsappUtils.ts:
+      - Add 6 default prayer template constants:
+        - DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR (text from AC-157-52)
+        - DEFAULT_OPENING_PRAYER_TEMPLATE_EN (text from AC-157-55)
+        - DEFAULT_OPENING_PRAYER_TEMPLATE_ES (text from AC-157-55)
+        - DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR (text from AC-157-53)
+        - DEFAULT_CLOSING_PRAYER_TEMPLATE_EN (text from AC-157-55)
+        - DEFAULT_CLOSING_PRAYER_TEMPLATE_ES (text from AC-157-55)
+      - New exported function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string
+        - Returns correct template by language and prayer type
+        - Falls back to pt-BR if language not supported
+      - Opening prayer templates mention arriving 15 minutes early and sitting with bishopric
+      - Closing prayer templates mention joining during intermediate hymn
+      - Templates contain only {nome} and {data} placeholders (no {posicao}, {colecao}, {titulo}, {link})
+    files:
+      - "src/lib/whatsappUtils.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-08"]
+    done_when:
+      - "6 default prayer template constants exported"
+      - "getDefaultPrayerTemplate function exported"
+      - "getDefaultPrayerTemplate('pt-BR', 'opening') returns correct pt-BR opening template"
+      - "getDefaultPrayerTemplate('pt-BR', 'closing') returns correct pt-BR closing template"
+      - "getDefaultPrayerTemplate('en', 'opening') returns correct EN opening template"
+      - "getDefaultPrayerTemplate('en', 'closing') returns correct EN closing template"
+      - "getDefaultPrayerTemplate('es', 'opening') returns correct ES opening template"
+      - "getDefaultPrayerTemplate('es', 'closing') returns correct ES closing template"
+      - "Opening templates mention arriving 15 minutes early"
+      - "Closing templates mention joining during intermediate hymn"
+      - "Templates contain only {nome} and {data} placeholders"
+    tests:
+      - type: unit
+        description: "Verify getDefaultPrayerTemplate returns correct template for each language/type combo"
+      - type: unit
+        description: "Verify templates contain {nome} and {data} but NOT {posicao}, {colecao}, {titulo}, {link}"
+      - type: unit
+        description: "Verify fallback to pt-BR for unknown language"
+    covers:
+      acceptance_criteria: ["AC-157-52", "AC-157-53", "AC-157-54", "AC-157-55"]
+      edge_cases: []
+    risks:
+      - risk: "Template text may need fine-tuning"
+        mitigation: "Use exact text from SPEC AC-157-52/53/55"
+
+  # ---------------------------------------------------------------------------
+  # STEP-17: WhatsApp settings - segmented control
+  # ---------------------------------------------------------------------------
+  - id: STEP-17
+    description: >
+      Update src/app/(tabs)/settings/whatsapp.tsx:
+      - Import useWardManagePrayers from '../../../hooks/useSpeeches'
+      - Import getDefaultPrayerTemplate from '../../../lib/whatsappUtils'
+      - Add state: activeTab: 'speech' | 'opening_prayer' | 'closing_prayer' (default 'speech')
+      - When managePrayers=true:
+        - Render a SegmentedControl (or custom segmented buttons) at the top with 3 tabs:
+          Tab 1: t('whatsapp.tabSpeech') -> 'Discurso'
+          Tab 2: t('whatsapp.tabOpeningPrayer') -> 'Abertura'
+          Tab 3: t('whatsapp.tabClosingPrayer') -> 'Encerramento'
+        - Each tab shows its own template content:
+          - 'speech' tab: existing speech template editor with all 6 placeholders (unchanged)
+          - 'opening_prayer' tab: prayer template editor with only {nome} and {data} placeholders,
+            reads/writes whatsapp_template_opening_prayer column, uses getDefaultPrayerTemplate(lang, 'opening')
+          - 'closing_prayer' tab: prayer template editor with only {nome} and {data} placeholders,
+            reads/writes whatsapp_template_closing_prayer column, uses getDefaultPrayerTemplate(lang, 'closing')
+        - Each tab has independent: template state, auto-save mutation, preview
+        - Prayer tabs: PLACEHOLDER_TOKENS = ['{nome}', '{data}'] (2 items)
+        - Prayer tabs: PLACEHOLDER_I18N_KEYS = first 2 entries only (whatsapp.placeholderName, whatsapp.placeholderDate)
+        - Prayer tabs: SAMPLE_DATA uses same {nome} and {data} values as speech tab
+      - When managePrayers=false: no segmented control shown (single speech template, current behavior)
+      - Update ward query to fetch whatsapp_template_opening_prayer and whatsapp_template_closing_prayer
+      - Each prayer tab independently initializes from DB (null -> default, empty -> empty, value -> value)
+      - Each prayer tab independently auto-saves with debounce (same pattern as speech template)
+    files:
+      - "src/app/(tabs)/settings/whatsapp.tsx"
+    dependencies: ["STEP-16"]
+    parallelizable_with: []
+    done_when:
+      - "Segmented control with 3 tabs renders when managePrayers=true"
+      - "Segmented control hidden when managePrayers=false (single speech editor)"
+      - "Speech tab shows all 6 placeholders (unchanged from current)"
+      - "Opening prayer tab shows only {nome} and {data} placeholder chips"
+      - "Closing prayer tab shows only {nome} and {data} placeholder chips"
+      - "Opening prayer tab saves to whatsapp_template_opening_prayer column"
+      - "Closing prayer tab saves to whatsapp_template_closing_prayer column"
+      - "Prayer tabs use getDefaultPrayerTemplate for default template"
+      - "Each tab has independent editor, preview, and auto-save"
+      - "Tab labels use i18n keys (whatsapp.tabSpeech, whatsapp.tabOpeningPrayer, whatsapp.tabClosingPrayer)"
+      - "Ward query fetches opening_prayer and closing_prayer template columns"
+    tests:
+      - type: unit
+        description: "Verify segmented control renders with 3 tabs when managePrayers=true"
+      - type: unit
+        description: "Verify no segmented control when managePrayers=false"
+      - type: unit
+        description: "Verify prayer tabs have only 2 placeholder chips ({nome}, {data})"
+      - type: unit
+        description: "Verify correct ward column used per tab for save"
+      - type: unit
+        description: "Verify prayer tabs use getDefaultPrayerTemplate for defaults"
+    covers:
+      acceptance_criteria: ["AC-157-14", "AC-157-23", "AC-157-56"]
+      edge_cases: []
+    risks:
+      - risk: "Complex state management with 3 independent template editors"
+        mitigation: "Extract shared template editor logic into helper function or refactor per-tab state into objects"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- SpeechSlot isPrayer ---
+
+  - ac_id: AC-157-28
+    how_to_verify: "Test SpeechSlot with isPrayer=true, position=0 shows prayer label 'Oracao de Abertura', no topic field, status indicator"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-157-29
+    how_to_verify: "Test SpeechSlot with isPrayer=true, position=4 shows prayer label 'Oracao de Encerramento', no topic field, status indicator"
+    covered_by_steps: ["STEP-08"]
+
+  # --- Speeches tab prayer slots ---
+
+  - ac_id: AC-157-18
+    how_to_verify: "Test Speeches tab does NOT render positions 0/4 when managePrayers=false"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: AC-157-27
+    how_to_verify: "Test prayer slots render position 0 before speech slots and position 4 after in expanded card"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: AC-157-30
+    how_to_verify: "Test testimony/primary expanded card shows only positions 0/4 when managePrayers=true, no positions 1/2/3"
+    covered_by_steps: ["STEP-09"]
+
+  # --- Collapsed card layout ---
+
+  - ac_id: AC-157-31
+    how_to_verify: "Test collapsed card has max 5 lines when managePrayers=true (2 prayers + 3 speeches)"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-157-32
+    how_to_verify: "Test conference/other collapsed card shows 1 line when managePrayers=true (no prayer lines)"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-157-33
+    how_to_verify: "Test testimony/primary collapsed card shows 2 prayer lines when managePrayers=true"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-157-34
+    how_to_verify: "Test speeches collapsed card shows 5 lines (2 prayers + 3 speeches) when managePrayers=true and has_second_speech=true"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-157-35
+    how_to_verify: "Test speeches collapsed card shows 4 lines (2 prayers + 2 speeches) when managePrayers=true and has_second_speech=false"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-157-36
+    how_to_verify: "Test prayer lines use italic font with t('prayers.prayerPrefix') prefix, no LED"
+    covered_by_steps: ["STEP-10"]
+
+  # --- Invite Management ---
+
+  - ac_id: AC-157-17
+    how_to_verify: "Test InviteManagementSection excludes positions 0/4 when managePrayers=false"
+    covered_by_steps: ["STEP-14"]
+
+  - ac_id: AC-157-26
+    how_to_verify: "Test InviteManagementSection includes positions 0/4 with prayer labels when managePrayers=true"
+    covered_by_steps: ["STEP-14"]
+
+  # --- WhatsApp Templates ---
+
+  - ac_id: AC-157-52
+    how_to_verify: "Test default opening prayer template for pt-BR matches SPEC text (mentions arriving 15 min early)"
+    covered_by_steps: ["STEP-16"]
+
+  - ac_id: AC-157-53
+    how_to_verify: "Test default closing prayer template for pt-BR matches SPEC text (mentions joining during intermediate hymn)"
+    covered_by_steps: ["STEP-16"]
+
+  - ac_id: AC-157-54
+    how_to_verify: "Test prayer templates have only {nome} and {data} placeholders, NOT {posicao}/{colecao}/{titulo}/{link}"
+    covered_by_steps: ["STEP-16", "STEP-17"]
+
+  - ac_id: AC-157-55
+    how_to_verify: "Test default prayer templates for en and es match SPEC text"
+    covered_by_steps: ["STEP-16"]
+
+  # --- WhatsApp Settings ---
+
+  - ac_id: AC-157-14
+    how_to_verify: "Test WhatsApp settings shows no segmented control when managePrayers=false (only speech template visible)"
+    covered_by_steps: ["STEP-17"]
+
+  - ac_id: AC-157-23
+    how_to_verify: "Test WhatsApp settings shows 3-tab segmented control when managePrayers=true with correct tab labels"
+    covered_by_steps: ["STEP-17"]
+
+  - ac_id: AC-157-56
+    how_to_verify: "Test WhatsApp settings segmented control: speech tab has 6 placeholders, prayer tabs have 2 placeholders, each saves to correct column"
+    covered_by_steps: ["STEP-17"]
+
+  # --- Edge Cases ---
+
+  - ec_id: EC-157-04
+    how_to_verify: "Test that when managePrayers=true, prayer slots use MemberSelectorModal (no custom names), matching speech assignment behavior"
+    covered_by_steps: ["STEP-09"]
+
+  - ec_id: EC-157-11
+    how_to_verify: "Test that when managePrayers=false, collapsed cards show current layout (speeches only, no prayer lines)"
+    covered_by_steps: ["STEP-10"]
+
+  - ec_id: EC-157-12
+    how_to_verify: "Test that WhatsApp invitation for position 0 uses opening prayer template, position 4 uses closing prayer template, positions 1/2/3 use speech template"
+    covered_by_steps: ["STEP-14"]
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+#
+#  STEP-16 ──────────────────┐
+#       │                    │
+#  STEP-08 ──┐               │
+#       │    │               │
+#       v    │               v
+#  STEP-09   │          STEP-17
+#       │    │
+#       v    │
+#  STEP-10   │
+#            │
+#  STEP-14 ──┘
+#
+#  Parallelizable pairs:
+#    - STEP-08 || STEP-16 (independent: SpeechSlot vs whatsappUtils)
+#    - STEP-10 || STEP-14 (both depend on STEP-09/STEP-08 respectively, but touch different files)
+#
+#  Recommended execution order:
+#    1. STEP-08 + STEP-16 (parallel)
+#    2. STEP-09 (depends on STEP-08)
+#    3. STEP-10 + STEP-14 (parallel, depend on STEP-09 and STEP-08)
+#    4. STEP-17 (depends on STEP-16)
+#
+# =============================================================================

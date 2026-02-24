@@ -2,7 +2,7 @@
 # REVIEW_CONSOLIDATED.yaml
 # Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-150, CR-151, CR-152, CR-153, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-194, CR-195, CR-196, CR-197, CR-198, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-211, CR-212, CR-213, CR-214, CR-215, CR-216, CR-217, CR-219, CR-218, CR-220, CR-221
 # Reviewed: 2026-02-24
-# Version: 42
+# Version: 44
 # =============================================================================
 
 metadata:
@@ -12430,3 +12430,244 @@ cr221_phase1:
     p2_count: 0
     files_reviewed: 10
     commits_reviewed: 11
+
+# =============================================================================
+# CR-221 REVIEW (Batch 25, Phase 2 of 3)
+# Managed Prayers - SpeechSlot isPrayer, Speeches tab prayer rendering,
+# SundayCard collapsed prayer lines + type change, InviteManagement prayers,
+# WhatsApp prayer templates + segmented control
+# =============================================================================
+
+cr221_phase2:
+  phase: "2 of 3"
+  phase_description: "SpeechSlot isPrayer prop, Speeches tab prayer slots rendering, SundayCard collapsed prayer lines + Sunday type change logic, InviteManagementSection prayer positions, WhatsApp prayer template defaults, WhatsApp settings segmented control"
+  verdict: approved
+  iteration: 2
+
+  verdict_summary: >
+    CR-221 Phase 2 APPROVED (iteration 2). Both P1 issues from iteration 1 have been
+    resolved: (R-1) Test file src/__tests__/batch25-phase2.test.ts committed in 00ed02d.
+    (R-2) 17 superseded assertions across 10 legacy test files updated in f1006c1.
+    Full test suite passes: 6645 passed, 0 failed, 49 skipped. Implementation quality
+    is excellent -- all 6 steps (S08, S09, S10, S14, S16, S17) correctly implement
+    the SPEC/ARCH/PLAN chain for managed prayers UI and WhatsApp templates. Code is
+    well-structured, backward compatible, and follows project conventions. No functional
+    bugs, no security issues, no deploy requirements for this phase.
+
+  chain_validation:
+    spec_vs_request: pass
+    arch_vs_spec: pass
+    plan_vs_arch: pass
+    code_vs_plan: pass
+    chain_intact: true
+    notes:
+      - "SPEC F157 fully covers all managed prayers requirements from user request"
+      - "ARCH M044 correctly designs all Phase 2 components (SpeechSlotPrayerMode, SpeechesTabPrayerSlots, SundayCardCollapsedPrayers, InviteManagementPrayers, WhatsAppPrayerTemplates, WhatsAppTemplateSegmentedControl)"
+      - "PLAN P045 steps S08/S09/S10/S14/S16/S17 correctly decompose ARCH into implementation steps"
+      - "CODE correctly implements all 6 PLAN steps -- 7 source files modified, 767 insertions / 116 deletions"
+      - "All 20 ACs and 3 ECs covered by Phase 2 steps are correctly implemented"
+
+  commits:
+    - hash: e5ee44e
+      step: S08
+      cr: CR-221
+      message: "feat(speech-slot): add isPrayer prop to SpeechSlot component (CR-221, STEP-08)"
+      files_changed: [src/components/SpeechSlot.tsx]
+      review:
+        correctness: pass
+        notes: >
+          isPrayer prop added to SpeechSlotProps as optional boolean defaulting to false.
+          getPositionLabel correctly returns prayer i18n labels for positions 0/4 when
+          isPrayer=true. Topic row hidden via showTopicRow = !isPrayer && ... condition.
+          Position 2 toggle check correctly gates on !isPrayer. PrayerSelector import
+          retained (still used by AgendaForm). Clean implementation, backward compatible.
+
+    - hash: cfce38a
+      step: S16
+      cr: CR-221
+      message: "feat(whatsapp): add default prayer template constants and getter (CR-221, STEP-16)"
+      files_changed: [src/lib/whatsappUtils.ts]
+      review:
+        correctness: pass
+        notes: >
+          6 default prayer template constants added (opening + closing for pt-BR, en, es).
+          Template texts match SPEC AC-157-52/53/55 exactly. getDefaultPrayerTemplate
+          function correctly dispatches by language and type with pt-BR fallback.
+          Templates use only {nome} and {data} placeholders as required. Opening
+          templates mention 15-minute early arrival, closing templates mention
+          intermediate hymn. Clean, well-structured code.
+
+    - hash: 02fe311
+      step: S09
+      cr: CR-221
+      message: "feat(speeches): render prayer SpeechSlots when managePrayers enabled (CR-221, STEP-09)"
+      files_changed: [src/app/(tabs)/speeches.tsx]
+      review:
+        correctness: pass
+        notes: >
+          useWardManagePrayers imported and called at component level. Prayer SpeechSlots
+          rendered with isPrayer=true for positions 0 (before speeches) and 4 (after speeches)
+          when managePrayers=true and isSpeechesType. Testimony/primary types show only
+          prayer slots when managePrayers=true. handleAssignSpeaker correctly overrides
+          status to 'assigned_confirmed' when managePrayers=false for positions 0/4.
+          managePrayers passed to SundayCard. IIFE pattern for prayer slot rendering
+          is functional but slightly verbose; acceptable for clarity.
+
+    - hash: a8bfe76
+      step: S10
+      cr: CR-221
+      message: "feat(sunday-card): add collapsed prayer lines and smart type change logic (CR-221, STEP-10)"
+      files_changed: [src/components/SundayCard.tsx, src/app/(tabs)/speeches.tsx]
+      review:
+        correctness: pass
+        notes: >
+          managePrayers prop added to both SundayCardProps and SundayTypeDropdownProps.
+          Collapsed card correctly renders prayer lines in italic with prayerPrefix
+          before speech lines (pos 0) and after (pos 4) when managePrayers=true.
+          Testimony/primary cards show type label + 2 prayer lines when managePrayers=true.
+          Type change logic in SundayTypeDropdown correctly implements all preservation rules:
+          speeches->testimony/primary deletes [1,2,3], speeches->conference/other deletes
+          [0,1,2,3,4], testimony/primary->conference/other deletes [0,4], testimony<->primary
+          no deletion. Dynamic confirmation dialog correctly varies text based on
+          hasSpeechAssignments and hasPrayerAssignments. Non-managePrayers path preserved
+          as legacy fallback. Well-structured code with helper functions for clarity.
+
+    - hash: 26b1d0e
+      step: S14
+      cr: CR-221
+      message: "feat(invite): add prayer positions to InviteManagementSection (CR-221, STEP-14)"
+      files_changed: [src/components/InviteManagementSection.tsx]
+      review:
+        correctness: pass
+        notes: >
+          useWardManagePrayers imported and called. Ward query extended to fetch
+          whatsapp_template_opening_prayer and whatsapp_template_closing_prayer.
+          Invite items filtering correctly excludes positions 0/4 when managePrayers=false
+          and includes them when true. Position labels correctly use prayer i18n keys
+          for positions 0/4 (t('speeches.openingPrayer'), t('speeches.closingPrayer')).
+          handleNotInvitedAction correctly branches on position to select prayer vs
+          speech WhatsApp template. Prayer template resolution uses resolvePrayerTemplate
+          with only speakerName and date variables. Phone cleaning duplicated from
+          buildWhatsAppUrl (minor, acceptable). getDefaultPrayerTemplate imported
+          correctly for fallback.
+
+    - hash: b11002e
+      step: S17
+      cr: CR-221
+      message: "feat(whatsapp-settings): add segmented control for prayer templates (CR-221, STEP-17)"
+      files_changed: [src/app/(tabs)/settings/whatsapp.tsx]
+      review:
+        correctness: pass
+        notes: >
+          Segmented control with 3 tabs (speech/opening_prayer/closing_prayer) renders
+          when managePrayers=true. Each tab has independent template state, initialization
+          from DB, auto-save mutation with debounce, and preview. Prayer tabs correctly
+          use PRAYER_PLACEHOLDER_TOKENS (only {nome}, {data}) and PRAYER_PLACEHOLDER_I18N_KEYS
+          (2 entries). Ward query extended to fetch prayer template columns. Language
+          change correctly resets all 3 initialized flags. Tab labels use correct i18n keys.
+          getDefaultPrayerTemplate imported and used for initialization. Each prayer tab
+          independently auto-saves to its own ward column. Well-structured code with
+          clean state management.
+
+    - hash: 00ed02d
+      step: R-1-fix
+      cr: CR-221
+      message: "test(batch25): add 234 tests for F157 CR-221 Phase 2 (Steps 8-17)"
+      files_changed: [src/__tests__/batch25-phase2.test.ts]
+      review:
+        correctness: pass
+        notes: >
+          Phase 2 test file (234 tests) committed to git. All tests pass.
+
+    - hash: f1006c1
+      step: R-2-fix
+      cr: CR-221
+      message: "fix(tests): update superseded assertions for Phase 2 code changes (R-2)"
+      files_changed: [src/__tests__/batch10-phase1.test.ts, src/__tests__/batch19-phase1.test.ts, src/__tests__/batch19-phase2.test.ts, src/__tests__/batch21-phase2-tester-f135-f137.test.ts, src/__tests__/batch23-f140-f142.test.ts, src/__tests__/batch24-phase1.test.ts, src/__tests__/batch7-f035-f039.test.ts, src/__tests__/batch8-phase1.test.ts, src/__tests__/batch9-phase1.test.ts, src/__tests__/batch9-phase3.test.ts]
+      review:
+        correctness: pass
+        notes: >
+          17 superseded assertions across 10 legacy test files updated to match
+          new code patterns from CR-221 Phase 2. Updates are correct -- assertions
+          now validate the same functional behavior but with updated code structure
+          expectations (e.g., prayer position branching, managePrayers-aware logic,
+          expanded ward query selects, updated useCallback deps).
+
+    - hash: ca1ed5b
+      step: docs
+      cr: CR-221
+      message: "docs(code-ledger): add Phase 2 test and R-2 fix commits (CR-221)"
+      files_changed: [docs/code/CODE_LEDGER.yaml]
+      review:
+        correctness: pass
+        notes: "CODE_LEDGER updated with fix commits."
+
+  issues:
+    - id: R-1
+      severity: P1
+      category: quality
+      location: "src/__tests__/batch25-phase2.test.ts"
+      status: resolved
+      resolution_commit: 00ed02d
+      description: >
+        The Phase 2 test file src/__tests__/batch25-phase2.test.ts was NOT committed
+        to git. It appeared as an untracked file.
+      resolution: >
+        Test file committed in 00ed02d: "test(batch25): add 234 tests for F157
+        CR-221 Phase 2 (Steps 8-17)". File is now tracked in git.
+
+    - id: R-2
+      severity: P1
+      category: quality
+      location: "10 legacy test files, 17 assertions"
+      status: resolved
+      resolution_commit: f1006c1
+      description: >
+        Phase 2 code changes broke 17 pre-existing source-analysis test assertions
+        across legacy test files that assert on exact code patterns now changed by CR-221.
+      resolution: >
+        All 17 superseded assertions updated in f1006c1: "fix(tests): update superseded
+        assertions for Phase 2 code changes (R-2)". 10 test files updated. Full suite
+        now passes: 6645 passed, 0 failed, 49 skipped.
+
+  pending_deploys: []
+
+  repository_status:
+    clean: false
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/project-status.yaml"
+      - "docs/arch/ARCH_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P045.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/tests/TEST_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_010.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: "All code and test files committed. Documentation files are committed by Orchestrator."
+
+  test_results:
+    batch25_phase2_tests: "234/234 tests passing (batch25-phase2.test.ts)"
+    test_files:
+      - "src/__tests__/batch25-phase2.test.ts (234 tests)"
+    full_suite: "6645 passed, 0 failed, 49 skipped (6694 total across 96 suites)"
+    regressions: 0
+    regression_details: "None. All 17 previously superseded assertions updated in f1006c1."
+
+  summary: >
+    CR-221 Phase 2: APPROVED (iteration 2). Both P1 issues from iteration 1 resolved:
+    R-1 test file committed (00ed02d), R-2 17 superseded assertions updated across
+    10 legacy test files (f1006c1). Full suite green: 6645 passed, 0 failed, 49 skipped.
+    Implementation quality is excellent -- all 6 steps (S08, S09, S10, S14, S16, S17)
+    correctly implement the SPEC/ARCH/PLAN chain for managed prayers UI and WhatsApp
+    templates. Code is well-structured, backward compatible, and follows project
+    conventions. No functional bugs, no security issues, no deploy requirements.
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p2_count: 0
+    p1_resolved: 2
+    files_reviewed: 7
+    fix_commits_reviewed: 3
+    commits_reviewed: 7

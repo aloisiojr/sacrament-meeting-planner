@@ -12274,3 +12274,481 @@ cr_221:
           for positions (0, 1, 2, 3, 4), positioned BEFORE data migration Steps 2-3.
         file: "supabase/migrations/019_managed_prayers.sql"
         blocking: false
+
+# #############################################################################
+# CR-221: Managed Prayers (Oracoes Gerenciadas) - Phase 2
+# #############################################################################
+
+cr_221_phase2:
+  cr_id: CR-221
+  title: "Managed Prayers (Oracoes Gerenciadas) - Phase 2"
+  type: feature_request
+  spec: specs/SPEC_F157.yaml
+  qa_plan: qa/QA_PLAN_010.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Full PRE validation of Phase 2 scope (Steps 8-10, 14, 16-17).
+      Phase 1 prerequisites verified: migration, types, hooks, settings toggle,
+      i18n keys, 162 tests passing. All 6 target files confirmed as clean baseline
+      (no Phase 2 code present). QA_PLAN_010 created with 38 must_pass + 8 should_pass.
+
+  post_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    phase: "2 of 3"
+    commits:
+      - hash: e5ee44e
+        message: "feat(speech-slot): add isPrayer prop to SpeechSlot component (CR-221, STEP-08)"
+      - hash: cfce38a
+        message: "feat(whatsapp): add default prayer template constants and getter (CR-221, STEP-16)"
+      - hash: 02fe311
+        message: "feat(speeches): render prayer SpeechSlots when managePrayers enabled (CR-221, STEP-09)"
+      - hash: a8bfe76
+        message: "feat(sunday-card): add collapsed prayer lines and smart type change logic (CR-221, STEP-10)"
+      - hash: 26b1d0e
+        message: "feat(invite): add prayer positions to InviteManagementSection (CR-221, STEP-14)"
+      - hash: b11002e
+        message: "feat(whatsapp-settings): add segmented control for prayer templates (CR-221, STEP-17)"
+      - hash: d84f5c3
+        message: "docs(code-ledger): update CODE_LEDGER for Phase 2 steps S08-S17"
+      - hash: 00ed02d
+        message: "test(batch25): add 234 tests for F157 CR-221 Phase 2 (Steps 8-17)"
+      - hash: f1006c1
+        message: "fix(tests): update superseded assertions for Phase 2 code changes (R-2)"
+      - hash: ca1ed5b
+        message: "docs(code-ledger): add test and R-2 fix commits"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 234
+    tester_tests_total: 234
+    tester_suite_passed: 6645
+    tester_suite_total: 6645
+
+    # =========================================================================
+    # Phase 2 Scope Note
+    # =========================================================================
+    # Phase 2 covers: SpeechSlot isPrayer prop, Speeches tab prayer rendering,
+    # SundayCard collapsed prayer lines, InviteManagement prayer positions,
+    # WhatsApp prayer template defaults + utility, WhatsApp segmented control.
+    #
+    # Phase 3 will cover: AgendaForm prayer fields migration, Home/Agenda
+    # prayer counting, presentation mode prayer data source, SundayAgenda
+    # type cleanup, push notification differentiation.
+    # =========================================================================
+
+    must_pass_results:
+      # --- STEP-08: SpeechSlot isPrayer prop ---
+      - id: MP-01
+        description: "SpeechSlot accepts isPrayer?: boolean prop"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:55-56: isPrayer?: boolean declared in SpeechSlotProps interface
+          SpeechSlot.tsx:89: isPrayer = false in destructured props (default false)
+
+      - id: MP-02
+        description: "When isPrayer=true, topic row is NOT rendered"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:167: const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+          Topic row only shows when !isPrayer, hiding it completely for prayer slots.
+
+      - id: MP-03
+        description: "getPositionLabel returns prayer label for position 0"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:63-64: if (isPrayer) { if (position === 0) return t('prayers.opening'); }
+          Uses i18n key prayers.opening for position 0 prayer label.
+
+      - id: MP-04
+        description: "getPositionLabel returns prayer label for position 4"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:65: if (position === 4) return t('prayers.closing');
+          Uses i18n key prayers.closing for position 4 prayer label.
+
+      - id: MP-05
+        description: "When isPrayer=true, 2nd speech toggle is hidden"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:176: {position === 2 && !isPrayer && onToggleSecondSpeech && (
+          Toggle only renders when !isPrayer, hiding it for prayer slots.
+          SpeechSlot.tsx:104: const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false;
+
+      # --- STEP-09: Speeches tab prayer SpeechSlots ---
+      - id: MP-06
+        description: "Speeches tab imports and calls useWardManagePrayers()"
+        status: PASSED
+        evidence: |
+          speeches.tsx:39: import useWardManagePrayers from useSpeeches
+          speeches.tsx:113: const { managePrayers } = useWardManagePrayers();
+
+      - id: MP-07
+        description: "Expanded card renders SpeechSlot with isPrayer=true for position 0 BEFORE speech slots"
+        status: PASSED
+        evidence: |
+          speeches.tsx:441-454: managePrayers && (() => {
+            const prayerSpeech = speechesForDay.find((s) => s.position === 0) ?? null;
+            return (<SpeechSlot ... position={0} isPrayer ... />);
+          })()
+          Rendered BEFORE the [1, 2, 3].map block at line 456.
+
+      - id: MP-08
+        description: "Expanded card renders SpeechSlot with isPrayer=true for position 4 AFTER speech slots"
+        status: PASSED
+        evidence: |
+          speeches.tsx:474-487: managePrayers && (() => {
+            const prayerSpeech = speechesForDay.find((s) => s.position === 4) ?? null;
+            return (<SpeechSlot ... position={4} isPrayer ... />);
+          })()
+          Rendered AFTER the [1, 2, 3].map block at line 456.
+
+      - id: MP-09
+        description: "Positions 0/4 are NOT rendered when managePrayers=false"
+        status: PASSED
+        evidence: |
+          speeches.tsx:441: {managePrayers && (() => { ... position 0 ... })()}
+          speeches.tsx:474: {managePrayers && (() => { ... position 4 ... })()}
+          Both wrapped in managePrayers condition. When false, neither renders.
+
+      - id: MP-10
+        description: "Testimony/primary shows only prayer slots (pos 0/4) when managePrayers=true"
+        status: PASSED
+        evidence: |
+          speeches.tsx:491: {isExpanded && isTestimonyOrPrimary && managePrayers && (
+          Renders only position 0 (line 496-506) and position 4 (line 508-520)
+          SpeechSlots, no speech slots (1/2/3).
+
+      # --- STEP-10: SundayCard collapsed prayer lines ---
+      - id: MP-11
+        description: "SundayCard accepts managePrayers?: boolean prop"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:48: managePrayers?: boolean; (in SundayCardProps interface)
+          SundayCard.tsx:399: managePrayers = false (default in destructured props)
+
+      - id: MP-12
+        description: "Collapsed card prayer lines use italic font style"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:477: fontStyle: 'italic' (opening prayer, testimony/primary)
+          SundayCard.tsx:486: fontStyle: 'italic' (closing prayer, testimony/primary)
+          SundayCard.tsx:517: fontStyle: 'italic' (opening prayer, speeches type)
+          SundayCard.tsx:565: fontStyle: 'italic' (closing prayer, speeches type)
+
+      - id: MP-13
+        description: "Collapsed card prayer lines use prayerPrefix label"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:481: {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
+          SundayCard.tsx:490: {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
+          SundayCard.tsx:521: {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
+          SundayCard.tsx:569: {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
+
+      - id: MP-14
+        description: "Speeches type collapsed card includes prayer line for position 0 BEFORE speech lines"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:512-525: managePrayers && (() => { opening prayer at position 0 })()
+          Rendered BEFORE visiblePositions.map at line 527, which renders speech lines.
+
+      - id: MP-15
+        description: "Speeches type collapsed card includes prayer line for position 4 AFTER speech lines"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:559-573: managePrayers && (() => { closing prayer at position 4 })()
+          Rendered AFTER visiblePositions.map at line 527-558, which renders speech lines.
+
+      - id: MP-16
+        description: "Testimony/primary collapsed card shows 2 prayer lines when managePrayers=true"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:460: {!isSpeechesType && isTestimonyOrPrimary && managePrayers && !expanded && (() => {
+          Renders exception text (line 466-473) + opening prayer (line 475-483)
+          + closing prayer (line 484-492). Total: 3 lines (type + 2 prayers).
+
+      - id: MP-17
+        description: "Conference/other collapsed card unchanged (1 line) when managePrayers=true"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:497: {!isSpeechesType && !(isTestimonyOrPrimary && managePrayers && !expanded) && (
+          Conference/other types fall through to the generic exception text rendering.
+          No prayer lines are added for conference/other types regardless of managePrayers.
+
+      - id: MP-18
+        description: "speeches.tsx passes managePrayers prop to SundayCard"
+        status: PASSED
+        evidence: |
+          speeches.tsx:427: managePrayers={managePrayers}
+          Passed in renderItem callback, sourced from useWardManagePrayers() at line 113.
+
+      # --- STEP-14: InviteManagementSection prayer positions ---
+      - id: MP-19
+        description: "InviteManagementSection uses managePrayers from useWardManagePrayers hook"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:21: import useWardManagePrayers from useSpeeches
+          InviteManagementSection.tsx:50: const { managePrayers } = useWardManagePrayers();
+          Note: Uses hook directly instead of prop. Architecturally equivalent.
+
+      - id: MP-20
+        description: "Positions 0/4 included in invite items when managePrayers=true"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:97-99:
+            if (item.speech.position === 0 || item.speech.position === 4) {
+              return managePrayers;
+            }
+          Returns true when managePrayers is true, including positions 0/4.
+
+      - id: MP-21
+        description: "Position 0 labeled as openingPrayer, position 4 as closingPrayer"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:243-249:
+            {speech.position === 0
+              ? t('speeches.openingPrayer')
+              : speech.position === 4
+                ? t('speeches.closingPrayer')
+                : speech.position === 3
+                  ? t('speeches.lastSpeech')
+                  : t('speeches.slot', { number: `${speech.position}\u00BA` })}
+
+      - id: MP-22
+        description: "Positions 0/4 excluded when managePrayers=false"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:97-99:
+            if (item.speech.position === 0 || item.speech.position === 4) {
+              return managePrayers; // false when managePrayers=false
+            }
+          Filter returns false, excluding prayer positions from invite items.
+
+      - id: MP-23
+        description: "WhatsApp template for position 0 uses whatsapp_template_opening_prayer"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:115-116:
+            const templateField = speech.position === 0
+              ? 'whatsapp_template_opening_prayer'
+            const customTemplate = ward?.[templateField] as string | null;
+          Falls back to getDefaultPrayerTemplate(locale, 'opening') at line 119.
+
+      - id: MP-24
+        description: "WhatsApp template for position 4 uses whatsapp_template_closing_prayer"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:117:
+              : 'whatsapp_template_closing_prayer';
+          Used for position 4, falls back to getDefaultPrayerTemplate(locale, 'closing').
+
+      # --- STEP-16: WhatsApp prayer template defaults + utility ---
+      - id: MP-25
+        description: "Default opening prayer template constants exist for all 3 languages"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:19: DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR (exported const)
+          whatsappUtils.ts:22: DEFAULT_OPENING_PRAYER_TEMPLATE_EN (exported const)
+          whatsappUtils.ts:25: DEFAULT_OPENING_PRAYER_TEMPLATE_ES (exported const)
+
+      - id: MP-26
+        description: "Default closing prayer template constants exist for all 3 languages"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:28: DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR (exported const)
+          whatsappUtils.ts:31: DEFAULT_CLOSING_PRAYER_TEMPLATE_EN (exported const)
+          whatsappUtils.ts:34: DEFAULT_CLOSING_PRAYER_TEMPLATE_ES (exported const)
+
+      - id: MP-27
+        description: "getDefaultPrayerTemplate function is exported"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:57: export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string
+          Returns correct template based on language and prayer type.
+
+      - id: MP-28
+        description: "Prayer templates contain only {nome} and {data} placeholders"
+        status: PASSED
+        evidence: |
+          Opening templates (PT_BR/EN/ES, lines 19-26): contain {nome} and {data} only.
+          Closing templates (PT_BR/EN/ES, lines 28-35): contain {nome} and {data} only.
+          Verified: NO occurrences of {posicao}, {colecao}, {titulo}, or {link}
+          in prayer template constants. Those only exist in speech templates (lines 9-15).
+
+      - id: MP-29
+        description: "Opening prayer template mentions arriving 15 minutes early"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:20: "15min antes" (PT_BR)
+          whatsappUtils.ts:23: "15 minutes early" (EN)
+          whatsappUtils.ts:26: "15 minutos antes" (ES)
+
+      - id: MP-30
+        description: "Closing prayer template mentions joining during intermediate hymn"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:29: "hino intermediario" (PT_BR)
+          whatsappUtils.ts:32: "intermediate hymn" (EN)
+          whatsappUtils.ts:35: "himno intermedio" (ES)
+
+      # --- STEP-17: WhatsApp settings segmented control ---
+      - id: MP-31
+        description: "WhatsApp settings imports useWardManagePrayers"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:19: import { useWardManagePrayers } from '../../../hooks/useSpeeches';
+          whatsapp.tsx:84: const { managePrayers } = useWardManagePrayers();
+
+      - id: MP-32
+        description: "Segmented control with 3 tabs renders when managePrayers=true"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:310-347: {managePrayers && (
+            <View style={[styles.segmentedControl, ...]}>
+              {(['speech', 'opening_prayer', 'closing_prayer'] as ActiveTab[]).map((tab) => { ... })}
+            </View>
+          )}
+          3 tabs mapped and rendered as Pressable elements with labels.
+
+      - id: MP-33
+        description: "Segmented control NOT shown when managePrayers=false"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:310: {managePrayers && ( ... )}
+          Entire segmented control block is behind managePrayers condition.
+
+      - id: MP-34
+        description: "Prayer tabs show only {nome} and {data} placeholders"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:42-45: PRAYER_PLACEHOLDER_I18N_KEYS = ['whatsapp.placeholderName', 'whatsapp.placeholderDate']
+          whatsapp.tsx:47-50: PRAYER_PLACEHOLDER_TOKENS = ['{nome}', '{data}']
+          whatsapp.tsx:273-274: const isPrayerTab = activeTab === 'opening_prayer' || activeTab === 'closing_prayer';
+          const currentTokens = isPrayerTab ? PRAYER_PLACEHOLDER_TOKENS : PLACEHOLDER_TOKENS;
+          Speech tab has all 6 tokens, prayer tabs only 2.
+
+      - id: MP-35
+        description: "Prayer tabs save to correct ward columns"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:191-193: saveOpeningMutation updates whatsapp_template_opening_prayer column
+          whatsapp.tsx:209-211: saveClosingMutation updates whatsapp_template_closing_prayer column
+          Both use .update({ whatsapp_template_[opening|closing]_prayer: newTemplate }).eq('id', wardId)
+
+      - id: MP-36
+        description: "Prayer tabs use getDefaultPrayerTemplate for defaults"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:18: import getDefaultPrayerTemplate from whatsappUtils
+          whatsapp.tsx:135: setOpeningTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'pt-BR', 'opening'));
+          whatsapp.tsx:150: setClosingTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'pt-BR', 'closing'));
+
+      - id: MP-37
+        description: "Tab labels use i18n keys"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:314-318:
+            const label = tab === 'speech' ? t('whatsapp.tabSpeech')
+              : tab === 'opening_prayer' ? t('whatsapp.tabOpeningPrayer')
+              : t('whatsapp.tabClosingPrayer');
+
+      - id: MP-38
+        description: "Ward query fetches whatsapp_template_opening_prayer and closing_prayer columns"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:97: .select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language')
+
+    must_pass_total: 38
+    must_pass_passed: 38
+    must_pass_failed: 0
+
+    should_pass_results:
+      - id: SP-01
+        description: "SpeechSlot isPrayer defaults to false (backward compatible)"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:89: isPrayer = false in destructured props.
+          Existing callers that don't pass isPrayer get false (no prayer behavior).
+
+      - id: SP-02
+        description: "Collapsed card height accommodates 5-line cards"
+        status: PASSED
+        evidence: |
+          SundayCard does not use fixed minHeight. Speech rows use flexbox
+          layout with marginBottom: 4 (line 657). The card naturally expands
+          to fit content. No fixed height constraint prevents 5-line display.
+
+      - id: SP-03
+        description: "Prayer lines do NOT have LED indicators"
+        status: PASSED
+        evidence: |
+          SundayCard.tsx:475-483 (testimony/primary prayers): No StatusLED component.
+          SundayCard.tsx:512-525 (speeches opening prayer): No StatusLED component.
+          SundayCard.tsx:559-573 (speeches closing prayer): No StatusLED component.
+          Only speech lines (visiblePositions.map at line 527-558) have StatusLED.
+
+      - id: SP-04
+        description: "SpeechSlot status indicator shows for prayer slots"
+        status: PASSED
+        evidence: |
+          SpeechSlot.tsx:186-202: Status section (StatusLED + status text) renders
+          for all non-disabled slots, including prayer slots. No isPrayer guard
+          on the status section rendering.
+
+      - id: SP-05
+        description: "InviteManagementSection uses managePrayers state"
+        status: PASSED
+        evidence: |
+          InviteManagementSection.tsx:50: const { managePrayers } = useWardManagePrayers();
+          Uses hook directly (not prop from Home tab). This is architecturally
+          equivalent - component is self-contained with its own hook call.
+          Home tab (index.tsx:240) renders <InviteManagementSection /> without props.
+
+      - id: SP-06
+        description: "Each tab has independent editor and preview"
+        status: PASSED
+        evidence: |
+          whatsapp.tsx:259-261: currentTemplate switches between template/openingTemplate/closingTemplate
+          whatsapp.tsx:263-265: currentHandleChange switches between handlers
+          whatsapp.tsx:271: preview = resolveTemplate(currentTemplate)
+          Each tab shows its own template in the editor and its own resolved preview.
+
+      - id: SP-07
+        description: "When managePrayers=false, no prayer positions (0/4) rendered in Speeches tab"
+        status: PASSED
+        evidence: |
+          speeches.tsx:441: {managePrayers && ...position 0...} -- gated by managePrayers
+          speeches.tsx:474: {managePrayers && ...position 4...} -- gated by managePrayers
+          SundayCard.tsx:512: {managePrayers && ...opening prayer line...} -- gated
+          SundayCard.tsx:559: {managePrayers && ...closing prayer line...} -- gated
+          When managePrayers=false, none of these render.
+
+      - id: SP-08
+        description: "Default prayer templates exist for en and es languages"
+        status: PASSED
+        evidence: |
+          whatsappUtils.ts:22-23: DEFAULT_OPENING_PRAYER_TEMPLATE_EN (EN opening)
+          whatsappUtils.ts:25-26: DEFAULT_OPENING_PRAYER_TEMPLATE_ES (ES opening)
+          whatsappUtils.ts:31-32: DEFAULT_CLOSING_PRAYER_TEMPLATE_EN (EN closing)
+          whatsappUtils.ts:34-35: DEFAULT_CLOSING_PRAYER_TEMPLATE_ES (ES closing)
+          getDefaultPrayerTemplate switches on 'en', 'es', default 'pt-BR'.
+
+    should_pass_total: 8
+    should_pass_passed: 8
+    should_pass_failed: 0
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch25-phase2.test.ts"
+      tests_passed: 234
+      tests_total: 234
+      full_suite_passed: 6645
+      full_suite_total: 6645
+      full_suite_skipped: 49

@@ -38,9 +38,6 @@ import type {
   SundayExceptionReason,
 } from '../types/database';
 
-// Re-export for backward compatibility
-export { areNext3FullyAssigned, findNextPendingSunday } from '../lib/speechUtils';
-
 // Look ahead window
 const LOOK_AHEAD_SUNDAYS = 12;
 

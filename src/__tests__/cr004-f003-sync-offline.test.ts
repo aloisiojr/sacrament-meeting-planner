@@ -109,11 +109,6 @@ describe('CR-004 F003: SyncEngine, OfflineManager & Notifications', () => {
       expect(source).toContain("import { isNetInfoOnline } from '../lib/connectionUtils'");
     });
 
-    it('useConnection should re-export isNetInfoOnline', () => {
-      const source = readSourceFile('hooks/useConnection.ts');
-      expect(source).toContain("export { isNetInfoOnline } from '../lib/connectionUtils'");
-    });
-
     it('useConnection should call isNetInfoOnline with NetInfo state', () => {
       const source = readSourceFile('hooks/useConnection.ts');
       expect(source).toContain('isNetInfoOnline(state)');
@@ -832,28 +827,7 @@ describe('CR-004 F003: SyncEngine, OfflineManager & Notifications', () => {
     });
   });
 
-  describe('CR-53: notificationUtils re-exports', () => {
-    it('should re-export getOrdinal from notificationUtils', () => {
-      const source = readSourceFile('hooks/useNotifications.ts');
-      expect(source).toContain('getOrdinal');
-      expect(source).toContain("from '../lib/notificationUtils'");
-    });
-
-    it('should re-export buildNotificationText', () => {
-      const source = readSourceFile('hooks/useNotifications.ts');
-      expect(source).toContain('buildNotificationText');
-    });
-
-    it('should re-export formatNameList', () => {
-      const source = readSourceFile('hooks/useNotifications.ts');
-      expect(source).toContain('formatNameList');
-    });
-
-    it('should re-export OrdinalLanguage type', () => {
-      const source = readSourceFile('hooks/useNotifications.ts');
-      expect(source).toContain('OrdinalLanguage');
-    });
-  });
+  // CR-53: notificationUtils re-exports removed (dead re-exports cleanup)
 
   // ---------------------------------------------------------------
   // CR-52: connectionUtils pure functions

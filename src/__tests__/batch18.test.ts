@@ -73,15 +73,6 @@ describe('F113 (CR-175): Deep link scheme change to sacrmeetplan://', () => {
     });
   });
 
-  // --- AC-113-02: create-invitation uses sacrmeetplan://invite/ ---
-  // SUPERSEDED by F139 (CR-203): create-invitation now generates HTTPS URL to invite-redirect instead of deep link
-  describe.skip('AC-113-02: create-invitation uses sacrmeetplan://invite/ [SUPERSEDED by F139]', () => {
-    it('create-invitation/index.ts contains sacrmeetplan://invite/', () => {
-      const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetplan://invite/');
-    });
-  });
-
   // --- AC-113-03: send-reset-email no longer uses sacrmeetman:// ---
   describe('AC-113-03: send-reset-email uses HTTPS redirect URL', () => {
     it('send-reset-email/index.ts does NOT contain sacrmeetman://', () => {
@@ -144,16 +135,6 @@ describe('F113 (CR-175): Deep link scheme change to sacrmeetplan://', () => {
     });
   });
 
-  // --- EC-113-01: Old sacrmeetman:// invitation links stop working ---
-  // SUPERSEDED by F139 (CR-203): create-invitation now uses HTTPS URLs instead of deep links
-  describe.skip('EC-113-01: Old invitation links stop working (expected) [SUPERSEDED by F139]', () => {
-    it('create-invitation only uses sacrmeetplan:// (not sacrmeetman://)', () => {
-      const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetplan://invite/');
-      expect(content).not.toContain('sacrmeetman://');
-    });
-  });
-
   // --- EC-113-02: Old password reset emails stop working ---
   describe('EC-113-02: Old reset emails stop working (expected)', () => {
     it('send-reset-email no longer contains sacrmeetman://', () => {
@@ -204,53 +185,6 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
     });
   });
 
-  // --- AC-114-03: reset-redirect returns HTML with auto-redirect ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect now serves password reset form instead of redirect
-  describe.skip('AC-114-03: HTML with auto-redirect [SUPERSEDED by F138]', () => {
-    it('reset-redirect uses meta refresh for auto-redirect (F134: script tag removed)', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('http-equiv="refresh"');
-    });
-
-    it('reset-redirect redirect target uses sacrmeetplan://reset-password', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('sacrmeetplan://reset-password');
-    });
-
-    // F119 (CR-191): Content-Type now includes charset=utf-8
-    it('reset-redirect returns Content-Type text/html', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain("'Content-Type': 'text/html; charset=utf-8'");
-    });
-
-    it('reset-redirect contains meta refresh tag', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('meta http-equiv="refresh"');
-    });
-  });
-
-  // --- AC-114-04: Fallback button ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect no longer has fallback button (serves form directly)
-  describe.skip('AC-114-04: Fallback button in HTML [SUPERSEDED by F138]', () => {
-    it('HTML contains a fallback <a> button', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('<a href=');
-      expect(content).toContain('class="button"');
-    });
-
-    it('fallback button text is Abrir no aplicativo', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('Abrir no aplicativo');
-    });
-
-    it('fallback button href uses deepLink variable (sacrmeetplan:// deep link)', () => {
-      const content = readProjectFile(resetRedirectPath);
-      // The <a href> uses the deepLink template variable which contains sacrmeetplan://
-      expect(content).toContain('<a href="${deepLink}"');
-      expect(content).toContain('sacrmeetplan://reset-password');
-    });
-  });
-
   // --- AC-114-05: Validates required params ---
   describe('AC-114-05: Validates required params', () => {
     it('returns 400 when params are missing', () => {
@@ -298,76 +232,6 @@ describe('F114 (CR-176): HTTPS redirect Edge Function', () => {
     });
   });
 
-  // --- AC-114-08: Deep link uses sacrmeetplan:// ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses deep link scheme
-  describe.skip('AC-114-08: reset-redirect uses sacrmeetplan:// scheme [SUPERSEDED by F138]', () => {
-    it('reset-redirect deep link uses sacrmeetplan://', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('sacrmeetplan://reset-password');
-    });
-
-    it('reset-redirect does NOT use sacrmeetman://', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).not.toContain('sacrmeetman://');
-    });
-  });
-
-  // --- EC-114-01: Desktop browser (app not installed) ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect now serves inline form, no fallback button
-  describe.skip('EC-114-01: Desktop browser fallback [SUPERSEDED by F138]', () => {
-    it('fallback button is visible in HTML (not hidden)', () => {
-      const content = readProjectFile(resetRedirectPath);
-      // The button should be in the HTML body, not display:none
-      expect(content).toContain('Abrir no aplicativo');
-      expect(content).not.toContain('display:none');
-      expect(content).not.toContain('display: none');
-    });
-  });
-
-  // --- EC-114-02: Token expired or invalid ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect now imports Supabase client for verifyOtp/updateUser
-  describe.skip('EC-114-02: No token validation in redirect function [SUPERSEDED by F138]', () => {
-    it('reset-redirect does NOT import supabase client', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).not.toContain('createClient');
-      expect(content).not.toContain('@supabase/supabase-js');
-    });
-
-    it('reset-redirect does NOT query database', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).not.toContain('.from(');
-      expect(content).not.toContain('.select(');
-    });
-  });
-
-  // --- EC-114-03: Auto-redirect mechanisms (F134: script removed) ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses meta refresh or fallback button
-  describe.skip('EC-114-03: Redirect mechanisms [SUPERSEDED by F138]', () => {
-    it('has meta refresh for auto-redirect', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('meta http-equiv="refresh"');
-    });
-
-    it('has fallback button as second mechanism', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).toContain('<a href=');
-    });
-  });
-
-  // --- EC-114-04: No script tags in redirect or email (F134) ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect now uses <script> for Supabase JS CDN
-  describe.skip('EC-114-04: No script tags [SUPERSEDED by F138]', () => {
-    it('reset-redirect does NOT contain <script> tags (F134 fix)', () => {
-      const content = readProjectFile(resetRedirectPath);
-      expect(content).not.toContain('<script>');
-      expect(content).not.toContain('</script>');
-    });
-
-    it('email template does NOT contain <script> tags', () => {
-      const content = readProjectFile('supabase/functions/send-reset-email/index.ts');
-      expect(content).not.toContain('<script>');
-    });
-  });
 });
 
 // =============================================================================

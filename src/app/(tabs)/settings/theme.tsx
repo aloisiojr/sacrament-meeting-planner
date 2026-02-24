@@ -107,8 +107,4 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: 16,
   },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
 });

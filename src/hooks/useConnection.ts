@@ -9,9 +9,6 @@ import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { onlineManager } from '@tanstack/react-query';
 import { isNetInfoOnline } from '../lib/connectionUtils';
 
-// Re-export pure utility for convenience
-export { isNetInfoOnline } from '../lib/connectionUtils';
-
 // --- Types ---
 
 export interface ConnectionState {

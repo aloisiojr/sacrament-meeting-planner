@@ -14,10 +14,6 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-// Re-export pure utilities for convenience
-export { getOrdinal, buildNotificationText, formatNameList } from '../lib/notificationUtils';
-export type { OrdinalLanguage } from '../lib/notificationUtils';
-
 // --- Notification display configuration ---
 
 Notifications.setNotificationHandler({

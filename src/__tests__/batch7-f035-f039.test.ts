@@ -291,19 +291,6 @@ describe('F037 (CR-93): Change deep link protocol to sacrmeetplan://', () => {
     });
   });
 
-  // SUPERSEDED by F139 (CR-203): create-invitation now uses HTTPS URL to invite-redirect instead of deep link
-  describe.skip('AC-F037-02: Edge Function uses sacrmeetplan:// deep link [SUPERSEDED by F139]', () => {
-    it('should contain sacrmeetplan://invite/ in create-invitation Edge Function', () => {
-      const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetplan://invite/');
-    });
-
-    it('should NOT contain wardmanager:// in create-invitation Edge Function', () => {
-      const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).not.toContain('wardmanager://');
-    });
-  });
-
   describe('AC-F037-03: No references to wardmanager:// in source code', () => {
     it('should have zero wardmanager:// references in src/ directory', () => {
       const srcDir = path.resolve(__dirname, '..');
@@ -337,15 +324,6 @@ describe('F037 (CR-93): Change deep link protocol to sacrmeetplan://', () => {
       const content = readProjectFile('app.json');
       const config = JSON.parse(content);
       expect(config.expo.android.package).toBe('com.sacramentmeetingmanager.app');
-    });
-  });
-
-  // SUPERSEDED by F139 (CR-203): create-invitation now uses HTTPS URL instead of deep link
-  describe.skip('EC-F037-01: Existing wardmanager:// links will not work [SUPERSEDED by F139]', () => {
-    it('should only use sacrmeetplan:// protocol (old links stop working by design)', () => {
-      const content = readProjectFile('supabase/functions/create-invitation/index.ts');
-      expect(content).toContain('sacrmeetplan://invite/');
-      expect(content).not.toContain('wardmanager://');
     });
   });
 

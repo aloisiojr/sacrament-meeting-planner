@@ -518,13 +518,7 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
 
   // --- EC-151-01: Card with fewer positions still padded ---
 
-  describe('EC-151-01: minHeight applies regardless of position count', () => {
-    it('[SUPERSEDED by F154] headerCenter uses justifyContent center (no inline minHeight)', () => {
-      // F154 (CR-219) removed inline minHeight from headerCenter View.
-      // The View now uses only style={styles.headerCenter} with justifyContent: 'center'.
-      expect(sundayCardSource).toContain('style={styles.headerCenter}');
-    });
-  });
+  // EC-151-01: Test removed — [SUPERSEDED by F154/F158 CR-229] headerCenter now uses inline minHeight
 
   // --- EC-151-02: Expand/collapse preserves minHeight behavior ---
 
@@ -538,11 +532,7 @@ describe('F151 (CR-215): Collapsed speech cards uniform height', () => {
   // --- EC-151-03: Font scaling ---
 
   describe('EC-151-03: speechRow dimensions for minHeight calculation', () => {
-    it('speechRow has marginBottom: 4', () => {
-      const speechRowStyle = sundayCardSource.match(/speechRow:\s*\{[^}]*\}/s);
-      expect(speechRowStyle).toBeTruthy();
-      expect(speechRowStyle![0]).toContain('marginBottom: 4');
-    });
+    // Test removed: speechRow marginBottom changed from 4 to 1 by CR-228
 
     it('speakerNameLine has fontSize: 13', () => {
       const speakerStyle = sundayCardSource.match(/speakerNameLine:\s*\{[^}]*\}/s);

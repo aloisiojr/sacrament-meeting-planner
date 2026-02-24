@@ -202,10 +202,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
   },
-  pencilText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   fontToggleButton: {
     width: 36,
     height: 36,
@@ -224,10 +220,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  closeText: {
-    fontSize: 18,
-    fontWeight: '600',
   },
   loading: {
     flex: 1,

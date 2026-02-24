@@ -28,6 +28,11 @@ export const speechKeys = {
     ['speeches', 'bySunday', wardId, date] as const,
 };
 
+export const wardKeys = {
+  managePrayers: (wardId: string) =>
+    ['ward', wardId, 'managePrayers'] as const,
+};
+
 // --- Types ---
 
 export interface AssignSpeakerInput {
@@ -79,6 +84,31 @@ export function getAvailableStatuses(current: SpeechStatus): SpeechStatus[] {
 }
 
 // --- Hooks ---
+
+/**
+ * Query the ward's manage_prayers flag.
+ * Returns false as default when loading or no data.
+ */
+export function useWardManagePrayers(): { managePrayers: boolean; isLoading: boolean } {
+  const { wardId } = useAuth();
+
+  const { data, isLoading } = useQuery({
+    queryKey: wardKeys.managePrayers(wardId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wards')
+        .select('manage_prayers')
+        .eq('id', wardId)
+        .single();
+
+      if (error) throw error;
+      return data?.manage_prayers ?? false;
+    },
+    enabled: !!wardId,
+  });
+
+  return { managePrayers: data ?? false, isLoading };
+}
 
 /**
  * Fetch speeches for a date range, grouped by sunday date.

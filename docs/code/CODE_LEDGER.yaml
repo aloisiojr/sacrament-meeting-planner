@@ -31,6 +31,7 @@
 # CR-218, CR-220
 # CR-221
 # CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230
+# CR-231
 # Generated: 2026-02-24
 # =============================================================================
 
@@ -5309,3 +5310,156 @@ batch25_phase3_test_results:
   regressions: 0
   pre_existing_failures_fixed: 12
   pre_existing_failure_fix_details: "12 tests across 8 files updated for Phase 3 prayer data source change"
+
+# =============================================================================
+# Batch 27 - F159 (CR-231): Individual WhatsApp Templates per Speech Position
+# =============================================================================
+
+batch27_f159:
+  cr: CR-231
+  feature: F159
+  plan_ref: "docs/plans/PLAN_P048.yaml"
+  spec_ref: "docs/specs/SPEC_F159.yaml"
+  arch_ref: "docs/arch/ARCH_M159.yaml"
+  commits:
+
+  - step: STEP-01
+    cr: CR-231
+    hash: e48ee14
+    message: "feat(migration): add 3 speech template columns and drop old column (CR-231)"
+    files_changed:
+      - supabase/migrations/020_split_speech_template.sql
+    changes:
+      - id: CHG-773
+        description: "Add whatsapp_template_speech_1/2/3 columns, copy existing data, drop old whatsapp_template column"
+    acs_covered: [AC-159-01, AC-159-02, AC-159-03, AC-159-04, AC-159-21]
+
+  - step: STEP-02
+    cr: CR-231
+    hash: 86e6a33
+    message: "feat(types): update Ward interface with 3 speech template columns (CR-231)"
+    files_changed:
+      - src/types/database.ts
+    changes:
+      - id: CHG-774
+        description: "Replace whatsapp_template field with whatsapp_template_speech_1/2/3 in Ward interface"
+    acs_covered: [AC-159-05]
+
+  - step: STEP-03
+    cr: CR-231
+    hash: 021debe
+    message: "feat(whatsapp): 9 default speech templates, remove {posicao} placeholder (CR-231)"
+    files_changed:
+      - src/lib/whatsappUtils.ts
+    changes:
+      - id: CHG-775
+        description: "Replace 3 single-language default templates with 9 per-position templates, remove {posicao} from WhatsAppVariables and resolveTemplate, add getDefaultSpeechTemplate(language, position)"
+    acs_covered: [AC-159-06, AC-159-07, AC-159-08, AC-159-09]
+
+  - step: STEP-04
+    cr: CR-231
+    hash: 824f757
+    message: "refactor(whatsapp): update re-exports for speech template split (CR-231)"
+    files_changed:
+      - src/lib/whatsapp.ts
+    changes:
+      - id: CHG-776
+        description: "Replace old re-exports (DEFAULT_TEMPLATE_PT_BR/EN/ES, getDefaultTemplate) with getDefaultSpeechTemplate"
+
+  - step: STEP-05
+    cr: CR-231
+    hash: cbd60b2
+    message: "feat(invite): select speech template by position, remove position variable (CR-231)"
+    files_changed:
+      - src/components/InviteManagementSection.tsx
+    changes:
+      - id: CHG-777
+        description: "Query 3 speech template columns, build speechTemplateMap by position, pass position to buildWhatsAppUrl, remove position from WhatsAppVariables"
+    acs_covered: [AC-159-10, AC-159-11]
+
+  - step: STEP-06
+    cr: CR-231
+    hash: 821ad8c
+    message: "feat(settings): 5-tab segmented control for speech template editing (CR-231)"
+    files_changed:
+      - src/app/(tabs)/settings/whatsapp.tsx
+    changes:
+      - id: CHG-778
+        description: "Replace single speech tab with 3 speech tabs (speech_1/2/3), always show segmented control, 3 separate state/mutation/handler per speech position, remove {posicao} from placeholders and sample data"
+    acs_covered: [AC-159-12, AC-159-13, AC-159-14, AC-159-15, AC-159-16]
+
+  - step: STEP-07
+    cr: CR-231
+    hash: 3d559ed
+    message: "feat(settings): reset all 5 template columns on language change (CR-231)"
+    files_changed:
+      - src/app/(tabs)/settings/index.tsx
+    changes:
+      - id: CHG-779
+        description: "Reset whatsapp_template_speech_1/2/3 and prayer template columns to null on ward language change"
+    acs_covered: [AC-159-20]
+
+  - step: STEP-08
+    cr: CR-231
+    hash: 0fed6a2
+    message: "feat(edge): create ward with 3 per-position speech template columns (CR-231)"
+    files_changed:
+      - supabase/functions/register-first-user/index.ts
+    changes:
+      - id: CHG-780
+        description: "Replace single whatsapp_template with 3 language-aware per-position speech template columns on ward creation"
+    acs_covered: [AC-159-17]
+
+  - step: STEP-09
+    cr: CR-231
+    hash: 97cde32
+    message: "feat(i18n): remove placeholderPosition, add 3 speech tab labels (CR-231)"
+    files_changed:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    changes:
+      - id: CHG-781
+        description: "Remove placeholderPosition key, replace tabSpeech with tabSpeech1/tabSpeech2/tabSpeech3 in all 3 locales"
+    acs_covered: [AC-159-18, AC-159-19]
+
+  - step: STEP-10
+    cr: CR-231
+    hash: de736d0
+    message: "test(f159): add 70 tests for CR-231 speech template split (AC-159-01 through AC-159-21)"
+    files_changed:
+      - src/__tests__/batch27-f159.test.ts
+    changes:
+      - id: CHG-782
+        description: "Comprehensive test coverage for all 21 ACs: migration, types, templates, utils, invite section, settings screen, edge function, i18n, language reset"
+
+  - step: STEP-10b
+    cr: CR-231
+    hash: 039d575
+    message: "fix(test): update existing tests for speech template split API changes (CR-231)"
+    files_changed:
+      - src/__tests__/whatsapp-utils.test.ts
+      - src/__tests__/batch19-phase1.test.ts
+      - src/__tests__/batch23-f140-f142.test.ts
+      - src/__tests__/batch25-phase1.test.ts
+      - src/__tests__/batch25-phase2.test.ts
+      - src/__tests__/batch25-phase3.test.ts
+      - src/__tests__/batch7-f040-f044.test.ts
+      - src/__tests__/batch8-phase1.test.ts
+      - src/__tests__/cr002-qa.test.ts
+      - src/__tests__/cr003-qa.test.ts
+      - src/__tests__/cr004-f004-error-handling.test.ts
+      - src/__tests__/phase03-whatsapp-invite.test.ts
+    changes:
+      - id: CHG-783
+        description: "Updated 12 existing test files referencing old API (DEFAULT_TEMPLATE_PT_BR -> DEFAULT_TEMPLATE_SPEECH_1_PT_BR, getDefaultTemplate -> getDefaultSpeechTemplate, removed position from WhatsAppVariables, updated i18n key assertions)"
+
+batch27_test_results:
+  new_tests: 70
+  new_tests_passing: 70
+  full_suite_tests: 6933
+  full_suite_passing: 6933
+  full_suite_files: 99
+  regressions: 0
+  pre_existing_failures_fixed: 62
+  pre_existing_failure_fix_details: "62 tests across 12 files updated for CR-231 API changes (old template constants, getDefaultTemplate, WhatsAppVariables.position, i18n keys)"

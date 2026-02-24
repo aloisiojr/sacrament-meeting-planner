@@ -1,0 +1,511 @@
+# =============================================================================
+# SPEC_F158.yaml
+# Batch 26: Ajustes UI Oracoes Gerenciadas (CRs 222-230)
+# Created: 2026-02-24
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 26
+phase: 1
+created: "2026-02-24"
+last_updated: "2026-02-24"
+request_type: ui
+execution_order: >
+  9 CRs grouped into a single feature (F158). All are UI adjustments to the
+  managed prayers feature (F157/CR-221). Recommended implementation order:
+  (1) CR-230 bugfix (double label in AgendaForm),
+  (2) CR-222 add StatusLED circles to prayer lines in collapsed card,
+  (3) CR-223 hide prayer label when no name assigned,
+  (4) CR-227 add spacing gap after exception text in testimony/primary cards,
+  (5) CR-228 reduce line spacing in collapsed cards,
+  (6) CR-229 uniform card height for all card types,
+  (7) CR-225 pass managePrayers to NextSundaysSection SundayCard,
+  (8) CR-224 rename toggle + reorder + add description text,
+  (9) CR-226 multiline tab label for Speeches & Prayers tab.
+execution_rationale: >
+  CR-230 is a bugfix (double label) that should land first for correctness.
+  CRs 222/223/227/228/229 are all SundayCard collapsed layout adjustments
+  that build on each other - StatusLED circles (222), conditional label (223),
+  spacing (227), reduced margins (228), and uniform height (229). CR-225 is a
+  data-plumbing fix for the Home tab. CR-224 is a settings UI change. CR-226
+  is a standalone tab layout change.
+
+# =============================================================================
+# F158: UI Adjustments for Managed Prayers - CRs 222-230
+# =============================================================================
+
+features:
+
+  - id: F158
+    name: "UI adjustments for managed prayers collapsed cards and settings"
+    cr_ids: [222, 223, 224, 225, 226, 227, 228, 229, 230]
+    type: ui
+    related_crs: [221]
+    related_features: [F157, F151, F154]
+    description: >
+      Batch of 9 UI change requests that refine the managed prayers feature
+      (F157/CR-221). The changes cover: (1) adding StatusLED circles to prayer
+      lines in collapsed cards, (2) hiding the prayer label when no name is
+      assigned, (3) renaming the manage_prayers toggle and adding a description,
+      (4) passing managePrayers prop to NextSundaysSection, (5) allowing the
+      Speeches & Prayers tab label to wrap to 2 lines, (6) adding spacing
+      between exception text and prayer lines in testimony/primary cards,
+      (7) reducing vertical spacing between lines in collapsed cards,
+      (8) making all collapsed cards the same height, (9) fixing a double-label
+      bug in AgendaForm when managePrayers is on.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      # --- CR-222: StatusLED circles on prayer lines in collapsed card ---
+
+      - id: AC-158-01
+        description: "Opening prayer line in collapsed Discursos card has StatusLED circle"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', card is collapsed"
+        when: "The opening prayer line (position 0) is rendered in the collapsed card"
+        then: "A StatusLED circle (size 10) is displayed to the left of the prayer text, showing the status of the opening prayer speech record. The prayer text retains italic style and '(Oracao)' prefix (when name is present, per CR-223)."
+        status: pending
+
+      - id: AC-158-02
+        description: "Closing prayer line in collapsed Discursos card has StatusLED circle"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', card is collapsed"
+        when: "The closing prayer line (position 4) is rendered in the collapsed card"
+        then: "A StatusLED circle (size 10) is displayed to the left of the prayer text, showing the status of the closing prayer speech record. Same visual pattern as AC-158-01."
+        status: pending
+
+      - id: AC-158-03
+        description: "Testimony/Primary collapsed card prayer lines have StatusLED circles"
+        given: "Ward has manage_prayers = true, sunday type is 'testimony_meeting' or 'primary_presentation', card is collapsed"
+        when: "Prayer lines are rendered in the collapsed card"
+        then: "Both opening prayer (position 0) and closing prayer (position 4) lines display StatusLED circles with their respective statuses."
+        status: pending
+
+      - id: AC-158-04
+        description: "All 5 lines in collapsed Discursos card (2nd speech ON) have StatusLED circles"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', has_second_speech = true, card is collapsed"
+        when: "The collapsed card renders 5 lines"
+        then: "All 5 lines (opening prayer, speech 1, speech 2, speech 3, closing prayer) have StatusLED circles. The card displays a consistent column of 5 circles."
+        status: pending
+
+      - id: AC-158-05
+        description: "All 4 lines in collapsed Discursos card (2nd speech OFF) have StatusLED circles"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', has_second_speech = false, card is collapsed"
+        when: "The collapsed card renders 4 lines"
+        then: "All 4 lines (opening prayer, speech 1, speech 3, closing prayer) have StatusLED circles."
+        status: pending
+
+      # --- CR-223: Hide prayer label when no name assigned ---
+
+      - id: AC-158-06
+        description: "Prayer line shows only StatusLED circle when no name is assigned"
+        given: "Ward has manage_prayers = true, a prayer position has no speaker_name assigned (empty or null)"
+        when: "The prayer line is rendered in the collapsed card"
+        then: "The line shows only the StatusLED circle with an empty space placeholder for the name. The '(Oracao)' prefix label is NOT displayed. The line occupies the same vertical space as other lines."
+        status: pending
+
+      - id: AC-158-07
+        description: "Prayer line shows StatusLED + prefix + name when name IS assigned"
+        given: "Ward has manage_prayers = true, a prayer position has a speaker_name assigned"
+        when: "The prayer line is rendered in the collapsed card"
+        then: "The line shows the StatusLED circle followed by '(Oracao) NomeMembro' in italic. The full pattern is: [LED] (Oracao) Name."
+        status: pending
+
+      - id: AC-158-08
+        description: "Both opening and closing prayer lines follow the same conditional logic"
+        given: "Ward has manage_prayers = true, card is collapsed"
+        when: "Opening prayer has a name but closing prayer does not (or vice versa)"
+        then: "The line WITH a name shows [LED] (Oracao) Name in italic. The line WITHOUT a name shows only [LED] with an empty space. Each line is independent."
+        status: pending
+
+      # --- CR-224: Rename toggle, reorder, add description ---
+
+      - id: AC-158-09
+        description: "Toggle label changed from 'Oracoes Gerenciadas' to 'Usar Convites para Oracoes'"
+        given: "User is Bispado on Settings screen"
+        when: "Ward configuration section is displayed"
+        then: >
+          The toggle label shows t('settings.managePrayers') which is now:
+          pt-BR: 'Usar Convites para Oracoes',
+          en: 'Use Invitations for Prayers',
+          es: 'Usar Invitaciones para Oraciones'.
+        status: pending
+
+      - id: AC-158-10
+        description: "Toggle is the 2nd item in Ward Settings group"
+        given: "User is Bispado on Settings screen, manage_prayers toggle is visible"
+        when: "Ward configuration section is rendered"
+        then: "The manage_prayers toggle is positioned as the 2nd item in the Ward Settings group, right after 'Discursantes' (Members). The order is: (1) Discursantes, (2) Usar Convites para Oracoes, (3) Biblioteca de Temas, (4) Modelo de Convite pelo WhatsApp, (5) Idioma da Ala, (6) Fuso Horario."
+        status: pending
+
+      - id: AC-158-11
+        description: "Description text displayed below the toggle label"
+        given: "User is Bispado on Settings screen, manage_prayers toggle is visible"
+        when: "The toggle item is rendered"
+        then: >
+          A description text is displayed below the toggle label (above the Switch).
+          The text reads (i18n):
+          pt-BR: 'Ative esta opcao caso queira enviar convites para que pessoas facam as oracoes de abertura e encerramento, assim como ja e feito com os discursos.'
+          en: 'Enable this option if you want to send invitations for people to give the opening and closing prayers, just like it is already done with speeches.'
+          es: 'Active esta opcion si desea enviar invitaciones para que las personas hagan las oraciones de apertura y cierre, tal como ya se hace con los discursos.'
+          The description text uses a smaller font size and secondary text color.
+        status: pending
+
+      # --- CR-225: Pass managePrayers to NextSundaysSection cards ---
+
+      - id: AC-158-12
+        description: "NextSundaysSection passes managePrayers prop to SundayCard"
+        given: "Ward has manage_prayers = true, Home tab is displayed"
+        when: "NextSundaysSection renders SundayCard components for next 3 sundays"
+        then: "Each SundayCard receives managePrayers={managePrayers} prop. Prayer lines are displayed in collapsed cards (with StatusLED circles per CR-222, conditional labels per CR-223)."
+        status: pending
+
+      - id: AC-158-13
+        description: "NextSundaysSection cards match Speeches tab collapsed cards"
+        given: "Ward has manage_prayers = true, Home tab and Speeches tab both visible"
+        when: "The same sunday is shown collapsed in both tabs"
+        then: "The collapsed card layout is visually identical in both NextSundaysSection (Home) and Speeches tab. Same prayer lines, same StatusLED circles, same spacing."
+        status: pending
+
+      # --- CR-226: Multiline tab label for Speeches & Prayers ---
+
+      - id: AC-158-14
+        description: "Tab label 'Discursos e Oracoes' wraps to 2 lines"
+        given: "Ward has manage_prayers = true"
+        when: "The tab bar is rendered with the 'Discursos e Oracoes' label"
+        then: "The tab label is allowed to wrap to 2 lines to avoid text being cut off. A tabBarLabelStyle is applied with numberOfLines or equivalent to allow multiline wrapping. The tab bar height accommodates 2-line labels."
+        status: pending
+
+      - id: AC-158-15
+        description: "Other tab labels unaffected when Speeches tab label wraps"
+        given: "Ward has manage_prayers = true, tab label wraps to 2 lines"
+        when: "Other tabs (Home, Agendas, Settings) are rendered"
+        then: "Other tab labels remain single-line. The tab bar style is applied globally but only affects labels that naturally need wrapping."
+        status: pending
+
+      # --- CR-227: Spacing between exception text and prayer lines ---
+
+      - id: AC-158-16
+        description: "Gap between exception text and prayer lines in testimony collapsed card"
+        given: "Ward has manage_prayers = true, sunday type is 'testimony_meeting', card is collapsed"
+        when: "Exception text ('Reuniao de Testemunho') and prayer lines are rendered"
+        then: "There is a visible spacing gap (margin) between the exception text line and the first prayer line (opening prayer). The gap clearly separates the exception text from the prayer section."
+        status: pending
+
+      - id: AC-158-17
+        description: "Gap between exception text and prayer lines in primary collapsed card"
+        given: "Ward has manage_prayers = true, sunday type is 'primary_presentation', card is collapsed"
+        when: "Exception text ('Reuniao Especial da Primaria') and prayer lines are rendered"
+        then: "Same spacing gap as AC-158-16 between the exception text and the first prayer line."
+        status: pending
+
+      # --- CR-228: Reduce vertical spacing between lines in collapsed cards ---
+
+      - id: AC-158-18
+        description: "Reduced marginBottom on speechRow in collapsed cards"
+        given: "A SundayCard is collapsed (any tab: Home or Speeches)"
+        when: "Lines with speaker names (speech or prayer) are rendered in the collapsed card"
+        then: "The marginBottom on speechRow style is reduced from 4px to 1px (or similar smaller value). This makes the overall card shorter by reducing the vertical spacing between lines."
+        status: pending
+
+      - id: AC-158-19
+        description: "Reduced spacing applies to both prayer lines and speech lines"
+        given: "Ward has manage_prayers = true, card is collapsed with 5 lines"
+        when: "All 5 lines are rendered"
+        then: "All lines (opening prayer, 3 speeches, closing prayer) use the same reduced marginBottom. The spacing is uniform across all line types."
+        status: pending
+
+      - id: AC-158-20
+        description: "Reduced spacing applies equally in Home tab and Speeches tab"
+        given: "A collapsed card is shown in both Home tab (NextSundaysSection) and Speeches tab"
+        when: "The same card layout is rendered in both locations"
+        then: "The reduced spacing is consistent because both use the same SundayCard component with the same styles."
+        status: pending
+
+      # --- CR-229: Uniform card height for all collapsed cards ---
+
+      - id: AC-158-21
+        description: "All collapsed cards in Speeches tab have the same height"
+        given: "Speeches tab shows multiple collapsed SundayCards with varying content"
+        when: "Cards are rendered with different numbers of lines (2, 3, 4, or 5 lines)"
+        then: "All collapsed cards have the same fixed height. Cards with fewer lines have empty space to match the height of the tallest card configuration (5 lines when manage_prayers is ON, 3 lines when OFF)."
+        status: pending
+
+      - id: AC-158-22
+        description: "All collapsed cards in Home tab NextSundaysSection have the same height"
+        given: "Home tab NextSundaysSection shows next 3 SundayCards collapsed"
+        when: "Cards have different types (speeches, testimony, conference)"
+        then: "All 3 collapsed cards have the same fixed height, matching the Speeches tab card height."
+        status: pending
+
+      - id: AC-158-23
+        description: "Card height is based on maximum line count for current manage_prayers state"
+        given: "Ward has manage_prayers = true"
+        when: "Collapsed cards are rendered"
+        then: "The fixed height accommodates 5 lines (max: opening prayer + 3 speeches + closing prayer). When manage_prayers = false, the fixed height accommodates 3 lines (max: 3 speeches). The height calculation uses the reduced marginBottom from CR-228."
+        status: pending
+
+      - id: AC-158-24
+        description: "Exception-only cards (conference/other) match the uniform height"
+        given: "A sunday with type 'general_conference' or similar exception, card is collapsed"
+        when: "The card is rendered alongside speech-type cards"
+        then: "The exception card has the same total height as speech-type cards. The single line of exception text is vertically positioned within the taller card."
+        status: pending
+
+      - id: AC-158-25
+        description: "Testimony/Primary cards with manage_prayers ON match the uniform height"
+        given: "Ward has manage_prayers = true, sunday type is 'testimony_meeting'"
+        when: "The collapsed card is rendered (3 lines: exception text + 2 prayer lines)"
+        then: "The card has the same total height as a 5-line speeches card. Extra space fills below the 3 lines."
+        status: pending
+
+      # --- CR-230: Fix double label bug in AgendaForm ---
+
+      - id: AC-158-26
+        description: "Opening prayer field shows label only once when manage_prayers is ON"
+        given: "Ward has manage_prayers = true, agenda card is expanded in AgendaForm"
+        when: "Opening prayer field (position 0) is rendered"
+        then: "The label 'Oracao de Abertura' appears exactly once. The FieldRow wrapper provides the label. The ReadOnlySpeakerRow inside does NOT render its own FieldRow with the same label."
+        status: pending
+
+      - id: AC-158-27
+        description: "Closing prayer field shows label only once when manage_prayers is ON"
+        given: "Ward has manage_prayers = true, agenda card is expanded in AgendaForm"
+        when: "Closing prayer field (position 4) is rendered"
+        then: "The label 'Oracao de Encerramento' appears exactly once. Same fix as AC-158-26."
+        status: pending
+
+      - id: AC-158-28
+        description: "ReadOnlySpeakerRow no longer wraps content in FieldRow internally"
+        given: "AgendaForm renders ReadOnlySpeakerRow for prayers (manage_prayers = true)"
+        when: "ReadOnlySpeakerRow is called from within a FieldRow"
+        then: "ReadOnlySpeakerRow renders only the speaker read-only row (speakerReadRow View) without its own FieldRow wrapper. The parent FieldRow in AgendaForm provides the label. This eliminates the double-label."
+        status: pending
+
+      - id: AC-158-29
+        description: "Speech ReadOnlySpeakerRow fields unaffected by the fix"
+        given: "AgendaForm renders ReadOnlySpeakerRow for speeches (positions 1, 2, 3)"
+        when: "Speech speaker rows are displayed"
+        then: "Speech ReadOnlySpeakerRow fields continue to display correctly with a single label. The fix does not regress existing speech field rendering."
+        status: pending
+
+    # =========================================================================
+    # EDGE CASES
+    # =========================================================================
+
+    edge_cases:
+
+      - id: EC-158-01
+        case: "Prayer line StatusLED circle when manage_prayers is OFF"
+        expected: "When manage_prayers = false, prayer lines do not appear in collapsed cards at all. StatusLED circles are only added to prayer lines that are already rendered (i.e., when manage_prayers = true). No visual regression when toggle is OFF."
+        status: pending
+
+      - id: EC-158-02
+        case: "Collapsed card height when manage_prayers is toggled ON then OFF"
+        expected: "When manage_prayers is toggled from true to false, the uniform card height recalculates to accommodate 3 lines (speeches only) instead of 5 lines. Cards become shorter."
+        status: pending
+
+      - id: EC-158-03
+        case: "Tab label wrapping when manage_prayers is toggled OFF"
+        expected: "When manage_prayers = false, the tab label is 'Discursos' (single word) which does not need wrapping. The multiline tabBarLabelStyle does not cause visual issues with short labels."
+        status: pending
+
+      - id: EC-158-04
+        case: "NextSundaysSection with mixed sunday types and manage_prayers ON"
+        expected: "When manage_prayers = true and next 3 sundays have different types (e.g., speeches, testimony, conference), all 3 cards in NextSundaysSection have the same height. Prayer lines appear correctly per type. Exception-only cards show single line within the taller uniform height."
+        status: pending
+
+      - id: EC-158-05
+        case: "Manage prayers toggle description text wrapping"
+        expected: "The description text below the toggle label wraps naturally to multiple lines within the available width. The text does not overflow or get truncated."
+        status: pending
+
+      - id: EC-158-06
+        case: "ReadOnlySpeakerRow fix does not break existing speech rows in AgendaForm"
+        expected: "The ReadOnlySpeakerRow calls for speech positions (1, 2, 3) that are NOT wrapped in an external FieldRow continue to render their own FieldRow with label. Only the prayer-specific calls (where parent FieldRow already provides label) are affected by the fix."
+        status: pending
+
+      - id: EC-158-07
+        case: "All 5 lines with StatusLED when 2nd speech is ON and manage_prayers is ON"
+        expected: "Collapsed card shows 5 lines each with StatusLED: opening prayer (status from position 0), speech 1 (position 1), speech 2 (position 2), speech 3 (position 3), closing prayer (position 4). All 5 circles align vertically."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - src/components/SundayCard.tsx (CRs 222, 223, 227, 228, 229)
+      - src/components/AgendaForm.tsx (CR-230)
+      - src/app/(tabs)/settings/index.tsx (CR-224)
+      - src/app/(tabs)/_layout.tsx (CR-226)
+      - src/components/NextSundaysSection.tsx (CR-225)
+      - src/i18n/locales/pt-BR.json (CRs 224, 226)
+      - src/i18n/locales/en.json (CRs 224, 226)
+      - src/i18n/locales/es.json (CRs 224, 226)
+
+    files_not_modified:
+      - src/components/NextAssignmentsSection.tsx (already passes managePrayers correctly)
+      - src/components/SpeechSlot.tsx (no changes needed)
+      - src/hooks/useSpeeches.ts (no logic changes)
+      - supabase/migrations/ (no DB changes)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS
+    # =========================================================================
+
+    implementation_details:
+
+      - location: "src/components/SundayCard.tsx"
+        cr_ids: [222, 223, 227, 228, 229]
+        description: "Collapsed card layout adjustments"
+        details: |
+          CR-222: Add StatusLED to prayer lines in collapsed card.
+          - For prayer lines (positions 0 and 4), add <StatusLED status={prayerStatus}
+            size={10} /> before the prayer text in the speechRow View.
+          - Get prayer status from the speech record: speech?.status ?? 'not_assigned'.
+          - Applies to both isSpeechesType and isTestimonyOrPrimary branches.
+
+          CR-223: Conditionally hide prayer prefix label.
+          - Change prayer text from always showing '{prayerPrefix} {name}' to:
+            - If name is present: show '{prayerPrefix} {name}' in italic
+            - If name is empty/null: show empty space (no text, just StatusLED)
+          - The line still occupies vertical space (empty Text with ' ').
+
+          CR-227: Add marginTop spacing after exception text in testimony/primary.
+          - In the isTestimonyOrPrimary branch, add marginTop (e.g., 6px) to the
+            first prayer View after the exception text. This creates a visual gap.
+
+          CR-228: Reduce marginBottom on speechRow style.
+          - Change speechRow marginBottom from 4 to 1 (or 2).
+          - This applies globally to all collapsed card lines.
+
+          CR-229: Add minHeight to headerCenter for uniform card height.
+          - When collapsed, set minHeight on headerCenter View to accommodate
+            the maximum number of lines for the current manage_prayers state.
+          - manage_prayers = true: 5 lines height
+          - manage_prayers = false: 3 lines height (existing F151/CR-215 behavior)
+          - Calculation based on: N lines * lineHeight + (N-1) * marginBottom.
+          - This replaces the existing F151 minHeight: 62 logic with a dynamic value.
+
+      - location: "src/components/AgendaForm.tsx"
+        cr_ids: [230]
+        description: "Fix double label bug in prayer fields"
+        details: |
+          The bug: when manage_prayers = true, the opening/closing prayer fields
+          are rendered as:
+            <FieldRow label="Oracao de Abertura">
+              <ReadOnlySpeakerRow label="Oracao de Abertura" ... />
+            </FieldRow>
+          ReadOnlySpeakerRow internally renders its own FieldRow with the same
+          label, producing:
+            FieldRow("Oracao de Abertura")
+              FieldRow("Oracao de Abertura")  <-- double label
+                speakerReadRow
+
+          Fix: For the prayer-specific manage_prayers=true branch, render the
+          speaker read-only View directly without the ReadOnlySpeakerRow wrapper,
+          or pass a flag to ReadOnlySpeakerRow to skip its internal FieldRow.
+
+          Approach: Replace the ReadOnlySpeakerRow call inside the prayer FieldRow
+          with direct rendering of the speakerReadRow content (View with Text and
+          PencilIcon), since the parent FieldRow already provides the label.
+
+      - location: "src/app/(tabs)/settings/index.tsx"
+        cr_ids: [224]
+        description: "Rename toggle, reorder, add description"
+        details: |
+          1. Move the managePrayers toggle from last position (L246-257) to
+             2nd position in the Ward Settings group, right after the Members item.
+          2. Update the toggle label from t('settings.managePrayers') which uses
+             the new i18n key value 'Usar Convites para Oracoes'.
+          3. Add a description Text below the label, using the new i18n key
+             t('settings.managePrayersDescription').
+          4. The toggle item becomes a multi-line item with label + description
+             on the left and Switch on the right.
+
+      - location: "src/app/(tabs)/_layout.tsx"
+        cr_ids: [226]
+        description: "Allow tab label to wrap to 2 lines"
+        details: |
+          Add tabBarLabelStyle to the Tabs screenOptions (or specifically to
+          the speeches tab) to allow text wrapping:
+            tabBarLabelStyle: { textAlign: 'center' }
+          And/or set the tab options with a custom tabBarLabel render function
+          that allows numberOfLines={2} on the Text component.
+
+      - location: "src/components/NextSundaysSection.tsx"
+        cr_ids: [225]
+        description: "Pass managePrayers prop to SundayCard"
+        details: |
+          Import useWardManagePrayers from hooks/useSpeeches.
+          Call const { managePrayers } = useWardManagePrayers() in the component.
+          Pass managePrayers={managePrayers} to each SundayCard rendered in the
+          map loop (same pattern as NextAssignmentsSection).
+
+      - location: "src/i18n/locales/*.json"
+        cr_ids: [224]
+        description: "i18n key changes for manage prayers toggle"
+        details: |
+          Update settings.managePrayers:
+            pt-BR: "Usar Convites para Orações"
+            en: "Use Invitations for Prayers"
+            es: "Usar Invitaciones para Oraciones"
+
+          Add settings.managePrayersDescription:
+            pt-BR: "Ative esta opção caso queira enviar convites para que pessoas façam as orações de abertura e encerramento, assim como já é feito com os discursos."
+            en: "Enable this option if you want to send invitations for people to give the opening and closing prayers, just like it is already done with speeches."
+            es: "Active esta opción si desea enviar invitaciones para que las personas hagan las oraciones de apertura y cierre, tal como ya se hace con los discursos."
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        CR-228 reduces marginBottom from 4 to 1 (or 2). The exact value
+        should be validated visually. The spec uses 1px as the target but
+        the implementor should adjust to the value that looks best on device.
+
+    - id: A-02
+      text: >
+        CR-229 uniform card height is achieved via minHeight on headerCenter.
+        This extends the existing F151/CR-215 approach. The minHeight value
+        is calculated as: numberOfLines * lineHeight + (numberOfLines - 1) *
+        newMarginBottom. When manage_prayers = true, numberOfLines = 5; when
+        false, numberOfLines = 3.
+
+    - id: A-03
+      text: >
+        CR-230 fix for double label uses direct rendering of the speaker
+        read-only content inside the prayer FieldRow, rather than modifying
+        ReadOnlySpeakerRow itself. This avoids regressions in the speech
+        fields (positions 1, 2, 3) that call ReadOnlySpeakerRow directly
+        (not wrapped in a parent FieldRow).
+
+    - id: A-04
+      text: >
+        CR-224 reorder places the manage_prayers toggle as the 2nd item
+        only when the user is Bispado. For other roles, the toggle is not
+        visible at all (existing behavior). The items above the toggle
+        (Members) must also be Bispado-visible for the ordering to be
+        correct. Since Members is visible to both Bispado and Secretario
+        (via hasPermission('member:read')), the toggle appears after Members
+        for Bispado and is simply not rendered for other roles.
+
+    - id: A-05
+      text: >
+        CR-226 multiline tab label may require adjusting the tab bar height
+        slightly. The exact styling depends on the Expo Router/React Navigation
+        tab bar implementation. A tabBarLabelStyle with fontSize and lineHeight
+        adjustments may be needed to fit 2 lines cleanly.
+
+  inconsistencies: []

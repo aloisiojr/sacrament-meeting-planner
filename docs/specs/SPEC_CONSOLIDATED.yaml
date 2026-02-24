@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-24"
-  total_features: 143
-  total_change_requests: 207
+  total_features: 144
+  total_change_requests: 216
   implemented_crs: 96
-  pending_crs: 109
+  pending_crs: 118
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -81,6 +81,7 @@ metadata:
     - docs/specs/SPEC_F154.yaml
     - docs/specs/SPEC_F155_F156.yaml
     - docs/specs/SPEC_F157.yaml
+    - docs/specs/SPEC_F158.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2850,8 +2851,36 @@ features:
       - "Phase 2 (in progress): Steps 8-10, 14, 16-17 (Speeches tab cards, invite management, WhatsApp templates) - 20 ACs"
       - "Phase 3 (planned): Remaining steps (Agenda tab, Home tab, presentation mode, sunday type change, push notifications)"
 
+  - id: F158
+    name: "UI adjustments for managed prayers collapsed cards and settings"
+    status: pending
+    rfs: []
+    description: >
+      Batch de 9 CRs (222-230) com ajustes UI para a feature de oracoes
+      gerenciadas (F157/CR-221). Inclui: StatusLED nos circulos de oracao
+      em cards contraidos, ocultar label de oracao quando nao ha nome,
+      renomear toggle para 'Usar Convites para Oracoes' com descricao,
+      passar managePrayers para NextSundaysSection, tab label multiline,
+      espacamento entre texto de excecao e oracoes, reduzir margem entre
+      linhas, altura uniforme entre cards, e correcao de label duplicado
+      no AgendaForm.
+    modified_by_crs: [222, 223, 224, 225, 226, 227, 228, 229, 230]
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    notes:
+      - "CR-222: StatusLED circles nas linhas de oracao em cards contraidos"
+      - "CR-223: Ocultar label '(Oracao)' quando nao ha nome designado"
+      - "CR-224: Renomear toggle, mover para 2a posicao, adicionar descricao"
+      - "CR-225: Passar managePrayers para NextSundaysSection SundayCard"
+      - "CR-226: Tab label 'Discursos e Oracoes' em 2 linhas"
+      - "CR-227: Espacamento entre texto de excecao e linhas de oracao"
+      - "CR-228: Reduzir marginBottom entre linhas em cards contraidos"
+      - "CR-229: Altura uniforme para todos os cards contraidos"
+      - "CR-230: Correcao de label duplicado em AgendaForm (bug)"
+      - "29 acceptance criteria, 7 edge cases"
+      - "8 arquivos impactados"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (104 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25)
+# PENDING CHANGE REQUESTS (113 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26)
 # =============================================================================
 
 pending_crs:
@@ -5285,6 +5314,164 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
+  # --- Batch 26 (UI Adjustments for Managed Prayers) ---
+
+  - id: 222
+    type: ui
+    area: "SundayCard collapsed (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      Adicionar circulos StatusLED nas linhas de oracao em cards contraidos.
+      Atualmente as linhas de oracao nao tem circulos de status, enquanto
+      as linhas de discursos tem.
+    acceptance_criteria:
+      - "Linhas de oracao (posicoes 0 e 4) em cards contraidos tem StatusLED circle"
+      - "Todos os 5 tipos de linha (opening prayer, 3 speeches, closing prayer) tem circulos"
+      - "Status do circulo reflete speech.status da posicao de oracao"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 223
+    type: ui
+    area: "SundayCard collapsed (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221, 222]
+    description: >
+      Quando nao houver nome de oracao designado, ocultar o label '(Oracao)'.
+      A linha fica apenas com o circulo StatusLED e espaco vazio.
+    acceptance_criteria:
+      - "Linha de oracao sem nome mostra apenas circulo StatusLED"
+      - "Label '(Oracao)' so aparece quando ha nome designado"
+      - "Logica independente para abertura e encerramento"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 224
+    type: ui
+    area: "Settings (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      Trocar label 'Oracoes Gerenciadas' por 'Usar Convites para Oracoes'.
+      Mover toggle para 2a posicao no menu (apos Discursantes). Adicionar
+      texto descritivo abaixo do label explicando a funcionalidade.
+    acceptance_criteria:
+      - "Label do toggle atualizado em pt-BR, en, es"
+      - "Toggle e o 2o item no grupo Ward Settings"
+      - "Texto descritivo exibido abaixo do label em pt-BR, en, es"
+    files_likely_impacted:
+      - src/app/(tabs)/settings/index.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+  - id: 225
+    type: bug
+    area: "Home NextSundaysSection (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      NextSundaysSection nao passa prop managePrayers para SundayCard.
+      Cards contraidos na Home nao mostram linhas de oracao mesmo quando
+      manage_prayers esta ligado. NextAssignmentsSection ja passa corretamente.
+    acceptance_criteria:
+      - "NextSundaysSection passa managePrayers para cada SundayCard"
+      - "Cards contraidos na Home mostram linhas de oracao quando manage_prayers=true"
+      - "Layout identico ao da aba Discursos"
+    files_likely_impacted:
+      - src/components/NextSundaysSection.tsx
+
+  - id: 226
+    type: ui
+    area: "Tab layout (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      Permitir que o label da aba 'Discursos e Oracoes' quebre em 2 linhas
+      para nao cortar o texto. Aplicar estilo tabBarLabelStyle adequado.
+    acceptance_criteria:
+      - "Label da aba Discursos e Oracoes permite 2 linhas"
+      - "Texto nao e cortado em nenhum dos 3 idiomas"
+      - "Outras abas nao sao afetadas negativamente"
+    files_likely_impacted:
+      - src/app/(tabs)/_layout.tsx
+
+  - id: 227
+    type: ui
+    area: "SundayCard collapsed (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      Adicionar espacamento (margem) entre o texto de excecao
+      ('Reuniao de Testemunho' ou 'Reuniao Especial da Primaria') e as
+      duas linhas de oracoes em cards contraidos de testimony/primary.
+    acceptance_criteria:
+      - "Gap visivel entre texto de excecao e 1a linha de oracao"
+      - "Espacamento igual para testimony_meeting e primary_presentation"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 228
+    type: ui
+    area: "SundayCard collapsed (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221, 229]
+    description: >
+      Diminuir o espaco entre as linhas com nomes em cards contraidos
+      (tanto na aba Home quanto na aba Discursos e Oracoes). Reduzir
+      marginBottom do speechRow para que o card fique mais compacto.
+    acceptance_criteria:
+      - "marginBottom do speechRow reduzido (de 4px para 1-2px)"
+      - "Espacamento uniforme entre todas as linhas (oracoes e discursos)"
+      - "Consistente entre aba Home e aba Discursos"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 229
+    type: ui
+    area: "SundayCard collapsed (F157, F151, F154)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [215, 219, 221, 228]
+    description: >
+      Todos os cards contraidos devem ter a mesma altura, tanto na aba Home
+      quanto na aba Discursos e Oracoes. Evolui F151/CR-215 e F154/CR-219
+      para considerar manage_prayers state: 5 linhas quando ON, 3 quando OFF.
+    acceptance_criteria:
+      - "Todos os cards contraidos na mesma tela tem altura identica"
+      - "Altura baseada no numero maximo de linhas do manage_prayers state atual"
+      - "Cards com menos linhas preenchem espaco vazio para igualar altura"
+      - "Funciona em ambas abas (Home e Discursos)"
+    files_likely_impacted:
+      - src/components/SundayCard.tsx
+
+  - id: 230
+    type: bug
+    area: "AgendaForm (F157)"
+    feature_id: F158
+    spec_file: "docs/specs/SPEC_F158.yaml"
+    related_crs: [221]
+    description: >
+      Bug: label 'Oracao de Abertura' aparece 2x no card aberto de edicao
+      da agenda quando manage_prayers=true. FieldRow wrapper fornece o label
+      e ReadOnlySpeakerRow internamente tambem wrapa em FieldRow com o
+      mesmo label. Mesmo problema para 'Oracao de Encerramento'.
+    acceptance_criteria:
+      - "Label 'Oracao de Abertura' aparece exatamente 1x"
+      - "Label 'Oracao de Encerramento' aparece exatamente 1x"
+      - "ReadOnlySpeakerRow nao duplica FieldRow quando chamado de dentro de FieldRow"
+      - "Campos de discursos (posicoes 1, 2, 3) nao sao afetados"
+    files_likely_impacted:
+      - src/components/AgendaForm.tsx
+
 # =============================================================================
 
   - id: DD-01
@@ -6593,3 +6780,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F157.yaml (CR-221 - Managed Prayers)"
     summary: "Oracoes gerenciadas: oracoes movidas de sunday_agendas para speeches (positions 0/4). Toggle manage_prayers per-ward. OFF: PrayerSelector, status confirmed. ON: workflow completo (status cycle, WhatsApp, push, invite management). Cards contraidos com linhas de oracao em italico. WhatsApp templates separados. Auto-criacao positions 0/4 para speeches/testimony/primary. Preservacao de oracoes ao mudar tipo entre speeches/testimony/primary (F157). Phase 1 completed (Steps 1-7: DB, i18n, types, hooks, settings). Phase 2 completed (Steps 8-10, 14, 16-17: SpeechSlot isPrayer, Speeches tab prayer slots, SundayCard collapsed, InviteManagement, WhatsApp templates). Phase 3 in progress (Steps 11-13, 15, 19-22: AgendaForm, Agenda collapsed, Home tab, Tab layout, Presentation mode, Permissions, Regression, Tests)."
+
+  batch_26:
+    range: "CR-222 a CR-230"
+    status: "9 pendentes (222, 223, 224, 225, 226, 227, 228, 229, 230)"
+    files:
+      - "docs/specs/SPEC_F158.yaml (CR-222 to CR-230 - UI adjustments for managed prayers)"
+    summary: "Ajustes UI para oracoes gerenciadas (F157/CR-221): StatusLED circles nas linhas de oracao em cards contraidos (CR-222), ocultar label de oracao sem nome (CR-223), renomear toggle + reordenar + descricao (CR-224), passar managePrayers para NextSundaysSection (CR-225), tab label multiline (CR-226), espacamento entre excecao e oracoes (CR-227), reduzir margem entre linhas (CR-228), altura uniforme cards (CR-229), correcao label duplicado AgendaForm (CR-230)."

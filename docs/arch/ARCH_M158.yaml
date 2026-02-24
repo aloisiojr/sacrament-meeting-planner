@@ -1,0 +1,525 @@
+# =============================================================================
+# ARCH_M158.yaml
+# Architecture for Batch 26: F158 - UI Adjustments for Managed Prayers (CRs 222-230)
+# 9 UI/UX refinement CRs over the managed prayers feature (F157/CR-221)
+# Created: 2026-02-24
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Refine the managed prayers UI in collapsed SundayCards, AgendaForm,
+    Settings, and tab layout. Changes include: StatusLED circles on prayer
+    lines, conditional prayer label visibility, toggle rename/reorder/
+    description, pass managePrayers to NextSundaysSection, multiline tab
+    label, spacing gap after exception text, reduced line spacing, uniform
+    card height, and fix double-label bug in AgendaForm.
+  principles:
+    - "All changes are UI-only: no database migrations, no new hooks, no new Edge Functions"
+    - "SundayCard is the primary component: 5 of 9 CRs modify it (CRs 222, 223, 227, 228, 229)"
+    - "Uniform card height uses dynamic minHeight calculation instead of hardcoded 62px (replaces F154 approach)"
+    - "Double-label fix in AgendaForm uses inline rendering instead of modifying ReadOnlySpeakerRow (avoids regressions)"
+    - "i18n changes are additive: new keys for toggle description, updated values for existing keys"
+  phase_scope: >
+    Single phase covering all 9 CRs. Recommended order: CR-230 (bugfix),
+    CR-222 (StatusLED), CR-223 (conditional label), CR-227 (spacing),
+    CR-228 (reduced margins), CR-229 (uniform height), CR-225 (prop plumbing),
+    CR-224 (settings), CR-226 (tab label).
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                F158: UI Adjustments for Managed Prayers              │
+  │                                                                      │
+  │  ┌──────────────────────────────────────────────────────────────┐   │
+  │  │  SundayCard.tsx (CRs 222, 223, 227, 228, 229)               │   │
+  │  │  - CR-222: Add StatusLED circles to prayer lines             │   │
+  │  │  - CR-223: Hide label when no name assigned                  │   │
+  │  │  - CR-227: marginTop gap after exception text                │   │
+  │  │  - CR-228: Reduce speechRow marginBottom (4 -> 1)            │   │
+  │  │  - CR-229: Dynamic minHeight for uniform card height         │   │
+  │  └──────────────────────────────────────────────────────────────┘   │
+  │                                                                      │
+  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐   │
+  │  │ AgendaForm.tsx   │  │ settings/index   │  │ _layout.tsx     │   │
+  │  │ CR-230: fix      │  │ CR-224: rename   │  │ CR-226: multi-  │   │
+  │  │ double label     │  │ toggle, reorder, │  │ line tab label  │   │
+  │  │ in prayer fields │  │ add description  │  │ (numberOfLines) │   │
+  │  └──────────────────┘  └──────────────────┘  └─────────────────┘   │
+  │                                                                      │
+  │  ┌──────────────────┐  ┌──────────────────────────────────────┐    │
+  │  │ NextSundaysSect. │  │ i18n locales (pt-BR, en, es)         │    │
+  │  │ CR-225: pass     │  │ CRs 224, 226: new/updated keys       │    │
+  │  │ managePrayers    │  │ - settings.managePrayers (rename)     │    │
+  │  │ prop to cards    │  │ - settings.managePrayersDescription   │    │
+  │  └──────────────────┘  └──────────────────────────────────────┘    │
+  └─────────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- 1. CR-230: Fix double label in AgendaForm ---
+
+  - name: "AgendaFormDoubleLabel_Fix"
+    responsibility: "Eliminate duplicate label in prayer fields when managePrayers=true"
+    file: "src/components/AgendaForm.tsx"
+    cr_ids: [230]
+    changes:
+      - "Opening prayer FieldRow (line ~299-328): replace ReadOnlySpeakerRow call with inline rendering of speaker read-only content (View + Text + PencilIcon) inside the existing FieldRow"
+      - "Closing prayer FieldRow (line ~525-554): same inline rendering replacement"
+      - "The parent FieldRow already provides the label, so the inline content must NOT include its own FieldRow wrapper"
+      - "For the non-managePrayers branch (SelectorField), no changes needed"
+    contract:
+      before: |
+        <FieldRow label={t('agenda.openingPrayer')}>
+          <ReadOnlySpeakerRow label={t('agenda.openingPrayer')} .../>  // ReadOnlySpeakerRow wraps in FieldRow internally -> double label
+        </FieldRow>
+      after: |
+        <FieldRow label={t('agenda.openingPrayer')}>
+          <View style={[styles.speakerReadRow, ...]}>  // Direct View, no FieldRow wrapper
+            <Text ...>{speakerName || label}</Text>
+            {!disabled && <Pressable><PencilIcon .../></Pressable>}
+          </View>
+        </FieldRow>
+    dependencies: []
+    notes: >
+      ReadOnlySpeakerRow is NOT modified (it still wraps in FieldRow internally).
+      This preserves its behavior for speech positions (1, 2, 3) which call it
+      directly without a parent FieldRow. Only the prayer-specific calls in
+      AgendaForm are changed to inline rendering.
+
+  # --- 2. CR-222: StatusLED circles on prayer lines ---
+
+  - name: "SundayCardPrayerStatusLED"
+    responsibility: "Add StatusLED circle before prayer text in collapsed card prayer lines"
+    file: "src/components/SundayCard.tsx"
+    cr_ids: [222]
+    changes:
+      - "In isSpeechesType collapsed section: add <StatusLED status={prayerStatus} size={10} /> before prayer text in both opening (pos 0) and closing (pos 4) prayer lines"
+      - "Prayer status derived from: speeches.find(s => s.position === 0/4)?.status ?? 'not_assigned'"
+      - "In isTestimonyOrPrimary + managePrayers collapsed section: same StatusLED addition to both prayer lines"
+      - "StatusLED is already imported and used for speech lines; same component, same size (10)"
+    contract:
+      input: "speeches array (already available via SundayCardProps)"
+      output: "Each prayer line renders [StatusLED(size=10)] [Text] instead of just [Text]"
+    dependencies: []
+    notes: >
+      StatusLED is already used for speech lines in the same component. The only
+      change is adding it to the prayer line Views. The status is read from the
+      speech record for that prayer position.
+
+  # --- 3. CR-223: Hide prayer label when no name assigned ---
+
+  - name: "SundayCardConditionalPrayerLabel"
+    responsibility: "Show prayer prefix label only when speaker_name is present"
+    file: "src/components/SundayCard.tsx"
+    cr_ids: [223]
+    changes:
+      - "In prayer lines (both isSpeechesType and isTestimonyOrPrimary branches):"
+      - "  If speaker_name is present: show '{prayerPrefix} {name}' in italic (current behavior)"
+      - "  If speaker_name is empty/null: show only StatusLED + empty space Text(' ') - NO prefix label"
+      - "This follows the same pattern as speech lines which already show only StatusLED + ' ' when no name"
+    contract:
+      input: "prayer speech record (speaker_name field)"
+      output: "Conditional rendering: [LED] '(Oracao) Name' when name exists, [LED] ' ' when empty"
+    dependencies: ["SundayCardPrayerStatusLED"]
+    notes: >
+      The empty space Text(' ') is needed to maintain consistent row height,
+      matching the pattern already used for speech lines without names (lines
+      551-555 in current SundayCard.tsx).
+
+  # --- 4. CR-227: Spacing gap after exception text ---
+
+  - name: "SundayCardExceptionPrayerGap"
+    responsibility: "Add visible spacing between exception text and prayer lines in testimony/primary cards"
+    file: "src/components/SundayCard.tsx"
+    cr_ids: [227]
+    changes:
+      - "In the isTestimonyOrPrimary + managePrayers branch: add marginTop (6px) to the first prayer line View after the exception Text"
+      - "This creates a visual gap between 'Reuniao de Testemunho' or 'Reuniao Especial da Primaria' and the prayer lines"
+      - "Only applies to the first prayer View (opening prayer); closing prayer uses normal speechRow spacing"
+    contract:
+      input: "isTestimonyOrPrimary && managePrayers && !expanded"
+      output: "First prayer View after exception text has marginTop: 6"
+    dependencies: []
+
+  # --- 5. CR-228: Reduce line spacing in collapsed cards ---
+
+  - name: "SundayCardReducedSpacing"
+    responsibility: "Reduce marginBottom on speechRow style for tighter collapsed card layout"
+    file: "src/components/SundayCard.tsx"
+    cr_ids: [228]
+    changes:
+      - "styles.speechRow.marginBottom changed from 4 to 1"
+      - "This applies to ALL lines in collapsed cards: both speech and prayer lines"
+      - "Affects both Home tab (NextSundaysSection) and Speeches tab since both use SundayCard"
+    contract:
+      before: "speechRow: { marginBottom: 4 }"
+      after: "speechRow: { marginBottom: 1 }"
+    dependencies: []
+    notes: >
+      The exact value (1 vs 2) should be validated visually. The spec targets 1px.
+      This change is global to the speechRow style and affects all collapsed card types.
+
+  # --- 6. CR-229: Uniform card height ---
+
+  - name: "SundayCardUniformHeight"
+    responsibility: "Set dynamic minHeight on headerCenter for uniform collapsed card height"
+    file: "src/components/SundayCard.tsx"
+    cr_ids: [229]
+    changes:
+      - "Replace the existing static minHeight (62px from F154) with a dynamic calculation"
+      - "When !expanded, compute minHeight based on maximum number of lines for current manage_prayers state:"
+      - "  managePrayers=true: 5 lines (opening prayer + 3 speeches + closing prayer)"
+      - "  managePrayers=false: 3 lines (3 speeches)"
+      - "minHeight formula: maxLines * lineHeight + (maxLines - 1) * marginBottom"
+      - "  Where lineHeight = fontSize(13) + some vertical padding (~16-18px per line)"
+      - "  And marginBottom = 1 (from CR-228)"
+      - "Apply minHeight to headerCenter style when !expanded (both isSpeechesType and non-speeches cards)"
+      - "Cards with fewer lines (testimony, conference) get empty space below content"
+    contract:
+      input: "managePrayers flag, expanded state"
+      output: "headerCenter View gets minHeight when !expanded, calculated for max line count"
+    dependencies: ["SundayCardReducedSpacing"]
+    notes: >
+      The existing F154 approach (minHeight: 62) is replaced with a dynamic value.
+      The style can be applied inline: style={[styles.headerCenter, !expanded && { minHeight: calculatedHeight }]}.
+      The exact pixel values should be validated on device to ensure visual correctness.
+
+  # --- 7. CR-225: Pass managePrayers to NextSundaysSection ---
+
+  - name: "NextSundaysSectionManagePrayers"
+    responsibility: "Pass managePrayers prop to SundayCard components in NextSundaysSection"
+    file: "src/components/NextSundaysSection.tsx"
+    cr_ids: [225]
+    changes:
+      - "Import useWardManagePrayers from '../hooks/useSpeeches'"
+      - "Call const { managePrayers } = useWardManagePrayers() at component level"
+      - "Add managePrayers={managePrayers} prop to each SundayCard in the map loop (line ~94)"
+      - "Same pattern as NextAssignmentsSection which already passes managePrayers"
+    contract:
+      input: "useWardManagePrayers() hook result"
+      output: "SundayCard receives managePrayers prop, enabling prayer lines in collapsed cards"
+    dependencies: []
+    notes: >
+      NextAssignmentsSection already implements this pattern correctly.
+      NextSundaysSection was missed in CR-221 and needs the same plumbing.
+
+  # --- 8. CR-224: Rename toggle, reorder, add description ---
+
+  - name: "SettingsManagePrayersRework"
+    responsibility: "Rename toggle label, move to 2nd position, add description text"
+    file: "src/app/(tabs)/settings/index.tsx"
+    cr_ids: [224]
+    changes:
+      - "Move the managePrayers toggle block (lines ~246-257) from last position in Ward Settings to 2nd position (after Members item, before Topics)"
+      - "The toggle label already uses t('settings.managePrayers') which will be updated via i18n changes"
+      - "Add a description Text below the toggle label using t('settings.managePrayersDescription')"
+      - "The description uses smaller font (fontSize: 12) and secondary text color (colors.textSecondary)"
+      - "The toggle item becomes a multi-row layout: left side has label + description, right side has Switch"
+    contract:
+      before: |
+        [Members] [Topics] [WhatsApp] [WardLanguage] [Timezone] [ManagePrayers]
+      after: |
+        [Members] [ManagePrayers + description] [Topics] [WhatsApp] [WardLanguage] [Timezone]
+    dependencies: ["I18nF158Updates"]
+    notes: >
+      The View structure for the toggle item changes from a simple row
+      (Text + Switch) to a row with a left column (label Text + description Text)
+      and Switch on the right. The left column uses flex:1 to take remaining space.
+
+  # --- 9. CR-226: Multiline tab label ---
+
+  - name: "TabLayoutMultilineLabel"
+    responsibility: "Allow Speeches & Prayers tab label to wrap to 2 lines"
+    file: "src/app/(tabs)/_layout.tsx"
+    cr_ids: [226]
+    changes:
+      - "Add tabBarLabelStyle to Tabs screenOptions with textAlign: 'center' and fontSize: 10"
+      - "On the speeches Tabs.Screen options, use a custom tabBarLabel render function that renders a Text component with numberOfLines={2} and textAlign:'center'"
+      - "This allows the longer 'Discursos e Oracoes' label to wrap naturally to 2 lines"
+      - "Other tabs with shorter labels remain single-line (wrapping only occurs when needed)"
+    contract:
+      input: "speechesTabTitle string (may be long when managePrayers=true)"
+      output: "Tab label Text with numberOfLines={2}, allowing natural wrapping"
+    dependencies: []
+    notes: >
+      The tabBarLabel render function receives { focused, color } props from
+      React Navigation. The Text component should use the same fontSize and color
+      as the default tab label, just with numberOfLines={2} and textAlign:'center'.
+
+  # --- 10. i18n Updates ---
+
+  - name: "I18nF158Updates"
+    responsibility: "Update and add i18n keys for CRs 224 and 226"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [224, 226]
+    changes:
+      - "Update settings.managePrayers:"
+      - "  pt-BR: 'Usar Convites para Orações'"
+      - "  en: 'Use Invitations for Prayers'"
+      - "  es: 'Usar Invitaciones para Oraciones'"
+      - "Add settings.managePrayersDescription:"
+      - "  pt-BR: 'Ative esta opção caso queira enviar convites para que pessoas façam as orações de abertura e encerramento, assim como já é feito com os discursos.'"
+      - "  en: 'Enable this option if you want to send invitations for people to give the opening and closing prayers, just like it is already done with speeches.'"
+      - "  es: 'Active esta opción si desea enviar invitaciones para que las personas hagan las oraciones de apertura y cierre, tal como ya se hace con los discursos.'"
+    dependencies: []
+    notes: >
+      CR-226 does not need new i18n keys. The tab label already uses
+      t('tabs.speechesAndPrayers') which was added in CR-221/F157. The multiline
+      rendering is a styling change, not a content change.
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "sunday_card_prayer_led"
+    components: ["SundayCardPrayerStatusLED", "SundayCardConditionalPrayerLabel"]
+    methods:
+      - name: "Prayer line rendering pattern"
+        input: "Speech record for position 0 or 4 (from speeches prop)"
+        output: "[StatusLED(status, size=10)] [conditional Text: prefix+name or ' ']"
+        notes: >
+          CR-222 adds the StatusLED, CR-223 makes the text conditional. Both changes
+          apply to the same prayer line View elements in both isSpeechesType and
+          isTestimonyOrPrimary branches.
+
+  - name: "sunday_card_height_calculation"
+    components: ["SundayCardReducedSpacing", "SundayCardUniformHeight"]
+    methods:
+      - name: "Dynamic minHeight on headerCenter"
+        input: "managePrayers: boolean, expanded: boolean"
+        output: "minHeight value based on maxLines * lineHeight + (maxLines-1) * marginBottom"
+        notes: >
+          CR-228 changes marginBottom which directly affects the height calculation
+          in CR-229. CR-229 must use the new marginBottom value (1) in its formula.
+
+  - name: "next_sundays_manage_prayers_prop"
+    components: ["NextSundaysSectionManagePrayers", "SundayCardPrayerStatusLED"]
+    methods:
+      - name: "managePrayers prop flow"
+        input: "useWardManagePrayers() -> managePrayers boolean"
+        output: "SundayCard in NextSundaysSection receives managePrayers, enabling prayer lines with StatusLED"
+        notes: >
+          Without CR-225, the SundayCards in NextSundaysSection would not show
+          prayer lines even when managePrayers=true. This is a data plumbing fix.
+
+  - name: "agenda_form_prayer_label"
+    components: ["AgendaFormDoubleLabel_Fix"]
+    methods:
+      - name: "Inline prayer content rendering"
+        input: "managePrayers=true, getSpeech(0/4)?.speaker_name"
+        output: "Single FieldRow with inline View content (no nested FieldRow)"
+        notes: >
+          The fix only affects the managePrayers=true branch. The PrayerSelector
+          branch (managePrayers=false) is unchanged and has no double-label issue.
+
+  - name: "settings_toggle_layout"
+    components: ["SettingsManagePrayersRework", "I18nF158Updates"]
+    methods:
+      - name: "Toggle item with description"
+        input: "t('settings.managePrayers'), t('settings.managePrayersDescription')"
+        output: "Multi-row item: [label + description text] [Switch]"
+        notes: >
+          The i18n values must be updated before the settings layout change is
+          visible correctly. However, the code change and i18n change can be
+          committed together.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-109
+    title: "Inline prayer content in AgendaForm instead of modifying ReadOnlySpeakerRow"
+    context: >
+      CR-230 fixes a double-label bug where ReadOnlySpeakerRow wraps its content
+      in a FieldRow, and the parent code also wraps it in a FieldRow. Two options:
+      (a) add a skipFieldRow prop to ReadOnlySpeakerRow, (b) render the content
+      inline in the parent, bypassing ReadOnlySpeakerRow for prayer fields.
+    decision: >
+      Use inline rendering in AgendaForm for prayer fields (positions 0/4) when
+      managePrayers=true. Copy the View+Text+PencilIcon structure directly into
+      the FieldRow children, without calling ReadOnlySpeakerRow. This avoids
+      modifying ReadOnlySpeakerRow which would risk regressions for speech fields
+      (positions 1, 2, 3) that use it without a parent FieldRow.
+    decided_in: "CR-230/F158"
+    consequences:
+      - "Zero risk of regression for speech ReadOnlySpeakerRow calls"
+      - "Small code duplication (View+Text+PencilIcon pattern appears inline)"
+      - "If ReadOnlySpeakerRow layout changes in future, prayer inline code must be updated separately"
+
+  - id: ADR-110
+    title: "Dynamic minHeight replaces hardcoded 62px for collapsed card height"
+    context: >
+      F154 (CR-219) set a static minHeight:62 on headerCenter for uniform card
+      height with 3 lines. With managed prayers (5 lines max), 62px is insufficient.
+      Options: (a) increase to new static value, (b) calculate dynamically based
+      on managePrayers flag and line metrics.
+    decision: >
+      Calculate minHeight dynamically: maxLines * lineHeight + (maxLines - 1) *
+      marginBottom. maxLines is 5 when managePrayers=true, 3 when false. This
+      automatically adapts to the reduced marginBottom from CR-228 and any future
+      line count changes.
+    decided_in: "CR-229/F158"
+    supersedes: "F154 static minHeight:62 approach"
+    consequences:
+      - "Height automatically adjusts when managePrayers toggle changes"
+      - "No magic numbers: formula is transparent and maintainable"
+      - "Requires visual validation to determine correct lineHeight constant"
+
+  - id: ADR-111
+    title: "Custom tabBarLabel render function for multiline tab label"
+    context: >
+      CR-226 needs the 'Discursos e Oracoes' tab label to wrap to 2 lines.
+      React Navigation's default tab label uses numberOfLines={1}. Options:
+      (a) use tabBarLabelStyle only, (b) use custom tabBarLabel render function
+      with explicit numberOfLines={2}.
+    decision: >
+      Use a custom tabBarLabel render function on the speeches tab that renders
+      a Text component with numberOfLines={2} and textAlign:'center'. This gives
+      explicit control over line wrapping. The tabBarLabelStyle in screenOptions
+      can set textAlign:'center' globally. Other tabs keep default single-line behavior
+      since their labels are short enough.
+    decided_in: "CR-226/F158"
+    consequences:
+      - "Only the speeches tab gets custom rendering"
+      - "Tab bar height may need minor adjustment for 2-line labels"
+      - "When managePrayers=false, label is 'Discursos' (single word, no wrapping occurs)"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F158, F157]
+    interaction: >
+      F158 is entirely a UI refinement layer on top of F157. All 9 CRs assume
+      F157 (CR-221) is fully implemented. F158 does not change any data model,
+      hooks, or business logic from F157.
+
+  - features: [F158, F154]
+    interaction: >
+      F154 (CR-219) set a static minHeight:62 on headerCenter for uniform card
+      height. CR-229 replaces this with a dynamic calculation that accounts for
+      both managePrayers=true (5 lines) and managePrayers=false (3 lines).
+      ADR-110 supersedes the F154 static approach.
+
+  - features: [F158, F151]
+    interaction: >
+      F151 (CR-215) was the original uniform card height feature for isSpeechesType
+      only. F154 (CR-219) extended it to all types. CR-229 replaces both with
+      dynamic height calculation.
+
+  - features: [F158, F118]
+    interaction: >
+      F118 (CR-181) introduced has_second_speech toggle affecting visible positions
+      in collapsed cards (2 or 3 lines). CR-229 uniform height uses maxLines=5
+      (when managePrayers=true) or maxLines=3 (when false), regardless of
+      has_second_speech. Cards with fewer lines get empty space.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/components/SundayCard.tsx
+    feature: F158
+    cr_ids: [222, 223, 227, 228, 229]
+    changes:
+      - "CR-222: Add StatusLED to prayer lines in both isSpeechesType and isTestimonyOrPrimary collapsed branches"
+      - "CR-223: Conditional prayer text (show prefix+name when name exists, show ' ' when empty)"
+      - "CR-227: marginTop on first prayer View after exception text in testimony/primary branch"
+      - "CR-228: speechRow marginBottom reduced from 4 to 1"
+      - "CR-229: Dynamic minHeight on headerCenter when !expanded based on managePrayers"
+
+  - file: src/components/AgendaForm.tsx
+    feature: F158
+    cr_ids: [230]
+    changes:
+      - "Replace ReadOnlySpeakerRow calls for prayer fields (managePrayers=true) with inline View+Text+PencilIcon rendering inside existing FieldRow"
+
+  - file: src/app/(tabs)/settings/index.tsx
+    feature: F158
+    cr_ids: [224]
+    changes:
+      - "Move managePrayers toggle to 2nd position in Ward Settings group"
+      - "Add description text below toggle label"
+      - "Restructure toggle item layout for label + description + Switch"
+
+  - file: src/app/(tabs)/_layout.tsx
+    feature: F158
+    cr_ids: [226]
+    changes:
+      - "Add custom tabBarLabel render function for speeches tab with numberOfLines={2}"
+
+  - file: src/components/NextSundaysSection.tsx
+    feature: F158
+    cr_ids: [225]
+    changes:
+      - "Import and call useWardManagePrayers hook"
+      - "Pass managePrayers prop to SundayCard components"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F158
+    cr_ids: [224]
+    changes:
+      - "Update settings.managePrayers value"
+      - "Add settings.managePrayersDescription key"
+
+  - file: src/i18n/locales/en.json
+    feature: F158
+    cr_ids: [224]
+    changes:
+      - "Update settings.managePrayers value"
+      - "Add settings.managePrayersDescription key"
+
+  - file: src/i18n/locales/es.json
+    feature: F158
+    cr_ids: [224]
+    changes:
+      - "Update settings.managePrayers value"
+      - "Add settings.managePrayersDescription key"
+
+files_not_modified:
+  - "src/components/NextAssignmentsSection.tsx (already passes managePrayers correctly)"
+  - "src/components/SpeechSlot.tsx (no changes needed)"
+  - "src/hooks/useSpeeches.ts (no logic changes)"
+  - "src/components/StatusLED.tsx (unchanged, just consumed)"
+  - "src/components/PrayerSelector.tsx (unchanged)"
+  - "src/types/database.ts (no schema changes)"
+  - "supabase/migrations/ (no DB changes)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 10 components, each with one responsibility
+  GATE-03_contracts_defined: true        # 5 cross-component contracts defined
+  GATE-04_adrs_recorded: true           # ADR-109 through ADR-111 (3 ADRs)
+  GATE-05_arch_saved: true              # ARCH_M158.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED updated with F158 entries
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 10 components (appropriate for 9 CRs)

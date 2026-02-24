@@ -32,6 +32,7 @@
 # CR-211, CR-212, CR-213, CR-214, CR-215 (PRE+POST) - Batch 23 Phase 2
 # CR-216, CR-217, CR-219 (PRE+POST) - Batch 24 Phase 1
 # CR-221 (PRE+POST Phase 1, PRE+POST Phase 2, PRE+POST Phase 3) - Batch 25
+# CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230 (PRE+POST) - Batch 26
 # Updated: 2026-02-24
 # =============================================================================
 
@@ -12969,4 +12970,253 @@ cr_221_phase3:
         reason: "Depends on SundayAgenda type cleanup above."
         impact: "None. Tests compile and pass."
         recommendation: "Update when SundayAgenda type is cleaned up."
+
+# #############################################################################
+# Batch 26 - F158: UI Adjustments for Managed Prayers (CRs 222-230)
+# #############################################################################
+
+batch_26_f158:
+  feature_id: F158
+  title: "Ajustes UI Oracoes Gerenciadas"
+  crs: [222, 223, 224, 225, 226, 227, 228, 229, 230]
+  type: feature_request
+  spec: specs/SPEC_F158.yaml
+  qa_plan: qa/QA_PLAN_026.yaml
+
+  pre_validation:
+    validated: true
+    validation_date: "2026-02-24"
+    notes: "All 9 CRs feasible. CR-230 confirmed as bug (double label in AgendaForm)."
+
+  # ===========================================================================
+  # Phase 1 POST Validation
+  # ===========================================================================
+  phase_1:
+    verdict: passed
+    validation_date: "2026-02-24"
+    commits:
+      - hash: "14ae344"
+        desc: "fix(agenda): inline prayer content in AgendaForm to fix double-label bug (CR-230)"
+      - hash: "8d5872d"
+        desc: "feat(sunday-card): add StatusLED circles to prayer lines (CR-222)"
+      - hash: "9b3deff"
+        desc: "feat(sunday-card): hide prayer label when no name assigned (CR-223)"
+      - hash: "5082266"
+        desc: "feat(sunday-card): add spacing gap after exception text (CR-227)"
+      - hash: "8cfcb9e"
+        desc: "feat(sunday-card): reduce speechRow marginBottom from 4 to 1 (CR-228)"
+      - hash: "83b87f9"
+        desc: "feat(sunday-card): dynamic minHeight for uniform collapsed card height (CR-229)"
+      - hash: "a2f2087"
+        desc: "feat(next-sundays): pass managePrayers prop to SundayCard (CR-225)"
+      - hash: "b368db1"
+        desc: "feat(settings): rename toggle, reorder to 2nd position, add description (CR-224)"
+      - hash: "160f045"
+        desc: "feat(layout): multiline tab label for Speeches & Prayers tab (CR-226)"
+      - hash: "4874f59"
+        desc: "docs(code-ledger): add Batch 26 F158 commit entries"
+      - hash: "3aa3182"
+        desc: "test(batch26): add tests for F158 (CRs 222-230)"
+      - hash: "f136692"
+        desc: "docs(test-consolidated): add Batch 26 Phase 1 test entries"
+      - hash: "3824461"
+        desc: "fix(test): update marginBottom expectation in batch15 test for CR-228 (R-1)"
+      - hash: "9d5d5f8"
+        desc: "docs(code-ledger): add R-1 fix commit entry"
+
+    # =========================================================================
+    # Validation Checks - must_pass
+    # =========================================================================
+    must_pass:
+      F158-MP01:
+        cr: 222
+        description: "Collapsed card shows StatusLED circles for all 5 lines when managePrayers enabled"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L538-561: Opening prayer IIFE renders StatusLED size={10} with status from position 0"
+          - "SundayCard.tsx L562-593: Speech positions via visiblePositions.map render StatusLED size={10}"
+          - "SundayCard.tsx L595-618: Closing prayer IIFE renders StatusLED size={10} with status from position 4"
+          - "SundayCard.tsx L466-521: Testimony/primary collapsed also renders StatusLED for both prayer positions"
+          - "Tests: AC-158-01 through AC-158-05 all pass (batch26-f158.test.ts)"
+
+      F158-MP02:
+        cr: 223
+        description: "When no prayer name assigned, show only StatusLED circle without label text"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L546-558: Opening prayer has conditional: openingPrayer?.speaker_name ? (prefix+name) : (' ')"
+          - "SundayCard.tsx L603-615: Closing prayer has identical conditional rendering"
+          - "SundayCard.tsx L486-498, L505-517: Testimony/primary follows same pattern"
+          - "When no name: renders {' '} (empty space) in Text with same height, effectively showing only StatusLED"
+          - "Tests: AC-158-06 through AC-158-08 all pass"
+
+      F158-MP03:
+        cr: 224
+        description: "Settings 'Usar Convites para Oracoes' as 2nd item with explanatory text"
+        result: PASS
+        evidence:
+          - "settings/index.tsx L217-233: managePrayers toggle after Members (L210-216), before Topics (L234-240)"
+          - "i18n pt-BR L143: managePrayers = 'Usar Convites para Oracoes'"
+          - "i18n en L143: managePrayers = 'Use Invitations for Prayers'"
+          - "i18n es L143: managePrayers = 'Usar Invitaciones para Oraciones'"
+          - "settings/index.tsx L223-225: Description text via t('settings.managePrayersDescription') with fontSize:12"
+          - "Exact pt-BR description matches user request: 'Ative esta opcao caso queira enviar convites...'"
+          - "Tests: AC-158-09 through AC-158-11 all pass"
+
+      F158-MP04:
+        cr: 225
+        description: "Home tab collapsed cards show same content as Speeches tab"
+        result: PASS
+        evidence:
+          - "NextSundaysSection.tsx L24-25: imports useWardManagePrayers"
+          - "NextSundaysSection.tsx L36: const { managePrayers } = useWardManagePrayers()"
+          - "NextSundaysSection.tsx L103: SundayCard receives managePrayers={managePrayers} prop"
+          - "Both tabs use same SundayCard component from './SundayCard'"
+          - "Tests: AC-158-12 and AC-158-13 all pass"
+
+      F158-MP05:
+        cr: 226
+        description: "Tab text 'Discursos e Oracoes' displays without truncation"
+        result: PASS
+        evidence:
+          - "_layout.tsx L64-71: Custom tabBarLabel renders Text with numberOfLines={2}"
+          - "_layout.tsx L67: textAlign: 'center', fontSize: 10"
+          - "_layout.tsx L17-19: speechesTabTitle conditionally uses speechesAndPrayers or speeches i18n key"
+          - "Only the speeches tab has custom tabBarLabel; other tabs use standard title"
+          - "Tests: AC-158-14 and AC-158-15 all pass"
+
+      F158-MP06:
+        cr: 227
+        description: "Space between exception text and prayer lines in collapsed card"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L481: First prayer View has { marginTop: 6 } added to styles.speechRow"
+          - "Applies only to testimony/primary with managePrayers collapsed (L466)"
+          - "Closing prayer row (L500) has no extra marginTop (correct: only gap after exception text)"
+          - "Tests: AC-158-16 and AC-158-17 pass"
+
+      F158-MP07:
+        cr: 228
+        description: "Reduced spacing between name lines in collapsed cards"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L702: speechRow style marginBottom: 1 (was 4)"
+          - "All rows (prayers and speeches) use styles.speechRow - 5+ usages confirmed"
+          - "Shared style applies equally in Home tab and Speeches tab"
+          - "Tests: AC-158-18 through AC-158-20 pass"
+
+      F158-MP08:
+        cr: 229
+        description: "All collapsed cards have same height regardless of content"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L440-443: Dynamic constants LINE_HEIGHT=18, MARGIN_BOTTOM=1, maxLines=managePrayers?5:3"
+          - "SundayCard.tsx L443: collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines-1) * MARGIN_BOTTOM"
+          - "SundayCard.tsx L464: headerCenter style includes !expanded && { minHeight: collapsedMinHeight }"
+          - "managePrayers=true: 5*18 + 4*1 = 94; managePrayers=false: 3*18 + 2*1 = 56"
+          - "headerCenter wraps all content types (speeches, exception text, testimony/primary)"
+          - "Tests: AC-158-21 through AC-158-25 and EC-158-02/04 pass"
+
+      F158-MP09:
+        cr: 230
+        description: "No duplicate prayer labels in expanded agenda form"
+        result: PASS
+        evidence:
+          - "AgendaForm.tsx L299-338: Opening prayer FieldRow with managePrayers branch uses inline View with speakerReadRow style (NOT ReadOnlySpeakerRow)"
+          - "AgendaForm.tsx L535-574: Closing prayer FieldRow with managePrayers branch uses inline View (NOT ReadOnlySpeakerRow)"
+          - "ReadOnlySpeakerRow (L726-759) still wraps in FieldRow for speech positions 1,2,3"
+          - "Prayer labels appear exactly once each: from the outer FieldRow only"
+          - "Tests: AC-158-26 through AC-158-29 and EC-158-06 pass"
+
+    # =========================================================================
+    # Validation Checks - should_pass
+    # =========================================================================
+    should_pass:
+      F158-SP01:
+        cr: 222
+        description: "NextAssignmentsSection also passes managePrayers to SundayCard"
+        result: FAIL
+        evidence:
+          - "NextAssignmentsSection.tsx L155-163: SundayCard does NOT receive managePrayers prop"
+          - "managePrayers is only used for sectionTitleText (L53-55), not passed to SundayCard"
+          - "SPEC notes this file as files_not_modified with rationale 'already passes managePrayers correctly' - this is inaccurate"
+          - "Impact: Low. NextAssignmentsSection is bishopric-only and shows a single future card (usually expanded). Collapsed view would show 3 lines instead of 5."
+        impact: "Non-blocking. Bishopric-only section, minor visual inconsistency in collapsed state."
+
+      F158-SP02:
+        cr: 222
+        description: "Testimony/primary collapsed cards with managePrayers show StatusLED for prayer lines"
+        result: PASS
+        evidence:
+          - "SundayCard.tsx L466-521: isTestimonyOrPrimary && managePrayers && !expanded block renders StatusLED for both prayer positions"
+          - "Tests: AC-158-03 passes"
+
+      F158-SP03:
+        cr: 224
+        description: "Explanatory text uses i18n in all 3 languages"
+        result: PASS
+        evidence:
+          - "pt-BR: 'Ative esta opcao caso queira enviar convites...'"
+          - "en: 'Enable this option if you want to send invitations...'"
+          - "es: 'Active esta opcion si desea enviar invitaciones...'"
+          - "Tests: AC-158-11 passes for all 3 locales"
+
+      F158-SP04:
+        cr: 229
+        description: "Cards with has_second_speech=false still match height"
+        result: PASS
+        evidence:
+          - "collapsedMinHeight is computed once from maxLines (5 or 3), independent of content"
+          - "minHeight applies to headerCenter regardless of visiblePositions [1,3] vs [1,2,3]"
+
+      F158-SP05:
+        cr: 228
+        description: "Reduced spacing applies equally in both tabs"
+        result: PASS
+        evidence:
+          - "speechRow style is in SundayCard.tsx StyleSheet, shared by both tabs"
+          - "Tests: AC-158-20 passes"
+
+      F158-SP06:
+        cr: 226
+        description: "Tab text wrapping works in pt-BR and es"
+        result: PASS
+        evidence:
+          - "numberOfLines={2} allows wrapping for all languages"
+          - "Both 'Discursos e Oracoes' (pt-BR) and 'Discursos y Oraciones' (es) can wrap to 2 lines"
+
+    # =========================================================================
+    # Superseded Tests from Previous Batches
+    # =========================================================================
+    superseded_tests:
+      total_superseded: 10
+      details:
+        - file: "batch23-phase2.test.ts"
+          count: 2
+          reason: "CR-228 changed marginBottom from 4 to 1; CR-229 changed from justifyContent to minHeight"
+        - file: "batch24-phase1.test.ts"
+          count: 2
+          reason: "CR-229 superseded CR-219's justifyContent approach with minHeight approach"
+        - file: "batch25-phase1.test.ts"
+          count: 2
+          reason: "CR-224 renamed 'Managed Prayers' to 'Use Invitations for Prayers' and moved toggle position"
+        - file: "batch25-phase2.test.ts"
+          count: 3
+          reason: "CR-222 added StatusLED to prayer lines; CR-223 changed label visibility logic"
+        - file: "batch25-phase3.test.ts"
+          count: 1
+          reason: "CR-230 changed from ReadOnlySpeakerRow to inline rendering for prayer fields"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch26-f158.test.ts"
+      tests_passed: 87
+      tests_total: 87
+      full_suite_passed: 6878
+      full_suite_total: 6937
+      full_suite_skipped: 49
+      full_suite_failed: 10
+      full_suite_failed_note: "All 10 failures are superseded tests from batches 23-25, intentionally invalidated by this batch's changes"
 

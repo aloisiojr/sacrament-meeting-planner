@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { resolveTemplate, buildWhatsAppUrl, DEFAULT_TEMPLATE_PT_BR } from '../lib/whatsappUtils';
+import { resolveTemplate, buildWhatsAppUrl, DEFAULT_TEMPLATE_SPEECH_1_PT_BR } from '../lib/whatsappUtils';
 import {
   areNext3FullyAssigned,
   findNextPendingSunday,
@@ -68,17 +68,16 @@ function mockFormatDate(date: string, locale: 'pt-BR' | 'en' | 'es'): string {
 
 describe('PHASE-03: WhatsApp URL edge cases', () => {
   describe('resolveTemplate', () => {
-    it('handles all 6 placeholders', () => {
-      const template = '{nome} {data} {posicao} {colecao} {titulo} {link}';
+    it('handles all 5 placeholders', () => {
+      const template = '{nome} {data} {colecao} {titulo} {link}';
       const result = resolveTemplate(template, {
         speakerName: 'Joao',
         date: '15 FEV',
-        position: '1o',
         collection: 'Conference',
         topic: 'Faith',
         link: 'https://example.com',
       });
-      expect(result).toBe('Joao 15 FEV 1o Conference Faith https://example.com');
+      expect(result).toBe('Joao 15 FEV Conference Faith https://example.com');
     });
 
     it('handles template with multiple occurrences of same placeholder', () => {
@@ -86,18 +85,16 @@ describe('PHASE-03: WhatsApp URL edge cases', () => {
       const result = resolveTemplate(template, {
         speakerName: 'Maria',
         date: '',
-        position: '',
         topic: '',
       });
       expect(result).toBe('Maria says Maria is here');
     });
 
     it('returns trimmed result when all placeholders are empty', () => {
-      const template = '{nome} {data} {posicao}';
+      const template = '{nome} {data}';
       const result = resolveTemplate(template, {
         speakerName: '',
         date: '',
-        position: '',
         topic: '',
       });
       expect(result).toBe('');
@@ -109,7 +106,6 @@ describe('PHASE-03: WhatsApp URL edge cases', () => {
       const url = buildWhatsAppUrl('+55.11.98765.4321', '', '', {
         speakerName: 'Test',
         date: '',
-        position: '',
         topic: '',
       });
       // periods are NOT cleaned (only spaces, dashes, parentheses are)
@@ -120,7 +116,6 @@ describe('PHASE-03: WhatsApp URL edge cases', () => {
       const url = buildWhatsAppUrl('', '+55', '', {
         speakerName: 'Test',
         date: '',
-        position: '',
         topic: '',
       });
       expect(url).toContain('wa.me/55');
@@ -130,7 +125,6 @@ describe('PHASE-03: WhatsApp URL edge cases', () => {
       const url = buildWhatsAppUrl('+5511999999999', '+55', '', {
         speakerName: 'Test',
         date: '',
-        position: '',
         topic: '',
       });
       expect(url).toContain('wa.me/5511999999999');
@@ -139,19 +133,18 @@ describe('PHASE-03: WhatsApp URL edge cases', () => {
     });
   });
 
-  describe('DEFAULT_TEMPLATE_PT_BR', () => {
+  describe('DEFAULT_TEMPLATE_SPEECH_1_PT_BR', () => {
     it('contains all expected placeholders', () => {
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('{posicao}');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('{data}');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('{colecao}');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('{titulo}');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('{link}');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('{data}');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('{colecao}');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('{titulo}');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('{link}');
     });
 
     it('is in Portuguese', () => {
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('Bispado');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('discurso');
-      expect(DEFAULT_TEMPLATE_PT_BR).toContain('domingo');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('Bispado');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('discurso');
+      expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('domingo');
     });
   });
 });

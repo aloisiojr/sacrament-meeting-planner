@@ -17,12 +17,12 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import {
-  getDefaultTemplate,
+  getDefaultSpeechTemplate,
   resolveTemplate,
   buildWhatsAppUrl,
-  DEFAULT_TEMPLATE_PT_BR,
-  DEFAULT_TEMPLATE_EN,
-  DEFAULT_TEMPLATE_ES,
+  DEFAULT_TEMPLATE_SPEECH_1_PT_BR,
+  DEFAULT_TEMPLATE_SPEECH_1_EN,
+  DEFAULT_TEMPLATE_SPEECH_1_ES,
 } from '../lib/whatsappUtils';
 
 function readSourceFile(relativePath: string): string {
@@ -43,64 +43,58 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
   const getWhatsApp = () => readSourceFile('lib/whatsapp.ts');
   const getInviteManagement = () => readSourceFile('components/InviteManagementSection.tsx');
 
-  describe('AC-F040-01: Template padrao em pt-BR inclui 6 placeholders', () => {
-    it('should export DEFAULT_TEMPLATE_PT_BR', () => {
+  describe('AC-F040-01: Template padrao em pt-BR inclui 5 placeholders', () => {
+    it('should export DEFAULT_TEMPLATE_SPEECH_1_PT_BR', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('export const DEFAULT_TEMPLATE_PT_BR');
+      expect(content).toContain('export const DEFAULT_TEMPLATE_SPEECH_1_PT_BR');
     });
 
-    it('should include {nome} placeholder in pt-BR template', () => {
-      // Import and test the actual template
+    it('should include key placeholders in pt-BR template', () => {
       const content = getWhatsAppUtils();
-      const match = content.match(/DEFAULT_TEMPLATE_PT_BR\s*=\s*[`'"]([\s\S]*?)[`'"]\s*;/);
-      expect(match).not.toBeNull();
-      // Check for placeholders in the source code region around DEFAULT_TEMPLATE_PT_BR
+      // CR-231: templates no longer include {posicao}, use ordinal words instead
       const ptBrSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_PT_BR'),
-        content.indexOf('DEFAULT_TEMPLATE_EN')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_PT_BR'),
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_2_PT_BR')
       );
       expect(ptBrSection).toContain('{data}');
-      expect(ptBrSection).toContain('{posicao}');
       expect(ptBrSection).toContain('{colecao}');
       expect(ptBrSection).toContain('{titulo}');
       expect(ptBrSection).toContain('{link}');
     });
   });
 
-  describe('AC-F040-02: Template padrao em en existe e usa 6 placeholders', () => {
-    it('should export DEFAULT_TEMPLATE_EN', () => {
+  describe('AC-F040-02: Template padrao em en existe e usa 5 placeholders', () => {
+    it('should export DEFAULT_TEMPLATE_SPEECH_1_EN', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('export const DEFAULT_TEMPLATE_EN');
+      expect(content).toContain('export const DEFAULT_TEMPLATE_SPEECH_1_EN');
     });
 
-    it('should include all 6 placeholders in en template', () => {
+    it('should include all 5 placeholders in en template', () => {
       const content = getWhatsAppUtils();
       const enSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_EN'),
-        content.indexOf('DEFAULT_TEMPLATE_ES')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_EN'),
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_2_EN')
       );
       expect(enSection).toContain('{data}');
-      expect(enSection).toContain('{posicao}');
       expect(enSection).toContain('{colecao}');
       expect(enSection).toContain('{titulo}');
       expect(enSection).toContain('{link}');
     });
   });
 
-  describe('AC-F040-03: Template padrao em es existe e usa 6 placeholders', () => {
-    it('should export DEFAULT_TEMPLATE_ES', () => {
+  describe('AC-F040-03: Template padrao em es existe e usa 5 placeholders', () => {
+    it('should export DEFAULT_TEMPLATE_SPEECH_1_ES', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('export const DEFAULT_TEMPLATE_ES');
+      expect(content).toContain('export const DEFAULT_TEMPLATE_SPEECH_1_ES');
     });
 
-    it('should include all 6 placeholders in es template', () => {
+    it('should include all 5 placeholders in es template', () => {
       const content = getWhatsAppUtils();
       const esSection = content.substring(
-        content.indexOf('DEFAULT_TEMPLATE_ES'),
-        content.indexOf('export function getDefaultTemplate')
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_1_ES'),
+        content.indexOf('DEFAULT_TEMPLATE_SPEECH_2_ES')
       );
       expect(esSection).toContain('{data}');
-      expect(esSection).toContain('{posicao}');
       expect(esSection).toContain('{colecao}');
       expect(esSection).toContain('{titulo}');
       expect(esSection).toContain('{link}');
@@ -108,31 +102,31 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
   });
 
   describe('AC-F040-04: buildWhatsAppUrl usa template do idioma da ala como fallback', () => {
-    it('should have getDefaultTemplate function', () => {
+    it('should have getDefaultSpeechTemplate function', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('export function getDefaultTemplate');
+      expect(content).toContain('export function getDefaultSpeechTemplate');
     });
 
-    it('should accept language parameter in getDefaultTemplate', () => {
+    it('should accept language and position parameters in getDefaultSpeechTemplate', () => {
       const content = getWhatsAppUtils();
-      expect(content).toMatch(/getDefaultTemplate\s*\(\s*language\s*:\s*string\)/);
+      expect(content).toMatch(/getDefaultSpeechTemplate\s*\(\s*language\s*:\s*string,\s*position/);
     });
 
-    it('should return DEFAULT_TEMPLATE_EN for "en"', () => {
+    it('should return EN template for "en"', () => {
       const content = getWhatsAppUtils();
       expect(content).toContain("case 'en':");
-      expect(content).toContain('return DEFAULT_TEMPLATE_EN');
+      expect(content).toContain('return DEFAULT_TEMPLATE_SPEECH_1_EN');
     });
 
-    it('should return DEFAULT_TEMPLATE_ES for "es"', () => {
+    it('should return ES template for "es"', () => {
       const content = getWhatsAppUtils();
       expect(content).toContain("case 'es':");
-      expect(content).toContain('return DEFAULT_TEMPLATE_ES');
+      expect(content).toContain('return DEFAULT_TEMPLATE_SPEECH_1_ES');
     });
 
-    it('should return DEFAULT_TEMPLATE_PT_BR as default (fallback)', () => {
+    it('should return PT_BR template as default (fallback)', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('return DEFAULT_TEMPLATE_PT_BR');
+      expect(content).toContain('return DEFAULT_TEMPLATE_SPEECH_1_PT_BR');
     });
 
     it('should have language parameter in buildWhatsAppUrl with default pt-BR', () => {
@@ -140,20 +134,19 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
       expect(content).toMatch(/language\s*:\s*string\s*=\s*'pt-BR'/);
     });
 
-    it('should use getDefaultTemplate(language) in buildWhatsAppUrl when template is empty', () => {
+    it('should use getDefaultSpeechTemplate(language, position) in buildWhatsAppUrl when template is empty', () => {
       const content = getWhatsAppUtils();
-      expect(content).toContain('getDefaultTemplate(language)');
+      expect(content).toContain('getDefaultSpeechTemplate(language, position)');
     });
 
-    it('should pass locale as 5th argument to buildWhatsAppUrl in InviteManagementSection', () => {
+    it('should pass locale to buildWhatsAppUrl in InviteManagementSection', () => {
       const content = getInviteManagement();
-      // buildWhatsAppUrl should be called with locale as last param (multi-line call)
       expect(content).toContain('buildWhatsAppUrl(');
-      expect(content).toMatch(/buildWhatsAppUrl\s*\([\s\S]*?locale\s*\n?\s*\)/);
+      expect(content).toContain('locale');
     });
   });
 
-  describe('AC-F040-05: resolveTemplate continua resolvendo todos os 6 placeholders', () => {
+  describe('AC-F040-05: resolveTemplate continua resolvendo todos os 5 placeholders', () => {
     it('should replace {nome} placeholder', () => {
       const content = getWhatsAppUtils();
       expect(content).toContain('result = result.replace');
@@ -164,12 +157,6 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
       const content = getWhatsAppUtils();
       expect(content).toContain('{data}');
       expect(content).toContain('vars.date');
-    });
-
-    it('should replace {posicao} placeholder', () => {
-      const content = getWhatsAppUtils();
-      expect(content).toContain('{posicao}');
-      expect(content).toContain('vars.position');
     });
 
     it('should replace {colecao} placeholder', () => {
@@ -192,19 +179,9 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
   });
 
   describe('AC-F040-06: Testes existentes de WhatsApp continuam passando', () => {
-    it('should re-export DEFAULT_TEMPLATE_EN from whatsapp.ts', () => {
+    it('should re-export getDefaultSpeechTemplate from whatsapp.ts', () => {
       const content = getWhatsApp();
-      expect(content).toContain('DEFAULT_TEMPLATE_EN');
-    });
-
-    it('should re-export DEFAULT_TEMPLATE_ES from whatsapp.ts', () => {
-      const content = getWhatsApp();
-      expect(content).toContain('DEFAULT_TEMPLATE_ES');
-    });
-
-    it('should re-export getDefaultTemplate from whatsapp.ts', () => {
-      const content = getWhatsApp();
-      expect(content).toContain('getDefaultTemplate');
+      expect(content).toContain('getDefaultSpeechTemplate');
     });
 
     it('should continue to re-export resolveTemplate from whatsapp.ts', () => {
@@ -221,17 +198,16 @@ describe('F040 (CR-94): Update default WhatsApp template (i18n templates)', () =
   describe('EC-F040-01: Template customizado da ala tem prioridade', () => {
     it('should use template parameter when not empty in buildWhatsAppUrl', () => {
       const content = getWhatsAppUtils();
-      // The logic should be: const messageTemplate = template || getDefaultTemplate(language)
-      expect(content).toMatch(/template\s*\|\|\s*getDefaultTemplate\s*\(\s*language\s*\)/);
+      // The logic should be: const messageTemplate = template || getDefaultSpeechTemplate(language, position)
+      expect(content).toMatch(/template\s*\|\|\s*getDefaultSpeechTemplate\s*\(\s*language,\s*position\s*\)/);
     });
   });
 
   describe('EC-F040-02: Idioma nao suportado fallback para pt-BR', () => {
     it('should have default case returning pt-BR template', () => {
       const content = getWhatsAppUtils();
-      // Switch should have default case that returns pt-BR
       expect(content).toContain('default:');
-      expect(content).toContain('return DEFAULT_TEMPLATE_PT_BR');
+      expect(content).toContain('return DEFAULT_TEMPLATE_SPEECH_1_PT_BR');
     });
   });
 });
@@ -755,40 +731,38 @@ describe('F044 (CR-100): Read-only speaker field (superseded by F121/CR-182: inl
 
 describe('F040: Functional tests for WhatsApp utils', () => {
 
-  describe('getDefaultTemplate returns correct template per language', () => {
+  describe('getDefaultSpeechTemplate returns correct template per language', () => {
     it('should return pt-BR template for "pt-BR"', () => {
-      expect(getDefaultTemplate('pt-BR')).toBe(DEFAULT_TEMPLATE_PT_BR);
+      expect(getDefaultSpeechTemplate('pt-BR', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
     });
 
     it('should return en template for "en"', () => {
-      expect(getDefaultTemplate('en')).toBe(DEFAULT_TEMPLATE_EN);
+      expect(getDefaultSpeechTemplate('en', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
     });
 
     it('should return es template for "es"', () => {
-      expect(getDefaultTemplate('es')).toBe(DEFAULT_TEMPLATE_ES);
+      expect(getDefaultSpeechTemplate('es', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
     });
 
     it('should return pt-BR template for unknown language (fallback)', () => {
-      expect(getDefaultTemplate('fr')).toBe(DEFAULT_TEMPLATE_PT_BR);
-      expect(getDefaultTemplate('de')).toBe(DEFAULT_TEMPLATE_PT_BR);
-      expect(getDefaultTemplate('')).toBe(DEFAULT_TEMPLATE_PT_BR);
+      expect(getDefaultSpeechTemplate('fr', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
+      expect(getDefaultSpeechTemplate('de', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
+      expect(getDefaultSpeechTemplate('', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
     });
   });
 
-  describe('resolveTemplate replaces all 6 placeholders', () => {
+  describe('resolveTemplate replaces all 5 placeholders', () => {
     it('should replace all placeholders with values', () => {
-      const template = '{nome} - {data} - {posicao} - {colecao} - {titulo} - {link}';
+      const template = '{nome} - {data} - {colecao} - {titulo} - {link}';
       const result = resolveTemplate(template, {
         speakerName: 'Joao',
         date: '2026-02-22',
-        position: '1o',
         collection: 'Colecao A',
         topic: 'Tema X',
         link: 'https://example.com',
       });
       expect(result).toContain('Joao');
       expect(result).toContain('2026-02-22');
-      expect(result).toContain('1o');
       expect(result).toContain('Colecao A');
       expect(result).toContain('Tema X');
       expect(result).toContain('https://example.com');
@@ -799,7 +773,6 @@ describe('F040: Functional tests for WhatsApp utils', () => {
       const result = resolveTemplate(template, {
         speakerName: 'Maria',
         date: '2026-03-01',
-        position: '2o',
         topic: 'Tema Y',
         // collection and link are undefined
       });

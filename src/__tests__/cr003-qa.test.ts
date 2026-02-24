@@ -42,7 +42,7 @@ import {
 import {
   resolveTemplate,
   buildWhatsAppUrl,
-  DEFAULT_TEMPLATE_PT_BR,
+  DEFAULT_TEMPLATE_SPEECH_1_PT_BR,
 } from '../lib/whatsappUtils';
 import type { Role, Permission } from '../types/database';
 
@@ -279,15 +279,15 @@ describe('CR-35: Remove {duracao} placeholder', () => {
     expect(result).toContain('John');
   });
 
-  // AC-35.6: Only 6 valid placeholders
+  // AC-35.6: Only 5 valid placeholders (CR-231: posicao removed)
   // F116 (CR-178): Renamed PLACEHOLDERS to PLACEHOLDER_TOKENS
-  it('AC-35.6: whatsapp.tsx has exactly 6 placeholders', () => {
+  it('AC-35.6: whatsapp.tsx has exactly 5 placeholders', () => {
     const content = readSourceFile('app/(tabs)/settings/whatsapp.tsx');
     const placeholderMatch = content.match(/PLACEHOLDER_TOKENS\s*=\s*\[([^\]]+)\]/s);
     expect(placeholderMatch).toBeTruthy();
     const placeholders = placeholderMatch![1].match(/'\{[^}]+\}'/g);
-    expect(placeholders).toHaveLength(6);
-    const expected = ['{nome}', '{data}', '{posicao}', '{colecao}', '{titulo}', '{link}'];
+    expect(placeholders).toHaveLength(5);
+    const expected = ['{nome}', '{data}', '{colecao}', '{titulo}', '{link}'];
     for (const p of expected) {
       expect(placeholderMatch![1]).toContain(p);
     }
@@ -779,8 +779,8 @@ describe('i18n completeness for CR-3 batch', () => {
 
 describe('Cross-feature validation', () => {
   // Verify WhatsApp template default does not contain {duracao}
-  it('DEFAULT_TEMPLATE_PT_BR does not contain {duracao}', () => {
-    expect(DEFAULT_TEMPLATE_PT_BR).not.toContain('{duracao}');
+  it('DEFAULT_TEMPLATE_SPEECH_1_PT_BR does not contain {duracao}', () => {
+    expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).not.toContain('{duracao}');
   });
 
   // Verify formatFullDate consistency across locales

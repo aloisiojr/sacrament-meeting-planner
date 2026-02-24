@@ -187,7 +187,6 @@ describe('F116 (CR-178): Separate language control', () => {
     it('pt-BR has correct placeholder translations', () => {
       expect(getNestedValue(ptBR, 'whatsapp.placeholderName')).toBe('{nome}');
       expect(getNestedValue(ptBR, 'whatsapp.placeholderDate')).toBe('{data}');
-      expect(getNestedValue(ptBR, 'whatsapp.placeholderPosition')).toContain('{posi');
       expect(getNestedValue(ptBR, 'whatsapp.placeholderCollection')).toContain('{cole');
       expect(getNestedValue(ptBR, 'whatsapp.placeholderTitle')).toContain('{t');
       expect(getNestedValue(ptBR, 'whatsapp.placeholderLink')).toBe('{link}');
@@ -196,7 +195,6 @@ describe('F116 (CR-178): Separate language control', () => {
     it('en has correct placeholder translations', () => {
       expect(getNestedValue(en, 'whatsapp.placeholderName')).toBe('{name}');
       expect(getNestedValue(en, 'whatsapp.placeholderDate')).toBe('{date}');
-      expect(getNestedValue(en, 'whatsapp.placeholderPosition')).toBe('{position}');
       expect(getNestedValue(en, 'whatsapp.placeholderCollection')).toBe('{collection}');
       expect(getNestedValue(en, 'whatsapp.placeholderTitle')).toBe('{title}');
       expect(getNestedValue(en, 'whatsapp.placeholderLink')).toBe('{link}');
@@ -306,7 +304,6 @@ describe('F116 (CR-178): Separate language control', () => {
       'settings.whatsapp.preview',
       'whatsapp.placeholderName',
       'whatsapp.placeholderDate',
-      'whatsapp.placeholderPosition',
       'whatsapp.placeholderCollection',
       'whatsapp.placeholderTitle',
       'whatsapp.placeholderLink',

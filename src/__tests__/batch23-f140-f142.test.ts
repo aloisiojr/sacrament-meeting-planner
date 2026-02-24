@@ -209,10 +209,12 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
       expect(inviteSectionSource).toContain("queryKey: ['ward', wardId]");
     });
 
-    it('queries wards table selecting whatsapp_template', () => {
+    it('queries wards table selecting speech template columns', () => {
       expect(inviteSectionSource).toContain(".from('wards')");
-      // CR-221: select now includes prayer template fields
-      expect(inviteSectionSource).toContain(".select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')");
+      // CR-231: select now includes 3 per-position speech template fields
+      expect(inviteSectionSource).toContain('whatsapp_template_speech_1');
+      expect(inviteSectionSource).toContain('whatsapp_template_speech_2');
+      expect(inviteSectionSource).toContain('whatsapp_template_speech_3');
     });
 
     it('filters query by wardId', () => {
@@ -234,20 +236,20 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
 
   // --- AC-142-02: buildWhatsAppUrl receives custom template ---
   describe('AC-142-02: buildWhatsAppUrl receives the ward custom template instead of empty string', () => {
-    it('passes ward?.whatsapp_template to buildWhatsAppUrl', () => {
-      expect(inviteSectionSource).toContain('ward?.whatsapp_template');
+    it('uses per-position speech template mapping', () => {
+      // CR-231: Now uses speechTemplateMap for position-based selection
+      expect(inviteSectionSource).toContain('speechTemplateMap');
+      expect(inviteSectionSource).toContain('whatsapp_template_speech_1');
     });
 
-    it('uses nullish coalescing with empty string fallback', () => {
-      expect(inviteSectionSource).toContain("ward?.whatsapp_template ?? ''");
+    it('selectedTemplate is passed to buildWhatsAppUrl', () => {
+      expect(inviteSectionSource).toContain('selectedTemplate');
     });
 
-    it('does NOT hardcode empty string as template parameter', () => {
-      // The old pattern was: template: '' (hardcoded)
-      // The new pattern is: ward?.whatsapp_template ?? ''
-      // Verify the buildWhatsAppUrl call contains the ward template reference
+    it('buildWhatsAppUrl receives the selected template', () => {
+      // CR-231: The template is selected from speechTemplateMap by position
       const buildCall = inviteSectionSource.match(
-        /buildWhatsAppUrl\([\s\S]*?ward\?\.whatsapp_template\s*\?\?\s*''/
+        /buildWhatsAppUrl\([\s\S]*?selectedTemplate/
       );
       expect(buildCall).not.toBeNull();
     });
@@ -255,11 +257,9 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
 
   // --- AC-142-03: buildWhatsAppUrl uses default template when ward template is null ---
   describe('AC-142-03: buildWhatsAppUrl uses default template when ward template is null', () => {
-    it('ward?.whatsapp_template evaluates to undefined when ward is null/undefined', () => {
-      // When useQuery hasn't loaded yet, ward is undefined
-      // ward?.whatsapp_template is undefined, ?? '' gives ''
-      // buildWhatsAppUrl with '' falls back to getDefaultTemplate
-      expect(inviteSectionSource).toContain("ward?.whatsapp_template ?? ''");
+    it('speechTemplateMap falls back to empty string when ward template is null', () => {
+      // CR-231: ward?.whatsapp_template_speech_N ?? '' pattern
+      expect(inviteSectionSource).toContain("ward?.whatsapp_template_speech_1 ?? ''");
     });
 
     it('buildWhatsAppUrl is imported from whatsapp lib', () => {
@@ -332,10 +332,9 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
   // --- EC-142-01: Ward whatsapp_template is empty string ---
   describe('EC-142-01: Ward whatsapp_template is empty string (user intentionally cleared)', () => {
     it("empty string template falls through via ?? '' to buildWhatsAppUrl", () => {
-      // ward?.whatsapp_template is '' (empty string), ?? '' does NOT trigger ('' is not null/undefined)
-      // So '' is passed to buildWhatsAppUrl, which then checks: template || getDefaultTemplate(language)
-      // '' is falsy, so getDefaultTemplate is used -> correct default behavior
-      expect(inviteSectionSource).toContain("ward?.whatsapp_template ?? ''");
+      // CR-231: per-position templates - ward?.whatsapp_template_speech_N ?? ''
+      // '' is falsy, so getDefaultSpeechTemplate is used -> correct default behavior
+      expect(inviteSectionSource).toContain("ward?.whatsapp_template_speech_1 ?? ''");
     });
   });
 
@@ -343,8 +342,6 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
   describe('EC-142-02: Ward template query is still loading when user clicks WhatsApp button', () => {
     it('ward data defaults to undefined when query is loading', () => {
       // useQuery returns { data: ward } - when loading, ward is undefined
-      // ward?.whatsapp_template is undefined, ?? '' gives ''
-      // buildWhatsAppUrl receives '' and falls back to default template
       const dataDestructure = inviteSectionSource.match(
         /const\s*\{\s*data:\s*ward\s*\}\s*=\s*useQuery/
       );
@@ -352,8 +349,8 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
     });
 
     it('optional chaining prevents crash when ward is undefined', () => {
-      // ward?.whatsapp_template uses ?. so it doesn't crash
-      expect(inviteSectionSource).toContain('ward?.whatsapp_template');
+      // ward?.whatsapp_template_speech_N uses ?. so it doesn't crash
+      expect(inviteSectionSource).toContain('ward?.whatsapp_template_speech_1');
     });
   });
 

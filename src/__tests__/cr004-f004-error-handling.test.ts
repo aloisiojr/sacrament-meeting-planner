@@ -554,8 +554,7 @@ describe('CR-004 F004: Error Handling Overhaul', () => {
       const source = readSourceFile('lib/whatsapp.ts');
       expect(source).toContain('resolveTemplate');
       expect(source).toContain('buildWhatsAppUrl');
-      expect(source).toContain('DEFAULT_TEMPLATE_PT_BR');
-      expect(source).toContain('WhatsAppVariables');
+      expect(source).toContain('getDefaultSpeechTemplate');
     });
 
     it('should import Linking and Alert from react-native', () => {

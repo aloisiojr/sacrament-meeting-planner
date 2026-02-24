@@ -214,6 +214,23 @@ export default function SettingsScreen() {
                   colors={colors}
                 />
               )}
+              {isBishopric && (
+                <View style={[styles.item, { borderBottomColor: colors.divider }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemText, { color: colors.text }]}>
+                      {t('settings.managePrayers')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      {t('settings.managePrayersDescription')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={managePrayers}
+                    onValueChange={(val) => toggleManagePrayersMutation.mutate(val)}
+                    trackColor={{ false: colors.divider, true: colors.primary }}
+                  />
+                </View>
+              )}
               {hasPermission('topic:write') && (
                 <SettingsItem
                   label={t('settings.topics')}
@@ -242,18 +259,6 @@ export default function SettingsScreen() {
                   onPress={() => router.push('/(tabs)/settings/timezone')}
                   colors={colors}
                 />
-              )}
-              {isBishopric && (
-                <View style={[styles.item, { borderBottomColor: colors.divider }]}>
-                  <Text style={[styles.itemText, { color: colors.text }]}>
-                    {t('settings.managePrayers')}
-                  </Text>
-                  <Switch
-                    value={managePrayers}
-                    onValueChange={(val) => toggleManagePrayersMutation.mutate(val)}
-                    trackColor={{ false: colors.divider, true: colors.primary }}
-                  />
-                </View>
               )}
             </View>
           </>

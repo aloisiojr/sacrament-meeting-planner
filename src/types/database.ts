@@ -78,6 +78,9 @@ export interface Ward {
   language: string;
   timezone: string;
   whatsapp_template: string | null;
+  manage_prayers: boolean;
+  whatsapp_template_opening_prayer: string | null;
+  whatsapp_template_closing_prayer: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -133,7 +136,7 @@ export interface Speech {
   id: string;
   ward_id: string;
   sunday_date: string; // ISO date string (YYYY-MM-DD)
-  position: number; // 1, 2, or 3
+  position: number; // 0, 1, 2, 3, or 4
   member_id: string | null;
   speaker_name: string | null;
   speaker_phone: string | null;

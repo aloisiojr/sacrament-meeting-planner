@@ -540,10 +540,10 @@ describe('F099 (CR-161): Collapsed speech card redesign', () => {
     });
   });
 
-  // --- AC-099-04: Line spacing marginBottom 4 ---
+  // --- AC-099-04: Line spacing marginBottom (updated by CR-228 from 4 to 1) ---
   describe('AC-099-04: Line spacing increased', () => {
-    it('speechRow has marginBottom 4', () => {
-      expect(sundayCardSource).toMatch(/speechRow:[\s\S]*?marginBottom:\s*4/);
+    it('speechRow has marginBottom 1', () => {
+      expect(sundayCardSource).toMatch(/speechRow:[\s\S]*?marginBottom:\s*1/);
     });
   });
 

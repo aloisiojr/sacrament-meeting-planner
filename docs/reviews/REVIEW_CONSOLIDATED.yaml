@@ -2,7 +2,7 @@
 # REVIEW_CONSOLIDATED.yaml
 # Consolidated code review for CR-82, CR-80, CR-83..CR-100, CR-101..CR-111, CR-112..CR-125, CR-114..CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-150, CR-151, CR-152, CR-153, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-165, CR-166, CR-167, CR-168, CR-169, CR-170, CR-171, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-194, CR-195, CR-196, CR-197, CR-198, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-211, CR-212, CR-213, CR-214, CR-215, CR-216, CR-217, CR-219, CR-218, CR-220, CR-221
 # Reviewed: 2026-02-24
-# Version: 44
+# Version: 45
 # =============================================================================
 
 metadata:
@@ -12671,3 +12671,215 @@ cr221_phase2:
     files_reviewed: 7
     fix_commits_reviewed: 3
     commits_reviewed: 7
+
+# =============================================================================
+# CR-221 REVIEW (Batch 25, Phase 3 of 3)
+# Managed Prayers - AgendaForm prayer data source, Agenda collapsed prayer count,
+# Home tab dynamic title + prayer count, Tab layout dynamic label,
+# Presentation mode prayer data source, Permissions, Regression, Tests
+# =============================================================================
+
+cr221_phase3:
+  phase: "3 of 3"
+  phase_description: "AgendaForm prayer data source change + conditional editing, Agenda collapsed card prayer count from speeches, Home tab dynamic section title + prayer count, Tab layout dynamic label, Presentation mode prayer data source, Permissions verification, Regression safety, Comprehensive tests"
+  verdict: approved
+  iteration: 2
+
+  verdict_summary: >
+    CR-221 Phase 3 APPROVED (iteration 2). The P1 issue from iteration 1 (R-1) has
+    been fixed in commit b95b7cd: NextAssignmentsSection.tsx line 152 now correctly
+    uses {sectionTitleText} instead of the hardcoded {t('home.nextAssignments')}.
+    Both render paths (error at line 131, normal at line 152) now use the computed
+    variable. All Phase 3 code is correct: AgendaForm reads prayer data from speeches
+    positions 0/4 with conditional PrayerSelector (OFF) vs ReadOnlySpeakerRow+pencil
+    (ON); Agenda collapsed card prayer count reads from speeches; Home tab dynamic
+    section title and prayer count from speeches; Tab layout dynamic label correct;
+    Presentation mode reads from speeches; 156 Phase 3 tests + 12 superseded
+    assertions updated. 6801/6801 tests pass, 0 regressions.
+
+  chain_validation:
+    spec_vs_request: pass
+    arch_vs_spec: pass
+    plan_vs_arch: pass
+    code_vs_plan: pass
+    chain_intact: true
+    notes:
+      - "SPEC F157 fully covers all managed prayers requirements from user request"
+      - "ARCH M044 correctly designs all Phase 3 components (AgendaFormPrayerDataSource, AgendaCollapsedPrayerCount, HomeTabPrayerUpdates, TabLayoutDynamicLabel, PresentationModePrayerDataSource)"
+      - "PLAN P046 steps STEP-11/12/13/15/19/20/21/22 correctly decompose ARCH into implementation steps"
+      - "CODE correctly implements all PLAN steps (5 source commits + 1 test commit + 1 legacy fix commit + 1 R-1 fix commit)"
+      - "Minor deviation: SPEC says t('home.nextSpeeches') for toggle OFF, code uses t('home.nextAssignments') which is the pre-existing key with same translated value -- acceptable"
+
+  commits:
+    - hash: 3ca6a1d
+      step: S11/STEP-11
+      cr: CR-221
+      message: "feat(agenda-form): change prayer data source to speeches and add conditional editing (CR-221, STEP-11)"
+      files_changed: [src/components/AgendaForm.tsx]
+      review:
+        correctness: pass
+        notes: >
+          Opening/closing prayer fields now read from getSpeech(0)/getSpeech(4)?.speaker_name
+          instead of agenda columns. When managePrayers=true: renders ReadOnlySpeakerRow
+          with pencil icon navigating to Speeches tab via router.push with expandDate param.
+          When managePrayers=false: PrayerSelector writes via assignSpeaker.mutate with
+          status='assigned_confirmed'. Clear uses removeAssignment.mutate. Old handlePrayerSelect
+          callback removed, unused Member import removed. PrayerSelector selected state
+          correctly reads from speech.member_id/speech.speaker_name. Custom names (memberId=null)
+          handled via selection.memberId ?? ''. Clean implementation, all agenda prayer
+          column references removed.
+
+    - hash: c471b27
+      step: S12/STEP-12
+      cr: CR-221
+      message: "feat(agenda): change collapsed card prayer count to read from speeches positions 0/4 (CR-221, STEP-12)"
+      files_changed: [src/app/(tabs)/agenda.tsx]
+      review:
+        correctness: pass
+        notes: >
+          Both special meeting and normal meeting collapsed card prayer count now computed
+          from for-of loop over speeches array checking (s.position === 0 || s.position === 4)
+          && s.speaker_name. Replaces agenda?.opening_prayer_name/closing_prayer_name
+          references. Clean, minimal change (6 insertions, 4 deletions).
+
+    - hash: fd885ad
+      step: S13/STEP-13
+      cr: CR-221
+      message: "feat(home): dynamic section title and prayer count from speeches (CR-221, STEP-13)"
+      files_changed: [src/app/(tabs)/index.tsx, src/components/NextAssignmentsSection.tsx]
+      review:
+        correctness: pass
+        notes: >
+          index.tsx: useWardManagePrayers imported, prayer count correctly reads from
+          speeches positions 0/4 via for-of loop (both special and normal meetings).
+          NextAssignmentsSection.tsx: useWardManagePrayers imported, sectionTitleText
+          computed correctly as ternary. Line 152 now correctly uses {sectionTitleText}
+          in the main render path (fixed in iteration 2 via b95b7cd). Both render paths
+          (error at line 131, normal at line 152) use the computed variable.
+
+    - hash: 7369378
+      step: S15/STEP-15
+      cr: CR-221
+      message: "feat(layout): dynamic Speeches tab label based on manage_prayers toggle (CR-221, STEP-15)"
+      files_changed: [src/app/(tabs)/_layout.tsx]
+      review:
+        correctness: pass
+        notes: >
+          useWardManagePrayers imported and called. speechesTabTitle computed via
+          ternary: t('tabs.speechesAndPrayers') when ON, t('tabs.speeches') when OFF.
+          Tab title correctly uses speechesTabTitle variable. Clean implementation.
+
+    - hash: 1fd2899
+      step: S19/STEP-19
+      cr: CR-221
+      message: "feat(presentation): read prayer data from speeches positions 0/4 (CR-221, STEP-19)"
+      files_changed: [src/hooks/usePresentationMode.ts]
+      review:
+        correctness: pass
+        notes: >
+          Opening prayer reads speeches.find(s => s.position === 0)?.speaker_name ?? ''
+          replacing agenda?.opening_prayer_name ?? ''. Closing prayer reads from position 4
+          (updated in both normal and special meeting code paths). Speaker override fields
+          unchanged. Clean, minimal change (3 insertions, 3 deletions).
+
+    - hash: 4efc613
+      step: S22-tests
+      cr: CR-221
+      message: "test(batch25): add 156 tests for F157 CR-221 Phase 3 (Steps 11-22)"
+      files_changed: [src/__tests__/batch25-phase3.test.ts]
+      review:
+        correctness: pass
+        notes: >
+          982-line test file covering STEP-11 (AgendaForm), STEP-12 (agenda collapsed),
+          STEP-13 (home tab), STEP-15 (tab layout), STEP-19 (presentation mode),
+          STEP-20 (permissions), STEP-21 (regression), STEP-22 (comprehensive all-phase
+          coverage). Tests organized by describe blocks per step and AC/EC. All 156
+          tests pass. Source-code analysis pattern consistent with project conventions.
+
+    - hash: 1498c4f
+      step: S-R3-fix
+      cr: CR-221
+      message: "fix(tests): update superseded assertions for Phase 3 code changes (R-3)"
+      files_changed:
+        - src/__tests__/batch14-phase2.test.ts
+        - src/__tests__/batch16.test.ts
+        - src/__tests__/batch19-phase2.test.ts
+        - src/__tests__/batch20-phase1.test.ts
+        - src/__tests__/batch21-f130-f134.test.ts
+        - src/__tests__/batch24-phase2.test.ts
+        - src/__tests__/cr004-f008-agenda-actors.test.ts
+        - src/__tests__/phase04-agenda-presentation.test.ts
+      review:
+        correctness: pass
+        notes: >
+          12 superseded assertions across 8 legacy test files updated to match Phase 3
+          code patterns: prayer count from speeches instead of agenda columns, prayer
+          assignment via assignSpeaker/removeAssignment instead of updateAgenda, Member
+          import removed, ReadOnlySpeakerRow count >= 3 instead of exactly 3. All
+          updates are correct and maintain functional equivalence of the test assertions.
+
+    - hash: b95b7cd
+      step: S-R1-fix
+      cr: CR-221
+      message: "fix(home): use sectionTitleText in NextAssignmentsSection normal render path (CR-221, R-1)"
+      files_changed: [src/components/NextAssignmentsSection.tsx]
+      review:
+        correctness: pass
+        notes: >
+          One-line fix: line 152 changed from {t('home.nextAssignments')} to
+          {sectionTitleText}. Both render paths (error at line 131, normal at line 152)
+          now correctly use the computed sectionTitleText variable. Fix is minimal
+          and exactly addresses R-1. Verified in source code.
+
+  issues:
+    - id: R-1
+      severity: P1
+      category: bug
+      location: "src/components/NextAssignmentsSection.tsx:152"
+      status: fixed
+      fixed_in: b95b7cd
+      description: >
+        The main render path at line 152 used hardcoded {t('home.nextAssignments')}
+        instead of the computed {sectionTitleText} variable. Fixed in b95b7cd by
+        replacing the hardcoded call with {sectionTitleText}. Both render paths
+        now correctly use the computed variable.
+
+  pending_deploys: []
+
+  repository_status:
+    clean: false
+    uncommitted_code_files: []
+    uncommitted_doc_files:
+      - ".devteam/project-status.yaml"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml"
+      - "docs/plans/PLAN_P046.yaml"
+      - "docs/qa/QA_CONSOLIDATED.yaml"
+      - "docs/qa/QA_PLAN_042.yaml"
+      - "docs/specs/SPEC_CONSOLIDATED.yaml"
+      - "docs/specs/SPEC_F157.yaml"
+      - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+    notes: "All code and test files committed. Documentation files pending (Orchestrator responsibility)."
+
+  test_results:
+    batch25_phase3_tests: "156/156 tests passing (batch25-phase3.test.ts)"
+    test_files:
+      - "src/__tests__/batch25-phase3.test.ts (156 tests)"
+    full_suite: "6801 passed, 0 failed (6801 total across 97 suites)"
+    regressions: 0
+    regression_details: "12 superseded assertions across 8 files updated in 1498c4f."
+
+  summary: >
+    CR-221 Phase 3: APPROVED (iteration 2). The P1 issue from iteration 1 (R-1 --
+    NextAssignmentsSection.tsx line 152 hardcoded title) has been fixed in commit
+    b95b7cd. Both render paths now correctly use the computed sectionTitleText
+    variable. All Phase 3 code is correct and well-implemented. Chain validation
+    passes. 156 new tests + 12 updated legacy tests. 6801/6801 total tests pass.
+    8 commits reviewed (5 source + 1 test + 1 legacy fix + 1 R-1 fix).
+
+  stats:
+    p0_count: 0
+    p1_count: 0
+    p1_fixed: 1
+    p2_count: 0
+    files_reviewed: 8
+    commits_reviewed: 8

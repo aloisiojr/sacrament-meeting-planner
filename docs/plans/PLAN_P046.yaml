@@ -1,0 +1,510 @@
+# =============================================================================
+# PLAN_P046.yaml
+# Plan for Batch 25 Phase 3: F157 - Managed Prayers (CR-221)
+# Agenda tab integration, Home tab updates, Tab layout, Presentation mode,
+# Permissions, Regression, Comprehensive tests
+# Created: 2026-02-24
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement Phase 3 of managed prayers (CR-221): change AgendaForm prayer data
+  source from sunday_agendas columns to speeches positions 0/4 with conditional
+  editing (PrayerSelector when OFF, read-only + pencil navigation when ON),
+  update agenda collapsed card prayer count to read from speeches, update Home
+  tab with dynamic section title and prayer count from speeches, change tab
+  layout label dynamically based on manage_prayers toggle, update presentation
+  mode to read prayer data from speeches positions 0/4, verify and enforce
+  prayer permissions across all assignment points, validate regression safety
+  (existing wards unaffected, toggle ON/OFF cycle restores original behavior),
+  and create comprehensive tests covering all 64 ACs and 13 ECs of F157.
+  20 ACs, 10 ECs.
+
+strategy:
+  order: "AgendaForm data source -> Agenda collapsed -> Home tab -> Tab layout -> Presentation mode -> Permissions -> Regression -> Comprehensive tests"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# Phase 1 completed steps (PLAN_P044):
+# STEP-01: DB migration (019_managed_prayers.sql)
+# STEP-02: i18n strings
+# STEP-03: TypeScript type updates
+# STEP-04: useWardManagePrayers hook
+# STEP-05: useLazyCreateSpeeches type-aware positions
+# STEP-06: useDeleteSpeechesByDate optional positions filter
+# STEP-07: Settings toggle manage_prayers
+
+# Phase 2 completed steps (PLAN_P045):
+# STEP-08: SpeechSlot isPrayer prop
+# STEP-09: Speeches tab - render prayer SpeechSlots
+# STEP-10: SundayCard collapsed - prayer lines + sunday type change
+# STEP-14: InviteManagementSection - prayer positions (partial; index.tsx changes in STEP-13)
+# STEP-16: WhatsApp prayer templates (whatsappUtils.ts)
+# STEP-17: WhatsApp settings - segmented control
+
+# Phase 3 covers PLAN_P044 steps: STEP-11, STEP-12, STEP-13, STEP-15, STEP-19, STEP-20, STEP-21, STEP-22
+# Note: STEP-18 (Sunday type change) was implemented in Phase 2 STEP-10.
+# Note: STEP-14 (InviteManagement) was implemented in Phase 2; remaining index.tsx changes covered by STEP-13.
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-11: AgendaForm - prayer data source change + conditional editing
+  # ---------------------------------------------------------------------------
+  - id: STEP-11
+    description: >
+      Modify src/components/AgendaForm.tsx:
+      - Import useWardManagePrayers hook
+      - Replace reading prayer data from agenda.opening_prayer_name / closing_prayer_name
+        with getSpeech(0)?.speaker_name / getSpeech(4)?.speaker_name
+      - When manage_prayers=false (toggle OFF):
+        - PrayerSelector writes to speeches table (position 0 or 4) via
+          useAssignSpeaker with status='assigned_confirmed'
+        - PrayerSelector clears via useRemoveAssignment
+        - Behavior identical to current UX (members + custom names)
+      - When manage_prayers=true (toggle ON):
+        - Prayer fields become read-only Text with pencil icon
+        - Tapping field/pencil navigates to Speeches tab with expandDate param
+        - router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })
+      - Remove all references to agenda.opening_prayer_* and agenda.closing_prayer_* fields
+      - Remove prayer-related updateAgenda.mutate calls
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-12", "STEP-15", "STEP-19"]
+    done_when:
+      - "Opening prayer reads from getSpeech(0)?.speaker_name"
+      - "Closing prayer reads from getSpeech(4)?.speaker_name"
+      - "When OFF: PrayerSelector opens for prayer fields"
+      - "When OFF: PrayerSelector writes to speeches via useAssignSpeaker with status='assigned_confirmed'"
+      - "When OFF: custom names work (memberId=null, speakerName set)"
+      - "When ON: prayer fields are read-only Text"
+      - "When ON: pencil icon shown next to prayer name"
+      - "When ON: tapping navigates to Speeches tab with expandDate"
+      - "No references to agenda.opening_prayer_* or agenda.closing_prayer_*"
+      - "No prayer-related updateAgenda.mutate calls"
+    tests:
+      - type: unit
+        description: "Verify prayer data reads from speeches positions 0/4"
+      - type: unit
+        description: "Verify PrayerSelector works when toggle OFF"
+      - type: unit
+        description: "Verify read-only + pencil when toggle ON"
+      - type: unit
+        description: "Verify navigation to Speeches tab when pencil tapped"
+      - type: unit
+        description: "Verify custom name assignment stores memberId=null"
+    covers:
+      acceptance_criteria: ["AC-157-13", "AC-157-22", "AC-157-37", "AC-157-38", "AC-157-39", "AC-157-40", "AC-157-59"]
+      edge_cases: ["EC-157-03", "EC-157-05", "EC-157-06"]
+    risks:
+      - risk: "PrayerSelector onSelect callback needs speech record to exist"
+        mitigation: "useLazyCreateSpeeches now creates positions 0/4, so records exist when agenda expands"
+
+  # ---------------------------------------------------------------------------
+  # STEP-12: Agenda collapsed card - prayer count from speeches
+  # ---------------------------------------------------------------------------
+  - id: STEP-12
+    description: >
+      Update src/app/(tabs)/agenda.tsx:
+      - Change prayer count calculation for 'Oracoes Y/2' line in collapsed card
+      - Count speeches with position IN (0, 4) AND speaker_name IS NOT NULL
+      - Replace any references to agenda.opening_prayer_name/closing_prayer_name
+        in collapsed card with speeches data
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-11", "STEP-15", "STEP-19"]
+    done_when:
+      - "Collapsed card prayer count reads from speeches positions 0/4"
+      - "Prayer count format is 'Oracoes Y/2' where Y is count of assigned prayers"
+      - "No references to agenda.opening_prayer_name or agenda.closing_prayer_name"
+    tests:
+      - type: unit
+        description: "Verify prayer count reads from speeches positions 0/4"
+      - type: unit
+        description: "Verify count is 0, 1, or 2 based on assigned prayers"
+    covers:
+      acceptance_criteria: ["AC-157-41"]
+      edge_cases: ["EC-157-02"]
+    risks:
+      - risk: "Agenda data fetch may not include speeches"
+        mitigation: "Extend data fetch in agenda.tsx to include speeches or use separate query"
+
+  # ---------------------------------------------------------------------------
+  # STEP-13: Home tab - dynamic section title + prayer count
+  # ---------------------------------------------------------------------------
+  - id: STEP-13
+    description: >
+      Update src/app/(tabs)/index.tsx:
+      - Import useWardManagePrayers hook
+      - Next assignments section title: t('home.nextSpeechesAndPrayers') when ON,
+        t('home.nextSpeeches') when OFF
+      - Preview card 'Oracoes Y/2' line: read from speeches positions 0/4
+      - Prayer cards in next assignments are not expandable, have pencil button
+        that navigates to Speeches tab with expandDate
+      - Pass managePrayers to InviteManagementSection (if not already done in Phase 2)
+    files:
+      - "src/app/(tabs)/index.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-11", "STEP-12", "STEP-15", "STEP-19"]
+    done_when:
+      - "Section title is t('home.nextSpeechesAndPrayers') when managePrayers=true"
+      - "Section title is t('home.nextSpeeches') when managePrayers=false"
+      - "Preview card prayer count reads from speeches positions 0/4"
+      - "Prayer cards are not expandable when manage_prayers=true"
+      - "Prayer cards have pencil button navigating to Speeches tab"
+      - "managePrayers prop passed to InviteManagementSection"
+    tests:
+      - type: unit
+        description: "Verify section title changes based on manage_prayers"
+      - type: unit
+        description: "Verify prayer count from speeches positions 0/4"
+      - type: unit
+        description: "Verify prayer cards not expandable"
+    covers:
+      acceptance_criteria: ["AC-157-16", "AC-157-25", "AC-157-42", "AC-157-43", "AC-157-44"]
+      edge_cases: []
+    risks:
+      - risk: "Prayer cards may conflict with existing NextSundaysSection layout"
+        mitigation: "Prayer cards follow same pattern as speech cards but without accordion"
+
+  # ---------------------------------------------------------------------------
+  # STEP-15: Tab layout - dynamic label
+  # ---------------------------------------------------------------------------
+  - id: STEP-15
+    description: >
+      Update src/app/(tabs)/_layout.tsx:
+      - Import useWardManagePrayers hook
+      - Speeches tab title: t('tabs.speechesAndPrayers') when managePrayers=true,
+        t('tabs.speeches') when managePrayers=false
+    files:
+      - "src/app/(tabs)/_layout.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-11", "STEP-12", "STEP-13", "STEP-19"]
+    done_when:
+      - "Speeches tab label is t('tabs.speechesAndPrayers') when managePrayers=true"
+      - "Speeches tab label is t('tabs.speeches') when managePrayers=false"
+    tests:
+      - type: unit
+        description: "Verify tab label changes based on manage_prayers"
+    covers:
+      acceptance_criteria: ["AC-157-15", "AC-157-24"]
+      edge_cases: []
+    risks:
+      - risk: "Hook call in _layout.tsx may fire before auth context is ready"
+        mitigation: "useWardManagePrayers returns false (default) when loading"
+
+  # ---------------------------------------------------------------------------
+  # STEP-19: Presentation mode - prayer data source
+  # ---------------------------------------------------------------------------
+  - id: STEP-19
+    description: >
+      Update src/hooks/usePresentationMode.ts:
+      - Replace reading agenda.opening_prayer_name with
+        speeches.find(s => s.position === 0)?.speaker_name
+      - Replace reading agenda.closing_prayer_name with
+        speeches.find(s => s.position === 4)?.speaker_name
+      - No visual changes to presentation mode output
+    files:
+      - "src/hooks/usePresentationMode.ts"
+    dependencies: []
+    parallelizable_with: ["STEP-11", "STEP-12", "STEP-13", "STEP-15"]
+    done_when:
+      - "Opening prayer reads from speeches position 0"
+      - "Closing prayer reads from speeches position 4"
+      - "No references to agenda.opening_prayer_name or agenda.closing_prayer_name"
+      - "Presentation mode display unchanged"
+    tests:
+      - type: unit
+        description: "Verify prayer data comes from speeches positions 0/4"
+      - type: unit
+        description: "Verify no references to removed agenda prayer columns"
+    covers:
+      acceptance_criteria: ["AC-157-45"]
+      edge_cases: ["EC-157-10", "EC-157-13"]
+    risks:
+      - risk: "Speeches data may not be fetched in presentation mode"
+        mitigation: "usePresentationMode likely already fetches speeches; verify and extend query if needed"
+
+  # ---------------------------------------------------------------------------
+  # STEP-20: Permissions - prayer assignment follows speech permissions
+  # ---------------------------------------------------------------------------
+  - id: STEP-20
+    description: >
+      Verify and enforce prayer permissions across all prayer assignment points:
+      - Speeches tab: Bispado can assign, Secretario cannot (same as speeches),
+        Observador read-only
+      - Home tab pencil: same permissions as speech assignment
+      - Agenda tab: Secretario CAN assign via PrayerSelector when manage_prayers=false
+        (same exception as current CR-31 behavior)
+      - Agenda tab: when manage_prayers=true, fields are read-only for everyone
+        (pencil navigates to Speeches tab where permissions apply)
+      - Observador sees prayer slots in Speeches tab as disabled when manage_prayers=true
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/components/AgendaForm.tsx"
+      - "src/app/(tabs)/index.tsx"
+    dependencies: ["STEP-11", "STEP-13"]
+    parallelizable_with: []
+    done_when:
+      - "Bispado can assign prayers via Speeches tab"
+      - "Secretario cannot assign prayers via Speeches tab"
+      - "Observador sees prayer slots as disabled/read-only"
+      - "Secretario can assign prayers via AgendaForm PrayerSelector when toggle OFF"
+      - "AgendaForm prayer fields read-only for all roles when toggle ON"
+    tests:
+      - type: unit
+        description: "Verify Bispado can assign prayers in Speeches tab"
+      - type: unit
+        description: "Verify Secretario cannot assign in Speeches tab"
+      - type: unit
+        description: "Verify Observador sees disabled prayer slots"
+      - type: unit
+        description: "Verify Secretario can assign via AgendaForm when OFF"
+    covers:
+      acceptance_criteria: ["AC-157-59", "AC-157-60", "AC-157-64"]
+      edge_cases: []
+    risks:
+      - risk: "Permission checks may be scattered across components"
+        mitigation: "Reuse existing hasPermission checks from speech assignment logic"
+
+  # ---------------------------------------------------------------------------
+  # STEP-21: Regression - existing wards unaffected + toggle ON/OFF cycle
+  # ---------------------------------------------------------------------------
+  - id: STEP-21
+    description: >
+      Verify and ensure regression safety:
+      - Existing wards with manage_prayers=false work exactly as before migration
+      - Prayers appear in agenda as PrayerSelector fields
+      - No prayer slots in Speeches tab when OFF
+      - No changes to tab names or section titles when OFF
+      - Toggling ON then OFF restores original behavior:
+        - Speeches tab name reverts to 'Discursos'
+        - Home section title reverts
+        - Agenda prayer fields become editable PrayerSelector
+        - Prayer slots disappear from Speeches tab
+        - Invite management hides prayers
+        - WhatsApp settings hide prayer template tabs
+      - Realtime sync for prayer positions works via existing speeches subscription
+      - Activity log for prayer actions uses existing structured format
+      - Offline queue works for prayer mutations
+    files:
+      - "__tests__/batch25.test.ts"
+    dependencies: ["STEP-11", "STEP-12", "STEP-13", "STEP-15", "STEP-20"]
+    parallelizable_with: []
+    done_when:
+      - "All regression scenarios pass in tests"
+      - "Toggle OFF behavior matches pre-CR-221 behavior"
+      - "Toggle ON/OFF cycle restores original state"
+      - "Realtime sync picks up prayer position changes"
+    tests:
+      - type: unit
+        description: "Verify manage_prayers=false wards see no prayer changes"
+      - type: unit
+        description: "Verify toggle ON then OFF restores original UX"
+      - type: unit
+        description: "Verify realtime subscription includes positions 0/4"
+    covers:
+      acceptance_criteria: ["AC-157-62", "AC-157-63"]
+      edge_cases: ["EC-157-05", "EC-157-06", "EC-157-07", "EC-157-08", "EC-157-09"]
+    risks:
+      - risk: "Regression in existing features"
+        mitigation: "Run full test suite before and after changes"
+
+  # ---------------------------------------------------------------------------
+  # STEP-22: Comprehensive tests for F157
+  # ---------------------------------------------------------------------------
+  - id: STEP-22
+    description: >
+      Create or update test file __tests__/batch25.test.ts covering all F157
+      acceptance criteria and edge cases not yet tested. Tests organized by area:
+      - AgendaForm: prayer data source, PrayerSelector vs read-only by toggle
+      - Agenda collapsed: prayer count from speeches
+      - Home tab: dynamic title, prayer count, prayer cards
+      - Tab layout: dynamic label
+      - Presentation mode: prayer data source
+      - Permissions: role-based prayer assignment
+      - Regression: toggle OFF unchanged, toggle cycle
+      - Edge cases: EC-157-02, EC-157-03, EC-157-05, EC-157-06, EC-157-07,
+        EC-157-08, EC-157-09, EC-157-10, EC-157-11, EC-157-13
+      Also covers all ACs from Phase 1 and Phase 2 steps for comprehensive
+      validation. Update TEST_CONSOLIDATED.yaml with F157 entries.
+    files:
+      - "__tests__/batch25.test.ts"
+      - "__tests__/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-11", "STEP-12", "STEP-13", "STEP-15", "STEP-19", "STEP-20", "STEP-21"]
+    parallelizable_with: []
+    done_when:
+      - "Test file __tests__/batch25.test.ts exists with Phase 3 tests"
+      - "Tests cover all 64 ACs (AC-157-01 through AC-157-64)"
+      - "Tests cover all 13 ECs (EC-157-01 through EC-157-13)"
+      - "All tests pass (vitest)"
+      - "TEST_CONSOLIDATED.yaml updated with F157 entries"
+    tests:
+      - type: unit
+        description: "All test assertions pass with vitest"
+    covers:
+      acceptance_criteria: ["AC-157-13", "AC-157-15", "AC-157-16", "AC-157-22", "AC-157-24", "AC-157-25", "AC-157-37", "AC-157-38", "AC-157-39", "AC-157-40", "AC-157-41", "AC-157-42", "AC-157-43", "AC-157-44", "AC-157-45", "AC-157-59", "AC-157-60", "AC-157-62", "AC-157-63", "AC-157-64"]
+      edge_cases: ["EC-157-02", "EC-157-03", "EC-157-05", "EC-157-06", "EC-157-07", "EC-157-08", "EC-157-09", "EC-157-10", "EC-157-11", "EC-157-13"]
+    risks:
+      - risk: "Large test file may be hard to maintain"
+        mitigation: "Organize tests by area using describe blocks"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- Agenda Tab ---
+
+  - ac_id: AC-157-13
+    how_to_verify: "Test AgendaForm renders PrayerSelector when manage_prayers=false"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-22
+    how_to_verify: "Test AgendaForm prayer field is read-only with pencil icon when manage_prayers=true"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-37
+    how_to_verify: "Test opening prayer reads from speeches position 0 in AgendaForm"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-38
+    how_to_verify: "Test closing prayer reads from speeches position 4 in AgendaForm"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-39
+    how_to_verify: "Test PrayerSelector editable and writes to speeches when manage_prayers=false"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-40
+    how_to_verify: "Test read-only field + pencil navigates to Speeches tab when manage_prayers=true"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-41
+    how_to_verify: "Test agenda collapsed card 'Oracoes Y/2' reads from speeches positions 0/4"
+    covered_by_steps: ["STEP-12", "STEP-22"]
+
+  # --- Home Tab ---
+
+  - ac_id: AC-157-16
+    how_to_verify: "Test Home section title is t('home.nextSpeeches') when manage_prayers=false"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-25
+    how_to_verify: "Test Home section title is t('home.nextSpeechesAndPrayers') when manage_prayers=true"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-42
+    how_to_verify: "Test Home preview card prayer count reads from speeches positions 0/4"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-43
+    how_to_verify: "Test Home section title changes based on manage_prayers"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-44
+    how_to_verify: "Test Home prayer cards not expandable, have pencil button"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  # --- Tab Layout ---
+
+  - ac_id: AC-157-15
+    how_to_verify: "Test tab label is t('tabs.speeches') when manage_prayers=false"
+    covered_by_steps: ["STEP-15", "STEP-22"]
+
+  - ac_id: AC-157-24
+    how_to_verify: "Test tab label is t('tabs.speechesAndPrayers') when manage_prayers=true"
+    covered_by_steps: ["STEP-15", "STEP-22"]
+
+  # --- Presentation Mode ---
+
+  - ac_id: AC-157-45
+    how_to_verify: "Test presentation mode reads prayers from speeches positions 0/4"
+    covered_by_steps: ["STEP-19", "STEP-22"]
+
+  # --- Permissions ---
+
+  - ac_id: AC-157-59
+    how_to_verify: "Test prayer assignment permissions by role across Speeches, Agenda, Home"
+    covered_by_steps: ["STEP-11", "STEP-20", "STEP-22"]
+
+  - ac_id: AC-157-60
+    how_to_verify: "Test prayer status change permissions by role"
+    covered_by_steps: ["STEP-20", "STEP-22"]
+
+  - ac_id: AC-157-64
+    how_to_verify: "Test Observer sees prayer slots as disabled in Speeches tab when manage_prayers=true"
+    covered_by_steps: ["STEP-20", "STEP-22"]
+
+  # --- Regression ---
+
+  - ac_id: AC-157-62
+    how_to_verify: "Test existing wards with manage_prayers=false work as before"
+    covered_by_steps: ["STEP-21", "STEP-22"]
+
+  - ac_id: AC-157-63
+    how_to_verify: "Test toggling ON then OFF restores original behavior"
+    covered_by_steps: ["STEP-21", "STEP-22"]
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph:
+  description: >
+    Phase 3 steps and their dependencies. Steps from Phase 1 (STEP-01 through
+    STEP-07) and Phase 2 (STEP-08, STEP-09, STEP-10, STEP-14, STEP-16, STEP-17)
+    are all completed and available as implicit dependencies.
+
+  parallel_group_1:
+    description: "All independent UI integration steps (can run in parallel)"
+    steps: ["STEP-11", "STEP-12", "STEP-13", "STEP-15", "STEP-19"]
+    rationale: >
+      These 5 steps touch different files with no overlap:
+      - STEP-11: AgendaForm.tsx
+      - STEP-12: agenda.tsx
+      - STEP-13: index.tsx (Home tab)
+      - STEP-15: _layout.tsx
+      - STEP-19: usePresentationMode.ts
+      All depend only on Phase 1/2 completed steps (useWardManagePrayers hook,
+      type definitions, speeches data). They can be implemented in any order
+      or in parallel.
+
+  sequential_group_1:
+    description: "Permission verification (depends on STEP-11 and STEP-13)"
+    steps: ["STEP-20"]
+    rationale: >
+      STEP-20 verifies permissions across AgendaForm (STEP-11) and Home tab
+      (STEP-13). Must run after those steps are complete to verify the
+      permission checks are correctly wired.
+
+  sequential_group_2:
+    description: "Regression validation (depends on all UI steps)"
+    steps: ["STEP-21"]
+    rationale: >
+      STEP-21 validates that toggle OFF behavior is unchanged and toggle
+      ON/OFF cycle restores original state. Must run after all UI integration
+      steps (STEP-11, STEP-12, STEP-13, STEP-15) and permissions (STEP-20).
+
+  sequential_group_3:
+    description: "Comprehensive tests (depends on everything)"
+    steps: ["STEP-22"]
+    rationale: >
+      STEP-22 creates comprehensive tests covering ALL ACs and ECs across
+      all 3 phases. Must be the final step.
+
+  execution_order: >
+    Recommended execution order:
+    1. STEP-11 + STEP-12 + STEP-13 + STEP-15 + STEP-19 (parallel)
+    2. STEP-20 (after STEP-11 and STEP-13)
+    3. STEP-21 (after STEP-11, STEP-12, STEP-13, STEP-15, STEP-20)
+    4. STEP-22 (after all)

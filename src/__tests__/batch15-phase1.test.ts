@@ -356,8 +356,9 @@ describe('F097 (CR-159): Section titles in Presentation Mode', () => {
   // --- AC-097-13: Special meeting closing card title unchanged ---
   describe('AC-097-13: Special meeting last card title', () => {
     it('special meeting card uses agenda.closingHymn', () => {
-      // In the else branch (isSpecial), card title is closingHymn
-      expect(hookSource).toContain("title: t('agenda.closingHymn')");
+      // 1e1d906 refactored to use specialTitle variable for testimony/primary differentiation
+      // (superseded by batch25-phase1: the default specialTitle is closingHymn)
+      expect(hookSource).toContain("specialTitle = t('agenda.closingHymn')");
     });
   });
 

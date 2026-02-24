@@ -29,12 +29,13 @@
 # CR-211, CR-212, CR-213, CR-214, CR-215
 # CR-216, CR-217, CR-219
 # CR-218, CR-220
+# CR-221
 # Generated: 2026-02-23
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-221]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -4790,3 +4791,119 @@ batch23_phase2_test_results:
         description: "Updated batch23-phase2.test.ts: superseded F150 AC-150-03 assertions (AgendaForm now DOES use secondSpeechDisabledPlaceholder, reversed from previous assertion)"
     acs_covered: [AC-155-01, AC-155-02, AC-155-03, AC-155-04, AC-155-05, AC-155-06, AC-155-07, AC-155-08, AC-155-09, AC-155-10, AC-155-11, AC-156-01, AC-156-02, AC-156-03, AC-156-04, AC-156-05, AC-156-06, AC-156-07, AC-156-08, AC-156-09, AC-156-10, AC-156-11, AC-156-12]
     ecs_covered: [EC-155-01, EC-155-02, EC-155-03, EC-156-01, EC-156-02, EC-156-03, EC-156-04]
+
+  # --- CR-221 commits (Phase 1) ---
+
+  - step: S01
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-01
+    hash: f97898b
+    message: "feat(db): add managed prayers migration (CR-221, S01)"
+    files_changed:
+      - supabase/migrations/019_managed_prayers.sql
+    changes:
+      - id: CHG-700
+        description: "ALTER wards ADD manage_prayers BOOLEAN DEFAULT false, whatsapp_template_opening_prayer TEXT, whatsapp_template_closing_prayer TEXT"
+      - id: CHG-701
+        description: "INSERT opening prayers from sunday_agendas into speeches position 0 with status confirmed"
+      - id: CHG-702
+        description: "INSERT closing prayers from sunday_agendas into speeches position 4 with status confirmed"
+      - id: CHG-703
+        description: "ALTER sunday_agendas DROP opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name"
+      - id: CHG-704
+        description: "CREATE OR REPLACE enqueue_speech_notification() with manage_prayers check for positions 0/4"
+
+  - step: S02
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-02
+    hash: 6b81ead
+    message: "feat(i18n): add prayer management i18n keys for all 3 locales (CR-221, S02)"
+    files_changed:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    changes:
+      - id: CHG-705
+        description: "Added ~15 new i18n keys across all 3 locales: tabs.speechesAndPrayers, home.nextSpeechesAndPrayers, prayers.opening/closing/prayerPrefix, settings.managePrayers, whatsapp.tabSpeech/tabOpeningPrayer/tabClosingPrayer/defaultOpeningPrayerTemplate/defaultClosingPrayerTemplate, speeches.openingPrayer/closingPrayer, sundayExceptions.confirmDeletePrayers/confirmDeleteBoth"
+
+  - step: S03
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-03
+    hash: a511f43
+    message: "feat(types): add manage_prayers and prayer template fields to Ward type (CR-221, S03)"
+    files_changed:
+      - src/types/database.ts
+    changes:
+      - id: CHG-706
+        description: "Ward interface: added manage_prayers: boolean, whatsapp_template_opening_prayer: string | null, whatsapp_template_closing_prayer: string | null"
+      - id: CHG-707
+        description: "Speech interface: updated position comment to include 0 and 4 (0=opening prayer, 4=closing prayer)"
+
+  - step: S04
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-04
+    hash: 10ae99a
+    message: "feat(hooks): add useWardManagePrayers hook (CR-221, S04)"
+    files_changed:
+      - src/hooks/useSpeeches.ts
+    changes:
+      - id: CHG-708
+        description: "Added wardKeys.managePrayers query key factory"
+      - id: CHG-709
+        description: "Added useWardManagePrayers hook: queries wards.manage_prayers, returns { managePrayers: boolean, isLoading: boolean }"
+
+  - step: S05
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-05
+    hash: af09a00
+    message: "feat(hooks): make useLazyCreateSpeeches type-aware (CR-221, S05)"
+    files_changed:
+      - src/hooks/useSpeeches.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/components/NextAssignmentsSection.tsx
+    changes:
+      - id: CHG-710
+        description: "BREAKING: useLazyCreateSpeeches input changed from string to { sundayDate, sundayType? }. Positions determined by sundayType: speeches=[0,1,2,3,4], testimony/primary=[0,4], conference/other=[]"
+      - id: CHG-711
+        description: "Updated speeches.tsx callers (2 sites) to pass { sundayDate: date }"
+      - id: CHG-712
+        description: "Updated NextAssignmentsSection.tsx caller to pass { sundayDate: pendingEntry.date }"
+
+  - step: S06
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-06
+    hash: d5a0f1c
+    message: "feat(hooks): add optional positions filter to useDeleteSpeechesByDate (CR-221, S06)"
+    files_changed:
+      - src/hooks/useSpeeches.ts
+      - src/app/(tabs)/speeches.tsx
+      - src/app/(tabs)/agenda.tsx
+    changes:
+      - id: CHG-713
+        description: "BREAKING: useDeleteSpeechesByDate input changed from string to { sundayDate, positions? }. When positions provided, only deletes those positions"
+      - id: CHG-714
+        description: "Updated speeches.tsx caller to pass { sundayDate: date }"
+      - id: CHG-715
+        description: "Updated agenda.tsx caller to pass { sundayDate: d }"
+
+  - step: S07
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-07
+    hash: fa88bd1
+    message: "feat(settings): add manage_prayers toggle in Ward Settings (CR-221, S07)"
+    files_changed:
+      - src/app/(tabs)/settings/index.tsx
+    changes:
+      - id: CHG-716
+        description: "Added Switch import and useWardManagePrayers/wardKeys imports"
+      - id: CHG-717
+        description: "Added toggleManagePrayersMutation to update wards.manage_prayers"
+      - id: CHG-718
+        description: "Added Bishopric-only Switch toggle in Ward Settings section with label settings.managePrayers"

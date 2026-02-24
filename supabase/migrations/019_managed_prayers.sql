@@ -14,6 +14,13 @@ ALTER TABLE public.wards
   ADD COLUMN whatsapp_template_closing_prayer TEXT;
 
 -- =============================================================================
+-- Step 1b: Update CHECK constraint for prayer positions (0 and 4)
+-- =============================================================================
+ALTER TABLE public.speeches DROP CONSTRAINT IF EXISTS speeches_position_check;
+ALTER TABLE public.speeches ADD CONSTRAINT speeches_position_check
+  CHECK (position IN (0, 1, 2, 3, 4));
+
+-- =============================================================================
 -- Step 2: Copy opening prayers to speeches position 0
 -- =============================================================================
 INSERT INTO public.speeches (ward_id, sunday_date, position, member_id, speaker_name, status)

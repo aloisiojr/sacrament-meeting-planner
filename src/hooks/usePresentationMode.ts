@@ -97,7 +97,7 @@ export function buildPresentationCards(
   );
   welcomeFields.push(
     { label: t('agenda.openingHymn'), value: hymnLookup(agenda?.opening_hymn_id ?? null), type: 'hymn' },
-    { label: t('agenda.openingPrayer'), value: agenda?.opening_prayer_name ?? '', type: 'text' },
+    { label: t('agenda.openingPrayer'), value: speeches.find(s => s.position === 0)?.speaker_name ?? '', type: 'text' },
   );
   cards.push({ title: t('agenda.sectionWelcome'), fields: welcomeFields });
 
@@ -178,7 +178,7 @@ export function buildPresentationCards(
     const lastFields: PresentationField[] = [
       { label: t('speeches.lastSpeech'), value: speaker3Name, type: 'text' },
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
-      { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
+      { label: t('agenda.closingPrayer'), value: speeches.find(s => s.position === 4)?.speaker_name ?? '', type: 'text' },
     ];
     cards.push({ title: t('agenda.sectionLastSpeech'), fields: lastFields });
   } else {
@@ -190,7 +190,7 @@ export function buildPresentationCards(
         type: 'text',
       },
       { label: t('agenda.closingHymn'), value: hymnLookup(agenda?.closing_hymn_id ?? null), type: 'hymn' },
-      { label: t('agenda.closingPrayer'), value: agenda?.closing_prayer_name ?? '', type: 'text' },
+      { label: t('agenda.closingPrayer'), value: speeches.find(s => s.position === 4)?.speaker_name ?? '', type: 'text' },
     ];
 
     let specialTitle: string;

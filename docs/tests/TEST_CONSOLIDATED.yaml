@@ -5,9 +5,9 @@
 # =============================================================================
 
 type: test_consolidated
-version: 36
-last_updated: "2026-02-23T02:00:00Z"
-last_updated_by: "tester-batch24-phase2"
+version: 37
+last_updated: "2026-02-23T23:55:00Z"
+last_updated_by: "tester-batch25-phase1"
 
 test_suites:
 
@@ -23333,9 +23333,555 @@ gaps:
   # EC-156-01 through EC-156-04: Fully covered (4/4)
   # No gaps.
 
+  # ---------------------------------------------------------------------------
+  # Batch 25 Phase 1 - F157 (CR-221): Managed Prayers
+  # ---------------------------------------------------------------------------
+  - phase: 37
+    feature: F157
+    cr: CR-221
+    tests:
+      # STEP-01: DB Migration (019_managed_prayers.sql)
+      - name: "migration file exists at supabase/migrations/019_managed_prayers.sql"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ALTER TABLE wards adds manage_prayers BOOLEAN NOT NULL DEFAULT false"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "manage_prayers column is on public.wards table"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ALTER TABLE wards adds whatsapp_template_opening_prayer TEXT"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "whatsapp_template_opening_prayer is nullable"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ALTER TABLE wards adds whatsapp_template_closing_prayer TEXT"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "whatsapp_template_closing_prayer is nullable"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "INSERT INTO speeches for position 0 from opening_prayer fields"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "INSERT INTO speeches for position 4 from closing_prayer fields"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "opening prayer migration uses status assigned_confirmed"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "closing prayer migration uses status assigned_confirmed"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "opening prayer migration filters WHERE opening_prayer_name IS NOT NULL"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "closing prayer migration filters WHERE closing_prayer_name IS NOT NULL"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "opening prayer INSERT uses ON CONFLICT DO NOTHING"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04", "AC-157-06"]
+        covers_ecs: ["EC-157-01"]
+        status: passing
+
+      - name: "closing prayer INSERT uses ON CONFLICT DO NOTHING"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-04", "AC-157-06"]
+        covers_ecs: ["EC-157-01"]
+        status: passing
+
+      - name: "drops opening_prayer_member_id column"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "drops opening_prayer_name column"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "drops closing_prayer_member_id column"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "drops closing_prayer_name column"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "columns dropped from sunday_agendas table"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "data copy happens BEFORE column drop"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ON CONFLICT uses (ward_id, sunday_date, position)"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-06"]
+        covers_ecs: ["EC-157-01"]
+        status: passing
+
+      - name: "positions 0 and 4 are used in INSERT statements"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-06"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger function is created or replaced"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger function checks positions 0 and 4"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger queries manage_prayers from wards table"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger returns NEW when manage_prayers is false"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger uses COALESCE for null safety"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger inserts into notification_queue for assigned_not_invited"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-20"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger uses 5-minute delay for designation notifications"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-20"]
+        covers_ecs: []
+        status: passing
+
+      - name: "speech positions 1/2/3 behavior unchanged"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-20"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ON CONFLICT DO NOTHING prevents errors on duplicate entries"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-157-01"]
+        status: passing
+
+      - name: "conflict resolution uses (ward_id, sunday_date, position) key"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-157-01"]
+        status: passing
+
+      - name: "migration has 5 distinct steps in correct order"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-01", "AC-157-04", "AC-157-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger function returns TRIGGER type"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger function uses SECURITY DEFINER"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "trigger function uses plpgsql language"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-12"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-02: i18n keys
+      - name: "pt-BR has tabs.speechesAndPrayers"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "en has Speeches & Prayers"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "es has Discursos y Oraciones"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "home.nextSpeechesAndPrayers in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "prayers.opening/closing/prayerPrefix in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "settings.managePrayers in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "whatsapp tab keys in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "speeches.openingPrayer/closingPrayer in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "sundayExceptions.confirmDeletePrayers/Both in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-61"]
+        covers_ecs: []
+        status: passing
+
+      - name: "whatsapp default prayer templates in all 3 locales"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-52", "AC-157-53", "AC-157-55"]
+        covers_ecs: []
+        status: passing
+
+      - name: "prayer templates contain only {nome} and {data} placeholders"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-54"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-03: TypeScript type updates
+      - name: "Ward interface has manage_prayers: boolean"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "Ward interface has whatsapp_template_opening_prayer"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "Ward interface has whatsapp_template_closing_prayer"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "Speech interface position comment mentions 0,1,2,3,4"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-06"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-04: useWardManagePrayers hook
+      - name: "useWardManagePrayers exported from useSpeeches.ts"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "hook queries wards table for manage_prayers"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "hook returns managePrayers: boolean and isLoading"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "managePrayers defaults to false when no data"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "uses ['ward', wardId, 'managePrayers'] query key"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-05: useLazyCreateSpeeches type-aware
+      - name: "speeches type creates positions [0,1,2,3,4]"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-07"]
+        covers_ecs: []
+        status: passing
+
+      - name: "testimony_meeting creates positions [0,4]"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-08"]
+        covers_ecs: []
+        status: passing
+
+      - name: "primary_presentation creates positions [0,4]"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-09"]
+        covers_ecs: []
+        status: passing
+
+      - name: "conference/other types create no positions"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-10"]
+        covers_ecs: []
+        status: passing
+
+      - name: "idempotency: skips creation if records exist"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-07"]
+        covers_ecs: []
+        status: passing
+
+      - name: "new records have status not_assigned"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-07"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-06: useDeleteSpeechesByDate with positions
+      - name: "accepts optional positions parameter"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-46", "AC-157-47", "AC-157-48"]
+        covers_ecs: []
+        status: passing
+
+      - name: "uses .in(position, positions) when positions provided"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-46"]
+        covers_ecs: []
+        status: passing
+
+      - name: "deletes all when positions omitted (backward compatible)"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-47"]
+        covers_ecs: []
+        status: passing
+
+      - name: "invalidates speechKeys.all after deletion"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-46"]
+        covers_ecs: []
+        status: passing
+
+      # STEP-07: Settings toggle manage_prayers
+      - name: "settings screen imports useWardManagePrayers"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-57"]
+        covers_ecs: []
+        status: passing
+
+      - name: "toggle wrapped in isBishopric check"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-57"]
+        covers_ecs: []
+        status: passing
+
+      - name: "toggle label uses t('settings.managePrayers')"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-57"]
+        covers_ecs: []
+        status: passing
+
+      - name: "toggle uses Switch component bound to managePrayers"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-57"]
+        covers_ecs: []
+        status: passing
+
+      - name: "mutation updates wards.manage_prayers in supabase"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "mutation invalidates managePrayers and ward query keys"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-58"]
+        covers_ecs: []
+        status: passing
+
+      - name: "isBishopric derived from role === bishopric"
+        file: "src/__tests__/batch25-phase1.test.ts"
+        type: unit
+        covers_acs: ["AC-157-57"]
+        covers_ecs: []
+        status: passing
+
+  # ---------------------------------------------------------------------------
+  # Batch 25 Phase 1 - F157 (CR-221) coverage
+  # ---------------------------------------------------------------------------
+  # Phase 1 covers Steps 1-7: DB migration, i18n, types, hooks, settings toggle
+  # AC-157-01 through AC-157-10: Fully covered (10/10)
+  # AC-157-12: Covered (trigger skips for prayers when OFF)
+  # AC-157-20: Covered (trigger fires for prayers when ON)
+  # AC-157-46/47/48 (delete hook): Covered
+  # AC-157-52, AC-157-53, AC-157-54, AC-157-55: Covered (prayer templates)
+  # AC-157-57, AC-157-58: Covered (settings toggle)
+  # AC-157-61: Covered (i18n keys)
+  # EC-157-01: Covered (duplicate data migration)
+  # Remaining ACs (11,13-19,21-51,56,59-64) deferred to Phase 2 (UI components)
+
 stats:
-  total_tests: 3709
-  passing: 3709
+  total_tests: 3871
+  passing: 3871
   failing: 0
   skipped: 0
 
@@ -23750,4 +24296,20 @@ changelog:
       - "Superseded assertions updated: batch23-phase2 (7 F151 minHeight:62 refs -> justifyContent center), batch24-phase1 (14 F154 minHeight:62 refs -> justifyContent center), batch21-f130-f134 (1 empty string ref -> i18n placeholder)"
       - "23 ACs cobertos (F155:11, F156:12), 7 ECs cobertos (F155:3, F156:4), 0 gaps"
       - "Full suite: 6249 testes passando, 49 skipped, 0 falhando"
+      - "verdict: approved"
+  - version: 37
+    phase: 37
+    changes:
+      - "162 testes adicionados para Batch 25 Phase 1 (F157; CR-221)"
+      - "4 assertions atualizadas em 4 arquivos de teste existentes (batch10-phase1, batch15-phase1, batch16, batch19-phase2)"
+      - "STEP-01 DB Migration: 36 testes - migration file structure, ALTER TABLE wards (3 columns), data copy opening_prayer (pos 0) and closing_prayer (pos 4) with ON CONFLICT DO NOTHING, assigned_confirmed status, WHERE IS NOT NULL filter, DROP COLUMN (4 columns), data copy before drop order, trigger function (positions 0/4 check, manage_prayers query, COALESCE null safety, skip when OFF, fire when ON, 5min delay, SECURITY DEFINER, plpgsql)"
+      - "STEP-02 i18n: 62 testes - tabs.speechesAndPrayers, home.nextSpeechesAndPrayers, prayers.opening/closing/prayerPrefix, settings.managePrayers, whatsapp.tabSpeech/tabOpeningPrayer/tabClosingPrayer, speeches.openingPrayer/closingPrayer, sundayExceptions.confirmDeletePrayers/confirmDeleteBoth, whatsapp.defaultOpeningPrayerTemplate/defaultClosingPrayerTemplate (all in pt-BR/en/es), prayer template {nome}/{data} placeholders, no {posicao}/{colecao}/{titulo}/{link} in prayer templates, en 15 minutes early, en intermediate hymn, es 15 minutos"
+      - "STEP-03 Types: 14 testes - Ward interface (manage_prayers boolean, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer), Speech position comment 0-4, SpeechStatus types, SundayExceptionReason types"
+      - "STEP-04 Hook: 12 testes - useWardManagePrayers export, wardKeys.managePrayers, queries wards table, selects manage_prayers, filters by wardId, .single(), returns managePrayers boolean, returns isLoading, defaults false, query key structure"
+      - "STEP-05 LazyCreate: 16 testes - input accepts sundayType, sundayType optional, speeches -> [0,1,2,3,4], testimony_meeting -> [0,4], primary_presentation -> [0,4] shared with testimony, general/stake/ward_conference + other -> [], idempotency check, skip if exists, empty for no positions, status not_assigned"
+      - "STEP-06 Delete: 8 testes - accepts optional positions, .in(position, positions) when provided, length > 0 guard, deletes from speeches, filters ward_id + sunday_date, backward compatible without positions, cache invalidation"
+      - "STEP-07 Settings: 14 testes - imports useWardManagePrayers + wardKeys, isBishopric guard, t('settings.managePrayers') label, Switch component, value={managePrayers}, onValueChange mutation, update wards.manage_prayers, invalidates managePrayers key, invalidates ward key, filters by wardId, isBishopric = role === bishopric"
+      - "Superseded assertions updated: batch10-phase1 (1 substring 400->600 for useDeleteSpeechesByDate error throw), batch15-phase1 (1 specialTitle variable ref), batch16 (1 specialTitle variable ref), batch19-phase2 (1 lazyCreate.mutate object input)"
+      - "21 ACs cobertos (AC-157-01/02/03/04/05/06/07/08/09/10/12/20/46/47/48/52/53/54/55/57/58/61), 1 EC coberto (EC-157-01), 0 gaps"
+      - "Full suite: 6411 testes passando, 49 skipped, 0 falhando"
       - "verdict: approved"

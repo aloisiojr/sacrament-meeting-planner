@@ -55,7 +55,7 @@ export function InviteManagementSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('wards')
-        .select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')
+        .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')
         .eq('id', wardId)
         .single();
       if (error) throw error;
@@ -129,20 +129,26 @@ export function InviteManagementSection() {
           if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
           url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         } else {
-          // Speech: use existing speech template
+          // Speech: use position-specific speech template
+          const speechTemplateMap: Record<number, string> = {
+            1: ward?.whatsapp_template_speech_1 ?? '',
+            2: ward?.whatsapp_template_speech_2 ?? '',
+            3: ward?.whatsapp_template_speech_3 ?? '',
+          };
+          const selectedTemplate = speechTemplateMap[speech.position] ?? '';
           url = buildWhatsAppUrl(
             speech.speaker_phone,
             '', // countryCode already in phone
-            ward?.whatsapp_template ?? '', // F142: use ward's custom template
+            selectedTemplate,
             {
               speakerName: speech.speaker_name ?? '',
               date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
               topic: speech.topic_title ?? '',
-              position: `${speech.position}\u00BA`,
               collection: speech.topic_collection ?? '',
               link: speech.topic_link ?? '',
             },
-            locale
+            locale,
+            speech.position as 1 | 2 | 3
           );
         }
         await openWhatsApp(url);

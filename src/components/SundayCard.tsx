@@ -438,7 +438,7 @@ export const SundayCard = React.memo(function SundayCard({
 
   // CR-229: Dynamic minHeight for uniform collapsed card height (ADR-110)
   // CR-232: Reduced LINE_HEIGHT for prayer cards (5 lines) to keep card compact
-  const LINE_HEIGHT = managePrayers ? 14 : 18;
+  const LINE_HEIGHT = managePrayers ? 16 : 18;
   const MARGIN_BOTTOM = 1;
   const maxLines = managePrayers ? 5 : 3;
   const collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines - 1) * MARGIN_BOTTOM;

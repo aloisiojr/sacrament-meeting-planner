@@ -4907,3 +4907,120 @@ batch23_phase2_test_results:
         description: "Added toggleManagePrayersMutation to update wards.manage_prayers"
       - id: CHG-718
         description: "Added Bishopric-only Switch toggle in Ward Settings section with label settings.managePrayers"
+
+  - step: S08
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-08
+    hash: e5ee44e
+    message: "feat(speech-slot): add isPrayer prop to SpeechSlot component (CR-221, STEP-08)"
+    files_changed:
+      - src/components/SpeechSlot.tsx
+    changes:
+      - id: CHG-719
+        description: "Added isPrayer?: boolean prop (default false) to SpeechSlotProps"
+      - id: CHG-720
+        description: "getPositionLabel: when isPrayer=true, position 0 returns t('prayers.opening'), position 4 returns t('prayers.closing')"
+      - id: CHG-721
+        description: "When isPrayer=true: topic row hidden (showTopicRow = false), 2nd speech toggle hidden"
+
+  - step: S16
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-16
+    hash: cfce38a
+    message: "feat(whatsapp): add default prayer template constants and getter (CR-221, STEP-16)"
+    files_changed:
+      - src/lib/whatsappUtils.ts
+    changes:
+      - id: CHG-722
+        description: "Added DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants with {nome} and {data} placeholders"
+      - id: CHG-723
+        description: "Added DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants with {nome} and {data} placeholders"
+      - id: CHG-724
+        description: "Added getDefaultPrayerTemplate(language, type) function returning correct template by language and prayer type"
+
+  - step: S09
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-09
+    hash: 02fe311
+    message: "feat(speeches): render prayer SpeechSlots when managePrayers enabled (CR-221, STEP-09)"
+    files_changed:
+      - src/app/(tabs)/speeches.tsx
+    changes:
+      - id: CHG-725
+        description: "Imported useWardManagePrayers hook"
+      - id: CHG-726
+        description: "When managePrayers=true and speeches type expanded: renders SpeechSlot(isPrayer=true, pos=0) before and SpeechSlot(isPrayer=true, pos=4) after speech slots"
+      - id: CHG-727
+        description: "For testimony/primary with managePrayers: renders only prayer slots (0, 4)"
+      - id: CHG-728
+        description: "handleAssignSpeaker: when managePrayers=false and position 0/4, passes status='assigned_confirmed' override"
+      - id: CHG-729
+        description: "lazyCreate.mutate calls now pass sundayType from exception data"
+
+  - step: S10
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-10
+    hash: a8bfe76
+    message: "feat(sunday-card): add collapsed prayer lines and smart type change logic (CR-221, STEP-10)"
+    files_changed:
+      - src/components/SundayCard.tsx
+      - src/app/(tabs)/speeches.tsx
+    changes:
+      - id: CHG-730
+        description: "SundayCardProps: added managePrayers?: boolean prop"
+      - id: CHG-731
+        description: "Collapsed view: when managePrayers=true and speeches type, shows italic prayer lines with prayerPrefix before/after speech lines"
+      - id: CHG-732
+        description: "Collapsed view: when managePrayers=true and testimony/primary, shows prayer lines instead of just exception text"
+      - id: CHG-733
+        description: "SundayTypeDropdown: added managePrayers prop, smart type change logic with position-aware deletion"
+      - id: CHG-734
+        description: "Type transitions: speeches->testimony/primary deletes [1,2,3], speeches->conference/other deletes all, testimony->conference deletes [0,4], testimony<->primary no deletion"
+      - id: CHG-735
+        description: "Context-aware confirmation dialogs: confirmDeletePrayers, confirmDeleteBoth, changeConfirmMessage"
+      - id: CHG-736
+        description: "speeches.tsx: handleDeleteSpeeches now accepts optional positions parameter"
+
+  - step: S14
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-14
+    hash: 26b1d0e
+    message: "feat(invite): add prayer positions to InviteManagementSection (CR-221, STEP-14)"
+    files_changed:
+      - src/components/InviteManagementSection.tsx
+    changes:
+      - id: CHG-737
+        description: "Imported useWardManagePrayers and getDefaultPrayerTemplate"
+      - id: CHG-738
+        description: "Ward query updated to include whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"
+      - id: CHG-739
+        description: "inviteItems filter: includes positions 0/4 when managePrayers=true, excludes when false"
+      - id: CHG-740
+        description: "handleNotInvitedAction: for positions 0/4, uses prayer-specific WhatsApp template"
+      - id: CHG-741
+        description: "Position labels: pos 0 shows t('speeches.openingPrayer'), pos 4 shows t('speeches.closingPrayer')"
+
+  - step: S17
+    cr: CR-221
+    plan_ref: plans/PLAN_P044.yaml
+    plan_step: STEP-17
+    hash: b11002e
+    message: "feat(whatsapp-settings): add segmented control for prayer templates (CR-221, STEP-17)"
+    files_changed:
+      - src/app/(tabs)/settings/whatsapp.tsx
+    changes:
+      - id: CHG-742
+        description: "Imported useWardManagePrayers and getDefaultPrayerTemplate"
+      - id: CHG-743
+        description: "When managePrayers=true: shows 3-tab segmented control (Speech, Opening, Closing)"
+      - id: CHG-744
+        description: "Each tab has own template state, auto-save mutation, and DB column (whatsapp_template, _opening_prayer, _closing_prayer)"
+      - id: CHG-745
+        description: "Prayer tabs: PLACEHOLDER_TOKENS limited to [{nome}, {data}]"
+      - id: CHG-746
+        description: "Ward query updated to include whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"

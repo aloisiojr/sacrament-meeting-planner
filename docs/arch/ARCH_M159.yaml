@@ -1,0 +1,535 @@
+# =============================================================================
+# ARCH_M159.yaml
+# Architecture for Batch 27: F159 - Split Speech WhatsApp Template (CR-231)
+# Replaces single wards.whatsapp_template with 3 per-speech-position columns
+# Created: 2026-02-24
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Replace the single speech WhatsApp template column (wards.whatsapp_template)
+    with 3 individual columns (whatsapp_template_speech_1, whatsapp_template_speech_2,
+    whatsapp_template_speech_3), removing the {posicao} placeholder entirely.
+    Each template embeds the ordinal word for its position. The Settings WhatsApp
+    screen expands from 3 tabs to 5 tabs (3 speech + 2 prayer).
+  principles:
+    - "DB migration first: all other changes depend on the new column names"
+    - "Same pattern as CR-221 prayer template split: separate columns, separate defaults, select by position"
+    - "Remove {posicao} placeholder entirely from templates, variables, and UI"
+    - "Backward compatible: existing custom templates copied to all 3 new columns during migration"
+    - "Prayer templates (opening/closing) are NOT affected by this change"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │              F159: Split Speech WhatsApp Template (CR-231)          │
+  │                                                                     │
+  │  ┌─────────────────────────────────────────────────────────────┐   │
+  │  │  Migration 020: wards table schema change                    │   │
+  │  │  + whatsapp_template_speech_1 (copy from whatsapp_template)  │   │
+  │  │  + whatsapp_template_speech_2 (copy from whatsapp_template)  │   │
+  │  │  + whatsapp_template_speech_3 (copy from whatsapp_template)  │   │
+  │  │  - whatsapp_template (dropped after copy)                    │   │
+  │  └─────────────────────────────────────────────────────────────┘   │
+  │       │                                                             │
+  │       ▼                                                             │
+  │  ┌──────────────┐  ┌───────────────────┐  ┌────────────────────┐  │
+  │  │ Ward type    │  │ whatsappUtils.ts   │  │ register-first-   │  │
+  │  │ (database.ts)│  │ 9 default temps    │  │ user edge fn      │  │
+  │  │ 3 new fields │  │ getDefaultSpeech   │  │ 3 speech columns  │  │
+  │  │ -1 old field │  │ Template()         │  │ per language       │  │
+  │  └──────────────┘  │ -getDefaultTempl() │  └────────────────────┘  │
+  │       │            │ -WhatsAppVars.pos  │                          │
+  │       │            │ -{posicao} removal │                          │
+  │       ▼            └───────────────────┘                           │
+  │  ┌──────────────────┐  ┌────────────────────────────────────────┐  │
+  │  │ InviteMgmtSect.  │  │ settings/whatsapp.tsx                  │  │
+  │  │ Select template   │  │ 5 tabs: 1o Disc|2o Disc|3o Disc|      │  │
+  │  │ by speech.pos     │  │         Abertura|Encerramento          │  │
+  │  │ No position var   │  │ No {posicao} chip                     │  │
+  │  └──────────────────┘  │ 3 separate save mutations              │  │
+  │                         └────────────────────────────────────────┘  │
+  │                                                                     │
+  │  ┌──────────────────┐  ┌────────────────────────────────────────┐  │
+  │  │ settings/index   │  │ i18n (pt-BR, en, es)                   │  │
+  │  │ Reset 3 speech   │  │ - placeholderPosition (removed)        │  │
+  │  │ cols on lang chg │  │ + tabSpeech1, tabSpeech2, tabSpeech3   │  │
+  │  └──────────────────┘  │ - tabSpeech (removed)                  │  │
+  │                         └────────────────────────────────────────┘  │
+  └─────────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- 1. DB Migration ---
+
+  - name: "Migration020_SplitSpeechTemplate"
+    responsibility: "Add 3 speech template columns, copy data, drop old column"
+    file: "supabase/migrations/020_split_speech_template.sql"
+    cr_ids: [231]
+    changes:
+      - "ADD COLUMN whatsapp_template_speech_1 TEXT (nullable)"
+      - "ADD COLUMN whatsapp_template_speech_2 TEXT (nullable)"
+      - "ADD COLUMN whatsapp_template_speech_3 TEXT (nullable)"
+      - "UPDATE wards SET whatsapp_template_speech_{1,2,3} = whatsapp_template (copy existing value to all 3)"
+      - "ALTER TABLE wards DROP COLUMN whatsapp_template"
+    contract:
+      before: "wards has whatsapp_template TEXT (single column)"
+      after: "wards has whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3 TEXT (3 columns). Old column dropped."
+    dependencies: []
+    notes: >
+      Same pattern as migration 019 which added whatsapp_template_opening_prayer
+      and whatsapp_template_closing_prayer. The copy-then-drop ensures existing
+      custom templates are preserved. Null values remain null in all 3 columns.
+
+  # --- 2. TypeScript Types ---
+
+  - name: "WardTypeSpeechTemplates"
+    responsibility: "Update Ward interface with 3 speech template columns"
+    file: "src/types/database.ts"
+    cr_ids: [231]
+    changes:
+      - "Remove: whatsapp_template: string | null"
+      - "Add: whatsapp_template_speech_1: string | null"
+      - "Add: whatsapp_template_speech_2: string | null"
+      - "Add: whatsapp_template_speech_3: string | null"
+    contract:
+      before: "Ward { whatsapp_template: string | null; ... }"
+      after: "Ward { whatsapp_template_speech_1: string | null; whatsapp_template_speech_2: string | null; whatsapp_template_speech_3: string | null; ... }"
+    dependencies: ["Migration020_SplitSpeechTemplate"]
+
+  # --- 3. Default Templates & Utilities ---
+
+  - name: "WhatsAppUtilsSpeechTemplates"
+    responsibility: "Replace single default templates with 9 position-specific templates (3 positions x 3 languages)"
+    file: "src/lib/whatsappUtils.ts"
+    cr_ids: [231]
+    changes:
+      - "Remove constants: DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES"
+      - "Add 9 constants: DEFAULT_TEMPLATE_SPEECH_{1,2,3}_{PT_BR,EN,ES}"
+      - "  Speech 1: 'primeiro discurso' (pt-BR), 'first speech' (en), 'primer discurso' (es)"
+      - "  Speech 2: 'segundo discurso' (pt-BR), 'second speech' (en), 'segundo discurso' (es)"
+      - "  Speech 3: 'terceiro discurso' (pt-BR), 'third speech' (en), 'tercer discurso' (es)"
+      - "  No {posicao} placeholder in any template"
+      - "Remove function: getDefaultTemplate(language)"
+      - "Add function: getDefaultSpeechTemplate(language, position) where position is 1|2|3"
+      - "Remove position field from WhatsAppVariables interface"
+      - "Remove {posicao} replacement line from resolveTemplate"
+      - "Update buildWhatsAppUrl: add position parameter (1|2|3), use getDefaultSpeechTemplate as fallback"
+    contract:
+      methods:
+        - name: "getDefaultSpeechTemplate"
+          input: "(language: string, position: 1 | 2 | 3)"
+          output: "string (template text with ordinal embedded)"
+        - name: "resolveTemplate"
+          input: "(template: string, vars: WhatsAppVariables)"
+          output: "string (no {posicao} replacement)"
+          notes: "WhatsAppVariables no longer has position field"
+        - name: "buildWhatsAppUrl"
+          input: "(phone, countryCode, template, variables, language, position)"
+          output: "string (wa.me URL)"
+          notes: "position param added, used for getDefaultSpeechTemplate fallback"
+    dependencies: ["WardTypeSpeechTemplates"]
+
+  # --- 4. whatsapp.ts Re-exports ---
+
+  - name: "WhatsAppReExports"
+    responsibility: "Update re-exports to reflect renamed/removed symbols"
+    file: "src/lib/whatsapp.ts"
+    cr_ids: [231]
+    changes:
+      - "Remove from re-export: DEFAULT_TEMPLATE_PT_BR, DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES, getDefaultTemplate"
+      - "Add to re-export: getDefaultSpeechTemplate"
+      - "WhatsAppVariables re-export unchanged (type itself changed in whatsappUtils)"
+    dependencies: ["WhatsAppUtilsSpeechTemplates"]
+    notes: >
+      Check if any other files import the removed symbols from whatsapp.ts.
+      If so, update those imports to use the new symbols.
+
+  # --- 5. InviteManagementSection ---
+
+  - name: "InviteManagementSpeechTemplateSelect"
+    responsibility: "Select correct speech template column based on speech.position and stop passing position variable"
+    file: "src/components/InviteManagementSection.tsx"
+    cr_ids: [231]
+    changes:
+      - "Ward query .select() changes: replace 'whatsapp_template' with 'whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3'"
+      - "In handleNotInvitedAction speech branch (else block, positions 1/2/3):"
+      - "  Map speech.position to template column:"
+      - "    1 -> ward.whatsapp_template_speech_1"
+      - "    2 -> ward.whatsapp_template_speech_2"
+      - "    3 -> ward.whatsapp_template_speech_3"
+      - "  Pass selected column value (or '') as template to buildWhatsAppUrl"
+      - "  Pass speech.position to buildWhatsAppUrl (new param)"
+      - "  Remove position from WhatsAppVariables object (no more `position: '${speech.position}\\u00BA'`)"
+    contract:
+      before: |
+        // Speech template selection:
+        ward?.whatsapp_template ?? ''
+        // Position variable:
+        position: `${speech.position}\u00BA`
+      after: |
+        // Speech template selection:
+        const speechTemplateMap = { 1: 'whatsapp_template_speech_1', 2: 'whatsapp_template_speech_2', 3: 'whatsapp_template_speech_3' };
+        ward?.[speechTemplateMap[speech.position]] ?? ''
+        // Position: passed as buildWhatsAppUrl parameter, NOT in variables
+    dependencies: ["WhatsAppUtilsSpeechTemplates", "WardTypeSpeechTemplates"]
+
+  # --- 6. Settings WhatsApp Screen ---
+
+  - name: "WhatsAppSettingsScreenTabs"
+    responsibility: "Expand segmented control from 3 tabs to 5 tabs (3 speech + 2 prayer), each editing its own column"
+    file: "src/app/(tabs)/settings/whatsapp.tsx"
+    cr_ids: [231]
+    changes:
+      - "Change ActiveTab type: 'speech' -> 'speech_1' | 'speech_2' | 'speech_3' | 'opening_prayer' | 'closing_prayer'"
+      - "Ward query .select() changes: replace 'whatsapp_template' with 'whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3'"
+      - "Template states: replace single [template, setTemplate] with [speech1Template, setSpeech1Template], [speech2Template, setSpeech2Template], [speech3Template, setSpeech3Template]"
+      - "Save mutations: replace single saveMutation with saveSpeech1Mutation, saveSpeech2Mutation, saveSpeech3Mutation (each updates its own column)"
+      - "Save timer refs: replace single saveTimerRef with speech1SaveTimerRef, speech2SaveTimerRef, speech3SaveTimerRef"
+      - "Initialize effects: 3 separate useEffect blocks, one per speech template (init from ward.whatsapp_template_speech_{1,2,3})"
+      - "Handle change callbacks: 3 separate handlers (handleSpeech1Change, handleSpeech2Change, handleSpeech3Change)"
+      - "Segmented control: always show tabs (remove managePrayers check for showing the control). Show 3 speech tabs when managePrayers=false, 5 tabs when managePrayers=true"
+      - "Tab labels: use t('whatsapp.tabSpeech1'), t('whatsapp.tabSpeech2'), t('whatsapp.tabSpeech3')"
+      - "Remove {posicao} from PLACEHOLDER_I18N_KEYS and PLACEHOLDER_TOKENS for speech tabs"
+      - "Remove 'whatsapp.placeholderPosition' from speech placeholder keys"
+      - "Remove {posicao} from SAMPLE_DATA"
+      - "F141 language reset: reset all 3 speech initialized flags"
+    contract:
+      input: "Ward data with 3 speech template columns + 2 prayer template columns"
+      output: "5-tab segmented control (or 3-tab when managePrayers=false), each tab edits its own column"
+    dependencies: ["WardTypeSpeechTemplates", "I18nF159Updates"]
+    notes: >
+      The segmented control is now always shown since there are always at least
+      3 speech tabs. When managePrayers=false, only 3 speech tabs appear.
+      When managePrayers=true, 5 tabs appear (3 speech + 2 prayer).
+      The existing opening/closing prayer tab logic remains unchanged.
+
+  # --- 7. Settings Language Reset ---
+
+  - name: "SettingsLanguageResetSpeechTemplates"
+    responsibility: "Reset all 3 speech template columns to NULL on ward language change"
+    file: "src/app/(tabs)/settings/index.tsx"
+    cr_ids: [231]
+    changes:
+      - "In wardLanguageChangeMutation.mutationFn: replace { language: newLanguage, whatsapp_template: null } with { language: newLanguage, whatsapp_template_speech_1: null, whatsapp_template_speech_2: null, whatsapp_template_speech_3: null }"
+    contract:
+      before: ".update({ language: newLanguage, whatsapp_template: null })"
+      after: ".update({ language: newLanguage, whatsapp_template_speech_1: null, whatsapp_template_speech_2: null, whatsapp_template_speech_3: null })"
+    dependencies: ["Migration020_SplitSpeechTemplate"]
+    notes: >
+      Prayer template columns (whatsapp_template_opening_prayer, whatsapp_template_closing_prayer)
+      should also be reset on language change. Check if they already are. If not,
+      add them to the same update call.
+
+  # --- 8. Edge Function ---
+
+  - name: "RegisterFirstUserSpeechTemplates"
+    responsibility: "Create ward with 3 language-appropriate speech template columns"
+    file: "supabase/functions/register-first-user/index.ts"
+    cr_ids: [231]
+    changes:
+      - "Replace single defaultWhatsappTemplate string with 3 per-position defaults"
+      - "Use language from input to select correct ordinal (primeiro/first/primer for pos 1, etc.)"
+      - "Ward insert: replace { whatsapp_template: defaultWhatsappTemplate } with { whatsapp_template_speech_1: ..., whatsapp_template_speech_2: ..., whatsapp_template_speech_3: ... }"
+    contract:
+      before: "Ward created with single whatsapp_template column"
+      after: "Ward created with 3 separate speech template columns, each with correct ordinal"
+    dependencies: ["Migration020_SplitSpeechTemplate"]
+    notes: >
+      The edge function duplicates the default template text (it does not import
+      from whatsappUtils.ts since it runs in Deno). The templates must match
+      the client-side defaults in whatsappUtils.ts.
+
+  # --- 9. i18n Updates ---
+
+  - name: "I18nF159Updates"
+    responsibility: "Remove placeholderPosition key, replace tabSpeech with 3 position-specific tab labels"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [231]
+    changes:
+      - "Remove key: whatsapp.placeholderPosition (all 3 locales)"
+      - "Remove key: whatsapp.tabSpeech (all 3 locales)"
+      - "Add key: whatsapp.tabSpeech1 -> '1o Disc.' (pt-BR), '1st Speech' (en), '1er Disc.' (es)"
+      - "Add key: whatsapp.tabSpeech2 -> '2o Disc.' (pt-BR), '2nd Speech' (en), '2o Disc.' (es)"
+      - "Add key: whatsapp.tabSpeech3 -> '3o Disc.' (pt-BR), '3rd Speech' (en), '3er Disc.' (es)"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "speech_template_column_selection"
+    components: ["InviteManagementSpeechTemplateSelect", "WhatsAppSettingsScreenTabs"]
+    methods:
+      - name: "Position-to-column mapping"
+        input: "speech.position (1, 2, or 3)"
+        output: "Column name: whatsapp_template_speech_{1,2,3}"
+        notes: >
+          Both InviteManagementSection and whatsapp.tsx use the same 3 columns.
+          InviteManagementSection reads by position at runtime.
+          whatsapp.tsx presents each column in its own tab.
+
+  - name: "default_template_fallback"
+    components: ["WhatsAppUtilsSpeechTemplates", "InviteManagementSpeechTemplateSelect"]
+    methods:
+      - name: "getDefaultSpeechTemplate fallback in buildWhatsAppUrl"
+        input: "template (empty/null), language, position"
+        output: "Default template with embedded ordinal used when custom template is null"
+        notes: >
+          buildWhatsAppUrl now accepts a position parameter. When template is empty,
+          it calls getDefaultSpeechTemplate(language, position) instead of
+          getDefaultTemplate(language).
+
+  - name: "language_reset_all_speech_templates"
+    components: ["SettingsLanguageResetSpeechTemplates", "WhatsAppSettingsScreenTabs"]
+    methods:
+      - name: "Ward language change resets speech templates"
+        input: "newLanguage from language picker"
+        output: "All 3 speech template columns set to NULL in DB"
+        notes: >
+          When language changes, templates are reset to NULL so the app uses
+          getDefaultSpeechTemplate with the new language. The whatsapp.tsx
+          screen re-initializes from DB (NULL -> default for new language).
+
+  - name: "edge_function_template_init"
+    components: ["RegisterFirstUserSpeechTemplates", "WhatsAppUtilsSpeechTemplates"]
+    methods:
+      - name: "Initial ward creation with 3 speech templates"
+        input: "User registration with language preference"
+        output: "Ward created with 3 language-appropriate default speech templates"
+        notes: >
+          Edge function duplicates template text (Deno runtime cannot import
+          client-side TS). Templates must match whatsappUtils.ts defaults.
+
+# =============================================================================
+# DATA MODEL CHANGES
+# =============================================================================
+
+data_model:
+  entities:
+    - name: "wards"
+      changes:
+        - field: "whatsapp_template"
+          action: "DROP"
+          type: "TEXT"
+          notes: "Replaced by 3 position-specific columns"
+        - field: "whatsapp_template_speech_1"
+          action: "ADD"
+          type: "TEXT (nullable)"
+          notes: "Template for 1st speech position. NULL = use default."
+        - field: "whatsapp_template_speech_2"
+          action: "ADD"
+          type: "TEXT (nullable)"
+          notes: "Template for 2nd speech position. NULL = use default."
+        - field: "whatsapp_template_speech_3"
+          action: "ADD"
+          type: "TEXT (nullable)"
+          notes: "Template for 3rd speech position. NULL = use default."
+      migration_behavior: >
+        During migration: existing whatsapp_template value is copied to all 3
+        new columns. If whatsapp_template is NULL, all 3 remain NULL. After
+        copy, whatsapp_template is dropped.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-112
+    title: "Per-position speech template columns instead of template-level parameterization (Batch 27)"
+    context: >
+      CR-231 wants to remove the {posicao} placeholder from speech templates.
+      Two approaches: (a) keep single column and embed ordinal at resolution time,
+      (b) split into 3 columns so each template is independently customizable.
+      Option (a) still requires knowing position at resolution time but prevents
+      per-position customization. Option (b) follows the prayer template precedent
+      (CR-221 split speech vs opening_prayer vs closing_prayer).
+    decision: >
+      Use 3 separate columns (whatsapp_template_speech_1, _speech_2, _speech_3),
+      matching the pattern established by CR-221 for prayer templates. Each template
+      is independently editable in the Settings WhatsApp screen. The ordinal word
+      is embedded in the default template text, not resolved at runtime.
+    decided_in: "CR-231/F159"
+    consequences:
+      - "Full per-position customization: users can write different messages for each speech"
+      - "Consistent with prayer template split pattern (CR-221/F157)"
+      - "3 additional columns in wards table (acceptable given existing prayer columns)"
+      - "Settings WhatsApp screen gains complexity (5 tabs vs 3)"
+
+  - id: ADR-113
+    title: "Segmented control always visible with 3-5 tabs (Batch 27)"
+    context: >
+      Pre-CR-231, the segmented control was only shown when managePrayers=true
+      (3 tabs: speech, opening, closing). With 3 speech tabs, the control must
+      always appear (at minimum 3 speech tabs). When managePrayers=true, 5 tabs.
+    decision: >
+      Always show the segmented control. When managePrayers=false, show 3 tabs
+      (1o Disc., 2o Disc., 3o Disc.). When managePrayers=true, show 5 tabs
+      (3 speech + 2 prayer). Use abbreviated labels to fit on smaller screens.
+    decided_in: "CR-231/F159"
+    consequences:
+      - "Segmented control is always visible (better discoverability)"
+      - "Abbreviated labels required to fit 5 tabs (e.g., '1o Disc.' instead of '1o Discurso')"
+      - "Default active tab remains first speech (speech_1)"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F159, F157]
+    interaction: >
+      F157 (CR-221) established the pattern of separate template columns for
+      prayer types. F159 extends the same pattern to speech positions.
+      Prayer template columns (whatsapp_template_opening_prayer,
+      whatsapp_template_closing_prayer) are NOT affected by F159.
+      The Settings WhatsApp screen now has 5 tabs total.
+
+  - features: [F159, F141]
+    interaction: >
+      F141 (CR-207) added ward language change template reset behavior.
+      F159 must reset all 3 speech template columns to NULL on language change,
+      not just the old single column. The F141 useEffect in whatsapp.tsx that
+      resets initialized flags must now reset 3 speech initialized flags.
+
+  - features: [F159, F142]
+    interaction: >
+      F142 (CR-207) made InviteManagementSection use the ward's custom template
+      instead of always using the default. F159 changes which column is read:
+      instead of ward.whatsapp_template, it reads the position-specific column.
+
+  - features: [F159, F116]
+    interaction: >
+      F116 (CR-178) added translated placeholder display labels in the WhatsApp
+      settings. F159 removes the {posicao} placeholder from the speech tab list
+      while leaving prayer tab placeholders unchanged.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: supabase/migrations/020_split_speech_template.sql
+    feature: F159
+    cr_ids: [231]
+    new_file: true
+    changes:
+      - "ADD 3 columns, UPDATE copy, DROP old column"
+
+  - file: src/types/database.ts
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Ward interface: remove whatsapp_template, add whatsapp_template_speech_{1,2,3}"
+
+  - file: src/lib/whatsappUtils.ts
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Remove 3 single-speech default constants, add 9 per-position constants"
+      - "Replace getDefaultTemplate with getDefaultSpeechTemplate"
+      - "Remove position from WhatsAppVariables"
+      - "Remove {posicao} from resolveTemplate"
+      - "Add position parameter to buildWhatsAppUrl"
+
+  - file: src/lib/whatsapp.ts
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Update re-exports: remove old symbols, add new ones"
+
+  - file: src/components/InviteManagementSection.tsx
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Ward query selects 3 speech columns instead of 1"
+      - "Speech branch maps position to column, passes position to buildWhatsAppUrl"
+      - "Removes position from variables object"
+
+  - file: src/app/(tabs)/settings/whatsapp.tsx
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "ActiveTab type: 5 values instead of 3"
+      - "Ward query selects 3 speech columns instead of 1"
+      - "3 separate speech template states, mutations, handlers"
+      - "Segmented control always shown (3 or 5 tabs)"
+      - "Remove {posicao} from placeholder list"
+      - "Remove {posicao} from SAMPLE_DATA"
+
+  - file: src/app/(tabs)/settings/index.tsx
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "wardLanguageChangeMutation resets 3 speech template columns to NULL"
+
+  - file: supabase/functions/register-first-user/index.ts
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Ward insert uses 3 speech template columns with position-specific defaults"
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Remove: whatsapp.placeholderPosition, whatsapp.tabSpeech"
+      - "Add: whatsapp.tabSpeech1, whatsapp.tabSpeech2, whatsapp.tabSpeech3"
+
+  - file: src/i18n/locales/en.json
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Remove: whatsapp.placeholderPosition, whatsapp.tabSpeech"
+      - "Add: whatsapp.tabSpeech1, whatsapp.tabSpeech2, whatsapp.tabSpeech3"
+
+  - file: src/i18n/locales/es.json
+    feature: F159
+    cr_ids: [231]
+    changes:
+      - "Remove: whatsapp.placeholderPosition, whatsapp.tabSpeech"
+      - "Add: whatsapp.tabSpeech1, whatsapp.tabSpeech2, whatsapp.tabSpeech3"
+
+files_not_modified:
+  - "src/components/SundayCard.tsx (no WhatsApp template logic)"
+  - "src/components/SpeechSlot.tsx (no WhatsApp template logic)"
+  - "src/hooks/useSpeeches.ts (no template logic)"
+  - "src/components/AgendaForm.tsx (no template logic)"
+  - "src/lib/speechUtils.ts (no template logic)"
+  - "supabase/migrations/019_managed_prayers.sql (existing migration, not modified)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 9 components, each with one responsibility
+  GATE-03_contracts_defined: true        # 4 cross-component contracts defined
+  GATE-04_adrs_recorded: true           # ADR-112 and ADR-113 recorded
+  GATE-05_arch_saved: true              # ARCH_M159.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED will be updated below
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 9 components (under 10 limit)

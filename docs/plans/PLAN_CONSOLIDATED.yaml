@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-24"
-  version: 36
-  last_updated_by: "batch-26-ui-adjustments-managed-prayers"
+  version: 37
+  last_updated_by: "batch-27-split-speech-whatsapp-template"
   total_phases: 6
-  total_cr_plans: 53
+  total_cr_plans: 54
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1499,6 +1499,9 @@ pending_with_plan:
   - cr_id: 230
     plan_id: PLAN_P047
     description: "Fix double-label bug in AgendaForm prayer fields (inline rendering instead of ReadOnlySpeakerRow)"
+  - cr_id: 231
+    plan_id: PLAN_P048
+    description: "Split speech WhatsApp template into 3 individual templates (whatsapp_template_speech_1/2/3), remove {posicao} placeholder"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1520,6 +1523,27 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 37
+    phase: "batch-27-split-speech-whatsapp-template"
+    changes:
+      - "Added PLAN_P048 for Batch 27 (F159, CR-231)"
+      - "1 refactor CR: split single speech WhatsApp template into 3 per-position templates"
+      - "10 steps, 21 ACs, 11 arquivos impactados (1 novo + 10 modificados + 1 teste)"
+      - "1 migracao SQL (020_split_speech_template.sql), zero dependencias novas"
+      - "2 ADRs: ADR-112 (per-position speech template columns), ADR-113 (segmented control always visible 3-5 tabs)"
+      - "Migration 020 adds 3 columns (whatsapp_template_speech_1/2/3), copies existing data, drops old whatsapp_template"
+      - "9 new default template constants (3 positions x 3 languages) with embedded ordinals (primeiro/first/primer, etc.)"
+      - "getDefaultTemplate replaced by getDefaultSpeechTemplate(language, position)"
+      - "WhatsAppVariables.position removed, resolveTemplate no longer replaces {posicao}"
+      - "buildWhatsAppUrl gains position parameter for getDefaultSpeechTemplate fallback"
+      - "InviteManagementSection maps speech.position to correct template column"
+      - "Settings WhatsApp screen: 5-tab segmented control (1o Disc.|2o Disc.|3o Disc.|Abertura|Encerramento)"
+      - "Segmented control always visible (3 tabs when managePrayers=false, 5 when true)"
+      - "{posicao} removed from PLACEHOLDER_I18N_KEYS, PLACEHOLDER_TOKENS, and SAMPLE_DATA"
+      - "Language change resets all 3 speech template columns to NULL"
+      - "Edge function creates ward with 3 language-appropriate speech templates"
+      - "i18n: remove placeholderPosition + tabSpeech, add tabSpeech1/2/3 in all 3 locales"
+      - "STEP-01/09 parallelizaveis, STEP-02 depende STEP-01, STEP-03 depende STEP-02, STEP-04 depende STEP-03, STEP-05/06/07/08 parallelizaveis entre si, STEP-10 depende de todos"
   - version: 36
     phase: "batch-26-ui-adjustments-managed-prayers"
     changes:

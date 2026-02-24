@@ -319,8 +319,8 @@ function SpeechesTabContent() {
 
   // Delete speeches when changing sunday type away from speeches
   const handleDeleteSpeeches = useCallback(
-    (date: string) => {
-      deleteSpeechesByDate.mutate({ sundayDate: date });
+    (date: string, positions?: number[]) => {
+      deleteSpeechesByDate.mutate({ sundayDate: date, positions });
     },
     [deleteSpeechesByDate]
   );

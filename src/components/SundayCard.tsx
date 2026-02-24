@@ -44,6 +44,8 @@ export interface SundayCardProps {
   expanded?: boolean;
   /** F118: Whether the 2nd speech is enabled for this sunday. */
   hasSecondSpeech?: boolean;
+  /** CR-221: Whether managed prayers is enabled. */
+  managePrayers?: boolean;
   /** Called when the card header is pressed (expand/collapse). */
   onToggle?: () => void;
   /** Called when a speech LED is pressed. */
@@ -53,7 +55,7 @@ export interface SundayCardProps {
   /** Called when the sunday type is reverted to "speeches" (remove exception). */
   onRemoveException?: (date: string) => void;
   /** Called to delete speeches when changing sunday type away from speeches. */
-  onDeleteSpeeches?: (date: string) => void;
+  onDeleteSpeeches?: (date: string, positions?: number[]) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
   /** Optional render function for right side of header (e.g., pencil button). */
@@ -97,10 +99,12 @@ export interface SundayTypeDropdownProps {
   disabled?: boolean;
   speeches: Speech[];
   date: string;
-  onDeleteSpeeches?: (date: string) => void;
+  onDeleteSpeeches?: (date: string, positions?: number[]) => void;
+  /** CR-221: Whether managed prayers is enabled. */
+  managePrayers?: boolean;
 }
 
-export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches }: SundayTypeDropdownProps) {
+export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, disabled, speeches, date, onDeleteSpeeches, managePrayers = false }: SundayTypeDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -112,46 +116,148 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
     return t(`sundayExceptions.${type}`, type);
   };
 
+  const isTestimonyOrPrimary = (type: string) =>
+    type === 'testimony_meeting' || type === 'primary_presentation';
+
+  const isConferenceOrOther = (type: string) =>
+    type === 'general_conference' || type === 'stake_conference' ||
+    type === 'ward_conference' || type === 'other';
+
   const handleSelect = (type: SundayTypeOption) => {
     setModalVisible(false);
     if (type === SUNDAY_TYPE_SPEECHES) {
       onRevertToSpeeches();
       return;
     }
-    // Confirm when changing FROM speeches WITH assignments
-    const hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title);
-    if (currentType === SUNDAY_TYPE_SPEECHES && hasAssignments) {
+
+    // CR-221: Determine which positions to delete based on type transition and managePrayers
+    const getPositionsToDelete = (): number[] | undefined => {
+      if (!managePrayers) return undefined; // delete all (legacy behavior)
+
+      if (currentType === SUNDAY_TYPE_SPEECHES) {
+        if (isTestimonyOrPrimary(type)) return [1, 2, 3]; // preserve 0,4
+        if (isConferenceOrOther(type)) return [0, 1, 2, 3, 4]; // delete all
+      }
+      if (isTestimonyOrPrimary(currentType)) {
+        if (isConferenceOrOther(type)) return [0, 4]; // delete prayer slots
+        if (isTestimonyOrPrimary(type)) return undefined; // no deletion needed (testimony <-> primary)
+      }
+      return undefined;
+    };
+
+    // CR-221: Determine confirmation message based on what will be deleted
+    const getConfirmMessage = (): string | null => {
+      if (!managePrayers) return null; // use default
+
+      const hasSpeechAssignments = speeches
+        .filter((s) => s.position >= 1 && s.position <= 3)
+        .some((s) => !!s.speaker_name || !!s.topic_title);
+      const hasPrayerAssignments = speeches
+        .filter((s) => s.position === 0 || s.position === 4)
+        .some((s) => !!s.speaker_name);
+
+      if (currentType === SUNDAY_TYPE_SPEECHES) {
+        if (isTestimonyOrPrimary(type)) {
+          // Only speech slots will be deleted, prayers preserved
+          if (hasSpeechAssignments) return t('sundayExceptions.changeConfirmMessage');
+          return null; // no assignments to lose
+        }
+        if (isConferenceOrOther(type)) {
+          // Both speeches and prayers will be deleted
+          if (hasSpeechAssignments && hasPrayerAssignments) return t('sundayExceptions.confirmDeleteBoth');
+          if (hasSpeechAssignments) return t('sundayExceptions.changeConfirmMessage');
+          if (hasPrayerAssignments) return t('sundayExceptions.confirmDeletePrayers');
+          return null;
+        }
+      }
+      if (isTestimonyOrPrimary(currentType)) {
+        if (isConferenceOrOther(type)) {
+          // Prayer slots will be deleted
+          if (hasPrayerAssignments) return t('sundayExceptions.confirmDeletePrayers');
+          return null;
+        }
+        // testimony <-> primary: no deletion
+        return null;
+      }
+      return null;
+    };
+
+    // Fallback for non-managePrayers: original logic
+    if (!managePrayers) {
+      const hasAssignments = speeches.some(s => !!s.speaker_name || !!s.topic_title);
+      if (currentType === SUNDAY_TYPE_SPEECHES && hasAssignments) {
+        Alert.alert(
+          t('sundayExceptions.changeConfirmTitle'),
+          t('sundayExceptions.changeConfirmMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('common.confirm'),
+              style: 'destructive',
+              onPress: () => {
+                onDeleteSpeeches?.(date);
+                if (type === 'other') {
+                  setCustomReason('');
+                  setOtherModalVisible(true);
+                } else {
+                  onSelect(type as SundayExceptionReason);
+                }
+              },
+            },
+          ]
+        );
+        return;
+      }
+      if (currentType === SUNDAY_TYPE_SPEECHES) {
+        onDeleteSpeeches?.(date);
+      }
+      if (type === 'other') {
+        setCustomReason('');
+        setOtherModalVisible(true);
+        return;
+      }
+      onSelect(type as SundayExceptionReason);
+      return;
+    }
+
+    // CR-221: managePrayers-aware type change logic
+    const positions = getPositionsToDelete();
+    const confirmMsg = getConfirmMessage();
+
+    const executeChange = () => {
+      // testimony <-> primary: no deletion needed
+      if (isTestimonyOrPrimary(currentType) && isTestimonyOrPrimary(type)) {
+        // No deletion, just change type
+      } else if (positions !== undefined) {
+        onDeleteSpeeches?.(date, positions);
+      } else {
+        onDeleteSpeeches?.(date);
+      }
+
+      if (type === 'other') {
+        setCustomReason('');
+        setOtherModalVisible(true);
+      } else {
+        onSelect(type as SundayExceptionReason);
+      }
+    };
+
+    if (confirmMsg) {
       Alert.alert(
         t('sundayExceptions.changeConfirmTitle'),
-        t('sundayExceptions.changeConfirmMessage'),
+        confirmMsg,
         [
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('common.confirm'),
             style: 'destructive',
-            onPress: () => {
-              onDeleteSpeeches?.(date);
-              if (type === 'other') {
-                setCustomReason('');
-                setOtherModalVisible(true);
-              } else {
-                onSelect(type as SundayExceptionReason);
-              }
-            },
+            onPress: executeChange,
           },
         ]
       );
-      return;
+    } else {
+      executeChange();
     }
-    if (currentType === SUNDAY_TYPE_SPEECHES) {
-      onDeleteSpeeches?.(date);
-    }
-    if (type === 'other') {
-      setCustomReason('');
-      setOtherModalVisible(true);
-      return;
-    }
-    onSelect(type as SundayExceptionReason);
   };
 
   const handleOtherConfirm = () => {
@@ -290,6 +396,7 @@ export const SundayCard = React.memo(function SundayCard({
   isPast = false,
   expanded = false,
   hasSecondSpeech = true,
+  managePrayers = false,
   onToggle,
   onStatusPress,
   onTypeChange,
@@ -307,6 +414,7 @@ export const SundayCard = React.memo(function SundayCard({
     exception?.reason ?? SUNDAY_TYPE_SPEECHES;
 
   const isSpeechesType = currentType === SUNDAY_TYPE_SPEECHES;
+  const isTestimonyOrPrimary = currentType === 'testimony_meeting' || currentType === 'primary_presentation';
 
   // F118: Determine which positions to show based on has_second_speech
   const visiblePositions = hasSecondSpeech ? [1, 2, 3] : [1, 3];
@@ -348,7 +456,45 @@ export const SundayCard = React.memo(function SundayCard({
         <DateBlock date={date} locale={locale} />
 
         <View style={styles.headerCenter}>
-          {!isSpeechesType && (
+          {/* CR-221: For testimony/primary with managePrayers: show prayer lines instead of just exception text */}
+          {!isSpeechesType && isTestimonyOrPrimary && managePrayers && !expanded && (() => {
+            const openingPrayer = speeches.find((s) => s.position === 0);
+            const closingPrayer = speeches.find((s) => s.position === 4);
+            return (
+              <>
+                <Text
+                  style={[styles.exceptionText, { color: colors.warning }]}
+                  numberOfLines={1}
+                >
+                  {exception
+                    ? (exception.reason === 'other' && exception.custom_reason
+                        ? exception.custom_reason
+                        : t(`sundayExceptions.${currentType}`))
+                    : ''}
+                </Text>
+                <View style={styles.speechRow}>
+                  <Text
+                    style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
+                  </Text>
+                </View>
+                <View style={styles.speechRow}>
+                  <Text
+                    style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
+                  </Text>
+                </View>
+              </>
+            );
+          })()}
+          {/* Non-speeches types: show exception text (unless testimony/primary with managePrayers handled above) */}
+          {!isSpeechesType && !(isTestimonyOrPrimary && managePrayers && !expanded) && (
             <Text
               style={[styles.exceptionText, { color: colors.warning }]}
               numberOfLines={1}
@@ -362,6 +508,21 @@ export const SundayCard = React.memo(function SundayCard({
           )}
           {isSpeechesType && !expanded && (
             <>
+              {/* CR-221: Opening prayer line (collapsed) */}
+              {managePrayers && (() => {
+                const openingPrayer = speeches.find((s) => s.position === 0);
+                return (
+                  <View style={styles.speechRow}>
+                    <Text
+                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
+                    </Text>
+                  </View>
+                );
+              })()}
               {/* F118: Show only visible positions; no ordinal labels (AC-118-08) */}
               {visiblePositions.map((pos, idx) => {
                 const speech = speeches.find((s) => s.position === pos);
@@ -395,6 +556,21 @@ export const SundayCard = React.memo(function SundayCard({
                   </View>
                 );
               })}
+              {/* CR-221: Closing prayer line (collapsed) */}
+              {managePrayers && (() => {
+                const closingPrayer = speeches.find((s) => s.position === 4);
+                return (
+                  <View style={styles.speechRow}>
+                    <Text
+                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
+                    </Text>
+                  </View>
+                );
+              })()}
             </>
           )}
         </View>
@@ -413,6 +589,7 @@ export const SundayCard = React.memo(function SundayCard({
             speeches={speeches}
             date={date}
             onDeleteSpeeches={onDeleteSpeeches}
+            managePrayers={managePrayers}
           />
           {children}
         </View>

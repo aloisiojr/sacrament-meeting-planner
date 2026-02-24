@@ -77,7 +77,9 @@ export interface Ward {
   stake_name: string;
   language: string;
   timezone: string;
-  whatsapp_template: string | null;
+  whatsapp_template_speech_1: string | null;
+  whatsapp_template_speech_2: string | null;
+  whatsapp_template_speech_3: string | null;
   manage_prayers: boolean;
   whatsapp_template_opening_prayer: string | null;
   whatsapp_template_closing_prayer: string | null;

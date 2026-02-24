@@ -242,7 +242,7 @@ function AgendaTabContent() {
           typeDisabled={!canEditType}
           onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
           onRemoveException={(d) => removeSundayException.mutate(d)}
-          onDeleteSpeeches={(d) => deleteSpeechesByDate.mutate(d)}
+          onDeleteSpeeches={(d) => deleteSpeechesByDate.mutate({ sundayDate: d })}
         />
       );
     },

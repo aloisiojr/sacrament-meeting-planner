@@ -16,6 +16,7 @@ import {
 import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
 import { useWardManagePrayers, wardKeys } from '../../../hooks/useSpeeches';
+import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import { ChevronRightIcon, CheckIcon } from '../../../components/icons';
 
 interface SettingsItemProps {
@@ -46,7 +47,7 @@ const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, c
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage, setWardLanguage } = useAuth();
+  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage, setWardLanguage, user, userName } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [appLanguageModalVisible, setAppLanguageModalVisible] = useState(false);
@@ -67,9 +68,13 @@ export default function SettingsScreen() {
         .eq('id', wardId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, enabled) => {
       queryClient.invalidateQueries({ queryKey: wardKeys.managePrayers(wardId) });
       queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'settings:manage_prayers',
+          buildLogDescription('settings:manage_prayers', { enabled: String(enabled) }), userName);
+      }
     },
   });
 

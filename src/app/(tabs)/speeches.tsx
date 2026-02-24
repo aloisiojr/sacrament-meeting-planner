@@ -182,7 +182,7 @@ function SpeechesTabContent() {
 
     // Expand the card and lazy-create speeches
     setExpandedDate(targetDate);
-    lazyCreate.mutate(targetDate);
+    lazyCreate.mutate({ sundayDate: targetDate });
 
     // Scroll to the target date
     const index = listItems.findIndex(
@@ -210,7 +210,7 @@ function SpeechesTabContent() {
       } else {
         setExpandedDate(date);
         // Lazy-create speeches on first expand
-        lazyCreate.mutate(date);
+        lazyCreate.mutate({ sundayDate: date });
         // Auto-scroll to expanded card (ADR-047)
         const index = listItems.findIndex(
           (i) => i.type === 'sunday' && i.key === date

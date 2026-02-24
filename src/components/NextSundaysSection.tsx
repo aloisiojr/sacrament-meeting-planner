@@ -21,6 +21,7 @@ import { QueryErrorView } from './QueryErrorView';
 import {
   useSpeeches,
   groupSpeechesBySunday,
+  useWardManagePrayers,
 } from '../hooks/useSpeeches';
 import { useAgendaRange } from '../hooks/useAgenda';
 import { useSundayExceptions } from '../hooks/useSundayTypes';
@@ -32,6 +33,7 @@ export function NextSundaysSection() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const { managePrayers } = useWardManagePrayers();
 
   // Get next 3 sundays
   const nextSundays = useMemo(() => {
@@ -98,6 +100,7 @@ export function NextSundaysSection() {
             exception={entry.exception}
             isNext={entry.date === nextSunday}
             hasSecondSpeech={hasSecondSpeech}
+            managePrayers={managePrayers}
             renderHeaderRight={() => (
               <Pressable
                 style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}

@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 13
-last_updated: "2026-02-24T06:00:00"
+version: 14
+last_updated: "2026-02-24T18:47:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -571,4 +571,39 @@ deploy_history:
       - "sunday_agendas: old prayer columns (opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name) DROPPED"
       - "enqueue_speech_notification: SECURITY DEFINER=true, search_path=public, manage_prayers check for positions 0/4"
       - "speech_notification_trigger: active on INSERT and UPDATE"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-24"
+    action: "Backup wards whatsapp_template data (pre-migration 020)"
+    method: "Management API SELECT query"
+    reason: "Migration 020 is destructive (drops whatsapp_template column). Backup before applying."
+    result: "Sucesso - 2 wards backed up to /tmp/wards_whatsapp_template_backup_20260224.json"
+    verified: true
+    cr: "Batch 27 (F159, CR-231)"
+    notes: "2 wards (Panamby, Teste) had whatsapp_template data - copied to all 3 new columns"
+
+  - date: "2026-02-24"
+    action: "Migration 020_split_speech_template.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - whatsapp_template split into whatsapp_template_speech_1/2/3, data migrated, old column dropped"
+    verified: true
+    cr: "Batch 27 (F159, CR-231)"
+    verification:
+      - "information_schema.columns: whatsapp_template_speech_1 TEXT nullable"
+      - "information_schema.columns: whatsapp_template_speech_2 TEXT nullable"
+      - "information_schema.columns: whatsapp_template_speech_3 TEXT nullable"
+      - "information_schema.columns: whatsapp_template NOT present (dropped)"
+      - "Data migration: 2 wards correctly migrated (template copied to all 3 columns)"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-24"
+    action: "Redeploy Edge Function register-first-user"
+    method: "supabase functions deploy register-first-user --no-verify-jwt"
+    reason: "F159 (CR-231): Updated to insert 3 per-position speech templates (whatsapp_template_speech_1/2/3) instead of single whatsapp_template"
+    result: "Sucesso - Function redeployada e ACTIVE (version 8)"
+    verified: true
+    cr: "Batch 27 (F159, CR-231)"
+    verification:
+      - "supabase functions list mostra register-first-user como ACTIVE v8"
       - "REST API health check: HTTP 200"

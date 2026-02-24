@@ -473,6 +473,10 @@ export const SundayCard = React.memo(function SundayCard({
                     : ''}
                 </Text>
                 <View style={styles.speechRow}>
+                  <StatusLED
+                    status={openingPrayer?.status ?? 'not_assigned'}
+                    size={10}
+                  />
                   <Text
                     style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
                     numberOfLines={1}
@@ -482,6 +486,10 @@ export const SundayCard = React.memo(function SundayCard({
                   </Text>
                 </View>
                 <View style={styles.speechRow}>
+                  <StatusLED
+                    status={closingPrayer?.status ?? 'not_assigned'}
+                    size={10}
+                  />
                   <Text
                     style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
                     numberOfLines={1}
@@ -513,6 +521,10 @@ export const SundayCard = React.memo(function SundayCard({
                 const openingPrayer = speeches.find((s) => s.position === 0);
                 return (
                   <View style={styles.speechRow}>
+                    <StatusLED
+                      status={openingPrayer?.status ?? 'not_assigned'}
+                      size={10}
+                    />
                     <Text
                       style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
                       numberOfLines={1}
@@ -561,6 +573,10 @@ export const SundayCard = React.memo(function SundayCard({
                 const closingPrayer = speeches.find((s) => s.position === 4);
                 return (
                   <View style={styles.speechRow}>
+                    <StatusLED
+                      status={closingPrayer?.status ?? 'not_assigned'}
+                      size={10}
+                    />
                     <Text
                       style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
                       numberOfLines={1}

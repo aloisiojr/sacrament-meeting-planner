@@ -1005,7 +1005,6 @@ describe('STEP-16: WhatsApp prayer templates', () => {
         speakerName: 'Maria',
         date: '2026-03-01',
         topic: '',
-        position: '',
       });
       expect(result).toContain('Maria');
     });
@@ -1015,7 +1014,6 @@ describe('STEP-16: WhatsApp prayer templates', () => {
         speakerName: 'Maria',
         date: '2026-03-01',
         topic: '',
-        position: '',
       });
       expect(result).toContain('2026-03-01');
     });
@@ -1025,7 +1023,6 @@ describe('STEP-16: WhatsApp prayer templates', () => {
         speakerName: 'João',
         date: '01/03/2026',
         topic: '',
-        position: '',
       });
       expect(result).toContain('João');
       expect(result).toContain('01/03/2026');

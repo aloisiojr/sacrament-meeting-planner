@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-23"
-  last_updated_by: "batch-24-phase-2"
+  last_updated_by: "batch-25-phase-1"
   total_modules: 8
-  total_adrs: 92
-  total_crs_implemented: 132
+  total_adrs: 99
+  total_crs_implemented: 133
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -50,6 +50,7 @@ metadata:
     - docs/arch/ARCH_M041.yaml
     - docs/arch/ARCH_M042.yaml
     - docs/arch/ARCH_M043.yaml
+    - docs/arch/ARCH_M044.yaml
 
 # =============================================================================
 # TECH STACK
@@ -274,7 +275,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -291,7 +292,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -331,11 +332,12 @@ modules:
       CR-214/F150: SpeechSlot disabled 2nd speech fields now show standard placeholders (t('speeches.selectSpeaker'), t('speeches.selectTopic')) instead of explanation text (t('speeches.secondSpeechDisabledPlaceholder')).
       CR-215/F151: SundayCard collapsed headerCenter gains minHeight: 62 when !expanded && isSpeechesType for uniform card height regardless of 2 or 3 visible positions.
       CR-219/F154: SundayCard collapsed headerCenter minHeight condition simplified from !expanded && isSpeechesType to !expanded. All collapsed card types (speech and exception) now have uniform minHeight: 62. Supersedes F151 approach.
+      CR-221/F157: Managed Prayers. Prayers stored as speeches positions 0 (opening) and 4 (closing). manage_prayers toggle on wards. useLazyCreateSpeeches extended for positions 0/4 by sunday type. SpeechSlot gains isPrayer prop (no topic row). SundayCard collapsed shows prayer lines (italic + prefix) when ON. useDeleteSpeechesByDate gains optional positions filter. Notification trigger checks manage_prayers for positions 0/4. Separate WhatsApp templates for opening/closing prayers. (ADR-102 through ADR-108).
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -1521,6 +1523,74 @@ adrs:
       - "Disabled placeholder message gets italic+textSecondary styling"
       - "SpeechSlot.tsx is NOT modified (scoped to AgendaForm only)"
 
+  - id: ADR-102
+    title: "Prayers as speeches positions 0/4 instead of separate table (Batch 25 Phase 1)"
+    context: "CR-221 needs to manage prayers as first-class entities with status workflow, WhatsApp invitations, and push notifications. Options: (a) keep in sunday_agendas with status columns, (b) new prayers table, (c) reuse speeches table positions 0/4."
+    decision: "Reuse speeches table with position 0 (opening prayer) and position 4 (closing prayer). Leverages existing status lifecycle, snapshot pattern (ADR-003), RLS policies, realtime subscription, mutation hooks, and notification trigger."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Zero new tables, zero new RLS policies"
+      - "Existing hooks and components extend naturally"
+      - "Migration required to copy data from sunday_agendas to speeches"
+      - "sunday_agendas loses prayer columns (breaking change for all consumers)"
+
+  - id: ADR-103
+    title: "Per-ward manage_prayers toggle on wards table (Batch 25 Phase 1)"
+    context: "Managed prayers could be per-ward, per-sunday, or per-user. Per-user and per-sunday add complexity with no clear benefit."
+    decision: "Per-ward boolean toggle in wards table. When OFF, prayers are simple assignments (assigned_confirmed, no notifications). When ON, full speech workflow (status lifecycle, notifications, Speeches tab management)."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Single boolean column, one toggle in settings"
+      - "All users in the ward see the same prayer management mode"
+      - "Toggling OFF preserves prayer data in DB"
+
+  - id: ADR-104
+    title: "Separate WhatsApp templates for opening and closing prayers (Batch 25 Phase 1)"
+    context: "Prayer invitations need different messages than speech invitations. Opening asks to arrive early, closing asks to join during intermediate hymn."
+    decision: "Two separate template columns: whatsapp_template_opening_prayer and whatsapp_template_closing_prayer. Default templates differ by prayer type. Both use only {nome} and {data} placeholders."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Wards can customize each prayer invitation independently"
+      - "WhatsApp settings screen needs 3-tab segmented control"
+      - "Template resolution logic selects correct template by position"
+
+  - id: ADR-105
+    title: "useLazyCreateSpeeches receives sundayType for position selection (Batch 25 Phase 1)"
+    context: "The current useLazyCreateSpeeches always creates positions [1,2,3]. With prayers, positions depend on sunday type."
+    decision: "Change input from string (sundayDate) to object { sundayDate, sundayType }. Breaking change; all callers must be updated. speeches type: [0,1,2,3,4], testimony/primary: [0,4], conference/other: none."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Single hook handles all position creation logic"
+      - "Breaking change for callers in speeches.tsx"
+      - "Idempotency preserved"
+
+  - id: ADR-106
+    title: "Notification trigger checks manage_prayers for prayer positions (Batch 25 Phase 1)"
+    context: "enqueue_speech_notification fires for ALL speeches changes. When manage_prayers=false, prayer assignments should not trigger notifications."
+    decision: "Add SELECT on wards.manage_prayers inside trigger for positions 0/4. If false, RETURN NEW (skip notification). SECURITY DEFINER preserved."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "One additional SELECT per prayer position change (minimal perf impact)"
+      - "No false notifications when manage_prayers is OFF"
+
+  - id: ADR-107
+    title: "SpeechSlot isPrayer prop for prayer-specific rendering (Batch 25 Phase 1)"
+    context: "Prayers differ from speeches: no topic field, different labels, no 2nd speech toggle. Options: new PrayerSlot component or conditional rendering."
+    decision: "Add isPrayer prop to SpeechSlot. When true: hide topic row, use prayer labels, hide toggle. Avoids component duplication."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Single component for both speeches and prayers"
+      - "Minimal added complexity (one prop, 3 conditional checks)"
+
+  - id: ADR-108
+    title: "useDeleteSpeechesByDate accepts optional positions array (Batch 25 Phase 1)"
+    context: "Sunday type changes now have different deletion rules. Some transitions delete only speeches (1,2,3), some only prayers (0,4), some all."
+    decision: "Add optional positions?: number[] parameter. When provided, DELETE includes AND position IN (...) filter. When omitted, deletes all (backward compatible)."
+    decided_in: "CR-221/F157"
+    consequences:
+      - "Flexible deletion for type change rules"
+      - "Backward compatible: omitting positions keeps current behavior"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1530,9 +1600,10 @@ database_schema:
     # --- Ward-scoped tables (RLS on ward_id) ---
     - name: wards
       description: "Alas (multi-tenant root entity)"
-      columns: [id, name, stake_name, language, timezone, whatsapp_template, created_at, updated_at]
+      columns: [id, name, stake_name, language, timezone, whatsapp_template, manage_prayers, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, created_at, updated_at]
       unique: ["(stake_name, name)"]
       rls: "id = auth.jwt().app_metadata.ward_id"
+      notes: "manage_prayers (BOOLEAN DEFAULT false), whatsapp_template_opening_prayer, whatsapp_template_closing_prayer added by CR-221/F157 (migration 019)."
 
     - name: members
       description: "Membros da ala"
@@ -1552,11 +1623,11 @@ database_schema:
       notes: "can_conduct e can_preside sao independentes (CR-71, ADR-020). CR-180/F117: can_music split into can_pianist + can_conductor with CHECK constraint (ADR-080). Migration 017."
 
     - name: speeches
-      description: "Discursos designados (3 slots por domingo)"
+      description: "Discursos e oracoes designados (5 slots por domingo: pos 0=abertura, 1-3=discursos, 4=encerramento)"
       columns: [id, ward_id, sunday_date, position, member_id, speaker_name, speaker_phone, topic_title, topic_link, topic_collection, status, created_at, updated_at]
       unique: ["(ward_id, sunday_date, position)"]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "Snapshot pattern: speaker_name/phone e topic_title/link copiados como texto"
+      notes: "Snapshot pattern: speaker_name/phone e topic_title/link copiados como texto. CR-221/F157: positions 0 (opening prayer) and 4 (closing prayer) added. Prayers have no topic fields."
 
     - name: sunday_exceptions
       description: "Tipos de domingo (testimony_meeting, general_conference, etc.)"
@@ -1567,10 +1638,10 @@ database_schema:
 
     - name: sunday_agendas
       description: "Agenda completa da reuniao sacramental por domingo"
-      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, opening_prayer_member_id, opening_prayer_name, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, closing_prayer_member_id, closing_prayer_name, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
+      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
       unique: ["(ward_id, sunday_date)"]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016). has_second_speech added by CR-181/F118 (migration 018)."
+      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016). has_second_speech added by CR-181/F118 (migration 018). CR-221/F157 (migration 019): dropped opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name (data migrated to speeches positions 0/4)."
 
     - name: ward_collection_config
       description: "Configuracao de colecoes ativas por ala"
@@ -1660,14 +1731,13 @@ database_schema:
     - "016_add_has_intermediate_hymn.sql"
     - "017_split_music_actor.sql"
     - "018_add_has_second_speech.sql"
+    - "019_managed_prayers.sql"
 
   key_relationships:
     - "members.ward_id -> wards.id"
     - "speeches.ward_id -> wards.id"
     - "speeches.member_id -> members.id (nullable, ON DELETE SET NULL)"
     - "sunday_agendas.ward_id -> wards.id"
-    - "sunday_agendas.opening_prayer_member_id -> members.id (nullable)"
-    - "sunday_agendas.closing_prayer_member_id -> members.id (nullable)"
     - "sunday_agendas.*_hymn_id -> hymns.id (nullable)"
     - "sunday_agendas.*_actor_id -> meeting_actors.id (nullable)"
     - "meeting_actors.ward_id -> wards.id"
@@ -1895,7 +1965,7 @@ file_structure:
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). CR-178/F116: Observer gains Settings tab with limited access (app language, theme, about)."
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel. CR-186/F128: play icon on Iniciar button, date param to Presentation, non-expandable AgendaPreviewCard with status lines and pencil -> Agenda tab. CR-196/F132: dynamic speaker count X/2 or X/3 based on has_second_speech."
       "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. CR-184/F126: accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. CR-185/F127: play button (U+25B6) in expanded card header navigates to Presentation with date param. CR-196/F132: collapsed card dynamic speaker count X/2 or X/3 based on has_second_speech."
-      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button. CR-196/F132: handleToggleSecondSpeech adds separate Supabase update for topic fields (ADR-085). CR-194/F130: null-to-string fix in speech update."
+      "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button. CR-196/F132: handleToggleSecondSpeech adds separate Supabase update for topic fields (ADR-085). CR-194/F130: null-to-string fix in speech update. CR-221/F157: prayer SpeechSlots (positions 0/4) when manage_prayers ON. useLazyCreateSpeeches receives sundayType. handleAssignSpeaker status override for prayers."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
         "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only). CR-195/F131: wardLanguageChangeMutation.onSuccess now calls setWardLanguage() to update AuthContext immediately."

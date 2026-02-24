@@ -15,14 +15,13 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
-import { getDefaultTemplate, getDefaultPrayerTemplate } from '../../../lib/whatsappUtils';
+import { getDefaultSpeechTemplate, getDefaultPrayerTemplate } from '../../../lib/whatsappUtils';
 import { useWardManagePrayers } from '../../../hooks/useSpeeches';
 
 // F116: Placeholder keys mapped to i18n keys for app-language-aware display
 const PLACEHOLDER_I18N_KEYS = [
   'whatsapp.placeholderName',
   'whatsapp.placeholderDate',
-  'whatsapp.placeholderPosition',
   'whatsapp.placeholderCollection',
   'whatsapp.placeholderTitle',
   'whatsapp.placeholderLink',
@@ -32,7 +31,6 @@ const PLACEHOLDER_I18N_KEYS = [
 const PLACEHOLDER_TOKENS = [
   '{nome}',
   '{data}',
-  '{posicao}',
   '{colecao}',
   '{titulo}',
   '{link}',
@@ -53,7 +51,6 @@ const PRAYER_PLACEHOLDER_TOKENS = [
 const SAMPLE_DATA: Record<string, string> = {
   '{nome}': 'Maria Silva',
   '{data}': '2026-03-01',
-  '{posicao}': '1',
   '{colecao}': 'Temas da Ala',
   '{titulo}': 'Fe em Jesus Cristo',
   '{link}': 'https://example.com/topic',
@@ -67,7 +64,7 @@ function resolveTemplate(template: string): string {
   return result;
 }
 
-type ActiveTab = 'speech' | 'opening_prayer' | 'closing_prayer';
+type ActiveTab = 'speech_1' | 'speech_2' | 'speech_3' | 'opening_prayer' | 'closing_prayer';
 
 export default function WhatsAppTemplateScreen() {
   const { t } = useTranslation();
@@ -75,14 +72,16 @@ export default function WhatsAppTemplateScreen() {
   const { wardId, wardLanguage, user, userName } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speech1SaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speech2SaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speech3SaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openingSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closingSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   // CR-221: Segmented control state
   const { managePrayers } = useWardManagePrayers();
-  const [activeTab, setActiveTab] = useState<ActiveTab>('speech');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('speech_1');
 
   // F116: Build translated placeholder display labels
   const placeholderLabels = PLACEHOLDER_I18N_KEYS.map((key) => t(key));
@@ -94,7 +93,7 @@ export default function WhatsAppTemplateScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('wards')
-        .select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language')
+        .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language')
         .eq('id', wardId)
         .single();
       if (error) throw error;
@@ -103,9 +102,13 @@ export default function WhatsAppTemplateScreen() {
     enabled: !!wardId,
   });
 
-  // Speech template state
-  const [template, setTemplate] = useState('');
-  const [initialized, setInitialized] = useState(false);
+  // Speech template states (3 separate)
+  const [speech1Template, setSpeech1Template] = useState('');
+  const [speech1Initialized, setSpeech1Initialized] = useState(false);
+  const [speech2Template, setSpeech2Template] = useState('');
+  const [speech2Initialized, setSpeech2Initialized] = useState(false);
+  const [speech3Template, setSpeech3Template] = useState('');
+  const [speech3Initialized, setSpeech3Initialized] = useState(false);
 
   // CR-221: Prayer template states
   const [openingTemplate, setOpeningTemplate] = useState('');
@@ -113,19 +116,50 @@ export default function WhatsAppTemplateScreen() {
   const [closingTemplate, setClosingTemplate] = useState('');
   const [closingInitialized, setClosingInitialized] = useState(false);
 
-  // Initialize speech template from DB
+  // Initialize speech 1 template from DB
   useEffect(() => {
-    if (ward && !initialized) {
-      if (ward.whatsapp_template === null || ward.whatsapp_template === undefined) {
-        setTemplate(getDefaultTemplate(wardLanguage ?? 'pt-BR'));
-      } else if (ward.whatsapp_template === '') {
-        setTemplate('');
+    if (ward && !speech1Initialized) {
+      const val = ward.whatsapp_template_speech_1;
+      if (val === null || val === undefined) {
+        setSpeech1Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 1));
+      } else if (val === '') {
+        setSpeech1Template('');
       } else {
-        setTemplate(ward.whatsapp_template);
+        setSpeech1Template(val);
       }
-      setInitialized(true);
+      setSpeech1Initialized(true);
     }
-  }, [ward, initialized, wardLanguage]);
+  }, [ward, speech1Initialized, wardLanguage]);
+
+  // Initialize speech 2 template from DB
+  useEffect(() => {
+    if (ward && !speech2Initialized) {
+      const val = ward.whatsapp_template_speech_2;
+      if (val === null || val === undefined) {
+        setSpeech2Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 2));
+      } else if (val === '') {
+        setSpeech2Template('');
+      } else {
+        setSpeech2Template(val);
+      }
+      setSpeech2Initialized(true);
+    }
+  }, [ward, speech2Initialized, wardLanguage]);
+
+  // Initialize speech 3 template from DB
+  useEffect(() => {
+    if (ward && !speech3Initialized) {
+      const val = ward.whatsapp_template_speech_3;
+      if (val === null || val === undefined) {
+        setSpeech3Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 3));
+      } else if (val === '') {
+        setSpeech3Template('');
+      } else {
+        setSpeech3Template(val);
+      }
+      setSpeech3Initialized(true);
+    }
+  }, [ward, speech3Initialized, wardLanguage]);
 
   // CR-221: Initialize opening prayer template from DB
   useEffect(() => {
@@ -161,26 +195,62 @@ export default function WhatsAppTemplateScreen() {
   const prevWardLanguageRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (prevWardLanguageRef.current !== undefined && prevWardLanguageRef.current !== wardLanguage) {
-      setInitialized(false);
+      setSpeech1Initialized(false);
+      setSpeech2Initialized(false);
+      setSpeech3Initialized(false);
       setOpeningInitialized(false);
       setClosingInitialized(false);
     }
     prevWardLanguageRef.current = wardLanguage;
   }, [wardLanguage]);
 
-  // Auto-save mutation for speech template
-  const saveMutation = useMutation({
+  // Auto-save mutation for speech 1 template
+  const saveSpeech1Mutation = useMutation({
     mutationFn: async (newTemplate: string) => {
       const { error } = await supabase
         .from('wards')
-        .update({ whatsapp_template: newTemplate })
+        .update({ whatsapp_template_speech_1: newTemplate })
         .eq('id', wardId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
       if (user) {
-        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp atualizado', userName);
+        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp 1o discurso atualizado', userName);
+      }
+    },
+  });
+
+  // Auto-save mutation for speech 2 template
+  const saveSpeech2Mutation = useMutation({
+    mutationFn: async (newTemplate: string) => {
+      const { error } = await supabase
+        .from('wards')
+        .update({ whatsapp_template_speech_2: newTemplate })
+        .eq('id', wardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp 2o discurso atualizado', userName);
+      }
+    },
+  });
+
+  // Auto-save mutation for speech 3 template
+  const saveSpeech3Mutation = useMutation({
+    mutationFn: async (newTemplate: string) => {
+      const { error } = await supabase
+        .from('wards')
+        .update({ whatsapp_template_speech_3: newTemplate })
+        .eq('id', wardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+      if (user) {
+        logAction(wardId, user.id, user.email ?? '', 'settings:whatsapp_template', 'Modelo WhatsApp 3o discurso atualizado', userName);
       }
     },
   });
@@ -219,16 +289,40 @@ export default function WhatsAppTemplateScreen() {
     },
   });
 
-  // Handle speech template change with auto-save debounce
-  const handleChange = useCallback(
+  // Handle speech 1 template change with auto-save debounce
+  const handleSpeech1Change = useCallback(
     (text: string) => {
-      setTemplate(text);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        saveMutation.mutate(text);
+      setSpeech1Template(text);
+      if (speech1SaveTimerRef.current) clearTimeout(speech1SaveTimerRef.current);
+      speech1SaveTimerRef.current = setTimeout(() => {
+        saveSpeech1Mutation.mutate(text);
       }, 1000);
     },
-    [saveMutation]
+    [saveSpeech1Mutation]
+  );
+
+  // Handle speech 2 template change with auto-save debounce
+  const handleSpeech2Change = useCallback(
+    (text: string) => {
+      setSpeech2Template(text);
+      if (speech2SaveTimerRef.current) clearTimeout(speech2SaveTimerRef.current);
+      speech2SaveTimerRef.current = setTimeout(() => {
+        saveSpeech2Mutation.mutate(text);
+      }, 1000);
+    },
+    [saveSpeech2Mutation]
+  );
+
+  // Handle speech 3 template change with auto-save debounce
+  const handleSpeech3Change = useCallback(
+    (text: string) => {
+      setSpeech3Template(text);
+      if (speech3SaveTimerRef.current) clearTimeout(speech3SaveTimerRef.current);
+      speech3SaveTimerRef.current = setTimeout(() => {
+        saveSpeech3Mutation.mutate(text);
+      }, 1000);
+    },
+    [saveSpeech3Mutation]
   );
 
   // CR-221: Handle opening prayer template change
@@ -256,15 +350,21 @@ export default function WhatsAppTemplateScreen() {
   );
 
   // Get current template/preview/handlers based on active tab
-  const currentTemplate = activeTab === 'speech' ? template
+  const currentTemplate = activeTab === 'speech_1' ? speech1Template
+    : activeTab === 'speech_2' ? speech2Template
+    : activeTab === 'speech_3' ? speech3Template
     : activeTab === 'opening_prayer' ? openingTemplate
     : closingTemplate;
 
-  const currentHandleChange = activeTab === 'speech' ? handleChange
+  const currentHandleChange = activeTab === 'speech_1' ? handleSpeech1Change
+    : activeTab === 'speech_2' ? handleSpeech2Change
+    : activeTab === 'speech_3' ? handleSpeech3Change
     : activeTab === 'opening_prayer' ? handleOpeningChange
     : handleClosingChange;
 
-  const currentIsSaving = activeTab === 'speech' ? saveMutation.isPending
+  const currentIsSaving = activeTab === 'speech_1' ? saveSpeech1Mutation.isPending
+    : activeTab === 'speech_2' ? saveSpeech2Mutation.isPending
+    : activeTab === 'speech_3' ? saveSpeech3Mutation.isPending
     : activeTab === 'opening_prayer' ? saveOpeningMutation.isPending
     : saveClosingMutation.isPending;
 
@@ -273,6 +373,21 @@ export default function WhatsAppTemplateScreen() {
   const isPrayerTab = activeTab === 'opening_prayer' || activeTab === 'closing_prayer';
   const currentTokens = isPrayerTab ? PRAYER_PLACEHOLDER_TOKENS : PLACEHOLDER_TOKENS;
   const currentLabels = isPrayerTab ? prayerPlaceholderLabels : placeholderLabels;
+
+  // Build tabs array based on managePrayers
+  const speechTabs: ActiveTab[] = ['speech_1', 'speech_2', 'speech_3'];
+  const prayerTabs: ActiveTab[] = ['opening_prayer', 'closing_prayer'];
+  const tabs = managePrayers ? [...speechTabs, ...prayerTabs] : speechTabs;
+
+  const tabLabel = (tab: ActiveTab): string => {
+    switch (tab) {
+      case 'speech_1': return t('whatsapp.tabSpeech1');
+      case 'speech_2': return t('whatsapp.tabSpeech2');
+      case 'speech_3': return t('whatsapp.tabSpeech3');
+      case 'opening_prayer': return t('whatsapp.tabOpeningPrayer');
+      case 'closing_prayer': return t('whatsapp.tabClosingPrayer');
+    }
+  };
 
   // Insert placeholder at cursor position
   const insertPlaceholder = useCallback(
@@ -306,45 +421,38 @@ export default function WhatsAppTemplateScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* CR-221: Segmented control (only when managePrayers) */}
-        {managePrayers && (
-          <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceVariant }]}>
-            {(['speech', 'opening_prayer', 'closing_prayer'] as ActiveTab[]).map((tab) => {
-              const isActive = activeTab === tab;
-              const label = tab === 'speech'
-                ? t('whatsapp.tabSpeech')
-                : tab === 'opening_prayer'
-                  ? t('whatsapp.tabOpeningPrayer')
-                  : t('whatsapp.tabClosingPrayer');
-              return (
-                <Pressable
-                  key={tab}
+        {/* CR-231: Segmented control always shown (3 speech tabs, or 5 with prayers) */}
+        <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceVariant }]}>
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <Pressable
+                key={tab}
+                style={[
+                  styles.segmentedTab,
+                  isActive && { backgroundColor: colors.card },
+                ]}
+                onPress={() => {
+                  setActiveTab(tab);
+                  setSelection({ start: 0, end: 0 });
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+              >
+                <Text
                   style={[
-                    styles.segmentedTab,
-                    isActive && { backgroundColor: colors.card },
+                    styles.segmentedTabText,
+                    { color: isActive ? colors.primary : colors.textSecondary },
+                    isActive && { fontWeight: '600' },
                   ]}
-                  onPress={() => {
-                    setActiveTab(tab);
-                    setSelection({ start: 0, end: 0 });
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
+                  numberOfLines={1}
                 >
-                  <Text
-                    style={[
-                      styles.segmentedTabText,
-                      { color: isActive ? colors.primary : colors.textSecondary },
-                      isActive && { fontWeight: '600' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+                  {tabLabel(tab)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         {/* Placeholder list */}
         <View style={styles.placeholderSection}>

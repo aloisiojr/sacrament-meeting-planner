@@ -294,9 +294,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
   },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
 });

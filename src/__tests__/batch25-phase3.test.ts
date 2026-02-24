@@ -162,14 +162,7 @@ describe('STEP-11: AgendaForm - prayer data source change', () => {
   // --- AC-157-22: Toggle ON - read-only with pencil icon ---
 
   describe('AC-157-22: Toggle ON - read-only field + pencil navigation', () => {
-    it('renders ReadOnlySpeakerRow when managePrayers is true for opening prayer', () => {
-      // The component renders ReadOnlySpeakerRow conditionally
-      const openingSection = agendaFormSource.substring(
-        agendaFormSource.indexOf("t('agenda.openingPrayer')"),
-        agendaFormSource.indexOf("t('agenda.openingPrayer')") + 500
-      );
-      expect(openingSection).toContain('ReadOnlySpeakerRow');
-    });
+    // Test removed: CR-230 replaced ReadOnlySpeakerRow with inline View for opening prayer
 
     it('renders ReadOnlySpeakerRow when managePrayers is true for closing prayer', () => {
       // Count ReadOnlySpeakerRow occurrences; should include prayer rows

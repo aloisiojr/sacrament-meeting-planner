@@ -429,23 +429,9 @@ describe('STEP-10: SundayCard collapsed prayer lines', () => {
       expect(sundayCardSource).toMatch(/speeches\.find\(\(s\)\s*=>\s*s\.position\s*===\s*4\)/);
     });
 
-    it('prayer lines do NOT use StatusLED component', () => {
-      // Prayer lines in collapsed card should not have StatusLED
-      // Check that the prayer line blocks don't contain StatusLED
-      const openingPrayerBlock = sundayCardSource.substring(
-        sundayCardSource.indexOf('Opening prayer line (collapsed)'),
-        sundayCardSource.indexOf('visiblePositions.map')
-      );
-      expect(openingPrayerBlock).not.toContain('<StatusLED');
-    });
-
-    it('prayer lines display prefix followed by speaker name or empty', () => {
-      expect(sundayCardSource).toContain("openingPrayer?.speaker_name ?? ''");
-    });
-
-    it('closing prayer line shows empty string when no assignment', () => {
-      expect(sundayCardSource).toContain("closingPrayer?.speaker_name ?? ''");
-    });
+    // Test removed: CR-222 added StatusLED to prayer lines
+    // Test removed: CR-223 replaced ?? '' with ternary for prayer lines
+    // Test removed: CR-223 replaced ?? '' with ternary for closing prayer line
   });
 
   // --- AC-157-32: Conference/Other collapsed shows 1 line ---

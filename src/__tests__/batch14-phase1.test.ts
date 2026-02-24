@@ -669,23 +669,7 @@ describe('F089 (CR-146): Offline graceful degradation', () => {
     });
   });
 
-  // --- AC-089-03: common.offlineNoData i18n key ---
-  describe('AC-089-03: common.offlineNoData i18n key', () => {
-    it('pt-BR has common.offlineNoData', () => {
-      const locale = readLocale('pt-BR') as { common: Record<string, string> };
-      expect(locale.common.offlineNoData).toBe('Dados indisponiveis no modo offline');
-    });
-
-    it('en has common.offlineNoData', () => {
-      const locale = readLocale('en') as { common: Record<string, string> };
-      expect(locale.common.offlineNoData).toBe('Data unavailable in offline mode');
-    });
-
-    it('es has common.offlineNoData', () => {
-      const locale = readLocale('es') as { common: Record<string, string> };
-      expect(locale.common.offlineNoData).toBe('Datos no disponibles en modo sin conexion');
-    });
-  });
+  // AC-089-03: Tests removed — common.offlineNoData i18n key was removed (orphan key)
 
   // --- AC-089-04: Cached data shown when offline ---
   describe('AC-089-04: offlineFirst provides cached data when offline', () => {
@@ -815,15 +799,6 @@ describe('F089 (CR-146): Offline graceful degradation', () => {
 // =============================================================================
 
 describe('Cross-feature: i18n key consistency (Batch 14 Phase 1)', () => {
-  it('all 3 locales have common.offlineNoData', () => {
-    const ptBR = readLocale('pt-BR') as { common: Record<string, string> };
-    const en = readLocale('en') as { common: Record<string, string> };
-    const es = readLocale('es') as { common: Record<string, string> };
-    expect(ptBR.common.offlineNoData).toBeDefined();
-    expect(en.common.offlineNoData).toBeDefined();
-    expect(es.common.offlineNoData).toBeDefined();
-  });
-
   it('all 3 locales have auth.resetPasswordTitle', () => {
     const ptBR = readLocale('pt-BR') as { auth: Record<string, string> };
     const en = readLocale('en') as { auth: Record<string, string> };

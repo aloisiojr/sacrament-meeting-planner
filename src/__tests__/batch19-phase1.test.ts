@@ -825,30 +825,6 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
 
   const resetSource = readProjectFile('supabase/functions/reset-redirect/index.ts');
 
-  // --- AC-119-01: Content-Type includes charset=utf-8 ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect now returns 302 redirect, no HTML
-  describe.skip('AC-119-01: Content-Type with charset [SUPERSEDED by F144]', () => {
-    it('Content-Type header is text/html; charset=utf-8', () => {
-      expect(resetSource).toContain("'Content-Type': 'text/html; charset=utf-8'");
-    });
-  });
-
-  // --- AC-119-02: HTML not escaped or double-encoded ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
-  describe.skip('AC-119-02: HTML template not encoded [SUPERSEDED by F144]', () => {
-    it('HTML passed directly to Response (no JSON.stringify)', () => {
-      expect(resetSource).toContain('new Response(html,');
-    });
-
-    it('no JSON.stringify on html variable', () => {
-      expect(resetSource).not.toContain('JSON.stringify(html');
-    });
-
-    it('no encodeURIComponent on html variable', () => {
-      expect(resetSource).not.toContain('encodeURIComponent(html');
-    });
-  });
-
   // --- AC-119-03: No conflicting Content-Type in corsHeaders ---
   describe('AC-119-03: corsHeaders does not contain Content-Type', () => {
     it('corsHeaders object does not have Content-Type key', () => {
@@ -857,108 +833,6 @@ describe('F119 (CR-191): Password reset plain-text HTML fix', () => {
       );
       expect(corsBlock).not.toBeNull();
       expect(corsBlock![0]).not.toContain("'Content-Type'");
-    });
-  });
-
-  // --- AC-119-04: Cache-Control header ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML, returns 302
-  describe.skip('AC-119-04: Cache-Control header set [SUPERSEDED by F144]', () => {
-    it('Cache-Control is no-cache, no-store, must-revalidate', () => {
-      expect(resetSource).toContain("'Cache-Control': 'no-cache, no-store, must-revalidate'");
-    });
-  });
-
-  // --- AC-119-05: Deep link uses sacrmeetplan:// scheme ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses deep link scheme
-  describe.skip('AC-119-05: Deep link scheme [SUPERSEDED by F138]', () => {
-    it('uses sacrmeetplan://reset-password deep link', () => {
-      expect(resetSource).toContain('sacrmeetplan://reset-password');
-    });
-  });
-
-  // --- AC-119-06: HTML renders properly ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns inline HTML
-  describe.skip('AC-119-06: HTML structure is valid [SUPERSEDED by F144]', () => {
-    it('HTML has DOCTYPE', () => {
-      expect(resetSource).toContain('<!DOCTYPE html>');
-    });
-
-    it('HTML has meta charset', () => {
-      expect(resetSource).toContain('<meta charset="UTF-8">');
-    });
-
-    it.skip('HTML has meta-refresh as fallback redirect [SUPERSEDED by F138]', () => {
-      expect(resetSource).toContain('http-equiv="refresh"');
-    });
-
-    it('HTML does NOT have JavaScript redirect (F134: script tag removed)', () => {
-      // F138 uses CDN script for Supabase JS, but NOT window.location.href redirect
-      expect(resetSource).not.toContain('window.location.href');
-    });
-
-    it('status code is 200', () => {
-      expect(resetSource).toContain('status: 200');
-    });
-  });
-
-  // --- AC-119-07: Root cause investigation documented ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect was completely rewritten, old comments removed
-  describe.skip('AC-119-07: Root cause investigation documented [SUPERSEDED by F138]', () => {
-    it('has code comment documenting root cause', () => {
-      expect(resetSource).toContain('Root cause');
-    });
-
-    it('documents Content-Type without charset issue', () => {
-      expect(resetSource).toContain("Content-Type header was set to 'text/html' without charset");
-    });
-
-    it('documents corsHeaders verification', () => {
-      expect(resetSource).toContain('corsHeaders verified to NOT contain');
-    });
-
-    it('documents no encoding applied', () => {
-      expect(resetSource).toContain('no JSON.stringify or encodeURIComponent');
-    });
-  });
-
-  // --- EC-119-01: Browser with strict CSP ---
-  // SUPERSEDED by F138 (CR-202): reset-redirect no longer uses meta-refresh or fallback button
-  describe.skip('EC-119-01: Meta-refresh as backup redirect [SUPERSEDED by F138]', () => {
-    it('has meta http-equiv=refresh for fallback', () => {
-      expect(resetSource).toContain('http-equiv="refresh"');
-    });
-
-    it('also has clickable link as manual fallback', () => {
-      expect(resetSource).toContain('class="button"');
-      expect(resetSource).toContain('Abrir no aplicativo');
-    });
-  });
-
-  // --- EC-119-02: Supabase proxy adding/modifying headers ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
-  describe.skip('EC-119-02: Explicit charset takes precedence [SUPERSEDED by F144]', () => {
-    it('Content-Type set AFTER corsHeaders spread', () => {
-      // Content-Type should come after ...corsHeaders in the object literal
-      const responseHeaders = resetSource.match(
-        /headers:\s*\{[\s\S]*?\.\.\.corsHeaders[\s\S]*?Content-Type[\s\S]*?\}/
-      );
-      expect(responseHeaders).not.toBeNull();
-    });
-
-    it('Cache-Control prevents proxy caching', () => {
-      expect(resetSource).toContain('no-cache, no-store, must-revalidate');
-    });
-  });
-
-  // --- EC-119-03: Chrome on Android ---
-  // SUPERSEDED by F144 (CR-204): reset-redirect no longer returns HTML
-  describe.skip('EC-119-03: Cross-browser compatibility [SUPERSEDED by F144]', () => {
-    it('uses standard Content-Type with charset', () => {
-      expect(resetSource).toContain('text/html; charset=utf-8');
-    });
-
-    it('CORS headers allow all origins', () => {
-      expect(resetSource).toContain("'Access-Control-Allow-Origin': '*'");
     });
   });
 

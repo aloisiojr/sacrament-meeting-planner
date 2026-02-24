@@ -527,11 +527,7 @@ describe('F154 (CR-219): Uniform collapsed card height for all types', () => {
   // --- AC-154-04: All collapsed cards visually identical height ---
 
   describe('AC-154-04: Uniform height for all collapsed card types', () => {
-    it('[SUPERSEDED] justifyContent center provides uniform alignment', () => {
-      // F154 final implementation uses justifyContent: 'center' on headerCenter
-      // which applies to all card types uniformly.
-      expect(sundayCardSource).toContain('style={styles.headerCenter}');
-    });
+    // Test removed: [SUPERSEDED by F158 CR-229] headerCenter now uses inline minHeight style
 
     it('isSpeechesType is NOT in the minHeight condition (supersedes F151)', () => {
       const headerLine = sundayCardSource.match(
@@ -637,11 +633,7 @@ describe('F154 (CR-219): Uniform collapsed card height for all types', () => {
       expect(headerCenterStyle![0]).not.toContain('minHeight');
     });
 
-    it('[SUPERSEDED] headerCenter View has no inline style overrides', () => {
-      // The headerCenter View now uses only style={styles.headerCenter}
-      // with no conditional minHeight inline style.
-      expect(sundayCardSource).toContain('style={styles.headerCenter}');
-    });
+    // Test removed: [SUPERSEDED by F158 CR-229] headerCenter now uses inline minHeight style
 
     it('[SUPERSEDED] no minHeight condition exists (neither expanded nor isSpeechesType)', () => {
       expect(sundayCardSource).not.toContain('!expanded && { minHeight: 62 }');

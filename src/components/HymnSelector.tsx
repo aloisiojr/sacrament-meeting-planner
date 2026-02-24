@@ -48,9 +48,9 @@ export function HymnSelector({
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
 
-  const hymnQuery = sacramentalOnly
-    ? useSacramentalHymns(language, search)
-    : useHymns(language, search);
+  const sacramentalQuery = useSacramentalHymns(language, search);
+  const allHymnsQuery = useHymns(language, search);
+  const hymnQuery = sacramentalOnly ? sacramentalQuery : allHymnsQuery;
 
   const hymns = hymnQuery.data ?? [];
 

@@ -20,7 +20,7 @@ import { NextAssignmentsSection } from '../../components/NextAssignmentsSection'
 import { InviteManagementSection } from '../../components/InviteManagementSection';
 import { getTodaySundayDate } from '../../hooks/usePresentationMode';
 import { useAgenda } from '../../hooks/useAgenda';
-import { useSpeeches } from '../../hooks/useSpeeches';
+import { useSpeeches, useWardManagePrayers } from '../../hooks/useSpeeches';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
 import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage } from '../../i18n';
@@ -34,6 +34,7 @@ function HomeTabContent() {
   const locale = getCurrentLanguage();
 
   const sundayDate = useMemo(() => getTodaySundayDate(), []);
+  const { managePrayers } = useWardManagePrayers();
 
   // Fetch data for preview card
   const { data: agenda } = useAgenda(sundayDate);
@@ -71,8 +72,9 @@ function HomeTabContent() {
     if (isSpecialWithStatus) {
       // Special meeting: prayers + hymns (no speakers)
       let prayersFilled = 0;
-      if (agenda?.opening_prayer_name) prayersFilled++;
-      if (agenda?.closing_prayer_name) prayersFilled++;
+      for (const s of speeches ?? []) {
+        if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
+      }
 
       let hymnsFilled = 0;
       const hymnsTotal = 3;
@@ -98,8 +100,9 @@ function HomeTabContent() {
       }
 
       let prayersFilled = 0;
-      if (agenda?.opening_prayer_name) prayersFilled++;
-      if (agenda?.closing_prayer_name) prayersFilled++;
+      for (const s of speeches ?? []) {
+        if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
+      }
 
       let hymnsFilled = 0;
       let hymnsTotal = 3;

@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
-import { useSpeeches } from '../hooks/useSpeeches';
+import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment } from '../hooks/useSpeeches';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
 import { getCurrentLanguage } from '../i18n';
 import { ActorSelector } from './ActorSelector';
@@ -33,7 +33,6 @@ import { XIcon, PencilIcon } from './icons';
 import type {
   SundayAgenda,
   MeetingActor,
-  Member,
   Hymn,
   SundayExceptionReason,
   Speech,
@@ -69,6 +68,9 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   const { data: agenda } = useAgenda(sundayDate);
   const updateAgenda = useUpdateAgenda();
   const { data: speeches } = useSpeeches({ start: sundayDate, end: sundayDate });
+  const { managePrayers } = useWardManagePrayers();
+  const assignSpeaker = useAssignSpeaker();
+  const removeAssignment = useRemoveAssignment();
 
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
@@ -119,21 +121,6 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       updateAgenda.mutate({
         agendaId: agenda.id,
         fields: { [field]: hymn.id } as Record<string, unknown>,
-      });
-    },
-    [agenda, isObserver, updateAgenda]
-  );
-
-  // Handle prayer selection (member or custom name)
-  const handlePrayerSelect = useCallback(
-    (member: Member, nameField: string, idField: string) => {
-      if (!agenda || isObserver) return;
-      updateAgenda.mutate({
-        agendaId: agenda.id,
-        fields: {
-          [nameField]: member.full_name,
-          [idField]: member.id,
-        } as Record<string, unknown>,
       });
     },
     [agenda, isObserver, updateAgenda]
@@ -310,24 +297,34 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.openingPrayer')} colors={colors}>
-        <SelectorField
-          value={agenda.opening_prayer_name ?? ''}
-          placeholder={t('agenda.openingPrayer')}
-          onPress={() => {
-            if (!isObserver) {
-              setSelectorModal({ type: 'prayer', field: 'opening_prayer' });
-            }
-          }}
-          disabled={isObserver}
-          colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { opening_prayer_name: null, opening_prayer_member_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
-          hasValue={!!agenda.opening_prayer_name}
-        />
+        {managePrayers ? (
+          <ReadOnlySpeakerRow
+            label={t('agenda.openingPrayer')}
+            speakerName={getSpeech(0)?.speaker_name ?? ''}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            colors={colors}
+            disabled={isObserver}
+          />
+        ) : (
+          <SelectorField
+            value={getSpeech(0)?.speaker_name ?? ''}
+            placeholder={t('agenda.openingPrayer')}
+            onPress={() => {
+              if (!isObserver) {
+                setSelectorModal({ type: 'prayer', field: 'opening_prayer' });
+              }
+            }}
+            disabled={isObserver}
+            colors={colors}
+            onClear={!isObserver ? () => {
+              const speech = getSpeech(0);
+              if (speech) {
+                removeAssignment.mutate({ speechId: speech.id, speakerName: speech.speaker_name ?? undefined });
+              }
+            } : undefined}
+            hasValue={!!getSpeech(0)?.speaker_name}
+          />
+        )}
       </FieldRow>
 
       {/* Section 2: Designations & Sacrament */}
@@ -526,24 +523,34 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.closingPrayer')} colors={colors}>
-        <SelectorField
-          value={agenda.closing_prayer_name ?? ''}
-          placeholder={t('agenda.closingPrayer')}
-          onPress={() => {
-            if (!isObserver) {
-              setSelectorModal({ type: 'prayer', field: 'closing_prayer' });
-            }
-          }}
-          disabled={isObserver}
-          colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { closing_prayer_name: null, closing_prayer_member_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
-          hasValue={!!agenda.closing_prayer_name}
-        />
+        {managePrayers ? (
+          <ReadOnlySpeakerRow
+            label={t('agenda.closingPrayer')}
+            speakerName={getSpeech(4)?.speaker_name ?? ''}
+            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            colors={colors}
+            disabled={isObserver}
+          />
+        ) : (
+          <SelectorField
+            value={getSpeech(4)?.speaker_name ?? ''}
+            placeholder={t('agenda.closingPrayer')}
+            onPress={() => {
+              if (!isObserver) {
+                setSelectorModal({ type: 'prayer', field: 'closing_prayer' });
+              }
+            }}
+            disabled={isObserver}
+            colors={colors}
+            onClear={!isObserver ? () => {
+              const speech = getSpeech(4);
+              if (speech) {
+                removeAssignment.mutate({ speechId: speech.id, speakerName: speech.speaker_name ?? undefined });
+              }
+            } : undefined}
+            hasValue={!!getSpeech(4)?.speaker_name}
+          />
+        )}
       </FieldRow>
 
       {/* Actor selector bottom-sheet */}
@@ -594,23 +601,30 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           modalOnly={true}
           onClose={() => setSelectorModal(null)}
           selected={(() => {
-            const nameField = `${selectorModal.field}_name` as keyof typeof agenda;
-            const idField = `${selectorModal.field}_member_id` as keyof typeof agenda;
-            const name = agenda[nameField] as string | null;
-            if (!name) return null;
-            return { memberId: (agenda[idField] as string | null) ?? null, name };
+            const position = selectorModal.field === 'opening_prayer' ? 0 : 4;
+            const speech = getSpeech(position);
+            if (!speech?.speaker_name) return null;
+            return { memberId: speech.member_id ?? null, name: speech.speaker_name };
           })()}
           onSelect={(selection: PrayerSelection | null) => {
-            if (!agenda || isObserver) return;
-            const nameField = `${selectorModal.field}_name`;
-            const idField = `${selectorModal.field}_member_id`;
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: {
-                [nameField]: selection?.name ?? null,
-                [idField]: selection?.memberId ?? null,
-              } as Record<string, unknown>,
-            });
+            if (isObserver) return;
+            const position = selectorModal.field === 'opening_prayer' ? 0 : 4;
+            const speech = getSpeech(position);
+            if (!speech) {
+              setSelectorModal(null);
+              return;
+            }
+            if (selection) {
+              assignSpeaker.mutate({
+                speechId: speech.id,
+                memberId: selection.memberId ?? '',
+                speakerName: selection.name,
+                speakerPhone: null,
+                status: 'assigned_confirmed',
+              });
+            } else {
+              removeAssignment.mutate({ speechId: speech.id, speakerName: speech.speaker_name ?? undefined });
+            }
             setSelectorModal(null);
           }}
           placeholder={selectorModal.field === 'opening_prayer' ? t('agenda.openingPrayer') : t('agenda.closingPrayer')}

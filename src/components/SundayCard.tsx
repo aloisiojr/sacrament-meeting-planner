@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 1,
   },
   expandedContent: {
     paddingHorizontal: 12,

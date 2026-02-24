@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useWardManagePrayers } from '../../hooks/useSpeeches';
 import { ExitConfirmation } from '../../components/ExitConfirmation';
 import { HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon } from '../../components/icons';
 
@@ -9,8 +10,12 @@ export default function TabsLayout() {
   const { t } = useTranslation();
   const { role } = useAuth();
   const { colors } = useTheme();
+  const { managePrayers } = useWardManagePrayers();
 
   const isObserver = role === 'observer';
+  const speechesTabTitle = managePrayers
+    ? t('tabs.speechesAndPrayers')
+    : t('tabs.speeches');
 
   return (
     <>
@@ -47,7 +52,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="speeches"
         options={{
-          title: t('tabs.speeches'),
+          title: speechesTabTitle,
           tabBarIcon: ({ color, size }) => (
             <MicIcon color={color} size={size} />
           ),

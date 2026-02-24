@@ -410,8 +410,9 @@ function AgendaSundayCard({
             if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
 
             let prayersFilled = 0;
-            if (agenda?.opening_prayer_name) prayersFilled++;
-            if (agenda?.closing_prayer_name) prayersFilled++;
+            for (const s of speeches) {
+              if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
+            }
 
             let hymnsFilled = 0;
             const hymnsTotal = 3; // opening, sacrament, closing (no intermediate for special meetings)
@@ -470,8 +471,9 @@ function AgendaSundayCard({
             }
 
             let prayersFilled = 0;
-            if (agenda?.opening_prayer_name) prayersFilled++;
-            if (agenda?.closing_prayer_name) prayersFilled++;
+            for (const s of speeches) {
+              if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
+            }
 
             let hymnsFilled = 0;
             let hymnsTotal = 3; // opening, sacrament, closing

@@ -477,26 +477,38 @@ export const SundayCard = React.memo(function SundayCard({
                     status={openingPrayer?.status ?? 'not_assigned'}
                     size={10}
                   />
-                  <Text
-                    style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
-                  </Text>
+                  {openingPrayer?.speaker_name ? (
+                    <Text
+                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {t('prayers.prayerPrefix')} {openingPrayer.speaker_name}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+                      {' '}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.speechRow}>
                   <StatusLED
                     status={closingPrayer?.status ?? 'not_assigned'}
                     size={10}
                   />
-                  <Text
-                    style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
-                  </Text>
+                  {closingPrayer?.speaker_name ? (
+                    <Text
+                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {t('prayers.prayerPrefix')} {closingPrayer.speaker_name}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+                      {' '}
+                    </Text>
+                  )}
                 </View>
               </>
             );
@@ -525,17 +537,22 @@ export const SundayCard = React.memo(function SundayCard({
                       status={openingPrayer?.status ?? 'not_assigned'}
                       size={10}
                     />
-                    <Text
-                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {t('prayers.prayerPrefix')} {openingPrayer?.speaker_name ?? ''}
-                    </Text>
+                    {openingPrayer?.speaker_name ? (
+                      <Text
+                        style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {t('prayers.prayerPrefix')} {openingPrayer.speaker_name}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+                        {' '}
+                      </Text>
+                    )}
                   </View>
                 );
               })()}
-              {/* F118: Show only visible positions; no ordinal labels (AC-118-08) */}
               {visiblePositions.map((pos, idx) => {
                 const speech = speeches.find((s) => s.position === pos);
                 const name = speech?.speaker_name ?? '';
@@ -577,13 +594,19 @@ export const SundayCard = React.memo(function SundayCard({
                       status={closingPrayer?.status ?? 'not_assigned'}
                       size={10}
                     />
-                    <Text
-                      style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {t('prayers.prayerPrefix')} {closingPrayer?.speaker_name ?? ''}
-                    </Text>
+                    {closingPrayer?.speaker_name ? (
+                      <Text
+                        style={[styles.speakerNameLine, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {t('prayers.prayerPrefix')} {closingPrayer.speaker_name}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.speakerNameLine, { color: colors.textSecondary }]}>
+                        {' '}
+                      </Text>
+                    )}
                   </View>
                 );
               })()}

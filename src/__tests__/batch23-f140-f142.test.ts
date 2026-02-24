@@ -211,7 +211,8 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
 
     it('queries wards table selecting whatsapp_template', () => {
       expect(inviteSectionSource).toContain(".from('wards')");
-      expect(inviteSectionSource).toContain(".select('whatsapp_template')");
+      // CR-221: select now includes prayer template fields
+      expect(inviteSectionSource).toContain(".select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')");
     });
 
     it('filters query by wardId', () => {
@@ -372,11 +373,11 @@ describe('F142 (CR-207): WhatsApp template disconnect fix in InviteManagementSec
       expect(handleBlock).not.toBeNull();
     });
 
-    it('ward?.whatsapp_template is in handleNotInvitedAction useCallback deps', () => {
-      // The useCallback dependency array should include ward?.whatsapp_template
-      // SUPERSEDED by F152 (CR-216): deps now also include t
+    it('ward is in handleNotInvitedAction useCallback deps', () => {
+      // CR-221: deps changed from ward?.whatsapp_template to ward (full object)
+      // because prayer template selection needs multiple ward fields
       const depsMatch = inviteSectionSource.match(
-        /handleNotInvitedAction[\s\S]*?\[\s*changeStatus[\s\S]*?ward\?\.whatsapp_template[\s\S]*?\]/
+        /handleNotInvitedAction[\s\S]*?\[\s*changeStatus[\s\S]*?ward[\s\S]*?\]/
       );
       expect(depsMatch).not.toBeNull();
     });

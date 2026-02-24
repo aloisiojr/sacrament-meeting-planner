@@ -390,7 +390,8 @@ describe('F136 (CR-199) - Tester: StatusLED alignment', () => {
   // --- AC-136-05: pos2 disabled ---
   describe('AC-136-05: position 2 disabled renders correctly', () => {
     it('isPos2Disabled computed from position === 2 && isSecondSpeechEnabled === false', () => {
-      expect(speechSlotSource).toContain('position === 2 && isSecondSpeechEnabled === false');
+      // CR-221: condition now also requires !isPrayer
+      expect(speechSlotSource).toContain('position === 2 && !isPrayer && isSecondSpeechEnabled === false');
     });
   });
 

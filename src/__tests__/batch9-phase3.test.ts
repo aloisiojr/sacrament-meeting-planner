@@ -501,7 +501,8 @@ describe('F066 (CR-120): Auto-scroll on card expand', () => {
   describe('handleToggle dependencies include listItems', () => {
     it('speeches.tsx handleToggle depends on listItems', () => {
       const content = getSpeeches();
-      expect(content).toContain('[expandedDate, lazyCreate, listItems]');
+      // CR-221: handleToggle now also depends on speechMap
+      expect(content).toContain('[expandedDate, lazyCreate, speechMap, listItems]');
     });
 
     it('agenda.tsx handleToggle depends on listItems', () => {

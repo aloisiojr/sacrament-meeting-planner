@@ -389,8 +389,8 @@ describe('F121 (CR-182): Read-only speeches + pencil navigation in AgendaForm', 
     it('expandDate triggers setExpandedDate and lazyCreate', () => {
       expect(speechesTabSource).toContain('params.expandDate');
       expect(speechesTabSource).toContain('setExpandedDate(targetDate)');
-      // CR-221 changed lazyCreate.mutate to accept object (superseded by batch25-phase1)
-      expect(speechesTabSource).toContain('lazyCreate.mutate({ sundayDate: targetDate })');
+      // CR-221 Phase 2: lazyCreate now also passes sundayType
+      expect(speechesTabSource).toContain('lazyCreate.mutate({ sundayDate: targetDate, sundayType: targetSundayType })');
     });
 
     it('expandDate triggers scroll to target card', () => {

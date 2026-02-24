@@ -16,6 +16,7 @@ import type {
   SpeechBySunday,
   DateRange,
   SundayException,
+  SundayExceptionReason,
 } from '../types/database';
 
 // --- Query Keys ---
@@ -163,7 +164,8 @@ export function groupSpeechesBySunday(
 }
 
 /**
- * Lazy-create 3 speech records for a sunday date.
+ * Lazy-create speech records for a sunday date based on sunday type.
+ * Positions by type: speeches=[0,1,2,3,4], testimony/primary=[0,4], conference/other=[].
  * Only creates if records don't already exist for that date (ADR-005).
  */
 export function useLazyCreateSpeeches() {
@@ -171,7 +173,30 @@ export function useLazyCreateSpeeches() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sundayDate: string): Promise<Speech[]> => {
+    mutationFn: async (input: { sundayDate: string; sundayType?: SundayExceptionReason }): Promise<Speech[]> => {
+      const { sundayDate, sundayType } = input;
+
+      // Determine positions based on sunday type
+      let positions: number[];
+      switch (sundayType) {
+        case 'testimony_meeting':
+        case 'primary_presentation':
+          positions = [0, 4];
+          break;
+        case 'general_conference':
+        case 'stake_conference':
+        case 'ward_conference':
+        case 'other':
+          positions = [];
+          break;
+        case 'speeches':
+        default:
+          positions = [0, 1, 2, 3, 4];
+          break;
+      }
+
+      if (positions.length === 0) return [];
+
       // Check if speeches already exist
       const { data: existing, error: checkErr } = await supabase
         .from('speeches')
@@ -182,8 +207,8 @@ export function useLazyCreateSpeeches() {
       if (checkErr) throw checkErr;
       if (existing && existing.length > 0) return [];
 
-      // Create 3 speech records
-      const records = [1, 2, 3].map((position) => ({
+      // Create speech records for the determined positions
+      const records = positions.map((position) => ({
         ward_id: wardId,
         sunday_date: sundayDate,
         position,

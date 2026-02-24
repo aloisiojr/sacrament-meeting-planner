@@ -84,7 +84,7 @@ export function NextAssignmentsSection() {
 
   const handleToggle = useCallback(() => {
     if (!expanded && pendingEntry) {
-      lazyCreate.mutate(pendingEntry.date);
+      lazyCreate.mutate({ sundayDate: pendingEntry.date });
     }
     setExpanded((prev) => !prev);
   }, [expanded, lazyCreate, pendingEntry]);

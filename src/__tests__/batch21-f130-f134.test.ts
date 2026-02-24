@@ -60,10 +60,11 @@ describe('F130 (CR-194): TypeScript compilation errors and doc naming', () => {
     });
   });
 
-  describe('AC-130-04: AgendaForm imports Member type', () => {
-    it('AgendaForm.tsx imports Member from database types', () => {
+  describe('AC-130-04: AgendaForm imports types from database', () => {
+    it('AgendaForm.tsx imports types from database', () => {
       const content = readSourceFile('components/AgendaForm.tsx');
-      expect(content).toContain('Member');
+      // CR-221 Phase 3: Member import removed (handlePrayerSelect removed); MeetingActor still imported
+      expect(content).toContain('MeetingActor');
       expect(content).toContain("from '../types/database'");
     });
   });

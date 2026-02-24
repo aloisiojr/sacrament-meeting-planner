@@ -313,13 +313,14 @@ describe('CR-004 F008: Agenda & Actors Enhancements', () => {
 
     it('prayer selection should handle null memberId for custom names', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      // When PrayerSelector returns selection, we set memberId which can be null
-      expect(source).toContain('selection?.memberId ?? null');
+      // CR-221 Phase 3: prayer selection uses assignSpeaker.mutate with memberId from selection
+      expect(source).toContain("selection.memberId ?? ''");
     });
 
     it('prayer selection should handle name from selection', () => {
       const source = readSourceFile('components/AgendaForm.tsx');
-      expect(source).toContain('selection?.name ?? null');
+      // CR-221 Phase 3: prayer selection uses assignSpeaker.mutate with speakerName from selection
+      expect(source).toContain('speakerName: selection.name');
     });
 
     it('PrayerSelector custom name hint should use i18n', () => {

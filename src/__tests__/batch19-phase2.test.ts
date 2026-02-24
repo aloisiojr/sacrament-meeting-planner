@@ -104,12 +104,16 @@ describe('F120 (CR-179): X clear buttons in AgendaForm', () => {
 
   // --- AC-120-03: X button on prayer fields ---
   describe('AC-120-03: X button on prayer fields', () => {
-    it('opening prayer field has onClear that clears name and member_id', () => {
-      expect(agendaFormSource).toContain('opening_prayer_name: null, opening_prayer_member_id: null');
+    it('opening prayer field has onClear that uses removeAssignment', () => {
+      // CR-221 Phase 3: prayer clear now uses removeAssignment.mutate on speech record
+      expect(agendaFormSource).toContain('removeAssignment.mutate');
+      expect(agendaFormSource).toContain('getSpeech(0)');
     });
 
-    it('closing prayer field has onClear that clears name and member_id', () => {
-      expect(agendaFormSource).toContain('closing_prayer_name: null, closing_prayer_member_id: null');
+    it('closing prayer field has onClear that uses removeAssignment', () => {
+      // CR-221 Phase 3: prayer clear now uses removeAssignment.mutate on speech record
+      expect(agendaFormSource).toContain('removeAssignment.mutate');
+      expect(agendaFormSource).toContain('getSpeech(4)');
     });
   });
 

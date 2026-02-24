@@ -543,8 +543,9 @@ describe('F096 (CR-153): Collapsed agenda card status lines', () => {
     });
 
     it('counts opening and closing prayer', () => {
-      expect(agendaSource).toContain('opening_prayer_name');
-      expect(agendaSource).toContain('closing_prayer_name');
+      // CR-221 Phase 3: prayer count now reads from speeches positions 0/4
+      expect(agendaSource).toContain('s.position === 0');
+      expect(agendaSource).toContain('s.position === 4');
       expect(agendaSource).toContain('prayersFilled');
     });
   });
@@ -1008,12 +1009,14 @@ describe('F096 Additional Tests: status computation and cross-feature validation
       expect(agendaSource).toContain('let prayersFilled = 0');
     });
 
-    it('opening_prayer_name increments count', () => {
-      expect(agendaSource).toContain("if (agenda?.opening_prayer_name) prayersFilled++");
+    it('opening prayer counted from speeches position 0', () => {
+      // CR-221 Phase 3: prayer count now from speeches positions 0/4
+      expect(agendaSource).toContain('s.position === 0');
     });
 
-    it('closing_prayer_name increments count', () => {
-      expect(agendaSource).toContain("if (agenda?.closing_prayer_name) prayersFilled++");
+    it('closing prayer counted from speeches position 4', () => {
+      // CR-221 Phase 3: prayer count now from speeches positions 0/4
+      expect(agendaSource).toContain('s.position === 4');
     });
 
     it('prayersFilled compared against 2 for green color', () => {

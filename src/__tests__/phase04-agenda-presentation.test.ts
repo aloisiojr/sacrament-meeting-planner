@@ -246,7 +246,8 @@ describe('PHASE-04: buildPresentationCards detailed validation', () => {
 
     it('Card 4 (Last Speech) includes closing hymn and prayer', () => {
       const agenda = makeAgenda();
-      const speeches = [makeSpeech(1), makeSpeech(2), makeSpeech(3)];
+      // CR-221 Phase 3: closing prayer now reads from speeches position 4
+      const speeches = [makeSpeech(1), makeSpeech(2), makeSpeech(3), makeSpeech(4, { speaker_name: 'Brother White' })];
       const cards = buildPresentationCards(agenda, speeches, null, mockHymnLookup, mockT);
 
       const lastCard = cards[3];

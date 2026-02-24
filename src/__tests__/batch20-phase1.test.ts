@@ -385,7 +385,8 @@ describe('F128 (CR-186): Home preview card and play icon', () => {
   describe('EC-128-01: No agenda record', () => {
     it('status lines handle null agenda with optional chaining', () => {
       expect(homeSource).toContain('agenda?.presiding_name');
-      expect(homeSource).toContain('agenda?.opening_prayer_name');
+      // CR-221 Phase 3: prayer count now from speeches positions 0/4
+      expect(homeSource).toContain('s.position === 0');
     });
   });
 

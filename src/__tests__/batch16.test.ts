@@ -688,9 +688,10 @@ describe('F109 (CR-171): Status lines for testimony/primary collapsed cards', ()
     });
 
     it('counts opening and closing prayers (total 2)', () => {
+      // CR-221 Phase 3: prayer count now reads from speeches positions 0/4
       expect(agendaSource).toContain('prayersFilled');
-      expect(agendaSource).toContain('opening_prayer_name');
-      expect(agendaSource).toContain('closing_prayer_name');
+      expect(agendaSource).toContain('s.position === 0');
+      expect(agendaSource).toContain('s.position === 4');
     });
   });
 

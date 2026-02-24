@@ -298,13 +298,23 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.openingPrayer')} colors={colors}>
         {managePrayers ? (
-          <ReadOnlySpeakerRow
-            label={t('agenda.openingPrayer')}
-            speakerName={getSpeech(0)?.speaker_name ?? ''}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
-            colors={colors}
-            disabled={isObserver}
-          />
+          <View style={[styles.speakerReadRow, { borderColor: colors.border }, isObserver && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+            <Text
+              style={[
+                styles.speakerReadText,
+                { color: getSpeech(0)?.speaker_name ? colors.textSecondary : colors.textTertiary },
+                getSpeech(0)?.speaker_name ? { fontStyle: 'italic' } : undefined,
+              ]}
+              numberOfLines={1}
+            >
+              {getSpeech(0)?.speaker_name || t('agenda.openingPrayer')}
+            </Text>
+            {!isObserver && (
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })} style={styles.speakerIconBtn}>
+                <PencilIcon size={16} color={colors.textSecondary} />
+              </Pressable>
+            )}
+          </View>
         ) : (
           <SelectorField
             value={getSpeech(0)?.speaker_name ?? ''}
@@ -524,13 +534,23 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.closingPrayer')} colors={colors}>
         {managePrayers ? (
-          <ReadOnlySpeakerRow
-            label={t('agenda.closingPrayer')}
-            speakerName={getSpeech(4)?.speaker_name ?? ''}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
-            colors={colors}
-            disabled={isObserver}
-          />
+          <View style={[styles.speakerReadRow, { borderColor: colors.border }, isObserver && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
+            <Text
+              style={[
+                styles.speakerReadText,
+                { color: getSpeech(4)?.speaker_name ? colors.textSecondary : colors.textTertiary },
+                getSpeech(4)?.speaker_name ? { fontStyle: 'italic' } : undefined,
+              ]}
+              numberOfLines={1}
+            >
+              {getSpeech(4)?.speaker_name || t('agenda.closingPrayer')}
+            </Text>
+            {!isObserver && (
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })} style={styles.speakerIconBtn}>
+                <PencilIcon size={16} color={colors.textSecondary} />
+              </Pressable>
+            )}
+          </View>
         ) : (
           <SelectorField
             value={getSpeech(4)?.speaker_name ?? ''}

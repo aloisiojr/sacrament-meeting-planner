@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 12
-last_updated: "2026-02-23T00:04:00"
+version: 13
+last_updated: "2026-02-24T06:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -545,3 +545,30 @@ deploy_history:
     verification:
       - "https://aloisiojr.github.io/sacrament-meeting-planner/reset-password.html - HTTP 200, Content-Type: text/html; charset=utf-8"
       - "https://aloisiojr.github.io/sacrament-meeting-planner/accept-invite.html - HTTP 200, Content-Type: text/html; charset=utf-8"
+
+  - date: "2026-02-24"
+    action: "Backup sunday_agendas prayer data (pre-migration 019)"
+    method: "Management API SELECT query"
+    reason: "Migration 019 is destructive (drops prayer columns from sunday_agendas). Backup before applying."
+    result: "Sucesso - 1 row backed up to /tmp/sunday_agendas_prayer_backup_20260224.json"
+    verified: true
+    cr: "Batch 25 (F157, CR-221)"
+    notes: "1 agenda had prayer data: Lucca Luz Pavanelo (opening), Rebecca Pavanelo (closing) for 2026-02-22"
+
+  - date: "2026-02-24"
+    action: "Migration 019_managed_prayers.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding (2 requests: schema+data, trigger function)"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - manage_prayers toggle + prayer templates added to wards, speeches constraint updated to [0,1,2,3,4], prayer data migrated from sunday_agendas to speeches positions 0/4, old prayer columns dropped, enqueue_speech_notification updated with manage_prayers check"
+    verified: true
+    cr: "Batch 25 (F157, CR-221)"
+    verification:
+      - "wards: manage_prayers BOOLEAN NOT NULL DEFAULT false"
+      - "wards: whatsapp_template_opening_prayer TEXT nullable"
+      - "wards: whatsapp_template_closing_prayer TEXT nullable"
+      - "speeches: CHECK constraint updated to (0, 1, 2, 3, 4)"
+      - "speeches: 2 prayer rows migrated (position 0: Lucca Luz Pavanelo, position 4: Rebecca Pavanelo)"
+      - "sunday_agendas: old prayer columns (opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name) DROPPED"
+      - "enqueue_speech_notification: SECURITY DEFINER=true, search_path=public, manage_prayers check for positions 0/4"
+      - "speech_notification_trigger: active on INSERT and UPDATE"
+      - "REST API health check: HTTP 200"

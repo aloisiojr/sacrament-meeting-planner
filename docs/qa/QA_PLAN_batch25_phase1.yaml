@@ -1,0 +1,594 @@
+# =============================================================================
+# QA_PLAN_batch25_phase1.yaml - PRE Validation for CR-221 (Oracoes Gerenciadas)
+# Generated: 2026-02-23
+# Mode: PRE (initial validation before implementation)
+# Type: feature_request
+# =============================================================================
+
+metadata:
+  batch: 25
+  phase: 1
+  plan_id: "QA_PLAN_batch25_phase1"
+  crs: ["CR-221"]
+  type: "feature_request"
+  validated: true
+  timestamp: "2026-02-23"
+
+# =============================================================================
+# CR-221: Managed Prayers (Oracoes Gerenciadas)
+# Request: "Funcionalidade de oracoes gerenciadas: permitir que oracoes de
+#   abertura e encerramento sejam designadas com o mesmo workflow de discursos
+#   (status, convites WhatsApp, push notifications). Funcionalidade optativa
+#   por ala via toggle em Configuracoes da Ala."
+# =============================================================================
+
+cr_221:
+  feature_id: "F157"
+  title: "Managed Prayers (Oracoes Gerenciadas)"
+  status: "PRE_VALIDATED"
+
+  # ===========================================================================
+  # AREA 1: Prayer fields in sunday_agendas (schema, data, code usage)
+  # ===========================================================================
+  pre_evidence:
+    area_1_prayer_fields_in_sunday_agendas:
+      summary: |
+        The sunday_agendas table has 4 prayer fields that will be REMOVED by CR-221:
+        - opening_prayer_name TEXT
+        - opening_prayer_member_id UUID REFERENCES members(id) ON DELETE SET NULL
+        - closing_prayer_name TEXT
+        - closing_prayer_member_id UUID REFERENCES members(id) ON DELETE SET NULL
+        These are defined in 001_initial_schema.sql lines 186-187 and 202-203.
+      schema_location: "supabase/migrations/001_initial_schema.sql:186-187,202-203"
+      typescript_type: "src/types/database.ts:185-186,208-209"
+      code_references:
+        - file: "src/components/AgendaForm.tsx"
+          usage: |
+            Lines 312-331: opening_prayer fields used for FieldRow + SelectorField
+            Lines 528-547: closing_prayer fields used for FieldRow + SelectorField
+            Lines 590-618: PrayerSelector modal uses prayer fields with dynamic field names
+            Line 326: Clears both opening_prayer_name and opening_prayer_member_id
+            Line 542: Clears both closing_prayer_name and closing_prayer_member_id
+        - file: "src/app/(tabs)/index.tsx"
+          usage: |
+            Lines 74-75: prayersFilled counter reads agenda.opening_prayer_name and closing_prayer_name
+            Lines 101-102: Same pattern for normal speeches meetings
+            Lines 182-185,211-214: Display "Oracoes: X de 2" in collapsed cards
+        - file: "src/app/(tabs)/agenda.tsx"
+          usage: |
+            Lines 412-414: prayersFilled counter for special meetings
+            Lines 472-474: prayersFilled counter for normal meetings
+            Lines 438-441,502-505: Display prayer count in collapsed cards
+        - file: "src/hooks/usePresentationMode.ts"
+          usage: |
+            Line 100: opening_prayer_name in welcome card
+            Lines 181,193: closing_prayer_name in last speech / special meeting cards
+      total_source_files_affected: 5
+      total_test_files_with_references: 11
+
+    # ===========================================================================
+    # AREA 2: Speeches table (schema, positions, triggers, notifications)
+    # ===========================================================================
+    area_2_speeches_table:
+      summary: |
+        The speeches table currently has a CHECK constraint limiting positions to (1, 2, 3).
+        CR-221 will add positions 0 (opening prayer) and 4 (closing prayer).
+        This requires:
+        1. ALTER TABLE to change CHECK constraint: position IN (0, 1, 2, 3, 4)
+        2. The UNIQUE constraint (ward_id, sunday_date, position) already supports new positions
+        3. The notification trigger (enqueue_speech_notification) fires on ALL positions
+           - It will automatically work for positions 0 and 4
+           - The speech_position field in notification_queue is SMALLINT (no constraint)
+      schema_location: "supabase/migrations/001_initial_schema.sql:116"
+      position_constraint: "CHECK (position IN (1, 2, 3))"
+      unique_constraint: "UNIQUE (ward_id, sunday_date, position)"
+      notification_trigger: "supabase/migrations/003_notification_triggers.sql (all lines)"
+      trigger_behavior: |
+        The enqueue_speech_notification() trigger fires on ANY position change.
+        It stores NEW.position in notification_queue.speech_position.
+        No position filtering exists in the trigger - positions 0 and 4 will
+        automatically generate notifications (designation, speaker_confirmed,
+        speaker_withdrew) just like positions 1-3.
+      key_finding: |
+        CRITICAL: The trigger will work for prayer positions but notification
+        text generation (in push notification handler) may need to distinguish
+        prayer positions from speech positions for proper labeling.
+
+    # ===========================================================================
+    # AREA 3: PrayerSelector component
+    # ===========================================================================
+    area_3_prayer_selector:
+      summary: |
+        PrayerSelector (src/components/PrayerSelector.tsx) is a standalone component
+        that allows selecting a member OR typing a custom name for prayers.
+        It returns PrayerSelection { memberId: string | null, name: string }.
+        Key features:
+        - Member search with inline FlatList
+        - Custom name option (type any name for non-members/visitors)
+        - modalOnly mode (used by AgendaForm)
+        - Clear button to deselect
+        When toggle OFF: PrayerSelector will be used (custom names + members)
+        When toggle ON: MemberSelectorModal should be used instead (members only)
+      file: "src/components/PrayerSelector.tsx"
+      props_interface: "PrayerSelectorProps at line 32"
+      used_by:
+        - "src/components/AgendaForm.tsx (lines 590-618, as modal)"
+        - "src/components/SpeechSlot.tsx (imported but UNUSED - dead import at line 27)"
+      dead_import_note: |
+        SpeechSlot.tsx imports PrayerSelector at line 27 but never uses it in JSX.
+        This is a dead import that should be cleaned up.
+
+    # ===========================================================================
+    # AREA 4: InviteManagementSection
+    # ===========================================================================
+    area_4_invite_management:
+      summary: |
+        InviteManagementSection (src/components/InviteManagementSection.tsx)
+        shows speeches with status 'assigned_not_invited' or 'assigned_invited'.
+        It fetches ALL speeches in the look-ahead window (12 sundays) and
+        filters using getInviteItems() from src/lib/speechUtils.ts.
+
+        Key integration points for CR-221:
+        1. useSpeeches hook fetches speeches with .select('*') - no position filter
+           So prayers at positions 0 and 4 WILL be returned automatically.
+        2. getInviteItems() filters by status only (no position filter) - prayers
+           will appear in the invite list when they have actionable status.
+        3. Display shows speech.position as ordinal "{position}o" or "Ultimo Discurso"
+           for position 3. Positions 0 and 4 need new labels (e.g., "Oracao de Abertura",
+           "Oracao de Encerramento").
+        4. WhatsApp template uses ward.whatsapp_template (single template for all).
+           CR-221 needs separate templates: whatsapp_template_opening_prayer and
+           whatsapp_template_closing_prayer.
+        5. F118 filter: position 2 is filtered by has_second_speech. No special
+           filtering needed for prayer positions.
+      file: "src/components/InviteManagementSection.tsx"
+      speech_utils_file: "src/lib/speechUtils.ts"
+      position_label_logic: "InviteManagementSection.tsx:211 - uses speech.position to build label"
+      whatsapp_template_logic: "InviteManagementSection.tsx:105 - ward?.whatsapp_template"
+
+    # ===========================================================================
+    # AREA 5: WhatsApp templates (storage, configuration)
+    # ===========================================================================
+    area_5_whatsapp_templates:
+      summary: |
+        Current state:
+        - wards table has a single 'whatsapp_template' TEXT column (001_initial_schema.sql:17)
+        - Ward TypeScript type has whatsapp_template: string | null (database.ts:80)
+        - WhatsApp template screen (settings/whatsapp.tsx) edits this single template
+        - Template uses placeholders: {nome}, {data}, {posicao}, {colecao}, {titulo}, {link}
+        - Default templates are defined per language in whatsappUtils.ts
+
+        CR-221 requires:
+        1. Add whatsapp_template_opening_prayer TEXT to wards table
+        2. Add whatsapp_template_closing_prayer TEXT to wards table
+        3. New default templates for prayers (simpler, no {posicao}/{colecao}/{titulo}/{link})
+        4. Prayer templates need different placeholders: {nome}, {data} (prayer name, date)
+        5. Settings screen needs to show prayer templates when manage_prayers is ON
+      wards_schema: "supabase/migrations/001_initial_schema.sql:10-20"
+      template_screen: "src/app/(tabs)/settings/whatsapp.tsx"
+      template_utils: "src/lib/whatsappUtils.ts"
+      current_placeholders: ["{nome}", "{data}", "{posicao}", "{colecao}", "{titulo}", "{link}"]
+
+    # ===========================================================================
+    # AREA 6: Notification triggers (003_notification_triggers.sql)
+    # ===========================================================================
+    area_6_notification_triggers:
+      summary: |
+        The enqueue_speech_notification() trigger function:
+        - Fires on INSERT or UPDATE of speeches table
+        - Handles status transitions: assigned_not_invited, assigned_confirmed, gave_up
+        - Stores speech_position in notification_queue
+        - No position filtering in trigger logic
+
+        The trigger was redefined in migrations 013 and 015 (security definer fixes)
+        but the logic remains the same.
+
+        For CR-221: The trigger will automatically work for positions 0 and 4.
+        No changes needed to the trigger itself. However, the push notification
+        handler (which reads from notification_queue and sends Expo push) may need
+        to generate different message text for prayer positions vs speech positions.
+      trigger_file: "supabase/migrations/003_notification_triggers.sql"
+      latest_version: "supabase/migrations/015_fix_function_search_path.sql:140-220"
+      notification_queue_schema: "supabase/migrations/001_initial_schema.sql:264-293"
+      position_handling: "Trigger stores NEW.position - works for any position value"
+
+    # ===========================================================================
+    # AREA 7: useLazyCreateSpeeches (auto-creation of speech records)
+    # ===========================================================================
+    area_7_lazy_create_speeches:
+      summary: |
+        useLazyCreateSpeeches (src/hooks/useSpeeches.ts:139-175):
+        - Creates 3 speech records (positions 1, 2, 3) for a sunday date
+        - Only creates if no records exist for that date (checks existing.length > 0)
+        - Called when expanding a SundayCard in the Speeches tab
+
+        CR-221 requires:
+        - Modify to create positions [0, 1, 2, 3, 4] instead of [1, 2, 3]
+        - Position 0 (opening prayer) and 4 (closing prayer) need default status
+          based on manage_prayers toggle:
+          - toggle ON: status = 'not_assigned' (full workflow)
+          - toggle OFF: status = 'assigned_confirmed' (simple mode)
+        - The existing check (existing.length > 0) needs to be smarter to handle
+          adding prayer records to dates that already have speech records
+
+        Note: There is NO "useEnsureSpeeches" hook - the hook is called
+        "useLazyCreateSpeeches" and it's triggered by card expansion.
+      file: "src/hooks/useSpeeches.ts:139-175"
+      current_positions: "[1, 2, 3]"
+      trigger_point: "src/app/(tabs)/speeches.tsx - on card expand"
+      existing_check: "Checks if ANY speeches exist for date (not per-position)"
+
+    # ===========================================================================
+    # AREA 8: Collapsed SundayCard (SundayCard.tsx, fixed height)
+    # ===========================================================================
+    area_8_sunday_card_collapsed:
+      summary: |
+        SundayCard (src/components/SundayCard.tsx:285-422):
+        - Collapsed state shows DateBlock + LEDs with speaker names
+        - visiblePositions based on hasSecondSpeech: [1, 2, 3] or [1, 3]
+        - LEDs show StatusLED for each visible position
+        - Speaker names shown next to LEDs
+
+        CR-221 implications:
+        - When manage_prayers is ON: collapsed card should also show prayer LEDs
+        - visiblePositions would need to include 0 and 4 (or separate section)
+        - Collapsed card height is not fixed (uses flexbox), but adding 2 more
+          rows will increase the collapsed card height
+        - The SundayCard props currently receive speeches[] which will include
+          prayer records (positions 0, 4) - needs filtering or display logic
+      file: "src/components/SundayCard.tsx"
+      visible_positions_logic: "Line 312: hasSecondSpeech ? [1, 2, 3] : [1, 3]"
+      led_rendering: "Lines 363-397: maps visiblePositions to StatusLED + name"
+      card_style: "No fixed height - uses flexbox padding (paddingVertical: 10)"
+
+    # ===========================================================================
+    # AREA 9: Prayer counting in Home and Agenda collapsed
+    # ===========================================================================
+    area_9_prayer_counting:
+      summary: |
+        Prayer counting currently reads from sunday_agendas fields:
+
+        Home tab (src/app/(tabs)/index.tsx):
+        - Lines 73-75: Special meetings - prayersFilled from agenda.opening_prayer_name
+          and closing_prayer_name
+        - Lines 100-102: Normal meetings - same pattern
+        - Lines 182-185: Display "Oracoes: X de 2" for special meetings
+        - Lines 211-214: Display "Oracoes: X de 2" for normal meetings
+
+        Agenda tab (src/app/(tabs)/agenda.tsx):
+        - Lines 412-414: Special meetings prayer count
+        - Lines 472-474: Normal meetings prayer count
+        - Lines 438-441,502-505: Display prayer count
+
+        CR-221 implications:
+        - When toggle ON: prayer count should come from speeches table (positions 0, 4)
+          checking status (assigned_confirmed = filled)
+        - When toggle OFF: prayer count comes from speeches (positions 0, 4)
+          where status is always 'assigned_confirmed' and speaker_name is set
+        - The "2 de 2" total remains the same
+        - Need to stop reading from agenda.opening_prayer_name/closing_prayer_name
+      home_file: "src/app/(tabs)/index.tsx"
+      agenda_file: "src/app/(tabs)/agenda.tsx"
+
+    # ===========================================================================
+    # AREA 10: Confirmation dialog when changing sunday type
+    # ===========================================================================
+    area_10_type_change_confirmation:
+      summary: |
+        SundayTypeDropdown (src/components/SundayCard.tsx:103-281):
+        - When changing FROM speeches to another type, checks hasAssignments
+          (lines 122): speeches.some(s => !!s.speaker_name || !!s.topic_title)
+        - If assignments exist, shows confirmation Alert (lines 124-144)
+        - On confirm, calls onDeleteSpeeches(date) then sets new type
+        - useDeleteSpeechesByDate (src/hooks/useSpeeches.ts:327-352) deletes
+          ALL speeches for ward+date with no position filter
+
+        CR-221 implications:
+        - When switching away from speeches type, prayer records (positions 0, 4)
+          should also be deleted (already handled - delete has no position filter)
+        - When switching TO testimony_meeting or primary_presentation, prayers
+          should be auto-created (positions 0, 4) since these meeting types
+          still have prayers
+        - The hasAssignments check should include prayer records
+        - The confirmation message may need to mention prayers if they have
+          assigned people
+      file: "src/components/SundayCard.tsx:103-281"
+      delete_hook: "src/hooks/useSpeeches.ts:327-352"
+
+  # ===========================================================================
+  # ADDITIONAL FINDINGS
+  # ===========================================================================
+  additional_findings:
+    manage_prayers_column:
+      summary: |
+        The wards table currently has NO manage_prayers column.
+        It needs to be added: manage_prayers BOOLEAN DEFAULT false
+        This means all existing wards will default to toggle OFF (backward compatible).
+
+    speech_position_constraint:
+      summary: |
+        The speeches.position CHECK constraint currently allows only (1, 2, 3).
+        This MUST be altered to allow (0, 1, 2, 3, 4) before any prayer
+        records can be inserted. This is a blocking migration dependency.
+
+    dead_import:
+      summary: |
+        SpeechSlot.tsx imports PrayerSelector and PrayerSelection but never uses them.
+        This is a dead import (line 27) that should be cleaned up.
+
+    speech_type_position_labels:
+      summary: |
+        InviteManagementSection line 211 and SpeechSlot line 59 have position
+        label logic that only handles positions 1, 2, 3. New labels needed for
+        positions 0 and 4.
+
+    presentation_mode_prayers:
+      summary: |
+        usePresentationMode.ts reads agenda.opening_prayer_name (line 100)
+        and agenda.closing_prayer_name (lines 181, 193). After CR-221,
+        these must read from speeches table (positions 0, 4) instead.
+
+  # ===========================================================================
+  # COMPLETE CODE INVENTORY: Files referencing prayer fields in sunday_agendas
+  # ===========================================================================
+  prayer_field_inventory:
+    description: |
+      Complete inventory of all files referencing opening_prayer_name,
+      opening_prayer_member_id, closing_prayer_name, or closing_prayer_member_id
+      from the sunday_agendas table. ALL of these must be migrated.
+
+    source_files:
+      - path: "src/types/database.ts"
+        lines: "185-186, 208-209"
+        fields: "opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name"
+        action: "REMOVE from SundayAgenda interface"
+
+      - path: "src/components/AgendaForm.tsx"
+        lines: "30, 312-331, 528-547, 590-618"
+        fields: "opening_prayer_name, opening_prayer_member_id, closing_prayer_name, closing_prayer_member_id"
+        action: "REPLACE with speech-based prayer rendering"
+
+      - path: "src/app/(tabs)/index.tsx"
+        lines: "74-75, 101-102, 182-185, 211-214"
+        fields: "opening_prayer_name, closing_prayer_name"
+        action: "REPLACE prayer count logic with speech-based counting"
+
+      - path: "src/app/(tabs)/agenda.tsx"
+        lines: "413-414, 473-474, 438-441, 502-505"
+        fields: "opening_prayer_name, closing_prayer_name"
+        action: "REPLACE prayer count logic with speech-based counting"
+
+      - path: "src/hooks/usePresentationMode.ts"
+        lines: "100, 181, 193"
+        fields: "opening_prayer_name, closing_prayer_name"
+        action: "REPLACE with reading from speeches (positions 0, 4)"
+
+    migration_files:
+      - path: "supabase/migrations/001_initial_schema.sql"
+        lines: "116, 186-187, 202-203"
+        fields: "position CHECK, opening_prayer_*, closing_prayer_*"
+        action: "New migration to alter position constraint and drop prayer columns"
+
+    test_files_affected:
+      - "src/__tests__/batch20-phase1.test.ts"
+      - "src/__tests__/cr004-f008-agenda-actors.test.ts"
+      - "src/__tests__/cr001-qa-extended.test.ts"
+      - "src/__tests__/batch19-phase2.test.ts"
+      - "src/__tests__/batch16.test.ts"
+      - "src/__tests__/batch7-f035-f039.test.ts"
+      - "src/__tests__/batch14-phase2.test.ts"
+      - "src/__tests__/integration/setup-integration.ts"
+      - "src/__tests__/usePresentationMode-utils.test.ts"
+      - "src/__tests__/phase04-agenda-presentation.test.ts"
+      - "src/__tests__/phase02-database-types.test.ts"
+      - "src/__tests__/database-types.test.ts"
+      - "src/__tests__/cr001-qa.test.ts"
+      - "src/__tests__/batch9-phase1.test.ts"
+
+  # ===========================================================================
+  # VALIDATION CHECKS (for POST validation)
+  # ===========================================================================
+  validation_checks:
+    must_pass:
+      # --- Schema / Migration checks ---
+      - id: "MP-01"
+        description: "New migration adds manage_prayers BOOLEAN DEFAULT false to wards table"
+        type: "static"
+        check: "Migration file exists with ALTER TABLE wards ADD COLUMN manage_prayers"
+
+      - id: "MP-02"
+        description: "New migration alters speeches.position CHECK to allow (0, 1, 2, 3, 4)"
+        type: "static"
+        check: "Migration file exists with ALTER TABLE speeches DROP CONSTRAINT + ADD CONSTRAINT for position IN (0,1,2,3,4)"
+
+      - id: "MP-03"
+        description: "New migration adds whatsapp_template_opening_prayer and whatsapp_template_closing_prayer to wards table"
+        type: "static"
+        check: "Migration file exists with ALTER TABLE wards ADD COLUMN for both template columns"
+
+      - id: "MP-04"
+        description: "New migration removes opening_prayer_name, opening_prayer_member_id, closing_prayer_name, closing_prayer_member_id from sunday_agendas"
+        type: "static"
+        check: "Migration file exists with ALTER TABLE sunday_agendas DROP COLUMN for all 4 fields"
+
+      - id: "MP-05"
+        description: "New migration includes data migration: copy existing prayer data to speeches (positions 0, 4) with status confirmed"
+        type: "static"
+        check: "Migration includes INSERT INTO speeches SELECT from sunday_agendas for prayer data before dropping columns"
+
+      # --- TypeScript type checks ---
+      - id: "MP-06"
+        description: "Ward type in database.ts includes manage_prayers boolean"
+        type: "static"
+        check: "Ward interface has manage_prayers: boolean"
+
+      - id: "MP-07"
+        description: "Ward type includes whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"
+        type: "static"
+        check: "Ward interface has both new template fields"
+
+      - id: "MP-08"
+        description: "SundayAgenda type no longer has prayer fields"
+        type: "static"
+        check: "SundayAgenda interface does NOT contain opening_prayer_name, opening_prayer_member_id, closing_prayer_name, closing_prayer_member_id"
+
+      - id: "MP-09"
+        description: "Speech.position type comment updated to include 0 and 4"
+        type: "static"
+        check: "Speech interface position comment includes 0, 1, 2, 3, 4"
+
+      # --- useLazyCreateSpeeches changes ---
+      - id: "MP-10"
+        description: "useLazyCreateSpeeches creates positions [0, 1, 2, 3, 4] not just [1, 2, 3]"
+        type: "static"
+        check: "Hook creates records for all 5 positions"
+
+      - id: "MP-11"
+        description: "Prayer positions (0, 4) get default status based on manage_prayers toggle"
+        type: "static"
+        check: "Position 0 and 4 status is 'assigned_confirmed' when manage_prayers=false, 'not_assigned' when manage_prayers=true"
+
+      # --- AgendaForm prayer rendering ---
+      - id: "MP-12"
+        description: "AgendaForm no longer reads opening_prayer_name/closing_prayer_name from agenda"
+        type: "static"
+        check: "No references to agenda.opening_prayer_name or agenda.closing_prayer_name in AgendaForm.tsx"
+
+      - id: "MP-13"
+        description: "AgendaForm renders prayer fields from speeches (positions 0, 4)"
+        type: "static"
+        check: "Prayer FieldRows read from speeches array filtered by position 0 and 4"
+
+      - id: "MP-14"
+        description: "Toggle OFF: AgendaForm uses PrayerSelector for prayer fields (custom name + member)"
+        type: "static"
+        check: "When manage_prayers=false, PrayerSelector is used for prayer assignment"
+
+      - id: "MP-15"
+        description: "Toggle ON: AgendaForm uses MemberSelectorModal for prayer fields (members only)"
+        type: "static"
+        check: "When manage_prayers=true, MemberSelectorModal or equivalent member-only selector is used"
+
+      # --- InviteManagementSection ---
+      - id: "MP-16"
+        description: "InviteManagementSection shows prayer items when manage_prayers=true"
+        type: "static"
+        check: "Prayer speeches (positions 0, 4) appear in invite list with proper labels"
+
+      - id: "MP-17"
+        description: "InviteManagementSection uses correct WhatsApp template for prayers"
+        type: "static"
+        check: "Position 0 uses whatsapp_template_opening_prayer, position 4 uses whatsapp_template_closing_prayer"
+
+      - id: "MP-18"
+        description: "Prayer position labels display correctly (not ordinal numbers)"
+        type: "static"
+        check: "Position 0 shows 'Oracao de Abertura' and position 4 shows 'Oracao de Encerramento' (localized)"
+
+      # --- Prayer counting ---
+      - id: "MP-19"
+        description: "Home tab prayer count reads from speeches (positions 0, 4) not agenda fields"
+        type: "static"
+        check: "prayersFilled logic in index.tsx uses speeches array, not agenda.opening_prayer_name"
+
+      - id: "MP-20"
+        description: "Agenda tab prayer count reads from speeches (positions 0, 4) not agenda fields"
+        type: "static"
+        check: "prayersFilled logic in agenda.tsx uses speeches array, not agenda.opening_prayer_name"
+
+      # --- Presentation mode ---
+      - id: "MP-21"
+        description: "Presentation mode reads prayer names from speeches (positions 0, 4)"
+        type: "static"
+        check: "buildPresentationCards reads from speeches not agenda for prayer names"
+
+      # --- Settings ---
+      - id: "MP-22"
+        description: "Ward settings includes manage_prayers toggle"
+        type: "static"
+        check: "Settings screen or ward settings has a toggle for manage_prayers"
+
+      # --- Test suite ---
+      - id: "MP-23"
+        description: "All tests pass (no regression)"
+        type: "runtime"
+        check: "npx jest --passWithNoTests exits with 0"
+
+    should_pass:
+      - id: "SP-01"
+        description: "SundayCard collapsed view shows prayer LEDs when manage_prayers=true"
+        type: "static"
+        check: "Collapsed card includes positions 0, 4 in visible positions when manage_prayers=true"
+
+      - id: "SP-02"
+        description: "Dead import of PrayerSelector in SpeechSlot.tsx is cleaned up"
+        type: "static"
+        check: "SpeechSlot.tsx does not import PrayerSelector"
+
+      - id: "SP-03"
+        description: "Prayer WhatsApp template screen accessible from settings when manage_prayers=true"
+        type: "static"
+        check: "Settings screen shows prayer template options when manage_prayers is on"
+
+      - id: "SP-04"
+        description: "Type change dialog (switching away from speeches) includes prayer records in hasAssignments check"
+        type: "static"
+        check: "SundayTypeDropdown hasAssignments check includes positions 0 and 4"
+
+      - id: "SP-05"
+        description: "Auto-create prayer records for testimony/primary meetings too"
+        type: "static"
+        check: "Prayer records (positions 0, 4) are created for all meeting types that show prayers"
+
+      - id: "SP-06"
+        description: "InviteManagementSection filters out prayer items when manage_prayers=false"
+        type: "static"
+        check: "Prayers with status 'assigned_confirmed' (toggle OFF default) don't appear in invite list"
+
+      - id: "SP-07"
+        description: "speechUtils.ts getInviteItems and areNext3FullyAssigned handle prayer positions correctly"
+        type: "static"
+        check: "Functions either exclude or properly handle positions 0 and 4"
+
+      - id: "SP-08"
+        description: "Notification push text distinguishes prayer vs speech positions"
+        type: "static"
+        check: "Push notification messages use 'prayer' not 'speech' for positions 0 and 4"
+
+  # ===========================================================================
+  # RISK ASSESSMENT
+  # ===========================================================================
+  risk_assessment:
+    high_risk:
+      - area: "Data migration"
+        reason: |
+          Removing 4 columns from sunday_agendas requires migrating existing prayer
+          data to speeches table first. If migration fails midway, data loss is possible.
+          Mitigation: Use transactional migration with data copy BEFORE column drops.
+
+      - area: "Position constraint change"
+        reason: |
+          Altering CHECK constraint on speeches.position is a breaking change. If any
+          code inserts positions 0 or 4 before the migration runs, it will fail.
+          Mitigation: Migration must run first, code changes depend on it.
+
+    medium_risk:
+      - area: "Backward compatibility"
+        reason: |
+          Large number of test files (14) reference prayer fields in sunday_agendas.
+          All tests must be updated simultaneously with the implementation.
+
+      - area: "InviteManagement label logic"
+        reason: |
+          Position label logic assumes positions 1-3 (ordinal format). Positions 0 and 4
+          need completely different labels, not ordinal numbers.
+
+    low_risk:
+      - area: "Notification trigger"
+        reason: |
+          Trigger already works for any position. Low risk of regression.
+
+      - area: "Toggle default (OFF)"
+        reason: |
+          Default manage_prayers=false means no immediate behavioral change for
+          existing wards. Low risk to existing users.

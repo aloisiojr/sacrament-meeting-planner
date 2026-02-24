@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-23"
-  total_features: 142
-  total_change_requests: 206
+  total_features: 143
+  total_change_requests: 207
   implemented_crs: 96
-  pending_crs: 108
+  pending_crs: 109
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -80,6 +80,7 @@ metadata:
     - docs/specs/SPEC_F153.yaml
     - docs/specs/SPEC_F154.yaml
     - docs/specs/SPEC_F155_F156.yaml
+    - docs/specs/SPEC_F157.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2812,8 +2813,42 @@ features:
       - "SpeechSlot.tsx explicitamente excluido do escopo"
       - "F149 visual disabled preservado, mudancas sao aditivas"
 
+  # ---------------------------------------------------------------------------
+  # Batch 25 Phase 1 (F157)
+  # ---------------------------------------------------------------------------
+
+  - id: F157
+    name: "Managed Prayers with optional full workflow"
+    status: pending
+    rfs: []
+    description: >
+      Oracoes gerenciadas: oracoes de abertura e encerramento movidas de
+      sunday_agendas (colunas opening/closing_prayer_*) para speeches
+      (positions 0 e 4). Toggle manage_prayers (BOOLEAN DEFAULT false) na
+      tabela wards controla comportamento. Toggle OFF: PrayerSelector
+      editavel na agenda, status confirmed, sem push/invite management,
+      tab 'Discursos'. Toggle ON: workflow completo (status cycle, WhatsApp,
+      push, invite management), prayer slots na aba Discursos (antes do 1o
+      e apos ultimo discurso), agenda read-only com pencil, tab 'Discursos
+      e Oracoes'. Cards contraidos com linhas de oracao em italico com
+      prefixo '(Oracao)'. WhatsApp templates separados para oracoes com
+      segmented control 3 abas. Auto-criacao positions 0/4 para
+      Discursos/Testemunho/Primaria. Mudanca de tipo preserva oracoes
+      entre Discursos/Testemunho/Primaria, apaga ao mudar para Conf./Outro.
+    modified_by_crs: [221]
+    spec_file: "docs/specs/SPEC_F157.yaml"
+    notes:
+      - "CR-221: Oracoes gerenciadas com workflow optativo"
+      - "64 acceptance criteria, 13 edge cases"
+      - "~19 arquivos impactados (DB migration, tabs, components, hooks, i18n)"
+      - "Toggle per-ward: manage_prayers BOOLEAN DEFAULT false"
+      - "Prayer positions: 0 (abertura), 4 (encerramento)"
+      - "Colunas prayer removidas de sunday_agendas (migracao de dados)"
+      - "Permissoes: mesmo padrao dos discursos"
+      - "Apresentacao mode: sem mudancas visuais (nova data source)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (103 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24)
+# PENDING CHANGE REQUESTS (104 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25)
 # =============================================================================
 
 pending_crs:
@@ -5178,9 +5213,76 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
 
-# =============================================================================
+  # --- Batch 25 Phase 1 (Managed Prayers) ---
 
-design_decisions:
+  - id: 221
+    type: feature
+    area: "Cross-cutting (F008, F009, F010, F012, F017, F024)"
+    feature_id: F157
+    spec_file: "docs/specs/SPEC_F157.yaml"
+    related_crs: [74, 98, 133]
+    description: >
+      Oracoes gerenciadas: oracoes de abertura e encerramento movidas de
+      sunday_agendas para speeches (positions 0 e 4). Toggle manage_prayers
+      (BOOLEAN DEFAULT false) na tabela wards. Toggle OFF: PrayerSelector na
+      agenda, status confirmed, sem push, sem invite management. Toggle ON:
+      workflow completo (status cycle, WhatsApp, push, invite management),
+      prayer slots na aba Discursos, read-only na agenda com pencil para
+      Discursos. Cards contraidos com linhas de oracao em italico. WhatsApp
+      templates separados para oracoes com segmented control (3 abas).
+      Auto-criacao de positions 0/4 para Discursos/Testemunho/Primaria.
+      Mudanca de tipo preserva oracoes entre Discursos/Testemunho/Primaria,
+      apaga ao mudar para Conf./Outro.
+    acceptance_criteria:
+      - "manage_prayers BOOLEAN DEFAULT false na tabela wards"
+      - "whatsapp_template_opening_prayer e closing na tabela wards"
+      - "Migracao de oracoes de sunday_agendas para speeches positions 0/4"
+      - "Drop colunas opening/closing_prayer_* de sunday_agendas"
+      - "Auto-criacao positions 0/4 para speeches/testimony/primary"
+      - "Toggle OFF: PrayerSelector editavel na agenda"
+      - "Toggle OFF: status confirmed, sem push, sem invite mgmt"
+      - "Toggle OFF: tab 'Discursos', titulo 'Proximos Discursos'"
+      - "Toggle ON: MemberSelectorModal na aba Discursos"
+      - "Toggle ON: agenda read-only + pencil -> aba Discursos"
+      - "Toggle ON: tab 'Discursos e Oracoes'"
+      - "Toggle ON: titulo 'Proximos Discursos e Oracoes'"
+      - "Toggle ON: prayer slots antes do 1o e apos ultimo discurso"
+      - "Toggle ON: invite management com labels Abertura/Encerramento"
+      - "Toggle ON: WhatsApp segmented control 3 abas"
+      - "Card contraido: linhas de oracao em italico com prefixo (Oracao)"
+      - "Card contraido: 5 linhas max (speeches+oracoes)"
+      - "Testemunho/Primaria: apenas 2 linhas de oracao"
+      - "Tipo change: preserva oracoes speeches<->testimony<->primary"
+      - "Tipo change: apaga oracoes ao mudar para conf/outro"
+      - "Dialogo confirmacao com texto dinamico"
+      - "Templates padrao oracoes em pt-BR, en, es"
+      - "Prayer templates: apenas {nome} e {data} placeholders"
+      - "Push notifications: mesmo fluxo quando ON"
+      - "Permissoes: mesmo padrao dos discursos"
+      - "i18n: todos os novos textos em pt-BR, en, es"
+      - "Apresentacao mode: sem mudancas visuais"
+      - "Wards existentes inalteradas (manage_prayers=false por default)"
+    files_likely_impacted:
+      - supabase/migrations/NNN_managed_prayers.sql
+      - src/app/(tabs)/speeches.tsx
+      - src/app/(tabs)/index.tsx
+      - src/app/(tabs)/agenda.tsx
+      - src/app/(tabs)/_layout.tsx
+      - src/components/SundayCard.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/PrayerSelector.tsx
+      - src/hooks/useSpeeches.ts
+      - src/hooks/useSundayAgenda.ts
+      - src/hooks/usePresentationMode.ts
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - src/app/(tabs)/settings/index.tsx
+      - src/lib/whatsappUtils.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+# =============================================================================
 
   - id: DD-01
     title: "Sunday types: lista correta"
@@ -5724,6 +5826,50 @@ design_decisions:
       qualificadas com schema explicito (public.tabela, auth.tabela).
       Migracao 015 recria as 7 funcoes afetadas.
 
+  - id: DD-58
+    title: "Oracoes armazenadas como speeches positions 0 (abertura) e 4 (encerramento)"
+    decided_in: CR-221
+    decision: >
+      Oracoes de abertura e encerramento sao armazenadas na tabela speeches
+      usando position=0 e position=4 respectivamente. Colunas
+      opening_prayer_*, closing_prayer_* removidas de sunday_agendas.
+      Migracao copia dados existentes para speeches antes de dropar colunas.
+      Topic fields (topic_title, topic_link, topic_collection) nao sao
+      usados para oracoes (permanecem null).
+    superseded:
+      - "Colunas opening/closing_prayer_* em sunday_agendas (CR-74)"
+
+  - id: DD-59
+    title: "manage_prayers toggle optativo por ala"
+    decided_in: CR-221
+    decision: >
+      A funcionalidade de oracoes gerenciadas e optativa por ala via toggle
+      manage_prayers (BOOLEAN DEFAULT false) na tabela wards. Quando OFF,
+      oracoes usam PrayerSelector na agenda com status 'assigned_confirmed'
+      (sem workflow). Quando ON, oracoes seguem workflow completo de
+      discursos (status cycle, WhatsApp, push, invite management).
+      Toggle acessivel apenas para Bispado em Configuracoes da Ala.
+
+  - id: DD-60
+    title: "Auto-criacao de positions 0/4 condicional ao tipo de domingo"
+    decided_in: CR-221
+    decision: >
+      Positions 0/4 (oracoes) sao auto-criadas para tipos: speeches,
+      testimony_meeting, primary_presentation. NAO criadas para:
+      general_conference, stake_conference, ward_conference, other.
+      Positions 1/2/3 (discursos) criadas apenas para speeches (como hoje).
+
+  - id: DD-61
+    title: "Preservacao de oracoes ao mudar tipo de domingo"
+    decided_in: CR-221
+    decision: >
+      Ao mudar tipo de domingo: oracoes (positions 0/4) sao PRESERVADAS
+      ao alternar entre speeches, testimony_meeting e primary_presentation.
+      Oracoes sao APAGADAS ao mudar para general_conference, stake_conference,
+      ward_conference ou other. Discursos (positions 1/2/3) continuam sendo
+      apagados ao sair de speeches (como hoje). Dialogo de confirmacao usa
+      texto dinamico conforme o que sera apagado.
+
 # =============================================================================
 # BUSINESS RULES (globais, consolidadas)
 # =============================================================================
@@ -6003,6 +6149,26 @@ business_rules:
     origin: CR-144
     notes: "Previne ataques de search_path manipulation. 7 funcoes corrigidas na migracao 015."
 
+  - id: BR-59
+    rule: "Oracoes armazenadas em speeches positions 0 (abertura) e 4 (encerramento), NAO em sunday_agendas"
+    origin: CR-221
+    notes: "Migracao copia dados antes de dropar colunas. Auto-criacao para speeches/testimony/primary."
+
+  - id: BR-60
+    rule: "manage_prayers toggle controla workflow de oracoes: OFF = status confirmed, ON = workflow completo"
+    origin: CR-221
+    notes: "Toggle na tabela wards. OFF: PrayerSelector na agenda. ON: MemberSelectorModal na aba Discursos, agenda read-only."
+
+  - id: BR-61
+    rule: "Oracoes preservadas ao mudar entre speeches/testimony/primary, apagadas ao mudar para conf/outro"
+    origin: CR-221
+    notes: "Dialogo de confirmacao com texto dinamico conforme o que sera apagado (discursos, oracoes ou ambos)."
+
+  - id: BR-62
+    rule: "WhatsApp templates de oracoes usam apenas {nome} e {data} como placeholders"
+    origin: CR-221
+    notes: "Discursos mantem 6 placeholders. Oracoes nao tem tema/posicao/colecao/link."
+
 # =============================================================================
 # DATA MODEL (schema principal, estado atual)
 # =============================================================================
@@ -6013,6 +6179,7 @@ data_model:
       description: "Alas da igreja"
       key_columns: [id, name, stake_name, language, timezone, whatsapp_template]
       unique_constraints: ["(stake_name, name)"]
+      notes: "CR-221/F157 (pendente): adiciona manage_prayers BOOLEAN DEFAULT false, whatsapp_template_opening_prayer TEXT, whatsapp_template_closing_prayer TEXT"
 
     - name: users
       description: "Usuarios via auth.users do Supabase com app_metadata (ward_id, role)"
@@ -6052,11 +6219,13 @@ data_model:
       notes: "'speeches' e persistido (CR-56). custom_reason usado apenas quando reason='other'"
 
     - name: speeches
-      description: "Discursos (3 por domingo)"
+      description: "Discursos (3 por domingo) e oracoes (positions 0/4, CR-221/F157 pendente)"
       key_columns: [id, ward_id, sunday_date, position, member_id, speaker_name, speaker_phone, topic_title, topic_link, topic_collection, status]
       unique_constraints: ["(ward_id, sunday_date, position)"]
       valid_statuses: [not_assigned, assigned_not_invited, assigned_invited, assigned_confirmed, gave_up]
+      valid_positions: "0 (opening prayer), 1 (1st speech), 2 (2nd speech), 3 (3rd speech), 4 (closing prayer)"
       snapshot_fields: [speaker_name, speaker_phone, topic_title, topic_link, topic_collection]
+      notes: "CR-221/F157 (pendente): positions 0/4 para oracoes. topic_* nao usados para oracoes."
 
     - name: meeting_actors
       description: "Atores da reuniao (gerenciados inline na agenda)"
@@ -6087,6 +6256,8 @@ data_model:
         Atores armazenados como snapshot (nome) + FK opcional. Oracoes: member_id
         para membros, null + name para nomes customizados (CR-74). Override de
         discursante para troca de ultima hora: speaker_*_override (CR-100).
+        CR-221/F157 (pendente): colunas opening_prayer_*, closing_prayer_* serao
+        removidas (migradas para speeches positions 0/4).
 
     - name: device_push_tokens
       description: "Tokens de push notification por dispositivo"
@@ -6412,3 +6583,10 @@ cr_history:
       - "docs/specs/SPEC_F154.yaml (CR-219 - Uniform collapsed card height for all types)"
       - "docs/specs/SPEC_F155_F156.yaml (CR-218 - Light theme bluish contrast, CR-220 - Speaker fields rework)"
     summary: "Phase 1: Show dialog when WhatsApp button pressed and speaker has no phone number, offering mark-as-invited or cancel (F152). Add outlined circle around play icon in Agenda cards and increase distance from collapse chevron (F153). Apply uniform minHeight to ALL collapsed SundayCard types, not just speech-type, superseding F151 approach (F154). Phase 2: Improve light theme contrast by replacing neutral grays with Tailwind Slate blue-gray palette, making white cards stand out against Slate-100 background (F155). Rework speaker fields in agenda editing card with italic + reduced color, change 2nd speech disabled label to 'ajustado', scoped to AgendaForm only (F156)."
+
+  batch_25:
+    range: "CR-221"
+    status: "1 pendente (221)"
+    files:
+      - "docs/specs/SPEC_F157.yaml (CR-221 - Managed Prayers)"
+    summary: "Oracoes gerenciadas: oracoes movidas de sunday_agendas para speeches (positions 0/4). Toggle manage_prayers per-ward. OFF: PrayerSelector, status confirmed. ON: workflow completo (status cycle, WhatsApp, push, invite management). Cards contraidos com linhas de oracao em italico. WhatsApp templates separados. Auto-criacao positions 0/4 para speeches/testimony/primary. Preservacao de oracoes ao mudar tipo entre speeches/testimony/primary (F157)."

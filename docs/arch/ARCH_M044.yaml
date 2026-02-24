@@ -1,0 +1,985 @@
+# =============================================================================
+# ARCH_M044.yaml
+# Architecture for Batch 25 Phase 1: F157 - Managed Prayers (CR-221)
+# Database migration + hooks + ward settings toggle + auto-create prayers
+# Created: 2026-02-23
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Move prayer data from sunday_agendas columns (opening_prayer_name,
+    opening_prayer_member_id, closing_prayer_name, closing_prayer_member_id)
+    into the speeches table as positions 0 (opening) and 4 (closing). Add
+    per-ward manage_prayers toggle and per-ward WhatsApp templates for
+    opening/closing prayers. Auto-create prayer positions for eligible
+    sunday types. Conditionally show prayer slots in Speeches tab, adjust
+    collapsed card layout, update Agenda tab prayer fields, add WhatsApp
+    template segmented control, update Home tab section titles, modify
+    notification trigger, and add all i18n keys.
+  principles:
+    - "Prayers are speeches: positions 0/4 in the same speeches table, same snapshot pattern (ADR-003), same RLS policies"
+    - "Toggle-driven behavior: manage_prayers=false preserves pre-CR-221 UX; manage_prayers=true enables full workflow"
+    - "Migration safety: copy data BEFORE dropping columns; ON CONFLICT DO NOTHING for idempotency"
+    - "Minimal new components: reuse SpeechSlot for prayer slots (no topic field), PrayerSelector for toggle OFF, MemberSelectorModal for toggle ON"
+    - "Notification trigger gains manage_prayers awareness: skip enqueue for positions 0/4 when toggle is OFF"
+    - "No new tables: only columns added to wards, data migrated within speeches, columns dropped from sunday_agendas"
+  phase_scope: >
+    Phase 1 covers all sub-areas of F157: DB migration, auto-creation logic,
+    Speeches tab prayer slots, Agenda tab read-only/editable prayer fields,
+    Home tab title updates, WhatsApp template segmented control, Sunday type
+    change logic, collapsed card layouts, notification trigger update,
+    settings toggle, and i18n for all new strings.
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                      CR-221: Managed Prayers                        │
+  │                                                                     │
+  │  ┌─────────────────────────────────────────────────────────────┐   │
+  │  │  Migration (019_managed_prayers.sql)                         │   │
+  │  │  1. ALTER wards: +manage_prayers, +whatsapp_template_*       │   │
+  │  │  2. INSERT speeches pos 0/4 FROM sunday_agendas prayers      │   │
+  │  │  3. DROP sunday_agendas prayer columns                       │   │
+  │  │  4. ALTER enqueue_speech_notification() for manage_prayers   │   │
+  │  └─────────────────────────────────────────────────────────────┘   │
+  │                                                                     │
+  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐  │
+  │  │ useSpeeches.ts   │  │ SundayCard.tsx   │  │ SpeechSlot.tsx  │  │
+  │  │ useLazyCreate:   │  │ collapsed card:  │  │ prayer slots:   │  │
+  │  │ positions 0,1,   │  │ prayer lines     │  │ no topic field, │  │
+  │  │ 2,3,4 by type    │  │ when ON          │  │ prayer label    │  │
+  │  │ useAssignSpeaker:│  │ visiblePositions │  │ isPrayer prop   │  │
+  │  │ status override  │  │ includes 0/4     │  │                 │  │
+  │  └──────────────────┘  └──────────────────┘  └─────────────────┘  │
+  │                                                                     │
+  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐  │
+  │  │ AgendaForm.tsx   │  │ WhatsApp screen  │  │ Settings index  │  │
+  │  │ OFF: PrayerSel.  │  │ 3-tab segmented  │  │ manage_prayers  │  │
+  │  │ reads speeches   │  │ control when ON  │  │ toggle (Bisp.)  │  │
+  │  │ ON: read-only +  │  │ prayer templates │  │                 │  │
+  │  │ pencil -> Speech │  │ {nome},{data}    │  │                 │  │
+  │  └──────────────────┘  └──────────────────┘  └─────────────────┘  │
+  │                                                                     │
+  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐  │
+  │  │ Home tab (index) │  │ _layout.tsx      │  │ i18n locales    │  │
+  │  │ section title    │  │ tab label        │  │ ~20 new keys    │  │
+  │  │ dynamic by ON/OFF│  │ dynamic by ON/OFF│  │ pt-BR, en, es   │  │
+  │  │ InviteMgmt:      │  │                  │  │ prayer templates │  │
+  │  │ prayers when ON  │  │                  │  │                 │  │
+  │  └──────────────────┘  └──────────────────┘  └─────────────────┘  │
+  │                                                                     │
+  │  ┌──────────────────┐  ┌──────────────────┐                       │
+  │  │ SundayTypeDD     │  │ Notification     │                       │
+  │  │ dynamic confirm  │  │ Trigger SQL      │                       │
+  │  │ dialog text for  │  │ check ward       │                       │
+  │  │ prayers/speeches │  │ manage_prayers   │                       │
+  │  │ preservation     │  │ for pos 0/4      │                       │
+  │  └──────────────────┘  └──────────────────┘                       │
+  └─────────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- 1. Database Migration ---
+
+  - name: "ManagedPrayersMigration"
+    responsibility: "Add manage_prayers + prayer template columns to wards, migrate prayer data to speeches, drop old columns, update notification trigger"
+    file: "supabase/migrations/019_managed_prayers.sql"
+    changes:
+      - "ALTER TABLE wards ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false"
+      - "ALTER TABLE wards ADD COLUMN whatsapp_template_opening_prayer TEXT (nullable)"
+      - "ALTER TABLE wards ADD COLUMN whatsapp_template_closing_prayer TEXT (nullable)"
+      - "INSERT INTO speeches (pos 0) FROM sunday_agendas.opening_prayer_* WHERE NOT NULL, ON CONFLICT DO NOTHING"
+      - "INSERT INTO speeches (pos 4) FROM sunday_agendas.closing_prayer_* WHERE NOT NULL, ON CONFLICT DO NOTHING"
+      - "ALTER TABLE sunday_agendas DROP COLUMN opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name"
+      - "CREATE OR REPLACE FUNCTION enqueue_speech_notification() with manage_prayers check for positions 0/4"
+    dependencies: []
+    order_of_operations: |
+      1. Add columns to wards (non-destructive)
+      2. Copy prayer data to speeches (must happen BEFORE drop)
+      3. Drop old columns from sunday_agendas (destructive, point of no return)
+      4. Update notification trigger function (replaces existing function)
+    sql_skeleton: |
+      -- Step 1: Add new columns to wards
+      ALTER TABLE public.wards
+        ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN whatsapp_template_opening_prayer TEXT,
+        ADD COLUMN whatsapp_template_closing_prayer TEXT;
+
+      -- Step 2: Copy opening prayers to speeches position 0
+      INSERT INTO public.speeches (ward_id, sunday_date, position, member_id, speaker_name, status)
+      SELECT sa.ward_id, sa.sunday_date, 0, sa.opening_prayer_member_id, sa.opening_prayer_name, 'assigned_confirmed'
+      FROM public.sunday_agendas sa
+      WHERE sa.opening_prayer_name IS NOT NULL
+      ON CONFLICT (ward_id, sunday_date, position) DO NOTHING;
+
+      -- Step 3: Copy closing prayers to speeches position 4
+      INSERT INTO public.speeches (ward_id, sunday_date, position, member_id, speaker_name, status)
+      SELECT sa.ward_id, sa.sunday_date, 4, sa.closing_prayer_member_id, sa.closing_prayer_name, 'assigned_confirmed'
+      FROM public.sunday_agendas sa
+      WHERE sa.closing_prayer_name IS NOT NULL
+      ON CONFLICT (ward_id, sunday_date, position) DO NOTHING;
+
+      -- Step 4: Drop old columns
+      ALTER TABLE public.sunday_agendas
+        DROP COLUMN opening_prayer_member_id,
+        DROP COLUMN opening_prayer_name,
+        DROP COLUMN closing_prayer_member_id,
+        DROP COLUMN closing_prayer_name;
+
+      -- Step 5: Update notification trigger to check manage_prayers
+      CREATE OR REPLACE FUNCTION enqueue_speech_notification()
+      RETURNS TRIGGER
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+      DECLARE
+        v_manage_prayers BOOLEAN;
+      BEGIN
+        IF TG_OP = 'UPDATE' AND OLD.status = NEW.status THEN
+          RETURN NEW;
+        END IF;
+
+        -- For prayer positions (0 and 4), check if manage_prayers is enabled
+        IF NEW.position IN (0, 4) THEN
+          SELECT manage_prayers INTO v_manage_prayers
+          FROM wards WHERE id = NEW.ward_id;
+          IF NOT COALESCE(v_manage_prayers, false) THEN
+            RETURN NEW; -- Skip notification when manage_prayers is OFF
+          END IF;
+        END IF;
+
+        -- Case 1: designation (delayed 5min)
+        IF NEW.status = 'assigned_not_invited' THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id, 'designation', NEW.sunday_date, NEW.position,
+            NEW.speaker_name, 'secretary', 'pending', now() + INTERVAL '5 minutes'
+          );
+        END IF;
+
+        -- Case 4: speaker confirmed (immediate)
+        IF NEW.status = 'assigned_confirmed' AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id, 'speaker_confirmed', NEW.sunday_date, NEW.position,
+            NEW.speaker_name, 'secretary_and_bishopric', 'pending', now()
+          );
+        END IF;
+
+        -- Case 5: speaker gave up (immediate)
+        IF NEW.status = 'gave_up' AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id, 'speaker_withdrew', NEW.sunday_date, NEW.position,
+            NEW.speaker_name, 'bishopric', 'pending', now()
+          );
+        END IF;
+
+        -- Cancellation
+        IF NEW.status = 'not_assigned' AND TG_OP = 'UPDATE' AND OLD.status != 'not_assigned' THEN
+          UPDATE notification_queue
+          SET status = 'cancelled'
+          WHERE ward_id = NEW.ward_id
+            AND sunday_date = NEW.sunday_date
+            AND speech_position = NEW.position
+            AND type = 'designation'
+            AND status = 'pending';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  # --- 2. TypeScript Type Updates ---
+
+  - name: "TypeDefinitionUpdates"
+    responsibility: "Update Ward and SundayAgenda TypeScript interfaces to match new schema"
+    file: "src/types/database.ts"
+    changes:
+      - "Ward interface: add manage_prayers: boolean, whatsapp_template_opening_prayer: string | null, whatsapp_template_closing_prayer: string | null"
+      - "SundayAgenda interface: remove opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name fields"
+      - "Speech interface: update position comment from '1, 2, or 3' to '0, 1, 2, 3, or 4'"
+    dependencies: ["ManagedPrayersMigration"]
+
+  # --- 3. Auto-Creation Logic ---
+
+  - name: "LazyCreatePrayerPositions"
+    responsibility: "Extend useLazyCreateSpeeches to create positions 0/4 for eligible sunday types"
+    file: "src/hooks/useSpeeches.ts"
+    changes:
+      - "useLazyCreateSpeeches mutationFn receives sundayType parameter (SundayExceptionReason)"
+      - "For 'speeches' type: create positions [0, 1, 2, 3, 4]"
+      - "For 'testimony_meeting' and 'primary_presentation': create positions [0, 4] only"
+      - "For conference types and 'other': create no positions (empty array)"
+      - "Check existing by ward_id+sunday_date (same as current), skip if any exist"
+      - "New input type: { sundayDate: string; sundayType: SundayExceptionReason }"
+    contract:
+      input: "{ sundayDate: string; sundayType: SundayExceptionReason }"
+      output: "Promise<Speech[]>"
+      behavior: |
+        - speeches type: positions [0, 1, 2, 3, 4]
+        - testimony_meeting: positions [0, 4]
+        - primary_presentation: positions [0, 4]
+        - general_conference, stake_conference, ward_conference, other: [] (no creation)
+        - Idempotent: if any records exist for (ward_id, sunday_date), skip all
+    dependencies: ["TypeDefinitionUpdates"]
+
+  # --- 4. Ward Data Hook ---
+
+  - name: "UseWardManagePrayers"
+    responsibility: "Expose manage_prayers flag from ward data for use across UI components"
+    file: "src/hooks/useSpeeches.ts"
+    changes:
+      - "New exported hook useWardManagePrayers() returns { managePrayers: boolean, isLoading: boolean }"
+      - "Queries wards table by wardId, selects manage_prayers column"
+      - "Uses TanStack Query with key ['ward', wardId, 'managePrayers']"
+      - "Returns false as default when loading or no data"
+    contract:
+      input: "none (uses wardId from AuthContext)"
+      output: "{ managePrayers: boolean; isLoading: boolean }"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      This is a lightweight focused hook. The full ward query in whatsapp.tsx fetches
+      whatsapp_template; this hook only fetches manage_prayers for performance. Both
+      share queryKey prefix ['ward', wardId] so invalidation covers both.
+
+  # --- 5. Speeches Tab - Prayer Slots ---
+
+  - name: "SpeechSlotPrayerMode"
+    responsibility: "Extend SpeechSlot to render prayer-specific layout (no topic field, prayer label)"
+    file: "src/components/SpeechSlot.tsx"
+    changes:
+      - "New prop isPrayer?: boolean (default false)"
+      - "When isPrayer=true: hide topic row entirely (no topic field, no topic action area)"
+      - "When isPrayer=true: label from getPositionLabel uses prayer i18n keys instead of speech ordinals"
+      - "When isPrayer=true: hide 2nd speech toggle (position === 2 check also requires !isPrayer)"
+      - "Remove dead PrayerSelector import (cleanup)"
+      - "getPositionLabel updated: position 0 -> t('prayers.opening'), position 4 -> t('prayers.closing')"
+    contract:
+      input: "SpeechSlotProps + isPrayer?: boolean"
+      output: "React element without topic row when isPrayer, with prayer-specific label"
+    dependencies: ["TypeDefinitionUpdates"]
+
+  # --- 6. Speeches Tab - Render Prayer Slots ---
+
+  - name: "SpeechesTabPrayerSlots"
+    responsibility: "Render prayer SpeechSlots in expanded SundayCard when manage_prayers=true"
+    file: "src/app/(tabs)/speeches.tsx"
+    changes:
+      - "Import and call useWardManagePrayers()"
+      - "In renderItem for expanded card: when managePrayers=true, render SpeechSlot(isPrayer=true, position=0) BEFORE speech slots and SpeechSlot(isPrayer=true, position=4) AFTER speech slots"
+      - "When managePrayers=false: do not render positions 0/4 (current behavior)"
+      - "For testimony_meeting/primary_presentation with managePrayers=true: render only prayer slots (0, 4), no speech slots (1, 2, 3)"
+      - "Pass sundayType to lazyCreate.mutate() calls (handleToggle, expandDate param handler)"
+      - "handleAssignSpeaker: when managePrayers=false and position is 0/4, pass status='assigned_confirmed' override"
+    contract:
+      input: "managePrayers flag + sunday type from exception"
+      output: "SpeechSlot elements with isPrayer=true for positions 0/4 when managePrayers=true"
+    dependencies: ["SpeechSlotPrayerMode", "LazyCreatePrayerPositions", "UseWardManagePrayers"]
+
+  # --- 7. SundayCard Collapsed - Prayer Lines ---
+
+  - name: "SundayCardCollapsedPrayers"
+    responsibility: "Show prayer lines in collapsed card when manage_prayers=true"
+    file: "src/components/SundayCard.tsx"
+    changes:
+      - "New prop managePrayers?: boolean (default false)"
+      - "When managePrayers=true and isSpeechesType:"
+      - "  - Render prayer line (pos 0) BEFORE speech lines"
+      - "  - Render prayer line (pos 4) AFTER speech lines"
+      - "  - Prayer lines: italic font, '(Oracao)' prefix from t('prayers.prayerPrefix'), no LED"
+      - "When managePrayers=true and (testimony_meeting or primary_presentation):"
+      - "  - Render 2 prayer lines (pos 0, pos 4) instead of exception text"
+      - "  - Same italic + prefix format"
+      - "When managePrayers=false: no change to current layout"
+      - "visiblePositions logic extended: when managePrayers=true, positions include 0 and 4"
+      - "headerCenter minHeight may need increase for 5-line cards (currently 62px from F154)"
+    contract:
+      input: "SundayCardProps + managePrayers?: boolean"
+      output: "Collapsed card with prayer lines when managePrayers=true"
+    dependencies: ["TypeDefinitionUpdates"]
+
+  # --- 8. Agenda Tab - Prayer Data Source Change ---
+
+  - name: "AgendaFormPrayerDataSource"
+    responsibility: "Change prayer fields from sunday_agendas columns to speeches positions 0/4, conditional editing"
+    file: "src/components/AgendaForm.tsx"
+    changes:
+      - "Import useWardManagePrayers hook"
+      - "Opening prayer: read from getSpeech(0)?.speaker_name instead of agenda.opening_prayer_name"
+      - "Closing prayer: read from getSpeech(4)?.speaker_name instead of agenda.closing_prayer_name"
+      - "When manage_prayers=false (toggle OFF):"
+      - "  - PrayerSelector writes to speeches table (position 0 or 4) via useAssignSpeaker with status='assigned_confirmed'"
+      - "  - PrayerSelector clears via useRemoveAssignment"
+      - "  - Behavior identical to current UX (members + custom names)"
+      - "When manage_prayers=true (toggle ON):"
+      - "  - Prayer fields become read-only Text with pencil icon"
+      - "  - Tapping field/pencil navigates to Speeches tab with expandDate param"
+      - "  - router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })"
+      - "Remove all references to agenda.opening_prayer_*, agenda.closing_prayer_* fields"
+      - "Remove prayer-related updateAgenda.mutate calls (fields no longer in sunday_agendas)"
+    contract:
+      toggle_off:
+        prayer_read: "speeches.find(s => s.position === 0/4)?.speaker_name"
+        prayer_write: "useAssignSpeaker({ speechId, memberId, speakerName, speakerPhone, status: 'assigned_confirmed' })"
+        prayer_clear: "useRemoveAssignment({ speechId })"
+        selector: "PrayerSelector (members + custom names)"
+      toggle_on:
+        prayer_read: "speeches.find(s => s.position === 0/4)?.speaker_name"
+        prayer_write: "none (read-only in AgendaForm)"
+        navigation: "router.push to Speeches tab with expandDate"
+        selector: "none (read-only text + pencil icon)"
+    dependencies: ["UseWardManagePrayers", "TypeDefinitionUpdates"]
+    notes: >
+      AgendaForm already imports useSpeeches and has getSpeech() helper. The prayer
+      assignment mutations (useAssignSpeaker, useRemoveAssignment) need to be imported
+      from useSpeeches.ts. For PrayerSelector in toggle-OFF mode, the onSelect callback
+      must find or create the speech record for position 0/4, then call useAssignSpeaker.
+      Since useLazyCreateSpeeches now creates positions 0/4, the speech records should
+      already exist when the agenda card is expanded. AgendaForm also needs a mechanism
+      to assign custom names (PrayerSelector returns PrayerSelection with memberId=null
+      for custom names). For custom names, call useAssignSpeaker with memberId set to
+      the memberId from PrayerSelection (null for custom), speakerName from the
+      selection name, and speakerPhone=null.
+
+  # --- 9. Agenda Collapsed Card ---
+
+  - name: "AgendaCollapsedPrayerCount"
+    responsibility: "Update agenda collapsed card 'Oracoes Y/2' to read from speeches positions 0/4"
+    file: "src/app/(tabs)/agenda.tsx"
+    changes:
+      - "Prayer count calculation: count speeches with position IN (0,4) AND speaker_name IS NOT NULL"
+      - "Replace any references to agenda.opening_prayer_name/closing_prayer_name in collapsed card"
+      - "Status line 'Oracoes Y/2' now derived from speeches data"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The useAgendaRange hook in agenda.tsx currently returns sunday_agendas data.
+      The collapsed card prayer count needs speeches data instead. This may require
+      extending the data fetched in agenda.tsx to include speeches, or modifying the
+      useAgendaRange hook to join speeches.
+
+  # --- 10. Home Tab Updates ---
+
+  - name: "HomeTabPrayerUpdates"
+    responsibility: "Dynamic section title and prayer card handling in Home tab"
+    file: "src/app/(tabs)/index.tsx"
+    changes:
+      - "Import useWardManagePrayers hook"
+      - "Next assignments section title: t('home.nextSpeechesAndPrayers') when ON, t('home.nextSpeeches') when OFF"
+      - "Preview card 'Oracoes Y/2' line: read from speeches positions 0/4 instead of sunday_agendas"
+      - "InviteManagementSection: when managePrayers=true, include positions 0/4 in invite items with prayer labels"
+      - "When managePrayers=false: positions 0/4 excluded from InviteManagementSection"
+    dependencies: ["UseWardManagePrayers"]
+
+  # --- 11. InviteManagementSection ---
+
+  - name: "InviteManagementPrayers"
+    responsibility: "Include prayer positions in invite management when manage_prayers=true"
+    file: "src/components/InviteManagementSection.tsx"
+    changes:
+      - "Accept new prop managePrayers?: boolean"
+      - "When managePrayers=true: include positions 0/4 in getInviteItems filter"
+      - "Position 0 label: t('speeches.openingPrayer') instead of ordinal"
+      - "Position 4 label: t('speeches.closingPrayer') instead of ordinal"
+      - "When managePrayers=false: filter out positions 0/4 (current behavior preserved)"
+      - "WhatsApp template selection: use whatsapp_template_opening_prayer for pos 0, whatsapp_template_closing_prayer for pos 4, existing whatsapp_template for pos 1/2/3"
+    contract:
+      input: "managePrayers: boolean"
+      output: "Invite items including/excluding prayer positions based on toggle"
+    dependencies: ["UseWardManagePrayers"]
+
+  # --- 12. Tab Layout - Dynamic Label ---
+
+  - name: "TabLayoutDynamicLabel"
+    responsibility: "Change Speeches tab label based on manage_prayers flag"
+    file: "src/app/(tabs)/_layout.tsx"
+    changes:
+      - "Import useWardManagePrayers hook"
+      - "Speeches tab title: t('tabs.speechesAndPrayers') when ON, t('tabs.speeches') when OFF"
+    dependencies: ["UseWardManagePrayers"]
+
+  # --- 13. Settings Toggle ---
+
+  - name: "SettingsManagePrayersToggle"
+    responsibility: "Add manage_prayers toggle in Ward Settings screen (Bispado only)"
+    file: "src/app/(tabs)/settings/index.tsx"
+    changes:
+      - "Fetch ward manage_prayers value from Supabase query"
+      - "Render Switch toggle labeled t('settings.managePrayers') in ward settings group"
+      - "Toggle calls supabase update on wards.manage_prayers"
+      - "Invalidate ward query keys on success"
+      - "Only visible to Bispado role (hasPermission check)"
+      - "Log action via logAction with 'settings:manage_prayers' action type"
+    dependencies: ["TypeDefinitionUpdates"]
+
+  # --- 14. WhatsApp Template Screen ---
+
+  - name: "WhatsAppTemplateSegmentedControl"
+    responsibility: "Add 3-tab segmented control for speech/opening prayer/closing prayer templates"
+    file: "src/app/(tabs)/settings/whatsapp.tsx"
+    changes:
+      - "Import useWardManagePrayers hook"
+      - "When managePrayers=true: show segmented control with 3 tabs"
+      - "  Tab 1: 'Discurso' (existing speech template) - all 6 placeholders"
+      - "  Tab 2: 'Abertura' (opening prayer template) - only {nome}, {data} placeholders"
+      - "  Tab 3: 'Encerramento' (closing prayer template) - only {nome}, {data} placeholders"
+      - "State management: activeTab state ('speech' | 'opening_prayer' | 'closing_prayer')"
+      - "Each tab has its own template state, editor, preview, and auto-save mutation"
+      - "Prayer tabs: PLACEHOLDER_TOKENS limited to ['{nome}', '{data}']"
+      - "Prayer tabs: PLACEHOLDER_I18N_KEYS limited to first 2 entries"
+      - "Prayer tabs: ward column is whatsapp_template_opening_prayer / whatsapp_template_closing_prayer"
+      - "Prayer tabs: getDefaultTemplate replaced with getDefaultPrayerTemplate(language, 'opening'|'closing')"
+      - "When managePrayers=false: no segmented control (single speech template, current behavior)"
+      - "Fetch ward query updated to include whatsapp_template_opening_prayer, whatsapp_template_closing_prayer"
+    contract:
+      input: "managePrayers flag, activeTab state"
+      output: "Segmented control with 3 template editors when ON, single editor when OFF"
+    dependencies: ["UseWardManagePrayers", "WhatsAppPrayerTemplates"]
+
+  # --- 15. WhatsApp Prayer Templates ---
+
+  - name: "WhatsAppPrayerTemplates"
+    responsibility: "Default prayer templates and template resolution for prayer positions"
+    file: "src/lib/whatsappUtils.ts"
+    changes:
+      - "Add DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants"
+      - "Add DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants"
+      - "New function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string"
+      - "Prayer templates use only {nome} and {data} placeholders"
+      - "Update buildWhatsAppUrl to accept optional templateType parameter for selecting correct template"
+    contract:
+      input: "language: string, type: 'opening' | 'closing'"
+      output: "Default prayer template string with {nome} and {data} placeholders"
+    dependencies: []
+
+  # --- 16. Sunday Type Change Logic ---
+
+  - name: "SundayTypeChangePrayerPreservation"
+    responsibility: "Preserve/delete prayers based on type change rules, dynamic confirmation dialog"
+    file: "src/components/SundayCard.tsx"
+    changes:
+      - "SundayTypeDropdown: handleSelect updated for prayer preservation rules"
+      - "speeches -> testimony/primary: delete positions 1,2,3 only (preserve 0,4)"
+      - "speeches -> conference/other: delete positions 0,1,2,3,4 (delete all)"
+      - "testimony/primary -> speeches: preserve 0,4, create 1,2,3"
+      - "testimony/primary -> conference/other: delete 0,4"
+      - "testimony <-> primary: preserve 0,4 (no deletion)"
+      - "Confirmation dialog text varies based on what will be deleted:"
+      - "  - Only speeches: t('sundayExceptions.changeConfirmMessage')"
+      - "  - Only prayers: t('sundayExceptions.confirmDeletePrayers')"
+      - "  - Both: t('sundayExceptions.confirmDeleteBoth')"
+      - "  - Nothing: no dialog"
+      - "onDeleteSpeeches callback updated to accept optional positions filter"
+    contract:
+      type_change_rules:
+        speeches_to_testimony_primary: "delete positions [1,2,3], preserve [0,4]"
+        speeches_to_conference_other: "delete positions [0,1,2,3,4]"
+        testimony_primary_to_speeches: "preserve [0,4], create [1,2,3]"
+        testimony_primary_to_conference_other: "delete positions [0,4]"
+        testimony_to_primary: "preserve [0,4], no deletion"
+        primary_to_testimony: "preserve [0,4], no deletion"
+    dependencies: []
+
+  # --- 17. Delete Speeches Hook Update ---
+
+  - name: "DeleteSpeechesPositionFilter"
+    responsibility: "Extend useDeleteSpeechesByDate to optionally delete only specific positions"
+    file: "src/hooks/useSpeeches.ts"
+    changes:
+      - "useDeleteSpeechesByDate mutationFn accepts optional positions?: number[] parameter"
+      - "When positions provided: DELETE FROM speeches WHERE ward_id=? AND sunday_date=? AND position IN (?)"
+      - "When positions omitted: DELETE FROM speeches WHERE ward_id=? AND sunday_date=? (current behavior)"
+      - "Input type becomes { sundayDate: string; positions?: number[] }"
+    contract:
+      input: "{ sundayDate: string; positions?: number[] }"
+      output: "void (speeches deleted)"
+      behavior: |
+        - positions=[1,2,3]: delete only speech slots, preserve prayers
+        - positions=[0,4]: delete only prayers, preserve speeches
+        - positions=[0,1,2,3,4]: delete all
+        - positions=undefined: delete all (backward compatible)
+    dependencies: []
+
+  # --- 18. Presentation Mode ---
+
+  - name: "PresentationModePrayerDataSource"
+    responsibility: "Update usePresentationMode to read prayers from speeches positions 0/4"
+    file: "src/hooks/usePresentationMode.ts"
+    changes:
+      - "Replace reading agenda.opening_prayer_name with speeches.find(s => s.position === 0)?.speaker_name"
+      - "Replace reading agenda.closing_prayer_name with speeches.find(s => s.position === 4)?.speaker_name"
+      - "No visual changes to presentation mode output"
+    dependencies: ["TypeDefinitionUpdates"]
+
+  # --- 19. i18n Strings ---
+
+  - name: "I18nPrayerStrings"
+    responsibility: "Add all new i18n keys for CR-221 in all 3 locales"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    changes:
+      - "tabs.speechesAndPrayers: 'Discursos e Oracoes' / 'Speeches & Prayers' / 'Discursos y Oraciones'"
+      - "home.nextSpeechesAndPrayers: 'Proximos Discursos e Oracoes' / 'Upcoming Speeches & Prayers' / 'Proximos Discursos y Oraciones'"
+      - "prayers.opening: 'Oracao de Abertura' / 'Opening Prayer' / 'Oracion de Apertura'"
+      - "prayers.closing: 'Oracao de Encerramento' / 'Closing Prayer' / 'Oracion de Cierre'"
+      - "prayers.prayerPrefix: '(Oracao)' / '(Prayer)' / '(Oracion)'"
+      - "settings.managePrayers: 'Oracoes Gerenciadas' / 'Managed Prayers' / 'Oraciones Administradas'"
+      - "whatsapp.tabSpeech: 'Discurso' / 'Speech' / 'Discurso'"
+      - "whatsapp.tabOpeningPrayer: 'Abertura' / 'Opening' / 'Apertura'"
+      - "whatsapp.tabClosingPrayer: 'Encerramento' / 'Closing' / 'Cierre'"
+      - "speeches.openingPrayer: 'Abertura' / 'Opening' / 'Apertura'"
+      - "speeches.closingPrayer: 'Encerramento' / 'Closing' / 'Cierre'"
+      - "sundayExceptions.confirmDeletePrayers: 'As oracoes designadas serao removidas...' / ..."
+      - "sundayExceptions.confirmDeleteBoth: 'Os discursos e as oracoes designadas serao removidos...' / ..."
+      - "Default prayer templates (opening + closing) for each language"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "ward_manage_prayers_flag"
+    components: ["UseWardManagePrayers", "SpeechesTabPrayerSlots", "SundayCardCollapsedPrayers", "AgendaFormPrayerDataSource", "HomeTabPrayerUpdates", "TabLayoutDynamicLabel", "WhatsAppTemplateSegmentedControl", "InviteManagementPrayers"]
+    methods:
+      - name: "useWardManagePrayers()"
+        input: "none (reads wardId from AuthContext)"
+        output: "{ managePrayers: boolean; isLoading: boolean }"
+        notes: "All UI components consume this hook to determine toggle state. Single source of truth."
+
+  - name: "lazy_create_with_type"
+    components: ["LazyCreatePrayerPositions", "SpeechesTabPrayerSlots"]
+    methods:
+      - name: "useLazyCreateSpeeches().mutate()"
+        input: "{ sundayDate: string; sundayType: SundayExceptionReason }"
+        output: "Promise<Speech[]>"
+        notes: "Breaking change from current string input. All callers must be updated."
+
+  - name: "speech_slot_prayer_mode"
+    components: ["SpeechSlotPrayerMode", "SpeechesTabPrayerSlots"]
+    methods:
+      - name: "SpeechSlot isPrayer prop"
+        input: "isPrayer?: boolean"
+        output: "Hides topic row, uses prayer label, hides 2nd speech toggle"
+        notes: "Backward compatible: omitting isPrayer keeps current behavior."
+
+  - name: "sunday_card_manage_prayers"
+    components: ["SundayCardCollapsedPrayers", "SpeechesTabPrayerSlots", "HomeTabPrayerUpdates"]
+    methods:
+      - name: "SundayCard managePrayers prop"
+        input: "managePrayers?: boolean"
+        output: "Collapsed card renders prayer lines when true"
+        notes: "Backward compatible: omitting managePrayers keeps current behavior."
+
+  - name: "delete_speeches_with_positions"
+    components: ["DeleteSpeechesPositionFilter", "SundayTypeChangePrayerPreservation"]
+    methods:
+      - name: "useDeleteSpeechesByDate().mutate()"
+        input: "{ sundayDate: string; positions?: number[] }"
+        output: "void"
+        notes: "Breaking change from current string input. All callers must be updated."
+
+  - name: "prayer_template_resolution"
+    components: ["WhatsAppPrayerTemplates", "InviteManagementPrayers", "WhatsAppTemplateSegmentedControl"]
+    methods:
+      - name: "getDefaultPrayerTemplate()"
+        input: "language: string, type: 'opening' | 'closing'"
+        output: "string (template with {nome} and {data} placeholders)"
+        notes: "Used by both WhatsApp settings preview and invite management."
+
+  - name: "agenda_prayer_assignment"
+    components: ["AgendaFormPrayerDataSource", "LazyCreatePrayerPositions"]
+    methods:
+      - name: "PrayerSelector -> useAssignSpeaker flow"
+        input: "PrayerSelection { memberId: string | null, name: string }"
+        output: "Speech record updated with speaker_name, member_id, status='assigned_confirmed'"
+        notes: "Only when manage_prayers=false. Custom names (memberId=null) set member_id to null. Uses existing useAssignSpeaker hook with status override."
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities:
+
+    - table: "wards"
+      changes:
+        - column: "manage_prayers"
+          type: "BOOLEAN NOT NULL DEFAULT false"
+          description: "Per-ward toggle for managed prayers workflow"
+        - column: "whatsapp_template_opening_prayer"
+          type: "TEXT (nullable)"
+          description: "Custom WhatsApp template for opening prayer invitations. NULL = use i18n default."
+        - column: "whatsapp_template_closing_prayer"
+          type: "TEXT (nullable)"
+          description: "Custom WhatsApp template for closing prayer invitations. NULL = use i18n default."
+
+    - table: "speeches"
+      changes:
+        - description: "Positions 0 (opening prayer) and 4 (closing prayer) now used"
+        - description: "No schema change to speeches table itself - positions 0/4 were already valid per unique constraint on (ward_id, sunday_date, position)"
+
+    - table: "sunday_agendas"
+      changes:
+        - column: "opening_prayer_member_id"
+          action: "DROP"
+          description: "Data migrated to speeches position 0"
+        - column: "opening_prayer_name"
+          action: "DROP"
+          description: "Data migrated to speeches position 0"
+        - column: "closing_prayer_member_id"
+          action: "DROP"
+          description: "Data migrated to speeches position 4"
+        - column: "closing_prayer_name"
+          action: "DROP"
+          description: "Data migrated to speeches position 4"
+
+  migration_strategy: |
+    CRITICAL ORDER OF OPERATIONS:
+    1. ALTER wards ADD COLUMNS (safe, non-destructive)
+    2. INSERT INTO speeches FROM sunday_agendas (copy data, ON CONFLICT DO NOTHING)
+    3. ALTER sunday_agendas DROP COLUMNS (destructive, after data is safely copied)
+    4. CREATE OR REPLACE trigger function (update existing, no trigger recreation needed)
+
+    ROLLBACK: Steps 1-2 are safely reversible. Step 3 is NOT reversible (data loss).
+    The INSERT in step 2 is idempotent: ON CONFLICT DO NOTHING handles re-runs.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    - RLS: speeches table RLS policies already enforce ward_id filtering. No new policies needed for positions 0/4.
+    - RLS: wards table manage_prayers column readable by all ward members (existing ward RLS policy covers SELECT).
+    - RLS: wards table manage_prayers column writable only by ward admin (existing ward RLS policy for UPDATE).
+    - Notification trigger: SECURITY DEFINER preserved. New manage_prayers check uses SELECT on wards (same schema, same permissions).
+    - Permissions: prayer assignment follows speech permissions (speech:assign, speech:unassign, speech:change_status).
+    - Agenda tab exception: Secretario can assign prayers via PrayerSelector when manage_prayers=false (same as current prayer assignment behavior).
+    - No new Edge Functions, no new RLS policies, no new roles.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    - Activity log: prayer assignments use existing 'speech:assign' action type. Position number in metadata distinguishes prayers (0/4) from speeches (1/2/3).
+    - Settings change: 'settings:manage_prayers' action logged when toggle is changed.
+    - WhatsApp template: 'settings:whatsapp_template' action logged (same as current, for each template tab).
+    - Realtime: existing subscription on speeches table automatically picks up positions 0/4 changes.
+    - Offline queue: prayer mutations use same TanStack Query mutation infrastructure as speeches.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-102
+    title: "Prayers as speeches positions 0/4 instead of separate table or sunday_agendas columns"
+    context: >
+      CR-221 needs to manage prayers as first-class entities with optional status
+      workflow, WhatsApp invitations, and push notifications. Options considered:
+      (a) keep in sunday_agendas with additional status columns, (b) new prayers
+      table with same schema as speeches, (c) reuse speeches table with positions 0/4.
+    decision: >
+      Reuse the speeches table with position 0 (opening prayer) and position 4
+      (closing prayer). This leverages the existing status lifecycle, snapshot
+      pattern (ADR-003), RLS policies, realtime subscription, mutation hooks,
+      and notification trigger. The gap between positions 3 and 4 allows future
+      expansion if needed.
+    decided_in: "CR-221"
+    supersedes: "DD-58 (design decision, now formalized as ADR)"
+    consequences:
+      - "Zero new tables, zero new RLS policies"
+      - "Existing useSpeeches hook, SpeechSlot, SundayCard all extend naturally"
+      - "Notification trigger needs manage_prayers check (positions 0/4 only)"
+      - "Migration required to copy data from sunday_agendas to speeches"
+      - "Breaking change: sunday_agendas loses prayer columns, all consumers must update"
+
+  - id: ADR-103
+    title: "manage_prayers toggle on wards table instead of per-sunday or per-user"
+    context: >
+      The managed prayers feature could be controlled per-ward (all users same
+      behavior), per-sunday (some sundays managed, others not), or per-user
+      (each user chooses). Per-user adds complexity with no clear benefit.
+      Per-sunday adds UI complexity for a feature most wards will set once.
+    decision: >
+      Per-ward toggle in the wards table. When OFF, prayers behave as simple
+      assignments (assigned_confirmed status, no notifications, PrayerSelector
+      in agenda). When ON, prayers use full speech workflow (status lifecycle,
+      notifications, MemberSelectorModal in Speeches tab).
+    decided_in: "CR-221"
+    supersedes: "DD-59 (design decision, now formalized as ADR)"
+    consequences:
+      - "Simple: one boolean column, one toggle in settings"
+      - "All users in the ward see the same prayer management mode"
+      - "Toggle ON/OFF is immediate (no app restart needed)"
+      - "Toggling OFF preserves prayer data in DB (status not reset)"
+
+  - id: ADR-104
+    title: "Separate WhatsApp templates for opening and closing prayers"
+    context: >
+      Prayer invitations need different messages than speech invitations (no topic/
+      collection/link placeholders, different instructions for arriving early vs
+      joining during intermediate hymn). Options: (a) single prayer template for
+      both, (b) separate templates.
+    decision: >
+      Two separate template columns: whatsapp_template_opening_prayer and
+      whatsapp_template_closing_prayer. The default templates differ: opening
+      asks to arrive 15 minutes early, closing asks to join during intermediate
+      hymn. Both use only {nome} and {data} placeholders.
+    decided_in: "CR-221"
+    supersedes: "DD-60 (design decision, now formalized as ADR)"
+    consequences:
+      - "Wards can customize each prayer invitation independently"
+      - "WhatsApp settings screen needs 3-tab segmented control"
+      - "Template resolution logic must select correct template by position"
+
+  - id: ADR-105
+    title: "useLazyCreateSpeeches receives sundayType parameter for position selection"
+    context: >
+      The current useLazyCreateSpeeches always creates positions [1, 2, 3]. With
+      prayers, the positions to create depend on the sunday type: speeches needs
+      [0,1,2,3,4], testimony/primary needs [0,4] only, conference/other needs none.
+    decision: >
+      Change useLazyCreateSpeeches input from string (sundayDate) to object
+      { sundayDate, sundayType }. The hook determines which positions to create
+      based on the type. This is a breaking change; all callers must be updated.
+    decided_in: "CR-221"
+    consequences:
+      - "Single hook handles all position creation logic"
+      - "Breaking change: speeches.tsx handleToggle and expandDate handler must pass type"
+      - "Idempotency preserved: if any records exist, skip all"
+
+  - id: ADR-106
+    title: "Notification trigger checks manage_prayers for prayer positions"
+    context: >
+      The enqueue_speech_notification trigger fires for ALL speeches table changes.
+      When manage_prayers=false, prayer assignments should NOT trigger notifications
+      (status is always assigned_confirmed, which would send speaker_confirmed
+      notifications). The trigger needs conditional logic.
+    decision: >
+      Add a SELECT on wards.manage_prayers inside the trigger function for positions
+      0 and 4. If manage_prayers is false, RETURN NEW immediately (skip all notification
+      logic). For positions 1/2/3, the trigger behaves as before. SECURITY DEFINER
+      is preserved.
+    decided_in: "CR-221"
+    consequences:
+      - "One additional SELECT per prayer position INSERT/UPDATE (minimal perf impact)"
+      - "No false notifications when manage_prayers is OFF"
+      - "Trigger function replacement is safe (CREATE OR REPLACE)"
+
+  - id: ADR-107
+    title: "SpeechSlot isPrayer prop for prayer-specific rendering"
+    context: >
+      Prayers differ from speeches: no topic field, different labels, no 2nd speech
+      toggle. Options: (a) new PrayerSlot component, (b) conditional rendering in
+      SpeechSlot via props.
+    decision: >
+      Add isPrayer prop to SpeechSlot. When true: hide topic row, use prayer labels
+      (t('prayers.opening')/t('prayers.closing')), hide toggle. This avoids
+      component duplication while keeping prayer-specific behavior clean.
+    decided_in: "CR-221"
+    consequences:
+      - "Single component for both speeches and prayers"
+      - "Minimal added complexity (one prop, 3 conditional checks)"
+      - "Consistent visual language: prayer slots look like speech slots minus topic"
+
+  - id: ADR-108
+    title: "useDeleteSpeechesByDate accepts optional positions array for selective deletion"
+    context: >
+      Sunday type changes now have different deletion rules: some transitions delete
+      only speeches (1,2,3), some delete only prayers (0,4), some delete all. The
+      current hook deletes all speeches for a date unconditionally.
+    decision: >
+      Add optional positions?: number[] parameter. When provided, DELETE includes
+      AND position IN (...) filter. When omitted, deletes all (backward compatible).
+    decided_in: "CR-221"
+    consequences:
+      - "Flexible deletion for type change rules"
+      - "Backward compatible: omitting positions keeps current behavior"
+      - "SundayTypeDropdown logic determines which positions to pass"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F157, F008]
+    interaction: >
+      F008 defined the speech assignment workflow (positions 1/2/3). F157 extends
+      this to positions 0/4 for prayers. Same status lifecycle, same hooks, same
+      snapshot pattern. SpeechSlot gains isPrayer mode.
+
+  - features: [F157, F010]
+    interaction: >
+      F010 defined the speech status lifecycle (not_assigned -> assigned_not_invited
+      -> assigned_invited -> assigned_confirmed | gave_up). F157 uses the same
+      lifecycle for prayers when manage_prayers=true. When OFF, prayers skip to
+      assigned_confirmed directly.
+
+  - features: [F157, F012]
+    interaction: >
+      F012 defined the PrayerSelector for agenda tab. F157 changes the data source
+      from sunday_agendas columns to speeches positions 0/4. PrayerSelector behavior
+      unchanged when manage_prayers=false. When ON, PrayerSelector replaced with
+      read-only text + pencil icon.
+
+  - features: [F157, F017]
+    interaction: >
+      F017 defined push notifications via trigger. F157 modifies the trigger to
+      check manage_prayers for positions 0/4. Notification behavior unchanged for
+      positions 1/2/3.
+
+  - features: [F157, F024]
+    interaction: >
+      F024 defined WhatsApp invitation workflow. F157 adds separate templates for
+      opening/closing prayers with reduced placeholders ({nome}, {data} only).
+      Template resolution in InviteManagementSection must select template by position.
+
+  - features: [F157, F093]
+    interaction: >
+      F093 (CR-150) defined collapsed card layout with speaker names + LEDs.
+      F157 extends this with prayer lines (italic, prefix) when manage_prayers=true.
+      Prayer lines do NOT have LEDs. The 5-line max height applies.
+
+  - features: [F157, F118]
+    interaction: >
+      F118 (CR-181) defined has_second_speech toggle. F157 interacts: when
+      manage_prayers=true, collapsed card shows 4 or 5 lines depending on
+      has_second_speech. visiblePositions logic must combine both flags.
+
+  - features: [F157, F154]
+    interaction: >
+      F154 (CR-219) set minHeight:62 for collapsed cards. F157 may need to
+      increase this for 5-line cards (3 speeches + 2 prayers). The exact value
+      depends on line height calculations.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: supabase/migrations/019_managed_prayers.sql
+    feature: F157
+    changes: ["New migration: wards columns, data copy, column drops, trigger update"]
+
+  - file: src/types/database.ts
+    feature: F157
+    changes: ["Ward interface: +3 fields. SundayAgenda: -4 fields. Speech: comment update."]
+
+  - file: src/hooks/useSpeeches.ts
+    feature: F157
+    changes: ["useLazyCreateSpeeches: type-aware positions. useDeleteSpeechesByDate: optional positions. New useWardManagePrayers hook."]
+
+  - file: src/components/SpeechSlot.tsx
+    feature: F157
+    changes: ["isPrayer prop. Prayer labels. Hide topic row. Remove dead PrayerSelector import."]
+
+  - file: src/app/(tabs)/speeches.tsx
+    feature: F157
+    changes: ["Render prayer SpeechSlots when ON. Pass sundayType to lazyCreate. Status override for toggle OFF prayers."]
+
+  - file: src/components/SundayCard.tsx
+    feature: F157
+    changes: ["managePrayers prop. Collapsed prayer lines. Type change preservation rules. Dynamic confirmation dialog."]
+
+  - file: src/components/AgendaForm.tsx
+    feature: F157
+    changes: ["Prayer data source: speeches instead of agenda. Conditional PrayerSelector/read-only. Navigation to Speeches tab."]
+
+  - file: src/app/(tabs)/agenda.tsx
+    feature: F157
+    changes: ["Collapsed card prayer count from speeches."]
+
+  - file: src/app/(tabs)/index.tsx
+    feature: F157
+    changes: ["Dynamic section title. Preview prayer count from speeches."]
+
+  - file: src/components/InviteManagementSection.tsx
+    feature: F157
+    changes: ["managePrayers prop. Include/exclude positions 0/4. Prayer labels. Template selection."]
+
+  - file: src/app/(tabs)/_layout.tsx
+    feature: F157
+    changes: ["Dynamic tab label."]
+
+  - file: src/app/(tabs)/settings/index.tsx
+    feature: F157
+    changes: ["manage_prayers Switch toggle. Ward query."]
+
+  - file: src/app/(tabs)/settings/whatsapp.tsx
+    feature: F157
+    changes: ["3-tab segmented control. Prayer template editors. Reduced placeholders."]
+
+  - file: src/lib/whatsappUtils.ts
+    feature: F157
+    changes: ["Default prayer templates. getDefaultPrayerTemplate function."]
+
+  - file: src/hooks/usePresentationMode.ts
+    feature: F157
+    changes: ["Prayer data source: speeches positions 0/4 instead of agenda columns."]
+
+  - file: src/i18n/locales/pt-BR.json
+    feature: F157
+    changes: ["~15 new i18n keys + default prayer templates."]
+
+  - file: src/i18n/locales/en.json
+    feature: F157
+    changes: ["~15 new i18n keys + default prayer templates."]
+
+  - file: src/i18n/locales/es.json
+    feature: F157
+    changes: ["~15 new i18n keys + default prayer templates."]
+
+files_not_modified:
+  - "src/app/presentation.tsx (display logic unchanged, data comes through usePresentationMode)"
+  - "src/components/AccordionCard.tsx (no layout changes)"
+  - "src/components/StatusLED.tsx (unchanged)"
+  - "src/components/StatusChangeModal.tsx (unchanged)"
+  - "src/components/MemberSelectorModal.tsx (unchanged, used by SpeechSlot for prayers when ON)"
+  - "src/components/PrayerSelector.tsx (unchanged, used by AgendaForm when OFF)"
+  - "src/hooks/useRealtimeSync.ts (speeches table already synced)"
+  - "src/lib/permissions.ts (no new permissions needed)"
+  - "src/lib/activityLog.ts (existing buildLogDescription handles prayer positions)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 19 components, each with exactly one responsibility
+  GATE-03_contracts_defined: true        # 8 cross-component contracts defined
+  GATE-04_adrs_recorded: true           # ADR-102 through ADR-108 (7 ADRs)
+  GATE-05_arch_saved: true              # ARCH_M044.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED updated
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 19 components (large feature, justified by cross-cutting nature)

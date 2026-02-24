@@ -1,0 +1,913 @@
+# =============================================================================
+# SPEC_F157.yaml
+# CR-221: Managed Prayers (Oracoes Gerenciadas)
+# Created: 2026-02-23
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 25
+phase: 1
+created: "2026-02-23"
+last_updated: "2026-02-23"
+request_type: feature
+execution_order: >
+  Single feature (F157) with multiple sub-areas. Recommended implementation
+  order: (1) DB migration + manage_prayers toggle, (2) auto-creation logic for
+  positions 0/4, (3) Speeches tab with prayer slots, (4) Agenda tab read-only
+  + pencil navigation, (5) Home tab updates, (6) WhatsApp templates for prayers,
+  (7) Sunday type change logic, (8) collapsed card layouts, (9) i18n for all
+  new strings.
+execution_rationale: >
+  F157 is a large cross-cutting feature that touches the data model (speeches
+  table positions 0/4, wards table manage_prayers + whatsapp templates),
+  multiple tabs (Speeches, Agenda, Home), settings (WhatsApp template screen
+  with segmented control), push notifications, and i18n. The DB migration must
+  land first because all UI changes depend on the new positions and toggle.
+
+# =============================================================================
+# F157: Managed Prayers (Oracoes Gerenciadas) - CR-221
+# =============================================================================
+
+features:
+
+  - id: F157
+    name: "Managed Prayers with optional full workflow"
+    cr_id: 221
+    type: feature
+    related_crs: [74, 98, 133]
+    related_features: [F008, F009, F010, F012, F016, F017, F024, F039, F076, F093, F096, F132, F149, F154]
+    description: >
+      CR-221 adds managed prayers as an optional feature per ward. Prayers
+      (opening and closing) are stored as speeches with positions 0 (opening)
+      and 4 (closing) in the speeches table, replacing the existing
+      opening_prayer_name, opening_prayer_member_id, closing_prayer_name,
+      closing_prayer_member_id columns in sunday_agendas.
+
+      The feature is controlled by a per-ward toggle manage_prayers (BOOLEAN
+      DEFAULT false) in the wards table. When OFF, prayers behave similarly to
+      today (simple assignment with PrayerSelector, status always "confirmed",
+      no push notifications, no invite management). When ON, prayers go through
+      the full speech workflow (status cycle, WhatsApp invites, push
+      notifications, invite management).
+
+      Key changes:
+      - Data model: prayers move from sunday_agendas to speeches (positions 0/4)
+      - Auto-creation: positions 0/4 auto-created for Discursos, Testemunho,
+        Primaria types (not for Conf. Geral, Conf. Estaca, Conf. Ala, Outro)
+      - Speeches tab: when ON, shows prayer slots (before 1st speech, after
+        last speech) with full workflow; when OFF, prayers do not appear
+      - Agenda tab: when OFF, PrayerSelector (members + custom names); when ON,
+        read-only field with pencil icon navigating to Speeches tab
+      - Home tab: section title changes, prayer counts in preview
+      - WhatsApp: separate templates for opening/closing prayers, segmented
+        control with 3 tabs in settings
+      - Sunday type change: prayers preserved when switching between
+        Discursos/Testemunho/Primaria; deleted when switching to Conf. types/Outro
+      - Push notifications: same flow as speeches when ON
+      - Permissions: same as speeches (Bispado assigns, Secretario manages
+        invites, Observador views)
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA - Data Model & Migration
+    # =========================================================================
+
+    acceptance_criteria:
+
+      # --- DB Migration ---
+
+      - id: AC-157-01
+        description: "Add manage_prayers column to wards table"
+        given: "Database schema before CR-221 migration"
+        when: "Migration runs"
+        then: "wards table has new column manage_prayers BOOLEAN DEFAULT false. All existing wards have manage_prayers = false."
+        status: pending
+
+      - id: AC-157-02
+        description: "Add whatsapp_template_opening_prayer to wards table"
+        given: "Database schema before CR-221 migration"
+        when: "Migration runs"
+        then: "wards table has new column whatsapp_template_opening_prayer TEXT (nullable). Default is NULL (will use i18n default template at runtime)."
+        status: pending
+
+      - id: AC-157-03
+        description: "Add whatsapp_template_closing_prayer to wards table"
+        given: "Database schema before CR-221 migration"
+        when: "Migration runs"
+        then: "wards table has new column whatsapp_template_closing_prayer TEXT (nullable). Default is NULL (will use i18n default template at runtime)."
+        status: pending
+
+      - id: AC-157-04
+        description: "Migrate existing prayer data from sunday_agendas to speeches"
+        given: "sunday_agendas has rows with opening_prayer_name or closing_prayer_name populated"
+        when: "Migration runs"
+        then: >
+          For each sunday_agendas row with opening_prayer_name NOT NULL:
+          INSERT into speeches (ward_id, sunday_date, position=0,
+          member_id=opening_prayer_member_id, speaker_name=opening_prayer_name,
+          status='assigned_confirmed'). For each row with closing_prayer_name
+          NOT NULL: INSERT into speeches (ward_id, sunday_date, position=4,
+          member_id=closing_prayer_member_id, speaker_name=closing_prayer_name,
+          status='assigned_confirmed'). Duplicate (ward_id, sunday_date, position)
+          entries are skipped (ON CONFLICT DO NOTHING).
+        status: pending
+
+      - id: AC-157-05
+        description: "Drop prayer columns from sunday_agendas after migration"
+        given: "Prayer data has been copied to speeches table"
+        when: "Migration runs (after data copy)"
+        then: >
+          Columns opening_prayer_member_id, opening_prayer_name,
+          closing_prayer_member_id, closing_prayer_name are dropped from
+          sunday_agendas table. These columns no longer exist.
+        status: pending
+
+      - id: AC-157-06
+        description: "Speeches unique constraint allows positions 0 and 4"
+        given: "speeches table has unique constraint on (ward_id, sunday_date, position)"
+        when: "Inserting speeches with position 0 or 4"
+        then: "The unique constraint allows positions 0 and 4. Only one position-0 and one position-4 per (ward_id, sunday_date) pair."
+        status: pending
+
+      # --- Auto-creation Logic ---
+
+      - id: AC-157-07
+        description: "Auto-create positions 0 and 4 for Discursos type"
+        given: "A sunday with type 'speeches' is loaded or created"
+        when: "The auto-creation logic runs (same trigger as positions 1, 2, 3)"
+        then: "Positions 0, 1, 2, 3, 4 are all created. Positions 0 and 4 have status 'not_assigned'."
+        status: pending
+
+      - id: AC-157-08
+        description: "Auto-create positions 0 and 4 for Testemunho type"
+        given: "A sunday with type 'testimony_meeting' is loaded or created"
+        when: "The auto-creation logic runs"
+        then: "Only positions 0 and 4 are created (no positions 1, 2, 3). Both have status 'not_assigned'."
+        status: pending
+
+      - id: AC-157-09
+        description: "Auto-create positions 0 and 4 for Primaria type"
+        given: "A sunday with type 'primary_presentation' is loaded or created"
+        when: "The auto-creation logic runs"
+        then: "Only positions 0 and 4 are created (no positions 1, 2, 3). Both have status 'not_assigned'."
+        status: pending
+
+      - id: AC-157-10
+        description: "Do NOT auto-create positions 0 and 4 for conference/other types"
+        given: "A sunday with type 'general_conference', 'stake_conference', 'ward_conference', or 'other'"
+        when: "The auto-creation logic runs"
+        then: "No positions are created (neither 0/4 prayer positions nor 1/2/3 speech positions)."
+        status: pending
+
+      # --- Toggle OFF: manage_prayers = false ---
+
+      - id: AC-157-11
+        description: "Toggle OFF - status always 'confirmed' when assigning prayer"
+        given: "Ward has manage_prayers = false"
+        when: "A member is assigned to a prayer position (0 or 4) via any method"
+        then: "The speech record status is set to 'assigned_confirmed' (not 'assigned_not_invited'). This skips the invitation workflow."
+        status: pending
+
+      - id: AC-157-12
+        description: "Toggle OFF - push notifications do NOT fire for prayers"
+        given: "Ward has manage_prayers = false and a prayer is assigned"
+        when: "The assignment is saved"
+        then: "No push notification is enqueued for the prayer assignment. The 'assigned_confirmed' status does not trigger the notification enqueue function."
+        status: pending
+
+      - id: AC-157-13
+        description: "Toggle OFF - Agenda uses PrayerSelector for prayers"
+        given: "Ward has manage_prayers = false and agenda is expanded"
+        when: "User taps the prayer field in AgendaForm"
+        then: "PrayerSelector opens, allowing selection of a member or typing a custom name (same behavior as today, but now reading/writing to speeches positions 0/4 instead of sunday_agendas columns)."
+        status: pending
+
+      - id: AC-157-14
+        description: "Toggle OFF - WhatsApp template section disabled in settings"
+        given: "Ward has manage_prayers = false"
+        when: "User opens WhatsApp Template settings"
+        then: "Only the speech template tab is visible. The opening prayer and closing prayer tabs are not shown (segmented control has 1 tab = no segmented control visible)."
+        status: pending
+
+      - id: AC-157-15
+        description: "Toggle OFF - Speeches tab title is 'Discursos'"
+        given: "Ward has manage_prayers = false"
+        when: "The Speeches tab is displayed"
+        then: "The tab label shows t('tabs.speeches') which is 'Discursos' (pt-BR), 'Speeches' (en), 'Discursos' (es). No mention of prayers."
+        status: pending
+
+      - id: AC-157-16
+        description: "Toggle OFF - Home section title is 'Proximos Discursos'"
+        given: "Ward has manage_prayers = false and user is Bispado"
+        when: "Home tab is displayed"
+        then: "The next assignments section title shows t('home.nextSpeeches') which is 'Proximos Discursos' (pt-BR)."
+        status: pending
+
+      - id: AC-157-17
+        description: "Toggle OFF - prayers do NOT appear in invite management"
+        given: "Ward has manage_prayers = false"
+        when: "Secretario views invite management section on Home"
+        then: "Only speech positions 1, 2, 3 appear. Prayer positions 0 and 4 do not appear in the invite management list."
+        status: pending
+
+      - id: AC-157-18
+        description: "Toggle OFF - prayers do NOT appear in Speeches tab"
+        given: "Ward has manage_prayers = false"
+        when: "Speeches tab is displayed"
+        then: "Only speech slots (positions 1, 2, 3) are shown in the expanded card. Prayer slots (positions 0, 4) are not rendered."
+        status: pending
+
+      # --- Toggle ON: manage_prayers = true ---
+
+      - id: AC-157-19
+        description: "Toggle ON - status 'assigned_not_invited' when assigning prayer"
+        given: "Ward has manage_prayers = true"
+        when: "A member is assigned to a prayer position (0 or 4) via Speeches tab"
+        then: "The speech record status is set to 'assigned_not_invited' (full workflow). This triggers the notification enqueue function."
+        status: pending
+
+      - id: AC-157-20
+        description: "Toggle ON - push notifications fire for prayers"
+        given: "Ward has manage_prayers = true and a prayer is assigned"
+        when: "The assignment is saved with status 'assigned_not_invited'"
+        then: "Push notification is enqueued following the same flow as speeches (5 min delay, grouped by sunday)."
+        status: pending
+
+      - id: AC-157-21
+        description: "Toggle ON - Speeches tab uses MemberSelectorModal for prayers"
+        given: "Ward has manage_prayers = true and a prayer slot is displayed in Speeches tab"
+        when: "User taps the member selector on the prayer slot"
+        then: "MemberSelectorModal opens (members only, no custom names). Same selector used for speech slots."
+        status: pending
+
+      - id: AC-157-22
+        description: "Toggle ON - Agenda prayer field is read-only with pencil icon"
+        given: "Ward has manage_prayers = true and agenda is expanded"
+        when: "Prayer fields are displayed in AgendaForm"
+        then: "Prayer name is shown as read-only text. A pencil icon is displayed next to the prayer name. Tapping the field or pencil icon navigates to the Speeches tab with the relevant sunday expanded."
+        status: pending
+
+      - id: AC-157-23
+        description: "Toggle ON - WhatsApp template has 3-tab segmented control"
+        given: "Ward has manage_prayers = true"
+        when: "User opens WhatsApp Template settings"
+        then: "Segmented control with 3 tabs: 'Discurso' (speech), 'Abertura' (opening prayer), 'Encerramento' (closing prayer). Each tab has its own editor with preview and placeholder chips."
+        status: pending
+
+      - id: AC-157-24
+        description: "Toggle ON - Speeches tab title is 'Discursos e Oracoes'"
+        given: "Ward has manage_prayers = true"
+        when: "The Speeches tab is displayed"
+        then: "The tab label shows t('tabs.speechesAndPrayers') which is 'Discursos e Oracoes' (pt-BR), 'Speeches & Prayers' (en), 'Discursos y Oraciones' (es)."
+        status: pending
+
+      - id: AC-157-25
+        description: "Toggle ON - Home section title is 'Proximos Discursos e Oracoes'"
+        given: "Ward has manage_prayers = true and user is Bispado"
+        when: "Home tab is displayed"
+        then: "The next assignments section title shows t('home.nextSpeechesAndPrayers') which is 'Proximos Discursos e Oracoes' (pt-BR)."
+        status: pending
+
+      - id: AC-157-26
+        description: "Toggle ON - prayers appear in invite management with labels"
+        given: "Ward has manage_prayers = true"
+        when: "Secretario views invite management section on Home"
+        then: "Prayer positions 0 and 4 appear in the invite management list with labels 'Abertura' (position 0) and 'Encerramento' (position 4) instead of speech position labels."
+        status: pending
+
+      - id: AC-157-27
+        description: "Toggle ON - prayer slots appear in Speeches tab expanded card"
+        given: "Ward has manage_prayers = true and a speech-type sunday card is expanded"
+        when: "The expanded card renders"
+        then: "Opening prayer slot (position 0) appears BEFORE the 1st speech slot. Closing prayer slot (position 4) appears AFTER the last speech slot."
+        status: pending
+
+      # --- Expanded Card Layout (Toggle ON) ---
+
+      - id: AC-157-28
+        description: "Opening prayer slot in expanded card - layout"
+        given: "Ward has manage_prayers = true, expanded speech card for 'speeches' type"
+        when: "Opening prayer slot (position 0) is rendered"
+        then: >
+          The slot shows: label 'Oracao de Abertura' (i18n), status indicator
+          (text + LED) next to the label, member selector (MemberSelectorModal),
+          X button to clear assignment. There is NO topic/theme field for prayers.
+        status: pending
+
+      - id: AC-157-29
+        description: "Closing prayer slot in expanded card - layout"
+        given: "Ward has manage_prayers = true, expanded speech card for 'speeches' type"
+        when: "Closing prayer slot (position 4) is rendered"
+        then: "Visually identical to opening prayer slot. Label is 'Oracao de Encerramento' (i18n). Same status indicator, member selector, X button. No topic field."
+        status: pending
+
+      - id: AC-157-30
+        description: "Testimony/Primary expanded card shows only prayer slots"
+        given: "Ward has manage_prayers = true, expanded card for 'testimony_meeting' or 'primary_presentation'"
+        when: "The expanded card renders"
+        then: "Only the 2 prayer fields (opening and closing) are shown. No speech slots (positions 1, 2, 3) are rendered."
+        status: pending
+
+      # --- Collapsed Card Layout (Toggle ON) ---
+
+      - id: AC-157-31
+        description: "Collapsed card height is 5 lines max for all card types"
+        given: "Ward has manage_prayers = true"
+        when: "Any SundayCard is collapsed"
+        then: "The collapsed card has a fixed maximum height of 5 lines. Cards with fewer lines do not exceed this height."
+        status: pending
+
+      - id: AC-157-32
+        description: "Collapsed card - Conf. Geral/Estaca/Ala/Outro shows 1 line"
+        given: "Ward has manage_prayers = true, sunday type is conference or 'other'"
+        when: "The card is collapsed"
+        then: "Card shows 1 line with the exception text (same as current behavior)."
+        status: pending
+
+      - id: AC-157-33
+        description: "Collapsed card - Testemunho/Primaria shows 2 prayer lines"
+        given: "Ward has manage_prayers = true, sunday type is 'testimony_meeting' or 'primary_presentation'"
+        when: "The card is collapsed"
+        then: >
+          Card shows 2 lines: opening prayer and closing prayer. Each line has
+          format '(Oracao) Nome' in italic. If no member assigned, shows
+          '(Oracao) ---' or similar empty indicator.
+        status: pending
+
+      - id: AC-157-34
+        description: "Collapsed card - Discursos with 2nd ON shows 5 lines"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', has_second_speech = true"
+        when: "The card is collapsed"
+        then: >
+          Card shows 5 lines: (1) opening prayer in italic with '(Oracao)' prefix,
+          (2) 1st speech (LED + name), (3) 2nd speech (LED + name),
+          (4) 3rd speech (LED + name), (5) closing prayer in italic with
+          '(Oracao)' prefix.
+        status: pending
+
+      - id: AC-157-35
+        description: "Collapsed card - Discursos with 2nd OFF shows 4 lines"
+        given: "Ward has manage_prayers = true, sunday type is 'speeches', has_second_speech = false"
+        when: "The card is collapsed"
+        then: >
+          Card shows 4 lines: (1) opening prayer in italic with '(Oracao)' prefix,
+          (2) 1st speech (LED + name), (3) 3rd speech (LED + name),
+          (4) closing prayer in italic with '(Oracao)' prefix.
+        status: pending
+
+      - id: AC-157-36
+        description: "Collapsed card - prayer lines use italic with '(Oracao)' prefix"
+        given: "Ward has manage_prayers = true, card is collapsed and has prayer positions"
+        when: "Prayer lines are rendered in collapsed card"
+        then: "Prayer lines display '(Oracao) NomeMembro' in italic font style. The '(Oracao)' prefix is translatable via i18n key. Speech lines remain normal (LED + name, no italic, no prefix)."
+        status: pending
+
+      # --- Agenda Tab ---
+
+      - id: AC-157-37
+        description: "Agenda expanded card - opening prayer same position"
+        given: "Agenda card is expanded"
+        when: "Opening prayer field is rendered"
+        then: "Opening prayer remains in the same position as today (section 'Boas-Vindas'), now reading from speeches position 0 instead of sunday_agendas column."
+        status: pending
+
+      - id: AC-157-38
+        description: "Agenda expanded card - closing prayer same position"
+        given: "Agenda card is expanded"
+        when: "Closing prayer field is rendered"
+        then: "Closing prayer remains in the same position as today (section 'Ultimo Discurso'), now reading from speeches position 4 instead of sunday_agendas column."
+        status: pending
+
+      - id: AC-157-39
+        description: "Agenda - Toggle OFF: PrayerSelector editable"
+        given: "Ward has manage_prayers = false, agenda card is expanded"
+        when: "User taps prayer field"
+        then: "PrayerSelector opens (members + custom names). User can select a member or type a custom name. Selection saves to speeches position 0 or 4 with status 'assigned_confirmed'."
+        status: pending
+
+      - id: AC-157-40
+        description: "Agenda - Toggle ON: read-only field with pencil navigation"
+        given: "Ward has manage_prayers = true, agenda card is expanded"
+        when: "User taps prayer field or pencil icon"
+        then: "Navigation goes to Speeches tab with the relevant sunday date expanded (router.push with expandDate param). The field itself is read-only (not editable in place)."
+        status: pending
+
+      - id: AC-157-41
+        description: "Agenda collapsed card - 'Oracoes Y/2' line"
+        given: "Agenda card is collapsed"
+        when: "Prayer count line is rendered"
+        then: "The line 'Oracoes Y/2' remains, now reading from speeches positions 0 and 4 instead of sunday_agendas columns. Y is the count of assigned prayers (0, 1, or 2)."
+        status: pending
+
+      # --- Home Tab ---
+
+      - id: AC-157-42
+        description: "Home preview card - 'Oracoes Y/2' line"
+        given: "Home tab shows preview cards for next 3 sundays"
+        when: "Prayer count is displayed"
+        then: "The 'Oracoes Y/2' line remains, now reading from speeches positions 0 and 4."
+        status: pending
+
+      - id: AC-157-43
+        description: "Home - next assignments section title dynamic"
+        given: "User is Bispado on Home tab"
+        when: "The next assignments section is rendered"
+        then: "Title is 'Proximos Discursos e Oracoes' when manage_prayers = true, 'Proximos Discursos' when manage_prayers = false."
+        status: pending
+
+      - id: AC-157-44
+        description: "Home - prayer cards are not expandable, have pencil button"
+        given: "Ward has manage_prayers = true, Home tab shows prayer assignments"
+        when: "Prayer cards are displayed in next assignments section"
+        then: "Prayer cards are not expandable (no accordion). Each card has a pencil button that navigates to the Speeches tab with the relevant date."
+        status: pending
+
+      # --- Presentation Mode ---
+
+      - id: AC-157-45
+        description: "Presentation mode - no changes to prayer display"
+        given: "Presentation mode is opened"
+        when: "Prayer names are displayed"
+        then: "Prayers are displayed exactly as today (speaker name shown in the appropriate section). No visual changes to presentation mode. Data now comes from speeches positions 0/4 instead of sunday_agendas columns."
+        status: pending
+
+      # --- Sunday Type Change Logic ---
+
+      - id: AC-157-46
+        description: "Type change: Discursos -> Testemunho/Primaria preserves prayers"
+        given: "Sunday type is 'speeches' with assigned prayers and speeches"
+        when: "User changes type to 'testimony_meeting' or 'primary_presentation'"
+        then: "Speech records (positions 1, 2, 3) are deleted. Prayer records (positions 0, 4) are PRESERVED. Confirmation dialog mentions only speeches being deleted."
+        status: pending
+
+      - id: AC-157-47
+        description: "Type change: Discursos -> Conf. Geral/Estaca/Ala/Outro deletes all"
+        given: "Sunday type is 'speeches' with assigned prayers and speeches"
+        when: "User changes type to 'general_conference', 'stake_conference', 'ward_conference', or 'other'"
+        then: "Both speech records (positions 1, 2, 3) AND prayer records (positions 0, 4) are deleted. Confirmation dialog mentions both speeches and prayers being deleted."
+        status: pending
+
+      - id: AC-157-48
+        description: "Type change: Testemunho/Primaria -> Conf./Outro deletes prayers"
+        given: "Sunday type is 'testimony_meeting' or 'primary_presentation' with assigned prayers"
+        when: "User changes type to 'general_conference', 'stake_conference', 'ward_conference', or 'other'"
+        then: "Prayer records (positions 0, 4) are deleted. Confirmation dialog mentions prayers being deleted."
+        status: pending
+
+      - id: AC-157-49
+        description: "Type change: Testemunho/Primaria -> Discursos preserves prayers"
+        given: "Sunday type is 'testimony_meeting' or 'primary_presentation' with assigned prayers"
+        when: "User changes type to 'speeches'"
+        then: "Prayer records (positions 0, 4) are PRESERVED. Speech records (positions 1, 2, 3) are created as empty."
+        status: pending
+
+      - id: AC-157-50
+        description: "Type change: Testemunho <-> Primaria preserves prayers"
+        given: "Sunday type is 'testimony_meeting' with assigned prayers"
+        when: "User changes type to 'primary_presentation' (or vice versa)"
+        then: "Prayer records (positions 0, 4) are PRESERVED. No deletion occurs."
+        status: pending
+
+      - id: AC-157-51
+        description: "Confirmation dialog has dynamic text based on what will be deleted"
+        given: "User is changing sunday type"
+        when: "The change would delete prayers, speeches, or both"
+        then: >
+          The confirmation dialog text varies:
+          - Deleting only speeches: mentions speeches only
+          - Deleting only prayers: mentions prayers only
+          - Deleting both: mentions both speeches and prayers
+          - No deletions needed: no dialog shown
+        status: pending
+
+      # --- WhatsApp Templates ---
+
+      - id: AC-157-52
+        description: "Default opening prayer template (pt-BR)"
+        given: "Ward language is pt-BR and no custom opening prayer template is set"
+        when: "WhatsApp invitation is generated for opening prayer"
+        then: >
+          Default template: "Ola {nome}, voce foi designado(a) para fazer a
+          oracao de abertura na Reuniao Sacramental do dia {data}. Para ajudar
+          na reverencia, pedimos que voce chegue 15min antes do inicio da
+          reuniao e se sente junto com o bispado ao pulpito. Podemos contar
+          com voce?"
+        status: pending
+
+      - id: AC-157-53
+        description: "Default closing prayer template (pt-BR)"
+        given: "Ward language is pt-BR and no custom closing prayer template is set"
+        when: "WhatsApp invitation is generated for closing prayer"
+        then: >
+          Default template: "Ola {nome}, voce foi designado(a) para fazer a
+          oracao de encerramento da Reuniao Sacramental do dia {data}.
+          Gostariamos de pedir para que se junte ao bispado no pulpito durante
+          o hino intermediario. Podemos contar com voce?"
+        status: pending
+
+      - id: AC-157-54
+        description: "Prayer templates have only {nome} and {data} placeholders"
+        given: "Prayer WhatsApp template editor"
+        when: "Placeholder chips are displayed"
+        then: "Only 2 placeholders are available: {nome} and {data}. The speech placeholders ({posicao}, {colecao}, {titulo}, {link}) are NOT available for prayer templates."
+        status: pending
+
+      - id: AC-157-55
+        description: "Default templates in en and es"
+        given: "Ward language is en or es"
+        when: "Default prayer templates are used"
+        then: >
+          EN opening: "Hello {nome}, you have been assigned to give the opening
+          prayer at the Sacrament Meeting on {data}. To help with reverence,
+          we kindly ask you to arrive 15 minutes early and sit with the
+          bishopric at the pulpit. Can we count on you?"
+          EN closing: "Hello {nome}, you have been assigned to give the closing
+          prayer at the Sacrament Meeting on {data}. We would like to ask you
+          to join the bishopric at the pulpit during the intermediate hymn.
+          Can we count on you?"
+          ES opening: "Hola {nome}, has sido designado(a) para hacer la oracion
+          de apertura en la Reunion Sacramental del dia {data}. Para ayudar
+          con la reverencia, te pedimos que llegues 15 minutos antes del inicio
+          de la reunion y te sientes junto con el obispado en el pulpito.
+          Podemos contar contigo?"
+          ES closing: "Hola {nome}, has sido designado(a) para hacer la oracion
+          de cierre de la Reunion Sacramental del dia {data}. Nos gustaria
+          pedirte que te unas al obispado en el pulpito durante el himno
+          intermedio. Podemos contar contigo?"
+        status: pending
+
+      - id: AC-157-56
+        description: "WhatsApp settings - segmented control with 3 tabs when ON"
+        given: "Ward has manage_prayers = true"
+        when: "User opens WhatsApp Template settings screen"
+        then: >
+          A segmented control is displayed at the top with 3 tabs: 'Discurso',
+          'Abertura', 'Encerramento' (i18n translated). Each tab shows its own
+          template editor with preview and placeholder chips. The Discurso tab
+          shows the existing speech template. Abertura and Encerramento tabs
+          show the prayer templates. Prayer template editors show only {nome}
+          and {data} placeholder chips.
+        status: pending
+
+      # --- Settings Toggle ---
+
+      - id: AC-157-57
+        description: "Manage prayers toggle in Ward Settings"
+        given: "User is Bispado on Settings screen"
+        when: "Ward configuration section is displayed"
+        then: >
+          A toggle labeled 'Oracoes Gerenciadas' (i18n) is displayed in the
+          Ward Settings. When toggled ON, manage_prayers is set to true in the
+          wards table. When toggled OFF, manage_prayers is set to false. The
+          toggle is only visible to Bispado role.
+        status: pending
+
+      - id: AC-157-58
+        description: "Toggle state persists and applies immediately"
+        given: "User toggles manage_prayers"
+        when: "The toggle value is saved"
+        then: "The new state is persisted to the wards table. All affected UI elements (Speeches tab name, Home section title, agenda prayer fields, collapsed card layout, WhatsApp template tabs, invite management) update to reflect the new state. No app restart required."
+        status: pending
+
+      # --- Permissions ---
+
+      - id: AC-157-59
+        description: "Prayer assignment follows speech permissions"
+        given: "User has a specific role"
+        when: "User tries to assign a member to a prayer position"
+        then: >
+          Bispado: can assign prayers via Speeches tab and Home.
+          Secretario: cannot assign via Speeches tab or Home, but CAN assign
+          via Agenda tab (same exception as speeches via CR-31).
+          Observador: cannot assign prayers anywhere (read-only).
+        status: pending
+
+      - id: AC-157-60
+        description: "Prayer status change follows speech permissions"
+        given: "User has a specific role"
+        when: "User tries to change prayer status"
+        then: "Bispado: can change status. Secretario: can change status. Observador: cannot change status."
+        status: pending
+
+      # --- i18n ---
+
+      - id: AC-157-61
+        description: "All new strings translated in pt-BR, en, es"
+        given: "New i18n keys are added for CR-221"
+        when: "The app is displayed in any of the 3 supported languages"
+        then: >
+          All new keys have translations in all 3 languages. Key list includes
+          (but is not limited to):
+          - tabs.speechesAndPrayers: "Discursos e Oracoes" / "Speeches & Prayers" / "Discursos y Oraciones"
+          - home.nextSpeechesAndPrayers: "Proximos Discursos e Oracoes" / "Upcoming Speeches & Prayers" / "Proximos Discursos y Oraciones"
+          - prayers.opening: "Oracao de Abertura" / "Opening Prayer" / "Oracion de Apertura"
+          - prayers.closing: "Oracao de Encerramento" / "Closing Prayer" / "Oracion de Cierre"
+          - prayers.prayerPrefix: "(Oracao)" / "(Prayer)" / "(Oracion)"
+          - settings.managePrayers: "Oracoes Gerenciadas" / "Managed Prayers" / "Oraciones Administradas"
+          - whatsapp.tabSpeech: "Discurso" / "Speech" / "Discurso"
+          - whatsapp.tabOpeningPrayer: "Abertura" / "Opening" / "Apertura"
+          - whatsapp.tabClosingPrayer: "Encerramento" / "Closing" / "Cierre"
+          - speeches.openingPrayer: "Abertura" / "Opening" / "Apertura" (for invite management labels)
+          - speeches.closingPrayer: "Encerramento" / "Closing" / "Cierre" (for invite management labels)
+          - sundayType.confirmDeleteSpeeches: (existing, updated for dynamic text)
+          - sundayType.confirmDeletePrayers: (new, for prayer-only deletion)
+          - sundayType.confirmDeleteBoth: (new, for both speeches + prayers deletion)
+        status: pending
+
+      # --- Edge Cases & Regression ---
+
+      - id: AC-157-62
+        description: "Existing wards unaffected after migration"
+        given: "Existing wards with manage_prayers = false (default)"
+        when: "The app loads after migration"
+        then: "All functionality works exactly as before. Prayers appear in agenda as PrayerSelector fields. No prayer slots in Speeches tab. No changes to tab names or section titles."
+        status: pending
+
+      - id: AC-157-63
+        description: "Toggling ON then OFF restores original behavior"
+        given: "Ward with manage_prayers = true is toggled to false"
+        when: "UI reloads"
+        then: >
+          Speeches tab name reverts to 'Discursos'. Home section title reverts.
+          Agenda prayer fields become editable PrayerSelector. Prayer slots
+          disappear from Speeches tab. Invite management hides prayers.
+          WhatsApp settings hide prayer template tabs. Existing prayer data
+          (in speeches positions 0/4) is preserved in the DB; prayers with
+          non-confirmed status keep their status but do not trigger notifications.
+        status: pending
+
+      - id: AC-157-64
+        description: "Observer sees prayers in Speeches tab when manage_prayers ON"
+        given: "Ward has manage_prayers = true and user is Observer"
+        when: "Speeches tab is displayed"
+        then: "Prayer slots are visible but read-only (disabled state). Observer cannot assign members or change status."
+        status: pending
+
+    # =========================================================================
+    # EDGE CASES
+    # =========================================================================
+
+    edge_cases:
+
+      - id: EC-157-01
+        case: "Migration with duplicate prayer data"
+        expected: "If a speeches record already exists for (ward_id, sunday_date, position 0 or 4), the migration uses ON CONFLICT DO NOTHING and skips the duplicate. No error."
+        status: pending
+
+      - id: EC-157-02
+        case: "Sunday with no agenda record but has speeches"
+        expected: "Prayers are stored in speeches table (not sunday_agendas), so a sunday can have prayers assigned even without an agenda record. The collapsed card prayer count reads from speeches."
+        status: pending
+
+      - id: EC-157-03
+        case: "Custom prayer name when manage_prayers = false"
+        expected: "When toggle is OFF, PrayerSelector allows custom names. The custom name is stored in speeches.speaker_name with member_id = null (same pattern as current sunday_agendas prayer fields with CR-74)."
+        status: pending
+
+      - id: EC-157-04
+        case: "Custom prayer name when manage_prayers = true"
+        expected: "When toggle is ON, MemberSelectorModal is used in Speeches tab. Only registered members can be assigned (no custom names). This matches the speech assignment behavior."
+        status: pending
+
+      - id: EC-157-05
+        case: "Toggle ON with prayers already assigned via PrayerSelector"
+        expected: "Prayers assigned while toggle was OFF (with status 'assigned_confirmed') keep their status. They appear in the Speeches tab with 'Confirmado' status. Custom-name prayers (member_id = null) also keep their data and display the snapshot name."
+        status: pending
+
+      - id: EC-157-06
+        case: "Toggle OFF with prayers in non-confirmed status"
+        expected: "Prayers assigned while toggle was ON (with status 'assigned_not_invited' or 'assigned_invited') keep their status in the DB. When toggle is OFF, these prayers appear in the agenda PrayerSelector with their assigned names. The non-confirmed status does not trigger any workflow when toggle is OFF."
+        status: pending
+
+      - id: EC-157-07
+        case: "Realtime sync for prayer positions"
+        expected: "The existing realtime subscription on the speeches table automatically picks up changes to positions 0 and 4, since it subscribes to the entire table by ward_id."
+        status: pending
+
+      - id: EC-157-08
+        case: "Activity log for prayer actions"
+        expected: "Prayer assignments and status changes are logged in activity_log with appropriate action types (e.g., 'speech:assign' with additional metadata indicating prayer position). The log description uses the structured format from CR-142."
+        status: pending
+
+      - id: EC-157-09
+        case: "Offline queue for prayer mutations"
+        expected: "Prayer assignments and status changes use the same mutation queue as speeches. Offline support works identically for positions 0/4 as for positions 1/2/3."
+        status: pending
+
+      - id: EC-157-10
+        case: "Presentation mode with conference-type sunday (no prayers)"
+        expected: "Conference-type sundays have no prayer records. Presentation mode shows no prayer names in the welcome/closing sections. This is the same behavior as today when prayer fields are empty."
+        status: pending
+
+      - id: EC-157-11
+        case: "Collapsed card layout when manage_prayers = false"
+        expected: "When toggle is OFF, collapsed cards show the current layout (speeches only, no prayer lines). The card height and content match the pre-CR-221 behavior."
+        status: pending
+
+      - id: EC-157-12
+        case: "WhatsApp invitation for prayer uses correct template"
+        expected: "When sending WhatsApp invitation for position 0, the opening prayer template is used. For position 4, the closing prayer template is used. For positions 1/2/3, the speech template is used (unchanged)."
+        status: pending
+
+      - id: EC-157-13
+        case: "Speaker override fields in sunday_agendas"
+        expected: "The existing speaker_1_override, speaker_2_override, speaker_3_override fields in sunday_agendas (from CR-100/F044) are NOT affected. They continue to work for positions 1/2/3 only. There are no prayer override fields."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - supabase/migrations/NNN_managed_prayers.sql (new migration)
+      - src/app/(tabs)/speeches.tsx
+      - src/app/(tabs)/index.tsx (Home tab)
+      - src/app/(tabs)/agenda.tsx
+      - src/components/SundayCard.tsx
+      - src/components/SpeechSlot.tsx
+      - src/components/AgendaForm.tsx
+      - src/components/PrayerSelector.tsx
+      - src/hooks/useSpeeches.ts
+      - src/hooks/useSundayAgenda.ts
+      - src/hooks/usePresentationMode.ts
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - src/app/(tabs)/settings/index.tsx (or ward settings screen)
+      - src/lib/whatsappUtils.ts (or equivalent)
+      - src/lib/notificationUtils.ts (or equivalent trigger)
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+      - src/app/(tabs)/_layout.tsx (dynamic tab label)
+
+    files_not_modified:
+      - src/app/presentation.tsx (presentation mode display logic unchanged)
+      - src/components/AccordionCard.tsx (no layout changes)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS
+    # =========================================================================
+
+    implementation_details:
+
+      - location: "supabase/migrations/NNN_managed_prayers.sql"
+        description: "Database migration"
+        details: |
+          -- 1. Add new columns to wards
+          ALTER TABLE public.wards
+            ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false,
+            ADD COLUMN whatsapp_template_opening_prayer TEXT,
+            ADD COLUMN whatsapp_template_closing_prayer TEXT;
+
+          -- 2. Copy existing prayer data to speeches (BEFORE dropping columns)
+          INSERT INTO public.speeches (ward_id, sunday_date, position, member_id, speaker_name, status)
+          SELECT
+            sa.ward_id,
+            sa.sunday_date,
+            0 AS position,
+            sa.opening_prayer_member_id AS member_id,
+            sa.opening_prayer_name AS speaker_name,
+            'assigned_confirmed' AS status
+          FROM public.sunday_agendas sa
+          WHERE sa.opening_prayer_name IS NOT NULL
+          ON CONFLICT (ward_id, sunday_date, position) DO NOTHING;
+
+          INSERT INTO public.speeches (ward_id, sunday_date, position, member_id, speaker_name, status)
+          SELECT
+            sa.ward_id,
+            sa.sunday_date,
+            4 AS position,
+            sa.closing_prayer_member_id AS member_id,
+            sa.closing_prayer_name AS speaker_name,
+            'assigned_confirmed' AS status
+          FROM public.sunday_agendas sa
+          WHERE sa.closing_prayer_name IS NOT NULL
+          ON CONFLICT (ward_id, sunday_date, position) DO NOTHING;
+
+          -- 3. Drop old columns from sunday_agendas
+          ALTER TABLE public.sunday_agendas
+            DROP COLUMN opening_prayer_member_id,
+            DROP COLUMN opening_prayer_name,
+            DROP COLUMN closing_prayer_member_id,
+            DROP COLUMN closing_prayer_name;
+
+      - location: "Auto-creation logic (useSpeeches.ts or equivalent)"
+        description: "Auto-create prayer positions for eligible sunday types"
+        details: >
+          Modify the existing auto-creation logic that creates speech records
+          when a sunday is loaded. For types 'speeches', 'testimony_meeting',
+          'primary_presentation': create positions 0 and 4 in addition to the
+          existing logic. For 'speeches': positions 0, 1, 2, 3, 4. For
+          'testimony_meeting' and 'primary_presentation': positions 0, 4 only.
+          For conference types and 'other': no positions created.
+
+      - location: "SundayCard.tsx (collapsed card layout)"
+        description: "Add prayer lines to collapsed card when manage_prayers = true"
+        details: >
+          When manage_prayers = true, the collapsed card layout changes:
+          - For 'speeches' type: render prayer line (position 0) before speech
+            lines, prayer line (position 4) after speech lines. Prayer lines
+            use italic font with '(Oracao)' prefix.
+          - For 'testimony_meeting'/'primary_presentation': render only 2
+            prayer lines (positions 0 and 4).
+          - For conference/'other' types: no change (1 line of exception text).
+          When manage_prayers = false: no change to current layout.
+
+      - location: "AgendaForm.tsx"
+        description: "Change prayer data source and conditional editing"
+        details: >
+          Replace reading prayer data from sunday_agendas (opening_prayer_name,
+          etc.) with reading from speeches positions 0/4. When manage_prayers
+          = false: render PrayerSelector as editable (current behavior, but
+          with new data source). When manage_prayers = true: render read-only
+          text with pencil icon that navigates to Speeches tab.
+
+      - location: "WhatsApp Template settings"
+        description: "Segmented control for prayer templates"
+        details: >
+          When manage_prayers = true: show segmented control with 3 tabs
+          (Discurso/Abertura/Encerramento). Each tab manages its own template.
+          Prayer tabs show only {nome} and {data} placeholder chips. When
+          manage_prayers = false: show only the speech template (no segmented
+          control).
+
+      - location: "SundayTypeDropdown or equivalent"
+        description: "Dynamic confirmation dialog for type changes"
+        details: >
+          Modify the type change confirmation logic to check what will be
+          deleted (speeches only, prayers only, or both) and show appropriate
+          dialog text. Implement preservation rules: prayers preserved when
+          switching between speeches/testimony/primary; deleted when switching
+          to conference/other types.
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-01
+      text: >
+        The manage_prayers toggle is per-ward, not per-user. All users in
+        the same ward see the same prayer management mode. The toggle is
+        in the Ward Settings section (same area as ward language, timezone,
+        etc.) and is only accessible to Bispado role.
+
+    - id: A-02
+      text: >
+        The existing notification trigger (enqueue_speech_notification) already
+        fires on INSERT/UPDATE to the speeches table. Since prayers now use
+        the same table, the trigger will naturally fire for prayer positions
+        0/4. The trigger should check manage_prayers from the wards table:
+        if false, skip notification for positions 0/4; if true, enqueue
+        notification normally.
+
+    - id: A-03
+      text: >
+        The PrayerSelector component (used when manage_prayers = false) supports
+        both members and custom names, following the existing CR-74/CR-133
+        pattern. When writing to speeches table, custom names set speaker_name
+        with member_id = null. Member selections set both speaker_name (snapshot)
+        and member_id.
+
+    - id: A-04
+      text: >
+        The speaker_phone snapshot field in speeches is populated when a member
+        is assigned to a prayer position (using the member's phone from the
+        members table). This is needed for WhatsApp integration when
+        manage_prayers = true.
+
+    - id: A-05
+      text: >
+        The collapsed card height of "5 lines max" when manage_prayers = true
+        may require adjusting the minHeight value in SundayCard.tsx (currently
+        62px from F154). The new height needs to accommodate 5 lines of content
+        (3 speech lines + 2 prayer lines). The exact pixel value depends on
+        line height and font size.
+
+    - id: A-06
+      text: >
+        When manage_prayers = true, the Secretario cannot assign prayers via
+        the Speeches tab (same restriction as speeches). However, the Secretario
+        CAN assign prayers via the Agenda tab when manage_prayers = false
+        (using PrayerSelector, same as current behavior). When manage_prayers
+        = true, the Agenda prayer fields become read-only for everyone (pencil
+        navigates to Speeches tab where permissions apply).
+
+    - id: A-07
+      text: >
+        The existing usePresentationMode hook reads prayer data from
+        sunday_agendas fields. This needs to be updated to read from speeches
+        positions 0/4 instead. The presentation mode display itself does not
+        change (same visual output, different data source).
+
+    - id: A-08
+      text: >
+        RLS policies for the speeches table already allow access by ward
+        members. Since prayers use the same table, no new RLS policies are
+        needed. The manage_prayers column in wards needs to be readable by
+        all ward members (existing ward RLS policy covers this).
+
+  inconsistencies: []

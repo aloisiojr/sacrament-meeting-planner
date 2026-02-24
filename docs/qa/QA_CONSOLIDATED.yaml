@@ -31,7 +31,8 @@
 # CR-209, CR-210 (PRE+POST) - Batch 23 Phase 1
 # CR-211, CR-212, CR-213, CR-214, CR-215 (PRE+POST) - Batch 23 Phase 2
 # CR-216, CR-217, CR-219 (PRE+POST) - Batch 24 Phase 1
-# Updated: 2026-02-23
+# CR-221 (PRE+POST Phase 1) - Batch 25 Phase 1
+# Updated: 2026-02-24
 # =============================================================================
 
 # #############################################################################
@@ -11960,3 +11961,316 @@ cr_220:
     should_pass_total: 4
     should_pass_passed: 4
     should_pass_failed: 0
+
+# #############################################################################
+# CR-221: Managed Prayers (Oracoes Gerenciadas) - Phase 1
+# #############################################################################
+
+cr_221:
+  cr_id: CR-221
+  title: "Managed Prayers (Oracoes Gerenciadas)"
+  type: feature_request
+  spec: specs/SPEC_F157.yaml
+  qa_plan: qa/QA_PLAN_batch25_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-23"
+    status: passed
+    summary: |
+      Full PRE validation of 10 areas covering prayer fields in sunday_agendas,
+      speeches table positions, PrayerSelector component, InviteManagementSection,
+      WhatsApp templates, notification triggers, useLazyCreateSpeeches, SundayCard
+      collapsed layout, prayer counting in Home/Agenda, and type change confirmation.
+      Complete inventory of all prayer field references documented.
+
+  post_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    phase: "1 of 3"
+    commits:
+      - hash: f97898b
+        message: "feat(db): add managed prayers migration (CR-221, S01)"
+      - hash: 6b81ead
+        message: "feat(i18n): add prayer management i18n keys (CR-221, S02)"
+      - hash: a511f43
+        message: "feat(types): add manage_prayers fields to Ward type (CR-221, S03)"
+      - hash: 10ae99a
+        message: "feat(hooks): add useWardManagePrayers hook (CR-221, S04)"
+      - hash: af09a00
+        message: "feat(hooks): make useLazyCreateSpeeches type-aware (CR-221, S05)"
+      - hash: d5a0f1c
+        message: "feat(hooks): add optional positions filter to useDeleteSpeechesByDate (CR-221, S06)"
+      - hash: fa88bd1
+        message: "feat(settings): add manage_prayers toggle in Ward Settings (CR-221, S07)"
+      - hash: 6ac9227
+        message: "fix(settings): add logAction to manage_prayers toggle (CR-221, R-1 fix)"
+      - hash: dd5bb5d
+        message: "test(batch25): add Phase 1 tests for F157 managed prayers"
+      - hash: b06bbde
+        message: "docs(ledger): add CR-221 Phase 1 commits to CODE_LEDGER"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 162
+    tester_tests_total: 162
+    tester_suite_passed: 6411
+    tester_suite_total: 6411
+
+    # =========================================================================
+    # Phase 1 Scope Note
+    # =========================================================================
+    # Phase 1 covers: DB migration, i18n keys, TypeScript types (Ward only),
+    # useWardManagePrayers hook, useLazyCreateSpeeches type-aware,
+    # useDeleteSpeechesByDate with positions filter, settings toggle.
+    #
+    # Phase 2/3 will cover: AgendaForm prayer fields migration, Home/Agenda
+    # prayer counting, Speeches tab prayer slots, InviteManagement prayer items,
+    # WhatsApp template segmented control, SundayCard collapsed layout,
+    # presentation mode prayer data source, SundayAgenda type cleanup.
+    #
+    # Checks marked DEFERRED are valid Phase 2/3 work items, not failures.
+    # =========================================================================
+
+    must_pass_results:
+      - id: MP-01
+        description: "New migration adds manage_prayers BOOLEAN DEFAULT false to wards table"
+        status: PASSED
+        evidence: |
+          019_managed_prayers.sql:12: ALTER TABLE public.wards
+            ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false
+
+      - id: MP-02
+        description: "New migration alters speeches.position CHECK to allow (0, 1, 2, 3, 4)"
+        status: PASSED
+        evidence: |
+          019_managed_prayers.sql:17-21 (Step 1b, added in commit 5b7cd86):
+            ALTER TABLE public.speeches DROP CONSTRAINT IF EXISTS speeches_position_check;
+            ALTER TABLE public.speeches ADD CONSTRAINT speeches_position_check
+              CHECK (position IN (0, 1, 2, 3, 4));
+          Positioned BEFORE data migration Steps 2-3. Fix resolves QA-CR221-P1-001.
+
+      - id: MP-03
+        description: "New migration adds whatsapp_template_opening_prayer and whatsapp_template_closing_prayer to wards table"
+        status: PASSED
+        evidence: |
+          019_managed_prayers.sql:13-14:
+            ADD COLUMN whatsapp_template_opening_prayer TEXT,
+            ADD COLUMN whatsapp_template_closing_prayer TEXT
+
+      - id: MP-04
+        description: "New migration removes prayer columns from sunday_agendas"
+        status: PASSED
+        evidence: |
+          019_managed_prayers.sql:49-53: ALTER TABLE public.sunday_agendas
+            DROP COLUMN opening_prayer_member_id,
+            DROP COLUMN opening_prayer_name,
+            DROP COLUMN closing_prayer_member_id,
+            DROP COLUMN closing_prayer_name;
+          Note: TypeScript type SundayAgenda still has these fields (deferred to Phase 2).
+
+      - id: MP-05
+        description: "New migration includes data migration for existing prayer data"
+        status: PASSED
+        evidence: |
+          019_managed_prayers.sql:19-29: INSERT into speeches position=0 from
+          sunday_agendas.opening_prayer_name with ON CONFLICT DO NOTHING.
+          019_managed_prayers.sql:34-44: INSERT into speeches position=4 from
+          sunday_agendas.closing_prayer_name with ON CONFLICT DO NOTHING.
+          Status set to 'assigned_confirmed' for migrated data.
+
+      - id: MP-06
+        description: "Ward type in database.ts includes manage_prayers boolean"
+        status: PASSED
+        evidence: |
+          src/types/database.ts:81: manage_prayers: boolean;
+
+      - id: MP-07
+        description: "Ward type includes whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"
+        status: PASSED
+        evidence: |
+          src/types/database.ts:82: whatsapp_template_opening_prayer: string | null;
+          src/types/database.ts:83: whatsapp_template_closing_prayer: string | null;
+
+      - id: MP-08
+        description: "SundayAgenda type no longer has prayer fields"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. SundayAgenda type still has prayer fields at
+          database.ts:188-189,211-212 because AgendaForm, Home tab, and
+          Agenda tab still reference them. These will be removed when the
+          UI code is migrated to read from speeches positions 0/4.
+
+      - id: MP-09
+        description: "Speech.position type comment updated to include 0 and 4"
+        status: PASSED
+        evidence: |
+          src/types/database.ts:139: position: number; // 0, 1, 2, 3, or 4
+
+      - id: MP-10
+        description: "useLazyCreateSpeeches creates positions [0, 1, 2, 3, 4]"
+        status: PASSED
+        evidence: |
+          src/hooks/useSpeeches.ts:194: positions = [0, 1, 2, 3, 4] (for speeches type)
+          src/hooks/useSpeeches.ts:184: positions = [0, 4] (for testimony/primary)
+          src/hooks/useSpeeches.ts:190: positions = [] (for conference/other)
+          Type-aware creation based on sundayType parameter.
+
+      - id: MP-11
+        description: "Prayer positions (0, 4) get default status based on manage_prayers toggle"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. Currently useLazyCreateSpeeches sets status to
+          'not_assigned' for ALL positions (line 215). The differentiated
+          behavior (confirmed when OFF, not_assigned when ON) requires
+          reading the manage_prayers flag inside the mutation, which is
+          planned for Phase 2 when the UI integration is done.
+
+      - id: MP-12
+        description: "AgendaForm no longer reads prayer fields from agenda"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. AgendaForm.tsx still reads agenda.opening_prayer_name
+          (line 314) and agenda.closing_prayer_name (line 530).
+
+      - id: MP-13
+        description: "AgendaForm renders prayer fields from speeches"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. AgendaForm still reads from sunday_agendas."
+
+      - id: MP-14
+        description: "Toggle OFF: AgendaForm uses PrayerSelector"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. AgendaForm prayer UI not yet migrated."
+
+      - id: MP-15
+        description: "Toggle ON: AgendaForm uses MemberSelectorModal"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. Toggle ON behavior not yet implemented in AgendaForm."
+
+      - id: MP-16
+        description: "InviteManagementSection shows prayer items when manage_prayers=true"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. InviteManagementSection not yet updated."
+
+      - id: MP-17
+        description: "InviteManagementSection uses correct WhatsApp template for prayers"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. WhatsApp template selection logic not yet updated."
+
+      - id: MP-18
+        description: "Prayer position labels display correctly"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. Position label logic not yet updated."
+
+      - id: MP-19
+        description: "Home tab prayer count reads from speeches"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. index.tsx still reads from agenda.opening_prayer_name
+          and agenda.closing_prayer_name.
+
+      - id: MP-20
+        description: "Agenda tab prayer count reads from speeches"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. agenda.tsx still reads from agenda.opening_prayer_name
+          and agenda.closing_prayer_name.
+
+      - id: MP-21
+        description: "Presentation mode reads prayer names from speeches"
+        status: DEFERRED
+        evidence: |
+          Phase 2/3 work. usePresentationMode.ts still reads from
+          agenda.opening_prayer_name (line 100) and closing_prayer_name (lines 181, 193).
+
+      - id: MP-22
+        description: "Ward settings includes manage_prayers toggle"
+        status: PASSED
+        evidence: |
+          src/app/(tabs)/settings/index.tsx:61: useWardManagePrayers() hook
+          settings/index.tsx:247-257: Switch component for manage_prayers toggle
+          Only visible to Bispado role (isBishopric check at line 246).
+          Toggle saves to wards.manage_prayers via supabase update.
+          Activity log recorded via logAction (6ac9227 fix).
+
+      - id: MP-23
+        description: "All tests pass (no regression)"
+        status: PASSED
+        evidence: |
+          vitest run: 95 test files, 6411 tests passed, 49 skipped, 0 failures.
+          162 new tests in batch25-phase1.test.ts all passing.
+
+    must_pass_total: 23
+    must_pass_passed: 11
+    must_pass_failed: 0
+    must_pass_deferred: 12
+
+    should_pass_results:
+      - id: SP-01
+        description: "SundayCard collapsed view shows prayer LEDs when manage_prayers=true"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. SundayCard collapsed layout not yet updated."
+
+      - id: SP-02
+        description: "Dead import of PrayerSelector in SpeechSlot.tsx is cleaned up"
+        status: DEFERRED
+        evidence: |
+          SpeechSlot.tsx still imports PrayerSelector at line 27.
+          Should be cleaned up when SpeechSlot is updated in Phase 2.
+
+      - id: SP-03
+        description: "Prayer WhatsApp template screen accessible from settings"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. WhatsApp template screen not yet updated."
+
+      - id: SP-04
+        description: "Type change dialog includes prayer records in hasAssignments check"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. SundayTypeDropdown not yet updated."
+
+      - id: SP-05
+        description: "Auto-create prayer records for testimony/primary meetings too"
+        status: PASSED
+        evidence: |
+          src/hooks/useSpeeches.ts:182-184: testimony_meeting and
+          primary_presentation create positions = [0, 4].
+
+      - id: SP-06
+        description: "InviteManagementSection filters out prayer items when manage_prayers=false"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. InviteManagementSection not yet updated."
+
+      - id: SP-07
+        description: "speechUtils.ts handles prayer positions correctly"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. speechUtils.ts not yet updated."
+
+      - id: SP-08
+        description: "Notification push text distinguishes prayer vs speech positions"
+        status: DEFERRED
+        evidence: "Phase 2/3 work. Push notification text not yet differentiated."
+
+    should_pass_total: 8
+    should_pass_passed: 1
+    should_pass_failed: 0
+    should_pass_deferred: 7
+
+    # =========================================================================
+    # CRITICAL ISSUE (issues_for_coder) - RESOLVED
+    # =========================================================================
+    issues_for_coder:
+      - id: QA-CR221-P1-001
+        severity: critical
+        check_id: MP-02
+        status: RESOLVED
+        resolved_by: "commit 5b7cd86"
+        description: |
+          Migration 019_managed_prayers.sql was missing the ALTER TABLE to update
+          the speeches.position CHECK constraint from (1,2,3) to (0,1,2,3,4).
+        fix_applied: |
+          Step 1b added to migration (lines 17-21): DROP + ADD CHECK constraint
+          for positions (0, 1, 2, 3, 4), positioned BEFORE data migration Steps 2-3.
+        file: "supabase/migrations/019_managed_prayers.sql"
+        blocking: false

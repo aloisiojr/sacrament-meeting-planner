@@ -1,0 +1,1214 @@
+# =============================================================================
+# PLAN_P044.yaml
+# Plan for Batch 25: F157 - Managed Prayers (CR-221)
+# Created: 2026-02-23
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement managed prayers (CR-221): migrate prayer data from sunday_agendas
+  columns to speeches table positions 0/4, add per-ward manage_prayers toggle,
+  auto-create prayer positions for eligible sunday types, extend Speeches tab
+  with prayer slots (isPrayer SpeechSlot), conditional Agenda tab behavior
+  (PrayerSelector when OFF, read-only + pencil when ON), collapsed card prayer
+  lines, dynamic tab/section titles, WhatsApp 3-tab segmented control with
+  separate prayer templates, sunday type change preservation rules, notification
+  trigger manage_prayers check, invite management prayer support, presentation
+  mode data source update, and full i18n for all 3 locales. 64 ACs, 13 ECs.
+
+strategy:
+  order: "DB migration -> types -> hooks -> settings toggle -> UI (Speeches, Agenda, Home, Layout) -> WhatsApp -> Sunday type change -> collapsed cards -> presentation mode -> tests"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-01: Database migration - wards columns + data copy + drop + trigger
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    description: >
+      Create supabase/migrations/019_managed_prayers.sql with 5 operations:
+      (1) ALTER TABLE wards ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN whatsapp_template_opening_prayer TEXT, ADD COLUMN
+      whatsapp_template_closing_prayer TEXT.
+      (2) INSERT INTO speeches position 0 FROM sunday_agendas.opening_prayer_*
+      WHERE opening_prayer_name IS NOT NULL, ON CONFLICT DO NOTHING.
+      (3) INSERT INTO speeches position 4 FROM sunday_agendas.closing_prayer_*
+      WHERE closing_prayer_name IS NOT NULL, ON CONFLICT DO NOTHING.
+      (4) ALTER TABLE sunday_agendas DROP COLUMN opening_prayer_member_id,
+      opening_prayer_name, closing_prayer_member_id, closing_prayer_name.
+      (5) CREATE OR REPLACE FUNCTION enqueue_speech_notification() with
+      manage_prayers check: for positions 0/4, SELECT manage_prayers FROM wards;
+      if false, RETURN NEW (skip notification). All other cases unchanged.
+    files:
+      - "supabase/migrations/019_managed_prayers.sql"
+    dependencies: []
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "Migration file exists at supabase/migrations/019_managed_prayers.sql"
+      - "ALTER TABLE wards adds manage_prayers BOOLEAN NOT NULL DEFAULT false"
+      - "ALTER TABLE wards adds whatsapp_template_opening_prayer TEXT (nullable)"
+      - "ALTER TABLE wards adds whatsapp_template_closing_prayer TEXT (nullable)"
+      - "INSERT INTO speeches for position 0 from opening_prayer_* with ON CONFLICT DO NOTHING"
+      - "INSERT INTO speeches for position 4 from closing_prayer_* with ON CONFLICT DO NOTHING"
+      - "ALTER TABLE sunday_agendas drops 4 prayer columns"
+      - "enqueue_speech_notification() checks manage_prayers for positions 0/4"
+      - "Trigger skips notification for prayer positions when manage_prayers=false"
+      - "Trigger enqueues notification for prayer positions when manage_prayers=true"
+      - "Existing speech notification behavior for positions 1/2/3 is unchanged"
+    tests:
+      - type: unit
+        description: "Verify migration SQL is valid and contains all 5 operations in correct order"
+      - type: unit
+        description: "Verify ON CONFLICT DO NOTHING clause in both INSERT statements"
+      - type: unit
+        description: "Verify trigger function checks manage_prayers for positions 0 and 4"
+    covers:
+      acceptance_criteria: ["AC-157-01", "AC-157-02", "AC-157-03", "AC-157-04", "AC-157-05", "AC-157-06", "AC-157-12", "AC-157-20"]
+      edge_cases: ["EC-157-01"]
+    risks:
+      - risk: "Data loss if columns dropped before data copied"
+        mitigation: "Migration enforces strict order: copy THEN drop. INSERT runs before ALTER DROP."
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: i18n - Add all new prayer strings to 3 locales
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    description: >
+      Add all new i18n keys for CR-221 to pt-BR.json, en.json, es.json:
+      - tabs.speechesAndPrayers
+      - home.nextSpeechesAndPrayers
+      - prayers.opening / prayers.closing / prayers.prayerPrefix
+      - settings.managePrayers
+      - whatsapp.tabSpeech / whatsapp.tabOpeningPrayer / whatsapp.tabClosingPrayer
+      - speeches.openingPrayer / speeches.closingPrayer
+      - sundayExceptions.confirmDeletePrayers / sundayExceptions.confirmDeleteBoth
+      - whatsapp.defaultOpeningPrayerTemplate / whatsapp.defaultClosingPrayerTemplate
+      All translations per SPEC_F157 AC-157-61 values.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "pt-BR.json has tabs.speechesAndPrayers = 'Discursos e Oracoes'"
+      - "en.json has tabs.speechesAndPrayers = 'Speeches & Prayers'"
+      - "es.json has tabs.speechesAndPrayers = 'Discursos y Oraciones'"
+      - "pt-BR.json has home.nextSpeechesAndPrayers = 'Proximos Discursos e Oracoes'"
+      - "en.json has home.nextSpeechesAndPrayers = 'Upcoming Speeches & Prayers'"
+      - "es.json has home.nextSpeechesAndPrayers = 'Proximos Discursos y Oraciones'"
+      - "prayers.opening, prayers.closing, prayers.prayerPrefix present in all 3 locales"
+      - "settings.managePrayers present in all 3 locales"
+      - "whatsapp.tabSpeech, whatsapp.tabOpeningPrayer, whatsapp.tabClosingPrayer present in all 3 locales"
+      - "speeches.openingPrayer, speeches.closingPrayer present in all 3 locales"
+      - "sundayExceptions.confirmDeletePrayers, sundayExceptions.confirmDeleteBoth present in all 3 locales"
+    tests:
+      - type: unit
+        description: "Verify all new i18n keys exist in all 3 locale files"
+      - type: unit
+        description: "Verify prayer template default strings contain {nome} and {data} placeholders"
+    covers:
+      acceptance_criteria: ["AC-157-61"]
+      edge_cases: []
+    risks:
+      - risk: "Key namespace collisions with existing keys"
+        mitigation: "Use prayers.* and whatsapp.tab* namespaces which are new"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: TypeScript type updates - Ward + SundayAgenda + Speech
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    description: >
+      Update src/types/database.ts:
+      (1) Ward interface: add manage_prayers: boolean,
+      whatsapp_template_opening_prayer: string | null,
+      whatsapp_template_closing_prayer: string | null.
+      (2) SundayAgenda interface: remove opening_prayer_member_id,
+      opening_prayer_name, closing_prayer_member_id, closing_prayer_name fields.
+      (3) Speech interface: update position comment from '1, 2, or 3' to
+      '0, 1, 2, 3, or 4'.
+    files:
+      - "src/types/database.ts"
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "Ward interface has manage_prayers: boolean"
+      - "Ward interface has whatsapp_template_opening_prayer: string | null"
+      - "Ward interface has whatsapp_template_closing_prayer: string | null"
+      - "SundayAgenda interface does NOT have opening_prayer_member_id"
+      - "SundayAgenda interface does NOT have opening_prayer_name"
+      - "SundayAgenda interface does NOT have closing_prayer_member_id"
+      - "SundayAgenda interface does NOT have closing_prayer_name"
+      - "Speech interface position comment mentions 0, 1, 2, 3, or 4"
+    tests:
+      - type: unit
+        description: "TypeScript compiles without errors after type changes"
+    covers:
+      acceptance_criteria: ["AC-157-01", "AC-157-02", "AC-157-03", "AC-157-05"]
+      edge_cases: []
+    risks:
+      - risk: "Compilation errors from removed SundayAgenda fields"
+        mitigation: "Step 03 lands first so subsequent steps can fix consumers"
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: useWardManagePrayers hook
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    description: >
+      Add new hook useWardManagePrayers() to src/hooks/useSpeeches.ts:
+      - Queries wards table by wardId from AuthContext
+      - Selects manage_prayers column
+      - Uses TanStack Query with key ['ward', wardId, 'managePrayers']
+      - Returns { managePrayers: boolean; isLoading: boolean }
+      - Returns false as default when loading or no data
+    files:
+      - "src/hooks/useSpeeches.ts"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-05", "STEP-06"]
+    done_when:
+      - "useWardManagePrayers hook is exported from src/hooks/useSpeeches.ts"
+      - "Hook queries wards table for manage_prayers by wardId"
+      - "Hook returns { managePrayers: boolean; isLoading: boolean }"
+      - "managePrayers defaults to false when loading"
+      - "Query key is ['ward', wardId, 'managePrayers']"
+    tests:
+      - type: unit
+        description: "useWardManagePrayers returns false when loading"
+      - type: unit
+        description: "useWardManagePrayers returns correct boolean from ward data"
+    covers:
+      acceptance_criteria: ["AC-157-58"]
+      edge_cases: []
+    risks:
+      - risk: "Query cache conflicts with existing ward queries"
+        mitigation: "Share queryKey prefix ['ward', wardId] for proper invalidation"
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: useLazyCreateSpeeches - type-aware positions
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    description: >
+      Modify useLazyCreateSpeeches in src/hooks/useSpeeches.ts:
+      - Change input from string (sundayDate) to { sundayDate: string; sundayType: SundayExceptionReason }
+      - For 'speeches' type: create positions [0, 1, 2, 3, 4]
+      - For 'testimony_meeting' and 'primary_presentation': create positions [0, 4] only
+      - For conference types and 'other': create no positions (empty array)
+      - Keep existing idempotency: if any records exist for (ward_id, sunday_date), skip all
+      - Update all callers in speeches.tsx to pass new input shape
+    files:
+      - "src/hooks/useSpeeches.ts"
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-04", "STEP-06"]
+    done_when:
+      - "useLazyCreateSpeeches mutationFn receives { sundayDate, sundayType }"
+      - "speeches type creates positions [0, 1, 2, 3, 4]"
+      - "testimony_meeting creates positions [0, 4]"
+      - "primary_presentation creates positions [0, 4]"
+      - "general_conference, stake_conference, ward_conference, other create no positions"
+      - "All callers in speeches.tsx pass { sundayDate, sundayType } object"
+      - "Idempotency preserved: existing records skip creation"
+    tests:
+      - type: unit
+        description: "Verify positions [0,1,2,3,4] for speeches type"
+      - type: unit
+        description: "Verify positions [0,4] for testimony_meeting type"
+      - type: unit
+        description: "Verify positions [0,4] for primary_presentation type"
+      - type: unit
+        description: "Verify no positions for conference types"
+    covers:
+      acceptance_criteria: ["AC-157-07", "AC-157-08", "AC-157-09", "AC-157-10"]
+      edge_cases: []
+    risks:
+      - risk: "Breaking change for callers not updated simultaneously"
+        mitigation: "Update all callers in same step"
+
+  # ---------------------------------------------------------------------------
+  # STEP-06: useDeleteSpeechesByDate - optional positions filter
+  # ---------------------------------------------------------------------------
+  - id: STEP-06
+    description: >
+      Modify useDeleteSpeechesByDate in src/hooks/useSpeeches.ts:
+      - Change input from string (sundayDate) to { sundayDate: string; positions?: number[] }
+      - When positions provided: DELETE WHERE position IN (positions)
+      - When positions omitted: DELETE all (backward compatible)
+      - Update all callers to pass new input shape
+    files:
+      - "src/hooks/useSpeeches.ts"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-04", "STEP-05"]
+    done_when:
+      - "useDeleteSpeechesByDate mutationFn receives { sundayDate, positions? }"
+      - "When positions provided, DELETE includes AND position IN (...) filter"
+      - "When positions omitted, deletes all (backward compatible)"
+      - "All callers pass new input shape"
+    tests:
+      - type: unit
+        description: "Verify selective deletion with positions=[1,2,3]"
+      - type: unit
+        description: "Verify full deletion when positions omitted"
+    covers:
+      acceptance_criteria: ["AC-157-46", "AC-157-47", "AC-157-48", "AC-157-49", "AC-157-50"]
+      edge_cases: []
+    risks:
+      - risk: "Breaking change for callers"
+        mitigation: "Update callers in same step; omitted positions preserves old behavior"
+
+  # ---------------------------------------------------------------------------
+  # STEP-07: Settings toggle - manage_prayers in Ward Settings
+  # ---------------------------------------------------------------------------
+  - id: STEP-07
+    description: >
+      Add manage_prayers toggle in src/app/(tabs)/settings/index.tsx:
+      - Fetch ward manage_prayers value via Supabase query
+      - Render Switch toggle labeled t('settings.managePrayers') in ward settings group
+      - Toggle calls supabase.from('wards').update({ manage_prayers: value })
+      - Invalidate ward query keys on success (including ['ward', wardId, 'managePrayers'])
+      - Only visible to Bispado role (hasPermission check)
+      - Log action via logAction with 'settings:manage_prayers' action type
+    files:
+      - "src/app/(tabs)/settings/index.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "manage_prayers Switch toggle renders in ward settings for Bispado"
+      - "Toggle is NOT visible to Secretario or Observador"
+      - "Toggle updates wards.manage_prayers in Supabase"
+      - "Query keys invalidated on success"
+      - "Activity log records 'settings:manage_prayers' action"
+      - "Toggle label uses t('settings.managePrayers')"
+    tests:
+      - type: unit
+        description: "Verify toggle renders for Bispado role"
+      - type: unit
+        description: "Verify toggle hidden for Secretario/Observador"
+      - type: unit
+        description: "Verify toggle calls supabase update on wards"
+    covers:
+      acceptance_criteria: ["AC-157-57", "AC-157-58"]
+      edge_cases: []
+    risks:
+      - risk: "Toggle may appear in wrong section of settings"
+        mitigation: "Place in ward configuration section near existing ward settings"
+
+  # ---------------------------------------------------------------------------
+  # STEP-08: SpeechSlot - isPrayer prop
+  # ---------------------------------------------------------------------------
+  - id: STEP-08
+    description: >
+      Add isPrayer prop to SpeechSlot in src/components/SpeechSlot.tsx:
+      - New optional prop isPrayer?: boolean (default false)
+      - When isPrayer=true: hide topic row entirely (no topic field, no topic action area)
+      - When isPrayer=true: hide 2nd speech toggle (position === 2 check also requires !isPrayer)
+      - Update getPositionLabel: position 0 -> t('prayers.opening'), position 4 -> t('prayers.closing')
+      - When isPrayer=false: no changes to current behavior
+    files:
+      - "src/components/SpeechSlot.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-09"]
+    done_when:
+      - "SpeechSlot accepts isPrayer?: boolean prop"
+      - "When isPrayer=true, topic row is not rendered"
+      - "When isPrayer=true, 2nd speech toggle is not rendered"
+      - "getPositionLabel returns t('prayers.opening') for position 0"
+      - "getPositionLabel returns t('prayers.closing') for position 4"
+      - "When isPrayer=false, behavior identical to current"
+    tests:
+      - type: unit
+        description: "Verify topic row hidden when isPrayer=true"
+      - type: unit
+        description: "Verify 2nd speech toggle hidden when isPrayer=true"
+      - type: unit
+        description: "Verify prayer labels for positions 0 and 4"
+      - type: unit
+        description: "Verify unchanged behavior when isPrayer=false"
+    covers:
+      acceptance_criteria: ["AC-157-28", "AC-157-29"]
+      edge_cases: []
+    risks:
+      - risk: "Conditional rendering may break existing layout"
+        mitigation: "isPrayer defaults to false, so existing usage is unaffected"
+
+  # ---------------------------------------------------------------------------
+  # STEP-09: Speeches tab - render prayer SpeechSlots
+  # ---------------------------------------------------------------------------
+  - id: STEP-09
+    description: >
+      Extend src/app/(tabs)/speeches.tsx to render prayer slots:
+      - Import and call useWardManagePrayers()
+      - When managePrayers=true in expanded card:
+        - Render SpeechSlot(isPrayer=true, position=0) BEFORE speech slots
+        - Render SpeechSlot(isPrayer=true, position=4) AFTER speech slots
+      - When managePrayers=false: do NOT render positions 0/4 (current behavior)
+      - For testimony_meeting/primary_presentation with managePrayers=true:
+        render only prayer slots (0, 4), no speech slots (1, 2, 3)
+      - handleAssignSpeaker: when managePrayers=false and position is 0/4,
+        pass status='assigned_confirmed' override
+      - visiblePositions logic: include 0/4 when managePrayers=true
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-04", "STEP-05", "STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "Prayer SpeechSlots render for positions 0/4 when managePrayers=true"
+      - "Position 0 renders BEFORE speech slots"
+      - "Position 4 renders AFTER speech slots"
+      - "Positions 0/4 NOT rendered when managePrayers=false"
+      - "Testimony/primary shows only prayer slots when managePrayers=true"
+      - "Testimony/primary shows nothing when managePrayers=false"
+      - "Prayer assignment uses MemberSelectorModal (via SpeechSlot) when managePrayers=true"
+      - "Prayer status is 'assigned_not_invited' when managePrayers=true"
+      - "Prayer status is 'assigned_confirmed' when managePrayers=false and assigned via this tab"
+    tests:
+      - type: unit
+        description: "Verify prayer slots render before/after speech slots when ON"
+      - type: unit
+        description: "Verify prayer slots hidden when OFF"
+      - type: unit
+        description: "Verify testimony/primary shows only prayer slots when ON"
+      - type: unit
+        description: "Verify status override to assigned_confirmed when OFF"
+    covers:
+      acceptance_criteria: ["AC-157-11", "AC-157-18", "AC-157-19", "AC-157-21", "AC-157-27", "AC-157-30", "AC-157-64"]
+      edge_cases: ["EC-157-04", "EC-157-09"]
+    risks:
+      - risk: "Visible positions logic may conflict with has_second_speech"
+        mitigation: "Combine both flags: managePrayers adds 0/4, has_second_speech controls 2"
+
+  # ---------------------------------------------------------------------------
+  # STEP-10: SundayCard collapsed - prayer lines
+  # ---------------------------------------------------------------------------
+  - id: STEP-10
+    description: >
+      Add prayer lines to collapsed SundayCard (src/components/SundayCard.tsx):
+      - New prop managePrayers?: boolean (default false)
+      - When managePrayers=true and isSpeechesType (speeches):
+        - Render prayer line (pos 0) BEFORE speech lines with italic font
+          and '(Oracao)' prefix from t('prayers.prayerPrefix'), no LED
+        - Render prayer line (pos 4) AFTER speech lines, same format
+      - When managePrayers=true and testimony_meeting/primary_presentation:
+        - Render 2 prayer lines (pos 0, pos 4) instead of exception text
+        - Same italic + prefix format
+      - When managePrayers=false: no change to current layout
+      - Pass managePrayers prop from speeches.tsx parent
+      - visiblePositions includes 0/4 when managePrayers=true
+      - Adjust minHeight if needed for 5-line cards
+    files:
+      - "src/components/SundayCard.tsx"
+      - "src/app/(tabs)/speeches.tsx"
+    dependencies: ["STEP-04", "STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "SundayCard accepts managePrayers?: boolean prop"
+      - "Collapsed speeches card shows 5 lines when managePrayers=true and has_second_speech=true"
+      - "Collapsed speeches card shows 4 lines when managePrayers=true and has_second_speech=false"
+      - "Collapsed testimony/primary card shows 2 prayer lines when managePrayers=true"
+      - "Prayer lines use italic font style"
+      - "Prayer lines have t('prayers.prayerPrefix') prefix"
+      - "Prayer lines do NOT have LED indicators"
+      - "Conference/other cards unchanged (1 line)"
+      - "When managePrayers=false, layout identical to current"
+      - "speeches.tsx passes managePrayers prop to SundayCard"
+    tests:
+      - type: unit
+        description: "Verify 5-line card for speeches type with manage_prayers ON and has_second_speech"
+      - type: unit
+        description: "Verify 4-line card for speeches type with manage_prayers ON and no 2nd speech"
+      - type: unit
+        description: "Verify 2-line card for testimony/primary with manage_prayers ON"
+      - type: unit
+        description: "Verify prayer lines italic + prefix"
+      - type: unit
+        description: "Verify no change when manage_prayers OFF"
+    covers:
+      acceptance_criteria: ["AC-157-31", "AC-157-32", "AC-157-33", "AC-157-34", "AC-157-35", "AC-157-36"]
+      edge_cases: ["EC-157-11"]
+    risks:
+      - risk: "Card height may not accommodate 5 lines"
+        mitigation: "Increase minHeight from 62px if needed, test visually"
+
+  # ---------------------------------------------------------------------------
+  # STEP-11: AgendaForm - prayer data source change + conditional editing
+  # ---------------------------------------------------------------------------
+  - id: STEP-11
+    description: >
+      Modify src/components/AgendaForm.tsx:
+      - Import useWardManagePrayers hook
+      - Replace reading prayer data from agenda.opening_prayer_name / closing_prayer_name
+        with getSpeech(0)?.speaker_name / getSpeech(4)?.speaker_name
+      - When manage_prayers=false (toggle OFF):
+        - PrayerSelector writes to speeches table (position 0 or 4) via
+          useAssignSpeaker with status='assigned_confirmed'
+        - PrayerSelector clears via useRemoveAssignment
+        - Behavior identical to current UX (members + custom names)
+      - When manage_prayers=true (toggle ON):
+        - Prayer fields become read-only Text with pencil icon
+        - Tapping field/pencil navigates to Speeches tab with expandDate param
+        - router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })
+      - Remove all references to agenda.opening_prayer_* and agenda.closing_prayer_* fields
+      - Remove prayer-related updateAgenda.mutate calls
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-04", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "Opening prayer reads from getSpeech(0)?.speaker_name"
+      - "Closing prayer reads from getSpeech(4)?.speaker_name"
+      - "When OFF: PrayerSelector opens for prayer fields"
+      - "When OFF: PrayerSelector writes to speeches via useAssignSpeaker with status='assigned_confirmed'"
+      - "When OFF: custom names work (memberId=null, speakerName set)"
+      - "When ON: prayer fields are read-only Text"
+      - "When ON: pencil icon shown next to prayer name"
+      - "When ON: tapping navigates to Speeches tab with expandDate"
+      - "No references to agenda.opening_prayer_* or agenda.closing_prayer_*"
+      - "No prayer-related updateAgenda.mutate calls"
+    tests:
+      - type: unit
+        description: "Verify prayer data reads from speeches positions 0/4"
+      - type: unit
+        description: "Verify PrayerSelector works when toggle OFF"
+      - type: unit
+        description: "Verify read-only + pencil when toggle ON"
+      - type: unit
+        description: "Verify navigation to Speeches tab when pencil tapped"
+      - type: unit
+        description: "Verify custom name assignment stores memberId=null"
+    covers:
+      acceptance_criteria: ["AC-157-13", "AC-157-22", "AC-157-37", "AC-157-38", "AC-157-39", "AC-157-40", "AC-157-59"]
+      edge_cases: ["EC-157-03", "EC-157-05", "EC-157-06"]
+    risks:
+      - risk: "PrayerSelector onSelect callback needs speech record to exist"
+        mitigation: "useLazyCreateSpeeches now creates positions 0/4, so records exist when agenda expands"
+
+  # ---------------------------------------------------------------------------
+  # STEP-12: Agenda collapsed card - prayer count from speeches
+  # ---------------------------------------------------------------------------
+  - id: STEP-12
+    description: >
+      Update src/app/(tabs)/agenda.tsx:
+      - Change prayer count calculation for 'Oracoes Y/2' line in collapsed card
+      - Count speeches with position IN (0, 4) AND speaker_name IS NOT NULL
+      - Replace any references to agenda.opening_prayer_name/closing_prayer_name
+        in collapsed card with speeches data
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-11"]
+    done_when:
+      - "Collapsed card prayer count reads from speeches positions 0/4"
+      - "Prayer count format is 'Oracoes Y/2' where Y is count of assigned prayers"
+      - "No references to agenda.opening_prayer_name or agenda.closing_prayer_name"
+    tests:
+      - type: unit
+        description: "Verify prayer count reads from speeches positions 0/4"
+      - type: unit
+        description: "Verify count is 0, 1, or 2 based on assigned prayers"
+    covers:
+      acceptance_criteria: ["AC-157-41"]
+      edge_cases: ["EC-157-02"]
+    risks:
+      - risk: "Agenda data fetch may not include speeches"
+        mitigation: "Extend data fetch in agenda.tsx to include speeches or use separate query"
+
+  # ---------------------------------------------------------------------------
+  # STEP-13: Home tab - dynamic section title + prayer count
+  # ---------------------------------------------------------------------------
+  - id: STEP-13
+    description: >
+      Update src/app/(tabs)/index.tsx:
+      - Import useWardManagePrayers hook
+      - Next assignments section title: t('home.nextSpeechesAndPrayers') when ON,
+        t('home.nextSpeeches') when OFF
+      - Preview card 'Oracoes Y/2' line: read from speeches positions 0/4
+      - Prayer cards in next assignments are not expandable, have pencil button
+        that navigates to Speeches tab with expandDate
+    files:
+      - "src/app/(tabs)/index.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: ["STEP-14"]
+    done_when:
+      - "Section title is t('home.nextSpeechesAndPrayers') when managePrayers=true"
+      - "Section title is t('home.nextSpeeches') when managePrayers=false"
+      - "Preview card prayer count reads from speeches positions 0/4"
+      - "Prayer cards are not expandable when manage_prayers=true"
+      - "Prayer cards have pencil button navigating to Speeches tab"
+    tests:
+      - type: unit
+        description: "Verify section title changes based on manage_prayers"
+      - type: unit
+        description: "Verify prayer count from speeches positions 0/4"
+      - type: unit
+        description: "Verify prayer cards not expandable"
+    covers:
+      acceptance_criteria: ["AC-157-16", "AC-157-25", "AC-157-42", "AC-157-43", "AC-157-44"]
+      edge_cases: []
+    risks:
+      - risk: "Prayer cards may conflict with existing NextAssignmentsSection layout"
+        mitigation: "Prayer cards follow same pattern as speech cards but without accordion"
+
+  # ---------------------------------------------------------------------------
+  # STEP-14: InviteManagementSection - prayer positions
+  # ---------------------------------------------------------------------------
+  - id: STEP-14
+    description: >
+      Modify src/components/InviteManagementSection.tsx:
+      - Accept new prop managePrayers?: boolean
+      - When managePrayers=true: include positions 0/4 in getInviteItems filter
+      - Position 0 label: t('speeches.openingPrayer')
+      - Position 4 label: t('speeches.closingPrayer')
+      - When managePrayers=false: filter out positions 0/4 (current behavior)
+      - WhatsApp template selection: use whatsapp_template_opening_prayer for
+        pos 0, whatsapp_template_closing_prayer for pos 4, existing
+        whatsapp_template for pos 1/2/3
+      - Pass managePrayers from Home tab (index.tsx)
+    files:
+      - "src/components/InviteManagementSection.tsx"
+      - "src/app/(tabs)/index.tsx"
+    dependencies: ["STEP-04", "STEP-13"]
+    parallelizable_with: []
+    done_when:
+      - "InviteManagementSection accepts managePrayers?: boolean prop"
+      - "Positions 0/4 included in invite items when managePrayers=true"
+      - "Position 0 labeled t('speeches.openingPrayer')"
+      - "Position 4 labeled t('speeches.closingPrayer')"
+      - "Positions 0/4 excluded when managePrayers=false"
+      - "Correct WhatsApp template used per position"
+      - "Home tab passes managePrayers prop"
+    tests:
+      - type: unit
+        description: "Verify positions 0/4 included when managePrayers=true"
+      - type: unit
+        description: "Verify positions 0/4 excluded when managePrayers=false"
+      - type: unit
+        description: "Verify prayer labels for positions 0 and 4"
+      - type: unit
+        description: "Verify correct template selection by position"
+    covers:
+      acceptance_criteria: ["AC-157-17", "AC-157-26"]
+      edge_cases: ["EC-157-12"]
+    risks:
+      - risk: "Template resolution may use wrong template for prayer"
+        mitigation: "Explicit position-to-template mapping in template selection logic"
+
+  # ---------------------------------------------------------------------------
+  # STEP-15: Tab layout - dynamic label
+  # ---------------------------------------------------------------------------
+  - id: STEP-15
+    description: >
+      Update src/app/(tabs)/_layout.tsx:
+      - Import useWardManagePrayers hook
+      - Speeches tab title: t('tabs.speechesAndPrayers') when managePrayers=true,
+        t('tabs.speeches') when managePrayers=false
+    files:
+      - "src/app/(tabs)/_layout.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: ["STEP-13"]
+    done_when:
+      - "Speeches tab label is t('tabs.speechesAndPrayers') when managePrayers=true"
+      - "Speeches tab label is t('tabs.speeches') when managePrayers=false"
+    tests:
+      - type: unit
+        description: "Verify tab label changes based on manage_prayers"
+    covers:
+      acceptance_criteria: ["AC-157-15", "AC-157-24"]
+      edge_cases: []
+    risks:
+      - risk: "Hook call in _layout.tsx may fire before auth context is ready"
+        mitigation: "useWardManagePrayers returns false (default) when loading"
+
+  # ---------------------------------------------------------------------------
+  # STEP-16: WhatsApp prayer templates - defaults + utility
+  # ---------------------------------------------------------------------------
+  - id: STEP-16
+    description: >
+      Update src/lib/whatsappUtils.ts:
+      - Add DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants
+      - Add DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR, _EN, _ES constants
+      - Template texts per SPEC AC-157-52 and AC-157-53 and AC-157-55
+      - New function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string
+      - Prayer templates use only {nome} and {data} placeholders
+      - Update buildWhatsAppUrl or equivalent to accept optional templateType
+        for selecting correct template by position
+    files:
+      - "src/lib/whatsappUtils.ts"
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-08"]
+    done_when:
+      - "6 default prayer template constants exist (2 types x 3 languages)"
+      - "getDefaultPrayerTemplate function exported"
+      - "Opening prayer templates mention arriving 15 minutes early"
+      - "Closing prayer templates mention joining during intermediate hymn"
+      - "Templates contain only {nome} and {data} placeholders"
+      - "buildWhatsAppUrl can select template by position"
+    tests:
+      - type: unit
+        description: "Verify getDefaultPrayerTemplate returns correct template for each language/type"
+      - type: unit
+        description: "Verify templates contain {nome} and {data} but NOT {posicao}, {colecao}, etc."
+    covers:
+      acceptance_criteria: ["AC-157-52", "AC-157-53", "AC-157-54", "AC-157-55"]
+      edge_cases: []
+    risks:
+      - risk: "Template text may need fine-tuning"
+        mitigation: "Use exact text from SPEC AC-157-52/53/55"
+
+  # ---------------------------------------------------------------------------
+  # STEP-17: WhatsApp settings - segmented control
+  # ---------------------------------------------------------------------------
+  - id: STEP-17
+    description: >
+      Update src/app/(tabs)/settings/whatsapp.tsx:
+      - Import useWardManagePrayers hook
+      - When managePrayers=true: show segmented control with 3 tabs:
+        'Discurso' (speech), 'Abertura' (opening prayer), 'Encerramento' (closing prayer)
+      - State: activeTab ('speech' | 'opening_prayer' | 'closing_prayer')
+      - Each tab has its own template state, editor, preview, and auto-save mutation
+      - Prayer tabs: PLACEHOLDER_TOKENS limited to ['{nome}', '{data}']
+      - Prayer tabs: ward column is whatsapp_template_opening_prayer / closing_prayer
+      - Prayer tabs: use getDefaultPrayerTemplate for defaults
+      - When managePrayers=false: no segmented control (single speech template)
+      - Fetch ward query updated to include whatsapp_template_opening_prayer,
+        whatsapp_template_closing_prayer
+    files:
+      - "src/app/(tabs)/settings/whatsapp.tsx"
+    dependencies: ["STEP-04", "STEP-16"]
+    parallelizable_with: []
+    done_when:
+      - "Segmented control with 3 tabs renders when managePrayers=true"
+      - "Segmented control hidden when managePrayers=false"
+      - "Speech tab shows all 6 placeholders"
+      - "Prayer tabs show only {nome} and {data} placeholders"
+      - "Prayer tabs save to whatsapp_template_opening_prayer / closing_prayer columns"
+      - "Prayer tabs use getDefaultPrayerTemplate for defaults"
+      - "Each tab has independent editor and preview"
+      - "Tab labels use i18n keys"
+    tests:
+      - type: unit
+        description: "Verify segmented control renders with 3 tabs when ON"
+      - type: unit
+        description: "Verify no segmented control when OFF"
+      - type: unit
+        description: "Verify prayer tabs have only 2 placeholders"
+      - type: unit
+        description: "Verify correct ward column per tab"
+    covers:
+      acceptance_criteria: ["AC-157-14", "AC-157-23", "AC-157-56"]
+      edge_cases: []
+    risks:
+      - risk: "Complex state management with 3 independent template editors"
+        mitigation: "Factor out template editor as reusable component or use per-tab state objects"
+
+  # ---------------------------------------------------------------------------
+  # STEP-18: Sunday type change - prayer preservation rules
+  # ---------------------------------------------------------------------------
+  - id: STEP-18
+    description: >
+      Update sunday type change logic in src/components/SundayCard.tsx:
+      - speeches -> testimony/primary: delete positions [1,2,3] only (preserve 0,4)
+      - speeches -> conference/other: delete positions [0,1,2,3,4]
+      - testimony/primary -> speeches: preserve [0,4], create [1,2,3]
+      - testimony/primary -> conference/other: delete positions [0,4]
+      - testimony <-> primary: preserve [0,4], no deletion
+      - Confirmation dialog text varies based on what will be deleted:
+        - Only speeches: t('sundayExceptions.changeConfirmMessage') (existing)
+        - Only prayers: t('sundayExceptions.confirmDeletePrayers')
+        - Both: t('sundayExceptions.confirmDeleteBoth')
+        - Nothing: no dialog
+      - Use useDeleteSpeechesByDate with positions parameter
+    files:
+      - "src/components/SundayCard.tsx"
+    dependencies: ["STEP-06", "STEP-10"]
+    parallelizable_with: []
+    done_when:
+      - "speeches -> testimony/primary deletes positions [1,2,3] only"
+      - "speeches -> conference/other deletes positions [0,1,2,3,4]"
+      - "testimony/primary -> speeches preserves [0,4], creates [1,2,3]"
+      - "testimony/primary -> conference/other deletes [0,4]"
+      - "testimony <-> primary preserves [0,4]"
+      - "Confirmation dialog shows correct text based on deletion scope"
+      - "No dialog when no deletion needed"
+      - "useDeleteSpeechesByDate called with positions parameter"
+    tests:
+      - type: unit
+        description: "Verify speeches -> testimony deletes only positions 1,2,3"
+      - type: unit
+        description: "Verify speeches -> conference deletes all positions"
+      - type: unit
+        description: "Verify testimony -> speeches preserves prayers"
+      - type: unit
+        description: "Verify testimony <-> primary preserves prayers"
+      - type: unit
+        description: "Verify dynamic confirmation dialog text"
+    covers:
+      acceptance_criteria: ["AC-157-46", "AC-157-47", "AC-157-48", "AC-157-49", "AC-157-50", "AC-157-51"]
+      edge_cases: []
+    risks:
+      - risk: "Complex state machine for type transitions"
+        mitigation: "Implement as lookup table mapping (oldType, newType) -> { deletePositions, createPositions, dialogKey }"
+
+  # ---------------------------------------------------------------------------
+  # STEP-19: Presentation mode - prayer data source
+  # ---------------------------------------------------------------------------
+  - id: STEP-19
+    description: >
+      Update src/hooks/usePresentationMode.ts:
+      - Replace reading agenda.opening_prayer_name with
+        speeches.find(s => s.position === 0)?.speaker_name
+      - Replace reading agenda.closing_prayer_name with
+        speeches.find(s => s.position === 4)?.speaker_name
+      - No visual changes to presentation mode output
+    files:
+      - "src/hooks/usePresentationMode.ts"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-11", "STEP-12"]
+    done_when:
+      - "Opening prayer reads from speeches position 0"
+      - "Closing prayer reads from speeches position 4"
+      - "No references to agenda.opening_prayer_name or agenda.closing_prayer_name"
+      - "Presentation mode display unchanged"
+    tests:
+      - type: unit
+        description: "Verify prayer data comes from speeches positions 0/4"
+      - type: unit
+        description: "Verify no references to removed agenda prayer columns"
+    covers:
+      acceptance_criteria: ["AC-157-45"]
+      edge_cases: ["EC-157-10", "EC-157-13"]
+    risks:
+      - risk: "Speeches data may not be fetched in presentation mode"
+        mitigation: "usePresentationMode likely already fetches speeches; verify and extend query if needed"
+
+  # ---------------------------------------------------------------------------
+  # STEP-20: Permissions - prayer assignment follows speech permissions
+  # ---------------------------------------------------------------------------
+  - id: STEP-20
+    description: >
+      Verify and enforce prayer permissions across all prayer assignment points:
+      - Speeches tab: Bispado can assign, Secretario cannot (same as speeches),
+        Observador read-only
+      - Home tab pencil: same permissions as speech assignment
+      - Agenda tab: Secretario CAN assign via PrayerSelector when manage_prayers=false
+        (same exception as current CR-31 behavior)
+      - Agenda tab: when manage_prayers=true, fields are read-only for everyone
+        (pencil navigates to Speeches tab where permissions apply)
+      - Observador sees prayer slots in Speeches tab as disabled when manage_prayers=true
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/components/AgendaForm.tsx"
+      - "src/app/(tabs)/index.tsx"
+    dependencies: ["STEP-09", "STEP-11", "STEP-13"]
+    parallelizable_with: []
+    done_when:
+      - "Bispado can assign prayers via Speeches tab"
+      - "Secretario cannot assign prayers via Speeches tab"
+      - "Observador sees prayer slots as disabled/read-only"
+      - "Secretario can assign prayers via AgendaForm PrayerSelector when toggle OFF"
+      - "AgendaForm prayer fields read-only for all roles when toggle ON"
+    tests:
+      - type: unit
+        description: "Verify Bispado can assign prayers in Speeches tab"
+      - type: unit
+        description: "Verify Secretario cannot assign in Speeches tab"
+      - type: unit
+        description: "Verify Observador sees disabled prayer slots"
+      - type: unit
+        description: "Verify Secretario can assign via AgendaForm when OFF"
+    covers:
+      acceptance_criteria: ["AC-157-59", "AC-157-60", "AC-157-64"]
+      edge_cases: []
+    risks:
+      - risk: "Permission checks may be scattered across components"
+        mitigation: "Reuse existing hasPermission checks from speech assignment logic"
+
+  # ---------------------------------------------------------------------------
+  # STEP-21: Regression - existing wards unaffected + toggle ON/OFF cycle
+  # ---------------------------------------------------------------------------
+  - id: STEP-21
+    description: >
+      Verify and ensure regression safety:
+      - Existing wards with manage_prayers=false work exactly as before migration
+      - Prayers appear in agenda as PrayerSelector fields
+      - No prayer slots in Speeches tab when OFF
+      - No changes to tab names or section titles when OFF
+      - Toggling ON then OFF restores original behavior:
+        - Speeches tab name reverts to 'Discursos'
+        - Home section title reverts
+        - Agenda prayer fields become editable PrayerSelector
+        - Prayer slots disappear from Speeches tab
+        - Invite management hides prayers
+        - WhatsApp settings hide prayer template tabs
+      - Realtime sync for prayer positions works via existing speeches subscription
+      - Activity log for prayer actions uses existing structured format
+      - Offline queue works for prayer mutations
+    files:
+      - "__tests__/batch25.test.ts"
+    dependencies: ["STEP-09", "STEP-10", "STEP-11", "STEP-13", "STEP-14", "STEP-15", "STEP-17"]
+    parallelizable_with: []
+    done_when:
+      - "All regression scenarios pass in tests"
+      - "Toggle OFF behavior matches pre-CR-221 behavior"
+      - "Toggle ON/OFF cycle restores original state"
+      - "Realtime sync picks up prayer position changes"
+    tests:
+      - type: unit
+        description: "Verify manage_prayers=false wards see no prayer changes"
+      - type: unit
+        description: "Verify toggle ON then OFF restores original UX"
+      - type: unit
+        description: "Verify realtime subscription includes positions 0/4"
+    covers:
+      acceptance_criteria: ["AC-157-62", "AC-157-63"]
+      edge_cases: ["EC-157-05", "EC-157-06", "EC-157-07", "EC-157-08", "EC-157-09", "EC-157-11"]
+    risks:
+      - risk: "Regression in existing features"
+        mitigation: "Run full test suite before and after changes"
+
+  # ---------------------------------------------------------------------------
+  # STEP-22: Comprehensive tests for F157
+  # ---------------------------------------------------------------------------
+  - id: STEP-22
+    description: >
+      Create or update test file __tests__/batch25.test.ts covering all F157
+      acceptance criteria and edge cases. Tests organized by area:
+      - Migration: SQL structure validation
+      - Types: Ward, SundayAgenda, Speech interface shapes
+      - Hooks: useLazyCreateSpeeches positions by type, useDeleteSpeechesByDate with filter,
+        useWardManagePrayers return values
+      - SpeechSlot: isPrayer prop behavior (topic hidden, labels, toggle hidden)
+      - Speeches tab: prayer slots rendering by toggle state and sunday type
+      - SundayCard collapsed: prayer lines by toggle state and sunday type
+      - AgendaForm: prayer data source, PrayerSelector vs read-only by toggle
+      - Agenda collapsed: prayer count from speeches
+      - Home tab: dynamic title, prayer count, prayer cards
+      - InviteManagement: positions 0/4 inclusion/exclusion
+      - Tab layout: dynamic label
+      - Settings: manage_prayers toggle visibility/behavior
+      - WhatsApp: segmented control, prayer templates, placeholders
+      - Sunday type change: preservation rules, confirmation dialogs
+      - Presentation mode: prayer data source
+      - Permissions: role-based prayer assignment
+      - Regression: toggle OFF unchanged, toggle cycle
+      - i18n: all new keys in all 3 locales
+      - Edge cases: EC-157-01 through EC-157-13
+      Update TEST_CONSOLIDATED.yaml with F157 entries.
+    files:
+      - "__tests__/batch25.test.ts"
+      - "__tests__/TEST_CONSOLIDATED.yaml"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09", "STEP-10", "STEP-11", "STEP-12", "STEP-13", "STEP-14", "STEP-15", "STEP-16", "STEP-17", "STEP-18", "STEP-19", "STEP-20", "STEP-21"]
+    parallelizable_with: []
+    done_when:
+      - "Test file __tests__/batch25.test.ts exists"
+      - "Tests cover all 64 ACs (AC-157-01 through AC-157-64)"
+      - "Tests cover all 13 ECs (EC-157-01 through EC-157-13)"
+      - "All tests pass (vitest)"
+      - "TEST_CONSOLIDATED.yaml updated with F157 entries"
+    tests:
+      - type: unit
+        description: "All test assertions pass with vitest"
+    covers:
+      acceptance_criteria: ["AC-157-01", "AC-157-02", "AC-157-03", "AC-157-04", "AC-157-05", "AC-157-06", "AC-157-07", "AC-157-08", "AC-157-09", "AC-157-10", "AC-157-11", "AC-157-12", "AC-157-13", "AC-157-14", "AC-157-15", "AC-157-16", "AC-157-17", "AC-157-18", "AC-157-19", "AC-157-20", "AC-157-21", "AC-157-22", "AC-157-23", "AC-157-24", "AC-157-25", "AC-157-26", "AC-157-27", "AC-157-28", "AC-157-29", "AC-157-30", "AC-157-31", "AC-157-32", "AC-157-33", "AC-157-34", "AC-157-35", "AC-157-36", "AC-157-37", "AC-157-38", "AC-157-39", "AC-157-40", "AC-157-41", "AC-157-42", "AC-157-43", "AC-157-44", "AC-157-45", "AC-157-46", "AC-157-47", "AC-157-48", "AC-157-49", "AC-157-50", "AC-157-51", "AC-157-52", "AC-157-53", "AC-157-54", "AC-157-55", "AC-157-56", "AC-157-57", "AC-157-58", "AC-157-59", "AC-157-60", "AC-157-61", "AC-157-62", "AC-157-63", "AC-157-64"]
+      edge_cases: ["EC-157-01", "EC-157-02", "EC-157-03", "EC-157-04", "EC-157-05", "EC-157-06", "EC-157-07", "EC-157-08", "EC-157-09", "EC-157-10", "EC-157-11", "EC-157-12", "EC-157-13"]
+    risks:
+      - risk: "Large test file may be hard to maintain"
+        mitigation: "Organize tests by area using describe blocks"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # --- DB Migration ---
+
+  - ac_id: AC-157-01
+    how_to_verify: "Check migration file for ALTER TABLE wards ADD COLUMN manage_prayers BOOLEAN NOT NULL DEFAULT false"
+    covered_by_steps: ["STEP-01", "STEP-03", "STEP-22"]
+
+  - ac_id: AC-157-02
+    how_to_verify: "Check migration file for ALTER TABLE wards ADD COLUMN whatsapp_template_opening_prayer TEXT"
+    covered_by_steps: ["STEP-01", "STEP-03", "STEP-22"]
+
+  - ac_id: AC-157-03
+    how_to_verify: "Check migration file for ALTER TABLE wards ADD COLUMN whatsapp_template_closing_prayer TEXT"
+    covered_by_steps: ["STEP-01", "STEP-03", "STEP-22"]
+
+  - ac_id: AC-157-04
+    how_to_verify: "Check migration INSERT statements copy prayer data with ON CONFLICT DO NOTHING"
+    covered_by_steps: ["STEP-01", "STEP-22"]
+
+  - ac_id: AC-157-05
+    how_to_verify: "Check migration DROP COLUMN statements for all 4 prayer columns"
+    covered_by_steps: ["STEP-01", "STEP-03", "STEP-22"]
+
+  - ac_id: AC-157-06
+    how_to_verify: "Verify speeches unique constraint accepts positions 0 and 4 (constraint on ward_id, sunday_date, position already exists)"
+    covered_by_steps: ["STEP-01", "STEP-22"]
+
+  # --- Auto-creation ---
+
+  - ac_id: AC-157-07
+    how_to_verify: "Test useLazyCreateSpeeches with type 'speeches' creates positions [0,1,2,3,4]"
+    covered_by_steps: ["STEP-05", "STEP-22"]
+
+  - ac_id: AC-157-08
+    how_to_verify: "Test useLazyCreateSpeeches with type 'testimony_meeting' creates positions [0,4] only"
+    covered_by_steps: ["STEP-05", "STEP-22"]
+
+  - ac_id: AC-157-09
+    how_to_verify: "Test useLazyCreateSpeeches with type 'primary_presentation' creates positions [0,4] only"
+    covered_by_steps: ["STEP-05", "STEP-22"]
+
+  - ac_id: AC-157-10
+    how_to_verify: "Test useLazyCreateSpeeches with conference/other types creates no positions"
+    covered_by_steps: ["STEP-05", "STEP-22"]
+
+  # --- Toggle OFF ---
+
+  - ac_id: AC-157-11
+    how_to_verify: "Test that prayer assignment when manage_prayers=false uses status 'assigned_confirmed'"
+    covered_by_steps: ["STEP-09", "STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-12
+    how_to_verify: "Verify trigger function skips notification for positions 0/4 when manage_prayers=false"
+    covered_by_steps: ["STEP-01", "STEP-22"]
+
+  - ac_id: AC-157-13
+    how_to_verify: "Test AgendaForm renders PrayerSelector when manage_prayers=false"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-14
+    how_to_verify: "Test WhatsApp settings shows no segmented control when manage_prayers=false"
+    covered_by_steps: ["STEP-17", "STEP-22"]
+
+  - ac_id: AC-157-15
+    how_to_verify: "Test tab label is t('tabs.speeches') when manage_prayers=false"
+    covered_by_steps: ["STEP-15", "STEP-22"]
+
+  - ac_id: AC-157-16
+    how_to_verify: "Test Home section title is t('home.nextSpeeches') when manage_prayers=false"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-17
+    how_to_verify: "Test InviteManagementSection excludes positions 0/4 when manage_prayers=false"
+    covered_by_steps: ["STEP-14", "STEP-22"]
+
+  - ac_id: AC-157-18
+    how_to_verify: "Test Speeches tab does NOT render positions 0/4 when manage_prayers=false"
+    covered_by_steps: ["STEP-09", "STEP-22"]
+
+  # --- Toggle ON ---
+
+  - ac_id: AC-157-19
+    how_to_verify: "Test that prayer assignment when manage_prayers=true uses status 'assigned_not_invited'"
+    covered_by_steps: ["STEP-09", "STEP-22"]
+
+  - ac_id: AC-157-20
+    how_to_verify: "Verify trigger function enqueues notification for positions 0/4 when manage_prayers=true"
+    covered_by_steps: ["STEP-01", "STEP-22"]
+
+  - ac_id: AC-157-21
+    how_to_verify: "Test Speeches tab uses MemberSelectorModal for prayer slots when manage_prayers=true"
+    covered_by_steps: ["STEP-09", "STEP-22"]
+
+  - ac_id: AC-157-22
+    how_to_verify: "Test AgendaForm prayer field is read-only with pencil icon when manage_prayers=true"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-23
+    how_to_verify: "Test WhatsApp settings shows 3-tab segmented control when manage_prayers=true"
+    covered_by_steps: ["STEP-17", "STEP-22"]
+
+  - ac_id: AC-157-24
+    how_to_verify: "Test tab label is t('tabs.speechesAndPrayers') when manage_prayers=true"
+    covered_by_steps: ["STEP-15", "STEP-22"]
+
+  - ac_id: AC-157-25
+    how_to_verify: "Test Home section title is t('home.nextSpeechesAndPrayers') when manage_prayers=true"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-26
+    how_to_verify: "Test InviteManagementSection includes positions 0/4 with prayer labels when manage_prayers=true"
+    covered_by_steps: ["STEP-14", "STEP-22"]
+
+  - ac_id: AC-157-27
+    how_to_verify: "Test prayer slots render before/after speech slots in expanded card"
+    covered_by_steps: ["STEP-09", "STEP-22"]
+
+  # --- Expanded Card Layout ---
+
+  - ac_id: AC-157-28
+    how_to_verify: "Test SpeechSlot with isPrayer=true, position=0 shows prayer label, no topic, status indicator"
+    covered_by_steps: ["STEP-08", "STEP-22"]
+
+  - ac_id: AC-157-29
+    how_to_verify: "Test SpeechSlot with isPrayer=true, position=4 shows prayer label, no topic, status indicator"
+    covered_by_steps: ["STEP-08", "STEP-22"]
+
+  - ac_id: AC-157-30
+    how_to_verify: "Test testimony/primary expanded card shows only positions 0/4 when manage_prayers=true"
+    covered_by_steps: ["STEP-09", "STEP-22"]
+
+  # --- Collapsed Card Layout ---
+
+  - ac_id: AC-157-31
+    how_to_verify: "Test collapsed card has max 5 lines when manage_prayers=true"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  - ac_id: AC-157-32
+    how_to_verify: "Test conference/other collapsed card shows 1 line when manage_prayers=true"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  - ac_id: AC-157-33
+    how_to_verify: "Test testimony/primary collapsed card shows 2 prayer lines when manage_prayers=true"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  - ac_id: AC-157-34
+    how_to_verify: "Test speeches collapsed card shows 5 lines (2 prayers + 3 speeches) when manage_prayers=true and has_second_speech=true"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  - ac_id: AC-157-35
+    how_to_verify: "Test speeches collapsed card shows 4 lines (2 prayers + 2 speeches) when manage_prayers=true and has_second_speech=false"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  - ac_id: AC-157-36
+    how_to_verify: "Test prayer lines use italic font with t('prayers.prayerPrefix') prefix, no LED"
+    covered_by_steps: ["STEP-10", "STEP-22"]
+
+  # --- Agenda Tab ---
+
+  - ac_id: AC-157-37
+    how_to_verify: "Test opening prayer reads from speeches position 0 in AgendaForm"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-38
+    how_to_verify: "Test closing prayer reads from speeches position 4 in AgendaForm"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-39
+    how_to_verify: "Test PrayerSelector editable and writes to speeches when manage_prayers=false"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-40
+    how_to_verify: "Test read-only field + pencil navigates to Speeches tab when manage_prayers=true"
+    covered_by_steps: ["STEP-11", "STEP-22"]
+
+  - ac_id: AC-157-41
+    how_to_verify: "Test agenda collapsed card 'Oracoes Y/2' reads from speeches positions 0/4"
+    covered_by_steps: ["STEP-12", "STEP-22"]
+
+  # --- Home Tab ---
+
+  - ac_id: AC-157-42
+    how_to_verify: "Test Home preview card prayer count reads from speeches positions 0/4"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-43
+    how_to_verify: "Test Home section title changes based on manage_prayers"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  - ac_id: AC-157-44
+    how_to_verify: "Test Home prayer cards not expandable, have pencil button"
+    covered_by_steps: ["STEP-13", "STEP-22"]
+
+  # --- Presentation Mode ---
+
+  - ac_id: AC-157-45
+    how_to_verify: "Test presentation mode reads prayers from speeches positions 0/4"
+    covered_by_steps: ["STEP-19", "STEP-22"]
+
+  # --- Sunday Type Change ---
+
+  - ac_id: AC-157-46
+    how_to_verify: "Test speeches -> testimony/primary preserves prayers (positions 0/4)"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  - ac_id: AC-157-47
+    how_to_verify: "Test speeches -> conference/other deletes all including prayers"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  - ac_id: AC-157-48
+    how_to_verify: "Test testimony/primary -> conference/other deletes prayers"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  - ac_id: AC-157-49
+    how_to_verify: "Test testimony/primary -> speeches preserves prayers"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  - ac_id: AC-157-50
+    how_to_verify: "Test testimony <-> primary preserves prayers"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  - ac_id: AC-157-51
+    how_to_verify: "Test confirmation dialog text varies: speeches only, prayers only, both, or none"
+    covered_by_steps: ["STEP-18", "STEP-22"]
+
+  # --- WhatsApp Templates ---
+
+  - ac_id: AC-157-52
+    how_to_verify: "Test default opening prayer template for pt-BR matches SPEC text"
+    covered_by_steps: ["STEP-16", "STEP-22"]
+
+  - ac_id: AC-157-53
+    how_to_verify: "Test default closing prayer template for pt-BR matches SPEC text"
+    covered_by_steps: ["STEP-16", "STEP-22"]
+
+  - ac_id: AC-157-54
+    how_to_verify: "Test prayer templates have only {nome} and {data} placeholders"
+    covered_by_steps: ["STEP-16", "STEP-17", "STEP-22"]
+
+  - ac_id: AC-157-55
+    how_to_verify: "Test default prayer templates for en and es match SPEC text"
+    covered_by_steps: ["STEP-16", "STEP-22"]
+
+  - ac_id: AC-157-56
+    how_to_verify: "Test WhatsApp settings has 3-tab segmented control with correct labels"
+    covered_by_steps: ["STEP-17", "STEP-22"]
+
+  # --- Settings Toggle ---
+
+  - ac_id: AC-157-57
+    how_to_verify: "Test manage_prayers toggle renders in settings for Bispado only"
+    covered_by_steps: ["STEP-07", "STEP-22"]
+
+  - ac_id: AC-157-58
+    how_to_verify: "Test toggle state persists and all UI updates immediately"
+    covered_by_steps: ["STEP-04", "STEP-07", "STEP-22"]
+
+  # --- Permissions ---
+
+  - ac_id: AC-157-59
+    how_to_verify: "Test prayer assignment permissions by role across Speeches, Agenda, Home"
+    covered_by_steps: ["STEP-20", "STEP-22"]
+
+  - ac_id: AC-157-60
+    how_to_verify: "Test prayer status change permissions by role"
+    covered_by_steps: ["STEP-20", "STEP-22"]
+
+  # --- i18n ---
+
+  - ac_id: AC-157-61
+    how_to_verify: "Test all new i18n keys exist in pt-BR, en, es with correct values"
+    covered_by_steps: ["STEP-02", "STEP-22"]
+
+  # --- Regression ---
+
+  - ac_id: AC-157-62
+    how_to_verify: "Test existing wards with manage_prayers=false work as before"
+    covered_by_steps: ["STEP-21", "STEP-22"]
+
+  - ac_id: AC-157-63
+    how_to_verify: "Test toggling ON then OFF restores original behavior"
+    covered_by_steps: ["STEP-21", "STEP-22"]
+
+  - ac_id: AC-157-64
+    how_to_verify: "Test Observer sees prayer slots as disabled in Speeches tab when manage_prayers=true"
+    covered_by_steps: ["STEP-09", "STEP-20", "STEP-22"]

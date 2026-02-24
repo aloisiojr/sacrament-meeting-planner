@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { WhatsAppIcon, MoreVerticalIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useSpeeches, useChangeStatus } from '../hooks/useSpeeches';
+import { useSpeeches, useChangeStatus, useWardManagePrayers } from '../hooks/useSpeeches';
 import { useAgendaRange } from '../hooks/useAgenda';
 import { QueryErrorView } from './QueryErrorView';
 import { StatusLED } from './StatusLED';
@@ -26,6 +26,7 @@ import { InviteActionDropdown } from './InviteActionDropdown';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppUrl, buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
+import { getDefaultPrayerTemplate, resolveTemplate as resolvePrayerTemplate } from '../lib/whatsappUtils';
 import { getInviteItems } from '../lib/speechUtils';
 import { supabase } from '../lib/supabase';
 import type { Speech, SpeechStatus } from '../types/database';
@@ -45,13 +46,16 @@ export function InviteManagementSection() {
   const changeStatus = useChangeStatus();
   const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
 
+  // CR-221: Check if manage_prayers is enabled
+  const { managePrayers } = useWardManagePrayers();
+
   // F142: Fetch ward's custom WhatsApp template from database
   const { data: ward } = useQuery({
     queryKey: ['ward', wardId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('wards')
-        .select('whatsapp_template')
+        .select('whatsapp_template, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')
         .eq('id', wardId)
         .single();
       if (error) throw error;
@@ -84,35 +88,63 @@ export function InviteManagementSection() {
     () => {
       const items = getInviteItems(speeches ?? [], locale, formatDate);
       // F118: Filter out position 2 invite items when has_second_speech is false
+      // CR-221: Filter out prayer positions (0, 4) when managePrayers is false
       return items.filter((item) => {
         if (item.speech.position === 2) {
           const hasSecond = agendaMap.get(item.speech.sunday_date);
           return hasSecond !== false; // default true if no agenda record
         }
+        if (item.speech.position === 0 || item.speech.position === 4) {
+          return managePrayers;
+        }
         return true;
       });
     },
-    [speeches, locale, agendaMap]
+    [speeches, locale, agendaMap, managePrayers]
   );
 
   const handleNotInvitedAction = useCallback(
     async (speech: Speech) => {
       // Open WhatsApp and set status to invited
       if (speech.speaker_phone) {
-        const url = buildWhatsAppUrl(
-          speech.speaker_phone,
-          '', // countryCode already in phone
-          ward?.whatsapp_template ?? '', // F142: use ward's custom template
-          {
+        // CR-221: Select WhatsApp template based on position
+        let url: string;
+        if (speech.position === 0 || speech.position === 4) {
+          // Prayer: use prayer-specific template with {nome} and {data} placeholders
+          const prayerType = speech.position === 0 ? 'opening' : 'closing';
+          const templateField = speech.position === 0
+            ? 'whatsapp_template_opening_prayer'
+            : 'whatsapp_template_closing_prayer';
+          const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
+          const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
+          const message = resolvePrayerTemplate(template, {
             speakerName: speech.speaker_name ?? '',
             date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-            topic: speech.topic_title ?? '',
-            position: `${speech.position}\u00BA`,
-            collection: speech.topic_collection ?? '',
-            link: speech.topic_link ?? '',
-          },
-          locale
-        );
+            topic: '',
+            position: '',
+          });
+
+          // Build URL manually since prayer templates only use {nome}/{data}
+          let cleanPhone = speech.speaker_phone.replace(/[\s\-\(\)]/g, '');
+          if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
+          url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        } else {
+          // Speech: use existing speech template
+          url = buildWhatsAppUrl(
+            speech.speaker_phone,
+            '', // countryCode already in phone
+            ward?.whatsapp_template ?? '', // F142: use ward's custom template
+            {
+              speakerName: speech.speaker_name ?? '',
+              date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+              topic: speech.topic_title ?? '',
+              position: `${speech.position}\u00BA`,
+              collection: speech.topic_collection ?? '',
+              link: speech.topic_link ?? '',
+            },
+            locale
+          );
+        }
         await openWhatsApp(url);
         changeStatus.mutate({
           speechId: speech.id,
@@ -137,7 +169,7 @@ export function InviteManagementSection() {
         );
       }
     },
-    [changeStatus, locale, ward?.whatsapp_template, t]
+    [changeStatus, locale, ward, t]
   );
 
   const handleInvitedAction = useCallback(
@@ -208,7 +240,13 @@ export function InviteManagementSection() {
               </Text>
               <View style={styles.speechInfoRow}>
                 <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
-                  {speech.position === 3 ? t('speeches.lastSpeech') : t('speeches.slot', { number: `${speech.position}\u00BA` })}
+                  {speech.position === 0
+                    ? t('speeches.openingPrayer')
+                    : speech.position === 4
+                      ? t('speeches.closingPrayer')
+                      : speech.position === 3
+                        ? t('speeches.lastSpeech')
+                        : t('speeches.slot', { number: `${speech.position}\u00BA` })}
                 </Text>
                 <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
                   {' - '}

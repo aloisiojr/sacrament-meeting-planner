@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -29,6 +30,10 @@ export default function TabsLayout() {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.divider,
         },
+        tabBarLabelStyle: {
+          textAlign: 'center',
+          fontSize: 10,
+        },
       }}
     >
       <Tabs.Screen
@@ -55,6 +60,14 @@ export default function TabsLayout() {
           title: speechesTabTitle,
           tabBarIcon: ({ color, size }) => (
             <MicIcon color={color} size={size} />
+          ),
+          tabBarLabel: ({ color }) => (
+            <Text
+              numberOfLines={2}
+              style={{ fontSize: 10, textAlign: 'center', color }}
+            >
+              {speechesTabTitle}
+            </Text>
           ),
         }}
       />

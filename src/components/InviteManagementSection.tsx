@@ -121,7 +121,6 @@ export function InviteManagementSection() {
             speakerName: speech.speaker_name ?? '',
             date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
             topic: '',
-            position: '',
           });
 
           // Build URL manually since prayer templates only use {nome}/{data}

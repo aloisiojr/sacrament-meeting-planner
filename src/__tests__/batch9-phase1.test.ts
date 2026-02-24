@@ -106,7 +106,6 @@ describe('F055 (CR-112): View WhatsApp conversation without resending invite', (
         speakerName: 'Test',
         date: '2026-02-22',
         topic: 'Faith',
-        position: '1\u00BA',
       });
       expect(url).toContain('https://wa.me/5511987654321?text=');
     });

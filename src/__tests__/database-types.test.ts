@@ -146,13 +146,18 @@ describe('Database Types', () => {
         stake_name: 'Estaca Sao Paulo',
         language: 'pt-BR',
         timezone: 'America/Sao_Paulo',
-        whatsapp_template: null,
+        whatsapp_template_speech_1: null,
+        whatsapp_template_speech_2: null,
+        whatsapp_template_speech_3: null,
+        manage_prayers: false,
+        whatsapp_template_opening_prayer: null,
+        whatsapp_template_closing_prayer: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
       expect(ward.id).toBeDefined();
       expect(ward.name).toBe('Ala Central');
-      expect(ward.whatsapp_template).toBeNull();
+      expect(ward.whatsapp_template_speech_1).toBeNull();
     });
 
     it('should construct a valid Member object', () => {

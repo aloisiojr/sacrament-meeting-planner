@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal, Switch } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import {
 } from '../../../i18n';
 import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
+import { useWardManagePrayers, wardKeys } from '../../../hooks/useSpeeches';
 import { ChevronRightIcon, CheckIcon } from '../../../components/icons';
 
 interface SettingsItemProps {
@@ -52,7 +53,25 @@ export default function SettingsScreen() {
   const [wardLanguageModalVisible, setWardLanguageModalVisible] = useState(false);
 
   const isObserver = role === 'observer';
+  const isBishopric = role === 'bishopric';
   const currentAppLanguage = getCurrentLanguage();
+
+  // CR-221: Managed prayers toggle (Bispado only)
+  const { managePrayers } = useWardManagePrayers();
+
+  const toggleManagePrayersMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from('wards')
+        .update({ manage_prayers: enabled })
+        .eq('id', wardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: wardKeys.managePrayers(wardId) });
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+    },
+  });
 
   // F116: Ward language change mutation (Bispado/Secretario only)
   const wardLanguageChangeMutation = useMutation({
@@ -218,6 +237,18 @@ export default function SettingsScreen() {
                   onPress={() => router.push('/(tabs)/settings/timezone')}
                   colors={colors}
                 />
+              )}
+              {isBishopric && (
+                <View style={[styles.item, { borderBottomColor: colors.divider }]}>
+                  <Text style={[styles.itemText, { color: colors.text }]}>
+                    {t('settings.managePrayers')}
+                  </Text>
+                  <Switch
+                    value={managePrayers}
+                    onValueChange={(val) => toggleManagePrayersMutation.mutate(val)}
+                    trackColor={{ false: colors.divider, true: colors.primary }}
+                  />
+                </View>
               )}
             </View>
           </>

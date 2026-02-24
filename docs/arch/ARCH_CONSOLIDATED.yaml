@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-24"
-  last_updated_by: "batch-26-phase-1"
+  last_updated_by: "batch-27-phase-1"
   total_modules: 8
-  total_adrs: 111
-  total_crs_implemented: 142
+  total_adrs: 113
+  total_crs_implemented: 143
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -52,6 +52,7 @@ metadata:
     - docs/arch/ARCH_M043.yaml
     - docs/arch/ARCH_M044.yaml
     - docs/arch/ARCH_M158.yaml
+    - docs/arch/ARCH_M159.yaml
 
 # =============================================================================
 # TECH STACK
@@ -276,7 +277,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -293,7 +294,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229, 231]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -335,6 +336,7 @@ modules:
       CR-219/F154: SundayCard collapsed headerCenter minHeight condition simplified from !expanded && isSpeechesType to !expanded. All collapsed card types (speech and exception) now have uniform minHeight: 62. Supersedes F151 approach.
       CR-221/F157: Managed Prayers. Prayers stored as speeches positions 0 (opening) and 4 (closing). manage_prayers toggle on wards. useLazyCreateSpeeches extended for positions 0/4 by sunday type. SpeechSlot gains isPrayer prop (no topic row). SundayCard collapsed shows prayer lines (italic + prefix) when ON. useDeleteSpeechesByDate gains optional positions filter. Notification trigger checks manage_prayers for positions 0/4. Separate WhatsApp templates for opening/closing prayers. (ADR-102 through ADR-108).
       CRs 222-229/F158: UI adjustments for managed prayers collapsed cards. CR-222: StatusLED circles added to prayer lines. CR-223: conditional prayer label (hide when no name). CR-225: NextSundaysSection passes managePrayers to SundayCard. CR-227: spacing gap after exception text in testimony/primary. CR-228: speechRow marginBottom reduced from 4 to 1. CR-229: dynamic minHeight replaces static 62px for uniform card height (ADR-110). (ADR-109 through ADR-111).
+      CR-231/F159: Speech WhatsApp template split. Single wards.whatsapp_template replaced with 3 per-position columns: whatsapp_template_speech_{1,2,3}. {posicao} placeholder removed from templates, WhatsAppVariables, and resolveTemplate. getDefaultTemplate replaced by getDefaultSpeechTemplate(language, position). buildWhatsAppUrl gains position parameter. InviteManagementSection selects template column by speech.position. Settings WhatsApp screen expands to 5 tabs (3 speech + 2 prayer). Migration 020. (ADR-112, ADR-113).
 
   - id: M004
     name: AgendaModule
@@ -481,7 +483,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155, F158]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155, F158, F159]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -516,7 +518,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216, 218, 224, 225, 226]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216, 218, 224, 225, 226, 231]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -582,6 +584,7 @@ modules:
       CR-224/F158: Settings manage_prayers toggle renamed from 'Oracoes Gerenciadas' to 'Usar Convites para Oracoes', moved to 2nd position in Ward Settings (after Members), description text added below label. i18n keys settings.managePrayers (updated) and settings.managePrayersDescription (new).
       CR-225/F158: NextSundaysSection now imports useWardManagePrayers and passes managePrayers prop to SundayCard components. Matches NextAssignmentsSection pattern.
       CR-226/F158: Speeches tab label gains custom tabBarLabel render function with numberOfLines={2} to allow 'Discursos e Oracoes' to wrap to 2 lines (ADR-111).
+      CR-231/F159: WhatsApp speech template split. Settings whatsapp.tsx segmented control expands from 3 to 5 tabs (3 speech + 2 prayer). Each speech tab edits its own column. {posicao} placeholder removed from chip list and SAMPLE_DATA. Ward query selects 3 speech columns. wardLanguageChangeMutation in settings/index.tsx resets 3 speech columns. InviteManagementSection maps speech.position to column name. whatsapp.ts re-exports updated. i18n: remove placeholderPosition/tabSpeech, add tabSpeech1/tabSpeech2/tabSpeech3 (ADR-112, ADR-113).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1625,6 +1628,25 @@ adrs:
       - "Only speeches tab gets custom rendering"
       - "Short labels (managePrayers=false) render normally on single line"
 
+  - id: ADR-112
+    title: "Per-position speech template columns instead of template-level parameterization (Batch 27)"
+    context: "CR-231 removes {posicao} placeholder. Options: (a) keep single column and embed ordinal at runtime, (b) split into 3 columns for per-position customization."
+    decision: "Use 3 separate columns (whatsapp_template_speech_1, _speech_2, _speech_3), matching pattern from CR-221 prayer template split. Each template independently editable. Ordinal embedded in default text."
+    decided_in: "CR-231/F159"
+    consequences:
+      - "Full per-position customization"
+      - "Consistent with prayer template split pattern (CR-221/F157)"
+      - "3 additional columns in wards table"
+
+  - id: ADR-113
+    title: "Segmented control always visible with 3-5 tabs in WhatsApp settings (Batch 27)"
+    context: "Pre-CR-231, segmented control only shown when managePrayers=true. With 3 speech tabs, control must always appear."
+    decision: "Always show segmented control. managePrayers=false: 3 speech tabs. managePrayers=true: 5 tabs (3 speech + 2 prayer). Abbreviated labels."
+    decided_in: "CR-231/F159"
+    consequences:
+      - "Better discoverability of per-position templates"
+      - "Abbreviated labels required to fit 5 tabs"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1634,10 +1656,10 @@ database_schema:
     # --- Ward-scoped tables (RLS on ward_id) ---
     - name: wards
       description: "Alas (multi-tenant root entity)"
-      columns: [id, name, stake_name, language, timezone, whatsapp_template, manage_prayers, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, created_at, updated_at]
+      columns: [id, name, stake_name, language, timezone, whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, manage_prayers, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, created_at, updated_at]
       unique: ["(stake_name, name)"]
       rls: "id = auth.jwt().app_metadata.ward_id"
-      notes: "manage_prayers (BOOLEAN DEFAULT false), whatsapp_template_opening_prayer, whatsapp_template_closing_prayer added by CR-221/F157 (migration 019)."
+      notes: "manage_prayers (BOOLEAN DEFAULT false), whatsapp_template_opening_prayer, whatsapp_template_closing_prayer added by CR-221/F157 (migration 019). CR-231/F159 (migration 020): whatsapp_template replaced with whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3."
 
     - name: members
       description: "Membros da ala"
@@ -2007,7 +2029,7 @@ file_structure:
         "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
         "history.tsx": "Log de atividades com busca e paginacao + close button (CR-118/F065)"
-        "whatsapp.tsx": "Editor de template WhatsApp com preview. CR-178/F116: placeholder names translated per app language. UI labels via t() calls. Ward language for defaults/sample data."
+        "whatsapp.tsx": "Editor de template WhatsApp com preview. CR-178/F116: placeholder names translated per app language. UI labels via t() calls. Ward language for defaults/sample data. CR-231/F159: 5-tab segmented control (3 speech + 2 prayer, or 3 speech when managePrayers=false). {posicao} placeholder removed. 3 separate speech template states/mutations."
         "theme.tsx": "Toggle de tema (automatic/light/dark)"
         "about.tsx": "Info do app, creditos, disclaimer"
         "timezone.tsx": "Seletor de timezone da ala + close button (CR-118/F065)"
@@ -2057,7 +2079,7 @@ file_structure:
     "ExitConfirmation.tsx": "Confirmacao ao sair do app"
     "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos. CR-114/F060: wiring de onClearTopic. CR-188/F129: cards become non-expandable; all inline editing removed (SpeechSlot, modals, mutation hooks); pencil button (U+270F) navigates to Speeches tab with expandDate."
     "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
-    "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary). CR-209/F145: WhatsAppIcon consolidated to icons module, MoreVerticalIcon SVG replaces Unicode."
+    "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary). CR-209/F145: WhatsAppIcon consolidated to icons module, MoreVerticalIcon SVG replaces Unicode. CR-231/F159: ward query selects 3 speech template columns, speech branch maps position to column name, position variable removed from WhatsAppVariables."
     "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus'). CR-134/F077: opcoes de status dinamicas via ALL_ASSIGNED_STATUSES.filter(). CR-209/F145: WhatsAppIcon imported from icons module (local definition removed)."
 
   "src/components/icons/":
@@ -2068,8 +2090,8 @@ file_structure:
     "permissions.ts": "Mapa central de permissoes por role"
     "csvUtils.ts": "Parse/generate CSV com error codes i18n (ADR-026). splitPhoneNumber re-exportado de countryCodes.ts (CR-85)"
     "activityLog.ts": "Utility para logging de acoes (com userName)"
-    "whatsapp.ts": "Construcao de URL WhatsApp. CR-94: re-exports templates i18n."
-    "whatsappUtils.ts": "Template placeholders e resolucao. CR-94: templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate(). CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem."
+    "whatsapp.ts": "Construcao de URL WhatsApp. CR-94: re-exports templates i18n. CR-231/F159: re-exports updated (getDefaultSpeechTemplate replaces getDefaultTemplate)."
+    "whatsappUtils.ts": "Template placeholders e resolucao. CR-94: templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate(). CR-112/F055: buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem. CR-231/F159: 9 per-position default templates, getDefaultSpeechTemplate(language, position), {posicao} removed from WhatsAppVariables/resolveTemplate, buildWhatsAppUrl gains position param."
     "dateUtils.ts": "Formatacao de datas localizadas"
     "speechUtils.ts": "Utilitarios de discursos"
     "theme.ts": "Paleta de cores para dark/light. CR-218/F155: lightColors neutral tones shifted to Tailwind Slate blue-gray palette"
@@ -2559,6 +2581,22 @@ change_requests_history:
     status: "pending implementation"
     adrs: []
     new_files: []
+
+  batch_26_phase_1:
+    crs: "CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230"
+    scope: "UI Adjustments for Managed Prayers: StatusLED on prayer lines (F158), conditional prayer label (F158), settings toggle rework (F158), managePrayers prop plumbing (F158), multiline tab label (F158), spacing/height fixes (F158), AgendaForm double-label fix (F158)"
+    doc: "ARCH_M158.yaml"
+    status: "complete"
+    adrs: [ADR-109, ADR-110, ADR-111]
+    new_files: []
+
+  batch_27_phase_1:
+    crs: "CR-231"
+    scope: "Split speech WhatsApp template into 3 per-position columns (F159). DB migration 020, TypeScript types, whatsappUtils 9 default templates, getDefaultSpeechTemplate, remove {posicao}, InviteManagementSection position-based selection, Settings WhatsApp 5-tab UI, edge function update, i18n changes"
+    doc: "ARCH_M159.yaml"
+    status: "pending implementation"
+    adrs: [ADR-112, ADR-113]
+    new_files: ["supabase/migrations/020_split_speech_template.sql"]
 
 # =============================================================================
 # OBSERVABILITY

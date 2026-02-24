@@ -14,10 +14,10 @@ metadata:
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
   last_updated: "2026-02-24"
-  total_features: 144
-  total_change_requests: 216
+  total_features: 145
+  total_change_requests: 217
   implemented_crs: 96
-  pending_crs: 118
+  pending_crs: 119
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -82,6 +82,7 @@ metadata:
     - docs/specs/SPEC_F155_F156.yaml
     - docs/specs/SPEC_F157.yaml
     - docs/specs/SPEC_F158.yaml
+    - docs/specs/SPEC_F159.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -2879,8 +2880,28 @@ features:
       - "29 acceptance criteria, 7 edge cases"
       - "8 arquivos impactados"
 
+  - id: F159
+    name: "Individual WhatsApp templates per speech position"
+    status: pending
+    rfs: []
+    description: >
+      CR-231 splits the single speech WhatsApp template (wards.whatsapp_template)
+      into 3 individual templates, one per speech position (1st, 2nd, 3rd).
+      Removes the {posicao} placeholder entirely. Each template embeds the
+      ordinal in default text. DB migration: replace whatsapp_template with 3
+      columns (whatsapp_template_speech_1/2/3), copy existing to all 3. Settings
+      UI: 5 tabs (3 speech + 2 prayer). InviteManagementSection: select template
+      by speech.position. Edge function: create ward with 3 columns. i18n: remove
+      placeholderPosition, add tab labels.
+    modified_by_crs: [231]
+    spec_file: "docs/specs/SPEC_F159.yaml"
+    notes:
+      - "CR-231: Quebrar template de discurso em 3 individuais, remover {posicao}"
+      - "21 acceptance criteria"
+      - "~10 arquivos impactados (DB, types, whatsappUtils, settings, InviteManagement, edge function, i18n)"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (113 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26)
+# PENDING CHANGE REQUESTS (114 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27)
 # =============================================================================
 
 pending_crs:
@@ -5472,7 +5493,47 @@ pending_crs:
     files_likely_impacted:
       - src/components/AgendaForm.tsx
 
-# =============================================================================
+  # --- Batch 27 (Split Speech WhatsApp Templates) ---
+
+  - id: 231
+    type: refactor
+    area: "WhatsApp Templates (F010, F116, F142, F157)"
+    feature_id: F159
+    spec_file: "docs/specs/SPEC_F159.yaml"
+    related_crs: [103, 178, 221]
+    description: >
+      Quebrar o template unico de WhatsApp para discursos em 3 templates
+      individuais (um para cada posicao: 1o, 2o e 3o discurso). Remover o
+      placeholder {posicao} pois cada template ja representa uma posicao
+      especifica. DB: substituir wards.whatsapp_template por 3 colunas
+      (whatsapp_template_speech_1/2/3). Templates default com ordinal
+      embutido no texto (primeiro/segundo/terceiro). Settings: 5 tabs
+      (3 discursos + 2 oracoes). Remover i18n placeholderPosition.
+    acceptance_criteria:
+      - "DB: 3 novas colunas whatsapp_template_speech_1/2/3"
+      - "DB: coluna whatsapp_template removida apos migracao"
+      - "DB: template existente copiado para as 3 novas colunas"
+      - "Templates default: ordinal embutido, sem {posicao}"
+      - "WhatsAppVariables: campo position removido"
+      - "resolveTemplate: {posicao} nao e mais substituido"
+      - "InviteManagement: seleciona template correto por speech.position"
+      - "Settings: 5 tabs (1o Disc., 2o Disc., 3o Disc., Abertura, Encerramento)"
+      - "Settings: {posicao} removido dos placeholders"
+      - "Edge function: cria ward com 3 colunas"
+      - "i18n: placeholderPosition removido dos 3 locales"
+      - "i18n: novos labels tabSpeech1/2/3 nos 3 locales"
+      - "Language switch reseta as 3 colunas para NULL"
+    files_likely_impacted:
+      - supabase/migrations/020_split_speech_templates.sql
+      - src/types/database.ts
+      - src/lib/whatsappUtils.ts
+      - src/components/InviteManagementSection.tsx
+      - src/app/(tabs)/settings/whatsapp.tsx
+      - supabase/functions/register-first-user/index.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+      - src/app/(tabs)/settings/index.tsx
 
   - id: DD-01
     title: "Sunday types: lista correta"
@@ -6367,9 +6428,9 @@ data_model:
   tables:
     - name: wards
       description: "Alas da igreja"
-      key_columns: [id, name, stake_name, language, timezone, whatsapp_template]
+      key_columns: [id, name, stake_name, language, timezone, whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3]
       unique_constraints: ["(stake_name, name)"]
-      notes: "CR-221/F157 (pendente): adiciona manage_prayers BOOLEAN DEFAULT false, whatsapp_template_opening_prayer TEXT, whatsapp_template_closing_prayer TEXT"
+      notes: "CR-221/F157 (pendente): adiciona manage_prayers BOOLEAN DEFAULT false, whatsapp_template_opening_prayer TEXT, whatsapp_template_closing_prayer TEXT. CR-231/F159 (pendente): substitui whatsapp_template por whatsapp_template_speech_1/2/3 TEXT."
 
     - name: users
       description: "Usuarios via auth.users do Supabase com app_metadata (ward_id, role)"
@@ -6787,3 +6848,10 @@ cr_history:
     files:
       - "docs/specs/SPEC_F158.yaml (CR-222 to CR-230 - UI adjustments for managed prayers)"
     summary: "Ajustes UI para oracoes gerenciadas (F157/CR-221): StatusLED circles nas linhas de oracao em cards contraidos (CR-222), ocultar label de oracao sem nome (CR-223), renomear toggle + reordenar + descricao (CR-224), passar managePrayers para NextSundaysSection (CR-225), tab label multiline (CR-226), espacamento entre excecao e oracoes (CR-227), reduzir margem entre linhas (CR-228), altura uniforme cards (CR-229), correcao label duplicado AgendaForm (CR-230)."
+
+  batch_27:
+    range: "CR-231"
+    status: "1 pendente (231)"
+    files:
+      - "docs/specs/SPEC_F159.yaml (CR-231 - Split speech WhatsApp template into 3)"
+    summary: "Quebrar template unico de WhatsApp para discursos em 3 templates individuais (1o, 2o, 3o discurso). Remover placeholder {posicao}. DB: substituir whatsapp_template por 3 colunas (speech_1/2/3). Templates default com ordinal embutido. Settings: 5 tabs. Edge function: 3 colunas. i18n: remover placeholderPosition, adicionar tabSpeech1/2/3 (F159)."

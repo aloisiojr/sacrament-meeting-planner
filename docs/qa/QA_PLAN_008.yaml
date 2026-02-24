@@ -1,0 +1,255 @@
+# =============================================================================
+# QA_PLAN_008.yaml
+# PRE Validation Plan for CR-231
+# Feature: Break speech WhatsApp template into 3 individual templates (1st, 2nd, 3rd speech)
+#          and remove {posicao} placeholder
+# Created: 2026-02-24
+# =============================================================================
+
+cr_id: CR-231
+title: "Quebrar template de WhatsApp para discursos em 3 templates individuais e remover placeholder {posicao}"
+type: feature_request
+user_request: "Vamos quebrar o template de whatsapp para discrusos em 3 templates, um para cada discurso. E vamos tirar o placeholder de {posicao}. Pois não tem mais necessidade."
+
+# =============================================================================
+# PRE VALIDATION - Current State Analysis
+# =============================================================================
+pre_validation:
+  timestamp: "2026-02-24"
+  status: validated
+  validated: true
+
+  current_state:
+    summary: |
+      Currently there is ONE speech WhatsApp template stored in wards.whatsapp_template
+      (DB column from migration 001). This single template is used for all 3 speech positions
+      (1st, 2nd, 3rd). It uses the placeholder {posicao} to indicate which speech position
+      the invite is for, replaced at runtime with "1o", "2o", "3o" via speech.position + "BA" suffix.
+
+      Prayer templates (opening/closing) were already split into separate templates in CR-221
+      (migration 019). The same pattern should be followed for speech templates.
+
+    affected_files:
+      # Core logic
+      - path: src/lib/whatsappUtils.ts
+        role: "Default templates (DEFAULT_TEMPLATE_PT_BR/EN/ES), resolveTemplate(), buildWhatsAppUrl(), WhatsAppVariables interface"
+        current_behavior: "Single template per language with {posicao} placeholder; resolveTemplate replaces {posicao} with vars.position"
+
+      - path: src/lib/whatsapp.ts
+        role: "Re-exports from whatsappUtils.ts + openWhatsApp (RN-dependent)"
+        current_behavior: "Re-exports resolveTemplate, buildWhatsAppUrl, DEFAULT_TEMPLATE_*, getDefaultTemplate, WhatsAppVariables"
+
+      - path: src/components/InviteManagementSection.tsx
+        role: "Calls buildWhatsAppUrl with position field for speech invites"
+        current_behavior: "Passes position: speech.position + 'BA' suffix to buildWhatsAppUrl; uses single ward.whatsapp_template"
+
+      # Settings UI
+      - path: src/app/(tabs)/settings/whatsapp.tsx
+        role: "Template editing screen with segmented control (speech/opening_prayer/closing_prayer)"
+        current_behavior: "Speech tab edits single wards.whatsapp_template; PLACEHOLDER_TOKENS includes {posicao}; SAMPLE_DATA has {posicao}: '1'"
+
+      # Edge function
+      - path: supabase/functions/register-first-user/index.ts
+        role: "Creates ward with default whatsapp_template on registration"
+        current_behavior: "Sets defaultWhatsappTemplate containing {posicao}; saves to wards.whatsapp_template"
+
+      # Database
+      - path: supabase/migrations/001_initial_schema.sql
+        role: "Defines wards.whatsapp_template column (single TEXT)"
+        note: "Need new migration to add whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3"
+
+      - path: src/types/database.ts
+        role: "TypeScript types for Ward including whatsapp_template"
+        current_behavior: "Has whatsapp_template: string | null"
+
+      # i18n
+      - path: src/i18n/locales/pt-BR.json
+        role: "Portuguese translation with whatsapp.placeholderPosition key"
+      - path: src/i18n/locales/en.json
+        role: "English translation with whatsapp.placeholderPosition key"
+      - path: src/i18n/locales/es.json
+        role: "Spanish translation with whatsapp.placeholderPosition key"
+
+      # Tests that reference {posicao}
+      - path: src/__tests__/whatsapp-utils.test.ts
+        role: "Unit tests for resolveTemplate/buildWhatsAppUrl using {posicao}"
+      - path: src/__tests__/batch7-f040-f044.test.ts
+        role: "Tests checking {posicao} in templates and resolveTemplate"
+      - path: src/__tests__/phase03-whatsapp-invite.test.ts
+        role: "Tests checking {posicao} in DEFAULT_TEMPLATE_PT_BR"
+      - path: src/__tests__/phase06-admin-polish.test.ts
+        role: "Tests with SAMPLE_DATA containing {posicao}"
+      - path: src/__tests__/cr003-qa.test.ts
+        role: "Tests checking 6 placeholders including {posicao}"
+      - path: src/__tests__/cr002-qa.test.ts
+        role: "Tests checking edge function contains {posicao}"
+      - path: src/__tests__/batch25-phase2.test.ts
+        role: "Tests checking PLACEHOLDER_TOKENS includes {posicao}"
+
+  scope_analysis:
+    changes_required:
+      - area: "Database Migration"
+        description: |
+          New migration to add 3 columns: whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3.
+          Copy existing whatsapp_template value into all 3 new columns for backward compatibility.
+          Optionally drop old whatsapp_template column (or keep for backward compat and mark deprecated).
+
+      - area: "Default Templates"
+        description: |
+          Replace single DEFAULT_TEMPLATE_PT_BR/EN/ES with 3 per language (or modify to remove {posicao}).
+          Since {posicao} is removed, the templates for 1st/2nd/3rd can have the ordinal baked in
+          (e.g., "primeiro discurso", "segundo discurso", "terceiro discurso") or simply omit position entirely.
+          The getDefaultTemplate() function needs to accept speech position parameter.
+
+      - area: "WhatsAppVariables Interface"
+        description: |
+          Remove 'position' field from WhatsAppVariables interface.
+          Remove {posicao} replacement from resolveTemplate().
+
+      - area: "InviteManagementSection"
+        description: |
+          Select the correct template based on speech.position (1, 2, or 3).
+          Stop passing position to WhatsAppVariables.
+
+      - area: "Settings UI (whatsapp.tsx)"
+        description: |
+          Change segmented control to have 5 tabs (or sub-tabs): 1st speech, 2nd speech, 3rd speech,
+          opening prayer, closing prayer. Or reorganize as speech group with sub-selector.
+          Remove {posicao} from PLACEHOLDER_TOKENS and PLACEHOLDER_I18N_KEYS.
+          Remove {posicao} from SAMPLE_DATA.
+          Add state/mutation for each of the 3 speech templates.
+
+      - area: "Edge Function"
+        description: |
+          Update register-first-user to create ward with 3 speech template columns.
+          Remove {posicao} from default template.
+
+      - area: "Types"
+        description: |
+          Update Ward type in database.ts to include 3 new columns.
+          Remove position from WhatsAppVariables or make optional.
+
+      - area: "i18n"
+        description: |
+          Remove whatsapp.placeholderPosition keys from all locales (or keep if still used elsewhere - but it's not).
+          Add new tab labels for 1st/2nd/3rd speech if needed.
+
+      - area: "Tests"
+        description: |
+          Update all tests that reference {posicao} placeholder.
+          Update tests that check 6 placeholders (now 5).
+          Update tests that use position in WhatsAppVariables.
+
+# =============================================================================
+# VALIDATION CHECKS
+# =============================================================================
+validation_checks:
+
+  must_pass:
+    # --- Database ---
+    - id: MP-01
+      description: "New migration adds 3 speech template columns to wards table"
+      type: static
+      check: "Migration file exists with ALTER TABLE wards ADD COLUMN whatsapp_template_speech_1 TEXT, whatsapp_template_speech_2 TEXT, whatsapp_template_speech_3 TEXT"
+
+    - id: MP-02
+      description: "Ward type in database.ts includes new speech template columns"
+      type: static
+      check: "src/types/database.ts contains whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3"
+
+    # --- Templates ---
+    - id: MP-03
+      description: "No default speech template contains {posicao} placeholder"
+      type: static
+      check: "DEFAULT_TEMPLATE_*_SPEECH_1, _SPEECH_2, _SPEECH_3 (or equivalent) do NOT contain '{posicao}'"
+
+    - id: MP-04
+      description: "resolveTemplate no longer replaces {posicao}"
+      type: static
+      check: "resolveTemplate in whatsappUtils.ts does not contain replace for {posicao}"
+
+    - id: MP-05
+      description: "WhatsAppVariables no longer has mandatory position field"
+      type: static
+      check: "WhatsAppVariables interface does not have position as required field"
+
+    - id: MP-06
+      description: "PLACEHOLDER_TOKENS in settings/whatsapp.tsx does not include {posicao}"
+      type: static
+      check: "PLACEHOLDER_TOKENS array does not contain '{posicao}'"
+
+    - id: MP-07
+      description: "PLACEHOLDER_I18N_KEYS does not include whatsapp.placeholderPosition"
+      type: static
+      check: "PLACEHOLDER_I18N_KEYS array does not reference placeholderPosition"
+
+    - id: MP-08
+      description: "SAMPLE_DATA in settings/whatsapp.tsx does not include {posicao}"
+      type: static
+      check: "SAMPLE_DATA object does not have '{posicao}' key"
+
+    - id: MP-09
+      description: "InviteManagementSection selects correct template per speech position"
+      type: static
+      check: "handleNotInvitedAction uses different template for position 1, 2, and 3"
+
+    - id: MP-10
+      description: "InviteManagementSection no longer passes position to WhatsAppVariables"
+      type: static
+      check: "buildWhatsAppUrl call does not include position field (or position is removed)"
+
+    - id: MP-11
+      description: "Edge function register-first-user no longer uses {posicao} in default template"
+      type: static
+      check: "supabase/functions/register-first-user/index.ts does not contain '{posicao}'"
+
+    - id: MP-12
+      description: "Settings whatsapp.tsx has tabs/sections for each speech template (1st, 2nd, 3rd)"
+      type: static
+      check: "whatsapp.tsx handles 3 separate speech template tabs or sub-sections"
+
+    - id: MP-13
+      description: "Settings whatsapp.tsx saves each speech template to its own DB column"
+      type: static
+      check: "Mutations update whatsapp_template_speech_1, _speech_2, _speech_3 individually"
+
+    - id: MP-14
+      description: "All tests pass after changes"
+      type: runtime
+      check: "npx vitest run completes with 0 failures"
+
+    - id: MP-15
+      description: "i18n keys for placeholderPosition are removed from all locales"
+      type: static
+      check: "en.json, pt-BR.json, es.json no longer contain placeholderPosition"
+
+  should_pass:
+    - id: SP-01
+      description: "Migration copies existing whatsapp_template value into all 3 new columns for backward compat"
+      type: static
+      check: "Migration includes UPDATE or INSERT to copy existing template to new columns"
+
+    - id: SP-02
+      description: "Default templates for each speech position have position baked in or omitted gracefully"
+      type: static
+      check: "Templates read naturally without a generic position placeholder"
+
+    - id: SP-03
+      description: "Ward query in whatsapp.tsx fetches all 3 new columns"
+      type: static
+      check: "Supabase select includes whatsapp_template_speech_1, _speech_2, _speech_3"
+
+    - id: SP-04
+      description: "Ward query in InviteManagementSection.tsx fetches all 3 new columns"
+      type: static
+      check: "Supabase select includes whatsapp_template_speech_1, _speech_2, _speech_3"
+
+    - id: SP-05
+      description: "New i18n keys for speech tab labels (1st speech, 2nd speech, 3rd speech)"
+      type: static
+      check: "i18n files contain new keys for differentiating the 3 speech tabs"
+
+    - id: SP-06
+      description: "Edge function sets default template for all 3 new columns"
+      type: static
+      check: "register-first-user creates ward with all 3 speech template columns populated"

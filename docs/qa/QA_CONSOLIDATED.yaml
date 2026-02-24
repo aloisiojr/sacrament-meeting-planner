@@ -33,6 +33,7 @@
 # CR-216, CR-217, CR-219 (PRE+POST) - Batch 24 Phase 1
 # CR-221 (PRE+POST Phase 1, PRE+POST Phase 2, PRE+POST Phase 3) - Batch 25
 # CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230 (PRE+POST) - Batch 26
+# CR-231 (PRE+POST) - Batch 27
 # Updated: 2026-02-24
 # =============================================================================
 
@@ -13219,4 +13220,246 @@ batch_26_f158:
       full_suite_skipped: 49
       full_suite_failed: 10
       full_suite_failed_note: "All 10 failures are superseded tests from batches 23-25, intentionally invalidated by this batch's changes"
+
+# #############################################################################
+# CR-231: Split speech WhatsApp template into 3 individual templates (Batch 27)
+# #############################################################################
+
+cr_231:
+  cr_id: CR-231
+  title: "Quebrar template de WhatsApp para discursos em 3 templates individuais e remover placeholder {posicao}"
+  type: feature_request
+  spec: specs/SPEC_F159.yaml
+  qa_plan: qa/QA_PLAN_008.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Validated current state: single wards.whatsapp_template column with {posicao}
+      placeholder. Identified 12+ affected files across DB, core logic, UI, edge
+      function, i18n, and 7 test files. QA_PLAN_008 created with 15 must_pass
+      and 6 should_pass checks. Feature follows same pattern as CR-221 prayer
+      template split.
+
+  post_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    phase: "1 of 1"
+    commits:
+      - hash: e48ee14
+        message: "feat(migration): add 3 speech template columns and drop old column"
+      - hash: 86e6a33
+        message: "feat(types): update Ward interface with 3 speech template columns"
+      - hash: 021debe
+        message: "feat(whatsapp): 9 default speech templates, remove {posicao} placeholder"
+      - hash: 824f757
+        message: "refactor(whatsapp): update re-exports for speech template split"
+      - hash: cbd60b2
+        message: "feat(invite): select speech template by position, remove position variable"
+      - hash: 821ad8c
+        message: "feat(settings): 5-tab segmented control for speech template editing"
+      - hash: 3d559ed
+        message: "feat(settings): reset all 5 template columns on language change"
+      - hash: 0fed6a2
+        message: "feat(edge): create ward with 3 per-position speech template columns"
+      - hash: 97cde32
+        message: "feat(i18n): remove placeholderPosition, add 3 speech tab labels"
+      - hash: de736d0
+        message: "test(f159): add 70 tests for CR-231"
+      - hash: 039d575
+        message: "fix(test): update existing tests for API changes"
+      - hash: 3ebd62b
+        message: "docs(code-ledger): add Batch 27 F159 commit entries"
+      - hash: a056295
+        message: "fix(cr-231): remove stale position field references (R-1, R-2, R-3)"
+      - hash: c21ff34
+        message: "docs(code-ledger): add R-1/R-2/R-3 fix commit entry"
+
+    reviewer_verdict: approved
+    reviewer_issues: 3
+    reviewer_issues_note: "3 P1 issues found in iteration 1, all fixed in iteration 2 (commit a056295)"
+
+    tester_verdict: approved
+    tester_tests_passed: 6933
+    tester_tests_total: 6933
+    tester_new_tests: 70
+    tester_acs_covered: "21/21"
+
+    must_pass_results:
+      - id: MP-01
+        description: "New migration adds 3 speech template columns to wards table"
+        result: PASS
+        evidence:
+          - "supabase/migrations/020_split_speech_template.sql: ALTER TABLE public.wards ADD COLUMN whatsapp_template_speech_1 TEXT, ADD COLUMN whatsapp_template_speech_2 TEXT, ADD COLUMN whatsapp_template_speech_3 TEXT"
+
+      - id: MP-02
+        description: "Ward type in database.ts includes new speech template columns"
+        result: PASS
+        evidence:
+          - "src/types/database.ts:80-82: whatsapp_template_speech_1: string | null, whatsapp_template_speech_2: string | null, whatsapp_template_speech_3: string | null"
+          - "Old whatsapp_template field removed"
+
+      - id: MP-03
+        description: "No default speech template contains {posicao} placeholder"
+        result: PASS
+        evidence:
+          - "src/lib/whatsappUtils.ts: 9 DEFAULT_TEMPLATE_SPEECH_*_* constants, none contain {posicao}"
+          - "Templates use ordinal words: primeiro/segundo/terceiro (pt-BR), first/second/third (en), primer/segundo/tercer (es)"
+
+      - id: MP-04
+        description: "resolveTemplate no longer replaces {posicao}"
+        result: PASS
+        evidence:
+          - "src/lib/whatsappUtils.ts:136-145: resolveTemplate only replaces {nome}, {data}, {colecao}, {titulo}, {link}"
+          - "No reference to {posicao} or vars.position in resolveTemplate"
+
+      - id: MP-05
+        description: "WhatsAppVariables no longer has mandatory position field"
+        result: PASS
+        evidence:
+          - "src/lib/whatsappUtils.ts:123-129: WhatsAppVariables has speakerName, date, topic, collection?, link? - no position field"
+
+      - id: MP-06
+        description: "PLACEHOLDER_TOKENS in settings/whatsapp.tsx does not include {posicao}"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:31-37: PLACEHOLDER_TOKENS = ['{nome}', '{data}', '{colecao}', '{titulo}', '{link}']"
+
+      - id: MP-07
+        description: "PLACEHOLDER_I18N_KEYS does not include whatsapp.placeholderPosition"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:22-28: PLACEHOLDER_I18N_KEYS has 5 entries, no placeholderPosition"
+
+      - id: MP-08
+        description: "SAMPLE_DATA in settings/whatsapp.tsx does not include {posicao}"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:51-57: SAMPLE_DATA has {nome}, {data}, {colecao}, {titulo}, {link} - no {posicao}"
+
+      - id: MP-09
+        description: "InviteManagementSection selects correct template per speech position"
+        result: PASS
+        evidence:
+          - "src/components/InviteManagementSection.tsx:132-136: speechTemplateMap maps position 1->speech_1, 2->speech_2, 3->speech_3"
+          - "selectedTemplate uses speechTemplateMap[speech.position]"
+
+      - id: MP-10
+        description: "InviteManagementSection no longer passes position to WhatsAppVariables"
+        result: PASS
+        evidence:
+          - "src/components/InviteManagementSection.tsx:142-148: buildWhatsAppUrl call has speakerName, date, topic, collection, link - no position"
+          - "speech.position passed as 6th arg (position param) to buildWhatsAppUrl for default template selection"
+
+      - id: MP-11
+        description: "Edge function register-first-user no longer uses {posicao} in default template"
+        result: PASS
+        evidence:
+          - "supabase/functions/register-first-user/index.ts:88-112: 3 per-position templates with ordinal words"
+          - "No {posicao} placeholder in any template"
+
+      - id: MP-12
+        description: "Settings whatsapp.tsx has tabs/sections for each speech template (1st, 2nd, 3rd)"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:67: ActiveTab = 'speech_1' | 'speech_2' | 'speech_3' | 'opening_prayer' | 'closing_prayer'"
+          - "Line 378-380: speechTabs = ['speech_1', 'speech_2', 'speech_3'], tabs includes prayerTabs when managePrayers"
+
+      - id: MP-13
+        description: "Settings whatsapp.tsx saves each speech template to its own DB column"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:212: update whatsapp_template_speech_1"
+          - "Line 229: update whatsapp_template_speech_2"
+          - "Line 246: update whatsapp_template_speech_3"
+
+      - id: MP-14
+        description: "All tests pass after changes"
+        result: PASS
+        evidence:
+          - "npx vitest run: 99 test files, 6933/6933 tests passed, 0 failures"
+
+      - id: MP-15
+        description: "i18n keys for placeholderPosition are removed from all locales"
+        result: PASS
+        evidence:
+          - "grep for placeholderPosition in src/i18n/locales/*.json returns 0 matches in locale files"
+          - "Only found in test assertions that verify removal (batch27-f159.test.ts)"
+
+    should_pass_results:
+      - id: SP-01
+        description: "Migration copies existing whatsapp_template value into all 3 new columns"
+        result: PASS
+        evidence:
+          - "020_split_speech_template.sql:21-25: UPDATE public.wards SET whatsapp_template_speech_1 = whatsapp_template, whatsapp_template_speech_2 = whatsapp_template, whatsapp_template_speech_3 = whatsapp_template"
+
+      - id: SP-02
+        description: "Default templates for each speech position have position baked in or omitted gracefully"
+        result: PASS
+        evidence:
+          - "pt-BR: 'primeiro discurso', 'segundo discurso', 'terceiro discurso'"
+          - "en: 'first speech', 'second speech', 'third speech'"
+          - "es: 'primer discurso', 'segundo discurso', 'tercer discurso'"
+
+      - id: SP-03
+        description: "Ward query in whatsapp.tsx fetches all 3 new columns"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/whatsapp.tsx:96: .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, language')"
+
+      - id: SP-04
+        description: "Ward query in InviteManagementSection.tsx fetches all 3 new columns"
+        result: PASS
+        evidence:
+          - "src/components/InviteManagementSection.tsx:58: .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')"
+
+      - id: SP-05
+        description: "New i18n keys for speech tab labels (1st speech, 2nd speech, 3rd speech)"
+        result: PASS
+        evidence:
+          - "pt-BR.json: tabSpeech1='1o Disc.', tabSpeech2='2o Disc.', tabSpeech3='3o Disc.'"
+          - "en.json: tabSpeech1='1st Speech', tabSpeech2='2nd Speech', tabSpeech3='3rd Speech'"
+          - "es.json: tabSpeech1='1er Disc.', tabSpeech2='2o Disc.', tabSpeech3='3er Disc.'"
+
+      - id: SP-06
+        description: "Edge function sets default template for all 3 new columns"
+        result: PASS
+        evidence:
+          - "register-first-user/index.ts:121-123: whatsapp_template_speech_1: defaultSpeech1Template, whatsapp_template_speech_2: defaultSpeech2Template, whatsapp_template_speech_3: defaultSpeech3Template"
+
+    # =========================================================================
+    # Additional Observations
+    # =========================================================================
+    additional_observations:
+      - observation: "Language switch reset works for all 5 template columns"
+        evidence: "src/app/(tabs)/settings/index.tsx:92-96 sets all 5 columns to null on language change"
+      - observation: "whatsapp.tsx language change resets initialized flags for all 5 templates"
+        evidence: "src/app/(tabs)/settings/whatsapp.tsx:197-205 resets speech1/2/3 + opening/closing initialized"
+      - observation: "Old whatsapp_template column properly dropped in migration"
+        evidence: "020_split_speech_template.sql:30: ALTER TABLE public.wards DROP COLUMN whatsapp_template"
+      - observation: "whatsapp.ts re-exports updated: getDefaultSpeechTemplate replaces old getDefaultTemplate"
+        evidence: "src/lib/whatsapp.ts:14: exports getDefaultSpeechTemplate instead of getDefaultTemplate"
+      - observation: "Segmented control always shown (3 tabs without prayers, 5 tabs with prayers)"
+        evidence: "src/app/(tabs)/settings/whatsapp.tsx:424-455: managePrayers conditional removed from wrapper, tabs built dynamically"
+
+    # =========================================================================
+    # Superseded Tests from Previous Batches
+    # =========================================================================
+    superseded_tests:
+      total_superseded: 0
+      details: []
+      note: "Existing tests were updated in-place (commit 039d575) rather than superseded. All 6933 tests pass."
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch27-f159.test.ts"
+      tests_passed: 70
+      tests_total: 70
+      full_suite_passed: 6933
+      full_suite_total: 6933
+      full_suite_skipped: 0
+      full_suite_failed: 0
 

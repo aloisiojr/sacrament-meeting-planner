@@ -1,0 +1,555 @@
+# =============================================================================
+# QA_PLAN_010.yaml
+# QA Plan for Batch 25 Phase 2: F157 - CR-221 Managed Prayers
+# Steps 8-10, 14, 16-17
+# Created: 2026-02-24
+# =============================================================================
+
+type: qa_plan
+version: 1
+cr_id: CR-221
+feature_id: F157
+batch: 25
+phase: 2
+mode: PRE
+created: "2026-02-24"
+
+# =============================================================================
+# SCOPE
+# =============================================================================
+
+scope:
+  description: >
+    Phase 2 covers the UI rendering and business logic for prayer slots in the
+    Speeches tab, collapsed SundayCard prayer lines, InviteManagementSection
+    prayer position inclusion/exclusion, WhatsApp prayer template defaults and
+    utility functions, and the WhatsApp settings segmented control with 3 tabs.
+  steps_covered:
+    - STEP-08  # SpeechSlot isPrayer prop
+    - STEP-09  # Speeches tab render prayer SpeechSlots
+    - STEP-10  # SundayCard collapsed prayer lines
+    - STEP-14  # InviteManagementSection prayer positions
+    - STEP-16  # WhatsApp prayer template defaults + utility
+    - STEP-17  # WhatsApp settings segmented control (3 tabs when ON)
+  acceptance_criteria_covered:
+    - AC-157-14  # Toggle OFF - WhatsApp template section disabled
+    - AC-157-17  # Toggle OFF - prayers NOT in invite management
+    - AC-157-18  # Toggle OFF - prayers NOT in Speeches tab
+    - AC-157-23  # Toggle ON - WhatsApp 3-tab segmented control
+    - AC-157-26  # Toggle ON - prayers in invite management with labels
+    - AC-157-27  # Toggle ON - prayer slots in expanded card
+    - AC-157-28  # Opening prayer slot layout (no topic, prayer label)
+    - AC-157-29  # Closing prayer slot layout
+    - AC-157-30  # Testimony/Primary shows only prayer slots
+    - AC-157-31  # Collapsed card 5 lines max
+    - AC-157-32  # Collapsed card conf/other 1 line
+    - AC-157-33  # Collapsed card testimony/primary 2 prayer lines
+    - AC-157-34  # Collapsed card speeches+2nd ON = 5 lines
+    - AC-157-35  # Collapsed card speeches+2nd OFF = 4 lines
+    - AC-157-36  # Prayer lines italic + prefix
+    - AC-157-52  # Default opening prayer template pt-BR
+    - AC-157-53  # Default closing prayer template pt-BR
+    - AC-157-54  # Prayer templates only {nome} and {data}
+    - AC-157-55  # Default templates en and es
+    - AC-157-56  # WhatsApp settings segmented control 3 tabs
+
+# =============================================================================
+# PHASE 1 PREREQUISITES - VERIFIED
+# =============================================================================
+
+phase1_prerequisites:
+  status: verified
+  timestamp: "2026-02-24"
+  evidence:
+    - artifact: "supabase/migrations/019_managed_prayers.sql"
+      status: exists
+      evidence: "Migration file exists with manage_prayers column, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, data copy, column drops, CHECK constraint update for positions 0-4, and notification trigger manage_prayers check"
+
+    - artifact: "src/types/database.ts - Ward interface"
+      status: exists
+      evidence: "Ward interface contains manage_prayers: boolean, whatsapp_template_opening_prayer: string | null, whatsapp_template_closing_prayer: string | null (line 81-83)"
+
+    - artifact: "src/hooks/useSpeeches.ts - useWardManagePrayers"
+      status: exists
+      evidence: "Hook exported at line 93, queries wards table for manage_prayers, returns { managePrayers: boolean; isLoading: boolean }"
+
+    - artifact: "src/hooks/useSpeeches.ts - useLazyCreateSpeeches"
+      status: exists
+      evidence: "Hook at line 171, type-aware: speeches=[0,1,2,3,4], testimony/primary=[0,4], conference/other=[]"
+
+    - artifact: "src/hooks/useSpeeches.ts - useDeleteSpeechesByDate"
+      status: exists
+      evidence: "Hook at line 383, accepts optional positions?: number[] for selective deletion"
+
+    - artifact: "src/app/(tabs)/settings/index.tsx - manage_prayers toggle"
+      status: exists
+      evidence: "Toggle at line 249-253, uses Switch with managePrayers value, Bispado-only via isBishopric guard, logAction call included"
+
+    - artifact: "i18n keys (all 3 locales)"
+      status: exists
+      evidence: >
+        All Phase 2 relevant keys verified present:
+        - prayers.opening/closing/prayerPrefix in pt-BR, en, es
+        - speeches.openingPrayer/closingPrayer in pt-BR, en, es
+        - whatsapp.tabSpeech/tabOpeningPrayer/tabClosingPrayer in pt-BR, en, es
+        - whatsapp.defaultOpeningPrayerTemplate/defaultClosingPrayerTemplate in pt-BR, en, es
+        - sundayExceptions.confirmDeletePrayers/confirmDeleteBoth in pt-BR, en, es
+
+    - artifact: "Phase 1 tests"
+      status: passing
+      evidence: "162 tests pass in src/__tests__/batch25-phase1.test.ts (vitest run, 0 failures)"
+
+# =============================================================================
+# PHASE 2 CURRENT STATE - PRE-IMPLEMENTATION
+# =============================================================================
+
+phase2_current_state:
+  status: not_implemented
+  evidence:
+    - file: "src/components/SpeechSlot.tsx"
+      search: "isPrayer"
+      result: "NOT FOUND - SpeechSlot does not have isPrayer prop yet"
+      evidence: "getPositionLabel function exists at line 59 but only handles positions 1-3, no prayer label logic"
+
+    - file: "src/components/SundayCard.tsx"
+      search: "managePrayers|prayerPrefix|italic"
+      result: "NOT FOUND - SundayCard has no prayer-related props or rendering"
+
+    - file: "src/app/(tabs)/speeches.tsx"
+      search: "managePrayers|isPrayer|position.*0|position.*4"
+      result: "NOT FOUND - speeches.tsx does not reference managePrayers or render prayer slots"
+
+    - file: "src/components/InviteManagementSection.tsx"
+      search: "managePrayers|openingPrayer|closingPrayer"
+      result: "NOT FOUND - InviteManagementSection has no prayer-aware logic. Position label at line 211 uses generic speech slot format"
+
+    - file: "src/lib/whatsappUtils.ts"
+      search: "getDefaultPrayerTemplate|PRAYER_TEMPLATE|prayer"
+      result: "NOT FOUND - whatsappUtils.ts has no prayer template functions or constants"
+
+    - file: "src/app/(tabs)/settings/whatsapp.tsx"
+      search: "managePrayers|segmented|activeTab|opening_prayer|closing_prayer"
+      result: "NOT FOUND - WhatsApp settings screen has no segmented control or prayer template tabs"
+
+# =============================================================================
+# VALIDATION CHECKS
+# =============================================================================
+
+validation_checks:
+
+  # ---------------------------------------------------------------------------
+  # MUST PASS - STEP-08: SpeechSlot isPrayer prop
+  # ---------------------------------------------------------------------------
+
+  must_pass:
+
+    - id: MP-01
+      step: STEP-08
+      ac: AC-157-28
+      description: "SpeechSlot accepts isPrayer?: boolean prop"
+      how_to_verify: "Search SpeechSlot.tsx for isPrayer prop in component signature/interface"
+      search_pattern: "isPrayer"
+      search_file: "src/components/SpeechSlot.tsx"
+
+    - id: MP-02
+      step: STEP-08
+      ac: AC-157-28
+      description: "When isPrayer=true, topic row is NOT rendered"
+      how_to_verify: "Find conditional rendering that hides topic field/row when isPrayer is true"
+      search_pattern: "isPrayer"
+      search_file: "src/components/SpeechSlot.tsx"
+      notes: "Topic row should be wrapped in !isPrayer condition or equivalent"
+
+    - id: MP-03
+      step: STEP-08
+      ac: AC-157-28
+      description: "getPositionLabel returns prayer label for position 0"
+      how_to_verify: "Check getPositionLabel function returns t('prayers.opening') for position 0"
+      search_pattern: "position.*0|prayers.opening"
+      search_file: "src/components/SpeechSlot.tsx"
+
+    - id: MP-04
+      step: STEP-08
+      ac: AC-157-29
+      description: "getPositionLabel returns prayer label for position 4"
+      how_to_verify: "Check getPositionLabel function returns t('prayers.closing') for position 4"
+      search_pattern: "position.*4|prayers.closing"
+      search_file: "src/components/SpeechSlot.tsx"
+
+    - id: MP-05
+      step: STEP-08
+      ac: AC-157-28
+      description: "When isPrayer=true, 2nd speech toggle is hidden"
+      how_to_verify: "The position === 2 toggle visibility check also includes !isPrayer condition"
+      search_pattern: "isPrayer"
+      search_file: "src/components/SpeechSlot.tsx"
+
+    # ---------------------------------------------------------------------------
+    # MUST PASS - STEP-09: Speeches tab prayer SpeechSlots
+    # ---------------------------------------------------------------------------
+
+    - id: MP-06
+      step: STEP-09
+      ac: AC-157-27
+      description: "Speeches tab imports and calls useWardManagePrayers()"
+      how_to_verify: "Search speeches.tsx for useWardManagePrayers import and call"
+      search_pattern: "useWardManagePrayers"
+      search_file: "src/app/(tabs)/speeches.tsx"
+
+    - id: MP-07
+      step: STEP-09
+      ac: AC-157-27
+      description: "Expanded card renders SpeechSlot with isPrayer=true for position 0 BEFORE speech slots"
+      how_to_verify: "Find SpeechSlot rendering with isPrayer=true and position=0 in expanded card section"
+      search_pattern: "isPrayer.*true|isPrayer={true}"
+      search_file: "src/app/(tabs)/speeches.tsx"
+      notes: "Position 0 SpeechSlot must come BEFORE positions 1/2/3 in JSX order"
+
+    - id: MP-08
+      step: STEP-09
+      ac: AC-157-27
+      description: "Expanded card renders SpeechSlot with isPrayer=true for position 4 AFTER speech slots"
+      how_to_verify: "Find SpeechSlot rendering with isPrayer=true and position=4 in expanded card section"
+      search_pattern: "isPrayer|position.*4"
+      search_file: "src/app/(tabs)/speeches.tsx"
+      notes: "Position 4 SpeechSlot must come AFTER positions 1/2/3 in JSX order"
+
+    - id: MP-09
+      step: STEP-09
+      ac: AC-157-18
+      description: "Positions 0/4 are NOT rendered when managePrayers=false"
+      how_to_verify: "Prayer SpeechSlots are conditionally rendered only when managePrayers is true"
+      search_pattern: "managePrayers"
+      search_file: "src/app/(tabs)/speeches.tsx"
+      notes: "Must be behind a managePrayers check"
+
+    - id: MP-10
+      step: STEP-09
+      ac: AC-157-30
+      description: "Testimony/primary shows only prayer slots (pos 0/4) when managePrayers=true"
+      how_to_verify: "For non-speeches types with managePrayers ON, speech slots (1/2/3) should not render, only prayer slots"
+      search_pattern: "testimony|primary|managePrayers"
+      search_file: "src/app/(tabs)/speeches.tsx"
+
+    # ---------------------------------------------------------------------------
+    # MUST PASS - STEP-10: SundayCard collapsed prayer lines
+    # ---------------------------------------------------------------------------
+
+    - id: MP-11
+      step: STEP-10
+      ac: AC-157-34
+      description: "SundayCard accepts managePrayers?: boolean prop"
+      how_to_verify: "Search SundayCard.tsx for managePrayers prop in component signature/interface"
+      search_pattern: "managePrayers"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-12
+      step: STEP-10
+      ac: AC-157-36
+      description: "Collapsed card prayer lines use italic font style"
+      how_to_verify: "Search for fontStyle: 'italic' in SundayCard collapsed prayer line rendering"
+      search_pattern: "italic"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-13
+      step: STEP-10
+      ac: AC-157-36
+      description: "Collapsed card prayer lines use prayerPrefix label"
+      how_to_verify: "Search for t('prayers.prayerPrefix') usage in SundayCard collapsed section"
+      search_pattern: "prayerPrefix"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-14
+      step: STEP-10
+      ac: AC-157-34
+      description: "Speeches type collapsed card includes prayer line for position 0 BEFORE speech lines"
+      how_to_verify: "Rendering order: prayer(pos 0), speech lines, prayer(pos 4)"
+      search_pattern: "position.*0|managePrayers"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-15
+      step: STEP-10
+      ac: AC-157-34
+      description: "Speeches type collapsed card includes prayer line for position 4 AFTER speech lines"
+      how_to_verify: "Position 4 prayer line after speech lines in JSX/rendering order"
+      search_pattern: "position.*4"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-16
+      step: STEP-10
+      ac: AC-157-33
+      description: "Testimony/primary collapsed card shows 2 prayer lines when managePrayers=true"
+      how_to_verify: "For testimony/primary types, collapsed card renders prayer lines instead of exception text when managePrayers ON"
+      search_pattern: "testimony|primary|managePrayers"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-17
+      step: STEP-10
+      ac: AC-157-32
+      description: "Conference/other collapsed card unchanged (1 line) when managePrayers=true"
+      how_to_verify: "Conference/other types do not render prayer lines regardless of managePrayers"
+      search_pattern: "conference|other|managePrayers"
+      search_file: "src/components/SundayCard.tsx"
+
+    - id: MP-18
+      step: STEP-10
+      ac: AC-157-36
+      description: "speeches.tsx passes managePrayers prop to SundayCard"
+      how_to_verify: "SundayCard usage in speeches.tsx passes managePrayers={managePrayers}"
+      search_pattern: "managePrayers"
+      search_file: "src/app/(tabs)/speeches.tsx"
+      notes: "This verifies the integration between speeches.tsx and SundayCard"
+
+    # ---------------------------------------------------------------------------
+    # MUST PASS - STEP-14: InviteManagementSection prayer positions
+    # ---------------------------------------------------------------------------
+
+    - id: MP-19
+      step: STEP-14
+      ac: AC-157-26
+      description: "InviteManagementSection accepts managePrayers?: boolean prop"
+      how_to_verify: "Search InviteManagementSection.tsx for managePrayers prop in component signature"
+      search_pattern: "managePrayers"
+      search_file: "src/components/InviteManagementSection.tsx"
+
+    - id: MP-20
+      step: STEP-14
+      ac: AC-157-26
+      description: "Positions 0/4 included in invite items when managePrayers=true"
+      how_to_verify: "When managePrayers true, filter includes position 0 and 4 in invite items"
+      search_pattern: "managePrayers|position.*0|position.*4"
+      search_file: "src/components/InviteManagementSection.tsx"
+
+    - id: MP-21
+      step: STEP-14
+      ac: AC-157-26
+      description: "Position 0 labeled as openingPrayer, position 4 as closingPrayer"
+      how_to_verify: "Position 0 uses t('speeches.openingPrayer') and position 4 uses t('speeches.closingPrayer')"
+      search_pattern: "openingPrayer|closingPrayer"
+      search_file: "src/components/InviteManagementSection.tsx"
+
+    - id: MP-22
+      step: STEP-14
+      ac: AC-157-17
+      description: "Positions 0/4 excluded when managePrayers=false"
+      how_to_verify: "Filter logic excludes positions 0 and 4 from invite items when managePrayers is false"
+      search_pattern: "managePrayers|position"
+      search_file: "src/components/InviteManagementSection.tsx"
+      notes: "Verify the filtering logic gates prayer positions behind managePrayers check"
+
+    - id: MP-23
+      step: STEP-14
+      ac: AC-157-26
+      description: "WhatsApp template for position 0 uses whatsapp_template_opening_prayer"
+      how_to_verify: "Template resolution maps position 0 to whatsapp_template_opening_prayer"
+      search_pattern: "whatsapp_template_opening_prayer|position.*0"
+      search_file: "src/components/InviteManagementSection.tsx"
+
+    - id: MP-24
+      step: STEP-14
+      ac: AC-157-26
+      description: "WhatsApp template for position 4 uses whatsapp_template_closing_prayer"
+      how_to_verify: "Template resolution maps position 4 to whatsapp_template_closing_prayer"
+      search_pattern: "whatsapp_template_closing_prayer|position.*4"
+      search_file: "src/components/InviteManagementSection.tsx"
+
+    # ---------------------------------------------------------------------------
+    # MUST PASS - STEP-16: WhatsApp prayer template defaults + utility
+    # ---------------------------------------------------------------------------
+
+    - id: MP-25
+      step: STEP-16
+      ac: AC-157-52
+      description: "Default opening prayer template constants exist for all 3 languages"
+      how_to_verify: "Search whatsappUtils.ts for opening prayer template constants (PT_BR, EN, ES)"
+      search_pattern: "OPENING_PRAYER.*TEMPLATE|DEFAULT_OPENING"
+      search_file: "src/lib/whatsappUtils.ts"
+
+    - id: MP-26
+      step: STEP-16
+      ac: AC-157-53
+      description: "Default closing prayer template constants exist for all 3 languages"
+      how_to_verify: "Search whatsappUtils.ts for closing prayer template constants (PT_BR, EN, ES)"
+      search_pattern: "CLOSING_PRAYER.*TEMPLATE|DEFAULT_CLOSING"
+      search_file: "src/lib/whatsappUtils.ts"
+
+    - id: MP-27
+      step: STEP-16
+      ac: AC-157-52
+      description: "getDefaultPrayerTemplate function is exported"
+      how_to_verify: "Search for export function getDefaultPrayerTemplate or export const getDefaultPrayerTemplate"
+      search_pattern: "getDefaultPrayerTemplate"
+      search_file: "src/lib/whatsappUtils.ts"
+
+    - id: MP-28
+      step: STEP-16
+      ac: AC-157-54
+      description: "Prayer templates contain only {nome} and {data} placeholders"
+      how_to_verify: "Verify prayer template strings contain {nome} and {data}, and do NOT contain {posicao}, {colecao}, {titulo}, {link}"
+      search_pattern: "\\{nome\\}|\\{data\\}"
+      search_file: "src/lib/whatsappUtils.ts"
+      notes: "Must NOT contain {posicao}, {colecao}, {titulo}, or {link}"
+
+    - id: MP-29
+      step: STEP-16
+      ac: AC-157-52
+      description: "Opening prayer template mentions arriving 15 minutes early"
+      how_to_verify: "Verify the opening prayer template text contains reference to arriving 15 minutes early"
+      search_pattern: "15.*minut|15 minutes|15min"
+      search_file: "src/lib/whatsappUtils.ts"
+
+    - id: MP-30
+      step: STEP-16
+      ac: AC-157-53
+      description: "Closing prayer template mentions joining during intermediate hymn"
+      how_to_verify: "Verify closing prayer template mentions intermediate hymn or hino intermediario"
+      search_pattern: "intermedi|hymn|hino"
+      search_file: "src/lib/whatsappUtils.ts"
+
+    # ---------------------------------------------------------------------------
+    # MUST PASS - STEP-17: WhatsApp settings segmented control
+    # ---------------------------------------------------------------------------
+
+    - id: MP-31
+      step: STEP-17
+      ac: AC-157-56
+      description: "WhatsApp settings imports useWardManagePrayers"
+      how_to_verify: "Search whatsapp.tsx for useWardManagePrayers import and call"
+      search_pattern: "useWardManagePrayers"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-32
+      step: STEP-17
+      ac: AC-157-56
+      description: "Segmented control with 3 tabs renders when managePrayers=true"
+      how_to_verify: "Find segmented control component with 3 tabs (speech, opening prayer, closing prayer)"
+      search_pattern: "segmented|SegmentedControl|activeTab|tabSpeech|tabOpeningPrayer|tabClosingPrayer"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-33
+      step: STEP-17
+      ac: AC-157-14
+      description: "Segmented control NOT shown when managePrayers=false"
+      how_to_verify: "Segmented control is conditionally rendered only when managePrayers is true"
+      search_pattern: "managePrayers"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-34
+      step: STEP-17
+      ac: AC-157-54
+      description: "Prayer tabs show only {nome} and {data} placeholders"
+      how_to_verify: "Prayer template editor limits placeholder tokens to {nome} and {data}"
+      search_pattern: "PLACEHOLDER|placeholder|nome.*data"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+      notes: "Speech tab should have all 6 placeholders; prayer tabs only 2"
+
+    - id: MP-35
+      step: STEP-17
+      ac: AC-157-56
+      description: "Prayer tabs save to correct ward columns"
+      how_to_verify: "Opening prayer tab saves to whatsapp_template_opening_prayer, closing to whatsapp_template_closing_prayer"
+      search_pattern: "whatsapp_template_opening_prayer|whatsapp_template_closing_prayer"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-36
+      step: STEP-17
+      ac: AC-157-56
+      description: "Prayer tabs use getDefaultPrayerTemplate for defaults"
+      how_to_verify: "Prayer tabs import and use getDefaultPrayerTemplate function for default template values"
+      search_pattern: "getDefaultPrayerTemplate"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-37
+      step: STEP-17
+      ac: AC-157-56
+      description: "Tab labels use i18n keys"
+      how_to_verify: "Tab labels use t('whatsapp.tabSpeech'), t('whatsapp.tabOpeningPrayer'), t('whatsapp.tabClosingPrayer')"
+      search_pattern: "whatsapp.tabSpeech|whatsapp.tabOpeningPrayer|whatsapp.tabClosingPrayer"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+    - id: MP-38
+      step: STEP-17
+      ac: AC-157-56
+      description: "Ward query fetches whatsapp_template_opening_prayer and closing_prayer columns"
+      how_to_verify: "Supabase select query includes whatsapp_template_opening_prayer and whatsapp_template_closing_prayer"
+      search_pattern: "whatsapp_template_opening_prayer|whatsapp_template_closing_prayer"
+      search_file: "src/app/(tabs)/settings/whatsapp.tsx"
+
+  # ---------------------------------------------------------------------------
+  # SHOULD PASS - Additional quality checks
+  # ---------------------------------------------------------------------------
+
+  should_pass:
+
+    - id: SP-01
+      step: STEP-08
+      ac: AC-157-28
+      description: "SpeechSlot isPrayer defaults to false (backward compatible)"
+      how_to_verify: "isPrayer prop has default value of false or is optional with no-prayer-rendering when absent"
+
+    - id: SP-02
+      step: STEP-10
+      ac: AC-157-31
+      description: "Collapsed card minHeight adjusted for 5-line cards if needed"
+      how_to_verify: "If minHeight was 62px for 3-line cards, verify it accommodates 5 lines when managePrayers=true"
+
+    - id: SP-03
+      step: STEP-10
+      ac: AC-157-36
+      description: "Prayer lines do NOT have LED indicators"
+      how_to_verify: "Collapsed card prayer lines show name with prefix but no StatusLED component"
+
+    - id: SP-04
+      step: STEP-09
+      ac: AC-157-27
+      description: "SpeechSlot status indicator shows for prayer slots"
+      how_to_verify: "Prayer SpeechSlots have status text and LED visible"
+
+    - id: SP-05
+      step: STEP-14
+      ac: AC-157-26
+      description: "Home tab passes managePrayers prop to InviteManagementSection"
+      how_to_verify: "index.tsx renders InviteManagementSection with managePrayers={managePrayers}"
+
+    - id: SP-06
+      step: STEP-17
+      ac: AC-157-56
+      description: "Each tab has independent editor and preview"
+      how_to_verify: "Switching tabs shows different template content in editor and preview areas"
+
+    - id: SP-07
+      step: STEP-09
+      ac: AC-157-18
+      description: "When managePrayers=false, no prayer positions (0/4) rendered in Speeches tab"
+      how_to_verify: "Verify that collapsed and expanded states of SundayCard do not show positions 0/4"
+
+    - id: SP-08
+      step: STEP-16
+      ac: AC-157-55
+      description: "Default prayer templates exist for en and es languages"
+      how_to_verify: "Verify getDefaultPrayerTemplate returns valid templates for 'en' and 'es'"
+
+# =============================================================================
+# TEST FILE EXPECTATIONS
+# =============================================================================
+
+test_expectations:
+  file: "src/__tests__/batch25-phase2.test.ts"
+  minimum_test_count: 100
+  areas_to_cover:
+    - "STEP-08: SpeechSlot isPrayer prop (topic hidden, labels, toggle hidden)"
+    - "STEP-09: Speeches tab prayer slots rendering by toggle state and sunday type"
+    - "STEP-10: SundayCard collapsed prayer lines by toggle state and sunday type"
+    - "STEP-14: InviteManagement positions 0/4 inclusion/exclusion, labels, templates"
+    - "STEP-16: WhatsApp prayer template defaults, getDefaultPrayerTemplate, placeholders"
+    - "STEP-17: WhatsApp segmented control, prayer tab placeholders, template saving"
+
+# =============================================================================
+# VALIDATION SUMMARY
+# =============================================================================
+
+validation_summary:
+  total_must_pass: 38
+  total_should_pass: 8
+  steps_validated: 6
+  acs_validated: 20

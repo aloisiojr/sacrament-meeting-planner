@@ -149,7 +149,7 @@ export function NextAssignmentsSection() {
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        {t('home.nextAssignments')}
+        {sectionTitleText}
       </Text>
 
       <SundayCard

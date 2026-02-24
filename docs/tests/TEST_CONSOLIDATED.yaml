@@ -5,9 +5,9 @@
 # =============================================================================
 
 type: test_consolidated
-version: 40
-last_updated: "2026-02-24T11:42:00Z"
-last_updated_by: "tester-batch26-phase1"
+version: 41
+last_updated: "2026-02-24T15:10:00Z"
+last_updated_by: "tester-batch27"
 
 test_suites:
 
@@ -23880,8 +23880,8 @@ gaps:
   # Remaining ACs (11,13-19,21-51,56,59-64) deferred to Phase 2 (UI components)
 
 stats:
-  total_tests: 3958
-  passing: 3958
+  total_tests: 4028
+  passing: 4028
   failing: 0
   skipped: 0
 
@@ -24348,10 +24348,22 @@ changelog:
       - "Full suite: 87 testes passando, 0 skipped, 0 falhando"
       - "Pre-existing failure in batch15-phase1 (speechRow marginBottom 4) expected due to CR-228 changing value to 1"
       - "verdict: approved"
-  - phase: 2
-    feature: F157
-    cr: CR-221
-    tests:
+  - version: 41
+    phase: 27
+    changes:
+      - "70 testes adicionados para Batch 27 (F159; CR-231)"
+      - "Migration (7 testes): AC-159-01/02/03 (ADD COLUMN speech_1/2/3 TEXT), AC-159-04 (DROP COLUMN whatsapp_template), AC-159-21 (copy data, nullable, correct ordering)"
+      - "TypeScript Types (4 testes): AC-159-05 (Ward interface has 3 speech template columns, old field removed)"
+      - "Default Templates & Utils (12 testes): AC-159-06 (9 constants with ordinals, no {posicao}, old constants removed, getDefaultSpeechTemplate 9 combos + fallback), AC-159-07 (WhatsAppVariables no position), AC-159-08 (resolveTemplate no posicao replacement), AC-159-09 (buildWhatsAppUrl position param + getDefaultSpeechTemplate fallback + correct URL)"
+      - "Re-exports (4 testes): getDefaultSpeechTemplate re-exported, old constants/getDefaultTemplate NOT re-exported, resolveTemplate/buildWhatsAppUrl/buildWhatsAppConversationUrl still re-exported"
+      - "InviteManagementSection (7 testes): AC-159-10 (ward query selects 3 speech columns, no old column), AC-159-11 (speechTemplateMap position-based, position passed to buildWhatsAppUrl, position NOT in WhatsAppVariables)"
+      - "Settings WhatsApp Screen (15 testes): AC-159-12 (ActiveTab speech_1/2/3, no old 'speech', always shown, default speech_1, tab labels), AC-159-13 (3 save mutations, each updates own column, 3 states), AC-159-14 (query 3 cols, no old), AC-159-15 (no placeholderPosition/posicao in tokens), AC-159-16 (no posicao in SAMPLE_DATA), getDefaultSpeechTemplate imported, F141 language reset"
+      - "Edge Function (9 testes): AC-159-17 (ward insert uses 3 columns, no old field, ordinals pt-BR/en/es, no {posicao}, language-based selection)"
+      - "i18n (7 testes): AC-159-18 (placeholderPosition removed from 3 locales), AC-159-19 (tabSpeech removed, tabSpeech1/2/3 added with correct values)"
+      - "Language Reset (5 testes): AC-159-20 (3 speech columns reset to null, old field removed, prayer columns also reset)"
+      - "21 ACs cobertos (AC-159-01 through AC-159-21), 0 ECs (spec has no edge cases), 0 gaps"
+      - "Full suite: 6933 testes passando (all files), 0 falhando"
+      - "verdict: approved"
       # --- STEP-08: SpeechSlot isPrayer prop (AC-157-28, AC-157-29) ---
       - name: "SpeechSlotProps interface has isPrayer optional boolean"
         file: "src/__tests__/batch25-phase2.test.ts"
@@ -26256,5 +26268,450 @@ changelog:
         file: "src/__tests__/batch26-f158.test.ts"
         type: unit
         covers_acs: ["AC-158-11"]
+        covers_ecs: []
+        status: passing
+
+  # ---------------------------------------------------------------------------
+  # Batch 27 - F159 (CR-231): Individual WhatsApp Templates per Speech Position
+  # ---------------------------------------------------------------------------
+  - phase: 27
+    feature: F159
+    cr: CR-231
+    tests:
+      # --- Migration Tests (AC-159-01 through AC-159-04, AC-159-21) ---
+      - name: "AC-159-01: adds whatsapp_template_speech_1 column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-01"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-02: adds whatsapp_template_speech_2 column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-02"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-03: adds whatsapp_template_speech_3 column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-03"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-04: drops old whatsapp_template column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-04"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-21: copies existing data from whatsapp_template to all 3 new columns"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-21"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-21: columns are nullable (no NOT NULL constraint)"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-21"]
+        covers_ecs: []
+        status: passing
+      - name: "data copy happens before drop (correct ordering)"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-21"]
+        covers_ecs: []
+        status: passing
+
+      # --- TypeScript Types (AC-159-05) ---
+      - name: "AC-159-05: Ward interface has whatsapp_template_speech_1"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-05"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-05: Ward interface has whatsapp_template_speech_2"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-05"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-05: Ward interface has whatsapp_template_speech_3"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-05"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-05: Ward interface does NOT have old whatsapp_template field"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-05"]
+        covers_ecs: []
+        status: passing
+
+      # --- Default Templates & Utils (AC-159-06 through AC-159-09) ---
+      - name: "AC-159-06: 9 default template constants exist"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-06: templates contain correct ordinal words"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-06: no template contains {posicao} placeholder"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-06: old default template constants are removed"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-06: getDefaultSpeechTemplate returns correct template for each language/position"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-06: getDefaultSpeechTemplate falls back to pt-BR for unsupported language"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-06"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-07: WhatsAppVariables does not have position field"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-07"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-08: resolveTemplate does not replace {posicao}"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-08"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-08: resolveTemplate source does not contain posicao replacement"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-08"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-09: buildWhatsAppUrl has position parameter"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-09"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-09: buildWhatsAppUrl uses getDefaultSpeechTemplate for fallback"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-09"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-09: buildWhatsAppUrl returns correct URL with position-based default"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-09"]
+        covers_ecs: []
+        status: passing
+
+      # --- whatsapp.ts Re-exports ---
+      - name: "getDefaultSpeechTemplate is re-exported"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+      - name: "old default template constants are NOT re-exported"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+      - name: "getDefaultTemplate is NOT re-exported"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+      - name: "resolveTemplate, buildWhatsAppUrl, buildWhatsAppConversationUrl remain re-exported"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      # --- InviteManagementSection (AC-159-10, AC-159-11) ---
+      - name: "AC-159-10: ward query selects whatsapp_template_speech_1"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-10"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-10: ward query selects whatsapp_template_speech_2"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-10"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-10: ward query selects whatsapp_template_speech_3"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-10"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-10: ward query does NOT select old whatsapp_template column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-10"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-11: speech template selection uses position-based mapping"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-11"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-11: position passed to buildWhatsAppUrl as parameter"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-11"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-11: position NOT included in WhatsAppVariables object"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-11"]
+        covers_ecs: []
+        status: passing
+
+      # --- Settings WhatsApp Screen (AC-159-12 through AC-159-16) ---
+      - name: "AC-159-12: ActiveTab type includes speech_1, speech_2, speech_3"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-12: ActiveTab type does NOT include old speech value"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-12: segmented control always shown (not gated by managePrayers)"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-12: default active tab is speech_1"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-12: tab labels use t(whatsapp.tabSpeech1/2/3)"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-13: 3 separate save mutations exist"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-13"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-13: each mutation updates its own column"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-13"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-14: ward query fetches 3 speech template columns"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-14"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-14: ward query does NOT fetch old whatsapp_template"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-14"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-15: PLACEHOLDER_I18N_KEYS does not contain placeholderPosition"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-15"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-15: PLACEHOLDER_TOKENS does not contain {posicao}"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-15"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-16: SAMPLE_DATA does not contain {posicao} key"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-16"]
+        covers_ecs: []
+        status: passing
+      - name: "3 separate speech template states exist"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-13"]
+        covers_ecs: []
+        status: passing
+      - name: "getDefaultSpeechTemplate imported instead of getDefaultTemplate"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-12"]
+        covers_ecs: []
+        status: passing
+      - name: "F141 language reset resets all 3 speech initialized flags"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
+        covers_ecs: []
+        status: passing
+
+      # --- Edge Function (AC-159-17) ---
+      - name: "AC-159-17: ward insert uses whatsapp_template_speech_1"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: ward insert uses whatsapp_template_speech_2"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: ward insert uses whatsapp_template_speech_3"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: ward insert does NOT use old whatsapp_template field"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: templates include ordinal words for pt-BR"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: templates include ordinal words for en"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: templates include ordinal words for es"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: no {posicao} placeholder in any template"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-17: templates selected based on language"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-17"]
+        covers_ecs: []
+        status: passing
+
+      # --- i18n (AC-159-18, AC-159-19) ---
+      - name: "AC-159-18: placeholderPosition removed from pt-BR"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-18"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-18: placeholderPosition removed from en"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-18"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-18: placeholderPosition removed from es"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-18"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-19: tabSpeech removed from all locales"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-19"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-19: tabSpeech1 added to all locales with correct values"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-19"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-19: tabSpeech2 added to all locales with correct values"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-19"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-19: tabSpeech3 added to all locales with correct values"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-19"]
+        covers_ecs: []
+        status: passing
+
+      # --- Language Reset (AC-159-20) ---
+      - name: "AC-159-20: wardLanguageChangeMutation resets whatsapp_template_speech_1 to null"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-20: wardLanguageChangeMutation resets whatsapp_template_speech_2 to null"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-20: wardLanguageChangeMutation resets whatsapp_template_speech_3 to null"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-20: old whatsapp_template: null is removed from update"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
+        covers_ecs: []
+        status: passing
+      - name: "AC-159-20: prayer template columns also reset to null"
+        file: "src/__tests__/batch27-f159.test.ts"
+        type: unit
+        covers_acs: ["AC-159-20"]
         covers_ecs: []
         status: passing

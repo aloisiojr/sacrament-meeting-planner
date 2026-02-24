@@ -14,6 +14,26 @@ export const DEFAULT_TEMPLATE_EN =
 export const DEFAULT_TEMPLATE_ES =
   'Hola, como estas? El Obispado te quiere invitar a dar el {posicao} discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
 
+// --- Default Prayer Templates ---
+
+export const DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR =
+  'Olá {nome}, você foi designado(a) para fazer a oração de abertura na Reunião Sacramental do dia {data}. Para ajudar na reverência, pedimos que você chegue 15min antes do início da reunião e se sente junto com o bispado ao púlpito. Podemos contar com você?';
+
+export const DEFAULT_OPENING_PRAYER_TEMPLATE_EN =
+  'Hello {nome}, you have been assigned to give the opening prayer at the Sacrament Meeting on {data}. To help with reverence, we kindly ask you to arrive 15 minutes early and sit with the bishopric at the pulpit. Can we count on you?';
+
+export const DEFAULT_OPENING_PRAYER_TEMPLATE_ES =
+  'Hola {nome}, has sido designado(a) para hacer la oración de apertura en la Reunión Sacramental del día {data}. Para ayudar con la reverencia, te pedimos que llegues 15 minutos antes del inicio de la reunión y te sientes junto con el obispado en el púlpito. ¿Podemos contar contigo?';
+
+export const DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR =
+  'Olá {nome}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}. Gostaríamos de pedir para que se junte ao bispado no púlpito durante o hino intermediário. Podemos contar com você?';
+
+export const DEFAULT_CLOSING_PRAYER_TEMPLATE_EN =
+  'Hello {nome}, you have been assigned to give the closing prayer at the Sacrament Meeting on {data}. We would like to ask you to join the bishopric at the pulpit during the intermediate hymn. Can we count on you?';
+
+export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
+  'Hola {nome}, has sido designado(a) para hacer la oración de cierre de la Reunión Sacramental del día {data}. Nos gustaría pedirte que te unas al obispado en el púlpito durante el himno intermedio. ¿Podemos contar contigo?';
+
 /**
  * Get the default template for a given language.
  * Falls back to pt-BR if the language is not supported.
@@ -27,6 +47,33 @@ export function getDefaultTemplate(language: string): string {
     case 'pt-BR':
     default:
       return DEFAULT_TEMPLATE_PT_BR;
+  }
+}
+
+/**
+ * Get the default prayer template for a given language and prayer type.
+ * Falls back to pt-BR if the language is not supported.
+ */
+export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string {
+  if (type === 'opening') {
+    switch (language) {
+      case 'en':
+        return DEFAULT_OPENING_PRAYER_TEMPLATE_EN;
+      case 'es':
+        return DEFAULT_OPENING_PRAYER_TEMPLATE_ES;
+      case 'pt-BR':
+      default:
+        return DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR;
+    }
+  }
+  switch (language) {
+    case 'en':
+      return DEFAULT_CLOSING_PRAYER_TEMPLATE_EN;
+    case 'es':
+      return DEFAULT_CLOSING_PRAYER_TEMPLATE_ES;
+    case 'pt-BR':
+    default:
+      return DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR;
   }
 }
 

@@ -376,7 +376,8 @@ export function useRemoveAssignment() {
 }
 
 /**
- * Delete all speeches for a given sunday date.
+ * Delete speeches for a given sunday date, optionally filtered by positions.
+ * When positions is provided, only delete those specific positions.
  * Used when changing sunday type away from 'speeches' to clean up orphaned data.
  */
 export function useDeleteSpeechesByDate() {
@@ -384,21 +385,28 @@ export function useDeleteSpeechesByDate() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sundayDate: string) => {
-      const { error } = await supabase
+    mutationFn: async (input: { sundayDate: string; positions?: number[] }) => {
+      const { sundayDate, positions } = input;
+      let query = supabase
         .from('speeches')
         .delete()
         .eq('ward_id', wardId!)
         .eq('sunday_date', sundayDate);
+
+      if (positions && positions.length > 0) {
+        query = query.in('position', positions);
+      }
+
+      const { error } = await query;
       if (error) throw error;
     },
-    onSuccess: (_, sundayDate) => {
+    onSuccess: (_, input) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (wardId && user) {
         logAction(
           wardId, user.id, user.email ?? '',
           'speech_cleanup',
-          buildLogDescription('speech_cleanup', { data: formatDateHumanReadable(sundayDate, getCurrentLanguage()) }),
+          buildLogDescription('speech_cleanup', { data: formatDateHumanReadable(input.sundayDate, getCurrentLanguage()) }),
           userName
         );
       }

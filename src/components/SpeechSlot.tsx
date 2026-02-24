@@ -32,7 +32,7 @@ import type { Speech, SpeechStatus, Member, TopicWithCollection } from '../types
 export interface SpeechSlotProps {
   /** The speech data for this slot (null if not yet created). */
   speech: Speech | null;
-  /** The position (1, 2, or 3). */
+  /** The position (0, 1, 2, 3, or 4). */
   position: number;
   /** Called when a speaker is assigned. */
   onAssignSpeaker?: (speechId: string, member: Member) => void;
@@ -52,11 +52,18 @@ export interface SpeechSlotProps {
   isSecondSpeechEnabled?: boolean;
   /** F118: Called when the 2nd speech toggle changes (only for position 2, Bispado). */
   onToggleSecondSpeech?: (enabled: boolean) => void;
+  /** CR-221: Whether this slot is a prayer (positions 0 or 4). Hides topic row and 2nd speech toggle. */
+  isPrayer?: boolean;
 }
 
 // --- Position Labels ---
 
-function getPositionLabel(position: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
+function getPositionLabel(position: number, t: (key: string, opts?: Record<string, unknown>) => string, isPrayer?: boolean): string {
+  // CR-221: Prayer labels for positions 0 and 4
+  if (isPrayer) {
+    if (position === 0) return t('prayers.opening');
+    if (position === 4) return t('prayers.closing');
+  }
   // F118: Position 3 uses "Ultimo Discurso" label
   if (position === 3) {
     return t('speeches.lastSpeech');
@@ -79,6 +86,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   onClearTopic,
   isSecondSpeechEnabled,
   onToggleSecondSpeech,
+  isPrayer = false,
 }: SpeechSlotProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -92,12 +100,12 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   const isObserver = role === 'observer';
   const isBispado = role === 'bishopric';
 
-  // F118: For position 2, check if toggle is enabled
-  const isPos2Disabled = position === 2 && isSecondSpeechEnabled === false;
+  // F118: For position 2, check if toggle is enabled (only when not a prayer slot)
+  const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false;
 
   const status = speech?.status ?? 'not_assigned';
   const hasSpeaker = !!speech?.speaker_name;
-  const label = getPositionLabel(position, t);
+  const label = getPositionLabel(position, t, isPrayer);
 
   const handleSpeakerPress = useCallback(() => {
     if (!speech || !canAssign) return;
@@ -155,8 +163,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
     'gave_up',
   ];
 
-  // Show topic row when there's a display value, or when can assign and speech exists
-  const showTopicRow = !!(topicDisplay || (canAssign && speech));
+  // Show topic row when there's a display value, or when can assign and speech exists (hide for prayer slots)
+  const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }, isPos2Disabled && styles.disabledContainer]}>
@@ -164,8 +172,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
       <View style={styles.labelRow}>
         <View style={styles.labelWithToggle}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-          {/* F118: Toggle switch for position 2 */}
-          {position === 2 && onToggleSecondSpeech && (
+          {/* F118: Toggle switch for position 2 (hidden for prayer slots) */}
+          {position === 2 && !isPrayer && onToggleSecondSpeech && (
             <Switch
               value={isSecondSpeechEnabled !== false}
               onValueChange={onToggleSecondSpeech}

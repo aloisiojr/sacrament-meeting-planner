@@ -25,6 +25,7 @@ import {
   useAssignTopic,
   useChangeStatus,
   useRemoveAssignment,
+  useWardManagePrayers,
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException } from '../hooks/useSundayTypes';
@@ -47,6 +48,11 @@ export function NextAssignmentsSection() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
+  const { managePrayers } = useWardManagePrayers();
+
+  const sectionTitleText = managePrayers
+    ? t('home.nextSpeechesAndPrayers')
+    : t('home.nextAssignments');
 
   const [expanded, setExpanded] = useState(false);
   const [speakerModalSpeechId, setSpeakerModalSpeechId] = useState<string | null>(null);
@@ -122,7 +128,7 @@ export function NextAssignmentsSection() {
     return (
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {t('home.nextAssignments')}
+          {sectionTitleText}
         </Text>
         <QueryErrorView
           error={speechesErr ?? exceptionsErr ?? null}

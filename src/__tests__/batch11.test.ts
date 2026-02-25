@@ -508,35 +508,41 @@ describe('F080 (CR-137): Checkbox visual in ActorSelector multi-select', () => {
 
   // --- AC-080-01: Checkbox rendered in multi-select mode ---
   describe('AC-080-01: Checkbox visual in multi-select mode', () => {
-    it('multiSelect conditional renders checkbox Text', () => {
+    it('multiSelect conditional renders checkbox icons', () => {
       const content = getActorSelector();
       expect(content).toContain('{multiSelect && (');
     });
 
-    it('checkbox has styles.checkbox class', () => {
+    it('checkbox area uses marginRight: 8 for spacing', () => {
       const content = getActorSelector();
-      expect(content).toContain('styles.checkbox');
+      // CR-236: SVG icons replaced Unicode checkboxes; wrapper View uses marginRight: 8
+      expect(content).toContain('marginRight: 8');
     });
   });
 
   // --- AC-080-02: Checkbox filled for selected items ---
   describe('AC-080-02: Checkbox filled for selected items', () => {
-    it('selected items render U+2611 (ballot box with check)', () => {
+    it('selected items render CheckSquareIcon SVG component', () => {
       const content = getActorSelector();
-      expect(content).toContain("'\\u2611'");
+      // CR-236: Replaced Unicode U+2611 with CheckSquareIcon SVG
+      expect(content).toContain('CheckSquareIcon');
     });
   });
 
   // --- AC-080-03: Checkbox empty for unselected items ---
   describe('AC-080-03: Checkbox empty for unselected items', () => {
-    it('unselected items render U+2610 (ballot box)', () => {
+    it('unselected items render SquareIcon SVG component', () => {
       const content = getActorSelector();
-      expect(content).toContain("'\\u2610'");
+      // CR-236: Replaced Unicode U+2610 with SquareIcon SVG
+      expect(content).toContain('SquareIcon');
     });
 
-    it('isSelected ternary switches between checked and unchecked', () => {
+    it('isSelected ternary switches between CheckSquareIcon and SquareIcon', () => {
       const content = getActorSelector();
-      expect(content).toContain("isSelected ? '\\u2611' : '\\u2610'");
+      // CR-236: SVG icons replaced Unicode checkbox ternary
+      expect(content).toContain('isSelected');
+      expect(content).toContain('CheckSquareIcon');
+      expect(content).toContain('SquareIcon');
     });
   });
 
@@ -631,20 +637,16 @@ describe('F080 (CR-137): Checkbox visual in ActorSelector multi-select', () => {
       expect(areaStyle).toContain("alignItems: 'center'");
     });
 
-    it('checkbox style has fontSize 20', () => {
+    it('CheckSquareIcon and SquareIcon use size={20}', () => {
       const content = getActorSelector();
-      const cbIdx = content.indexOf('checkbox:');
-      const cbEnd = content.indexOf('},', cbIdx);
-      const cbStyle = content.substring(cbIdx, cbEnd);
-      expect(cbStyle).toContain('fontSize: 20');
+      // CR-236: SVG icons use size={20} prop instead of fontSize style
+      expect(content).toContain('size={20}');
     });
 
-    it('checkbox style has marginRight 8', () => {
+    it('checkbox wrapper View has marginRight 8', () => {
       const content = getActorSelector();
-      const cbIdx = content.indexOf('checkbox:');
-      const cbEnd = content.indexOf('},', cbIdx);
-      const cbStyle = content.substring(cbIdx, cbEnd);
-      expect(cbStyle).toContain('marginRight: 8');
+      // CR-236: SVG icon wrapper uses inline marginRight: 8 instead of styles.checkbox
+      expect(content).toContain('marginRight: 8');
     });
   });
 });

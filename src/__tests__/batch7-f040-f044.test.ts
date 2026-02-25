@@ -383,11 +383,11 @@ describe('F042 (CR-97): Multi-select for Reconhecendo a Presenca field', () => {
       expect(content).toContain("selectedNames?.includes(item.name)");
     });
 
-    it('should render checkbox (U+2611/U+2610) for selected/unselected actors', () => {
+    it('should render CheckSquareIcon/SquareIcon for selected/unselected actors', () => {
       const content = getActorSelector();
-      // F080: Replaced U+2713 text prefix with checkbox unicode characters
-      expect(content).toContain('\\u2611');
-      expect(content).toContain('\\u2610');
+      // CR-236: Replaced U+2611/U+2610 Unicode with SVG CheckSquareIcon/SquareIcon components
+      expect(content).toContain('CheckSquareIcon');
+      expect(content).toContain('SquareIcon');
     });
   });
 

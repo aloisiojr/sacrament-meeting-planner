@@ -406,9 +406,10 @@ describe('F137 (CR-200): Play icon fontSize enlargement in Home and Agenda', () 
   });
 
   describe('AC-137-02: Agenda PlayIcon size >= 18', () => {
-    it('PlayIcon SVG component has size={18} in Agenda', () => {
+    it('PlayIcon SVG component has size={24} in Agenda', () => {
       // PlayIcon now uses size prop instead of fontSize style
-      expect(agendaSource).toContain('<PlayIcon size={18}');
+      // CR-235: PlayIcon changed from circle-play icon to larger size={24}
+      expect(agendaSource).toContain('<PlayIcon size={24}');
     });
   });
 

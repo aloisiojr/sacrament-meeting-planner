@@ -197,18 +197,23 @@ export function useLazyCreateSpeeches() {
 
       if (positions.length === 0) return [];
 
-      // Check if speeches already exist
+      // Check which positions already exist
       const { data: existing, error: checkErr } = await supabase
         .from('speeches')
-        .select('id')
+        .select('position')
         .eq('ward_id', wardId)
         .eq('sunday_date', sundayDate);
 
       if (checkErr) throw checkErr;
-      if (existing && existing.length > 0) return [];
 
-      // Create speech records for the determined positions
-      const records = positions.map((position) => ({
+      // Find missing positions (handles partial creation from migration 019)
+      const existingPositions = new Set((existing ?? []).map((s) => s.position));
+      const missingPositions = positions.filter((p) => !existingPositions.has(p));
+
+      if (missingPositions.length === 0) return [];
+
+      // Create speech records only for missing positions
+      const records = missingPositions.map((position) => ({
         ward_id: wardId,
         sunday_date: sundayDate,
         position,

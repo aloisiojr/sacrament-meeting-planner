@@ -310,6 +310,42 @@ export const CheckIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   </Svg>
 );
 
+/** Lucide: square (https://lucide.dev/icons/square) */
+export const SquareIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M21 3H3v18h18V3z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
+/** Lucide: square-check (https://lucide.dev/icons/square-check) */
+export const CheckSquareIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M21 3H3v18h18V3z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="m9 12 2 2 4-4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
 /** Lucide: more-vertical (https://lucide.dev/icons/more-vertical) */
 export const MoreVerticalIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

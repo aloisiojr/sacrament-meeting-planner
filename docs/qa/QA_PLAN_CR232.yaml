@@ -1,0 +1,128 @@
+type: qa_plan
+id: QA-232
+created_at: "2026-02-24"
+request_type: bugfix
+feature_or_bug: "Card contraido muito alto com oracoes habilitadas"
+user_request: "card contraido muito alto com oracoes habilitadas"
+
+# Estado atual documentado
+baseline:
+  description: |
+    The SundayCard component in SundayCard.tsx (line 439-443) calculates collapsedMinHeight
+    using only the managePrayers flag: maxLines = managePrayers ? 5 : 3.
+    This always reserves 5 lines of height when prayers are enabled, regardless of:
+    1. hasSecondSpeech flag (when false, only 4 lines are rendered: opening prayer + 2 speeches + closing prayer)
+    2. Sunday type (testimony/primary with managePrayers shows only 3 lines: exception text + 2 prayer lines)
+    This causes collapsed cards to be taller than their actual content in these scenarios.
+
+    Calculation: collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines - 1) * MARGIN_BOTTOM
+    With managePrayers=true: 5 * 18 + 4 * 1 = 94px (always)
+    Actual content with hasSecondSpeech=false: 4 lines -> 4 * 18 + 3 * 1 = 75px
+    Actual content for testimony/primary: 3 lines -> 3 * 18 + 2 * 1 = 56px
+
+  evidence:
+    - "SundayCard.tsx line 442: const maxLines = managePrayers ? 5 : 3"
+    - "SundayCard.tsx line 443: const collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines - 1) * MARGIN_BOTTOM"
+    - "SundayCard.tsx line 464: <View style={[styles.headerCenter, !expanded && { minHeight: collapsedMinHeight }]}>"
+    - "SundayCard.tsx line 420: const visiblePositions = hasSecondSpeech ? [1, 2, 3] : [1, 3]"
+    - "When managePrayers=true and hasSecondSpeech=false: renders 4 lines (opening + 2 speeches + closing) but reserves 94px (5 lines)"
+    - "When managePrayers=true and isTestimonyOrPrimary: renders 3 lines (exception + opening + closing) but reserves 94px (5 lines)"
+
+# Plano de validacao: O QUE vou verificar no POST
+validation_checks:
+  - id: VC-232-01
+    description: "collapsedMinHeight accounts for hasSecondSpeech when managePrayers=true"
+    type: functional
+    how_to_verify: |
+      Read SundayCard.tsx and verify that the maxLines or collapsedMinHeight calculation
+      considers hasSecondSpeech. When managePrayers=true and hasSecondSpeech=false,
+      the minHeight should correspond to 4 lines, not 5.
+    expected_result: |
+      The minHeight for collapsed cards with managePrayers=true and hasSecondSpeech=false
+      should be 4 * LINE_HEIGHT + 3 * MARGIN_BOTTOM = 75px (not 94px).
+    priority: must_pass
+
+  - id: VC-232-02
+    description: "collapsedMinHeight for standard speeches with managePrayers=true and hasSecondSpeech=true remains 5 lines"
+    type: regression
+    how_to_verify: |
+      Read SundayCard.tsx and verify that when managePrayers=true and hasSecondSpeech=true,
+      the minHeight still corresponds to 5 lines (94px).
+    expected_result: |
+      minHeight = 5 * 18 + 4 * 1 = 94px when managePrayers=true and hasSecondSpeech=true.
+    priority: must_pass
+
+  - id: VC-232-03
+    description: "collapsedMinHeight without managePrayers remains unchanged"
+    type: regression
+    how_to_verify: |
+      Read SundayCard.tsx and verify that when managePrayers=false, the minHeight
+      calculation remains at 3 lines regardless of hasSecondSpeech.
+    expected_result: |
+      minHeight = 3 * 18 + 2 * 1 = 56px when managePrayers=false (regardless of hasSecondSpeech).
+    priority: must_pass
+
+  - id: VC-232-04
+    description: "minHeight is still only applied when card is collapsed (!expanded)"
+    type: regression
+    how_to_verify: |
+      Check that the minHeight style is conditionally applied only when !expanded.
+    expected_result: |
+      The style should contain !expanded && { minHeight: ... } pattern.
+    priority: must_pass
+
+  - id: VC-232-05
+    description: "Testimony/primary with managePrayers=true should have appropriate height"
+    type: functional
+    how_to_verify: |
+      Read SundayCard.tsx and verify the collapsed height for testimony/primary meeting
+      cards with managePrayers=true. These show 3 lines: exception text + opening prayer + closing prayer.
+    expected_result: |
+      The minHeight for testimony/primary with managePrayers should be appropriate for 3 lines
+      (exception text + opening prayer + closing prayer) or match the standard card height
+      to maintain uniformity. The key point is that the card should not have excessive
+      empty space. If uniform height is intentional (CR-229 design), then 5 lines is acceptable.
+      If the fix is specifically for speeches-type cards, then 5 lines is still acceptable
+      for testimony/primary. Document actual behavior.
+    priority: should_pass
+
+  - id: VC-232-06
+    description: "hasSecondSpeech=false still renders exactly 2 speech lines plus 2 prayer lines"
+    type: functional
+    how_to_verify: |
+      Read SundayCard.tsx collapsed rendering logic (lines 535-619) and confirm that
+      when hasSecondSpeech=false and managePrayers=true, exactly 4 lines are rendered:
+      1 opening prayer + 2 speeches (positions 1,3) + 1 closing prayer.
+    expected_result: |
+      visiblePositions = [1, 3] when hasSecondSpeech=false. Total lines: 4
+      (opening prayer + speech1 + speech3 + closing prayer).
+    priority: must_pass
+
+  - id: VC-232-07
+    description: "No changes to expanded card behavior"
+    type: regression
+    how_to_verify: |
+      Verify that the expanded content rendering (children, SpeechSlot, etc.)
+      is not affected by the fix.
+    expected_result: |
+      Expanded card behavior remains unchanged. The fix should only affect
+      collapsed card height calculation.
+    priority: must_pass
+
+# Reproducao do bug
+reproduction_steps:
+  - step: "Enable manage_prayers in ward settings"
+    expected: "Prayers toggle is ON"
+    actual: "Prayers toggle is ON"
+  - step: "Disable second speech (has_second_speech=false) for a sunday"
+    expected: "Only 2 speech slots shown"
+    actual: "Only 2 speech slots shown (positions 1 and 3)"
+  - step: "Collapse the card (look at it in the list)"
+    expected: "Card height should match 4 lines of content (opening prayer + 2 speeches + closing prayer)"
+    actual: "Card height reserves 5 lines (94px minHeight) but only 4 lines of content exist, leaving 19px of extra empty space"
+
+# Criterio de aprovacao
+pass_criteria: |
+  TODOS os checks com priority=must_pass DEVEM passar.
+  Se qualquer must_pass falhar -> verdict=failed.
+  Se todos must_pass passarem mas should_pass falhar -> verdict=partial.

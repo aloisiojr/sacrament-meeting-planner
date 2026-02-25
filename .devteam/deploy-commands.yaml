@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 14
-last_updated: "2026-02-24T18:47:00"
+version: 15
+last_updated: "2026-02-24T23:30:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -606,4 +606,17 @@ deploy_history:
     cr: "Batch 27 (F159, CR-231)"
     verification:
       - "supabase functions list mostra register-first-user como ACTIVE v8"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-02-24"
+    action: "Migration 021_fix_weekly_reminders_manage_prayers.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - create_weekly_reminders() atualizada com filtro manage_prayers para posicoes de oracao (0, 4)"
+    verified: true
+    cr: "CR-233"
+    verification:
+      - "pg_proc.prosrc: create_weekly_reminders contem filtro 'position NOT IN (0, 4) OR COALESCE(ward.manage_prayers, false)' em ambos checks (unassigned e unconfirmed)"
+      - "pg_proc.proconfig: search_path='' mantido"
+      - "Funcao seleciona w.manage_prayers no FOR loop"
       - "REST API health check: HTTP 200"

@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-24"
-  last_updated_by: "batch-27-phase-1"
+  last_updated_by: "batch-28-phase-1"
   total_modules: 8
-  total_adrs: 113
-  total_crs_implemented: 143
+  total_adrs: 115
+  total_crs_implemented: 148
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -53,6 +53,7 @@ metadata:
     - docs/arch/ARCH_M044.yaml
     - docs/arch/ARCH_M158.yaml
     - docs/arch/ARCH_M159.yaml
+    - docs/arch/ARCH_M161.yaml
 
 # =============================================================================
 # TECH STACK
@@ -277,7 +278,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159, F163, F164]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -294,7 +295,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229, 231]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229, 231, 236, 237]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -337,11 +338,13 @@ modules:
       CR-221/F157: Managed Prayers. Prayers stored as speeches positions 0 (opening) and 4 (closing). manage_prayers toggle on wards. useLazyCreateSpeeches extended for positions 0/4 by sunday type. SpeechSlot gains isPrayer prop (no topic row). SundayCard collapsed shows prayer lines (italic + prefix) when ON. useDeleteSpeechesByDate gains optional positions filter. Notification trigger checks manage_prayers for positions 0/4. Separate WhatsApp templates for opening/closing prayers. (ADR-102 through ADR-108).
       CRs 222-229/F158: UI adjustments for managed prayers collapsed cards. CR-222: StatusLED circles added to prayer lines. CR-223: conditional prayer label (hide when no name). CR-225: NextSundaysSection passes managePrayers to SundayCard. CR-227: spacing gap after exception text in testimony/primary. CR-228: speechRow marginBottom reduced from 4 to 1. CR-229: dynamic minHeight replaces static 62px for uniform card height (ADR-110). (ADR-109 through ADR-111).
       CR-231/F159: Speech WhatsApp template split. Single wards.whatsapp_template replaced with 3 per-position columns: whatsapp_template_speech_{1,2,3}. {posicao} placeholder removed from templates, WhatsAppVariables, and resolveTemplate. getDefaultTemplate replaced by getDefaultSpeechTemplate(language, position). buildWhatsAppUrl gains position parameter. InviteManagementSection selects template column by speech.position. Settings WhatsApp screen expands to 5 tabs (3 speech + 2 prayer). Migration 020. (ADR-112, ADR-113).
+      CR-236/F163: ActorSelector Unicode checkbox (U+2611/U+2610) replaced with SVG CheckSquareIcon/SquareIcon from icons module. Selected uses colors.primary, unselected uses colors.textSecondary.
+      CR-237/F164: speeches.selectTopic i18n capitalization fix ('tema'->'Tema', 'topic'->'Topic').
 
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157, F158]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157, F158, F161, F162]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -359,7 +362,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217, 220, 230]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217, 220, 230, 234, 235]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -408,6 +411,8 @@ modules:
       CR-217/F153: agenda.tsx play button Pressable gains circular border (width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary) with centered content. playButton marginRight increased from 8 to 16 for more spacing from chevron (ADR-099).
       CR-220/F156: ReadOnlySpeakerRow text styling reworked: speaker names get fontStyle:'italic' + color:colors.textSecondary (reduced contrast). Empty placeholder keeps textTertiary. 2nd speech disabled speakerName changed from '' to t('speeches.secondSpeechDisabledPlaceholder'). i18n 'configurado'->'ajustado' in 3 locales (ADR-101).
       CR-230/F158: Fix double-label bug in AgendaForm prayer fields. When managePrayers=true, ReadOnlySpeakerRow was called inside FieldRow, but ReadOnlySpeakerRow internally wraps in its own FieldRow -> double label. Fix: inline render View+Text+PencilIcon directly inside parent FieldRow for prayer positions (ADR-109).
+      CR-234/F161: welcome_new_families field added to AgendaForm (FieldRow + DebouncedTextInput between Recognizing and Announcements). Auto-saves via updateField. Observer read-only. usePresentationMode adds welcome_new_families to Welcome card (conditional, multiline type). DB migration 022 adds TEXT DEFAULT NULL column to sunday_agendas. SundayAgenda TypeScript interface updated. i18n key agenda.welcomeNewFamilies in 3 locales (ADR-114).
+      CR-235/F162: PlayIcon SVG replaced from triangle to circle-play (Circle + Path in icons/index.tsx). Agenda.tsx play button circular border container removed (circle-play has built-in circle). Size increased 18->24.
 
   - id: M005
     name: NotificationModule
@@ -483,7 +488,7 @@ modules:
   - id: M008
     name: UIShell
     responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
-    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155, F158, F159]
+    spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155, F158, F159, F165]
     key_files:
       - src/app/_layout.tsx
       - src/app/(tabs)/_layout.tsx
@@ -518,7 +523,7 @@ modules:
       - AboutScreen (settings/about.tsx)
       - WhatsAppScreen (settings/whatsapp.tsx)
       - TimezoneScreen (settings/timezone.tsx)
-    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216, 218, 224, 225, 226, 231]
+    modified_by_crs: [1, 9, 10, 12, 13, 14, 15, 16, 17, 19, 32, 33, 43, 82, 84, 87, 90, 105, 106, 107, 110, 111, 112, 113, 122, 114, 115, 118, 134, 135, 138, 140, 142, 146, 148, 149, 150, 156, 157, 158, 159, 160, 161, 163, 168, 175, 178, 181, 191, 186, 188, 193, 195, 196, 200, 206, 207, 209, 210, 211, 212, 216, 218, 224, 225, 226, 231, 238]
     notes: |
       4 tabs: Home, Agenda, Speeches, Settings.
       Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
@@ -585,6 +590,7 @@ modules:
       CR-225/F158: NextSundaysSection now imports useWardManagePrayers and passes managePrayers prop to SundayCard components. Matches NextAssignmentsSection pattern.
       CR-226/F158: Speeches tab label gains custom tabBarLabel render function with numberOfLines={2} to allow 'Discursos e Oracoes' to wrap to 2 lines (ADR-111).
       CR-231/F159: WhatsApp speech template split. Settings whatsapp.tsx segmented control expands from 3 to 5 tabs (3 speech + 2 prayer). Each speech tab edits its own column. {posicao} placeholder removed from chip list and SAMPLE_DATA. Ward query selects 3 speech columns. wardLanguageChangeMutation in settings/index.tsx resets 3 speech columns. InviteManagementSection maps speech.position to column name. whatsapp.ts re-exports updated. i18n: remove placeholderPosition/tabSpeech, add tabSpeech1/tabSpeech2/tabSpeech3 (ADR-112, ADR-113).
+      CR-238/F165: Settings wardLanguage item replaced with inline Pressable + description text (t('settings.wardLanguageDescription')). Explains that ward language only affects topic collection language and WhatsApp templates, not app UI. Follows managePrayers toggle pattern (ADR-115).
 
 # =============================================================================
 # MODULE DEPENDENCIES
@@ -1647,6 +1653,24 @@ adrs:
       - "Better discoverability of per-position templates"
       - "Abbreviated labels required to fit 5 tabs"
 
+  - id: ADR-114
+    title: "Free-text field for welcome_new_families instead of structured selector (Batch 28)"
+    context: "CR-234 adds welcome field. Options: (a) free-text multiline like announcements, or (b) structured selector like ActorSelector. Families are typically not existing ward members."
+    decision: "Use free-text multiline DebouncedTextInput (same as announcements). Simple TEXT column in DB. No member/actor relationship needed."
+    decided_in: "CR-234/F161"
+    consequences:
+      - "Simple implementation reusing existing patterns"
+      - "Flexible text input for any format"
+
+  - id: ADR-115
+    title: "Inline Pressable with description for wardLanguage instead of modifying SettingsItem (Batch 28)"
+    context: "CR-238 adds description text to ward language setting. Only this item needs a description among all SettingsItem uses."
+    decision: "Use inline Pressable layout for wardLanguage only, following managePrayers toggle pattern. Do not modify SettingsItem component."
+    decided_in: "CR-238/F165"
+    consequences:
+      - "No changes to widely-used SettingsItem component"
+      - "Slight code duplication acceptable for single-use requirement"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -1694,10 +1718,10 @@ database_schema:
 
     - name: sunday_agendas
       description: "Agenda completa da reuniao sacramental por domingo"
-      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
+      columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, welcome_new_families, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
       unique: ["(ward_id, sunday_date)"]
       rls: "ward_id = auth.jwt().app_metadata.ward_id"
-      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016). has_second_speech added by CR-181/F118 (migration 018). CR-221/F157 (migration 019): dropped opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name (data migrated to speeches positions 0/4)."
+      notes: "speaker_*_override added by CR-100/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added by CR-152/F095 (migration 016). has_second_speech added by CR-181/F118 (migration 018). CR-221/F157 (migration 019): dropped opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name (data migrated to speeches positions 0/4). CR-234/F161 (migration 022): added welcome_new_families TEXT DEFAULT NULL."
 
     - name: ward_collection_config
       description: "Configuracao de colecoes ativas por ala"
@@ -1788,6 +1812,9 @@ database_schema:
     - "017_split_music_actor.sql"
     - "018_add_has_second_speech.sql"
     - "019_managed_prayers.sql"
+    - "020_split_speech_template.sql"
+    - "021_fix_weekly_reminders_manage_prayers.sql"
+    - "022_add_welcome_new_families.sql"
 
   key_relationships:
     - "members.ward_id -> wards.id"
@@ -2020,11 +2047,11 @@ file_structure:
     "(tabs)/":
       "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). CR-178/F116: Observer gains Settings tab with limited access (app language, theme, about)."
       "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). CR-149/F092: botao Presentation Mode sempre visivel. CR-186/F128: play icon on Iniciar button, date param to Presentation, non-expandable AgendaPreviewCard with status lines and pencil -> Agenda tab. CR-196/F132: dynamic speaker count X/2 or X/3 based on has_second_speech."
-      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. CR-184/F126: accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. CR-185/F127: play button (U+25B6) in expanded card header navigates to Presentation with date param. CR-196/F132: collapsed card dynamic speaker count X/2 or X/3 based on has_second_speech."
+      "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout e initialScrollIndex para scroll preciso. CR-136/F079: viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. CR-184/F126: accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. CR-185/F127: play button (U+25B6) in expanded card header navigates to Presentation with date param. CR-196/F132: collapsed card dynamic speaker count X/2 or X/3 based on has_second_speech. CR-235/F162: play button circular border removed (circle-play icon has built-in circle), size 18->24."
       "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand (CR-120/F066). CR-132/F075: remove getItemLayout para scroll preciso. CR-182/F121: reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button. CR-196/F132: handleToggleSecondSpeech adds separate Supabase update for topic fields (ADR-085). CR-194/F130: null-to-string fix in speech update. CR-221/F157: prayer SpeechSlots (positions 0/4) when manage_prayers ON. useLazyCreateSpeeches receives sundayType. handleAssignSpeaker status override for prayers."
       "settings/":
         "_layout.tsx": "Settings stack navigator"
-        "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only). CR-195/F131: wardLanguageChangeMutation.onSuccess now calls setWardLanguage() to update AuthContext immediately."
+        "index.tsx": "Settings menu (links para sub-telas). CR-178/F116: Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only). CR-195/F131: wardLanguageChangeMutation.onSuccess now calls setWardLanguage() to update AuthContext immediately. CR-238/F165: wardLanguage item replaced with inline Pressable + description text (t('settings.wardLanguageDescription'))."
         "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts (CR-80) + Save/Cancel (CR-83) + SearchInput (CR-84) + import countryCodes (CR-85) + import confirm (CR-86) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel (CR-83) + SearchInput (CR-84) + description text (CR-88) + collection expand/collapse (CR-89) + SearchInput fixo no topo (CR-96) + close button (CR-118/F065)"
         "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
@@ -2051,7 +2078,7 @@ file_structure:
     "useSundayTypes.ts": "Auto-assign + override tipos de domingo"
     "useHymns.ts": "Busca de hinos (read-only)"
     "useActivityLog.ts": "Log paginado com busca"
-    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys. CR-172/F110: stake announcements field in Card 2 when has_stake_announcements is true. CR-181/F118: conditionally includes speech 2 in First Speeches based on has_second_speech."
+    "usePresentationMode.ts": "Dados do modo apresentacao. CR-100: usa speaker_*_override quando existir. CR-157/F097: recognized_names join '\\n' + multiline. CR-159/F097: card titles use sectionXxx i18n keys. CR-172/F110: stake announcements field in Card 2 when has_stake_announcements is true. CR-181/F118: conditionally includes speech 2 in First Speeches based on has_second_speech. CR-234/F161: welcome_new_families PresentationField in Welcome card (after recognized_names, before announcements)."
     "useSundayList.ts": "Lista de domingos com scroll infinito"
     "useRealtimeSync.ts": "Subscricao Supabase Realtime"
     "useConnection.ts": "Monitor de conexao (NetInfo). CR-146/F089: integra onlineManager.setOnline() do TanStack Query."
@@ -2059,8 +2086,8 @@ file_structure:
     "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
 
   "src/components/":
-    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param). CR-194/F130: Member type import fix. CR-196/F132: disabled ReadOnlySpeakerRow always rendered (not conditionally hidden) when has_second_speech=false."
-    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor."
+    "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param). CR-194/F130: Member type import fix. CR-196/F132: disabled ReadOnlySpeakerRow always rendered (not conditionally hidden) when has_second_speech=false. CR-234/F161: welcome_new_families FieldRow + DebouncedTextInput between Recognizing and Announcements."
+    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor. CR-236/F163: Unicode checkbox replaced with SVG CheckSquareIcon/SquareIcon (colors.primary for selected, colors.textSecondary for unselected)."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
@@ -2083,7 +2110,7 @@ file_structure:
     "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite (CR-106/F051). CR-113/F056: titulo usa t('speeches.changeStatus'). CR-134/F077: opcoes de status dinamicas via ALL_ASSIGNED_STATUSES.filter(). CR-209/F145: WhatsAppIcon imported from icons module (local definition removed)."
 
   "src/components/icons/":
-    "index.ts": "Centralized SVG icon components (CR-209/F145). 14 exports: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, MoreVerticalIcon (Lucide stroke-based), WhatsAppIcon (brand fill-based). Shared IconProps { size?: number; color?: string }. Uses react-native-svg. No icon library (DD-25/ADR-096)."
+    "index.ts": "Centralized SVG icon components (CR-209/F145). 16 exports: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, SquareIcon, CheckSquareIcon, MoreVerticalIcon (Lucide stroke-based), WhatsAppIcon (brand fill-based). Shared IconProps { size?: number; color?: string }. Uses react-native-svg. No icon library (DD-25/ADR-096). CR-235/F162: PlayIcon changed from triangle to circle-play. CR-236/F163: SquareIcon and CheckSquareIcon added."
 
   "src/lib/":
     "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
@@ -2113,7 +2140,7 @@ file_structure:
 
   "supabase/":
     "config.toml": "Configuracao local do Supabase"
-    "migrations/": "18 migrations SQL"
+    "migrations/": "22 migrations SQL"
     "functions/":
       "register-first-user/": "Registro do primeiro usuario (cria ala)"
       "register-invited-user/": "Registro via convite"
@@ -2202,6 +2229,7 @@ key_flows:
       - "Card titles: sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech (CR-159/F097)"
       - "Arrows: cards above expanded show down-arrow, below show up-arrow, expanded hides arrow (CR-156/F097)"
       - "Recognized names: one per line (CR-157/F097)"
+      - "Welcome new families: shown when non-empty (CR-234/F161)"
       - "CR-185/F127: Presentation accepts optional date param. Agenda tab play button (U+25B6) navigates with date."
 
   csv_import_export:
@@ -2597,6 +2625,14 @@ change_requests_history:
     status: "pending implementation"
     adrs: [ADR-112, ADR-113]
     new_files: ["supabase/migrations/020_split_speech_template.sql"]
+
+  batch_28_phase_1:
+    crs: "CR-234, CR-235, CR-236, CR-237, CR-238"
+    scope: "Welcome new families field in agenda (F161: DB migration 022, types, AgendaForm, presentation mode, i18n). PlayIcon circle-play SVG replacement (F162: icons module, agenda border removal). ActorSelector checkbox SVG replacement (F163: SquareIcon, CheckSquareIcon in icons module, ActorSelector). selectTopic capitalization (F164: i18n only). wardLanguage description text (F165: settings inline Pressable, i18n)"
+    doc: "ARCH_M161.yaml"
+    status: "pending implementation"
+    adrs: [ADR-114, ADR-115]
+    new_files: ["supabase/migrations/022_add_welcome_new_families.sql"]
 
 # =============================================================================
 # OBSERVABILITY

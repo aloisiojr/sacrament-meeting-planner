@@ -1,0 +1,496 @@
+# =============================================================================
+# ARCH_M161.yaml
+# Architecture for Batch 28: F161-F165
+# F161 - Welcome new families field (CR-234)
+# F162 - PlayIcon circle-play replacement (CR-235)
+# F163 - ActorSelector checkbox SVG replacement (CR-236)
+# F164 - selectTopic capitalization (CR-237)
+# F165 - wardLanguage description (CR-238)
+# Created: 2026-02-24
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Batch 28 delivers 5 independent features: (1) a new welcome_new_families
+    text field in the agenda, requiring DB migration, types, form, presentation
+    mode, and i18n changes; (2-3) two SVG icon replacements for visual consistency
+    (PlayIcon to circle-play, ActorSelector Unicode checkbox to SVG icons);
+    (4-5) two i18n/UI polish fixes (selectTopic capitalization, wardLanguage
+    description text).
+  principles:
+    - "DB migration first for F161: all other F161 changes depend on the new column"
+    - "SVG icons follow existing Lucide stroke-based pattern (fill=none, strokeWidth=2)"
+    - "i18n changes are isolated and can land independently"
+    - "No new components: all changes extend existing patterns"
+    - "No inter-feature dependencies: all 5 features are independent"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  +----------------------------------------------------------------------+
+  |              Batch 28: F161-F165 (CRs 234-238)                       |
+  |                                                                      |
+  |  F161 (CR-234): welcome_new_families field                           |
+  |  [Migration022] -> [database.ts] -> [AgendaForm] -> [Presentation]   |
+  |                                       |                              |
+  |                                   [i18n x3]                          |
+  |                                                                      |
+  |  F162 (CR-235): PlayIcon SVG replacement                             |
+  |  [icons/index.tsx: PlayIcon] -> [agenda.tsx: remove border]          |
+  |                                                                      |
+  |  F163 (CR-236): Checkbox SVG replacement                             |
+  |  [icons/index.tsx: +SquareIcon +CheckSquareIcon]                     |
+  |           -> [ActorSelector.tsx: replace Unicode]                     |
+  |                                                                      |
+  |  F164 (CR-237): selectTopic capitalization                           |
+  |  [pt-BR.json] [en.json] [es.json]   (i18n only)                     |
+  |                                                                      |
+  |  F165 (CR-238): wardLanguage description                             |
+  |  [settings/index.tsx: inline Pressable] + [i18n x3]                  |
+  +----------------------------------------------------------------------+
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F161: Welcome New Families ---
+
+  - name: "Migration022_AddWelcomeNewFamilies"
+    responsibility: "Add welcome_new_families TEXT column to sunday_agendas table"
+    file: "supabase/migrations/022_add_welcome_new_families.sql"
+    cr_ids: [234]
+    changes:
+      - "ALTER TABLE sunday_agendas ADD COLUMN welcome_new_families TEXT DEFAULT NULL"
+    contract:
+      before: "sunday_agendas has no welcome_new_families column"
+      after: "sunday_agendas has welcome_new_families TEXT DEFAULT NULL. Existing rows get NULL."
+    dependencies: []
+    notes: >
+      Simple column addition. No data migration needed. Nullable, no NOT NULL
+      constraint. Same pattern as prior column additions (e.g., migration 014
+      speaker overrides, migration 016 has_intermediate_hymn).
+
+  - name: "SundayAgendaTypeUpdate"
+    responsibility: "Add welcome_new_families field to SundayAgenda TypeScript interface"
+    file: "src/types/database.ts"
+    cr_ids: [234]
+    changes:
+      - "Add: welcome_new_families: string | null (between recognized_names and announcements)"
+    contract:
+      before: "SundayAgenda { ..., recognized_names: string[] | null; announcements: string | null; ... }"
+      after: "SundayAgenda { ..., recognized_names: string[] | null; welcome_new_families: string | null; announcements: string | null; ... }"
+    dependencies: ["Migration022_AddWelcomeNewFamilies"]
+
+  - name: "AgendaFormWelcomeField"
+    responsibility: "Add welcome_new_families FieldRow in AgendaForm between Recognizing and Announcements"
+    file: "src/components/AgendaForm.tsx"
+    cr_ids: [234]
+    changes:
+      - "New FieldRow with label t('agenda.welcomeNewFamilies') after Recognizing, before Announcements"
+      - "DebouncedTextInput with multiline, auto-save via updateField('welcome_new_families', text)"
+      - "editable={!isObserver} for observer read-only"
+      - "value={agenda.welcome_new_families ?? ''} (null coalesced to empty string)"
+      - "Same styles as announcements field (styles.textInput + styles.announcementsInput)"
+    contract:
+      input: "agenda.welcome_new_families (string | null)"
+      output: "DebouncedTextInput that auto-saves via updateField mutation"
+    dependencies: ["SundayAgendaTypeUpdate"]
+    notes: >
+      Follows exact same pattern as the existing announcements FieldRow.
+      No new component needed -- uses existing DebouncedTextInput + FieldRow.
+
+  - name: "PresentationModeWelcomeField"
+    responsibility: "Add welcome_new_families to Welcome card in presentation mode"
+    file: "src/hooks/usePresentationMode.ts"
+    cr_ids: [234]
+    changes:
+      - "In buildPresentationCards: push PresentationField for welcome_new_families"
+      - "Positioned after recognized_names and before announcements"
+      - "Conditional: only when agenda?.welcome_new_families is truthy"
+      - "type: 'multiline'"
+    contract:
+      input: "agenda.welcome_new_families (string | null)"
+      output: "PresentationField { label, value, type: 'multiline' } in welcomeFields array"
+    dependencies: ["SundayAgendaTypeUpdate"]
+    notes: >
+      Same conditional push pattern as recognized_names and announcements.
+      Only shown when the field has content.
+
+  - name: "I18nF161Updates"
+    responsibility: "Add agenda.welcomeNewFamilies i18n key to all 3 locales"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [234]
+    changes:
+      - "pt-BR: agenda.welcomeNewFamilies = 'Boas-vindas a Familias Recem-chegadas'"
+      - "en: agenda.welcomeNewFamilies = 'Welcome New Families'"
+      - "es: agenda.welcomeNewFamilies = 'Bienvenida a Familias Recien Llegadas'"
+    dependencies: []
+
+  # --- F162: PlayIcon Circle-Play Replacement ---
+
+  - name: "PlayIconCirclePlay"
+    responsibility: "Replace PlayIcon SVG from plain triangle to Lucide circle-play"
+    file: "src/components/icons/index.tsx"
+    cr_ids: [235]
+    changes:
+      - "Replace Path d='m6 3 14 9-14 9V3z' (triangle) with Circle + Path (circle-play)"
+      - "Circle cx=12, cy=12, r=10 for outer circle"
+      - "Path d='m10 8 6 4-6 4V8z' for inner play triangle"
+      - "All elements: stroke={color}, strokeWidth=2, fill='none'"
+      - "Comment updated from 'Lucide: play' to 'Lucide: circle-play'"
+    contract:
+      before: "PlayIcon renders filled triangle SVG path"
+      after: "PlayIcon renders circle-play SVG (circle outline + inner triangle). Same props interface."
+    dependencies: []
+    notes: >
+      Circle element is already imported in icons/index.tsx (used by StatusLED circle
+      and MoreVerticalIcon). No new import needed. Export name PlayIcon unchanged,
+      so all consumers (agenda.tsx, index.tsx) work without modification.
+
+  - name: "AgendaPlayButtonBorderRemoval"
+    responsibility: "Remove redundant circular border container around PlayIcon in agenda.tsx"
+    file: "src/app/(tabs)/agenda.tsx"
+    cr_ids: [235]
+    changes:
+      - "Remove View wrapper with borderWidth: 1.5, borderRadius: 15, width: 30, height: 30"
+      - "PlayIcon rendered directly inside Pressable"
+      - "PlayIcon size changed from 18 to 24 (compensate for removed container)"
+      - "hitSlop={8} maintained for touch target"
+    contract:
+      before: "Pressable > View(border container) > PlayIcon(size=18)"
+      after: "Pressable > PlayIcon(size=24)"
+    dependencies: ["PlayIconCirclePlay"]
+    notes: >
+      F153/CR-217 added the circular border for the plain triangle. With circle-play
+      having its own circle, the border is redundant (double-circle effect). Size
+      increased from 18 to 24 to maintain similar visual weight.
+
+  # --- F163: ActorSelector Checkbox SVG ---
+
+  - name: "SquareAndCheckSquareIcons"
+    responsibility: "Add SquareIcon and CheckSquareIcon SVG components to icons module"
+    file: "src/components/icons/index.tsx"
+    cr_ids: [236]
+    changes:
+      - "New export SquareIcon: Lucide square (Path d='M21 3H3v18h18V3z')"
+      - "New export CheckSquareIcon: Lucide square-check (square Path + checkmark Path d='m9 12 2 2 4-4')"
+      - "Both: stroke={color}, strokeWidth=2, strokeLinecap='round', strokeLinejoin='round', fill='none'"
+      - "Standard IconProps interface"
+    contract:
+      exports:
+        - "SquareIcon({ size?, color? }): JSX.Element"
+        - "CheckSquareIcon({ size?, color? }): JSX.Element"
+    dependencies: []
+    notes: >
+      Follows same pattern as all other icons in the module. Positioned after
+      CheckIcon component for logical grouping. Total icon count goes from 14 to 16.
+
+  - name: "ActorSelectorCheckboxSVG"
+    responsibility: "Replace Unicode checkbox characters with SVG icon components in ActorSelector"
+    file: "src/components/ActorSelector.tsx"
+    cr_ids: [236]
+    changes:
+      - "Import CheckSquareIcon, SquareIcon from icons module"
+      - "Replace <Text style={[styles.checkbox, ...]}>{'\\u2611'}</Text> with <CheckSquareIcon size={20} color={colors.primary} />"
+      - "Replace <Text style={[styles.checkbox, ...]}>{'\\u2610'}</Text> with <SquareIcon size={20} color={colors.textSecondary} />"
+      - "Wrap icon in <View style={{ marginRight: 8 }}> to preserve spacing"
+      - "Import View from react-native (if not already imported)"
+    contract:
+      before: "Text element with Unicode U+2611/U+2610, color: colors.text"
+      after: "SVG icons: selected=CheckSquareIcon(primary), unselected=SquareIcon(textSecondary)"
+    dependencies: ["SquareAndCheckSquareIcons"]
+    notes: >
+      Selected uses colors.primary for visual emphasis (active state pattern).
+      Unselected uses colors.textSecondary for subtle appearance.
+      The styles.checkbox style definition can remain (unused) or be removed.
+
+  # --- F164: selectTopic Capitalization ---
+
+  - name: "I18nF164Capitalization"
+    responsibility: "Capitalize 'Tema'/'Topic' in selectTopic i18n keys across all locales"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [237]
+    changes:
+      - "pt-BR: speeches.selectTopic: 'Selecionar tema' -> 'Selecionar Tema'"
+      - "en: speeches.selectTopic: 'Select topic' -> 'Select Topic'"
+      - "es: speeches.selectTopic: 'Seleccionar tema' -> 'Seleccionar Tema'"
+    dependencies: []
+    notes: >
+      Pure i18n value change. No code changes. Matches capitalization pattern
+      of adjacent selectSpeaker key ('Selecionar Pessoa').
+
+  # --- F165: Ward Language Description ---
+
+  - name: "SettingsWardLanguageDescription"
+    responsibility: "Replace SettingsItem with inline Pressable layout that includes description text"
+    file: "src/app/(tabs)/settings/index.tsx"
+    cr_ids: [238]
+    changes:
+      - "Replace <SettingsItem label=... value=... onPress=... /> with inline Pressable"
+      - "Left side: View with label Text + description Text (fontSize: 12, colors.textSecondary)"
+      - "Right side: View with value Text + ChevronRightIcon"
+      - "Description text: t('settings.wardLanguageDescription')"
+      - "Pressable uses styles.item and styles.itemText (existing shared styles)"
+      - "ChevronRightIcon already imported in settings/index.tsx"
+    contract:
+      before: "SettingsItem component (label + value + chevron, no description)"
+      after: "Inline Pressable with label + description + value + chevron"
+    dependencies: []
+    notes: >
+      Follows the same pattern as managePrayers toggle item (settings/index.tsx)
+      which also uses inline layout with label + description. The SettingsItem
+      component is NOT modified (used by other items that do not need descriptions).
+
+  - name: "I18nF165Description"
+    responsibility: "Add settings.wardLanguageDescription i18n key to all 3 locales"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [238]
+    changes:
+      - "pt-BR: settings.wardLanguageDescription = 'Altera somente o idioma da colecao de temas disponiveis e dos templates de WhatsApp'"
+      - "en: settings.wardLanguageDescription = 'Only changes the language of available topic collections and WhatsApp templates'"
+      - "es: settings.wardLanguageDescription = 'Solo cambia el idioma de las colecciones de temas disponibles y los modelos de WhatsApp'"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "welcome_new_families_data_flow"
+    components: ["Migration022_AddWelcomeNewFamilies", "SundayAgendaTypeUpdate", "AgendaFormWelcomeField", "PresentationModeWelcomeField"]
+    methods:
+      - name: "Column -> Type -> Form -> Presentation"
+        input: "welcome_new_families TEXT in DB"
+        output: "Rendered in AgendaForm (editable) and Presentation mode (read-only)"
+        notes: >
+          DB column is nullable TEXT. TypeScript type is string | null.
+          AgendaForm uses null coalescing (?? '') for display and updateField
+          for saving. Presentation mode only shows when non-empty (truthy check).
+
+  - name: "icon_svg_consistency"
+    components: ["PlayIconCirclePlay", "SquareAndCheckSquareIcons"]
+    methods:
+      - name: "Shared SVG rendering pattern"
+        input: "IconProps { size?, color? }"
+        output: "SVG element with stroke-based rendering (fill=none, strokeWidth=2)"
+        notes: >
+          All new/modified icons follow the established Lucide stroke-based pattern.
+          Circle element already imported. No new SVG primitives needed.
+
+  - name: "agenda_play_button_integration"
+    components: ["PlayIconCirclePlay", "AgendaPlayButtonBorderRemoval"]
+    methods:
+      - name: "Icon replacement + container simplification"
+        input: "PlayIcon component with new circle-play SVG"
+        output: "Direct rendering in Pressable without border wrapper"
+        notes: >
+          The border container removal depends on PlayIcon having a built-in circle.
+          If PlayIcon change is reverted, border container would need to be restored.
+
+# =============================================================================
+# DATA MODEL CHANGES
+# =============================================================================
+
+data_model:
+  entities:
+    - name: "sunday_agendas"
+      changes:
+        - field: "welcome_new_families"
+          action: "ADD"
+          type: "TEXT (nullable, DEFAULT NULL)"
+          notes: "Free-text field for listing families being welcomed. No NOT NULL constraint. Positioned logically after recognized_names."
+      migration: "022_add_welcome_new_families.sql"
+      migration_behavior: >
+        Simple ALTER TABLE ADD COLUMN. No data migration needed. All existing
+        rows automatically get NULL for the new column.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-114
+    title: "Free-text field for welcome_new_families instead of structured selector (Batch 28)"
+    context: >
+      CR-234 adds a 'welcome new families' field. Two options: (a) free-text
+      multiline like announcements, or (b) structured selector like ActorSelector
+      for recognized_names. Families being welcomed are typically not existing
+      ward members, so a member/actor selector would be inappropriate.
+    decision: >
+      Use a free-text multiline DebouncedTextInput (same as announcements field).
+      Simple TEXT column in DB. No member/actor relationship needed.
+    decided_in: "CR-234/F161"
+    consequences:
+      - "Simple implementation: reuses existing DebouncedTextInput + FieldRow pattern"
+      - "Flexible: user can type any format (names, notes, etc.)"
+      - "No structured data: cannot link to member records (acceptable for this use case)"
+
+  - id: ADR-115
+    title: "Inline Pressable with description for wardLanguage instead of modifying SettingsItem (Batch 28)"
+    context: >
+      CR-238 adds description text to the ward language setting. Two options:
+      (a) add optional description prop to SettingsItem component (used by ~10 items),
+      or (b) replace this single usage with inline Pressable layout including
+      description. Only wardLanguage needs a description among all settings items.
+    decision: >
+      Use inline Pressable layout for wardLanguage only, following the same
+      pattern as managePrayers toggle item. Do not modify SettingsItem component
+      to avoid unnecessary changes to a widely-used component for a single-use
+      requirement.
+    decided_in: "CR-238/F165"
+    consequences:
+      - "No changes to SettingsItem component (reduces risk)"
+      - "Slight code duplication (inline layout vs reusable component)"
+      - "If more items need descriptions in the future, consider adding a description prop to SettingsItem then"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F161, F149]
+    interaction: >
+      F149 added the presentation mode Welcome card with recognized_names and
+      announcements. F161 inserts welcome_new_families between those two fields.
+      Same conditional push pattern. No conflict.
+
+  - features: [F162, F153]
+    interaction: >
+      F153/CR-217 added a circular border container around PlayIcon in agenda.tsx.
+      F162 removes this container because the new circle-play icon has its own
+      circle. This is an intentional supersession, not a conflict.
+
+  - features: [F163, F080]
+    interaction: >
+      F080/CR-137 added the Unicode checkbox characters to ActorSelector.
+      F163 replaces them with SVG icons. This is a direct replacement.
+
+  - features: [F162, F163]
+    interaction: >
+      Both modify src/components/icons/index.tsx. F162 changes the existing
+      PlayIcon. F163 adds two new icons (SquareIcon, CheckSquareIcon).
+      No conflict -- different code sections.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: supabase/migrations/022_add_welcome_new_families.sql
+    feature: F161
+    cr_ids: [234]
+    new_file: true
+    changes:
+      - "ALTER TABLE sunday_agendas ADD COLUMN welcome_new_families TEXT DEFAULT NULL"
+
+  - file: src/types/database.ts
+    feature: F161
+    cr_ids: [234]
+    changes:
+      - "SundayAgenda interface: add welcome_new_families: string | null"
+
+  - file: src/components/AgendaForm.tsx
+    feature: F161
+    cr_ids: [234]
+    changes:
+      - "New FieldRow + DebouncedTextInput for welcome_new_families between Recognizing and Announcements"
+
+  - file: src/hooks/usePresentationMode.ts
+    feature: F161
+    cr_ids: [234]
+    changes:
+      - "Conditional push of welcome_new_families PresentationField in Welcome card"
+
+  - file: src/components/icons/index.tsx
+    features: [F162, F163]
+    cr_ids: [235, 236]
+    changes:
+      - "F162: PlayIcon SVG replaced from triangle to circle-play (Circle + Path)"
+      - "F163: New SquareIcon and CheckSquareIcon exports added"
+
+  - file: src/app/(tabs)/agenda.tsx
+    feature: F162
+    cr_ids: [235]
+    changes:
+      - "Remove circular border container around PlayIcon, change size 18->24"
+
+  - file: src/components/ActorSelector.tsx
+    feature: F163
+    cr_ids: [236]
+    changes:
+      - "Replace Unicode Text checkbox with SVG CheckSquareIcon/SquareIcon"
+      - "Import CheckSquareIcon, SquareIcon from icons module"
+
+  - file: src/app/(tabs)/settings/index.tsx
+    feature: F165
+    cr_ids: [238]
+    changes:
+      - "Replace SettingsItem for wardLanguage with inline Pressable + description text"
+
+  - file: src/i18n/locales/pt-BR.json
+    features: [F161, F164, F165]
+    cr_ids: [234, 237, 238]
+    changes:
+      - "F161: Add agenda.welcomeNewFamilies"
+      - "F164: Capitalize speeches.selectTopic ('tema' -> 'Tema')"
+      - "F165: Add settings.wardLanguageDescription"
+
+  - file: src/i18n/locales/en.json
+    features: [F161, F164, F165]
+    cr_ids: [234, 237, 238]
+    changes:
+      - "F161: Add agenda.welcomeNewFamilies"
+      - "F164: Capitalize speeches.selectTopic ('topic' -> 'Topic')"
+      - "F165: Add settings.wardLanguageDescription"
+
+  - file: src/i18n/locales/es.json
+    features: [F161, F164, F165]
+    cr_ids: [234, 237, 238]
+    changes:
+      - "F161: Add agenda.welcomeNewFamilies"
+      - "F164: Capitalize speeches.selectTopic ('tema' -> 'Tema')"
+      - "F165: Add settings.wardLanguageDescription"
+
+files_not_modified:
+  - "src/components/SundayCard.tsx (collapsed cards do not show welcome field)"
+  - "src/app/(tabs)/index.tsx (PlayIcon usage unchanged, only SVG definition changes)"
+  - "src/components/SpeechSlot.tsx (no changes needed for selectTopic i18n value)"
+  - "src/components/SettingsItem.tsx (not modified, replaced with inline layout for F165 only)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 12 components, each with one responsibility; grouped by feature
+  GATE-03_contracts_defined: true        # 3 cross-component contracts defined
+  GATE-04_adrs_recorded: true           # ADR-114 and ADR-115 recorded
+  GATE-05_arch_saved: true              # ARCH_M161.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED will be updated below
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 12 components but across 5 features (max 4 per feature, well under 10 per module)

@@ -382,16 +382,16 @@ describe('F150 (CR-214): Standard placeholders when 2nd speech disabled', () => 
       expect(es.speeches.selectSpeaker).toBe('Seleccionar Discursante');
     });
 
-    it('pt-BR has speeches.selectTopic = "Selecionar tema"', () => {
-      expect(ptBR.speeches.selectTopic).toBe('Selecionar tema');
+    it('pt-BR has speeches.selectTopic = "Selecionar Tema"', () => {
+      expect(ptBR.speeches.selectTopic).toBe('Selecionar Tema');
     });
 
-    it('en has speeches.selectTopic = "Select topic"', () => {
-      expect(en.speeches.selectTopic).toBe('Select topic');
+    it('en has speeches.selectTopic = "Select Topic"', () => {
+      expect(en.speeches.selectTopic).toBe('Select Topic');
     });
 
-    it('es has speeches.selectTopic = "Seleccionar tema"', () => {
-      expect(es.speeches.selectTopic).toBe('Seleccionar tema');
+    it('es has speeches.selectTopic = "Seleccionar Tema"', () => {
+      expect(es.speeches.selectTopic).toBe('Seleccionar Tema');
     });
   });
 

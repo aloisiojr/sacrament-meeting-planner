@@ -574,12 +574,14 @@ describe('F080 (CR-137): Checkbox visual in ActorSelector multi-select', () => {
 
   // --- AC-080-06: Single-select mode unchanged ---
   describe('AC-080-06: Single-select mode has no checkbox', () => {
-    it('checkbox is guarded by multiSelect condition', () => {
+    it('checkbox icons are guarded by multiSelect condition', () => {
       const content = getActorSelector();
-      // The checkbox is only rendered when multiSelect is true
-      const checkboxIdx = content.indexOf("'\\u2611'");
-      const preCheckbox = content.substring(checkboxIdx - 200, checkboxIdx);
-      expect(preCheckbox).toContain('multiSelect');
+      // CR-236: SVG icons replaced Unicode checkboxes, but multiSelect guard remains
+      // Look for CheckSquareIcon in JSX (after the import), which is guarded by {multiSelect && (
+      expect(content).toContain('{multiSelect && (');
+      const multiSelectIdx = content.indexOf('{multiSelect && (');
+      const checkboxAfterGuard = content.indexOf('CheckSquareIcon', multiSelectIdx);
+      expect(checkboxAfterGuard).toBeGreaterThan(multiSelectIdx);
     });
 
     it('old checkmark prefix U+2713 is NOT in source', () => {
@@ -607,14 +609,15 @@ describe('F080 (CR-137): Checkbox visual in ActorSelector multi-select', () => {
 
   // --- EC-080-02: Actor in edit mode during multi-select ---
   describe('EC-080-02: Editing mode hides checkbox', () => {
-    it('checkbox is inside the non-editing branch', () => {
+    it('checkbox icons are inside the non-editing branch', () => {
       const content = getActorSelector();
-      // When isEditing, a TextInput is shown instead of Pressable with checkbox
+      // When isEditing, a TextInput is shown instead of Pressable with checkbox icons
+      // CR-236: SVG icons replaced Unicode checkboxes
       expect(content).toContain('isEditing ?');
       const editInputIdx = content.indexOf('isEditing ?');
       const pressableIdx = content.indexOf('styles.actorNameArea', editInputIdx);
-      const checkboxInPressable = content.indexOf("'\\u2611'", pressableIdx);
-      // Checkbox is in the else branch (after the editing TextInput)
+      const checkboxInPressable = content.indexOf('CheckSquareIcon', pressableIdx);
+      // Checkbox icon is in the else branch (after the editing TextInput)
       expect(checkboxInPressable).toBeGreaterThan(editInputIdx);
     });
   });

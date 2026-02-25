@@ -301,47 +301,47 @@ describe('F152 (CR-216): WhatsApp no-phone dialog', () => {
 
 describe('F153 (CR-217): Play button circle outline and spacing', () => {
 
-  // --- AC-153-01: Play icon has outlined circle ---
+  // --- AC-153-01: Play icon has circle-play SVG pattern ---
+  // [SUPERSEDED by CR-235]: Circular border container removed from Pressable.
+  // The circle is now part of the PlayIcon SVG itself (circle-play pattern).
 
-  describe('AC-153-01: Play icon has outlined circle around it', () => {
-    it('Pressable has width: 30', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+  describe('AC-153-01: Play icon has circle in SVG (circle-play pattern)', () => {
+    it('PlayIcon SVG has Circle element for the circular outline', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf('export const PencilIcon')
       );
-      expect(playButtonBlock).toContain('width: 30');
+      // CR-235: PlayIcon uses Circle element instead of container border
+      expect(playIconBlock).toContain('Circle');
     });
 
-    it('Pressable has height: 30', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+    it('PlayIcon Circle has r={10} for the circular outline', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf('export const PencilIcon')
       );
-      expect(playButtonBlock).toContain('height: 30');
+      expect(playIconBlock).toContain('r={10}');
     });
 
-    it('Pressable has borderRadius: 15 (half of 30)', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
-      );
-      expect(playButtonBlock).toContain('borderRadius: 15');
+    it('Pressable uses style={styles.playButton} (no inline circle styles)', () => {
+      // CR-235: Removed inline circle styles, simplified to just styles.playButton
+      expect(agendaSource).toContain('style={styles.playButton}');
     });
 
-    it('Pressable has borderWidth: 1.5', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+    it('Pressable does NOT have inline borderRadius styles', () => {
+      // CR-235: No more inline border styles on the Pressable container
+      const playButtonRef = agendaSource.indexOf('style={styles.playButton}');
+      const surroundingBlock = agendaSource.substring(
+        Math.max(0, playButtonRef - 100),
+        playButtonRef + 100
       );
-      expect(playButtonBlock).toContain('borderWidth: 1.5');
+      expect(surroundingBlock).not.toContain('borderRadius');
+      expect(surroundingBlock).not.toContain('borderWidth');
     });
 
-    it('Pressable has borderColor: colors.textSecondary', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
-      );
-      expect(playButtonBlock).toContain('borderColor: colors.textSecondary');
+    it('PlayIcon uses size={24} (enlarged from 18)', () => {
+      // CR-235: PlayIcon size changed from 18 to 24
+      expect(agendaSource).toContain('<PlayIcon size={24}');
     });
   });
 
@@ -381,47 +381,41 @@ describe('F153 (CR-217): Play button circle outline and spacing', () => {
     });
   });
 
-  // --- AC-153-04: Circle uses theme-appropriate color ---
+  // --- AC-153-04: PlayIcon uses theme-appropriate color ---
 
-  describe('AC-153-04: Circle uses colors.textSecondary (theme-aware)', () => {
-    it('borderColor uses colors.textSecondary (same as PlayIcon color)', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
-      );
-      expect(playButtonBlock).toContain('borderColor: colors.textSecondary');
+  describe('AC-153-04: PlayIcon uses colors.textSecondary (theme-aware)', () => {
+    it('PlayIcon color is colors.textSecondary', () => {
+      // CR-235: PlayIcon size changed from 18 to 24
+      expect(agendaSource).toContain('<PlayIcon size={24} color={colors.textSecondary} />');
     });
 
-    it('PlayIcon color is also colors.textSecondary', () => {
-      expect(agendaSource).toContain('<PlayIcon size={18} color={colors.textSecondary} />');
-    });
-
-    it('no hardcoded color in circle border', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
-      );
-      expect(playButtonBlock).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    it('no hardcoded color in PlayIcon rendering', () => {
+      const playIconLine = agendaSource.match(/<PlayIcon[^>]*>/);
+      expect(playIconLine).toBeTruthy();
+      expect(playIconLine![0]).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     });
   });
 
-  // --- AC-153-05: Play button circle centered ---
+  // --- AC-153-05: PlayIcon circle is part of SVG, not container ---
+  // [SUPERSEDED by CR-235]: Container centering styles removed; PlayIcon SVG
+  // handles its own circle rendering internally.
 
-  describe('AC-153-05: PlayIcon centered within circular container', () => {
-    it('Pressable has justifyContent: "center"', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+  describe('AC-153-05: PlayIcon SVG handles circle internally', () => {
+    it('PlayIcon SVG has Circle with cx={12} cy={12} for centering', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf('export const PencilIcon')
       );
-      expect(playButtonBlock).toContain("justifyContent: 'center'");
+      expect(playIconBlock).toContain('cx={12}');
+      expect(playIconBlock).toContain('cy={12}');
     });
 
-    it('Pressable has alignItems: "center"', () => {
-      const playButtonBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,'),
-        agendaSource.indexOf('}]', agendaSource.indexOf('styles.playButton,')) + 2
+    it('PlayIcon SVG has play triangle Path inside circle', () => {
+      const playIconBlock = iconsSource.substring(
+        iconsSource.indexOf('export const PlayIcon'),
+        iconsSource.indexOf('export const PencilIcon')
       );
-      expect(playButtonBlock).toContain("alignItems: 'center'");
+      expect(playIconBlock).toContain('d="m10 8 6 4-6 4V8z"');
     });
   });
 
@@ -434,8 +428,8 @@ describe('F153 (CR-217): Play button circle outline and spacing', () => {
 
     it('Pressable onPress navigates to presentation mode', () => {
       const pressableBlock = agendaSource.substring(
-        agendaSource.indexOf('styles.playButton,') - 200,
-        agendaSource.indexOf('styles.playButton,')
+        agendaSource.indexOf('styles.playButton') - 200,
+        agendaSource.indexOf('styles.playButton')
       );
       expect(pressableBlock).toContain("pathname: '/presentation'");
     });

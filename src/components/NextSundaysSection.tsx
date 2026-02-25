@@ -70,7 +70,7 @@ export function NextSundaysSection() {
     return (
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {t('home.nextAssignments')}
+          {managePrayers ? t('home.nextSpeechesAndPrayers') : t('home.nextAssignments')}
         </Text>
         <QueryErrorView
           error={speechesErr ?? exceptionsErr ?? null}
@@ -86,7 +86,7 @@ export function NextSundaysSection() {
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        {t('home.nextAssignments')}
+        {managePrayers ? t('home.nextSpeechesAndPrayers') : t('home.nextAssignments')}
       </Text>
 
       {speechesBySunday.map((entry) => {

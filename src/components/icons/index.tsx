@@ -196,11 +196,19 @@ export const TrashIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   </Svg>
 );
 
-/** Lucide: play (https://lucide.dev/icons/play) */
+/** Lucide: circle-play (https://lucide.dev/icons/circle-play) */
 export const PlayIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle
+      cx={12}
+      cy={12}
+      r={10}
+      stroke={color}
+      strokeWidth={2}
+      fill="none"
+    />
     <Path
-      d="m6 3 14 9-14 9V3z"
+      d="m10 8 6 4-6 4V8z"
       stroke={color}
       strokeWidth={2}
       strokeLinecap="round"

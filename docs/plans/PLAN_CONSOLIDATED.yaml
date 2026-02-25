@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-02-24"
-  version: 37
-  last_updated_by: "batch-27-split-speech-whatsapp-template"
+  version: 38
+  last_updated_by: "batch-28-ui-ux-improvements"
   total_phases: 6
-  total_cr_plans: 54
+  total_cr_plans: 55
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1062,6 +1062,38 @@ cr_plans:
       STEP-12 + STEP-13 + STEP-15 + STEP-19 parallelizaveis (todos independentes), STEP-20
       depende STEP-11 + STEP-13, STEP-21 depende STEP-11/12/13/15/20, STEP-22 depende todos.
 
+  - id: PLAN_P049
+    title: "Batch 28: UI/UX Improvements (Welcome Field, Icon/Checkbox Style, Text Fixes)"
+    status: pending
+    crs_covered: [234, 235, 236, 237, 238]
+    total_steps: 13
+    plan_ref: "docs/plans/PLAN_P049.yaml"
+    summary: >
+      5 independent UI/UX improvements: capitalizacao de 'Tema'/'Topic' em
+      speeches.selectTopic nos 3 locales para consistencia com selectSpeaker
+      (F164/CR-237). Texto descritivo abaixo de 'Idioma da Ala' em Settings
+      explicando que altera apenas idioma de colecoes e templates WhatsApp,
+      substituindo SettingsItem por Pressable inline com description Text
+      seguindo padrao de managePrayers + i18n em 3 locales (F165/CR-238).
+      Substituicao de Unicode checkbox (U+2611/U+2610) no ActorSelector por
+      SVG CheckSquareIcon/SquareIcon stroke-based com colors.primary
+      (selected) e colors.textSecondary (unselected), 2 novos componentes
+      no modulo icons (F163/CR-236). Substituicao do PlayIcon triangle por
+      Lucide circle-play (Circle + Path) stroke-based + remocao do container
+      circular redundante (F153) no agenda.tsx com aumento de size 18->24
+      (F162/CR-235). Campo welcome_new_families na secao Welcome da agenda:
+      migracao 022 (TEXT nullable), tipo SundayAgenda, FieldRow com
+      DebouncedTextInput multiline auto-save entre Reconhecendo e Anuncios,
+      campo condicional no modo apresentacao (Welcome card, type multiline),
+      i18n em 3 locales (F161/CR-234). 5 features, 32 ACs, 11 arquivos
+      impactados (1 novo + 10 modificados + 1 teste), 1 migracao SQL (022),
+      zero dependencias novas. 2 ADRs referenciados: ADR-114 (circle-play
+      path), ADR-115 (SVG checkbox pattern). STEP-01/02/04/06/08/12
+      parallelizaveis (todos independentes), STEP-03 depende STEP-02,
+      STEP-05 depende STEP-04, STEP-07 depende STEP-06, STEP-09 depende
+      STEP-08, STEP-10/11 parallelizaveis (dependem STEP-09), STEP-13
+      depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1502,6 +1534,21 @@ pending_with_plan:
   - cr_id: 231
     plan_id: PLAN_P048
     description: "Split speech WhatsApp template into 3 individual templates (whatsapp_template_speech_1/2/3), remove {posicao} placeholder"
+  - cr_id: 234
+    plan_id: PLAN_P049
+    description: "Campo 'Boas-vindas a Familias Recem-chegadas' na agenda (DB migration 022 + types + AgendaForm + presentation + i18n)"
+  - cr_id: 235
+    plan_id: PLAN_P049
+    description: "Trocar PlayIcon triangle por circle-play SVG stroke-based + remover borda circular no agenda.tsx"
+  - cr_id: 236
+    plan_id: PLAN_P049
+    description: "Trocar Unicode checkbox em ActorSelector por SVG CheckSquareIcon/SquareIcon com cores tematicas"
+  - cr_id: 237
+    plan_id: PLAN_P049
+    description: "Capitalizar 'tema' para 'Tema' em speeches.selectTopic nos 3 locales"
+  - cr_id: 238
+    plan_id: PLAN_P049
+    description: "Texto explicativo abaixo de 'Idioma da Ala' em Settings com inline Pressable + i18n 3 locales"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1523,6 +1570,24 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 38
+    phase: "batch-28-ui-ux-improvements"
+    changes:
+      - "Added PLAN_P049 for Batch 28 (F161-F165, CRs 234-238)"
+      - "5 independent UI/UX improvement features"
+      - "13 steps, 32 ACs, 11 arquivos impactados (1 novo + 10 modificados + 1 teste)"
+      - "1 migracao SQL (022_add_welcome_new_families.sql), zero dependencias novas"
+      - "2 ADRs referenced: ADR-114 (circle-play path for PlayIcon), ADR-115 (SVG checkbox icons pattern)"
+      - "F164 (CR-237): capitalize Tema/Topic in selectTopic across 3 locales"
+      - "F165 (CR-238): description text below wardLanguage in Settings via inline Pressable + i18n 3 locales"
+      - "F163 (CR-236): replace Unicode checkbox (U+2611/U+2610) in ActorSelector with SVG CheckSquareIcon/SquareIcon"
+      - "F163 adds 2 new icon components to icons/index.tsx (SquareIcon, CheckSquareIcon)"
+      - "F162 (CR-235): replace PlayIcon triangle SVG with Lucide circle-play (Circle + Path)"
+      - "F162 removes circular border container (F153/CR-217) in agenda.tsx, increases size 18->24"
+      - "F161 (CR-234): welcome_new_families TEXT nullable column via migration 022"
+      - "F161 adds field to SundayAgenda interface, AgendaForm FieldRow with DebouncedTextInput, presentation Welcome card"
+      - "F161 agenda.welcomeNewFamilies i18n key in 3 locales"
+      - "STEP-01/02/04/06/08/12 parallelizaveis, STEP-03 depende STEP-02, STEP-05 depende STEP-04, STEP-07 depende STEP-06, STEP-09 depende STEP-08, STEP-10/11 parallelizaveis apos STEP-09, STEP-13 depende de todos"
   - version: 37
     phase: "batch-27-split-speech-whatsapp-template"
     changes:

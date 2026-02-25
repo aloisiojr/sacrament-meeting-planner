@@ -1,0 +1,992 @@
+# =============================================================================
+# SPEC_F161.yaml
+# Batch 28: Welcome new families field (CR-234), Play icon style (CR-235),
+# Checkbox style (CR-236), selectTopic capitalization (CR-237),
+# wardLanguage description (CR-238)
+# Created: 2026-02-24
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 28
+phase: 1
+created: "2026-02-24"
+last_updated: "2026-02-24"
+request_type: mixed
+execution_order: >
+  5 features (F161-F165) covering 5 CRs (CR-234 to CR-238).
+  Recommended implementation order:
+  (1) F164 (CR-237): i18n-only change, trivial, no dependencies;
+  (2) F165 (CR-238): i18n + minor SettingsItem UI change, no dependencies;
+  (3) F163 (CR-236): ActorSelector checkbox SVG replacement;
+  (4) F162 (CR-235): PlayIcon SVG replacement in icons module;
+  (5) F161 (CR-234): DB migration + TypeScript types + AgendaForm + presentation
+  mode + i18n. This is the most complex feature and should land last.
+execution_rationale: >
+  F164 and F165 are isolated i18n/UI fixes that can land in any order.
+  F163 and F162 are independent SVG/icon changes. F161 requires a DB migration
+  and touches more files, so it benefits from landing last to avoid merge
+  conflicts with the simpler changes. None of the 5 features have
+  inter-dependencies.
+
+# =============================================================================
+# CONTEXT
+# =============================================================================
+#
+# Current state (pre-Batch 28):
+# - AgendaForm 1st section (Welcome) has fields in order:
+#   Presidindo, Dirigindo, Reconhecendo a Presenca, Anuncios, Pianista,
+#   Regente, Hino de Abertura, Oracao de Abertura
+# - No "welcome new families" field exists
+# - PlayIcon in icons/index.tsx is a filled triangle (Lucide play path:
+#   "m6 3 14 9-14 9V3z"), stroke-based. Used in agenda.tsx (line 536)
+#   and index.tsx (line 138). Tab bar icons use Lucide: home, clipboard-list,
+#   mic, settings - all stroke-based with strokeWidth=2.
+# - ActorSelector.tsx:164-165 uses Unicode characters for checkbox:
+#   U+2611 (checked) and U+2610 (unchecked) rendered as plain Text
+# - pt-BR.json:211 has "selectTopic": "Selecionar tema" (lowercase 't')
+# - Settings wardLanguage item has no description text
+# =============================================================================
+
+# =============================================================================
+# F161: Welcome New Families Field in Agenda - CR-234
+# =============================================================================
+
+features:
+
+  - id: F161
+    name: "Welcome new families field in agenda (1st section)"
+    cr_id: 234
+    type: feature
+    related_crs: []
+    related_features: [F008, F149, F150]
+    description: >
+      CR-234 adds a new field "Boas-vindas a familias recem-chegadas" (Welcome
+      new families) to the agenda form's 1st section (Welcome). The field is
+      positioned after "Reconhecendo a Presenca" (recognizing) and before
+      "Anuncios" (announcements).
+
+      Key changes:
+      - DB: Add welcome_new_families TEXT column (nullable) to sunday_agendas
+        table via migration 022.
+      - TypeScript: Add welcome_new_families to SundayAgenda interface.
+      - AgendaForm.tsx: Add a DebouncedTextInput FieldRow between
+        "Reconhecendo a Presenca" (line ~227) and "Anuncios" (line ~229).
+        The field uses auto-save via updateField, same pattern as announcements.
+        Observer: field is disabled (editable={!isObserver}).
+      - Presentation mode: Add welcome_new_families to the Welcome card in
+        buildPresentationCards (usePresentationMode.ts). Positioned after
+        recognized_names and before announcements. Only shown when non-empty
+        (conditional push, same pattern as recognized_names/announcements).
+      - i18n: Add agenda.welcomeNewFamilies key to all 3 locales.
+
+      The field is a free-text multiline field (like announcements), allowing
+      the user to type names of families being welcomed.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      # --- DB Migration ---
+
+      - id: AC-161-01
+        description: "Add welcome_new_families column to sunday_agendas table"
+        given: "Database schema without welcome_new_families column"
+        when: "Migration 022 runs"
+        then: "sunday_agendas table has new column welcome_new_families TEXT DEFAULT NULL. No NOT NULL constraint. No data migration needed (all existing rows get NULL)."
+        status: pending
+
+      # --- TypeScript Types ---
+
+      - id: AC-161-02
+        description: "Update SundayAgenda interface with welcome_new_families field"
+        given: "SundayAgenda interface in src/types/database.ts has recognized_names followed by announcements"
+        when: "Types are updated"
+        then: "SundayAgenda interface has welcome_new_families: string | null field, positioned after recognized_names and before announcements."
+        status: pending
+
+      # --- AgendaForm ---
+
+      - id: AC-161-03
+        description: "Welcome new families FieldRow appears between Recognizing and Announcements"
+        given: "AgendaForm renders the 1st section (Welcome) of an expanded agenda card"
+        when: "The form is displayed"
+        then: >
+          A new FieldRow with label t('agenda.welcomeNewFamilies') is rendered
+          after the Reconhecendo a Presenca FieldRow and before the Anuncios
+          FieldRow. The FieldRow contains a DebouncedTextInput with multiline
+          support.
+        status: pending
+
+      - id: AC-161-04
+        description: "Welcome new families field auto-saves on change"
+        given: "User types text in the welcome new families field"
+        when: "Debounce timer expires (500ms)"
+        then: "updateField('welcome_new_families', text) is called, saving the value to the database via the existing auto-save mutation."
+        status: pending
+
+      - id: AC-161-05
+        description: "Welcome new families field is disabled for observer"
+        given: "User has observer role"
+        when: "AgendaForm renders the welcome new families field"
+        then: "The DebouncedTextInput has editable={!isObserver}, making it read-only for observers."
+        status: pending
+
+      - id: AC-161-06
+        description: "Welcome new families field uses empty string as default"
+        given: "Agenda has welcome_new_families as null in the database"
+        when: "AgendaForm renders the field"
+        then: "The DebouncedTextInput value is agenda.welcome_new_families ?? '' (null coalesced to empty string). Placeholder text shows the field label."
+        status: pending
+
+      # --- Presentation Mode ---
+
+      - id: AC-161-07
+        description: "Welcome new families appears in presentation Welcome card"
+        given: "Agenda has non-empty welcome_new_families value"
+        when: "buildPresentationCards creates the Welcome card"
+        then: >
+          A new PresentationField is pushed to welcomeFields with:
+          label = t('agenda.welcomeNewFamilies'),
+          value = agenda.welcome_new_families,
+          type = 'multiline'.
+          It appears after recognized_names (if present) and before announcements
+          (if present).
+        status: pending
+
+      - id: AC-161-08
+        description: "Welcome new families is omitted from presentation when empty"
+        given: "Agenda has welcome_new_families as null or empty string"
+        when: "buildPresentationCards creates the Welcome card"
+        then: "No PresentationField for welcome_new_families is added. The card renders the same as before CR-234."
+        status: pending
+
+      # --- i18n ---
+
+      - id: AC-161-09
+        description: "i18n key agenda.welcomeNewFamilies added to pt-BR"
+        given: "pt-BR.json does not have agenda.welcomeNewFamilies"
+        when: "i18n file is updated"
+        then: 'pt-BR.json has "welcomeNewFamilies": "Boas-vindas a Familias Recem-chegadas" in the agenda section.'
+        status: pending
+
+      - id: AC-161-10
+        description: "i18n key agenda.welcomeNewFamilies added to en"
+        given: "en.json does not have agenda.welcomeNewFamilies"
+        when: "i18n file is updated"
+        then: 'en.json has "welcomeNewFamilies": "Welcome New Families" in the agenda section.'
+        status: pending
+
+      - id: AC-161-11
+        description: "i18n key agenda.welcomeNewFamilies added to es"
+        given: "es.json does not have agenda.welcomeNewFamilies"
+        when: "i18n file is updated"
+        then: 'es.json has "welcomeNewFamilies": "Bienvenida a Familias Recien Llegadas" in the agenda section.'
+        status: pending
+
+    edge_cases:
+      - id: EC-161-01
+        case: "Long text in welcome new families field"
+        expected: "The multiline DebouncedTextInput expands vertically to accommodate the text, same behavior as the announcements field."
+        status: pending
+
+      - id: EC-161-02
+        case: "Special meeting type (testimony, conference, etc.)"
+        expected: "The welcome new families field is shown in the 1st section regardless of meeting type, because the Welcome section is always rendered for all meeting types."
+        status: pending
+
+    files_impacted:
+      - supabase/migrations/022_add_welcome_new_families.sql
+      - src/types/database.ts
+      - src/components/AgendaForm.tsx
+      - src/hooks/usePresentationMode.ts
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/SundayCard.tsx (collapsed cards do not show welcome field)
+      - src/app/(tabs)/agenda.tsx (no changes needed, AgendaForm handles it)
+
+    implementation_details:
+      - location: "supabase/migrations/022_add_welcome_new_families.sql"
+        current_code: "(new file)"
+        new_code: |
+          ALTER TABLE sunday_agendas
+            ADD COLUMN welcome_new_families TEXT DEFAULT NULL;
+        rationale: >
+          Simple column addition with nullable default. No data migration needed.
+
+      - location: "src/types/database.ts:183-184 (SundayAgenda interface)"
+        current_code: |
+          recognized_names: string[] | null;
+          announcements: string | null;
+        new_code: |
+          recognized_names: string[] | null;
+          welcome_new_families: string | null;
+          announcements: string | null;
+        rationale: "Add the new field between recognized_names and announcements to match the UI order."
+
+      - location: "src/components/AgendaForm.tsx:227-229 (between Recognizing and Announcements FieldRows)"
+        current_code: |
+              </FieldRow>
+
+              <FieldRow label={t('agenda.announcements')} colors={colors}>
+        new_code: |
+              </FieldRow>
+
+              <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
+                <DebouncedTextInput
+                  style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
+                  value={agenda.welcome_new_families ?? ''}
+                  onSave={(text) => updateField('welcome_new_families', text)}
+                  placeholder={t('agenda.welcomeNewFamilies')}
+                  placeholderTextColor={colors.textTertiary}
+                  multiline
+                  editable={!isObserver}
+                />
+              </FieldRow>
+
+              <FieldRow label={t('agenda.announcements')} colors={colors}>
+        rationale: >
+          Follows the exact same pattern as the announcements field.
+          Uses the same styles (textInput + announcementsInput) for visual consistency.
+
+      - location: "src/hooks/usePresentationMode.ts:86-87 (after recognized_names conditional)"
+        current_code: |
+          if (agenda?.announcements) {
+        new_code: |
+          if (agenda?.welcome_new_families) {
+            welcomeFields.push({
+              label: t('agenda.welcomeNewFamilies'),
+              value: agenda.welcome_new_families,
+              type: 'multiline',
+            });
+          }
+          if (agenda?.announcements) {
+        rationale: >
+          Same conditional push pattern as recognized_names and announcements.
+          Only shown when the field has content.
+
+      - location: "src/i18n/locales/pt-BR.json (agenda section, after recognizing)"
+        current_code: |
+          "recognizing": "Reconhecendo a Presença",
+        new_code: |
+          "recognizing": "Reconhecendo a Presença",
+          "welcomeNewFamilies": "Boas-vindas a Famílias Recém-chegadas",
+        rationale: "Portuguese translation matching the user's request."
+
+      - location: "src/i18n/locales/en.json (agenda section, after recognizing)"
+        current_code: |
+          "recognizing": "Recognizing Visitors",
+        new_code: |
+          "recognizing": "Recognizing Visitors",
+          "welcomeNewFamilies": "Welcome New Families",
+        rationale: "English translation."
+
+      - location: "src/i18n/locales/es.json (agenda section, after recognizing)"
+        current_code: |
+          "recognizing": "Reconociendo la Presencia",
+        new_code: |
+          "recognizing": "Reconociendo la Presencia",
+          "welcomeNewFamilies": "Bienvenida a Familias Recién Llegadas",
+        rationale: "Spanish translation."
+
+# =============================================================================
+# F162: Replace PlayIcon with presentation-style icon - CR-235
+# =============================================================================
+
+  - id: F162
+    name: "Replace PlayIcon triangle with circle-play outlined icon"
+    cr_id: 235
+    type: ui_improvement
+    related_crs: [186, 200, 210, 217]
+    related_features: [F128, F137, F146, F153]
+    description: >
+      CR-235 requests changing the PlayIcon from a filled triangle (Lucide
+      "play" path) to a circle-play icon (Lucide "circle-play") that follows
+      the same stroke-based style as the tab bar icons (HomeIcon,
+      ClipboardListIcon, MicIcon, SettingsIcon).
+
+      Currently, PlayIcon renders a plain triangle (path "m6 3 14 9-14 9V3z")
+      which looks visually different from the other icons in the app. The tab
+      bar icons all use Lucide's stroke-based design with strokeWidth=2.
+
+      The Lucide "circle-play" icon (https://lucide.dev/icons/circle-play)
+      is a circle with a play triangle inside, drawn with strokes. This matches
+      the visual style of the other app icons while still clearly communicating
+      "play/start".
+
+      SCOPE: Only the PlayIcon SVG definition in src/components/icons/index.tsx
+      is changed. All consumers (agenda.tsx, index.tsx) continue to use
+      <PlayIcon size={...} color={...} /> with the same props. The circular
+      container border around PlayIcon in agenda.tsx (added by F153/CR-217)
+      should be REMOVED since the circle-play icon already has its own circle.
+
+      NOTE: The F153 circular border (borderWidth: 1.5, borderRadius: 15,
+      borderColor: colors.textSecondary) wrapping the PlayIcon in agenda.tsx
+      becomes redundant with the circle-play icon that has its own circle
+      outline. This border wrapper should be removed to avoid a double-circle
+      effect.
+
+    acceptance_criteria:
+
+      - id: AC-162-01
+        description: "PlayIcon uses Lucide circle-play SVG path"
+        given: "PlayIcon component in src/components/icons/index.tsx"
+        when: "PlayIcon is rendered"
+        then: >
+          PlayIcon renders the Lucide circle-play icon with:
+          - A Circle element (cx=12, cy=12, r=10) with stroke={color},
+            strokeWidth=2, fill="none"
+          - A Path element with d="m10 8 6 4-6 4V8z" (play triangle inside)
+            with stroke={color}, strokeWidth=2, strokeLinecap="round",
+            strokeLinejoin="round", fill="none"
+          The icon is fully stroke-based, matching the tab bar icon style.
+        status: pending
+
+      - id: AC-162-02
+        description: "Agenda tab play icon no longer has circular border container"
+        given: "PlayIcon in agenda.tsx is currently wrapped in a View with circular border styling (F153)"
+        when: "Agenda card header renders the play button"
+        then: >
+          The wrapping View with borderWidth: 1.5, borderRadius: 15, width: 30,
+          height: 30, borderColor: colors.textSecondary is removed. The
+          PlayIcon is rendered directly inside the Pressable without the
+          circular container, since the circle-play icon already has its own
+          circle outline.
+        status: pending
+
+      - id: AC-162-03
+        description: "Home tab play icon unchanged in usage"
+        given: "PlayIcon in index.tsx is inside meetingButtonContent"
+        when: "Home tab renders the Start Meeting button"
+        then: "PlayIcon renders with size={20} color={colors.onPrimary}. The circle-play icon appears inside the primary-colored button. No layout changes needed."
+        status: pending
+
+      - id: AC-162-04
+        description: "PlayIcon maintains stroke-based rendering"
+        given: "All other icons in the app use stroke-based SVG"
+        when: "PlayIcon is inspected"
+        then: "PlayIcon uses stroke={color} and fill='none' for all elements. No filled shapes. strokeWidth=2 matching other Lucide icons."
+        status: pending
+
+      - id: AC-162-05
+        description: "PlayIcon consumers are not modified (same props)"
+        given: "PlayIcon is used in agenda.tsx and index.tsx"
+        when: "Both files import and render PlayIcon"
+        then: "Both files continue to use <PlayIcon size={...} color={...} /> with the same size and color props as before. Only the SVG definition changes."
+        status: pending
+
+    edge_cases:
+      - id: EC-162-01
+        case: "Small size rendering (size=18 in agenda)"
+        expected: "The circle-play icon at size=18 is still legible. The circle and inner triangle are clear. strokeWidth=2 remains appropriate at this size."
+        status: pending
+
+      - id: EC-162-02
+        case: "Large size rendering (size=20 in home)"
+        expected: "The circle-play icon at size=20 renders clearly inside the primary-colored Start Meeting button with onPrimary color."
+        status: pending
+
+    files_impacted:
+      - src/components/icons/index.tsx
+      - src/app/(tabs)/agenda.tsx
+
+    files_not_modified:
+      - src/app/(tabs)/index.tsx (PlayIcon usage unchanged, only SVG definition changes)
+
+    implementation_details:
+      - location: "src/components/icons/index.tsx:199-211 (PlayIcon)"
+        current_code: |
+          /** Lucide: play (https://lucide.dev/icons/play) */
+          export const PlayIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="m6 3 14 9-14 9V3z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          );
+        new_code: |
+          /** Lucide: circle-play (https://lucide.dev/icons/circle-play) */
+          export const PlayIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Circle
+                cx={12}
+                cy={12}
+                r={10}
+                stroke={color}
+                strokeWidth={2}
+                fill="none"
+              />
+              <Path
+                d="m10 8 6 4-6 4V8z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          );
+        rationale: >
+          Replaces the plain triangle with Lucide circle-play which has a
+          circle outline plus an inner play triangle. Both elements are
+          stroke-based (fill="none") matching the style of HomeIcon,
+          ClipboardListIcon, MicIcon, SettingsIcon. The export name PlayIcon
+          is kept so all consumers work without changes.
+
+      - location: "src/app/(tabs)/agenda.tsx:524-537 (play button circular container)"
+        current_code: |
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => router.push({ pathname: '/presentation', params: { date: item.date } })}
+                    style={[{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 15,
+                      borderWidth: 1.5,
+                      borderColor: colors.textSecondary,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }]}
+                  >
+                    <PlayIcon size={18} color={colors.textSecondary} />
+                  </Pressable>
+        new_code: |
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => router.push({ pathname: '/presentation', params: { date: item.date } })}
+                  >
+                    <PlayIcon size={24} color={colors.textSecondary} />
+                  </Pressable>
+        rationale: >
+          Remove the circular border container since the circle-play icon
+          already has a built-in circle. Increase size from 18 to 24 to
+          maintain similar visual weight (the old 18px triangle inside a
+          30px circle is now a 24px circle-play icon). hitSlop={8} maintained
+          for touch target.
+
+# =============================================================================
+# F163: Replace ActorSelector checkbox with SVG CheckSquare icon - CR-236
+# =============================================================================
+
+  - id: F163
+    name: "Replace ActorSelector Unicode checkbox with SVG icon"
+    cr_id: 236
+    type: ui_improvement
+    related_crs: [137]
+    related_features: [F080]
+    description: >
+      CR-236 requests replacing the Unicode checkbox characters (U+2611 and
+      U+2610) used in ActorSelector's multi-select mode with themed SVG
+      icons that match the app's visual style.
+
+      Currently, ActorSelector.tsx:164-165 renders:
+      - Selected: '\u2611' (ballot box with check) as plain Text
+      - Unselected: '\u2610' (ballot box) as plain Text
+      These are plain Unicode characters styled with fontSize: 20 and
+      color: colors.text. They do not match the stroke-based Lucide icon
+      style used throughout the app.
+
+      APPROACH: Create two new SVG icon components in icons/index.tsx:
+      - CheckSquareIcon: Lucide "check-square" (square with checkmark inside)
+      - SquareIcon: Lucide "square" (empty square outline)
+      Both use stroke-based rendering (fill="none", stroke={color},
+      strokeWidth=2) matching all other icons in the app.
+
+      In ActorSelector.tsx, replace the Text element containing the Unicode
+      character with the appropriate SVG icon component.
+
+    acceptance_criteria:
+
+      - id: AC-163-01
+        description: "SquareIcon SVG component added to icons module"
+        given: "src/components/icons/index.tsx has no SquareIcon"
+        when: "Icon component is added"
+        then: >
+          New export SquareIcon renders Lucide square icon:
+          Path d="M21 3H3v18h18V3z" (or equivalent rect), stroke={color},
+          strokeWidth=2, strokeLinecap="round", strokeLinejoin="round",
+          fill="none". Uses standard IconProps interface.
+        status: pending
+
+      - id: AC-163-02
+        description: "CheckSquareIcon SVG component added to icons module"
+        given: "src/components/icons/index.tsx has no CheckSquareIcon"
+        when: "Icon component is added"
+        then: >
+          New export CheckSquareIcon renders Lucide square-check icon:
+          - Path for the square outline
+          - Path for the checkmark inside (d="m9 11 3 3L22 4" or equivalent)
+          stroke={color}, strokeWidth=2, strokeLinecap="round",
+          strokeLinejoin="round", fill="none". Uses standard IconProps interface.
+        status: pending
+
+      - id: AC-163-03
+        description: "ActorSelector uses SVG icons instead of Unicode characters"
+        given: "ActorSelector renders checkbox in multi-select mode"
+        when: "An actor item is rendered with multiSelect=true"
+        then: >
+          Instead of <Text style={[styles.checkbox, ...]}>{'\\u2611'}</Text>
+          or <Text style={[styles.checkbox, ...]}>{'\\u2610'}</Text>, the
+          component renders:
+          - Selected: <CheckSquareIcon size={20} color={colors.primary} />
+          - Unselected: <SquareIcon size={20} color={colors.textSecondary} />
+          The Text element for the checkbox is completely replaced by the
+          SVG component.
+        status: pending
+
+      - id: AC-163-04
+        description: "Selected checkbox uses primary color"
+        given: "Actor is selected in multi-select mode"
+        when: "Checkbox icon is rendered"
+        then: "CheckSquareIcon uses color={colors.primary} to indicate selection with the app's primary accent color."
+        status: pending
+
+      - id: AC-163-05
+        description: "Unselected checkbox uses textSecondary color"
+        given: "Actor is not selected in multi-select mode"
+        when: "Checkbox icon is rendered"
+        then: "SquareIcon uses color={colors.textSecondary} for a subtle, non-distracting appearance."
+        status: pending
+
+      - id: AC-163-06
+        description: "Checkbox layout spacing preserved"
+        given: "Checkbox has marginRight: 8 in current styles"
+        when: "SVG icon replaces Text"
+        then: "The SVG icon wrapper maintains the same marginRight: 8 spacing between checkbox and actor name. A View wrapper with style={{ marginRight: 8 }} replaces the Text with styles.checkbox."
+        status: pending
+
+      - id: AC-163-07
+        description: "Single-select mode unchanged"
+        given: "ActorSelector is in single-select mode (multiSelect=false)"
+        when: "Actor items are rendered"
+        then: "No checkbox icon is shown. The multiSelect conditional guard is preserved."
+        status: pending
+
+    edge_cases:
+      - id: EC-163-01
+        case: "Dark theme checkbox rendering"
+        expected: "CheckSquareIcon uses colors.primary (same in both themes). SquareIcon uses colors.textSecondary which is #94A3B8 in dark theme, providing good visibility on dark background."
+        status: pending
+
+      - id: EC-163-02
+        case: "Light theme checkbox rendering"
+        expected: "CheckSquareIcon uses colors.primary (#2563EB). SquareIcon uses colors.textSecondary (#5A5A5A), both visible on light card background."
+        status: pending
+
+    files_impacted:
+      - src/components/icons/index.tsx
+      - src/components/ActorSelector.tsx
+
+    files_not_modified:
+      - src/components/AgendaForm.tsx (ActorSelector is self-contained)
+
+    implementation_details:
+      - location: "src/components/icons/index.tsx (after CheckIcon, before MoreVerticalIcon)"
+        current_code: "(no SquareIcon or CheckSquareIcon exist)"
+        new_code: |
+          /** Lucide: square (https://lucide.dev/icons/square) */
+          export const SquareIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M21 3H3v18h18V3z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          );
+
+          /** Lucide: square-check (https://lucide.dev/icons/square-check) */
+          export const CheckSquareIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M21 3H3v18h18V3z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <Path
+                d="m9 12 2 2 4-4"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          );
+        rationale: >
+          Two new stroke-based SVG icons matching the Lucide style used
+          throughout the app. Both use the same viewBox, strokeWidth, and
+          rendering approach as all other icons.
+
+      - location: "src/components/ActorSelector.tsx:164-166 (checkbox rendering)"
+        current_code: |
+                          <Text style={[styles.checkbox, { color: colors.text }]}>
+                            {isSelected ? '\u2611' : '\u2610'}
+                          </Text>
+        new_code: |
+                          <View style={{ marginRight: 8 }}>
+                            {isSelected
+                              ? <CheckSquareIcon size={20} color={colors.primary} />
+                              : <SquareIcon size={20} color={colors.textSecondary} />
+                            }
+                          </View>
+        rationale: >
+          Replace plain Unicode Text with themed SVG icons. Selected uses
+          primary color for emphasis, unselected uses textSecondary for subtlety.
+          View wrapper with marginRight: 8 replaces the old styles.checkbox
+          (which had fontSize: 20 and marginRight: 8).
+
+# =============================================================================
+# F164: Capitalize "Tema" in selectTopic i18n key - CR-237
+# =============================================================================
+
+  - id: F164
+    name: "Capitalize 'Tema' in selectTopic i18n keys"
+    cr_id: 237
+    type: ui_improvement
+    related_crs: []
+    related_features: []
+    description: >
+      CR-237 requests changing the speech card's "Selecionar tema" text to
+      "Selecionar Tema" (capitalizing the 'T' in Tema) in pt-BR. The same
+      capitalization pattern should be applied consistently to en and es.
+
+      Currently:
+      - pt-BR: "Selecionar tema" (lowercase t)
+      - en: "Select topic" (lowercase t)
+      - es: "Seleccionar tema" (lowercase t)
+
+      Desired:
+      - pt-BR: "Selecionar Tema" (uppercase T)
+      - en: "Select Topic" (uppercase T)
+      - es: "Seleccionar Tema" (uppercase T)
+
+      This matches the capitalization pattern of the adjacent "Selecionar
+      Pessoa" / "Select Person" / "Seleccionar Persona" key (selectSpeaker).
+
+    acceptance_criteria:
+
+      - id: AC-164-01
+        description: "pt-BR selectTopic uses uppercase Tema"
+        given: "pt-BR.json has speeches.selectTopic = 'Selecionar tema'"
+        when: "i18n file is updated"
+        then: 'pt-BR.json has speeches.selectTopic = "Selecionar Tema"'
+        status: pending
+
+      - id: AC-164-02
+        description: "en selectTopic uses uppercase Topic"
+        given: "en.json has speeches.selectTopic = 'Select topic'"
+        when: "i18n file is updated"
+        then: 'en.json has speeches.selectTopic = "Select Topic"'
+        status: pending
+
+      - id: AC-164-03
+        description: "es selectTopic uses uppercase Tema"
+        given: "es.json has speeches.selectTopic = 'Seleccionar tema'"
+        when: "i18n file is updated"
+        then: 'es.json has speeches.selectTopic = "Seleccionar Tema"'
+        status: pending
+
+    edge_cases: []
+
+    files_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/SpeechSlot.tsx (no code change, just i18n value)
+
+    implementation_details:
+      - location: "src/i18n/locales/pt-BR.json:211"
+        current_code: '"selectTopic": "Selecionar tema",'
+        new_code: '"selectTopic": "Selecionar Tema",'
+        rationale: "User requested uppercase T. Matches selectSpeaker capitalization pattern."
+
+      - location: "src/i18n/locales/en.json:211"
+        current_code: '"selectTopic": "Select topic",'
+        new_code: '"selectTopic": "Select Topic",'
+        rationale: "Consistent capitalization with pt-BR and selectSpeaker."
+
+      - location: "src/i18n/locales/es.json:211"
+        current_code: '"selectTopic": "Seleccionar tema",'
+        new_code: '"selectTopic": "Seleccionar Tema",'
+        rationale: "Consistent capitalization with pt-BR and selectSpeaker."
+
+# =============================================================================
+# F165: Add description text to ward language setting - CR-238
+# =============================================================================
+
+  - id: F165
+    name: "Add description text to ward language settings item"
+    cr_id: 238
+    type: ui_improvement
+    related_crs: []
+    related_features: [F116]
+    description: >
+      CR-238 requests adding an explanatory description text below the
+      "Idioma da Ala" label in Settings, similar to how "Usar Convites para
+      Oracoes" (managePrayers) has a description. The text should explain
+      that the ward language setting only affects the topic collection
+      language and WhatsApp templates, NOT the app UI language.
+
+      Currently, the wardLanguage SettingsItem is rendered using the
+      SettingsItem component which only shows a label and optional value
+      with a chevron-right icon. It has no description prop.
+
+      APPROACH: Instead of modifying the SettingsItem component (which is
+      used by many other items that don't need descriptions), replace the
+      wardLanguage SettingsItem usage with an inline implementation that
+      includes a description text, following the same pattern used by the
+      managePrayers toggle (settings/index.tsx:225-238). The wardLanguage
+      item will use a Pressable wrapper (instead of SettingsItem) with:
+      1. A View containing the label Text and description Text
+      2. The value Text and ChevronRightIcon on the right side
+
+      The description text is: "Altera somente o idioma da colecao de temas
+      disponiveis e dos templates de WhatsApp" (pt-BR).
+
+    acceptance_criteria:
+
+      - id: AC-165-01
+        description: "Ward language item shows description text below label"
+        given: "Settings screen renders the ward language item"
+        when: "User views the Ward Settings section"
+        then: >
+          Below the "Idioma da Ala" label text, a smaller description text
+          is shown with fontSize: 12, color: colors.textSecondary, marginTop: 2.
+          The text reads t('settings.wardLanguageDescription').
+        status: pending
+
+      - id: AC-165-02
+        description: "Ward language item remains tappable"
+        given: "Ward language item has description text"
+        when: "User taps on the item"
+        then: "The ward language selector modal opens, same as before. The entire row is tappable via Pressable."
+        status: pending
+
+      - id: AC-165-03
+        description: "Ward language value and chevron still shown on the right"
+        given: "Ward language item has description text"
+        when: "Settings screen renders"
+        then: "The current language label (e.g., 'Portugues (BR)') and ChevronRightIcon are displayed on the right side of the item, same as before."
+        status: pending
+
+      - id: AC-165-04
+        description: "i18n key settings.wardLanguageDescription added to pt-BR"
+        given: "pt-BR.json does not have settings.wardLanguageDescription"
+        when: "i18n file is updated"
+        then: 'pt-BR.json has "wardLanguageDescription": "Altera somente o idioma da coleção de temas disponíveis e dos templates de WhatsApp" in the settings section.'
+        status: pending
+
+      - id: AC-165-05
+        description: "i18n key settings.wardLanguageDescription added to en"
+        given: "en.json does not have settings.wardLanguageDescription"
+        when: "i18n file is updated"
+        then: 'en.json has "wardLanguageDescription": "Only changes the language of available topic collections and WhatsApp templates" in the settings section.'
+        status: pending
+
+      - id: AC-165-06
+        description: "i18n key settings.wardLanguageDescription added to es"
+        given: "es.json does not have settings.wardLanguageDescription"
+        when: "i18n file is updated"
+        then: 'es.json has "wardLanguageDescription": "Solo cambia el idioma de las colecciones de temas disponibles y los modelos de WhatsApp" in the settings section.'
+        status: pending
+
+    edge_cases:
+      - id: EC-165-01
+        case: "Long description text on narrow screen"
+        expected: "The description text wraps to multiple lines. The flex: 1 on the left View and marginRight: 12 ensure it does not overlap with the value/chevron on the right."
+        status: pending
+
+      - id: EC-165-02
+        case: "Observer role does not see ward language"
+        expected: "Observer role does not have settings:language permission, so the entire ward language item (including description) is not rendered. The hasPermission('settings:language') guard is preserved."
+        status: pending
+
+    files_impacted:
+      - src/app/(tabs)/settings/index.tsx
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+
+    files_not_modified:
+      - src/components/icons/index.tsx (no icon changes)
+
+    implementation_details:
+      - location: "src/app/(tabs)/settings/index.tsx:255-261 (wardLanguage SettingsItem)"
+        current_code: |
+                        {hasPermission('settings:language') && (
+                          <SettingsItem
+                            label={t('settings.wardLanguage')}
+                            value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+                            onPress={() => setWardLanguageModalVisible(true)}
+                            colors={colors}
+                          />
+                        )}
+        new_code: |
+                        {hasPermission('settings:language') && (
+                          <Pressable
+                            style={[styles.item, { borderBottomColor: colors.divider }]}
+                            onPress={() => setWardLanguageModalVisible(true)}
+                            accessibilityRole="button"
+                          >
+                            <View style={{ flex: 1, marginRight: 12 }}>
+                              <Text style={[styles.itemText, { color: colors.text }]}>
+                                {t('settings.wardLanguage')}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                                {t('settings.wardLanguageDescription')}
+                              </Text>
+                            </View>
+                            <View style={styles.itemRight}>
+                              <Text style={[styles.itemValue, { color: colors.textSecondary }]}>
+                                {LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+                              </Text>
+                              <ChevronRightIcon size={18} color={colors.textSecondary} />
+                            </View>
+                          </Pressable>
+                        )}
+        rationale: >
+          Replaces SettingsItem with inline Pressable layout that includes
+          a description Text. Follows the exact same pattern as the
+          managePrayers toggle item (lines 225-238) for the left side
+          (label + description), combined with the SettingsItem right side
+          pattern (value + chevron).
+
+      - location: "src/i18n/locales/pt-BR.json (settings section, after wardLanguage)"
+        current_code: |
+          "wardLanguage": "Idioma da Ala",
+        new_code: |
+          "wardLanguage": "Idioma da Ala",
+          "wardLanguageDescription": "Altera somente o idioma da coleção de temas disponíveis e dos templates de WhatsApp",
+        rationale: "User-provided description text in Portuguese."
+
+      - location: "src/i18n/locales/en.json (settings section, after wardLanguage)"
+        current_code: |
+          "wardLanguage": "Ward Language",
+        new_code: |
+          "wardLanguage": "Ward Language",
+          "wardLanguageDescription": "Only changes the language of available topic collections and WhatsApp templates",
+        rationale: "English translation of the description."
+
+      - location: "src/i18n/locales/es.json (settings section, after wardLanguage)"
+        current_code: |
+          "wardLanguage": "Idioma del Barrio",
+        new_code: |
+          "wardLanguage": "Idioma del Barrio",
+          "wardLanguageDescription": "Solo cambia el idioma de las colecciones de temas disponibles y los modelos de WhatsApp",
+        rationale: "Spanish translation of the description."
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-161-01
+    question: "Should welcome_new_families be a text field or a multi-select like recognized_names?"
+    decision: "Free-text multiline field (like announcements)"
+    rationale: >
+      The user's request says 'Boas-vindas a familias recem-chegadas' which
+      implies listing family names. A free-text multiline field (DebouncedTextInput)
+      is simpler and more flexible than an ActorSelector-based approach.
+      Families being welcomed are typically not existing ward members/actors,
+      so a member/actor selector would not be appropriate. The user can simply
+      type the family names, separated by line breaks or commas.
+    decided_in: CR-234
+
+  - id: DD-162-01
+    question: "Which Lucide icon should replace PlayIcon?"
+    decision: "Lucide circle-play (circle with play triangle inside)"
+    rationale: >
+      The user wants the play icon to follow the same style as tab bar icons.
+      Tab bar icons (home, clipboard-list, mic, settings) are all Lucide
+      stroke-based icons. The Lucide 'circle-play' icon has a circle outline
+      with a play triangle inside, rendered with strokes. This is visually
+      consistent with the other icons while still communicating 'play/start'.
+      The alternative 'play' icon (current) is just a triangle which looks
+      visually different.
+    decided_in: CR-235
+
+  - id: DD-162-02
+    question: "Should the F153 circular border around PlayIcon in agenda be kept?"
+    decision: "Remove the circular border"
+    rationale: >
+      F153/CR-217 added a circular border container (borderWidth: 1.5,
+      borderRadius: 15) around the plain triangle PlayIcon in agenda.tsx.
+      With the new circle-play icon that already has its own circle outline,
+      keeping the border would create a double-circle effect. Removing the
+      border container simplifies the code and avoids visual redundancy.
+    decided_in: CR-235
+
+  - id: DD-163-01
+    question: "What colors should the SVG checkbox icons use?"
+    decision: "Selected: colors.primary, Unselected: colors.textSecondary"
+    rationale: >
+      Using colors.primary for the selected state provides clear visual
+      feedback and matches the app's accent color pattern (primary is used
+      for selected/active states throughout the app). Using colors.textSecondary
+      for unselected provides a subtle but visible empty square that doesn't
+      compete with the actor name text. This is better than the current
+      approach of using colors.text for both states.
+    decided_in: CR-236
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-161-01
+      text: >
+        The welcome_new_families field is a free-text multiline field, not
+        a structured selector. The user's request mentions "campo" (field)
+        which typically means a text input in this app's context. If the
+        user later wants a structured member/family selector, a follow-up
+        CR would be needed.
+    - id: A-161-02
+      text: >
+        The welcome_new_families field is shown for ALL meeting types
+        (speeches, testimony, conference, etc.) because the Welcome section
+        is rendered for all types in AgendaForm.
+    - id: A-162-01
+      text: >
+        The PlayIcon size in agenda.tsx is increased from 18 to 24 when
+        removing the circular container. This compensates for the loss of
+        the container's visual weight (30px circle) and ensures the
+        circle-play icon is clearly visible. The exact size may need
+        visual adjustment during implementation.
+    - id: A-163-01
+      text: >
+        The Lucide square SVG path "M21 3H3v18h18V3z" may need adjustment
+        to match the exact Lucide source. The implementer should verify
+        against the official Lucide icon paths at lucide.dev/icons/square
+        and lucide.dev/icons/square-check.
+    - id: A-165-01
+      text: >
+        The wardLanguage description text provided by the user is the
+        pt-BR version. The en and es translations are inferred to maintain
+        consistency. The user can request adjustments if the translations
+        are not accurate.
+
+  inconsistencies: []

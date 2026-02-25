@@ -1,0 +1,790 @@
+# =============================================================================
+# PLAN_P049.yaml
+# Plan for Batch 28: F161-F165 - UI/UX Improvements
+# F161 (CR-234): Welcome new families field in agenda
+# F162 (CR-235): PlayIcon circle-play SVG replacement
+# F163 (CR-236): ActorSelector checkbox SVG replacement
+# F164 (CR-237): selectTopic capitalization fix
+# F165 (CR-238): wardLanguage description text in Settings
+# Single phase: "New agenda field, icon/checkbox style fixes, text fixes"
+# Created: 2026-02-24
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement 5 independent UI/UX improvements for Batch 28 (CRs 234-238):
+  (1) F164 - Capitalize 'Tema'/'Topic' in selectTopic i18n keys across 3 locales;
+  (2) F165 - Add description text below wardLanguage in Settings via inline Pressable
+  with i18n in 3 locales;
+  (3) F163 - Replace Unicode checkbox characters in ActorSelector with SVG
+  CheckSquareIcon/SquareIcon, adding 2 new icon components to icons module;
+  (4) F162 - Replace PlayIcon triangle SVG with Lucide circle-play (Circle + Path)
+  and remove redundant circular border container in agenda.tsx;
+  (5) F161 - Add welcome_new_families field: DB migration 022, SundayAgenda type
+  update, AgendaForm FieldRow with DebouncedTextInput, presentation mode card,
+  and i18n in 3 locales. 32 ACs total, 5 features, 0 inter-feature dependencies.
+
+strategy:
+  order: "STEP-01 (F164 i18n) -> STEP-02 (F165 i18n) || STEP-03 (F165 settings UI) -> STEP-04 (F163 icons) -> STEP-05 (F163 ActorSelector) -> STEP-06 (F162 PlayIcon SVG) -> STEP-07 (F162 agenda border) -> STEP-08 (F161 migration) -> STEP-09 (F161 types) -> STEP-10 (F161 AgendaForm) -> STEP-11 (F161 presentation) -> STEP-12 (F161 i18n) -> STEP-13 (tests)"
+  commit_strategy: "1 commit por step, Conventional Commits"
+  test_strategy: "Teste criado junto ou antes do codigo, ultimo step consolida testes"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP-01: F164 - Capitalize selectTopic in 3 locales (CR-237)
+  # ---------------------------------------------------------------------------
+  - id: STEP-01
+    cr_id: 237
+    description: >
+      Update speeches.selectTopic i18n value in all 3 locale files to capitalize
+      the noun (Tema/Topic):
+
+      src/i18n/locales/pt-BR.json:
+      - Change: "selectTopic": "Selecionar tema" -> "selectTopic": "Selecionar Tema"
+
+      src/i18n/locales/en.json:
+      - Change: "selectTopic": "Select topic" -> "selectTopic": "Select Topic"
+
+      src/i18n/locales/es.json:
+      - Change: "selectTopic": "Seleccionar tema" -> "selectTopic": "Seleccionar Tema"
+
+      Pure i18n value change. No code changes. Matches capitalization pattern of
+      adjacent selectSpeaker key ("Selecionar Pessoa" / "Select Person").
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-04", "STEP-06", "STEP-08", "STEP-12"]
+    covers:
+      - AC-164-01
+      - AC-164-02
+      - AC-164-03
+    done_when:
+      - "pt-BR.json speeches.selectTopic = 'Selecionar Tema' (uppercase T)"
+      - "en.json speeches.selectTopic = 'Select Topic' (uppercase T)"
+      - "es.json speeches.selectTopic = 'Seleccionar Tema' (uppercase T)"
+      - "No other keys modified in the speeches section"
+    tests:
+      - type: unit
+        description: "Verify pt-BR speeches.selectTopic has uppercase Tema"
+      - type: unit
+        description: "Verify en speeches.selectTopic has uppercase Topic"
+      - type: unit
+        description: "Verify es speeches.selectTopic has uppercase Tema"
+
+  # ---------------------------------------------------------------------------
+  # STEP-02: F165 - Add wardLanguageDescription i18n keys (CR-238)
+  # ---------------------------------------------------------------------------
+  - id: STEP-02
+    cr_id: 238
+    description: >
+      Add settings.wardLanguageDescription i18n key to all 3 locale files:
+
+      src/i18n/locales/pt-BR.json (settings section, after wardLanguage):
+      - Add: "wardLanguageDescription": "Altera somente o idioma da coleção de temas disponíveis e dos templates de WhatsApp"
+
+      src/i18n/locales/en.json (settings section, after wardLanguage):
+      - Add: "wardLanguageDescription": "Only changes the language of available topic collections and WhatsApp templates"
+
+      src/i18n/locales/es.json (settings section, after wardLanguage):
+      - Add: "wardLanguageDescription": "Solo cambia el idioma de las colecciones de temas disponibles y los modelos de WhatsApp"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-04", "STEP-06", "STEP-08"]
+    covers:
+      - AC-165-04
+      - AC-165-05
+      - AC-165-06
+    done_when:
+      - "pt-BR.json has settings.wardLanguageDescription with Portuguese text"
+      - "en.json has settings.wardLanguageDescription with English text"
+      - "es.json has settings.wardLanguageDescription with Spanish text"
+      - "Keys placed after wardLanguage in the settings section"
+    tests:
+      - type: unit
+        description: "Verify pt-BR settings.wardLanguageDescription exists with correct text"
+      - type: unit
+        description: "Verify en settings.wardLanguageDescription exists with correct text"
+      - type: unit
+        description: "Verify es settings.wardLanguageDescription exists with correct text"
+
+  # ---------------------------------------------------------------------------
+  # STEP-03: F165 - Replace SettingsItem with inline Pressable for wardLanguage (CR-238)
+  # ---------------------------------------------------------------------------
+  - id: STEP-03
+    cr_id: 238
+    description: >
+      Update src/app/(tabs)/settings/index.tsx to replace the SettingsItem
+      component for wardLanguage with an inline Pressable layout that includes
+      a description text.
+
+      Replace (around line 255-261):
+        <SettingsItem
+          label={t('settings.wardLanguage')}
+          value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+          onPress={() => setWardLanguageModalVisible(true)}
+          colors={colors}
+        />
+
+      With:
+        <Pressable
+          style={[styles.item, { borderBottomColor: colors.divider }]}
+          onPress={() => setWardLanguageModalVisible(true)}
+          accessibilityRole="button"
+        >
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={[styles.itemText, { color: colors.text }]}>
+              {t('settings.wardLanguage')}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+              {t('settings.wardLanguageDescription')}
+            </Text>
+          </View>
+          <View style={styles.itemRight}>
+            <Text style={[styles.itemValue, { color: colors.textSecondary }]}>
+              {LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+            </Text>
+            <ChevronRightIcon size={18} color={colors.textSecondary} />
+          </View>
+        </Pressable>
+
+      Follows same pattern as managePrayers toggle item. The hasPermission guard
+      is preserved unchanged. ChevronRightIcon already imported in the file.
+    files:
+      - "src/app/(tabs)/settings/index.tsx"
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    covers:
+      - AC-165-01
+      - AC-165-02
+      - AC-165-03
+    done_when:
+      - "SettingsItem for wardLanguage replaced with inline Pressable"
+      - "Description text visible below label via t('settings.wardLanguageDescription')"
+      - "Description text styled with fontSize: 12, color: colors.textSecondary, marginTop: 2"
+      - "Value text and ChevronRightIcon displayed on the right side"
+      - "Pressable onPress opens ward language selector modal (same behavior as before)"
+      - "hasPermission('settings:language') guard preserved"
+    tests:
+      - type: unit
+        description: "Verify description text rendered below wardLanguage label"
+      - type: unit
+        description: "Verify wardLanguage item still opens language selector modal on press"
+      - type: unit
+        description: "Verify value and chevron displayed on the right side"
+
+  # ---------------------------------------------------------------------------
+  # STEP-04: F163 - Add SquareIcon and CheckSquareIcon to icons module (CR-236)
+  # ---------------------------------------------------------------------------
+  - id: STEP-04
+    cr_id: 236
+    description: >
+      Add two new SVG icon components to src/components/icons/index.tsx
+      (after CheckIcon, before MoreVerticalIcon):
+
+      1. SquareIcon - Lucide square icon:
+         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+           <Path d="M21 3H3v18h18V3z" stroke={color} strokeWidth={2}
+             strokeLinecap="round" strokeLinejoin="round" fill="none" />
+         </Svg>
+
+      2. CheckSquareIcon - Lucide square-check icon:
+         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+           <Path d="M21 3H3v18h18V3z" stroke={color} strokeWidth={2}
+             strokeLinecap="round" strokeLinejoin="round" fill="none" />
+           <Path d="m9 12 2 2 4-4" stroke={color} strokeWidth={2}
+             strokeLinecap="round" strokeLinejoin="round" fill="none" />
+         </Svg>
+
+      Both use the standard IconProps interface (size?, color?). Both are
+      stroke-based (fill="none", strokeWidth=2) matching all other Lucide
+      icons in the module.
+    files:
+      - "src/components/icons/index.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-06", "STEP-08"]
+    covers:
+      - AC-163-01
+      - AC-163-02
+    done_when:
+      - "SquareIcon export exists in icons/index.tsx"
+      - "SquareIcon renders Svg with Path d='M21 3H3v18h18V3z', stroke-based"
+      - "CheckSquareIcon export exists in icons/index.tsx"
+      - "CheckSquareIcon renders Svg with square Path + checkmark Path d='m9 12 2 2 4-4'"
+      - "Both use IconProps interface (size?, color?)"
+      - "Both use fill='none', strokeWidth=2 matching other icons"
+    tests:
+      - type: unit
+        description: "Verify SquareIcon renders SVG with correct square path"
+      - type: unit
+        description: "Verify CheckSquareIcon renders SVG with square + checkmark paths"
+      - type: unit
+        description: "Verify both icons accept size and color props"
+
+  # ---------------------------------------------------------------------------
+  # STEP-05: F163 - Replace Unicode checkbox with SVG in ActorSelector (CR-236)
+  # ---------------------------------------------------------------------------
+  - id: STEP-05
+    cr_id: 236
+    description: >
+      Update src/components/ActorSelector.tsx to replace Unicode checkbox
+      characters with SVG icon components:
+
+      1. Add imports: import { CheckSquareIcon, SquareIcon } from './icons';
+
+      2. Replace the checkbox Text element (around line 164-166):
+         FROM:
+           <Text style={[styles.checkbox, { color: colors.text }]}>
+             {isSelected ? '\u2611' : '\u2610'}
+           </Text>
+         TO:
+           <View style={{ marginRight: 8 }}>
+             {isSelected
+               ? <CheckSquareIcon size={20} color={colors.primary} />
+               : <SquareIcon size={20} color={colors.textSecondary} />
+             }
+           </View>
+
+      3. Ensure View is imported from react-native (should already be).
+
+      The styles.checkbox style definition can remain or be removed (it is no
+      longer used). Selected uses colors.primary for emphasis, unselected uses
+      colors.textSecondary for subtle appearance.
+    files:
+      - "src/components/ActorSelector.tsx"
+    dependencies: ["STEP-04"]
+    parallelizable_with: []
+    covers:
+      - AC-163-03
+      - AC-163-04
+      - AC-163-05
+      - AC-163-06
+      - AC-163-07
+    done_when:
+      - "CheckSquareIcon and SquareIcon imported from './icons'"
+      - "Unicode Text element ('\u2611'/'\u2610') replaced with SVG icons"
+      - "Selected state uses CheckSquareIcon with size={20} color={colors.primary}"
+      - "Unselected state uses SquareIcon with size={20} color={colors.textSecondary}"
+      - "View wrapper with marginRight: 8 preserves spacing"
+      - "Single-select mode unchanged (multiSelect guard preserved)"
+      - "No Unicode checkbox characters remain in ActorSelector"
+    tests:
+      - type: unit
+        description: "Verify selected checkbox renders CheckSquareIcon with primary color"
+      - type: unit
+        description: "Verify unselected checkbox renders SquareIcon with textSecondary color"
+      - type: unit
+        description: "Verify checkbox layout spacing (marginRight: 8) preserved"
+      - type: unit
+        description: "Verify single-select mode has no checkbox icon"
+
+  # ---------------------------------------------------------------------------
+  # STEP-06: F162 - Replace PlayIcon SVG with circle-play (CR-235)
+  # ---------------------------------------------------------------------------
+  - id: STEP-06
+    cr_id: 235
+    description: >
+      Update PlayIcon in src/components/icons/index.tsx to use Lucide
+      circle-play SVG instead of plain triangle:
+
+      Replace (around line 199-211):
+        /** Lucide: play (https://lucide.dev/icons/play) */
+        export const PlayIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+          <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Path d="m6 3 14 9-14 9V3z" stroke={color} strokeWidth={2}
+              strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </Svg>
+        );
+
+      With:
+        /** Lucide: circle-play (https://lucide.dev/icons/circle-play) */
+        export const PlayIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+          <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth={2}
+              fill="none" />
+            <Path d="m10 8 6 4-6 4V8z" stroke={color} strokeWidth={2}
+              strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </Svg>
+        );
+
+      Circle is already imported in icons/index.tsx (used by StatusLED and
+      MoreVerticalIcon). Export name PlayIcon unchanged so all consumers work
+      without modification.
+    files:
+      - "src/components/icons/index.tsx"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-08"]
+    covers:
+      - AC-162-01
+      - AC-162-04
+      - AC-162-05
+    done_when:
+      - "PlayIcon renders Circle element (cx=12, cy=12, r=10) with stroke-based rendering"
+      - "PlayIcon renders Path d='m10 8 6 4-6 4V8z' (inner play triangle)"
+      - "All elements use stroke={color}, strokeWidth=2, fill='none'"
+      - "Comment updated to 'Lucide: circle-play'"
+      - "Export name PlayIcon unchanged"
+      - "No filled shapes (all stroke-based)"
+    tests:
+      - type: unit
+        description: "Verify PlayIcon renders Circle element with correct cx/cy/r"
+      - type: unit
+        description: "Verify PlayIcon renders inner play triangle Path"
+      - type: unit
+        description: "Verify all elements use stroke-based rendering (fill='none')"
+
+  # ---------------------------------------------------------------------------
+  # STEP-07: F162 - Remove circular border container in agenda.tsx (CR-235)
+  # ---------------------------------------------------------------------------
+  - id: STEP-07
+    cr_id: 235
+    description: >
+      Update src/app/(tabs)/agenda.tsx to remove the redundant circular border
+      container around PlayIcon (added by F153/CR-217), since the new circle-play
+      icon already has its own circle outline.
+
+      Replace (around line 524-537):
+        <Pressable
+          hitSlop={8}
+          onPress={() => router.push({ pathname: '/presentation', params: { date: item.date } })}
+          style={[{
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: colors.textSecondary,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }]}
+        >
+          <PlayIcon size={18} color={colors.textSecondary} />
+        </Pressable>
+
+      With:
+        <Pressable
+          hitSlop={8}
+          onPress={() => router.push({ pathname: '/presentation', params: { date: item.date } })}
+        >
+          <PlayIcon size={24} color={colors.textSecondary} />
+        </Pressable>
+
+      Size increased from 18 to 24 to maintain similar visual weight. The
+      circle-play icon at 24px provides equivalent visual presence to the old
+      18px triangle inside a 30px bordered circle. hitSlop={8} maintained.
+    files:
+      - "src/app/(tabs)/agenda.tsx"
+    dependencies: ["STEP-06"]
+    parallelizable_with: []
+    covers:
+      - AC-162-02
+      - AC-162-03
+    done_when:
+      - "View wrapper with borderWidth/borderRadius/width/height removed from play button"
+      - "PlayIcon rendered directly inside Pressable without container"
+      - "PlayIcon size changed from 18 to 24"
+      - "hitSlop={8} maintained on Pressable"
+      - "PlayIcon color={colors.textSecondary} unchanged"
+      - "Home tab PlayIcon usage (index.tsx) NOT modified"
+    tests:
+      - type: unit
+        description: "Verify play button has no circular border container"
+      - type: unit
+        description: "Verify PlayIcon renders with size={24} in agenda tab"
+      - type: unit
+        description: "Verify Home tab PlayIcon usage unchanged"
+
+  # ---------------------------------------------------------------------------
+  # STEP-08: F161 - DB Migration 022: Add welcome_new_families column (CR-234)
+  # ---------------------------------------------------------------------------
+  - id: STEP-08
+    cr_id: 234
+    description: >
+      Create migration file supabase/migrations/022_add_welcome_new_families.sql:
+
+      ALTER TABLE sunday_agendas
+        ADD COLUMN welcome_new_families TEXT DEFAULT NULL;
+
+      Simple column addition. Nullable, no NOT NULL constraint. No data migration
+      needed (all existing rows get NULL). Same pattern as prior column additions.
+    files:
+      - "supabase/migrations/022_add_welcome_new_families.sql"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-06", "STEP-12"]
+    covers:
+      - AC-161-01
+    done_when:
+      - "Migration file exists at supabase/migrations/022_add_welcome_new_families.sql"
+      - "ALTER TABLE adds welcome_new_families TEXT DEFAULT NULL to sunday_agendas"
+      - "No NOT NULL constraint"
+      - "No data migration (existing rows get NULL automatically)"
+    tests:
+      - type: unit
+        description: "Verify migration file adds welcome_new_families column"
+      - type: unit
+        description: "Verify column is nullable with DEFAULT NULL"
+
+  # ---------------------------------------------------------------------------
+  # STEP-09: F161 - Update SundayAgenda TypeScript interface (CR-234)
+  # ---------------------------------------------------------------------------
+  - id: STEP-09
+    cr_id: 234
+    description: >
+      Update the SundayAgenda interface in src/types/database.ts:
+
+      Add welcome_new_families: string | null between recognized_names and
+      announcements (around line 183-184):
+
+      FROM:
+        recognized_names: string[] | null;
+        announcements: string | null;
+
+      TO:
+        recognized_names: string[] | null;
+        welcome_new_families: string | null;
+        announcements: string | null;
+
+      Positioned after recognized_names to match the UI order in AgendaForm.
+    files:
+      - "src/types/database.ts"
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    covers:
+      - AC-161-02
+    done_when:
+      - "SundayAgenda interface has welcome_new_families: string | null"
+      - "Field positioned after recognized_names and before announcements"
+      - "No other fields modified in the interface"
+    tests:
+      - type: unit
+        description: "Verify SundayAgenda interface has welcome_new_families field"
+      - type: unit
+        description: "Verify field type is string | null"
+
+  # ---------------------------------------------------------------------------
+  # STEP-10: F161 - Add welcome_new_families FieldRow in AgendaForm (CR-234)
+  # ---------------------------------------------------------------------------
+  - id: STEP-10
+    cr_id: 234
+    description: >
+      Update src/components/AgendaForm.tsx to add a new FieldRow for
+      welcome_new_families between Recognizing and Announcements.
+
+      After the Reconhecendo a Presenca FieldRow closing tag (around line 227)
+      and before the Anuncios FieldRow (around line 229), add:
+
+        <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
+          <DebouncedTextInput
+            style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
+            value={agenda.welcome_new_families ?? ''}
+            onSave={(text) => updateField('welcome_new_families', text)}
+            placeholder={t('agenda.welcomeNewFamilies')}
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            editable={!isObserver}
+          />
+        </FieldRow>
+
+      Uses the exact same pattern as the announcements field:
+      - Same styles (textInput + announcementsInput) for visual consistency
+      - DebouncedTextInput with multiline support
+      - Auto-save via updateField
+      - Observer disabled via editable={!isObserver}
+      - Null coalesced to empty string (agenda.welcome_new_families ?? '')
+    files:
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-09"]
+    parallelizable_with: []
+    covers:
+      - AC-161-03
+      - AC-161-04
+      - AC-161-05
+      - AC-161-06
+    done_when:
+      - "FieldRow with label t('agenda.welcomeNewFamilies') exists between Recognizing and Announcements"
+      - "DebouncedTextInput with multiline inside the FieldRow"
+      - "value={agenda.welcome_new_families ?? ''} (null coalesced)"
+      - "onSave calls updateField('welcome_new_families', text)"
+      - "editable={!isObserver} for observer read-only"
+      - "Same styles as announcements field (textInput + announcementsInput)"
+    tests:
+      - type: unit
+        description: "Verify welcome new families FieldRow appears between Recognizing and Announcements"
+      - type: unit
+        description: "Verify DebouncedTextInput auto-saves via updateField"
+      - type: unit
+        description: "Verify field is disabled for observer role"
+      - type: unit
+        description: "Verify null value coalesced to empty string"
+
+  # ---------------------------------------------------------------------------
+  # STEP-11: F161 - Add welcome_new_families to presentation mode (CR-234)
+  # ---------------------------------------------------------------------------
+  - id: STEP-11
+    cr_id: 234
+    description: >
+      Update src/hooks/usePresentationMode.ts to add welcome_new_families to
+      the Welcome card in buildPresentationCards.
+
+      After the recognized_names conditional push (around line 86-87) and before
+      the announcements conditional, add:
+
+        if (agenda?.welcome_new_families) {
+          welcomeFields.push({
+            label: t('agenda.welcomeNewFamilies'),
+            value: agenda.welcome_new_families,
+            type: 'multiline',
+          });
+        }
+
+      Same conditional push pattern as recognized_names and announcements.
+      Only shown when the field has content (truthy check).
+    files:
+      - "src/hooks/usePresentationMode.ts"
+    dependencies: ["STEP-09"]
+    parallelizable_with: ["STEP-10"]
+    covers:
+      - AC-161-07
+      - AC-161-08
+    done_when:
+      - "welcome_new_families PresentationField pushed to welcomeFields when truthy"
+      - "Positioned after recognized_names and before announcements"
+      - "label = t('agenda.welcomeNewFamilies')"
+      - "type = 'multiline'"
+      - "Not added when welcome_new_families is null or empty"
+    tests:
+      - type: unit
+        description: "Verify welcome_new_families appears in presentation Welcome card when non-empty"
+      - type: unit
+        description: "Verify welcome_new_families omitted from presentation when empty/null"
+      - type: unit
+        description: "Verify correct positioning (after recognized_names, before announcements)"
+
+  # ---------------------------------------------------------------------------
+  # STEP-12: F161 - Add agenda.welcomeNewFamilies i18n keys (CR-234)
+  # ---------------------------------------------------------------------------
+  - id: STEP-12
+    cr_id: 234
+    description: >
+      Add agenda.welcomeNewFamilies i18n key to all 3 locale files:
+
+      src/i18n/locales/pt-BR.json (agenda section, after recognizing):
+      - Add: "welcomeNewFamilies": "Boas-vindas a Famílias Recém-chegadas"
+
+      src/i18n/locales/en.json (agenda section, after recognizing):
+      - Add: "welcomeNewFamilies": "Welcome New Families"
+
+      src/i18n/locales/es.json (agenda section, after recognizing):
+      - Add: "welcomeNewFamilies": "Bienvenida a Familias Recién Llegadas"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-06", "STEP-08"]
+    covers:
+      - AC-161-09
+      - AC-161-10
+      - AC-161-11
+    done_when:
+      - "pt-BR.json agenda.welcomeNewFamilies = 'Boas-vindas a Famílias Recém-chegadas'"
+      - "en.json agenda.welcomeNewFamilies = 'Welcome New Families'"
+      - "es.json agenda.welcomeNewFamilies = 'Bienvenida a Familias Recién Llegadas'"
+      - "Keys placed after recognizing in the agenda section"
+    tests:
+      - type: unit
+        description: "Verify pt-BR agenda.welcomeNewFamilies has correct Portuguese text"
+      - type: unit
+        description: "Verify en agenda.welcomeNewFamilies has correct English text"
+      - type: unit
+        description: "Verify es agenda.welcomeNewFamilies has correct Spanish text"
+
+  # ---------------------------------------------------------------------------
+  # STEP-13: Tests - Comprehensive test coverage for F161-F165
+  # ---------------------------------------------------------------------------
+  - id: STEP-13
+    cr_id: null
+    description: >
+      Create comprehensive test file for Batch 28 covering all 32 ACs.
+      File: __tests__/batch28-f161-f165.test.ts
+
+      Tests organized by feature:
+
+      F164 - selectTopic Capitalization (3 tests):
+      - AC-164-01: pt-BR selectTopic = "Selecionar Tema"
+      - AC-164-02: en selectTopic = "Select Topic"
+      - AC-164-03: es selectTopic = "Seleccionar Tema"
+
+      F165 - wardLanguage Description (6 tests):
+      - AC-165-01: Description text rendered below wardLanguage label
+      - AC-165-02: Ward language item remains tappable (opens modal)
+      - AC-165-03: Value and chevron shown on right side
+      - AC-165-04: pt-BR wardLanguageDescription exists
+      - AC-165-05: en wardLanguageDescription exists
+      - AC-165-06: es wardLanguageDescription exists
+
+      F163 - Checkbox SVG (7 tests):
+      - AC-163-01: SquareIcon exists in icons module
+      - AC-163-02: CheckSquareIcon exists in icons module
+      - AC-163-03: ActorSelector uses SVG icons instead of Unicode
+      - AC-163-04: Selected checkbox uses primary color
+      - AC-163-05: Unselected checkbox uses textSecondary color
+      - AC-163-06: Checkbox layout spacing preserved (marginRight: 8)
+      - AC-163-07: Single-select mode unchanged
+
+      F162 - PlayIcon (5 tests):
+      - AC-162-01: PlayIcon uses circle-play SVG
+      - AC-162-02: Agenda play button has no circular border
+      - AC-162-03: Home tab play icon unchanged in usage
+      - AC-162-04: PlayIcon is stroke-based (fill='none')
+      - AC-162-05: PlayIcon consumers not modified (same props)
+
+      F161 - Welcome New Families (11 tests):
+      - AC-161-01: Migration adds welcome_new_families column
+      - AC-161-02: SundayAgenda interface has welcome_new_families field
+      - AC-161-03: FieldRow appears between Recognizing and Announcements
+      - AC-161-04: Field auto-saves on change via updateField
+      - AC-161-05: Field disabled for observer
+      - AC-161-06: Null value coalesced to empty string
+      - AC-161-07: Appears in presentation Welcome card when non-empty
+      - AC-161-08: Omitted from presentation when empty
+      - AC-161-09: pt-BR welcomeNewFamilies i18n key
+      - AC-161-10: en welcomeNewFamilies i18n key
+      - AC-161-11: es welcomeNewFamilies i18n key
+    files:
+      - "__tests__/batch28-f161-f165.test.ts"
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09", "STEP-10", "STEP-11", "STEP-12"]
+    parallelizable_with: []
+    covers:
+      - AC-161-01
+      - AC-161-02
+      - AC-161-03
+      - AC-161-04
+      - AC-161-05
+      - AC-161-06
+      - AC-161-07
+      - AC-161-08
+      - AC-161-09
+      - AC-161-10
+      - AC-161-11
+      - AC-162-01
+      - AC-162-02
+      - AC-162-03
+      - AC-162-04
+      - AC-162-05
+      - AC-163-01
+      - AC-163-02
+      - AC-163-03
+      - AC-163-04
+      - AC-163-05
+      - AC-163-06
+      - AC-163-07
+      - AC-164-01
+      - AC-164-02
+      - AC-164-03
+      - AC-165-01
+      - AC-165-02
+      - AC-165-03
+      - AC-165-04
+      - AC-165-05
+      - AC-165-06
+    done_when:
+      - "All 32+ tests pass"
+      - "Every AC (AC-161-01 through AC-165-06) covered by at least 1 test"
+      - "No regressions in existing tests"
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  STEP-01 (F164 i18n)          ──╮
+  STEP-02 (F165 i18n)          ──┤ (parallelizable: all independent i18n)
+  STEP-12 (F161 i18n)          ──┤
+  STEP-04 (F163 icons)         ──┤ (parallelizable with i18n steps)
+  STEP-06 (F162 PlayIcon SVG)  ──┤
+  STEP-08 (F161 migration)     ──╯
+
+  STEP-03 (F165 settings UI)   ←── depends on STEP-02 (needs i18n key)
+  STEP-05 (F163 ActorSelector) ←── depends on STEP-04 (needs icon components)
+  STEP-07 (F162 agenda border) ←── depends on STEP-06 (needs circle-play icon)
+  STEP-09 (F161 types)         ←── depends on STEP-08 (needs DB column)
+  STEP-10 (F161 AgendaForm)    ←── depends on STEP-09 (needs TS type)
+  STEP-11 (F161 presentation)  ←── depends on STEP-09 (needs TS type)
+  STEP-10, STEP-11             ←── parallelizable with each other
+
+  STEP-13 (Tests)              ←── depends on ALL steps
+
+  Parallelizable groups:
+  - Group A: STEP-01, STEP-02, STEP-04, STEP-06, STEP-08, STEP-12 (all independent)
+  - Group B: STEP-03 (depends on STEP-02), STEP-05 (depends on STEP-04),
+             STEP-07 (depends on STEP-06), STEP-09 (depends on STEP-08)
+  - Group C: STEP-10, STEP-11 (both depend on STEP-09, parallelizable)
+  - Group D: STEP-13 (depends on all)
+
+# =============================================================================
+# COVERAGE MATRIX (AC -> Step)
+# =============================================================================
+
+coverage_matrix:
+  # F161 (CR-234)
+  AC-161-01: [STEP-08, STEP-13]
+  AC-161-02: [STEP-09, STEP-13]
+  AC-161-03: [STEP-10, STEP-13]
+  AC-161-04: [STEP-10, STEP-13]
+  AC-161-05: [STEP-10, STEP-13]
+  AC-161-06: [STEP-10, STEP-13]
+  AC-161-07: [STEP-11, STEP-13]
+  AC-161-08: [STEP-11, STEP-13]
+  AC-161-09: [STEP-12, STEP-13]
+  AC-161-10: [STEP-12, STEP-13]
+  AC-161-11: [STEP-12, STEP-13]
+  # F162 (CR-235)
+  AC-162-01: [STEP-06, STEP-13]
+  AC-162-02: [STEP-07, STEP-13]
+  AC-162-03: [STEP-07, STEP-13]
+  AC-162-04: [STEP-06, STEP-13]
+  AC-162-05: [STEP-06, STEP-13]
+  # F163 (CR-236)
+  AC-163-01: [STEP-04, STEP-13]
+  AC-163-02: [STEP-04, STEP-13]
+  AC-163-03: [STEP-05, STEP-13]
+  AC-163-04: [STEP-05, STEP-13]
+  AC-163-05: [STEP-05, STEP-13]
+  AC-163-06: [STEP-05, STEP-13]
+  AC-163-07: [STEP-05, STEP-13]
+  # F164 (CR-237)
+  AC-164-01: [STEP-01, STEP-13]
+  AC-164-02: [STEP-01, STEP-13]
+  AC-164-03: [STEP-01, STEP-13]
+  # F165 (CR-238)
+  AC-165-01: [STEP-03, STEP-13]
+  AC-165-02: [STEP-03, STEP-13]
+  AC-165-03: [STEP-03, STEP-13]
+  AC-165-04: [STEP-02, STEP-13]
+  AC-165-05: [STEP-02, STEP-13]
+  AC-165-06: [STEP-02, STEP-13]
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_spec_read: true            # SPEC_F161.yaml fully read
+  GATE-02_arch_read: true            # ARCH_M161.yaml fully read
+  GATE-03_all_acs_covered: true      # 32 ACs, each with at least 1 step + 1 test
+  GATE-04_done_when_verifiable: true # Each step has verifiable done_when criteria
+  GATE-05_dependencies_correct: true # Step dependencies follow feature/component order
+  GATE-06_plan_saved: true           # PLAN_P049.yaml saved
+  GATE-07_consolidated_updated: true # PLAN_CONSOLIDATED.yaml updated
+  GATE-08_plan_summary_filled: true  # Summary provided

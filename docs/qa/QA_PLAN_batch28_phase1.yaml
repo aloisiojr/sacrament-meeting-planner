@@ -1,0 +1,205 @@
+type: qa_plan
+id: QA-batch28-phase1
+created_at: "2026-02-24T23:45:00Z"
+request_type: feature_request
+feature_or_bug: "Batch 28 - CRs 234-238: UI/UX improvements (new agenda field, icon/checkbox style, text fixes)"
+user_request: |
+  1. Adicionar o campo "Boa-vindas a familias recem-chegadas" na agenda, na 1a sessao, logo depois do campo "Reconhecendo a Presenca" e antes de Anuncios.
+  2. Trocar o icone de play que tem no topo do card de edicao das agendas para que ele siga o mesmo estilo/padrao/tema dos outros icones do app (ex: os da Tab bar)
+  3. Trocar o checkbox da tela de selecao de "Reconhecendo a Presenca" para algo que combine com o tema/estilo do app
+  4. Trocar o texto "Selecionar tema" por "Selecionar Tema" no card de discursos.
+  5. Adicionar texto explicativo em "Idioma da Ala": "Altera somente o idioma da colecao de temas disponiveis e dos templates de WhatsApp"
+
+baseline:
+  description: |
+    Current state of the system before development:
+    - CR-234: No "welcome to new families" field exists in the agenda. Section 1 (Welcome) has:
+      Presiding -> Conducting -> Recognizing -> Announcements -> Pianist -> Conductor -> Opening Hymn -> Opening Prayer.
+      No database column, no i18n key, no UI field for "welcome_new_families" or equivalent.
+    - CR-235: PlayIcon in agenda.tsx card header is a Lucide SVG stroke-based icon (play triangle).
+      Used at line 536 with size={18} color={colors.textSecondary}. Same PlayIcon component is used
+      in Home tab (index.tsx) at size={20} with color={colors.onPrimary}. The tab bar uses different
+      icons: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon - all Lucide stroke-based SVGs.
+      The play icon style is already consistent with the app theme (stroke-based, monochromatic, Lucide).
+      The user wants a DIFFERENT icon, not necessarily matching tab bar icons, but following same style/pattern.
+    - CR-236: ActorSelector.tsx uses Unicode checkbox characters for multi-select mode:
+      '\u2611' (checked: ballot box with check) and '\u2610' (unchecked: ballot box).
+      These are plain Text components with fontSize 20. They don't match the app's SVG icon style.
+    - CR-237: The i18n key "speeches.selectTopic" is "Selecionar tema" (lowercase 't' in 'tema') in pt-BR.
+      In en.json it's "Select topic" (lowercase 't'). In es.json it's "Seleccionar tema" (lowercase 't').
+      User wants pt-BR to use "Selecionar Tema" (capital T).
+    - CR-238: Settings screen shows "Idioma da Ala" (wardLanguage) as a simple SettingsItem with
+      label and value. No description/explanation text is shown. The managePrayers setting has a
+      similar description text (managePrayersDescription key), but wardLanguage has no equivalent.
+  evidence:
+    - "No welcome_new_families field in SundayAgenda type (src/types/database.ts:174-217)"
+    - "No i18n key for new families welcome in any locale file"
+    - "PlayIcon at src/app/(tabs)/agenda.tsx:536 uses stroke-based Lucide SVG"
+    - "ActorSelector checkbox uses Unicode chars \\u2611/\\u2610 (src/components/ActorSelector.tsx:164-165)"
+    - "pt-BR speeches.selectTopic = 'Selecionar tema' (lowercase t)"
+    - "No wardLanguageDescription i18n key in any locale file"
+    - "No description text shown for wardLanguage SettingsItem in settings/index.tsx:257-261"
+
+# =====================================================================================
+# CR-234: New "welcome to new families" field in agenda Section 1
+# =====================================================================================
+validation_checks:
+  - id: VC-01
+    description: "New i18n key for 'welcome new families' label exists in all 3 locales (pt-BR, en, es)"
+    type: functional
+    how_to_verify: "Check pt-BR.json, en.json, es.json for a new agenda key (e.g., agenda.welcomeNewFamilies)"
+    expected_result: "Key exists in all 3 locale files with appropriate translations"
+    priority: must_pass
+
+  - id: VC-02
+    description: "New field appears in AgendaForm Section 1, between Recognizing and Announcements"
+    type: functional
+    how_to_verify: "Read src/components/AgendaForm.tsx and verify the new field is rendered between the 'recognizing' FieldRow (line ~194) and the 'announcements' FieldRow (line ~229)"
+    expected_result: "New field (text input or toggle+text) placed exactly between recognizing and announcements in the JSX"
+    priority: must_pass
+
+  - id: VC-03
+    description: "New database column exists in SundayAgenda type for welcome new families"
+    type: functional
+    how_to_verify: "Check src/types/database.ts SundayAgenda interface for new field. Check for migration file."
+    expected_result: "New field added to SundayAgenda interface (e.g., welcome_new_families: string | null)"
+    priority: must_pass
+
+  - id: VC-04
+    description: "Auto-save works for the new field (updateField call)"
+    type: functional
+    how_to_verify: "Verify the new field uses updateField() or updateAgenda.mutate() to persist changes"
+    expected_result: "Field value is saved to database on change, consistent with other fields in AgendaForm"
+    priority: must_pass
+
+  - id: VC-05
+    description: "New field is disabled for Observer role (isObserver check)"
+    type: behavioral
+    how_to_verify: "Verify the new field has editable={!isObserver} or disabled={isObserver} prop"
+    expected_result: "Observer users cannot edit the field"
+    priority: must_pass
+
+  - id: VC-06
+    description: "Presentation mode includes the new field"
+    type: functional
+    how_to_verify: "Check src/hooks/usePresentationMode.ts to see if the new field is added to the welcomeFields array"
+    expected_result: "New field shown in presentation mode between recognizing and announcements"
+    priority: should_pass
+
+  - id: VC-07
+    description: "New migration file exists for the database column"
+    type: functional
+    how_to_verify: "Check supabase/migrations/ for new migration adding the column to sunday_agendas"
+    expected_result: "Migration file exists with ALTER TABLE sunday_agendas ADD COLUMN for the new field"
+    priority: must_pass
+
+# =====================================================================================
+# CR-235: Replace play icon with theme-consistent icon
+# =====================================================================================
+  - id: VC-08
+    description: "Play icon in agenda card header replaced or restyled to match app icon theme"
+    type: functional
+    how_to_verify: "Check src/app/(tabs)/agenda.tsx around line 536 for the icon component used. Verify it follows Lucide stroke-based style consistent with tab bar icons."
+    expected_result: "Icon is changed from PlayIcon to a different icon, OR PlayIcon styling is updated to better match the tab bar icons' visual style. The icon should be a Lucide stroke-based SVG."
+    priority: must_pass
+
+  - id: VC-09
+    description: "Home tab play icon also updated if agenda icon was changed"
+    type: behavioral
+    how_to_verify: "Check src/app/(tabs)/index.tsx for PlayIcon usage. If agenda icon was changed to a different icon, verify consistency."
+    expected_result: "Both locations use the same icon component, or the change only applies to agenda card header per user request"
+    priority: should_pass
+
+  - id: VC-10
+    description: "New icon component (if any) is properly defined in icons/index.tsx"
+    type: functional
+    how_to_verify: "If a new icon is introduced, verify it exists in src/components/icons/index.tsx with proper Lucide SVG implementation"
+    expected_result: "Icon uses stroke-based rendering, viewBox='0 0 24 24', fill='none', stroke={color}"
+    priority: must_pass
+
+# =====================================================================================
+# CR-236: Replace Unicode checkbox with themed component
+# =====================================================================================
+  - id: VC-11
+    description: "Unicode checkbox characters replaced in ActorSelector multi-select mode"
+    type: functional
+    how_to_verify: "Check src/components/ActorSelector.tsx around lines 163-166. Verify \\u2611 and \\u2610 are replaced."
+    expected_result: "Unicode chars replaced with SVG icon components (e.g., CheckIcon with border/box) or a themed checkbox component using app colors"
+    priority: must_pass
+
+  - id: VC-12
+    description: "Replacement checkbox uses theme colors (colors.primary, colors.text, etc.)"
+    type: behavioral
+    how_to_verify: "Verify the new checkbox component uses dynamic theme colors from useTheme(), not hardcoded color values"
+    expected_result: "Checkbox works correctly in both light and dark themes"
+    priority: must_pass
+
+  - id: VC-13
+    description: "Checkbox visual state (checked/unchecked) is clearly distinguishable"
+    type: behavioral
+    how_to_verify: "Verify the checked and unchecked states have distinct visual representations (different fill, border, icon, etc.)"
+    expected_result: "Selected items show a filled/checked state, unselected show empty/unchecked state"
+    priority: must_pass
+
+# =====================================================================================
+# CR-237: Capitalize 'Tema' in pt-BR selectTopic
+# =====================================================================================
+  - id: VC-14
+    description: "pt-BR speeches.selectTopic changed from 'Selecionar tema' to 'Selecionar Tema'"
+    type: functional
+    how_to_verify: "Read src/i18n/locales/pt-BR.json and check the value of speeches.selectTopic"
+    expected_result: "Value is exactly 'Selecionar Tema' (capital T)"
+    priority: must_pass
+
+  - id: VC-15
+    description: "Other locales selectTopic capitalization reviewed"
+    type: behavioral
+    how_to_verify: "Check en.json and es.json speeches.selectTopic for consistent capitalization style"
+    expected_result: "en: 'Select Topic' (both capitalized) and es: 'Seleccionar Tema' (both capitalized) - or kept as-is if locale conventions differ"
+    priority: should_pass
+
+# =====================================================================================
+# CR-238: Add explanation text for Ward Language setting
+# =====================================================================================
+  - id: VC-16
+    description: "New i18n key for ward language description exists in all 3 locales"
+    type: functional
+    how_to_verify: "Check pt-BR.json, en.json, es.json for a new key (e.g., settings.wardLanguageDescription)"
+    expected_result: "Key exists in all 3 locale files. pt-BR contains 'Altera somente o idioma da colecao de temas disponiveis e dos templates de WhatsApp' or similar"
+    priority: must_pass
+
+  - id: VC-17
+    description: "Explanation text is displayed under the wardLanguage setting item"
+    type: functional
+    how_to_verify: "Check src/app/(tabs)/settings/index.tsx around lines 255-261. Verify a description Text is rendered below the SettingsItem for wardLanguage."
+    expected_result: "Description text shown in smaller/lighter font below the ward language setting, similar to managePrayersDescription"
+    priority: must_pass
+
+  - id: VC-18
+    description: "Description text uses theme colors and appropriate font styling"
+    type: behavioral
+    how_to_verify: "Verify the description text uses colors.textSecondary or colors.textTertiary and smaller fontSize"
+    expected_result: "Text styled consistently with other description texts in the app (e.g., managePrayersDescription)"
+    priority: should_pass
+
+# =====================================================================================
+# Regression checks
+# =====================================================================================
+  - id: VC-19
+    description: "Existing AgendaForm fields still work (presiding, conducting, recognizing, announcements)"
+    type: regression
+    how_to_verify: "Verify the existing fields around the insertion point for CR-234 are not broken or removed"
+    expected_result: "All existing Section 1 fields remain intact and functional"
+    priority: must_pass
+
+  - id: VC-20
+    description: "Full test suite passes with no regressions"
+    type: regression
+    how_to_verify: "Run npx jest and verify all tests pass"
+    expected_result: "All existing tests pass (no failures, no errors)"
+    priority: must_pass
+
+pass_criteria: |
+  ALL checks with priority=must_pass MUST pass.
+  If any must_pass fails -> verdict=failed.
+  If all must_pass pass but should_pass fails -> verdict=partial.

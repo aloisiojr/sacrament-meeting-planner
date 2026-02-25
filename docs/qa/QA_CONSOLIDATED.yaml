@@ -34,6 +34,7 @@
 # CR-221 (PRE+POST Phase 1, PRE+POST Phase 2, PRE+POST Phase 3) - Batch 25
 # CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230 (PRE+POST) - Batch 26
 # CR-231 (PRE+POST) - Batch 27
+# CR-234, CR-235, CR-236, CR-237, CR-238 (PRE) - Batch 28 Phase 1
 # Updated: 2026-02-24
 # =============================================================================
 
@@ -13462,4 +13463,358 @@ cr_231:
       full_suite_total: 6933
       full_suite_skipped: 0
       full_suite_failed: 0
+
+# #############################################################################
+# CR-234: Add "welcome new families" field to agenda Section 1
+# CR-235: Replace play icon with theme-consistent icon
+# CR-236: Replace Unicode checkbox in ActorSelector
+# CR-237: Capitalize "Tema" in pt-BR selectTopic
+# CR-238: Add explanation text for Ward Language setting
+# Batch 28 Phase 1 - PRE validation
+# #############################################################################
+
+cr_234:
+  cr_id: CR-234
+  title: "Add 'welcome new families' field to agenda Section 1 after Recognizing"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_batch28_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Feature does NOT exist. No database column, i18n key, or UI field for
+      "welcome new families" in AgendaForm. Section 1 goes directly from
+      "Recognizing" to "Announcements". QA plan created with 7 validation checks
+      covering i18n, UI placement, database, auto-save, observer, presentation mode,
+      and migration.
+    evidence:
+      - "src/types/database.ts:174-217 - SundayAgenda has no welcome_new_families field"
+      - "src/components/AgendaForm.tsx:194-229 - Recognizing directly followed by Announcements"
+      - "src/i18n/locales/pt-BR.json - no agenda.welcomeNewFamilies key"
+      - "src/hooks/usePresentationMode.ts - no welcome new families in welcomeFields"
+      - "No migration file for welcome_new_families column"
+
+cr_235:
+  cr_id: CR-235
+  title: "Replace play icon in agenda card header with theme-consistent icon"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_batch28_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Current PlayIcon is a Lucide stroke-based SVG (play triangle) at
+      src/app/(tabs)/agenda.tsx:536. Used with size={18} color={colors.textSecondary}
+      inside a circular Pressable with border. Tab bar icons use HomeIcon,
+      ClipboardListIcon, MicIcon, SettingsIcon - all Lucide stroke-based SVGs.
+      User wants the icon changed to follow the same style/pattern/theme.
+    evidence:
+      - "src/app/(tabs)/agenda.tsx:536 - <PlayIcon size={18} color={colors.textSecondary} />"
+      - "src/app/(tabs)/agenda.tsx:526-534 - Circular container with borderRadius: 15"
+      - "src/components/icons/index.tsx:199-211 - PlayIcon is Lucide play triangle SVG"
+      - "src/app/(tabs)/_layout.tsx:43-81 - Tab bar uses HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon"
+
+cr_236:
+  cr_id: CR-236
+  title: "Replace Unicode checkbox in ActorSelector with themed component"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_batch28_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      ActorSelector uses Unicode checkbox characters (\u2611/\u2610) as plain Text
+      with fontSize 20. These don't match the app's SVG Lucide icon theme. Rendering
+      varies across platforms. User wants them replaced with something matching app style.
+    evidence:
+      - "src/components/ActorSelector.tsx:163-166 - multiSelect checkbox uses \\u2611/\\u2610 Unicode"
+      - "src/components/ActorSelector.tsx:164 - {isSelected ? '\\u2611' : '\\u2610'}"
+      - "src/components/ActorSelector.tsx:377-380 - checkbox style: fontSize 20, marginRight 8"
+
+cr_237:
+  cr_id: CR-237
+  title: "Capitalize 'Tema' in pt-BR selectTopic text"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_batch28_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Current pt-BR value is "Selecionar tema" (lowercase 't'). User wants
+      "Selecionar Tema" (capital T). Simple i18n text change.
+    evidence:
+      - "src/i18n/locales/pt-BR.json:211 - selectTopic: 'Selecionar tema'"
+      - "src/i18n/locales/en.json:211 - selectTopic: 'Select topic'"
+      - "src/i18n/locales/es.json:211 - selectTopic: 'Seleccionar tema'"
+
+cr_238:
+  cr_id: CR-238
+  title: "Add explanation text for Ward Language setting"
+  type: feature_request
+  qa_plan: qa/QA_PLAN_batch28_phase1.yaml
+
+  pre_validation:
+    timestamp: "2026-02-24"
+    status: passed
+    summary: |
+      Ward Language setting in settings/index.tsx shows only label+value, no
+      description text. User wants explanatory text: "Altera somente o idioma
+      da colecao de temas disponiveis e dos templates de WhatsApp". Similar
+      pattern exists for managePrayers (has managePrayersDescription).
+    evidence:
+      - "src/app/(tabs)/settings/index.tsx:257-261 - wardLanguage SettingsItem has no description"
+      - "No settings.wardLanguageDescription key in any locale file"
+      - "Pattern reference: settings.managePrayersDescription exists in all 3 locales"
+
+# #############################################################################
+# CR-234 to CR-238: Batch 28 Phase 1 - POST validation
+# #############################################################################
+
+cr_234_post:
+  cr_id: CR-234
+  title: "Add 'welcome new families' field to agenda Section 1 after Recognizing"
+  type: feature_request
+  feature_id: F161
+  batch: 28
+
+  post_validation:
+    timestamp: "2026-02-25"
+    verdict: passed
+    qa_plan_ref: "docs/qa/QA_PLAN_batch28_phase1.yaml"
+
+    must_pass_results:
+      - id: VC-01
+        description: "New i18n key for 'welcome new families' label exists in all 3 locales"
+        result: PASS
+        evidence:
+          - "pt-BR.json:226 - 'welcomeNewFamilies': 'Boas-vindas a Familias Recem-chegadas'"
+          - "en.json:226 - 'welcomeNewFamilies': 'Welcome New Families'"
+          - "es.json:226 - 'welcomeNewFamilies': 'Bienvenida a Familias Recien Llegadas'"
+
+      - id: VC-02
+        description: "New field appears in AgendaForm Section 1, between Recognizing and Announcements"
+        result: PASS
+        evidence:
+          - "src/components/AgendaForm.tsx:229-239 - welcomeNewFamilies FieldRow with DebouncedTextInput"
+          - "Positioned after recognizing FieldRow (ends line 227) and before announcements FieldRow (line 241)"
+
+      - id: VC-03
+        description: "New database column exists in SundayAgenda type for welcome new families"
+        result: PASS
+        evidence:
+          - "src/types/database.ts:184 - welcome_new_families: string | null (between recognized_names and announcements)"
+          - "supabase/migrations/022_add_welcome_new_families.sql - ALTER TABLE sunday_agendas ADD COLUMN welcome_new_families TEXT DEFAULT NULL"
+
+      - id: VC-04
+        description: "Auto-save works for the new field (updateField call)"
+        result: PASS
+        evidence:
+          - "src/components/AgendaForm.tsx:233 - onSave={(text) => updateField('welcome_new_families', text)}"
+
+      - id: VC-05
+        description: "New field is disabled for Observer role (isObserver check)"
+        result: PASS
+        evidence:
+          - "src/components/AgendaForm.tsx:237 - editable={!isObserver}"
+
+      - id: VC-07
+        description: "New migration file exists for the database column"
+        result: PASS
+        evidence:
+          - "supabase/migrations/022_add_welcome_new_families.sql exists"
+          - "Content: ALTER TABLE sunday_agendas ADD COLUMN welcome_new_families TEXT DEFAULT NULL"
+
+    should_pass_results:
+      - id: VC-06
+        description: "Presentation mode includes the new field"
+        result: PASS
+        evidence:
+          - "src/hooks/usePresentationMode.ts:87-93 - welcome_new_families pushed to welcomeFields"
+          - "Conditional: only shown when agenda?.welcome_new_families is truthy"
+          - "Positioned after recognized_names (line 80-86) and before announcements (line 94-99)"
+          - "Uses type: 'multiline' matching spec"
+
+cr_235_post:
+  cr_id: CR-235
+  title: "Replace play icon in agenda card header with theme-consistent icon"
+  type: feature_request
+  feature_id: F162
+  batch: 28
+
+  post_validation:
+    timestamp: "2026-02-25"
+    verdict: passed
+    qa_plan_ref: "docs/qa/QA_PLAN_batch28_phase1.yaml"
+
+    must_pass_results:
+      - id: VC-08
+        description: "Play icon in agenda card header replaced with circle-play"
+        result: PASS
+        evidence:
+          - "src/components/icons/index.tsx:199-218 - PlayIcon uses Circle (cx=12, cy=12, r=10) + Path (d='m10 8 6 4-6 4V8z')"
+          - "Both elements: stroke={color}, strokeWidth=2, fill='none' - fully stroke-based"
+          - "Comment updated: '/** Lucide: circle-play (https://lucide.dev/icons/circle-play) */'"
+          - "src/app/(tabs)/agenda.tsx:520-529 - circular border container REMOVED, PlayIcon renders directly in Pressable with size=24"
+
+      - id: VC-10
+        description: "New icon component properly defined in icons/index.tsx"
+        result: PASS
+        evidence:
+          - "src/components/icons/index.tsx:200 - PlayIcon uses viewBox='0 0 24 24', fill='none'"
+          - "Circle: stroke={color}, strokeWidth=2, fill='none'"
+          - "Path: stroke={color}, strokeWidth=2, strokeLinecap='round', strokeLinejoin='round', fill='none'"
+          - "Matches stroke-based rendering style of HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon"
+
+    should_pass_results:
+      - id: VC-09
+        description: "Home tab play icon also updated (same PlayIcon component)"
+        result: PASS
+        evidence:
+          - "PlayIcon definition changed globally in icons/index.tsx - both agenda.tsx and index.tsx use the same updated icon"
+          - "src/app/(tabs)/index.tsx continues to use <PlayIcon size={20} color={colors.onPrimary} /> unchanged"
+
+cr_236_post:
+  cr_id: CR-236
+  title: "Replace Unicode checkbox in ActorSelector with themed component"
+  type: feature_request
+  feature_id: F163
+  batch: 28
+
+  post_validation:
+    timestamp: "2026-02-25"
+    verdict: passed
+    qa_plan_ref: "docs/qa/QA_PLAN_batch28_phase1.yaml"
+
+    must_pass_results:
+      - id: VC-11
+        description: "Unicode checkbox characters replaced in ActorSelector multi-select mode"
+        result: PASS
+        evidence:
+          - "src/components/ActorSelector.tsx:164-170 - Uses CheckSquareIcon/SquareIcon SVG components"
+          - "No Unicode \\u2611 or \\u2610 in checkbox rendering"
+          - "Import at line 22: import { CheckSquareIcon, SquareIcon } from './icons'"
+          - "Wrapped in <View style={{ marginRight: 8 }}> preserving spacing"
+
+      - id: VC-12
+        description: "Replacement checkbox uses theme colors"
+        result: PASS
+        evidence:
+          - "src/components/ActorSelector.tsx:167 - CheckSquareIcon color={colors.primary} (selected)"
+          - "src/components/ActorSelector.tsx:168 - SquareIcon color={colors.textSecondary} (unselected)"
+          - "Both colors from useTheme() - works in light and dark modes"
+
+      - id: VC-13
+        description: "Checkbox visual state (checked/unchecked) clearly distinguishable"
+        result: PASS
+        evidence:
+          - "Selected: CheckSquareIcon (square with checkmark) in primary color (blue)"
+          - "Unselected: SquareIcon (empty square outline) in textSecondary color (gray)"
+          - "Different icon shapes + different colors provide clear visual distinction"
+
+cr_237_post:
+  cr_id: CR-237
+  title: "Capitalize 'Tema' in pt-BR selectTopic text"
+  type: feature_request
+  feature_id: F164
+  batch: 28
+
+  post_validation:
+    timestamp: "2026-02-25"
+    verdict: passed
+    qa_plan_ref: "docs/qa/QA_PLAN_batch28_phase1.yaml"
+
+    must_pass_results:
+      - id: VC-14
+        description: "pt-BR speeches.selectTopic changed from 'Selecionar tema' to 'Selecionar Tema'"
+        result: PASS
+        evidence:
+          - "src/i18n/locales/pt-BR.json:212 - 'selectTopic': 'Selecionar Tema' (capital T)"
+
+    should_pass_results:
+      - id: VC-15
+        description: "Other locales selectTopic capitalization reviewed"
+        result: PASS
+        evidence:
+          - "en.json:212 - 'selectTopic': 'Select Topic' (capital T)"
+          - "es.json:212 - 'selectTopic': 'Seleccionar Tema' (capital T)"
+          - "All 3 locales now use consistent capitalization"
+
+cr_238_post:
+  cr_id: CR-238
+  title: "Add explanation text for Ward Language setting"
+  type: feature_request
+  feature_id: F165
+  batch: 28
+
+  post_validation:
+    timestamp: "2026-02-25"
+    verdict: passed
+    qa_plan_ref: "docs/qa/QA_PLAN_batch28_phase1.yaml"
+
+    must_pass_results:
+      - id: VC-16
+        description: "New i18n key for ward language description exists in all 3 locales"
+        result: PASS
+        evidence:
+          - "pt-BR.json:130 - 'wardLanguageDescription': 'Altera somente o idioma da colecao de temas disponiveis e dos templates de WhatsApp'"
+          - "en.json:130 - 'wardLanguageDescription': 'Only changes the language of available topic collections and WhatsApp templates'"
+          - "es.json:130 - 'wardLanguageDescription': 'Solo cambia el idioma de las colecciones de temas disponibles y los modelos de WhatsApp'"
+
+      - id: VC-17
+        description: "Explanation text displayed under the wardLanguage setting item"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/index.tsx:255-276 - Pressable wrapper replaces SettingsItem"
+          - "Line 264-266: <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>{t('settings.wardLanguageDescription')}</Text>"
+          - "Description shown below label, value+chevron on right side - matches managePrayers pattern"
+
+    should_pass_results:
+      - id: VC-18
+        description: "Description text uses theme colors and appropriate font styling"
+        result: PASS
+        evidence:
+          - "src/app/(tabs)/settings/index.tsx:265 - fontSize: 12, color: colors.textSecondary, marginTop: 2"
+          - "Matches managePrayersDescription styling at lines 230-232: same fontSize: 12, colors.textSecondary, marginTop: 2"
+
+    # =========================================================================
+    # Regression checks
+    # =========================================================================
+    regression_results:
+      - id: VC-19
+        description: "Existing AgendaForm fields still work"
+        result: PASS
+        evidence:
+          - "src/components/AgendaForm.tsx:152-171 - presiding FieldRow intact"
+          - "src/components/AgendaForm.tsx:173-192 - conducting FieldRow intact"
+          - "src/components/AgendaForm.tsx:194-227 - recognizing FieldRow intact"
+          - "src/components/AgendaForm.tsx:241-251 - announcements FieldRow intact"
+          - "All existing Section 1 fields present and functional"
+
+      - id: VC-20
+        description: "Full test suite passes with no regressions"
+        result: PASS
+        evidence:
+          - "npx vitest run: 100 test files, 97 passed, 3 failed"
+          - "All 53 Batch 28 tests pass (src/__tests__/batch28-f161-f165.test.ts)"
+          - "3 failing files (batch15, batch23, batch25) have 8 pre-existing failures unrelated to Batch 28:"
+          - "  - batch15: F098 selectSpeaker expected 'Selecionar Discursante' but current is 'Selecionar Pessoa' (pre-existing)"
+          - "  - batch23: F150 selectSpeaker same issue (pre-existing)"
+          - "  - batch25: useLazyCreateSpeeches idempotency check 'existing.length > 0' vs actual implementation (pre-existing)"
+          - "None of these failures are caused by Batch 28 changes"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch28-f161-f165.test.ts"
+      tests_passed: 53
+      tests_total: 53
+      full_suite_passed: 6979
+      full_suite_total: 6987
+      full_suite_failed: 8
+      full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 28"
 

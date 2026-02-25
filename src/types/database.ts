@@ -181,6 +181,7 @@ export interface SundayAgenda {
   conducting_name: string | null;
   conducting_actor_id: string | null;
   recognized_names: string[] | null;
+  welcome_new_families: string | null;
   announcements: string | null;
   pianist_name: string | null;
   pianist_actor_id: string | null;

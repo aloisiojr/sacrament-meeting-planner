@@ -64,6 +64,8 @@ export default function TabsLayout() {
           tabBarLabel: ({ color }) => (
             <Text
               numberOfLines={2}
+              allowFontScaling={false}
+              adjustsFontSizeToFit={false}
               style={{ fontSize: 10, textAlign: 'center', color }}
             >
               {speechesTabTitle}

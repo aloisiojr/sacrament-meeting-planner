@@ -223,7 +223,7 @@ export default function SettingsScreen() {
               )}
               {isBishopric && (
                 <View style={[styles.item, { borderBottomColor: colors.divider }]}>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={[styles.itemText, { color: colors.text }]}>
                       {t('settings.managePrayers')}
                     </Text>

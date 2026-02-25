@@ -84,6 +84,13 @@ export function buildPresentationCards(
       type: 'multiline',
     });
   }
+  if (agenda?.welcome_new_families) {
+    welcomeFields.push({
+      label: t('agenda.welcomeNewFamilies'),
+      value: agenda.welcome_new_families,
+      type: 'multiline',
+    });
+  }
   if (agenda?.announcements) {
     welcomeFields.push({
       label: t('agenda.announcements'),

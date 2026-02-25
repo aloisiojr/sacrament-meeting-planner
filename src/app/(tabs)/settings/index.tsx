@@ -253,12 +253,26 @@ export default function SettingsScreen() {
                 />
               )}
               {hasPermission('settings:language') && (
-                <SettingsItem
-                  label={t('settings.wardLanguage')}
-                  value={LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+                <Pressable
+                  style={[styles.item, { borderBottomColor: colors.divider }]}
                   onPress={() => setWardLanguageModalVisible(true)}
-                  colors={colors}
-                />
+                  accessibilityRole="button"
+                >
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={[styles.itemText, { color: colors.text }]}>
+                      {t('settings.wardLanguage')}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      {t('settings.wardLanguageDescription')}
+                    </Text>
+                  </View>
+                  <View style={styles.itemRight}>
+                    <Text style={[styles.itemValue, { color: colors.textSecondary }]}>
+                      {LANGUAGE_LABELS[wardLanguage as SupportedLanguage] ?? wardLanguage}
+                    </Text>
+                    <ChevronRightIcon size={18} color={colors.textSecondary} />
+                  </View>
+                </Pressable>
               )}
               {hasPermission('settings:timezone') && (
                 <SettingsItem

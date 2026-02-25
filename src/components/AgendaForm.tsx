@@ -226,6 +226,18 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         </Pressable>
       </FieldRow>
 
+      <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
+        <DebouncedTextInput
+          style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
+          value={agenda.welcome_new_families ?? ''}
+          onSave={(text) => updateField('welcome_new_families', text)}
+          placeholder={t('agenda.welcomeNewFamilies')}
+          placeholderTextColor={colors.textTertiary}
+          multiline
+          editable={!isObserver}
+        />
+      </FieldRow>
+
       <FieldRow label={t('agenda.announcements')} colors={colors}>
         <DebouncedTextInput
           style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}

@@ -67,6 +67,7 @@ describe('F145 (CR-209): Icons module', () => {
       'TrashIcon', 'PlayIcon', 'PencilIcon', 'XIcon',
       'ChevronDownIcon', 'ChevronUpIcon', 'ChevronRightIcon',
       'CheckIcon', 'MoreVerticalIcon', 'WhatsAppIcon',
+      'SquareIcon', 'CheckSquareIcon',
     ];
 
     it.each(expectedIcons)('exports %s as a named export', (iconName) => {
@@ -74,9 +75,9 @@ describe('F145 (CR-209): Icons module', () => {
       expect(iconsSource).toMatch(exportPattern);
     });
 
-    it('exports exactly 14 icon components', () => {
+    it('exports exactly 16 icon components', () => {
       const exportMatches = iconsSource.match(/export\s+const\s+\w+Icon\s*=/g) || [];
-      expect(exportMatches).toHaveLength(14);
+      expect(exportMatches).toHaveLength(16);
     });
 
     it('exports IconProps interface', () => {
@@ -100,7 +101,7 @@ describe('F145 (CR-209): Icons module', () => {
     it('stroke-based icons use viewBox="0 0 24 24" fill="none"', () => {
       // All Svg elements should have viewBox="0 0 24 24"
       const svgMatches = iconsSource.match(/viewBox="0 0 24 24"/g) || [];
-      expect(svgMatches.length).toBeGreaterThanOrEqual(14);
+      expect(svgMatches.length).toBeGreaterThanOrEqual(16);
     });
 
     it('stroke-based icons use strokeWidth={2}', () => {
@@ -115,14 +116,14 @@ describe('F145 (CR-209): Icons module', () => {
     });
 
     it('stroke-based icons default color to currentColor', () => {
-      // 13 stroke-based icons should default to 'currentColor'
+      // 15 stroke-based icons should default to 'currentColor' (13 original + SquareIcon + CheckSquareIcon)
       const currentColorDefaults = iconsSource.match(/color\s*=\s*'currentColor'/g) || [];
-      expect(currentColorDefaults.length).toBe(13);
+      expect(currentColorDefaults.length).toBe(15);
     });
 
     it('stroke-based icons default size to 24', () => {
       const sizeDefaults = iconsSource.match(/size\s*=\s*24/g) || [];
-      expect(sizeDefaults.length).toBe(14); // all 14 icons default to 24
+      expect(sizeDefaults.length).toBe(16); // all 16 icons default to 24
     });
 
     it('WhatsAppIcon uses fill-based rendering (fill={color})', () => {
@@ -526,14 +527,14 @@ describe('F145 (CR-209): Icons module', () => {
       // Every icon has <Svg ... viewBox="0 0 24 24"> -- SVG is resolution-independent
       // Match only actual Svg elements (not comments) by requiring the < before Svg
       const svgElementViewBoxCount = (iconsSource.match(/<Svg[^>]*viewBox="0 0 24 24"/g) || []).length;
-      expect(svgElementViewBoxCount).toBe(14); // all 14 icons
+      expect(svgElementViewBoxCount).toBe(16); // all 16 icons
     });
 
     it('icons module uses width={size} height={size} for consistent sizing', () => {
       const widthSizeCount = (iconsSource.match(/width=\{size\}/g) || []).length;
       const heightSizeCount = (iconsSource.match(/height=\{size\}/g) || []).length;
-      expect(widthSizeCount).toBe(14);
-      expect(heightSizeCount).toBe(14);
+      expect(widthSizeCount).toBe(16);
+      expect(heightSizeCount).toBe(16);
     });
   });
 
@@ -621,7 +622,7 @@ describe('F145 (CR-209): Edge cases', () => {
     it('Svg elements use width={size} and height={size}, so size=0 produces 0x0 Svg', () => {
       // All icons use width={size} height={size} -- passing 0 produces width=0 height=0
       const allUseSize = iconsSource.match(/width=\{size\}\s+height=\{size\}/g) || [];
-      expect(allUseSize.length).toBe(14);
+      expect(allUseSize.length).toBe(16);
     });
   });
 
@@ -632,7 +633,7 @@ describe('F145 (CR-209): Edge cases', () => {
       // viewBox ensures the icon scales proportionally regardless of width/height
       // Match only actual Svg elements (not comments) by requiring < before Svg
       const viewBoxCount = (iconsSource.match(/<Svg[^>]*viewBox="0 0 24 24"/g) || []).length;
-      expect(viewBoxCount).toBe(14);
+      expect(viewBoxCount).toBe(16);
     });
   });
 
@@ -641,7 +642,7 @@ describe('F145 (CR-209): Edge cases', () => {
   describe('EC-145-03: Icon with undefined color falls back to default', () => {
     it('stroke-based icons default color to currentColor', () => {
       const defaults = iconsSource.match(/color\s*=\s*'currentColor'/g) || [];
-      expect(defaults.length).toBe(13); // 13 stroke-based icons
+      expect(defaults.length).toBe(15); // 15 stroke-based icons (13 original + SquareIcon + CheckSquareIcon)
     });
 
     it('WhatsAppIcon defaults color to #25D366', () => {
@@ -722,14 +723,14 @@ describe('F146 (CR-210): Play icon placement', () => {
 
   describe('AC-146-02: Agenda tab PlayIcon near chevron with gap', () => {
     it('PlayIcon has marginRight: 16 via playButton style (increased from 8 by F153 CR-217)', () => {
-      // SUPERSEDED by F153 (CR-217): style changed from style={styles.playButton} to style={[styles.playButton, {...circle styles}]}
-      // and marginRight changed from 8 to 16
+      // CR-235: circle outline removed, style simplified back to style={styles.playButton}
       expect(agendaSource).toContain('styles.playButton');
       expect(agendaSource).toMatch(/playButton[^}]*\{[^}]*marginRight:\s*16/s);
     });
 
     it('PlayIcon uses color={colors.textSecondary}', () => {
-      expect(agendaSource).toMatch(/<PlayIcon\s+size=\{18\}\s+color=\{colors\.textSecondary\}/);
+      // CR-235: PlayIcon size changed from 18 to 24
+      expect(agendaSource).toMatch(/<PlayIcon\s+size=\{24\}\s+color=\{colors\.textSecondary\}/);
     });
 
     it('ChevronUpIcon and ChevronDownIcon also use textSecondary color', () => {
@@ -831,8 +832,8 @@ describe('F146 (CR-210): Edge cases', () => {
     });
 
     it('PlayIcon and chevron icons have fixed sizes (not percentage-based)', () => {
-      // PlayIcon uses size={18}, chevrons use size={12} -- fixed pixel sizes
-      expect(agendaSource).toMatch(/<PlayIcon\s+size=\{18\}/);
+      // CR-235: PlayIcon uses size={24} (changed from 18), chevrons use size={12} -- fixed pixel sizes
+      expect(agendaSource).toMatch(/<PlayIcon\s+size=\{24\}/);
       expect(agendaSource).toMatch(/<ChevronUpIcon\s+size=\{12\}/);
       expect(agendaSource).toMatch(/<ChevronDownIcon\s+size=\{12\}/);
     });

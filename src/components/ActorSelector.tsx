@@ -19,6 +19,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { SearchInput } from './SearchInput';
+import { CheckSquareIcon, SquareIcon } from './icons';
 import { useActors, useCreateActor, useUpdateActor, useDeleteActor, type ActorRoleFilter } from '../hooks/useActors';
 import type { MeetingActor, CreateActorInput } from '../types/database';
 
@@ -161,9 +162,12 @@ export function ActorSelector({
           ) : (
             <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
               {multiSelect && (
-                <Text style={[styles.checkbox, { color: colors.text }]}>
-                  {isSelected ? '\u2611' : '\u2610'}
-                </Text>
+                <View style={{ marginRight: 8 }}>
+                  {isSelected
+                    ? <CheckSquareIcon size={20} color={colors.primary} />
+                    : <SquareIcon size={20} color={colors.textSecondary} />
+                  }
+                </View>
               )}
               <Text style={[styles.actorName, { color: colors.text }]} numberOfLines={1}>
                 {item.name}

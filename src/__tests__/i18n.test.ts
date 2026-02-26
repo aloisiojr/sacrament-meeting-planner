@@ -50,9 +50,9 @@ describe('i18n locale files', () => {
   });
 
   it('should have the correct login title in all languages', () => {
-    expect(ptBR.auth.loginTitle).toBe('Gerenciador da Reuniao Sacramental');
+    expect(ptBR.auth.loginTitle).toBe('Gerenciador da Reunião Sacramental');
     expect(en.auth.loginTitle).toBe('Sacrament Meeting Planner');
-    expect(es.auth.loginTitle).toBe('Planificador de Reunion Sacramental');
+    expect(es.auth.loginTitle).toBe('Planificador de Reunión Sacramental');
   });
 
   it('should have the correct login subtitle in all languages', () => {

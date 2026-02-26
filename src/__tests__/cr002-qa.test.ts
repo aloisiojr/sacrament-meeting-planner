@@ -86,7 +86,7 @@ describe('CR-11: App language follows ward language', () => {
 
 describe('CR-12: Musical number renamed to special presentation', () => {
   it('pt-BR: agenda.musicalNumber should be "Apresentacao Especial"', () => {
-    expect(ptBR.agenda.musicalNumber).toBe('Apresentacao Especial');
+    expect(ptBR.agenda.musicalNumber).toBe('Apresentação Especial');
   });
 
   it('en: agenda.musicalNumber should be "Special Presentation"', () => {
@@ -94,7 +94,7 @@ describe('CR-12: Musical number renamed to special presentation', () => {
   });
 
   it('es: agenda.musicalNumber should be "Presentacion Especial"', () => {
-    expect(es.agenda.musicalNumber).toBe('Presentacion Especial');
+    expect(es.agenda.musicalNumber).toBe('Presentación Especial');
   });
 });
 
@@ -548,6 +548,6 @@ describe('CR-30: Settings WhatsApp label is descriptive', () => {
   });
 
   it('es label should be "Modelo de Invitacion por WhatsApp"', () => {
-    expect(es.settings.whatsappTemplate).toBe('Modelo de Invitacion por WhatsApp');
+    expect(es.settings.whatsappTemplate).toBe('Modelo de Invitación por WhatsApp');
   });
 });

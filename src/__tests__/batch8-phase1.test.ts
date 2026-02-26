@@ -554,7 +554,7 @@ describe('Cross-cutting: WhatsApp template with quotes resolves correctly', () =
 
 describe('Cross-cutting: formatDateHumanReadable for different dates', () => {
   it('formats March date in pt-BR', () => {
-    expect(formatDateHumanReadable('2026-03-01', 'pt-BR')).toBe('1 de Marco de 2026');
+    expect(formatDateHumanReadable('2026-03-01', 'pt-BR')).toBe('1 de Março de 2026');
   });
 
   it('formats December date in en', () => {

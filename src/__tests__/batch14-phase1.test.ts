@@ -59,7 +59,7 @@ describe('F091 (CR-148): Update sunday type change confirmation message', () => 
     it('pt-BR changeConfirmMessage mentions e/ou and designacoes serao apagadas', () => {
       const locale = readLocale('pt-BR') as { sundayExceptions: Record<string, string> };
       expect(locale.sundayExceptions.changeConfirmMessage).toContain('e/ou temas designados');
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('designacoes serao apagadas');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('designações serão apagadas');
     });
 
     it('en changeConfirmMessage mentions and/or and will be deleted', () => {
@@ -71,7 +71,7 @@ describe('F091 (CR-148): Update sunday type change confirmation message', () => 
     it('es changeConfirmMessage mentions y/o and seran eliminadas', () => {
       const locale = readLocale('es') as { sundayExceptions: Record<string, string> };
       expect(locale.sundayExceptions.changeConfirmMessage).toContain('y/o temas designados');
-      expect(locale.sundayExceptions.changeConfirmMessage).toContain('seran eliminadas');
+      expect(locale.sundayExceptions.changeConfirmMessage).toContain('serán eliminadas');
     });
   });
 
@@ -575,7 +575,7 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
 
     it('es resetPasswordTitle is correct', () => {
       const locale = readLocale('es') as { auth: Record<string, string> };
-      expect(locale.auth.resetPasswordTitle).toBe('Restablecer contrasena');
+      expect(locale.auth.resetPasswordTitle).toBe('Restablecer contraseña');
     });
 
     it('pt-BR updatePassword is correct', () => {
@@ -590,7 +590,7 @@ describe('F088 (CR-145): Password reset email redirect URL', () => {
 
     it('es updatePassword is correct', () => {
       const locale = readLocale('es') as { auth: Record<string, string> };
-      expect(locale.auth.updatePassword).toBe('Actualizar contrasena');
+      expect(locale.auth.updatePassword).toBe('Actualizar contraseña');
     });
   });
 

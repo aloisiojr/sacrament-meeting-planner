@@ -182,7 +182,7 @@ describe('CR-80 / F026: Members Screen Explanatory Texts', () => {
 
     it('should have members.csvHelp in pt-BR', () => {
       expect(ptBR.members.csvHelp).toBe(
-        'Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com codigo do pais, ex: +5511999999999).'
+        'Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com código do país, ex: +5511999999999).'
       );
     });
 
@@ -242,7 +242,7 @@ describe('CR-80 / F026: Members Screen Explanatory Texts', () => {
 
     it('should have members.csvHelp in es', () => {
       expect(es.members.csvHelp).toBe(
-        'Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Telefono Completo (con codigo de pais, ej: +5211234567890).'
+        'Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Teléfono Completo (con código de país, ej: +5211234567890).'
       );
     });
 
@@ -455,7 +455,7 @@ describe('CR-80 / F026: Members Screen Explanatory Texts', () => {
       // All translations should mention phone/telefone/telefono
       expect(en.members.csvHelp.toLowerCase()).toMatch(/phone/);
       expect(ptBR.members.csvHelp.toLowerCase()).toMatch(/telefone/);
-      expect(es.members.csvHelp.toLowerCase()).toMatch(/telefono/);
+      expect(es.members.csvHelp.toLowerCase()).toMatch(/teléfono/);
     });
   });
 });

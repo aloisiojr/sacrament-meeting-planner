@@ -1,0 +1,426 @@
+# =============================================================================
+# SPEC_F166.yaml
+# Batch 29: Fix i18n missing keys and accent errors (CR-239)
+# Created: 2026-02-26
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 29
+phase: 1
+created: "2026-02-26"
+last_updated: "2026-02-26"
+request_type: bugfix
+execution_order: >
+  1 feature (F166) covering 1 CR (CR-239).
+  Single feature with 4 sub-tasks that can be applied in any order:
+  (1) Add missing common.yes and common.no keys to all 3 locale files;
+  (2) Fix pt-BR accent errors (21 strings);
+  (3) Fix es accent errors (11 strings in QA plan + 16 additional found during audit);
+  (4) Fix dateUtils.ts hardcoded accent errors (5 strings).
+execution_rationale: >
+  All changes are to static data (JSON locale files and hardcoded strings in
+  dateUtils.ts). No logic changes, no new dependencies, no schema changes.
+  The 4 sub-tasks are independent and can be applied in any order. A single
+  commit is recommended since they are all part of the same i18n fix.
+
+# =============================================================================
+# CONTEXT
+# =============================================================================
+#
+# Current state (pre-Batch 29):
+# - App uses i18next with react-i18next, supporting 3 locales: pt-BR, en, es.
+# - All 3 locale files have 330 keys each with perfect key parity.
+# - ExitConfirmation.tsx uses t('common.yes') and t('common.no') but these
+#   keys do NOT exist in any locale file. Users see raw key strings.
+# - Multiple pt-BR and es strings are missing proper diacritical marks
+#   (accents, tildes, cedillas) making text grammatically incorrect.
+# - dateUtils.ts has hardcoded month/day names per locale that are also
+#   missing diacritical marks.
+# - QA_PLAN_002.yaml documents 4 issues: I18N-001 through I18N-004.
+# - During SPEC extraction, additional accent issues were found in es.json
+#   beyond what the QA plan documented (16 additional missing accents).
+# =============================================================================
+
+# =============================================================================
+# F166: Fix i18n missing keys and accent errors - CR-239
+# =============================================================================
+
+features:
+
+  - id: F166
+    name: "Fix i18n missing translation keys and accent/diacritic errors"
+    cr_id: 239
+    type: bugfix
+    related_crs: []
+    related_features: [F150]
+    description: >
+      CR-239 fixes all i18n issues found during QA PRE validation
+      (QA_PLAN_002.yaml issues I18N-001 through I18N-004) plus additional
+      accent issues discovered during the SPEC extraction audit.
+
+      Summary of fixes:
+      - I18N-001: Add missing common.yes and common.no keys to all 3 locale files
+      - I18N-002: Fix 21 pt-BR accent errors across 13 keys
+      - I18N-003: Fix 11 es accent errors (QA-documented) plus 16 additional
+        es accent errors found during SPEC extraction audit, totaling 27 es
+        accent corrections across 14 keys
+      - I18N-004: Fix 5 accent errors in dateUtils.ts hardcoded strings
+
+      All changes are limited to translation string corrections and adding
+      2 missing keys. No logic changes, no new dependencies, no schema changes.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      # --- I18N-001: Missing keys ---
+
+      - id: AC-166-01
+        description: "Add common.yes key to all 3 locale files with correct translations"
+        given: "ExitConfirmation.tsx line 24 calls t('common.yes') but the key does not exist in any locale file"
+        when: "All 3 locale files are updated"
+        then: "en.json has common.yes = 'Yes'; es.json has common.yes = 'Si' with accent (Sí); pt-BR.json has common.yes = 'Sim'. The key is placed after common.you (last key in common section)."
+        status: pending
+
+      - id: AC-166-02
+        description: "Add common.no key to all 3 locale files with correct translations"
+        given: "ExitConfirmation.tsx line 22 calls t('common.no') but the key does not exist in any locale file"
+        when: "All 3 locale files are updated"
+        then: "en.json has common.no = 'No'; es.json has common.no = 'No'; pt-BR.json has common.no = 'Nao' with tilde (Não). The key is placed after common.yes."
+        status: pending
+
+      - id: AC-166-03
+        description: "Key parity maintained across all 3 locale files"
+        given: "All 3 files had 330 keys before"
+        when: "common.yes and common.no are added to all 3 files"
+        then: "All 3 files have 332 keys. The set of keys is identical across files."
+        status: pending
+
+      # --- I18N-002: pt-BR accent corrections ---
+      # 13 keys affected, 21 total accent corrections
+
+      - id: AC-166-04
+        description: "Fix all pt-BR missing accents (21 corrections in 13 keys)"
+        given: "pt-BR.json has 13 keys with missing Portuguese diacritical marks"
+        when: "pt-BR.json is updated with correct accents"
+        then: >
+          The following 13 keys are corrected (see corrected_strings section
+          for exact full corrected values):
+          1. common.appTitle: Reuniao -> Reunião
+          2. auth.loginTitle: Reuniao -> Reunião
+          3. auth.passwordUpdated: Faca -> Faça
+          4. auth.resetExpired: redefinicao -> redefinição
+          5. sundayExceptions.changeConfirmMessage: designacoes -> designações,
+             serao -> serão, voce -> você, operacao -> operação
+          6. members.csvErrorEmptyFile: esta -> está
+          7. members.csvErrorInvalidHeader: Cabecalho -> Cabeçalho,
+             invalido -> inválido, Sao -> São, necessarias -> necessárias
+          8. members.csvErrorNameRequired: e -> é, obrigatorio -> obrigatório
+          9. members.csvErrorNoData: nao -> não, contem -> contém,
+             validas -> válidas
+          10. members.importReadError: nao -> não, esta -> está
+          11. members.csvHelp: codigo -> código, pais -> país
+          12. members.importConfirmMessage: sera -> será,
+              substituida -> substituída, conteudo -> conteúdo,
+              designacoes -> designações, nao -> não, serao -> serão
+          13. agenda.musicalNumber: Apresentacao -> Apresentação
+        status: pending
+
+      # --- I18N-003: es accent corrections ---
+      # 16 keys affected, 27 total accent corrections
+
+      - id: AC-166-05
+        description: "Fix all es missing accents (27 corrections in 16 keys)"
+        given: "es.json has 16 keys with missing Spanish diacritical marks"
+        when: "es.json is updated with correct accents"
+        then: >
+          The following 16 keys are corrected (see corrected_strings section
+          for exact full corrected values):
+          1. common.appTitle: Reunion -> Reunión
+          2. auth.loginTitle: Reunion -> Reunión
+          3. auth.resetPasswordTitle: contrasena -> contraseña
+          4. auth.newPassword: contrasena -> contraseña
+          5. auth.passwordUpdated: Contrasena -> Contraseña,
+             exito -> éxito, sesion -> sesión, contrasena -> contraseña
+          6. auth.updatePassword: contrasena -> contraseña
+          7. sundayExceptions.changeConfirmMessage: seran -> serán,
+             operacion -> operación
+          8. settings.whatsappTemplate: Invitacion -> Invitación
+          9. members.csvHeaderPhone: Telefono -> Teléfono
+          10. members.csvErrorEmptyFile: esta -> está, vacio -> vacío
+          11. members.csvErrorInvalidHeader: invalido -> inválido
+          12. members.csvErrorNoData: validas -> válidas
+          13. members.importReadError: este -> esté, danado -> dañado,
+              intentelo -> inténtelo
+          14. members.csvHelp: Telefono -> Teléfono, codigo -> código
+          15. members.importConfirmMessage: sera -> será, seran -> serán
+          16. agenda.musicalNumber: Presentacion -> Presentación
+        status: pending
+
+      # --- I18N-004: dateUtils.ts accent corrections ---
+      # 5 corrections in 3 arrays
+
+      - id: AC-166-06
+        description: "Fix dateUtils.ts pt-BR MONTH_FULL March accent"
+        given: "dateUtils.ts line 17 MONTH_FULL pt-BR has 'Marco' for March"
+        when: "dateUtils.ts is updated"
+        then: "'Marco' is changed to 'Março' (correct Portuguese for March)"
+        status: pending
+
+      - id: AC-166-07
+        description: "Fix dateUtils.ts pt-BR DAY_NAMES accents"
+        given: "dateUtils.ts line 27 DAY_NAMES pt-BR has 'Terca-feira' and 'Sabado'"
+        when: "dateUtils.ts is updated"
+        then: "'Terca-feira' -> 'Terça-feira' and 'Sabado' -> 'Sábado'"
+        status: pending
+
+      - id: AC-166-08
+        description: "Fix dateUtils.ts es DAY_NAMES accents"
+        given: "dateUtils.ts line 29 DAY_NAMES es has 'Miercoles' and 'Sabado'"
+        when: "dateUtils.ts is updated"
+        then: "'Miercoles' -> 'Miércoles' and 'Sabado' -> 'Sábado'"
+        status: pending
+
+      # --- General validation ---
+
+      - id: AC-166-09
+        description: "Interpolation parameters unchanged by accent fixes"
+        given: "Multiple corrected strings contain {{param}} interpolation"
+        when: "All accent fixes are applied"
+        then: "All {{param}} interpolation markers are preserved exactly as before. No interpolation parameter names are changed."
+        status: pending
+
+      - id: AC-166-10
+        description: "Existing i18n tests pass after fixes"
+        given: "23 i18n tests exist (13 in i18n.test.ts, 10 in i18n-module.test.ts)"
+        when: "All fixes are applied and tests are run"
+        then: "All i18n tests pass. Tests that assert exact string values may need updating if they reference corrected strings."
+        status: pending
+
+      - id: AC-166-11
+        description: "Full test suite passes after fixes"
+        given: "All i18n fixes are applied"
+        when: "npx vitest run is executed"
+        then: "All tests pass with 0 failures."
+        status: pending
+
+    edge_cases:
+      - id: EC-166-01
+        case: "Tests that assert exact locale string values"
+        expected: "If any test file asserts the exact value of a corrected string (e.g., checking that appTitle contains 'Reuniao' without accent), the test must be updated to match the corrected value. Search for corrected string values in test files."
+        status: pending
+
+      - id: EC-166-02
+        case: "ExitConfirmation dialog on Android after adding common.yes/no"
+        expected: "The exit confirmation dialog buttons show 'Yes'/'No' (en), 'Sí'/'No' (es), or 'Sim'/'Não' (pt-BR) instead of raw key strings 'common.yes'/'common.no'."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+      - src/lib/dateUtils.ts
+
+    files_not_modified:
+      - src/components/ExitConfirmation.tsx (no code change; keys now exist in locales)
+      - src/i18n/index.ts (no config change)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS - Exact before/after for every correction
+    # =========================================================================
+
+    implementation_details:
+
+      # --- en.json: Add 2 missing keys ---
+
+      - location: "src/i18n/locales/en.json (common section, after 'you' key)"
+        current_code: |
+          "you": "you"
+        new_code: |
+          "you": "you",
+          "yes": "Yes",
+          "no": "No"
+        rationale: "Add missing keys used by ExitConfirmation.tsx"
+
+      # --- es.json: Add 2 missing keys ---
+
+      - location: "src/i18n/locales/es.json (common section, after 'you' key)"
+        current_code: |
+          "you": "tú"
+        new_code: |
+          "you": "tú",
+          "yes": "Sí",
+          "no": "No"
+        rationale: "Add missing keys. Spanish 'sí' (with accent) = yes."
+
+      # --- pt-BR.json: Add 2 missing keys ---
+
+      - location: "src/i18n/locales/pt-BR.json (common section, after 'you' key)"
+        current_code: |
+          "you": "você"
+        new_code: |
+          "you": "você",
+          "yes": "Sim",
+          "no": "Não"
+        rationale: "Add missing keys used by ExitConfirmation.tsx"
+
+      # --- dateUtils.ts: Fix 5 accent errors ---
+
+      - location: "src/lib/dateUtils.ts:17 (MONTH_FULL pt-BR, index 2)"
+        current_code: "'Marco'"
+        new_code: "'Março'"
+        rationale: "Portuguese: March = Março"
+
+      - location: "src/lib/dateUtils.ts:27 (DAY_NAMES pt-BR)"
+        current_code: "'Terca-feira'"
+        new_code: "'Terça-feira'"
+        rationale: "Portuguese: Tuesday = Terça-feira"
+
+      - location: "src/lib/dateUtils.ts:27 (DAY_NAMES pt-BR)"
+        current_code: "'Sabado'"
+        new_code: "'Sábado'"
+        rationale: "Portuguese: Saturday = Sábado"
+
+      - location: "src/lib/dateUtils.ts:29 (DAY_NAMES es)"
+        current_code: "'Miercoles'"
+        new_code: "'Miércoles'"
+        rationale: "Spanish: Wednesday = Miércoles"
+
+      - location: "src/lib/dateUtils.ts:29 (DAY_NAMES es)"
+        current_code: "'Sabado'"
+        new_code: "'Sábado'"
+        rationale: "Spanish: Saturday = Sábado"
+
+# =============================================================================
+# COMPLETE CORRECTED STRINGS REFERENCE
+# =============================================================================
+# This section provides the FULL corrected string for each affected key,
+# making it unambiguous for the implementer.
+
+corrected_strings:
+
+  pt_br:
+    common.appTitle: "Gerenciador da Reunião Sacramental"
+    common.yes: "Sim"
+    common.no: "Não"
+    auth.loginTitle: "Gerenciador da Reunião Sacramental"
+    auth.passwordUpdated: "Senha atualizada com sucesso! Faça login com sua nova senha."
+    auth.resetExpired: "Link expirado. Solicite um novo email de redefinição."
+    sundayExceptions.changeConfirmMessage: "Existem discursantes e/ou temas designados. As designações serão apagadas se você confirmar a operação. Deseja realmente alterar o tipo?"
+    members.csvErrorEmptyFile: "O arquivo CSV está vazio."
+    members.csvErrorInvalidHeader: "Cabeçalho do CSV inválido. São necessárias pelo menos 2 colunas."
+    members.csvErrorNameRequired: "O nome é obrigatório."
+    members.csvErrorNoData: "O arquivo CSV não contém linhas de dados válidas."
+    members.importReadError: "Falha ao ler o arquivo. Verifique se o arquivo não está corrompido e tente novamente."
+    members.csvHelp: "Exportar salva todos os membros em um arquivo CSV. Importar carrega um arquivo CSV e substitui toda a lista de membros. Formato esperado: Nome, Telefone Completo (com código do país, ex: +5511999999999)."
+    members.importConfirmMessage: "Ao importar um arquivo CSV, toda a lista de membros atual será substituída pelo conteúdo do arquivo. As designações de discursos existentes (passadas e presentes) não serão afetadas. Deseja continuar?"
+    agenda.musicalNumber: "Apresentação Especial"
+
+  en:
+    common.yes: "Yes"
+    common.no: "No"
+
+  es:
+    common.appTitle: "Planificador de Reunión Sacramental"
+    common.yes: "Sí"
+    common.no: "No"
+    auth.loginTitle: "Planificador de Reunión Sacramental"
+    auth.resetPasswordTitle: "Restablecer contraseña"
+    auth.newPassword: "Nueva contraseña"
+    auth.passwordUpdated: "Contraseña actualizada con éxito! Inicie sesión con su nueva contraseña."
+    auth.updatePassword: "Actualizar contraseña"
+    sundayExceptions.changeConfirmMessage: "Existen oradores y/o temas designados. Las designaciones serán eliminadas si confirma la operación. Realmente desea cambiar el tipo?"
+    settings.whatsappTemplate: "Modelo de Invitación por WhatsApp"
+    members.csvHeaderPhone: "Teléfono Completo"
+    members.csvErrorEmptyFile: "El archivo CSV está vacío."
+    members.csvErrorInvalidHeader: "Encabezado del CSV inválido. Se necesitan al menos 2 columnas."
+    members.csvErrorNoData: "El archivo CSV no contiene filas de datos válidas."
+    members.importReadError: "Error al leer el archivo. Verifique que el archivo no esté dañado e inténtelo de nuevo."
+    members.csvHelp: "Exportar guarda todos los miembros en un archivo CSV. Importar carga un archivo CSV y reemplaza toda la lista de miembros. Formato esperado: Nombre, Teléfono Completo (con código de país, ej: +5211234567890)."
+    members.importConfirmMessage: "Al importar un archivo CSV, toda la lista de miembros actual será reemplazada por el contenido del archivo. Las asignaciones de discursos existentes (pasadas y presentes) no serán afectadas. Desea continuar?"
+    agenda.musicalNumber: "Presentación Especial"
+
+  dateUtils:
+    MONTH_FULL_pt_BR_index2: "Março"
+    DAY_NAMES_pt_BR: ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"]
+    DAY_NAMES_es: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-166-01
+    question: "Should common.no in pt-BR be 'Nao' (without tilde) or with tilde?"
+    decision: "Use with tilde: 'Não'"
+    rationale: >
+      The correct Portuguese spelling is "Não" with a tilde on the a.
+      This is consistent with all other Portuguese strings in the app
+      that use proper diacritical marks.
+    decided_in: CR-239
+
+  - id: DD-166-02
+    question: "Should common.yes in es be 'Si' (without accent) or with accent?"
+    decision: "Use with accent: 'Sí'"
+    rationale: >
+      In Spanish, 'si' (without accent) means 'if', while 'sí' (with accent)
+      means 'yes'. The correct translation for the Yes button is 'Sí'.
+    decided_in: CR-239
+
+  - id: DD-166-03
+    question: "Were there additional es.json accent issues beyond what QA_PLAN_002 documented?"
+    decision: "Yes, 16 additional accent corrections found during SPEC extraction audit"
+    rationale: >
+      QA_PLAN_002 I18N-003 documented 11 accent errors in 10 es.json keys.
+      During SPEC extraction, a comprehensive audit found 16 additional accent
+      errors across 7 more keys. These are:
+      - members.csvHeaderPhone: Telefono -> Teléfono
+      - members.csvErrorEmptyFile: esta -> está, vacio -> vacío
+      - members.csvErrorInvalidHeader: invalido -> inválido
+      - members.csvErrorNoData: validas -> válidas
+      - members.importReadError: este -> esté, intentelo -> inténtelo (danado was in QA)
+      - members.csvHelp: Telefono -> Teléfono, codigo -> código
+      - members.importConfirmMessage: sera -> será, seran -> serán
+      - sundayExceptions.changeConfirmMessage: seran -> serán (operacion was in QA)
+      - auth.passwordUpdated: sesion -> sesión (was not in QA, only contrasena+exito were)
+      All are included in this SPEC to ensure complete i18n correctness.
+    decided_in: CR-239
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-166-01
+      text: >
+        Tests that assert exact string values from locale files may need
+        updating. The implementer should run the full test suite and fix
+        any assertion failures caused by the accent corrections.
+    - id: A-166-02
+      text: >
+        The QA_PLAN_002.yaml suggested pt-BR common.no = "Nao" (without tilde)
+        but the SPEC corrects this to "Não" (with tilde) since Portuguese
+        requires the diacritical mark. Similarly, es common.yes is corrected
+        from "Si" to "Sí".
+
+  inconsistencies:
+    - id: INC-166-01
+      text: >
+        QA_PLAN_002 I18N-003 listed 11 accent errors in es.json but the actual
+        file has 27 total accent errors. The QA plan missed errors in:
+        csvHeaderPhone, csvErrorEmptyFile, csvErrorInvalidHeader, csvErrorNoData,
+        importReadError (partially), csvHelp, importConfirmMessage,
+        changeConfirmMessage (partially), and passwordUpdated (partially).
+        This SPEC includes all 27 corrections for completeness.

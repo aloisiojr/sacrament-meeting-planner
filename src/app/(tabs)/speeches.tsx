@@ -250,6 +250,7 @@ function SpeechesTabContent() {
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
+        speakerInformalName: member.informal_name,
         speakerPhone: member.phone ?? null,
         status: statusOverride,
       });

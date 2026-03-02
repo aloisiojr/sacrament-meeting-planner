@@ -651,6 +651,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
                 speechId: speech.id,
                 memberId: selection.memberId ?? '',
                 speakerName: selection.name,
+                speakerInformalName: null,
                 speakerPhone: null,
                 status: 'assigned_confirmed',
               });

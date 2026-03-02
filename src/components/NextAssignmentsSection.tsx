@@ -98,6 +98,7 @@ export function NextAssignmentsSection() {
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
+        speakerInformalName: member.informal_name,
         speakerPhone: member.phone ?? '',
       });
       setSpeakerModalSpeechId(null);

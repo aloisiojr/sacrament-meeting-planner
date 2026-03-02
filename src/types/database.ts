@@ -91,6 +91,7 @@ export interface Member {
   id: string;
   ward_id: string;
   full_name: string;
+  informal_name: string | null;
   country_code: string;
   phone: string | null;
   created_at: string;
@@ -141,6 +142,7 @@ export interface Speech {
   position: number; // 0, 1, 2, 3, or 4
   member_id: string | null;
   speaker_name: string | null;
+  speaker_informal_name: string | null;
   speaker_phone: string | null;
   topic_title: string | null;
   topic_link: string | null;
@@ -297,6 +299,7 @@ export interface DateRange {
 
 export interface CreateMemberInput {
   full_name: string;
+  informal_name?: string | null;
   country_code: string;
   phone?: string | null;
 }
@@ -304,6 +307,7 @@ export interface CreateMemberInput {
 export interface UpdateMemberInput {
   id: string;
   full_name?: string;
+  informal_name?: string | null;
   country_code?: string;
   phone?: string | null;
 }

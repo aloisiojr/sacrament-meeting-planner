@@ -194,7 +194,7 @@ export function ActorSelector({
                   setEditingId(item.id);
                   setEditingName(item.name);
                   setTimeout(() => {
-                    flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+                    flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
                   }, 100);
                 }}
               >
@@ -287,7 +287,7 @@ export function ActorSelector({
             contentContainerStyle={{ paddingBottom: keyboardHeight }}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {
-                flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.3 });
+                flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0 });
               }, 200);
             }}
             ListEmptyComponent={

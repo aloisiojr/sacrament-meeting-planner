@@ -4,7 +4,7 @@
  * The word "Actor"/"Ator" never appears in the UI.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   Modal,
   Dimensions,
   Alert,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +54,16 @@ export function ActorSelector({
   const [showAddInput, setShowAddInput] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList<MeetingActor>>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const { data: actors } = useActors(roleFilter);
   const createActor = useCreateActor();
@@ -214,10 +223,6 @@ export function ActorSelector({
           style={[styles.sheet, { backgroundColor: colors.card }]}
           onStartShouldSetResponder={() => true}
         >
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
           {/* Handle bar */}
           <View style={styles.handleBar}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -279,6 +284,7 @@ export function ActorSelector({
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: keyboardHeight }}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {
                 flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.3 });
@@ -292,7 +298,6 @@ export function ActorSelector({
               </View>
             }
           />
-          </KeyboardAvoidingView>
         </View>
       </Pressable>
     </Modal>

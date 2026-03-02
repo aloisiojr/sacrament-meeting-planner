@@ -682,16 +682,14 @@ describe('F168: DebouncedTextInput focus tracking (CR-241)', () => {
 // F169: Add keyboard avoidance to ActorSelector modal (CR-242)
 // =============================================================================
 
-describe('F169: ActorSelector KeyboardAvoidingView (CR-242)', () => {
+describe('F169: ActorSelector keyboard avoidance (CR-242)', () => {
   // -------------------------------------------------------------------------
-  // AC-169-01: KeyboardAvoidingView wraps sheet content
+  // AC-169-01: Keyboard event listeners for dynamic padding
   // -------------------------------------------------------------------------
 
-  it('AC-169-01: KeyboardAvoidingView is imported from react-native', () => {
-    expect(actorSelectorSource).toContain('KeyboardAvoidingView');
-    // Verify it's imported in the react-native import block
+  it('AC-169-01: Keyboard is imported from react-native', () => {
     const importMatch = actorSelectorSource.match(
-      /import\s*\{[^}]*KeyboardAvoidingView[^}]*\}\s*from\s*'react-native'/
+      /import\s*\{[^}]*Keyboard[^}]*\}\s*from\s*'react-native'/
     );
     expect(importMatch).not.toBeNull();
   });
@@ -703,83 +701,47 @@ describe('F169: ActorSelector KeyboardAvoidingView (CR-242)', () => {
     expect(importMatch).not.toBeNull();
   });
 
-  it('AC-169-01: KeyboardAvoidingView wraps content inside the sheet', () => {
-    // KeyboardAvoidingView should appear after the sheet View opening and
-    // before the closing </KeyboardAvoidingView> before the sheet closing
-    expect(actorSelectorSource).toContain('<KeyboardAvoidingView');
-    expect(actorSelectorSource).toContain('</KeyboardAvoidingView>');
-
-    // The opening KAV should appear after the sheet View
-    const sheetIdx = actorSelectorSource.indexOf('styles.sheet');
-    const kavIdx = actorSelectorSource.indexOf('<KeyboardAvoidingView');
-    expect(sheetIdx).toBeGreaterThan(-1);
-    expect(kavIdx).toBeGreaterThan(-1);
-    expect(kavIdx).toBeGreaterThan(sheetIdx);
+  it('AC-169-01: keyboardHeight state is declared', () => {
+    expect(actorSelectorSource).toContain('keyboardHeight');
+    expect(actorSelectorSource).toContain('setKeyboardHeight');
+    expect(actorSelectorSource).toMatch(/useState\(\s*0\s*\)/);
   });
 
-  it('AC-169-01: KeyboardAvoidingView has style={{ flex: 1 }}', () => {
+  // -------------------------------------------------------------------------
+  // AC-169-02: Keyboard listeners use platform-appropriate events
+  // -------------------------------------------------------------------------
+
+  it('AC-169-02: uses keyboardWillShow on iOS and keyboardDidShow on Android', () => {
+    expect(actorSelectorSource).toContain('keyboardWillShow');
+    expect(actorSelectorSource).toContain('keyboardDidShow');
+  });
+
+  it('AC-169-02: uses keyboardWillHide on iOS and keyboardDidHide on Android', () => {
+    expect(actorSelectorSource).toContain('keyboardWillHide');
+    expect(actorSelectorSource).toContain('keyboardDidHide');
+  });
+
+  it('AC-169-03: listeners are cleaned up on unmount', () => {
+    expect(actorSelectorSource).toMatch(/showSub\.remove\(\)/);
+    expect(actorSelectorSource).toMatch(/hideSub\.remove\(\)/);
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-169-04/05/06: FlatList has dynamic paddingBottom
+  // -------------------------------------------------------------------------
+
+  it('AC-169-04: FlatList has contentContainerStyle with paddingBottom keyboardHeight', () => {
     expect(actorSelectorSource).toMatch(
-      /<KeyboardAvoidingView[\s\S]*?style=\{\{\s*flex:\s*1\s*\}\}/
+      /contentContainerStyle=\{\{\s*paddingBottom:\s*keyboardHeight\s*\}\}/
     );
   });
 
-  // -------------------------------------------------------------------------
-  // AC-169-02: iOS uses behavior='padding'
-  // -------------------------------------------------------------------------
-
-  it('AC-169-02: behavior uses Platform.OS === ios conditional', () => {
-    expect(actorSelectorSource).toMatch(
-      /behavior=\{Platform\.OS\s*===\s*'ios'\s*\?\s*'padding'\s*:\s*undefined\}/
-    );
+  it('AC-169-05: FlatList has ref for scrollToIndex', () => {
+    expect(actorSelectorSource).toContain('ref={flatListRef}');
   });
 
-  // -------------------------------------------------------------------------
-  // AC-169-03: Android uses undefined behavior
-  // -------------------------------------------------------------------------
-
-  it('AC-169-03: Android uses undefined behavior (conditional ternary)', () => {
-    // Already covered by AC-169-02 check - the ternary returns undefined for non-iOS
-    const behaviorMatch = actorSelectorSource.match(
-      /behavior=\{Platform\.OS\s*===\s*'ios'\s*\?\s*'padding'\s*:\s*undefined\}/
-    );
-    expect(behaviorMatch).not.toBeNull();
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-169-04/05/06: FlatList and other elements are within KAV
-  // -------------------------------------------------------------------------
-
-  it('AC-169-04/05/06: FlatList is inside KeyboardAvoidingView', () => {
-    const kavStart = actorSelectorSource.indexOf('<KeyboardAvoidingView');
-    const kavEnd = actorSelectorSource.indexOf('</KeyboardAvoidingView>');
-    // Use regex to find JSX <FlatList (with newline or space after), not type annotation useRef<FlatList
-    const flatListMatch = actorSelectorSource.match(/\n\s*<FlatList\b/);
-    expect(kavStart).toBeGreaterThan(-1);
-    expect(kavEnd).toBeGreaterThan(-1);
-    expect(flatListMatch).not.toBeNull();
-    const flatListIdx = flatListMatch!.index!;
-    // FlatList should be between KAV open and close tags
-    expect(flatListIdx).toBeGreaterThan(kavStart);
-    expect(flatListIdx).toBeLessThan(kavEnd);
-  });
-
-  it('AC-169-05: add input/button is inside KeyboardAvoidingView', () => {
-    const kavStart = actorSelectorSource.indexOf('<KeyboardAvoidingView');
-    const kavEnd = actorSelectorSource.indexOf('</KeyboardAvoidingView>');
-    // The "Add" button text
-    const addBtnIdx = actorSelectorSource.indexOf("t('common.add')");
-    expect(addBtnIdx).toBeGreaterThan(-1);
-    expect(addBtnIdx).toBeGreaterThan(kavStart);
-    expect(addBtnIdx).toBeLessThan(kavEnd);
-  });
-
-  it('AC-169-06: SearchInput is inside KeyboardAvoidingView', () => {
-    const kavStart = actorSelectorSource.indexOf('<KeyboardAvoidingView');
-    const kavEnd = actorSelectorSource.indexOf('</KeyboardAvoidingView>');
-    const searchIdx = actorSelectorSource.indexOf('<SearchInput');
-    expect(searchIdx).toBeGreaterThan(-1);
-    expect(searchIdx).toBeGreaterThan(kavStart);
-    expect(searchIdx).toBeLessThan(kavEnd);
+  it('AC-169-06: scrollToIndex called when entering edit mode', () => {
+    expect(actorSelectorSource).toContain('scrollToIndex');
   });
 
   // -------------------------------------------------------------------------
@@ -790,22 +752,13 @@ describe('F169: ActorSelector KeyboardAvoidingView (CR-242)', () => {
     expect(actorSelectorSource).toContain('SCREEN_HEIGHT * 0.67');
   });
 
-  it('AC-169-07: handle bar is still present inside KAV', () => {
-    const kavStart = actorSelectorSource.indexOf('<KeyboardAvoidingView');
-    const kavEnd = actorSelectorSource.indexOf('</KeyboardAvoidingView>');
-    const handleBarIdx = actorSelectorSource.indexOf('styles.handleBar');
-    expect(handleBarIdx).toBeGreaterThan(-1);
-    expect(handleBarIdx).toBeGreaterThan(kavStart);
-    expect(handleBarIdx).toBeLessThan(kavEnd);
-  });
-
   it('AC-169-07: Modal still uses transparent and slide animation', () => {
     expect(actorSelectorSource).toContain('transparent');
     expect(actorSelectorSource).toContain('animationType="slide"');
   });
 
   // -------------------------------------------------------------------------
-  // EC-169-01/02: Short list and large screens (structural check)
+  // EC-169-01: keyboardShouldPersistTaps preserved
   // -------------------------------------------------------------------------
 
   it('EC-169-01: FlatList still has keyboardShouldPersistTaps="handled"', () => {
@@ -819,15 +772,14 @@ describe('F169: ActorSelector KeyboardAvoidingView (CR-242)', () => {
   // -------------------------------------------------------------------------
 
   it('EC-169-03: inline edit TextInput has onBlur handler', () => {
-    // The inline edit TextInput triggers handleEditSave on blur
     expect(actorSelectorSource).toContain('onBlur={() => handleEditSave(');
   });
 
   // -------------------------------------------------------------------------
-  // No keyboardVerticalOffset (ADR-118)
+  // onScrollToIndexFailed handler present
   // -------------------------------------------------------------------------
 
-  it('no keyboardVerticalOffset prop (ADR-118)', () => {
-    expect(actorSelectorSource).not.toContain('keyboardVerticalOffset');
+  it('onScrollToIndexFailed handler retries scroll', () => {
+    expect(actorSelectorSource).toContain('onScrollToIndexFailed');
   });
 });

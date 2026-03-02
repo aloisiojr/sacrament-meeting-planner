@@ -41,6 +41,8 @@ const PERMISSIONS_MAP: Record<Role, ReadonlySet<Permission>> = {
   ]),
 
   secretary: new Set<Permission>([
+    'speech:assign',
+    'speech:unassign',
     'speech:change_status',
     'member:read',
     'member:write',

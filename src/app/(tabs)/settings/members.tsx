@@ -380,6 +380,7 @@ export default function MembersScreen() {
     try {
       const csv = generateCsv(members ?? [], {
         name: t('members.csvHeaderName'),
+        informalName: t('members.csvHeaderInformalName'),
         phone: t('members.csvHeaderPhone'),
       });
       console.log('[Export] CSV length:', csv.length);
@@ -438,6 +439,7 @@ export default function MembersScreen() {
         const { countryCode, phone } = splitPhoneNumber(m.phone);
         return {
           full_name: m.full_name,
+          informal_name: m.informal_name || m.full_name.split(' ')[0],
           country_code: countryCode,
           phone: phone || null,
         };

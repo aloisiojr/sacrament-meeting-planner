@@ -8,6 +8,7 @@ export { splitPhoneNumber } from './countryCodes';
 
 export interface CsvMember {
   full_name: string;
+  informal_name: string; // Informal name for WhatsApp invites
   phone: string; // Full phone with country code, e.g., "+5511999999999"
 }
 
@@ -20,11 +21,13 @@ export type CsvErrorCode =
 
 export interface CsvHeaders {
   name: string;
+  informalName: string;
   phone: string;
 }
 
 export const CSV_DEFAULT_HEADERS: CsvHeaders = {
   name: 'Nome',
+  informalName: 'Nome Informal',
   phone: 'Telefone Completo',
 };
 
@@ -43,7 +46,7 @@ export interface CsvParseResult {
 
 /**
  * Parse a CSV string into an array of CsvMember.
- * Expected format: "Nome,Telefone Completo" (header required)
+ * Supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats.
  * Phone format: +xxyyyyyyyy (country code + number)
  */
 export function parseCsv(csvContent: string): CsvParseResult {
@@ -69,6 +72,8 @@ export function parseCsv(csvContent: string): CsvParseResult {
     return { success: false, members: [], errors };
   }
 
+  const hasThreeColumns = headerParts.length >= 3;
+
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -82,7 +87,16 @@ export function parseCsv(csvContent: string): CsvParseResult {
     }
 
     const fullName = parts[0].trim();
-    let fullPhone = parts[1].trim();
+    let informalName: string;
+    let fullPhone: string;
+
+    if (hasThreeColumns) {
+      informalName = (parts[1] ?? '').trim();
+      fullPhone = (parts[2] ?? '').trim();
+    } else {
+      informalName = '';
+      fullPhone = parts[1].trim();
+    }
 
     // Validate name
     if (!fullName) {
@@ -90,12 +104,17 @@ export function parseCsv(csvContent: string): CsvParseResult {
       continue;
     }
 
+    // Default informal_name to first word of full_name
+    if (!informalName) {
+      informalName = fullName.split(' ')[0];
+    }
+
     // Sanitize phone: if it contains non-digit/non-plus chars, treat as empty
     if (fullPhone && !/^[+\d]*$/.test(fullPhone)) {
       fullPhone = '';
     }
 
-    members.push({ full_name: fullName, phone: fullPhone });
+    members.push({ full_name: fullName, informal_name: informalName, phone: fullPhone });
   }
 
   if (errors.length > 0) {
@@ -140,18 +159,19 @@ function parseCsvLine(line: string): string[] {
 
 /**
  * Generate CSV content from member data.
- * Format: "Nome,Telefone Completo"
+ * Format: "Nome,Nome Informal,Telefone Completo" (3 columns)
  */
 export function generateCsv(
-  members: Array<{ full_name: string; country_code: string; phone: string | null }>,
+  members: Array<{ full_name: string; informal_name: string | null; country_code: string; phone: string | null }>,
   headers?: CsvHeaders
 ): string {
   const h = headers ?? CSV_DEFAULT_HEADERS;
-  const header = `${h.name},${h.phone}`;
+  const header = `${h.name},${h.informalName},${h.phone}`;
   const rows = members.map((m) => {
     const name = escapeCsvField(m.full_name);
+    const informalName = escapeCsvField(m.informal_name || m.full_name.split(' ')[0]);
     const fullPhone = m.phone ? `${m.country_code}${m.phone}` : '';
-    return `${name},${fullPhone}`;
+    return `${name},${informalName},${fullPhone}`;
   });
   // Add UTF-8 BOM for Excel compatibility
   return '\uFEFF' + [header, ...rows].join('\n');

@@ -15,6 +15,8 @@ import {
   Modal,
   Dimensions,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -208,6 +210,10 @@ export function ActorSelector({
           style={[styles.sheet, { backgroundColor: colors.card }]}
           onStartShouldSetResponder={() => true}
         >
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
           {/* Handle bar */}
           <View style={styles.handleBar}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -276,6 +282,7 @@ export function ActorSelector({
               </View>
             }
           />
+          </KeyboardAvoidingView>
         </View>
       </Pressable>
     </Modal>

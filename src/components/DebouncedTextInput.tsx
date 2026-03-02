@@ -24,6 +24,7 @@ export function DebouncedTextInput({
 }: DebouncedTextInputProps) {
   const [localValue, setLocalValue] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFocusedRef = useRef(false);
   const latestValueRef = useRef(localValue);
   const onSaveRef = useRef(onSave);
   const savedValueRef = useRef(value);
@@ -31,9 +32,12 @@ export function DebouncedTextInput({
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
   useEffect(() => { savedValueRef.current = value; }, [value]);
 
-  // Sync local value when external value changes (e.g., from server)
+  // Sync local value when external value changes (e.g., from server),
+  // but only when the input is NOT focused (to prevent flickering during typing)
   useEffect(() => {
-    setLocalValue(value);
+    if (!isFocusedRef.current) {
+      setLocalValue(value);
+    }
   }, [value]);
 
   const flush = useCallback(() => {
@@ -62,8 +66,17 @@ export function DebouncedTextInput({
     [delay, onSave]
   );
 
+  const handleFocus = useCallback(
+    (e: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
+      isFocusedRef.current = true;
+      rest.onFocus?.(e);
+    },
+    [rest.onFocus]
+  );
+
   const handleBlur = useCallback(
     (e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
+      isFocusedRef.current = false;
       flush();
       rest.onBlur?.(e);
     },
@@ -88,6 +101,7 @@ export function DebouncedTextInput({
       {...rest}
       value={localValue}
       onChangeText={handleChangeText}
+      onFocus={handleFocus}
       onBlur={handleBlur}
     />
   );

@@ -36,7 +36,8 @@
 # CR-231 (PRE+POST) - Batch 27
 # CR-234, CR-235, CR-236, CR-237, CR-238 (PRE) - Batch 28 Phase 1
 # CR-240, CR-241, CR-242 (PRE+POST) - Batch 30 Phase 1
-# Updated: 2026-03-01
+# CR-243, CR-244 (PRE+POST) - Batch 31 Phase 1
+# Updated: 2026-03-02
 # =============================================================================
 
 # #############################################################################
@@ -14134,4 +14135,162 @@ cr_242:
       full_suite_total: 7139
       full_suite_failed: 8
       full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 30"
+
+# #############################################################################
+# CR-243: Secretary prayer/speech assign/unassign (F170) - Batch 31 Phase 1
+# #############################################################################
+
+cr_243:
+  cr_id: CR-243
+  title: "Grant secretary speech:assign and speech:unassign permissions"
+  type: feature
+  spec: specs/SPEC_F170.yaml
+  qa_plan: qa/QA_PLAN_052.yaml
+
+  pre_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    summary: |
+      Root cause confirmed. Secretary role in src/lib/permissions.ts:43-65
+      lacks speech:assign and speech:unassign permissions. Bishopric has
+      both (lines 17-18). SpeechSlot.tsx:97-98 gates assign/unassign on
+      these permissions. Fix: add both permissions to secretary set.
+
+  post_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 9594aba
+        message: "feat(permissions): grant secretary speech:assign and speech:unassign (CR-243)"
+      - hash: e5d9af1
+        message: "test(permissions): update tests for secretary speech:assign/unassign (CR-243)"
+      - hash: 8a1cc27
+        message: "test(permissions,SpeechSlot): add tests for F170 and F171"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 61
+    tester_tests_total: 61
+
+    must_pass_results:
+      - id: MP-01
+        description: "Secretary role must include 'speech:assign' permission after fix"
+        status: PASSED
+        evidence:
+          - "src/lib/permissions.ts:44 - secretary Set includes 'speech:assign'"
+          - "hasPermission('secretary', 'speech:assign') returns true (verified via permissions.test.ts)"
+
+      - id: MP-02
+        description: "Secretary role must include 'speech:unassign' permission after fix"
+        status: PASSED
+        evidence:
+          - "src/lib/permissions.ts:45 - secretary Set includes 'speech:unassign'"
+          - "hasPermission('secretary', 'speech:unassign') returns true (verified via permissions.test.ts)"
+
+      - id: MP-03
+        description: "Existing permissions tests must still pass (no regression)"
+        status: PASSED
+        evidence:
+          - "npx vitest run src/__tests__/permissions.test.ts - 83 tests passed, 0 failed"
+          - "All existing role-permission checks preserved"
+
+      - id: MP-04
+        description: "Integration permissions tests must pass with updated permissions"
+        status: PASSED
+        evidence:
+          - "npx vitest run src/__tests__/integration/permissions-roles.integration.test.ts - 17 tests passed, 0 failed"
+          - "Secretary, bishopric, and observer integration tests all passing"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch31-f170-f171.test.ts"
+      additional_test_files:
+        - "src/__tests__/permissions.test.ts"
+        - "src/__tests__/integration/permissions-roles.integration.test.ts"
+      tests_passed: 61
+      tests_total: 61
+      full_suite_passed: 7191
+      full_suite_total: 7199
+      full_suite_failed: 8
+      full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 31"
+
+# #############################################################################
+# CR-244: Topic row visibility fix for secretary/observer (F171) - Batch 31 Phase 1
+# #############################################################################
+
+cr_244:
+  cr_id: CR-244
+  title: "Show topic row always for secretary and observer when speech exists"
+  type: bugfix
+  spec: specs/SPEC_F171.yaml
+  qa_plan: qa/QA_PLAN_052.yaml
+
+  pre_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    summary: |
+      Bug confirmed. SpeechSlot.tsx:167 conditions showTopicRow on canAssign
+      (speech:assign permission): showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech)).
+      Secretary and observer lack speech:assign, so empty topic fields are hidden.
+      Fix: change to showTopicRow = !isPrayer && !!speech.
+
+  post_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    phase: "1 of 2"
+    commits:
+      - hash: 6451f3a
+        message: "fix(SpeechSlot): decouple topic row visibility from permissions (CR-244)"
+      - hash: 8a1cc27
+        message: "test(permissions,SpeechSlot): add tests for F170 and F171"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 61
+    tester_tests_total: 61
+
+    must_pass_results:
+      - id: MP-05
+        description: "showTopicRow must NOT depend on canAssign permission"
+        status: PASSED
+        evidence:
+          - "src/components/SpeechSlot.tsx:167 - const showTopicRow = !isPrayer && !!speech;"
+          - "No reference to canAssign in showTopicRow condition"
+          - "Old code was: !isPrayer && !!(topicDisplay || (canAssign && speech))"
+
+      - id: MP-06
+        description: "Topic row must be rendered when speech exists and isPrayer=false, regardless of role"
+        status: PASSED
+        evidence:
+          - "src/components/SpeechSlot.tsx:167 - showTopicRow = !isPrayer && !!speech"
+          - "Condition is purely data-driven: speech must exist and slot must not be a prayer"
+          - "No permission checks in the visibility condition"
+
+      - id: MP-07
+        description: "Topic field Pressable must remain disabled for roles without speech:assign"
+        status: PASSED
+        evidence:
+          - "src/components/SpeechSlot.tsx:269 - disabled={!canAssign || !speech} preserved on topic Pressable"
+          - "src/components/SpeechSlot.tsx:282 - chevron only shown when canAssign is true"
+          - "src/components/SpeechSlot.tsx:287 - X clear button only shown when canAssign && topicDisplay"
+          - "Observer sees read-only field (disabled, no chevron, no X button)"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch31-f170-f171.test.ts"
+      tests_passed: 61
+      tests_total: 61
+      full_suite_passed: 7191
+      full_suite_total: 7199
+      full_suite_failed: 8
+      full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 31"
 

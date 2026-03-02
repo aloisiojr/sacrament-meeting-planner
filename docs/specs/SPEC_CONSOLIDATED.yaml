@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-03-01"
-  total_features: 154
-  total_change_requests: 226
+  last_updated: "2026-03-02"
+  total_features: 156
+  total_change_requests: 228
   implemented_crs: 96
-  pending_crs: 128
+  pending_crs: 130
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -88,6 +88,8 @@ metadata:
     - docs/specs/SPEC_F167.yaml
     - docs/specs/SPEC_F168.yaml
     - docs/specs/SPEC_F169.yaml
+    - docs/specs/SPEC_F170.yaml
+    - docs/specs/SPEC_F171.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -1523,12 +1525,15 @@ features:
       lib/permissions.ts. Secretary pode designar via Agenda (excecao CR-31)
       mas nao via Discursos/Home. Secretary tem acesso a gerenciamento de
       usuarios (CR-23). Regra de auto-preside removida (CR-71).
-    modified_by_crs: [23, 31, 37, 71]
+      CR-243: Secretary ganhou speech:assign e speech:unassign (mesmo
+      acesso que bishopric para designar/remover oracoes e discursos).
+    modified_by_crs: [23, 31, 37, 71, 243]
     notes:
       - "CR-23: Secretary ganhou permissao settings:users"
       - "CR-31: Corrigiu contradicao ASM-009 (Secretary pode designar via Agenda)"
       - "CR-37: Atualizou docs para refletir CR-23"
       - "CR-71: Removeu regra de que ator que dirige tambem pode presidir"
+      - "CR-243: Secretary ganhou speech:assign e speech:unassign"
 
   # ---------------------------------------------------------------------------
   # Admin & Audit (F013-F015, F018-F019)
@@ -3063,8 +3068,45 @@ features:
       - "1 arquivo impactado (ActorSelector.tsx)"
       - "Follows existing KeyboardAvoidingView pattern from members.tsx/topics.tsx"
 
+  # Batch 31 (F170-F171): secretary prayer permissions, topic field visibility
+
+  - id: F170
+    name: "Grant secretary speech:assign and speech:unassign permissions"
+    status: pending
+    rfs: []
+    description: >
+      CR-243 adds speech:assign and speech:unassign to the secretary role,
+      giving secretary the same ability as bishopric to assign and remove
+      speakers in prayer slots (positions 0/4) and speech slots (positions
+      1-3) on the Speeches tab. Single file change in permissions.ts.
+    modified_by_crs: [243]
+    spec_file: "docs/specs/SPEC_F170.yaml"
+    notes:
+      - "CR-243: Secretary can assign/unassign prayers (and speeches)"
+      - "9 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (permissions.ts)"
+      - "Adds speech:assign and speech:unassign to secretary permission set"
+
+  - id: F171
+    name: "Show topic field for all roles when speech exists"
+    status: pending
+    rfs: []
+    description: >
+      CR-244 fixes bug where secretary and observer cannot see the topic
+      field in SpeechSlot until a topic is already assigned. Changes
+      showTopicRow condition from canAssign-dependent to speech-existence
+      check: const showTopicRow = !isPrayer && !!speech. Single file
+      change in SpeechSlot.tsx.
+    modified_by_crs: [244]
+    spec_file: "docs/specs/SPEC_F171.yaml"
+    notes:
+      - "CR-244: Topic field visible for secretary and observer always"
+      - "10 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (SpeechSlot.tsx)"
+      - "Removes canAssign dependency from showTopicRow condition"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (123 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27 + Batch 28 + Batch 29 + Batch 30)
+# PENDING CHANGE REQUESTS (125 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27 + Batch 28 + Batch 29 + Batch 30 + Batch 31)
 # =============================================================================
 
 pending_crs:
@@ -5997,6 +6039,8 @@ pending_crs:
       Secretario NAO designa pela aba Discursos nem Home (speech:assign=false),
       MAS PODE designar pela aba Agenda (agenda:assign_speaker=true). Correcao
       de contradicao no ASM-009 do SPEC.final.md.
+    superseded:
+      - "CR-243/F170: Secretary agora tem speech:assign e speech:unassign. Pode designar tanto pela aba Discursos quanto Home e Agenda."
 
   - id: DD-10
     title: "expo-file-system v19: usar new File/Paths API"
@@ -6521,6 +6565,7 @@ business_rules:
   - id: BR-04
     rule: "Secretario NAO designa pela aba Discursos nem Home, mas PODE designar pela aba Agenda"
     origin: "CR-31 (correcao de ASM-009)"
+    superseded: "CR-243/F170: Secretary agora tem speech:assign e speech:unassign. Pode designar em todas as abas."
 
   - id: BR-05
     rule: "Snapshot pattern: edicao/exclusao de membro, tema ou ator NAO altera discursos/agendas existentes"

@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-01"
-  version: 40
-  last_updated_by: "batch-30-notification-debounce-keyboard"
+  last_updated: "2026-03-02"
+  version: 41
+  last_updated_by: "batch-31-secretary-permissions-topic-visibility"
   total_phases: 6
-  total_cr_plans: 57
+  total_cr_plans: 58
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1156,6 +1156,27 @@ cr_plans:
       STEP-03/04 parallelizaveis (independentes), STEP-05 depende STEP-03,
       STEP-06 depende de todos.
 
+  - id: PLAN_P052
+    title: "Batch 31: Secretary Permissions + Topic Row Visibility Fix (CR-243/CR-244)"
+    status: pending
+    crs_covered: [243, 244]
+    total_steps: 3
+    plan_ref: "docs/plans/PLAN_P052.yaml"
+    summary: >
+      2 independent but complementary fixes: add speech:assign and speech:unassign
+      permissions to secretary role in permissions.ts, granting same speaker/prayer
+      assignment capabilities as bishopric (F170/CR-243). Simplify showTopicRow
+      condition in SpeechSlot.tsx from !isPrayer && !!(topicDisplay || (canAssign &&
+      speech)) to !isPrayer && !!speech, removing permission dependency so secretary
+      and observer always see topic row (read-only for observer, editable for secretary
+      after F170) (F171/CR-244). Update permissions.test.ts and integration test:
+      EXPECTED_MATRIX secretary speech:assign/unassign from false to true, secretary
+      count from 21 to 23, test names and assertions updated. 2 features, 19 ACs,
+      6 ECs, 4 arquivos impactados (0 novos + 4 modificados), zero migracoes SQL,
+      zero dependencias novas. 2 ADRs: ADR-119 (full speech:assign/unassign for
+      secretary), ADR-120 (decouple topic visibility from permissions). STEP-01 and
+      STEP-02 parallelizaveis (independentes), STEP-03 depende de STEP-01 e STEP-02.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1611,6 +1632,12 @@ pending_with_plan:
   - cr_id: 238
     plan_id: PLAN_P049
     description: "Texto explicativo abaixo de 'Idioma da Ala' em Settings com inline Pressable + i18n 3 locales"
+  - cr_id: 243
+    plan_id: PLAN_P052
+    description: "Adicionar speech:assign e speech:unassign ao secretary role em permissions.ts"
+  - cr_id: 244
+    plan_id: PLAN_P052
+    description: "Simplificar showTopicRow em SpeechSlot.tsx para mostrar topic row sempre que speech existe"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1632,6 +1659,28 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 41
+    phase: "batch-31-secretary-permissions-topic-visibility"
+    changes:
+      - "Added PLAN_P052 for Batch 31 (F170-F171, CRs 243/244)"
+      - "2 features: secretary speech:assign/unassign permissions, topic row visibility fix"
+      - "3 steps, 19 ACs, 6 ECs, 4 arquivos impactados (0 novos + 4 modificados)"
+      - "Zero migracoes SQL, zero dependencias novas"
+      - "2 ADRs: ADR-119 (full speech:assign/unassign for secretary instead of prayer-only), ADR-120 (decouple topic visibility from permission checks)"
+      - "F170 adds 2 permissions to secretary Set<Permission> in permissions.ts (speech:assign, speech:unassign)"
+      - "F171 simplifies showTopicRow in SpeechSlot.tsx from !isPrayer && !!(topicDisplay || (canAssign && speech)) to !isPrayer && !!speech"
+      - "F170 and F171 are independent but complementary: F170 grants permission, F171 fixes visibility"
+      - "Observer role unchanged: still no speech:assign or speech:unassign"
+      - "Test updates: EXPECTED_MATRIX secretary values, count 21->23, test names and assertions"
+      - "STEP-01 and STEP-02 parallelizaveis (independentes), STEP-03 depende de STEP-01 e STEP-02"
+  - version: 40
+    phase: "batch-30-notification-debounce-keyboard"
+    changes:
+      - "Added PLAN_P051 for Batch 30 (F167-F169, CRs 240/241/242)"
+      - "3 bug fixes: push notification text for prayer positions, DebouncedTextInput flickering, keyboard avoidance in ActorSelector"
+      - "6 steps, 31 ACs, 9 ECs, 5 arquivos impactados (0 novos + 4 modificados + 1 teste)"
+      - "Zero migracoes SQL, zero dependencias novas"
+      - "2 ADRs: ADR-117 (useRef for focus tracking), ADR-118 (no keyboardVerticalOffset)"
   - version: 39
     phase: "batch-29-i18n-fixes"
     changes:

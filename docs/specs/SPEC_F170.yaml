@@ -1,0 +1,252 @@
+# =============================================================================
+# SPEC_F170.yaml
+# Batch 31: Secretary can assign/unassign prayers (CR-243)
+# Created: 2026-03-02
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 31
+phase: 1
+created: "2026-03-02"
+last_updated: "2026-03-02"
+request_type: feature
+execution_order: >
+  1 feature (F170) covering 1 CR (CR-243).
+  Single file change in permissions.ts. The fix adds speech:assign and
+  speech:unassign permissions to the secretary role, granting the same
+  prayer assignment capabilities as bishopric.
+execution_rationale: >
+  The secretary role is missing speech:assign and speech:unassign permissions.
+  Prayer slots (positions 0 and 4) are managed via SpeechSlot when
+  managePrayers=true. SpeechSlot gates the assign/unassign actions on these
+  two permissions (lines 97-98). Without them, the secretary cannot designate
+  or remove people from opening and closing prayers. The fix is to add both
+  permissions to the secretary role in the PERMISSIONS_MAP. This also gives
+  the secretary the ability to assign/unassign speakers for speeches (not
+  just prayers), which is the intended behavior per the user's confirmation
+  that the secretary should have the same access as bishopric for
+  assign/unassign.
+
+# =============================================================================
+# CONTEXT
+# =============================================================================
+#
+# Current state (pre-Batch 31):
+# - permissions.ts defines 3 roles: bishopric, secretary, observer.
+# - Bishopric has speech:assign and speech:unassign (lines 17-18).
+# - Secretary does NOT have speech:assign or speech:unassign (lines 43-65).
+# - Secretary has speech:change_status, member:read/write/import, topic:write,
+#   collection:toggle, sunday_type:write, settings:*, invite:manage,
+#   agenda:read/write, agenda:assign_speaker, presentation:start, push:receive,
+#   invitation:create, history:read.
+# - SpeechSlot.tsx:97 -> canAssign = hasPermission('speech:assign')
+# - SpeechSlot.tsx:98 -> canUnassign = hasPermission('speech:unassign')
+# - These permissions control:
+#   - Clicking on the speaker field to open the speaker selector (line 111-112)
+#   - Clicking on the topic field to open the topic selector (line 115-116)
+#   - Showing the X (remove) button on assigned speakers (line 250)
+#   - Showing the chevron arrow on speaker/topic fields (lines 245, 282)
+# - Prayers use SpeechSlot with isPrayer=true (positions 0 and 4).
+# - The secretary already has agenda:assign_speaker (for agenda tab), but
+#   that permission is separate from speech:assign/unassign which controls
+#   the Discursos tab and prayer slots.
+# - F023 (Permissions & Role-based Access) is the base feature for RBAC.
+# - F157 (Managed Prayers) added prayer slots to SpeechSlot.
+# =============================================================================
+
+# =============================================================================
+# F170: Secretary can assign/unassign prayers - CR-243
+# =============================================================================
+
+features:
+
+  - id: F170
+    name: "Grant secretary speech:assign and speech:unassign permissions"
+    cr_id: 243
+    type: feature
+    related_crs: [221]
+    related_features: [F023, F157]
+    description: >
+      CR-243 grants the secretary role the speech:assign and speech:unassign
+      permissions, giving the secretary the same ability as bishopric to
+      designate and remove people from opening prayer, closing prayer, and
+      speech slots. This is done by adding these two permissions to the
+      secretary's permission set in src/lib/permissions.ts.
+
+      With these permissions, the secretary will be able to:
+      - Click on speaker fields to open the speaker selector
+      - Click on topic fields to open the topic selector
+      - See and use the X button to remove speaker assignments
+      - See the chevron arrows on selectable fields
+
+      This applies to both the Discursos (speeches) tab and prayer slots
+      when manage_prayers is enabled.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      - id: AC-170-01
+        description: "Secretary role has speech:assign permission"
+        given: "The PERMISSIONS_MAP in src/lib/permissions.ts defines the secretary role"
+        when: "The secretary permission set is checked"
+        then: "The set includes 'speech:assign'. hasPermission('secretary', 'speech:assign') returns true."
+        status: pending
+
+      - id: AC-170-02
+        description: "Secretary role has speech:unassign permission"
+        given: "The PERMISSIONS_MAP in src/lib/permissions.ts defines the secretary role"
+        when: "The secretary permission set is checked"
+        then: "The set includes 'speech:unassign'. hasPermission('secretary', 'speech:unassign') returns true."
+        status: pending
+
+      - id: AC-170-03
+        description: "Secretary can assign speakers to prayer slots"
+        given: "User is logged in as secretary and manage_prayers is enabled"
+        when: "Secretary taps on a prayer speaker field (opening or closing prayer)"
+        then: "The speaker selector opens, allowing the secretary to select a member. The prayer slot shows the assigned member name after selection."
+        status: pending
+
+      - id: AC-170-04
+        description: "Secretary can remove speakers from prayer slots"
+        given: "User is logged in as secretary, manage_prayers is enabled, and a prayer slot has an assigned speaker"
+        when: "Secretary taps the X button on a prayer slot"
+        then: "A confirmation alert appears. Upon confirmation, the speaker assignment is removed and the field shows the placeholder text."
+        status: pending
+
+      - id: AC-170-05
+        description: "Secretary can assign speakers to speech slots"
+        given: "User is logged in as secretary"
+        when: "Secretary taps on a speech speaker field (1o, 2o, 3o, or Ultimo Discurso)"
+        then: "The speaker selector opens, allowing the secretary to select a member."
+        status: pending
+
+      - id: AC-170-06
+        description: "Secretary can remove speakers from speech slots"
+        given: "User is logged in as secretary and a speech slot has an assigned speaker"
+        when: "Secretary taps the X button on a speech slot"
+        then: "A confirmation alert appears. Upon confirmation, the speaker assignment is removed."
+        status: pending
+
+      - id: AC-170-07
+        description: "Secretary sees chevron arrows on selectable fields"
+        given: "User is logged in as secretary"
+        when: "SpeechSlot renders with a speech (prayer or speech)"
+        then: "The chevron down arrow icon is visible on the speaker field and the topic field (for non-prayer slots), indicating they are selectable."
+        status: pending
+
+      - id: AC-170-08
+        description: "Observer role is NOT affected"
+        given: "The PERMISSIONS_MAP in src/lib/permissions.ts defines the observer role"
+        when: "The observer permission set is checked"
+        then: "The set does NOT include 'speech:assign' or 'speech:unassign'. hasPermission('observer', 'speech:assign') returns false. hasPermission('observer', 'speech:unassign') returns false."
+        status: pending
+
+      - id: AC-170-09
+        description: "Full test suite passes"
+        given: "All permissions.ts changes are applied"
+        when: "npx vitest run is executed"
+        then: "All tests pass with 0 failures."
+        status: pending
+
+    edge_cases:
+      - id: EC-170-01
+        case: "Secretary assigns speaker then changes status"
+        expected: "Secretary can both assign the speaker and change the status on the same slot, since secretary already has speech:change_status permission."
+        status: pending
+
+      - id: EC-170-02
+        case: "Secretary assigns topic to speech slot"
+        expected: "Since canAssign is now true for secretary, the topic field is also selectable. Secretary can open the topic selector and assign a topic. This is correct behavior as secretary already has topic:write permission."
+        status: pending
+
+      - id: EC-170-03
+        case: "manage_prayers toggle is OFF"
+        expected: "When manage_prayers is disabled, prayer slots do not appear in the Discursos tab. The new permissions have no effect on prayer slots in this case. Prayer assignment in the Agenda tab uses PrayerSelector, which uses its own permission checks."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - src/lib/permissions.ts
+
+    files_not_modified:
+      - src/components/SpeechSlot.tsx (no changes; already reads speech:assign and speech:unassign)
+      - src/types/database.ts (no new permission types needed; speech:assign and speech:unassign already exist)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS
+    # =========================================================================
+
+    implementation_details:
+
+      - location: "src/lib/permissions.ts:43-44 (secretary permission set)"
+        current_code: |
+          secretary: new Set<Permission>([
+            'speech:change_status',
+        new_code: |
+          secretary: new Set<Permission>([
+            'speech:assign',
+            'speech:unassign',
+            'speech:change_status',
+        rationale: >
+          Add speech:assign and speech:unassign to the beginning of the
+          secretary permission set, matching the order used in the bishopric
+          set (lines 17-18). This grants the secretary the same assign/unassign
+          capabilities as bishopric for both speech and prayer slots.
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-170-01
+    question: "Should secretary only get prayer assign/unassign, or also speech assign/unassign?"
+    decision: "Grant both speech:assign and speech:unassign (same as bishopric)"
+    rationale: >
+      The user confirmed the secretary should have the same access as
+      bishopric for designating and removing. The speech:assign and
+      speech:unassign permissions control both speech and prayer slots
+      (SpeechSlot is used for both). There is no separate prayer-only
+      permission; the architecture uses the same permissions for both.
+      Granting these permissions is consistent with the secretary already
+      having agenda:assign_speaker for the Agenda tab.
+    decided_in: CR-243
+
+  - id: DD-170-02
+    question: "Does this change affect F023 permission matrix documentation?"
+    decision: "Yes, F023 description should note the CR-243 modification"
+    rationale: >
+      F023 is the base feature for RBAC. Adding permissions to a role is
+      a modification of the permission matrix. The SPEC_CONSOLIDATED entry
+      for F023 should be updated with a reference to CR-243.
+    decided_in: CR-243
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-170-01
+      text: >
+        Granting speech:assign to the secretary also enables the secretary
+        to assign topics (since the topic field press handler also checks
+        canAssign in SpeechSlot.tsx:116). This is intentional and consistent
+        with the secretary already having topic:write permission.
+    - id: A-170-02
+      text: >
+        The home:next_assignments permission remains bishopric-only. The
+        secretary does not see the "Next Assignments" section on the Home
+        screen. This is unchanged by CR-243.
+
+  inconsistencies: []

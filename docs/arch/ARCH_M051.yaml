@@ -1,0 +1,317 @@
+# =============================================================================
+# ARCH_M051.yaml
+# Architecture for Batch 31: F170, F171
+# F170 - Grant secretary speech:assign and speech:unassign permissions (CR-243)
+# F171 - Fix topic row visibility for secretary and observer (CR-244)
+# Created: 2026-03-02
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Batch 31 delivers two independent but complementary fixes to the permission
+    and UI visibility systems:
+    (1) F170/CR-243: The secretary role is missing speech:assign and
+    speech:unassign permissions. Without them, the secretary cannot designate
+    or remove speakers from prayer or speech slots in the Discursos tab.
+    Fix adds both permissions to the secretary set in permissions.ts.
+    (2) F171/CR-244: The topic row in SpeechSlot is hidden for secretary and
+    observer when no topic is assigned, because the showTopicRow condition
+    depends on canAssign (speech:assign permission). Fix simplifies the
+    condition to show the topic row whenever a speech record exists.
+  principles:
+    - "Minimal changes: F170 touches only permissions.ts, F171 touches only SpeechSlot.tsx"
+    - "Separation of concerns: visibility (F171) is independent of permission (F170)"
+    - "Both fixes are independent: F171 is needed even if F170 is applied (observer still needs it)"
+    - "No new permissions or types: speech:assign and speech:unassign already exist in the Permission type"
+    - "Read-only controls preserved: topic field disabled/chevron/X remain gated by canAssign"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  +----------------------------------------------------------------------+
+  |              Batch 31: F170 + F171                                   |
+  |                                                                      |
+  |  F170 (CR-243): Secretary permissions                                |
+  |  +-------------------------------+                                   |
+  |  | permissions.ts                |                                   |
+  |  | secretary: Set<Permission>    |                                   |
+  |  |   + 'speech:assign'           |                                   |
+  |  |   + 'speech:unassign'         |                                   |
+  |  +-------------------------------+                                   |
+  |           |                                                          |
+  |           v                                                          |
+  |  +-------------------------------+                                   |
+  |  | SpeechSlot.tsx                |                                   |
+  |  | canAssign = hasPermission()   |  <-- Now true for secretary       |
+  |  | canUnassign = hasPermission() |  <-- Now true for secretary       |
+  |  +-------------------------------+                                   |
+  |                                                                      |
+  |  F171 (CR-244): Topic row visibility fix                             |
+  |  +-------------------------------+                                   |
+  |  | SpeechSlot.tsx                |                                   |
+  |  | showTopicRow:                 |                                   |
+  |  |   BEFORE: !isPrayer &&        |                                   |
+  |  |     !!(topicDisplay ||        |                                   |
+  |  |     (canAssign && speech))    |                                   |
+  |  |   AFTER: !isPrayer && !!speech|                                   |
+  |  +-------------------------------+                                   |
+  +----------------------------------------------------------------------+
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F170: Secretary permissions ---
+
+  - name: "SecretaryPermissionGrant"
+    responsibility: "Add speech:assign and speech:unassign to the secretary role permission set"
+    files:
+      - "src/lib/permissions.ts"
+    cr_ids: [243]
+    changes:
+      - "Add 'speech:assign' to secretary Set<Permission> (before 'speech:change_status')"
+      - "Add 'speech:unassign' to secretary Set<Permission> (after 'speech:assign')"
+    contract:
+      input: "hasPermission('secretary', 'speech:assign') / hasPermission('secretary', 'speech:unassign')"
+      output_before: "false / false"
+      output_after: "true / true"
+    dependencies: []
+    notes: >
+      The Permission type in database.ts already defines speech:assign and
+      speech:unassign. No type changes needed. SpeechSlot.tsx reads these
+      permissions via useAuth().hasPermission at lines 97-98, so the secretary
+      will automatically gain assign/unassign capabilities in both speech
+      and prayer slots. The observer role is NOT modified.
+
+  # --- F171: Topic row visibility fix ---
+
+  - name: "TopicRowVisibilityFix"
+    responsibility: "Simplify showTopicRow condition to remove permission dependency"
+    files:
+      - "src/components/SpeechSlot.tsx"
+    cr_ids: [244]
+    changes:
+      - "Replace showTopicRow condition at line 167"
+      - "Remove: const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));"
+      - "Add: const showTopicRow = !isPrayer && !!speech;"
+      - "Update comment from 'when can assign' to 'whenever a speech exists'"
+    contract:
+      input: "SpeechSlot with speech record, isPrayer=false, role=observer or secretary (pre-F170)"
+      output_before: "showTopicRow = false when topicDisplay is null (no topic assigned)"
+      output_after: "showTopicRow = true whenever speech is non-null and not a prayer slot"
+    dependencies: []
+    notes: >
+      The topic field's interactivity (pressable, chevron, X button) remains
+      gated by canAssign checks on lines 269, 282, and 287. This fix only
+      changes row VISIBILITY, not INTERACTIVITY. The field will show as
+      read-only for users without speech:assign: disabled Pressable, no
+      chevron icon, no X clear button, placeholder text visible.
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "permission_to_speechslot"
+    components: ["SecretaryPermissionGrant", "TopicRowVisibilityFix"]
+    methods:
+      - name: "hasPermission('speech:assign') via useAuth()"
+        input: "User with role='secretary' logged in"
+        output: "canAssign=true (SpeechSlot.tsx:97)"
+        notes: >
+          After F170, hasPermission('speech:assign') returns true for secretary.
+          SpeechSlot.tsx:97 reads this to set canAssign. This enables:
+          - Speaker field pressable (line 232)
+          - Topic field pressable (line 269)
+          - Chevron icons visible (lines 245, 282)
+          - X remove button visible for speakers (line 250)
+          - X clear button visible for topics (line 287)
+      - name: "hasPermission('speech:unassign') via useAuth()"
+        input: "User with role='secretary' logged in"
+        output: "canUnassign=true (SpeechSlot.tsx:98)"
+        notes: >
+          After F170, hasPermission('speech:unassign') returns true for secretary.
+          This enables the X remove button on speaker assignments (line 250).
+
+  - name: "visibility_independence"
+    components: ["TopicRowVisibilityFix"]
+    methods:
+      - name: "showTopicRow evaluation"
+        input: "Any role, any speech state, any isPrayer value"
+        output: |
+          isPrayer=true: false (all roles, no topic row for prayers)
+          speech=null: false (all roles, no speech record yet)
+          isPrayer=false && speech exists: true (all roles see topic row)
+        notes: >
+          The visibility condition is completely decoupled from permissions.
+          The canAssign check only controls field interactivity, not visibility.
+          This means observer always sees the topic row (read-only) and
+          secretary sees it too (editable after F170, read-only before F170).
+
+# =============================================================================
+# DATA MODEL CHANGES
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No database schema changes. F170 modifies only the client-side permission map. F171 modifies only a UI condition."
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: >
+    F170 EXPANDS the secretary role's capabilities. This is intentional per
+    CR-243 confirmation. The secretary gains the same assign/unassign access
+    as bishopric in the Speeches tab and prayer slots. The observer role
+    remains unchanged (no speech:assign or speech:unassign).
+    F171 has NO security impact: it only affects UI visibility of a read-only
+    field. The topic field is disabled for users without canAssign, so no
+    data mutation is possible through the UI even with the row visible.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: >
+    No new logging or monitoring. Speech assignments by secretary will appear
+    in the existing activity_log with the secretary's user_name, using the
+    same log entries as bishopric assignments.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-119
+    title: "Grant full speech:assign/unassign to secretary instead of prayer-only permission (Batch 31)"
+    context: >
+      CR-243 requests that the secretary can assign/unassign prayers. The
+      permission system uses speech:assign for both speeches and prayers
+      (via SpeechSlot). Options: (a) grant speech:assign to secretary
+      (gives both speech AND prayer assign), (b) create new prayer-only
+      permission (requires new Permission type, new checks in SpeechSlot).
+    decision: >
+      Grant speech:assign and speech:unassign to the secretary role. The user
+      confirmed the secretary should have the same access as bishopric for
+      designations. Creating a prayer-only permission would be over-engineering
+      since the existing permission architecture treats prayers as speeches.
+    decided_in: "CR-243/F170"
+    consequences:
+      - "Secretary can assign/unassign BOTH speeches and prayers (not just prayers)"
+      - "No new Permission type needed; existing types sufficient"
+      - "Consistent with secretary already having agenda:assign_speaker"
+      - "Observer role remains unaffected"
+
+  - id: ADR-120
+    title: "Decouple topic row visibility from permission checks (Batch 31)"
+    context: >
+      CR-244 fixes a bug where secretary and observer cannot see the topic
+      field when no topic is assigned. The showTopicRow condition includes
+      canAssign (speech:assign). Options: (a) simplify to !isPrayer && !!speech,
+      (b) add a separate topic:read permission, (c) keep canAssign but add
+      OR condition for all roles.
+    decision: >
+      Simplify to !isPrayer && !!speech. The topic row should be visible
+      to all roles whenever a speech exists. The field interactivity
+      (pressable, chevron, X button) is already independently gated by
+      canAssign checks. Adding a new permission would be over-engineering.
+    decided_in: "CR-244/F171"
+    consequences:
+      - "Topic row always visible for non-prayer slots when speech exists"
+      - "Observer sees read-only topic field (disabled, no chevron, no X)"
+      - "Secretary sees editable topic field after F170, read-only before F170"
+      - "Simpler condition, easier to reason about"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F170, F171]
+    interaction: >
+      F170 and F171 are independent but complementary. F170 grants secretary
+      the speech:assign permission, which enables interactive topic fields.
+      F171 ensures the topic row is visible regardless of permissions.
+      When both are applied: secretary sees editable topic field.
+      When only F171 is applied: secretary sees read-only topic field.
+      When only F170 is applied: secretary sees topic field (canAssign=true
+      makes showTopicRow true for secretary via the old condition, but
+      observer still cannot see it without F171).
+
+  - features: [F170, F023]
+    interaction: >
+      F023 is the base feature for RBAC (permissions.ts). F170 modifies the
+      permission matrix by adding two permissions to the secretary role.
+      This is a direct extension of F023's permission map.
+
+  - features: [F170, F157]
+    interaction: >
+      F157 added managed prayers using SpeechSlot with isPrayer=true.
+      SpeechSlot gates assign/unassign on speech:assign/speech:unassign.
+      F170 grants these to secretary, completing the prayer management
+      capability for the secretary role.
+
+  - features: [F171, F157]
+    interaction: >
+      F157 added isPrayer prop to SpeechSlot. The showTopicRow condition
+      already includes !isPrayer to hide topics for prayer slots.
+      F171's simplified condition preserves this: !isPrayer && !!speech
+      still correctly hides topic rows for prayers.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/lib/permissions.ts
+    feature: F170
+    cr_ids: [243]
+    changes:
+      - "Add 'speech:assign' to secretary permission set (line 43-44)"
+      - "Add 'speech:unassign' to secretary permission set (line 43-44)"
+
+  - file: src/components/SpeechSlot.tsx
+    feature: F171
+    cr_ids: [244]
+    changes:
+      - "Simplify showTopicRow condition at line 167"
+      - "Remove canAssign and topicDisplay from showTopicRow expression"
+      - "Update comment to reflect new logic"
+
+files_not_modified:
+  - "src/types/database.ts (Permission type already includes speech:assign/speech:unassign)"
+  - "src/contexts/AuthContext.tsx (hasPermission logic unchanged)"
+  - "src/components/SundayCard.tsx (no topic row logic)"
+  - "src/hooks/useSpeeches.ts (data layer unchanged)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 2 components, each with one clear responsibility
+  GATE-03_contracts_defined: true        # 2 contracts defined (permission_to_speechslot, visibility_independence)
+  GATE-04_adrs_recorded: true           # ADR-119, ADR-120 recorded
+  GATE-05_arch_saved: true              # ARCH_M051.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED to be updated
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 2 components (well under 10)

@@ -1,0 +1,452 @@
+# =============================================================================
+# QA_PLAN_052.yaml
+# PRE Validation Plan for Batch 31 Phase 1
+# CR-243 (F170): Secretary prayer assign/unassign access
+# CR-244 (F171): Theme field visibility for Secretary and Observer
+# CR-245 (F172): WhatsApp 1st discourse number fix
+# Created: 2026-03-02
+# =============================================================================
+
+batch: 31
+phase: 1
+crs:
+  - CR-243
+  - CR-244
+  - CR-245
+features:
+  - F170
+  - F171
+  - F172
+type: mixed  # bugfix (CR-244, CR-245) + feature (CR-243)
+
+# =============================================================================
+# CR-243 (F170): Secretary prayer assign/unassign access
+# Type: feature
+# Request: "O secretario precisa ter acesso a designar oracao de abertura e fechamento"
+#          Mesmo acesso que o bispado (designar e remover)
+# =============================================================================
+
+cr_243:
+  title: "Secretary prayer assign/unassign access"
+  type: feature
+  feature_id: F170
+
+  pre_analysis:
+    root_cause: |
+      The secretary role does NOT have 'speech:assign' or 'speech:unassign' permissions.
+      In src/lib/permissions.ts:43-65, the secretary permission set includes
+      'speech:change_status' but NOT 'speech:assign' or 'speech:unassign'.
+      The bishopric role (lines 16-41) does include both 'speech:assign' and 'speech:unassign'.
+
+      In src/components/SpeechSlot.tsx:97-98, the component checks:
+        const canAssign = hasPermission('speech:assign');
+        const canUnassign = hasPermission('speech:unassign');
+      These gate the ability to open the speaker selector and remove assignments.
+
+      In src/components/AgendaForm.tsx:311-350 (opening prayer) and 547-586 (closing prayer),
+      when managePrayers=false, prayer assignment uses the same SelectorField pattern
+      gated by `isObserver` (line 66: const isObserver = !hasPermission('agenda:write')).
+      The secretary HAS 'agenda:write' so can use the inline prayer selector.
+
+      However, when managePrayers=true (lines 312-329, 548-565), prayers are managed
+      in the Speeches tab, where SpeechSlot gates assign/unassign via 'speech:assign'
+      and 'speech:unassign' permissions that the secretary LACKS.
+
+      So the issue is specifically about managed prayers (managePrayers=true):
+      the secretary cannot assign/unassign prayer speakers in the Speeches tab.
+
+    affected_files:
+      - path: src/lib/permissions.ts
+        lines: "43-65"
+        description: "Secretary permission set - missing speech:assign, speech:unassign"
+      - path: src/types/database.ts
+        lines: "10-34"
+        description: "Permission type definition - no new permission needed"
+      - path: src/components/SpeechSlot.tsx
+        lines: "97-98"
+        description: "Uses speech:assign and speech:unassign permissions"
+      - path: src/components/AgendaForm.tsx
+        lines: "311-350, 547-586"
+        description: "Prayer selector in agenda form"
+
+    implementation_approach: |
+      Option A (recommended): Add 'speech:assign' and 'speech:unassign' to the secretary
+      role in permissions.ts. This gives the secretary full assign/unassign access for
+      ALL speech positions (1,2,3 speeches + 0,4 prayers), matching the user's request
+      "mesmo acesso que o bispado".
+
+      Option B: Create new prayer-specific permissions (prayer:assign, prayer:unassign).
+      This is more granular but adds complexity. The user explicitly said "mesmo acesso
+      que o bispado" so Option A is preferred.
+
+      NOTE: The user said "designar e remover" which maps to speech:assign + speech:unassign.
+      The secretary already has speech:change_status. Adding assign+unassign gives parity
+      with bishopric for all speech/prayer operations.
+
+  validation_checks:
+    must_pass:
+      - id: MP-01
+        description: "Secretary role must include 'speech:assign' permission after fix"
+        check_type: static
+        file: src/lib/permissions.ts
+        condition: "secretary Set includes 'speech:assign'"
+
+      - id: MP-02
+        description: "Secretary role must include 'speech:unassign' permission after fix"
+        check_type: static
+        file: src/lib/permissions.ts
+        condition: "secretary Set includes 'speech:unassign'"
+
+      - id: MP-03
+        description: "Existing permissions tests must still pass (no regression)"
+        check_type: test
+        command: "npx vitest run src/__tests__/permissions.test.ts"
+
+      - id: MP-04
+        description: "Integration permissions tests must pass with updated permissions"
+        check_type: test
+        command: "npx vitest run src/__tests__/integration/permissions-roles.integration.test.ts"
+
+    should_pass:
+      - id: SP-01
+        description: "Secretary can see speaker selector field in SpeechSlot (canAssign=true)"
+        check_type: manual
+        steps: "Login as secretary, navigate to Speeches tab, expand a sunday, verify prayer slots show selector dropdowns"
+
+      - id: SP-02
+        description: "Secretary can remove prayer assignment in SpeechSlot (canUnassign=true)"
+        check_type: manual
+        steps: "Login as secretary, assign a prayer, verify X button appears to remove assignment"
+
+# =============================================================================
+# CR-244 (F171): Theme field visibility for Secretary and Observer
+# Type: bugfix
+# Request: "Secretario nao esta enxergando os campos de tema ate que eles estejam
+#           preenchidos, isso esta errado, Secretario e Observador enxergam o campo
+#           de temas sempre."
+# =============================================================================
+
+cr_244:
+  title: "Theme field visibility for Secretary and Observer"
+  type: bugfix
+  feature_id: F171
+
+  pre_analysis:
+    root_cause: |
+      In src/components/SpeechSlot.tsx:167, the topic row visibility is controlled by:
+        const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+
+      The condition `canAssign && speech` means the topic row is ONLY shown when:
+      1. There is already a topic value (topicDisplay is truthy), OR
+      2. The user has 'speech:assign' permission AND there is a speech record.
+
+      The secretary currently does NOT have 'speech:assign' (see CR-243), so when
+      there is no topic assigned yet, `canAssign` is false, `topicDisplay` is null,
+      and `showTopicRow` evaluates to false. The topic field is hidden.
+
+      For the observer, the observer role also lacks 'speech:assign', so the same
+      issue applies: the topic row is hidden when empty.
+
+      The user explicitly says: "Secretario e Observador enxergam o campo de temas sempre."
+      This means the topic row should ALWAYS be visible (when it's not a prayer slot)
+      regardless of permissions.
+
+    reproduction_steps:
+      - step: 1
+        action: "Login as secretary"
+      - step: 2
+        action: "Navigate to Speeches tab"
+      - step: 3
+        action: "Expand a sunday card that has speeches with no topic assigned"
+      - step: 4
+        expected: "Topic field should be visible (even if empty/placeholder)"
+        actual: "Topic field is NOT visible because canAssign=false for secretary"
+      - step: 5
+        action: "Repeat with observer role"
+        expected: "Topic field should also be visible (read-only/disabled)"
+        actual: "Topic field is NOT visible because canAssign=false for observer"
+
+    affected_files:
+      - path: src/components/SpeechSlot.tsx
+        lines: "167"
+        description: "showTopicRow condition gates visibility based on canAssign"
+
+    fix_approach: |
+      Change the showTopicRow condition from:
+        const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+      To:
+        const showTopicRow = !isPrayer && !!speech;
+
+      This makes the topic row visible for ALL roles whenever a speech record exists
+      and it's not a prayer slot. The field will be interactive only for roles with
+      canAssign=true; for others it appears as read-only (the Pressable is already
+      disabled when !canAssign via disabled={!canAssign || !speech} on line 269).
+
+      NOTE: If CR-243 adds speech:assign to secretary, the secretary fix would be
+      resolved by that alone. But the observer still needs this fix, and the user
+      explicitly wants BOTH secretary and observer to always see the theme field.
+      So the condition must be changed regardless of CR-243.
+
+  validation_checks:
+    must_pass:
+      - id: MP-05
+        description: "showTopicRow must NOT depend on canAssign permission"
+        check_type: static
+        file: src/components/SpeechSlot.tsx
+        condition: "showTopicRow condition does not reference canAssign for visibility"
+
+      - id: MP-06
+        description: "Topic row must be rendered when speech exists and isPrayer=false, regardless of role"
+        check_type: static
+        file: src/components/SpeechSlot.tsx
+        condition: "showTopicRow = !isPrayer && !!speech (or equivalent)"
+
+      - id: MP-07
+        description: "Topic field Pressable must remain disabled for roles without speech:assign"
+        check_type: static
+        file: src/components/SpeechSlot.tsx
+        condition: "disabled={!canAssign || !speech} is preserved on topic Pressable"
+
+    should_pass:
+      - id: SP-03
+        description: "Observer sees topic field (disabled) even when no topic is assigned"
+        check_type: manual
+        steps: "Login as observer, go to Speeches tab, expand a sunday, verify topic field is visible but disabled"
+
+      - id: SP-04
+        description: "Secretary sees topic field even when no topic is assigned"
+        check_type: manual
+        steps: "Login as secretary, go to Speeches tab, expand a sunday, verify topic field is visible"
+
+      - id: SP-05
+        description: "Topic field still shows clear X button for bishopric when topic is assigned"
+        check_type: manual
+        steps: "Login as bishopric, assign a topic, verify X button appears"
+
+# =============================================================================
+# CR-245 (F172): WhatsApp 1st discourse number fix
+# Type: bugfix
+# Request: "Quando clicamos no icone de whatsapp para mandar o convite do 1o
+#           discurso, esta aparecendo no texto como se fosse o 2o discurso"
+#           Confirmado que so o 1o discurso mostra errado.
+# =============================================================================
+
+cr_245:
+  title: "WhatsApp 1st discourse number shows as 2nd discourse"
+  type: bugfix
+  feature_id: F172
+
+  pre_analysis:
+    root_cause: |
+      In src/components/InviteManagementSection.tsx:131-151, the WhatsApp URL for speeches
+      is built using:
+        const speechTemplateMap: Record<number, string> = {
+          1: ward?.whatsapp_template_speech_1 ?? '',
+          2: ward?.whatsapp_template_speech_2 ?? '',
+          3: ward?.whatsapp_template_speech_3 ?? '',
+        };
+        const selectedTemplate = speechTemplateMap[speech.position] ?? '';
+        url = buildWhatsAppUrl(
+          speech.speaker_phone,
+          '',
+          selectedTemplate,
+          { ... },
+          locale,
+          speech.position as 1 | 2 | 3   // <-- position passed here
+        );
+
+      The speechTemplateMap correctly maps position to custom template.
+      The buildWhatsAppUrl function (whatsappUtils.ts:157-183) receives the position
+      and uses it for default template selection via getDefaultSpeechTemplate().
+
+      The issue is: when the ward has NO custom template (whatsapp_template_speech_1 is null),
+      selectedTemplate = '' (empty string), and buildWhatsAppUrl falls back to
+      getDefaultSpeechTemplate(language, position).
+
+      But looking more carefully: when ward?.whatsapp_template_speech_1 is NULL,
+      `ward?.whatsapp_template_speech_1 ?? ''` returns ''. The speechTemplateMap maps
+      position 1 to ''. Then selectedTemplate = ''.
+
+      In buildWhatsAppUrl (line 178): `const messageTemplate = template || getDefaultSpeechTemplate(language, position);`
+      Empty string is falsy, so it falls back to getDefaultSpeechTemplate(language, position).
+
+      For position 1, getDefaultSpeechTemplate(language, 1) returns the FIRST speech template
+      which says "primeiro discurso" (first speech). This seems correct.
+
+      WAIT - let me re-examine. The templates themselves are correct. Let me check if
+      there could be a position mismatch somewhere else.
+
+      Looking at getInviteItems (speechUtils.ts:56-75): it returns speech objects with their
+      original position from the database. The position field is set during lazy creation
+      in useSpeeches.ts:216 where it maps to the exact position number.
+
+      HYPOTHESIS: The issue may be in the custom template. If the ward has set a custom
+      template for speech_1 that contains "segundo discurso" text by mistake, or if the
+      ward template fields got swapped somehow.
+
+      BUT the user says the bug exists even with default templates (since it's a bug report,
+      not a misconfiguration).
+
+      RE-EXAMINING: Actually, the user says "Quando clicamos no icone de whatsapp para
+      mandar o convite do 1o discurso, esta aparecendo no texto como se fosse o 2o discurso".
+      The WhatsApp icon in InviteManagementSection shows for speeches with status
+      'assigned_not_invited'. When clicked, handleNotInvitedAction is called.
+
+      The templates (whatsappUtils.ts:8-33) are correct:
+      - DEFAULT_TEMPLATE_SPEECH_1_PT_BR: "fazer o primeiro discurso"
+      - DEFAULT_TEMPLATE_SPEECH_2_PT_BR: "fazer o segundo discurso"
+
+      The position mapping in getDefaultSpeechTemplate (lines 59-92) is correct:
+      - position 1 -> SPEECH_1 template
+      - position 2 -> SPEECH_2 template
+
+      The speechTemplateMap in InviteManagementSection (lines 132-136) correctly maps:
+      - 1: ward?.whatsapp_template_speech_1
+      - 2: ward?.whatsapp_template_speech_2
+
+      And speech.position is passed correctly on line 150.
+
+      CONCLUSION: The code path in InviteManagementSection.tsx appears correct for
+      default templates. The bug might be in the ward's custom template configuration
+      (the ward may have stored the wrong text in whatsapp_template_speech_1), or
+      there may be another code path where the WhatsApp icon appears.
+
+      However, there IS another possibility: the ward HAS a custom template set for
+      speech 1 that contains "segundo discurso" text. When the user customized their
+      WhatsApp templates in Settings > WhatsApp, they may have entered the wrong
+      ordinal for position 1. Let me check the WhatsApp settings screen to see if
+      the templates are correctly labeled.
+
+      ALTERNATIVE: Check if the template stored for speech 1 in the database may
+      actually be speech 2's template due to a UI ordering bug in the settings.
+
+    reproduction_steps:
+      - step: 1
+        action: "Login as bishopric or secretary"
+      - step: 2
+        action: "Ensure a speech at position 1 has a speaker assigned with phone and status 'assigned_not_invited'"
+      - step: 3
+        action: "Go to Home tab, find the invite management section"
+      - step: 4
+        action: "Click the WhatsApp icon for the 1st discourse"
+      - step: 5
+        expected: "WhatsApp message should say 'primeiro discurso' (first speech)"
+        actual: "WhatsApp message says 'segundo discurso' (second speech)"
+
+    affected_files:
+      - path: src/components/InviteManagementSection.tsx
+        lines: "131-151"
+        description: "WhatsApp URL building with position and template selection"
+      - path: src/lib/whatsappUtils.ts
+        lines: "8-92, 157-183"
+        description: "Default templates and buildWhatsAppUrl function"
+      - path: src/app/(tabs)/settings/whatsapp.tsx
+        description: "WhatsApp settings screen where templates are configured (potential source of swapped templates)"
+
+    investigation_needed: |
+      Static code analysis shows ALL code paths appear correct:
+      - InviteManagementSection.tsx:131-151: speechTemplateMap[1] -> whatsapp_template_speech_1 (correct)
+      - whatsappUtils.ts:59-70: getDefaultSpeechTemplate(lang, 1) -> SPEECH_1 template (correct)
+      - whatsappUtils.ts:178: buildWhatsAppUrl falls back to default when template='' (correct)
+      - settings/whatsapp.tsx: Each tab maps to correct DB field (verified)
+      - settings/whatsapp.tsx: Templates are NOT auto-saved to DB until user edits (so null -> '' -> default fallback works)
+
+      Since the code logic appears correct in all paths, the bug may be:
+
+      1. A database-level issue: the ward's whatsapp_template_speech_1 field contains
+         the speech 2 template text. This could happen if a previous migration or
+         data operation swapped the values.
+
+      2. A ward language mismatch: wardLanguage is different from getCurrentLanguage(),
+         causing a template from a different language to be selected.
+
+      3. The user edited their template in Settings > WhatsApp and accidentally put
+         "segundo discurso" in the speech 1 tab.
+
+      Developer investigation priority:
+      a) Query the ward's whatsapp_template_speech_1 from Supabase to check if it
+         contains "segundo" text (data issue)
+      b) If ward template is null, test with default templates to verify
+      c) If default templates work correctly, this is a data issue, not a code bug
+      d) If default templates ALSO show wrong, deep debug the position flow
+
+  validation_checks:
+    must_pass:
+      - id: MP-08
+        description: "getDefaultSpeechTemplate(language, 1) returns template with 'primeiro'/'first'"
+        check_type: test
+        command: "npx vitest run src/__tests__/phase03-whatsapp-invite.test.ts"
+
+      - id: MP-09
+        description: "buildWhatsAppUrl with position=1 and empty template uses speech 1 default template"
+        check_type: test
+        condition: "buildWhatsAppUrl('phone','','',vars,'pt-BR',1) message contains 'primeiro'"
+
+      - id: MP-10
+        description: "speechTemplateMap in InviteManagementSection maps position 1 to whatsapp_template_speech_1"
+        check_type: static
+        file: src/components/InviteManagementSection.tsx
+        condition: "speechTemplateMap[1] === ward?.whatsapp_template_speech_1"
+
+      - id: MP-11
+        description: "WhatsApp settings screen labels match correct positions"
+        check_type: static
+        file: src/app/(tabs)/settings/whatsapp.tsx
+        condition: "Speech 1 template field saves to whatsapp_template_speech_1"
+
+    should_pass:
+      - id: SP-06
+        description: "With NO custom template, 1st discourse WhatsApp message says 'primeiro discurso'"
+        check_type: manual
+        steps: "Clear all custom templates, assign speaker to position 1, click WhatsApp icon"
+
+      - id: SP-07
+        description: "With custom template, 1st discourse uses the correct custom template"
+        check_type: manual
+        steps: "Set custom template for speech 1 with 'PRIMEIRO' text, verify it appears correctly"
+
+      - id: SP-08
+        description: "2nd and 3rd discourse WhatsApp messages are NOT affected (regression check)"
+        check_type: manual
+        steps: "Click WhatsApp for 2nd and 3rd discourses, verify correct text"
+
+# =============================================================================
+# Pre-validation Summary
+# =============================================================================
+
+pre_validation_summary:
+  validated: true
+  timestamp: "2026-03-02"
+
+  cr_243_verdict: |
+    VALIDATED. Root cause clearly identified: secretary role lacks 'speech:assign'
+    and 'speech:unassign' permissions in src/lib/permissions.ts:43-65.
+    Fix is straightforward: add both permissions to the secretary Set.
+
+  cr_244_verdict: |
+    VALIDATED. Root cause clearly identified: SpeechSlot.tsx:167 conditions topic
+    row visibility on canAssign (speech:assign permission). Secretary and observer
+    lack this permission, so empty topic fields are hidden.
+    Fix: change showTopicRow to not depend on canAssign for visibility.
+    NOTE: Even if CR-243 adds speech:assign to secretary, observer still needs fix.
+
+  cr_245_verdict: |
+    PARTIALLY VALIDATED. Static analysis shows the code logic for default templates
+    appears correct. The bug may be in custom template storage/configuration.
+    Need to investigate src/app/(tabs)/settings/whatsapp.tsx for field ordering bugs.
+    Developer should test with and without custom templates to isolate the cause.
+    Validation checks are defined to cover both scenarios.
+
+  evidence:
+    - file: src/lib/permissions.ts
+      finding: "Secretary lacks speech:assign and speech:unassign (lines 43-65)"
+    - file: src/components/SpeechSlot.tsx
+      finding: "Line 167: showTopicRow depends on canAssign for empty topics"
+    - file: src/components/SpeechSlot.tsx
+      finding: "Lines 97-98: canAssign/canUnassign gate prayer slot interactions"
+    - file: src/components/InviteManagementSection.tsx
+      finding: "Lines 131-151: Template selection uses speech.position correctly"
+    - file: src/lib/whatsappUtils.ts
+      finding: "Lines 8-15: Default templates have correct ordinal text"
+    - file: src/lib/whatsappUtils.ts
+      finding: "Lines 59-92: getDefaultSpeechTemplate maps position correctly"

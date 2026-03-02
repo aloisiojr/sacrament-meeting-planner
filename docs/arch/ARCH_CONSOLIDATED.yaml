@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-01"
-  last_updated_by: "batch-30-phase-1"
+  last_updated: "2026-03-02"
+  last_updated_by: "batch-31-phase-1"
   total_modules: 8
-  total_adrs: 118
-  total_crs_implemented: 152
+  total_adrs: 120
+  total_crs_implemented: 154
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -56,6 +56,7 @@ metadata:
     - docs/arch/ARCH_M161.yaml
     - docs/arch/ARCH_M050.yaml
     - docs/arch/ARCH_M009.yaml
+    - docs/arch/ARCH_M051.yaml
 
 # =============================================================================
 # TECH STACK
@@ -167,7 +168,7 @@ modules:
   - id: M001
     name: AuthModule
     responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
-    spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134, F140, F143, F144]
+    spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134, F140, F143, F144, F170]
     key_files:
       - src/app/(auth)/login.tsx
       - src/app/(auth)/register.tsx
@@ -197,7 +198,7 @@ modules:
       - send-reset-email
       - reset-redirect
       - invite-redirect
-    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198, 202, 203, 204, 205, 208]
+    modified_by_crs: [2, 11, 23, 64, 67, 76, 80, 81, 145, 155, 175, 176, 178, 195, 197, 198, 202, 203, 204, 205, 208, 243]
     notes: |
       CR-67 adicionou forgot password. CR-64 corrigiu acesso do secretario a EFs.
       CR-76 removeu Authorization header manual (regression CR-64).
@@ -218,6 +219,7 @@ modules:
       CR-203/F139: New invite-redirect Edge Function serves self-contained invitation acceptance web page. create-invitation returns HTTPS URL instead of sacrmeetplan:// deep link. invite/[token].tsx remains as unused fallback.
       CR-208/F143: create-invitation gains structured error codes (code field), console.error at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true } runs checks without db insert).
       CR-204/F144: reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to external hosting (GitHub Pages, docs/public/). EXTERNAL_PAGES_URL env var configurable.
+      CR-243/F170: Secretary role gains speech:assign and speech:unassign permissions. Same assign/unassign capabilities as bishopric for speech and prayer slots.
 
   - id: M002
     name: WardDataModule
@@ -281,7 +283,7 @@ modules:
   - id: M003
     name: SpeechModule
     responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
-    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159, F163, F164]
+    spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159, F163, F164, F171]
     key_files:
       - src/app/(tabs)/speeches.tsx
       - src/hooks/useSpeeches.ts
@@ -298,7 +300,7 @@ modules:
       - useSundayList
     screens:
       - SpeechesTab (speeches.tsx)
-    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229, 231, 236, 237]
+    modified_by_crs: [4, 5, 7, 22, 29, 35, 106, 112, 114, 116, 119, 120, 126, 127, 128, 129, 134, 142, 150, 160, 161, 162, 163, 165, 169, 174, 177, 181, 194, 196, 199, 207, 209, 214, 215, 219, 221, 222, 223, 225, 227, 228, 229, 231, 236, 237, 244]
     notes: |
       Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
       Lazy creation: registros criados ao expandir o card.
@@ -343,6 +345,7 @@ modules:
       CR-231/F159: Speech WhatsApp template split. Single wards.whatsapp_template replaced with 3 per-position columns: whatsapp_template_speech_{1,2,3}. {posicao} placeholder removed from templates, WhatsAppVariables, and resolveTemplate. getDefaultTemplate replaced by getDefaultSpeechTemplate(language, position). buildWhatsAppUrl gains position parameter. InviteManagementSection selects template column by speech.position. Settings WhatsApp screen expands to 5 tabs (3 speech + 2 prayer). Migration 020. (ADR-112, ADR-113).
       CR-236/F163: ActorSelector Unicode checkbox (U+2611/U+2610) replaced with SVG CheckSquareIcon/SquareIcon from icons module. Selected uses colors.primary, unselected uses colors.textSecondary.
       CR-237/F164: speeches.selectTopic i18n capitalization fix ('tema'->'Tema', 'topic'->'Topic').
+      CR-244/F171: showTopicRow condition simplified from `!isPrayer && !!(topicDisplay || (canAssign && speech))` to `!isPrayer && !!speech`. Topic row now visible to all roles (secretary, observer) whenever a speech exists, not only when canAssign is true. Field interactivity (pressable, chevron, X button) remains gated by canAssign. Observer sees read-only topic field (ADR-120).
 
   - id: M004
     name: AgendaModule
@@ -1705,6 +1708,27 @@ adrs:
       - "Consistent with existing KeyboardAvoidingView usage"
       - "May need follow-up offset adjustment"
 
+  - id: ADR-119
+    title: "Grant full speech:assign/unassign to secretary instead of prayer-only permission (Batch 31)"
+    context: "CR-243 requests secretary can assign/unassign prayers. speech:assign controls both speeches and prayers (SpeechSlot). Options: (a) grant speech:assign, (b) create prayer-only permission."
+    decision: "Grant speech:assign and speech:unassign to secretary. User confirmed same access as bishopric. No new permission type needed."
+    decided_in: "CR-243/F170"
+    consequences:
+      - "Secretary can assign/unassign BOTH speeches and prayers"
+      - "No new Permission type; existing types sufficient"
+      - "Consistent with secretary already having agenda:assign_speaker"
+      - "Observer role remains unaffected"
+
+  - id: ADR-120
+    title: "Decouple topic row visibility from permission checks (Batch 31)"
+    context: "CR-244: showTopicRow depends on canAssign (speech:assign). Observer/secretary cannot see topic field when no topic assigned. Options: (a) simplify to !isPrayer && !!speech, (b) add topic:read permission."
+    decision: "Simplify to !isPrayer && !!speech. Topic row visible to all roles when speech exists. Field interactivity remains gated by canAssign."
+    decided_in: "CR-244/F171"
+    consequences:
+      - "Topic row always visible for non-prayer slots when speech exists"
+      - "Observer sees read-only topic field (disabled, no chevron, no X)"
+      - "Simpler condition, easier to reason about"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -2674,6 +2698,14 @@ change_requests_history:
     doc: "ARCH_M050.yaml"
     status: "pending implementation"
     adrs: [ADR-116]
+    new_files: []
+
+  batch_31_phase_1:
+    crs: "CR-243, CR-244"
+    scope: "Secretary permissions + topic visibility fix. F170: Add speech:assign and speech:unassign to secretary role in permissions.ts. F171: Simplify showTopicRow in SpeechSlot.tsx to !isPrayer && !!speech (remove canAssign dependency). Two independent single-file changes."
+    doc: "ARCH_M051.yaml"
+    status: "pending implementation"
+    adrs: [ADR-119, ADR-120]
     new_files: []
 
 # =============================================================================

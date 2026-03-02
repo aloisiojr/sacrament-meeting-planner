@@ -1,0 +1,261 @@
+# =============================================================================
+# SPEC_F171.yaml
+# Batch 31: Fix topic row visibility for secretary and observer (CR-244)
+# Created: 2026-03-02
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 31
+phase: 1
+created: "2026-03-02"
+last_updated: "2026-03-02"
+request_type: bugfix
+execution_order: >
+  1 feature (F171) covering 1 CR (CR-244).
+  Single file change in SpeechSlot.tsx. The fix changes the showTopicRow
+  condition to show the topic row whenever a speech exists (and it is not
+  a prayer), removing the dependency on speech:assign permission.
+execution_rationale: >
+  The bug is caused by the showTopicRow condition at SpeechSlot.tsx:167 which
+  includes canAssign (hasPermission('speech:assign')) in the expression:
+    const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+  When topicDisplay is null (no topic assigned), the row is only shown if
+  canAssign is true. Secretary and observer do not have speech:assign, so
+  they never see the empty topic field. The fix changes the condition to:
+    const showTopicRow = !isPrayer && !!speech;
+  This shows the topic row whenever a speech record exists, regardless of
+  permissions. The topic field will be read-only for users without
+  speech:assign (no chevron, not pressable), but always visible.
+
+  NOTE: Even if CR-243 (F170) adds speech:assign to the secretary role,
+  this fix is still needed for the observer role, which should see the
+  topic field in read-only mode. The two CRs are independent fixes.
+
+# =============================================================================
+# CONTEXT
+# =============================================================================
+#
+# Current state (pre-Batch 31):
+# - SpeechSlot.tsx:167 defines:
+#     const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+# - canAssign is derived from hasPermission('speech:assign') (line 97).
+# - topicDisplay is computed at lines 152-156: it's non-null only when
+#   speech.topic_title exists.
+# - When topicDisplay is null AND canAssign is false:
+#   showTopicRow = !isPrayer && !!(null || (false && speech)) = false
+#   => Topic row is hidden.
+# - Bishopric (has speech:assign): sees topic row always (for non-prayer slots)
+# - Secretary (no speech:assign): sees topic row ONLY when topic is already set
+# - Observer (no speech:assign): sees topic row ONLY when topic is already set
+# - Expected behavior: Secretary and Observer should ALWAYS see the topic row
+#   (read-only) when a speech exists, even if no topic is assigned yet.
+# - The topic field when shown to users without canAssign:
+#   - Is not pressable (disabled={!canAssign || !speech}, line 269)
+#   - Does not show the chevron arrow (canAssign check at line 282)
+#   - Does not show the X clear button (canAssign check at line 287)
+#   - Shows placeholder text "Selecionar Tema" when empty
+# =============================================================================
+
+# =============================================================================
+# F171: Fix topic row visibility for secretary and observer - CR-244
+# =============================================================================
+
+features:
+
+  - id: F171
+    name: "Show topic row always for secretary and observer when speech exists"
+    cr_id: 244
+    type: bugfix
+    related_crs: [243]
+    related_features: [F023, F157]
+    description: >
+      CR-244 fixes a bug where the secretary and observer roles cannot see
+      the topic field in SpeechSlot until a topic is already assigned. The
+      root cause is that the showTopicRow condition depends on the
+      speech:assign permission (canAssign). The fix simplifies the condition
+      to show the topic row whenever a speech exists and the slot is not a
+      prayer, regardless of permissions.
+
+      After the fix:
+      - Bishopric: sees editable topic field (can select/clear topics)
+      - Secretary: sees topic field (editable if CR-243/F170 is applied,
+        otherwise read-only with placeholder)
+      - Observer: sees read-only topic field with placeholder or topic value
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      - id: AC-171-01
+        description: "showTopicRow does not depend on canAssign permission"
+        given: "SpeechSlot.tsx defines the showTopicRow variable"
+        when: "The condition is evaluated"
+        then: "showTopicRow is defined as: const showTopicRow = !isPrayer && !!speech; It does not reference canAssign or any permission check."
+        status: pending
+
+      - id: AC-171-02
+        description: "Secretary sees empty topic field when no topic is assigned"
+        given: "User is logged in as secretary and a speech slot has a speaker assigned but no topic"
+        when: "SpeechSlot renders for that speech"
+        then: "The topic row is visible with placeholder text (e.g., 'Selecionar Tema'). The field is displayed even though no topic is assigned."
+        status: pending
+
+      - id: AC-171-03
+        description: "Observer sees empty topic field when no topic is assigned"
+        given: "User is logged in as observer and a speech slot has a speaker assigned but no topic"
+        when: "SpeechSlot renders for that speech"
+        then: "The topic row is visible with placeholder text. The field is read-only (not pressable, no chevron, no X button)."
+        status: pending
+
+      - id: AC-171-04
+        description: "Secretary sees topic field with assigned topic"
+        given: "User is logged in as secretary and a speech slot has a topic assigned"
+        when: "SpeechSlot renders for that speech"
+        then: "The topic row is visible showing the topic in 'Collection : Title' format."
+        status: pending
+
+      - id: AC-171-05
+        description: "Observer sees topic field with assigned topic"
+        given: "User is logged in as observer and a speech slot has a topic assigned"
+        when: "SpeechSlot renders for that speech"
+        then: "The topic row is visible showing the topic in 'Collection : Title' format. The field is read-only."
+        status: pending
+
+      - id: AC-171-06
+        description: "Topic row is still hidden for prayer slots"
+        given: "SpeechSlot renders with isPrayer=true (positions 0 or 4)"
+        when: "The slot is a prayer slot regardless of role"
+        then: "showTopicRow evaluates to false. No topic row is shown. Prayers do not have topics."
+        status: pending
+
+      - id: AC-171-07
+        description: "Topic row is hidden when speech is null"
+        given: "SpeechSlot renders with speech=null (no speech record created yet)"
+        when: "The slot has no speech data"
+        then: "showTopicRow evaluates to false (!!null = false). No topic row is shown."
+        status: pending
+
+      - id: AC-171-08
+        description: "Bishopric behavior unchanged"
+        given: "User is logged in as bishopric"
+        when: "SpeechSlot renders with a speech (topic assigned or not)"
+        then: "Topic row is visible with editable field (pressable, chevron shown, X button when topic assigned). Behavior identical to before the fix."
+        status: pending
+
+      - id: AC-171-09
+        description: "Observer topic field is read-only"
+        given: "User is logged in as observer"
+        when: "Topic row is visible on a speech slot"
+        then: "The topic field is disabled (not pressable). No chevron arrow is shown. No X (clear) button is shown. The field displays the assigned topic or placeholder text."
+        status: pending
+
+      - id: AC-171-10
+        description: "Full test suite passes"
+        given: "All SpeechSlot.tsx changes are applied"
+        when: "npx vitest run is executed"
+        then: "All tests pass with 0 failures."
+        status: pending
+
+    edge_cases:
+      - id: EC-171-01
+        case: "Speech exists but speaker is not assigned (status not_assigned)"
+        expected: "showTopicRow is true as long as speech is non-null. The topic row is shown even before a speaker is assigned. The topic field shows placeholder text and is read-only for observer, editable for bishopric (and secretary if F170 applied)."
+        status: pending
+
+      - id: EC-171-02
+        case: "F118 second speech toggle is disabled (position 2)"
+        expected: "When isSecondSpeechEnabled is false, position 2 shows disabled placeholder fields (lines 206-224). The showTopicRow change does not affect this case because the disabled branch renders its own placeholder topic row."
+        status: pending
+
+      - id: EC-171-03
+        case: "CR-243 (F170) applied together with CR-244 (F171)"
+        expected: "When both fixes are applied, secretary has canAssign=true AND showTopicRow is simplified. The topic field is both visible AND editable for secretary. Observer still sees it read-only. Both fixes are independent and complementary."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - src/components/SpeechSlot.tsx
+
+    files_not_modified:
+      - src/lib/permissions.ts (permission changes are in F170/CR-243)
+      - src/components/SundayCard.tsx (no changes needed)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS
+    # =========================================================================
+
+    implementation_details:
+
+      - location: "src/components/SpeechSlot.tsx:167 (showTopicRow condition)"
+        current_code: |
+          // Show topic row when there's a display value, or when can assign and speech exists (hide for prayer slots)
+          const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+        new_code: |
+          // Show topic row whenever a speech exists (hide for prayer slots)
+          const showTopicRow = !isPrayer && !!speech;
+        rationale: >
+          Remove the dependency on canAssign. The topic row should be visible
+          to all roles whenever a speech record exists (and it is not a prayer).
+          Users without speech:assign will see the field as read-only (disabled,
+          no chevron, no X button) - these controls are already gated by
+          canAssign checks on lines 269, 282, and 287. The visibility of the
+          row itself should not depend on permissions.
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-171-01
+    question: "Should we add a separate permission for viewing topics vs assigning topics?"
+    decision: "No, simplify showTopicRow to always show when speech exists"
+    rationale: >
+      Adding a new permission (e.g., topic:read) would be over-engineering.
+      The topic row already has proper read-only behavior built in: the
+      Pressable is disabled when !canAssign, the chevron is hidden, and the
+      X button is hidden. The only missing piece was the row visibility
+      itself, which should not be permission-gated.
+    decided_in: CR-244
+
+  - id: DD-171-02
+    question: "Should we keep the topicDisplay check in showTopicRow?"
+    decision: "No, remove it entirely"
+    rationale: >
+      The original condition was: !isPrayer && !!(topicDisplay || (canAssign && speech)).
+      The topicDisplay part meant "show if there's a topic to display" and the
+      canAssign part meant "show if user can assign". The new condition
+      !isPrayer && !!speech means "show for all non-prayer speeches". This is
+      simpler and covers both cases: when a topic exists (it will be displayed)
+      and when no topic exists (placeholder text is shown).
+    decided_in: CR-244
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-171-01
+      text: >
+        Showing an empty topic field (placeholder) to observer and secretary
+        is intentional and desired. Even though they cannot assign topics
+        (observer never, secretary only if F170 is applied), seeing the
+        placeholder makes the UI consistent and informs them that no topic
+        has been assigned yet.
+    - id: A-171-02
+      text: >
+        This fix is independent of CR-243 (F170). Even if F170 grants
+        speech:assign to secretary, the observer still needs this fix to
+        see the topic row. The two CRs should both be implemented.
+
+  inconsistencies: []

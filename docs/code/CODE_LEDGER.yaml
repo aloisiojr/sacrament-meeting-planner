@@ -35,12 +35,13 @@
 # CR-234, CR-235, CR-236, CR-237, CR-238
 # CR-239
 # CR-240, CR-241, CR-242
+# CR-243, CR-244
 # Generated: 2026-02-26
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-221, CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230, CR-234, CR-235, CR-236, CR-237, CR-238, CR-239, CR-240, CR-241, CR-242]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-221, CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230, CR-234, CR-235, CR-236, CR-237, CR-238, CR-239, CR-240, CR-241, CR-242, CR-243, CR-244]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -5834,3 +5835,48 @@ batch27_test_results:
       - id: CHG-815
         description: "Add 12 new tests for prayer positions 0 and 4 in speaker_confirmed (6 tests) and speaker_withdrew (6 tests) across 3 languages. Each test verifies prayer-specific title, body contains prayer label, body does NOT contain discurso/speech."
     acs_covered: [AC-167-10, AC-167-11, AC-167-12, AC-167-13]
+
+  # --- CR-243 commits (Batch 31 / F170) ---
+
+  - step: STEP-01
+    cr: CR-243
+    hash: 9594aba
+    message: "feat(permissions): grant secretary speech:assign and speech:unassign (CR-243)"
+    files_changed:
+      - src/lib/permissions.ts
+    changes:
+      - id: CHG-816
+        description: "Add 'speech:assign' and 'speech:unassign' to the secretary permission set in PERMISSIONS_MAP, granting the secretary the same speaker/prayer assignment capabilities as bishopric."
+    acs_covered: [AC-170-01, AC-170-02, AC-170-03, AC-170-04, AC-170-05, AC-170-06, AC-170-07, AC-170-08]
+
+  # --- CR-244 commits (Batch 31 / F171) ---
+
+  - step: STEP-02
+    cr: CR-244
+    hash: 6451f3a
+    message: "fix(SpeechSlot): decouple topic row visibility from permissions (CR-244)"
+    files_changed:
+      - src/components/SpeechSlot.tsx
+    changes:
+      - id: CHG-817
+        description: "Simplify showTopicRow condition from '!isPrayer && !!(topicDisplay || (canAssign && speech))' to '!isPrayer && !!speech', ensuring secretary and observer always see the topic row when a speech exists."
+    acs_covered: [AC-171-01, AC-171-02, AC-171-03, AC-171-04, AC-171-05, AC-171-06, AC-171-07, AC-171-08, AC-171-09]
+
+  # --- CR-243/CR-244 test commits (Batch 31 / F170+F171) ---
+
+  - step: STEP-03
+    cr: CR-243
+    hash: e5d9af1
+    message: "test(permissions): update tests for secretary speech:assign/unassign (CR-243)"
+    files_changed:
+      - src/__tests__/permissions.test.ts
+      - src/__tests__/integration/permissions-roles.integration.test.ts
+      - src/__tests__/cr003-qa.test.ts
+    changes:
+      - id: CHG-818
+        description: "Update EXPECTED_MATRIX: secretary speech:assign and speech:unassign changed from false to true. Update secretary permission count from 21 to 23. Rename test to reflect secretary now HAS speech:assign."
+      - id: CHG-819
+        description: "Update integration test: secretary speech:assign/unassign assertions changed to true, test name updated to reflect only home:next_assignments is bishopric-exclusive."
+      - id: CHG-820
+        description: "Update cr003-qa test: AC-31.3 assertion changed from toBe(false) to toBe(true) for secretary speech:assign, reflecting CR-243 grant."
+    acs_covered: [AC-170-09, AC-171-10]

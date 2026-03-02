@@ -4,7 +4,7 @@
  * The word "Actor"/"Ator" never appears in the UI.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,7 @@ export function ActorSelector({
   const [showAddInput, setShowAddInput] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const flatListRef = useRef<FlatList<MeetingActor>>(null);
 
   const { data: actors } = useActors(roleFilter);
   const createActor = useCreateActor();
@@ -145,7 +146,7 @@ export function ActorSelector({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: MeetingActor }) => {
+    ({ item, index }: { item: MeetingActor; index: number }) => {
       const isEditing = editingId === item.id;
       const isSelected = multiSelect && selectedNames?.includes(item.name);
 
@@ -183,6 +184,9 @@ export function ActorSelector({
                 onPress={() => {
                   setEditingId(item.id);
                   setEditingName(item.name);
+                  setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+                  }, 100);
                 }}
               >
                 <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>{'\u270E'}</Text>
@@ -270,10 +274,16 @@ export function ActorSelector({
 
           {/* Actor list */}
           <FlatList
+            ref={flatListRef}
             data={filtered}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             keyboardShouldPersistTaps="handled"
+            onScrollToIndexFailed={(info) => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.3 });
+              }, 200);
+            }}
             ListEmptyComponent={
               <View style={styles.empty}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>

@@ -752,10 +752,12 @@ describe('F169: ActorSelector KeyboardAvoidingView (CR-242)', () => {
   it('AC-169-04/05/06: FlatList is inside KeyboardAvoidingView', () => {
     const kavStart = actorSelectorSource.indexOf('<KeyboardAvoidingView');
     const kavEnd = actorSelectorSource.indexOf('</KeyboardAvoidingView>');
-    const flatListIdx = actorSelectorSource.indexOf('<FlatList');
+    // Use regex to find JSX <FlatList (with newline or space after), not type annotation useRef<FlatList
+    const flatListMatch = actorSelectorSource.match(/\n\s*<FlatList\b/);
     expect(kavStart).toBeGreaterThan(-1);
     expect(kavEnd).toBeGreaterThan(-1);
-    expect(flatListIdx).toBeGreaterThan(-1);
+    expect(flatListMatch).not.toBeNull();
+    const flatListIdx = flatListMatch!.index!;
     // FlatList should be between KAV open and close tags
     expect(flatListIdx).toBeGreaterThan(kavStart);
     expect(flatListIdx).toBeLessThan(kavEnd);

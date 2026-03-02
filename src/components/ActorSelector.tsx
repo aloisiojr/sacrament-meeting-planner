@@ -27,6 +27,7 @@ import type { MeetingActor, CreateActorInput } from '../types/database';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.67);
+const ITEM_HEIGHT = 49; // paddingVertical:12*2 + fontSize:16 lineHeight + hairlineWidth
 
 // --- Types ---
 
@@ -283,6 +284,7 @@ export function ActorSelector({
             data={filtered}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
+            getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: keyboardHeight }}
             onScrollToIndexFailed={(info) => {

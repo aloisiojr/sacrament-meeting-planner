@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
+import { speechKeys } from './useSpeeches';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
 // --- Query Keys ---
@@ -90,6 +91,7 @@ export function useCreateMember() {
         .insert({
           ward_id: wardId,
           full_name: input.full_name,
+          informal_name: input.informal_name || input.full_name.split(' ')[0],
           country_code: input.country_code,
           phone: input.phone ?? null,
         })
@@ -128,10 +130,27 @@ export function useUpdateMember() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
+      }
+      // CR-246: Cascade phone/name/informal_name update to future speeches
+      const today = new Date().toISOString().split('T')[0];
+      const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
+      try {
+        await supabase
+          .from('speeches')
+          .update({
+            speaker_name: data.full_name,
+            speaker_phone: fullPhone,
+            speaker_informal_name: data.informal_name || data.full_name.split(' ')[0],
+          })
+          .eq('member_id', data.id)
+          .gte('sunday_date', today);
+        queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      } catch {
+        // Best-effort: member update already succeeded
       }
     },
   });

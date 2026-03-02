@@ -62,8 +62,9 @@ describe('CR-31: Secretary designation permissions', () => {
     expect(hasPermission('secretary', 'agenda:assign_speaker')).toBe(true);
   });
 
-  it('AC-31.3: Secretary does NOT have speech:assign permission', () => {
-    expect(hasPermission('secretary', 'speech:assign')).toBe(false);
+  // AC-31.3 (updated by CR-243): Secretary now HAS speech:assign permission
+  it('AC-31.3: Secretary has speech:assign permission (CR-243)', () => {
+    expect(hasPermission('secretary', 'speech:assign')).toBe(true);
   });
 
   // EC-31.1: Observer must NOT have agenda:assign_speaker

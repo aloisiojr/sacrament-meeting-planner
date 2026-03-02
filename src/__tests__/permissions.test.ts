@@ -12,8 +12,8 @@ import type { Role, Permission } from '../lib/permissions';
  * true = role has permission, false = role does not.
  */
 const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
-  'speech:assign': { bishopric: true, secretary: false, observer: false },
-  'speech:unassign': { bishopric: true, secretary: false, observer: false },
+  'speech:assign': { bishopric: true, secretary: true, observer: false },
+  'speech:unassign': { bishopric: true, secretary: true, observer: false },
   'speech:change_status': { bishopric: true, secretary: true, observer: false },
   'member:read': { bishopric: true, secretary: true, observer: true },
   'member:write': { bishopric: true, secretary: true, observer: false },
@@ -90,9 +90,9 @@ describe('Permissions', () => {
       expect(hasPermission('bishopric', 'home:invite_mgmt')).toBe(true);
     });
 
-    it('should grant Secretary appropriate permissions minus speech:assign', () => {
-      expect(hasPermission('secretary', 'speech:assign')).toBe(false);
-      expect(hasPermission('secretary', 'speech:unassign')).toBe(false);
+    it('should grant Secretary appropriate permissions including speech:assign', () => {
+      expect(hasPermission('secretary', 'speech:assign')).toBe(true);
+      expect(hasPermission('secretary', 'speech:unassign')).toBe(true);
       expect(hasPermission('secretary', 'home:next_assignments')).toBe(false);
 
       // CR-23: Secretary now has settings:users
@@ -121,9 +121,9 @@ describe('Permissions', () => {
       expect(perms.length).toBe(24);
     });
 
-    it('should return 21 permissions for Secretary', () => {
+    it('should return 23 permissions for Secretary', () => {
       const perms = getPermissions('secretary');
-      expect(perms.length).toBe(21);
+      expect(perms.length).toBe(23);
     });
 
     it('should return 3 permissions for Observer', () => {

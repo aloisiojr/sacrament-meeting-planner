@@ -121,6 +121,79 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain(getOrdinal(2, lang));
       expect(result.body).toContain('2026-03-08');
     });
+
+    it('builds confirmed text for opening prayer (position 0) in pt-BR', () => {
+      const result = buildNotificationText('speaker_confirmed', 'pt-BR', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toBe('Oração Confirmada');
+      expect(result.body).toContain('oração de abertura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('Maria Silva');
+      expect(result.body).toContain('2026-03-08');
+    });
+
+    it('builds confirmed text for opening prayer (position 0) in en', () => {
+      const result = buildNotificationText('speaker_confirmed', 'en', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toBe('Prayer Confirmed');
+      expect(result.body).toContain('opening prayer');
+      expect(result.body).not.toContain('speech');
+      expect(result.body).toContain('Maria Silva');
+    });
+
+    it('builds confirmed text for opening prayer (position 0) in es', () => {
+      const result = buildNotificationText('speaker_confirmed', 'es', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toBe('Oración Confirmada');
+      expect(result.body).toContain('oración de apertura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('Maria Silva');
+    });
+
+    it('builds confirmed text for closing prayer (position 4) in pt-BR', () => {
+      const result = buildNotificationText('speaker_confirmed', 'pt-BR', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toBe('Oração Confirmada');
+      expect(result.body).toContain('oração de encerramento');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('João Santos');
+    });
+
+    it('builds confirmed text for closing prayer (position 4) in en', () => {
+      const result = buildNotificationText('speaker_confirmed', 'en', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toBe('Prayer Confirmed');
+      expect(result.body).toContain('closing prayer');
+      expect(result.body).not.toContain('speech');
+      expect(result.body).toContain('João Santos');
+    });
+
+    it('builds confirmed text for closing prayer (position 4) in es', () => {
+      const result = buildNotificationText('speaker_confirmed', 'es', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toBe('Oración Confirmada');
+      expect(result.body).toContain('oración de clausura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('João Santos');
+    });
   });
 
   describe('speaker_withdrew (Case 5)', () => {
@@ -133,6 +206,78 @@ describe('buildNotificationText', () => {
       expect(result.title).toBeTruthy();
       expect(result.body).toContain('Bob Wilson');
       expect(result.body).toContain(getOrdinal(3, lang));
+    });
+
+    it('builds withdrew text for opening prayer (position 0) in pt-BR', () => {
+      const result = buildNotificationText('speaker_withdrew', 'pt-BR', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toContain('Desistência de Oração');
+      expect(result.body).toContain('oração de abertura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('Maria Silva');
+    });
+
+    it('builds withdrew text for opening prayer (position 0) in en', () => {
+      const result = buildNotificationText('speaker_withdrew', 'en', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toContain('Prayer Withdrew');
+      expect(result.body).toContain('opening prayer');
+      expect(result.body).not.toContain('speech');
+      expect(result.body).toContain('Maria Silva');
+    });
+
+    it('builds withdrew text for opening prayer (position 0) in es', () => {
+      const result = buildNotificationText('speaker_withdrew', 'es', {
+        name: 'Maria Silva',
+        position: 0,
+        date: '2026-03-08',
+      });
+      expect(result.title).toContain('Desistimiento de Oración');
+      expect(result.body).toContain('oración de apertura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('Maria Silva');
+    });
+
+    it('builds withdrew text for closing prayer (position 4) in pt-BR', () => {
+      const result = buildNotificationText('speaker_withdrew', 'pt-BR', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toContain('Desistência de Oração');
+      expect(result.body).toContain('oração de encerramento');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('João Santos');
+    });
+
+    it('builds withdrew text for closing prayer (position 4) in en', () => {
+      const result = buildNotificationText('speaker_withdrew', 'en', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toContain('Prayer Withdrew');
+      expect(result.body).toContain('closing prayer');
+      expect(result.body).not.toContain('speech');
+      expect(result.body).toContain('João Santos');
+    });
+
+    it('builds withdrew text for closing prayer (position 4) in es', () => {
+      const result = buildNotificationText('speaker_withdrew', 'es', {
+        name: 'João Santos',
+        position: 4,
+        date: '2026-03-15',
+      });
+      expect(result.title).toContain('Desistimiento de Oración');
+      expect(result.body).toContain('oración de clausura');
+      expect(result.body).not.toContain('discurso');
+      expect(result.body).toContain('João Santos');
     });
   });
 

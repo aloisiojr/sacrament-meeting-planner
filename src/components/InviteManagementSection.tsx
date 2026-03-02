@@ -118,7 +118,7 @@ export function InviteManagementSection() {
           const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
           const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
           const message = resolvePrayerTemplate(template, {
-            speakerName: speech.speaker_name ?? '',
+            speakerName: speech.speaker_informal_name || speech.speaker_name || '',
             date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
             topic: '',
           });
@@ -140,7 +140,7 @@ export function InviteManagementSection() {
             '', // countryCode already in phone
             selectedTemplate,
             {
-              speakerName: speech.speaker_name ?? '',
+              speakerName: speech.speaker_informal_name || speech.speaker_name || '',
               date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
               topic: speech.topic_title ?? '',
               collection: speech.topic_collection ?? '',

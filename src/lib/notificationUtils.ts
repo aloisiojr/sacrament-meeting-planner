@@ -37,6 +37,19 @@ export function formatNameList(names: string[], language: OrdinalLanguage): stri
 }
 
 /**
+ * Get prayer label for position 0 (opening) or 4 (closing).
+ * Returns null if position is not a prayer position.
+ */
+function getPrayerLabel(position: number, language: OrdinalLanguage): string | null {
+  const labels: Record<OrdinalLanguage, Record<number, string>> = {
+    'pt-BR': { 0: 'oração de abertura', 4: 'oração de encerramento' },
+    en: { 0: 'opening prayer', 4: 'closing prayer' },
+    es: { 0: 'oración de apertura', 4: 'oración de clausura' },
+  };
+  return labels[language]?.[position] ?? null;
+}
+
+/**
  * Build notification text for the 5 notification cases.
  */
 export function buildNotificationText(
@@ -67,14 +80,32 @@ export function buildNotificationText(
         title: 'Lembrete de Discurso',
         body: 'Ainda há oradores para serem designados para o próximo domingo!',
       }),
-      speaker_confirmed: (d) => ({
-        title: 'Orador Confirmado',
-        body: `${d.name} foi confirmado(a) para o ${getOrdinal(d.position ?? 1, language)} discurso em ${d.date}.`,
-      }),
-      speaker_withdrew: (d) => ({
-        title: 'ATENÇÃO! Desistência',
-        body: `ATENÇÃO! ${d.name} NÃO poderá proferir o ${getOrdinal(d.position ?? 1, language)} discurso em ${d.date}. Designe outro orador!`,
-      }),
+      speaker_confirmed: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: 'Oração Confirmada',
+            body: `${d.name} foi confirmado(a) para a ${prayerLabel} em ${d.date}.`,
+          };
+        }
+        return {
+          title: 'Orador Confirmado',
+          body: `${d.name} foi confirmado(a) para o ${getOrdinal(d.position ?? 1, language)} discurso em ${d.date}.`,
+        };
+      },
+      speaker_withdrew: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: 'ATENÇÃO! Desistência de Oração',
+            body: `ATENÇÃO! ${d.name} NÃO poderá fazer a ${prayerLabel} em ${d.date}. Designe outra pessoa!`,
+          };
+        }
+        return {
+          title: 'ATENÇÃO! Desistência',
+          body: `ATENÇÃO! ${d.name} NÃO poderá proferir o ${getOrdinal(d.position ?? 1, language)} discurso em ${d.date}. Designe outro orador!`,
+        };
+      },
     },
     en: {
       designation: (d) => {
@@ -93,14 +124,32 @@ export function buildNotificationText(
         title: 'Speech Reminder',
         body: 'There are still speakers to be assigned for next Sunday!',
       }),
-      speaker_confirmed: (d) => ({
-        title: 'Speaker Confirmed',
-        body: `${d.name} has been confirmed to give the ${getOrdinal(d.position ?? 1, language)} speech on ${d.date}.`,
-      }),
-      speaker_withdrew: (d) => ({
-        title: 'ATTENTION! Speaker Withdrew',
-        body: `ATTENTION! ${d.name} will NOT be able to give the ${getOrdinal(d.position ?? 1, language)} speech on ${d.date}. Assign another speaker!`,
-      }),
+      speaker_confirmed: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: 'Prayer Confirmed',
+            body: `${d.name} has been confirmed to give the ${prayerLabel} on ${d.date}.`,
+          };
+        }
+        return {
+          title: 'Speaker Confirmed',
+          body: `${d.name} has been confirmed to give the ${getOrdinal(d.position ?? 1, language)} speech on ${d.date}.`,
+        };
+      },
+      speaker_withdrew: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: 'ATTENTION! Prayer Withdrew',
+            body: `ATTENTION! ${d.name} will NOT be able to give the ${prayerLabel} on ${d.date}. Assign someone else!`,
+          };
+        }
+        return {
+          title: 'ATTENTION! Speaker Withdrew',
+          body: `ATTENTION! ${d.name} will NOT be able to give the ${getOrdinal(d.position ?? 1, language)} speech on ${d.date}. Assign another speaker!`,
+        };
+      },
     },
     es: {
       designation: (d) => {
@@ -119,14 +168,32 @@ export function buildNotificationText(
         title: 'Recordatorio de Discurso',
         body: '¡Aún hay oradores por asignar para el próximo domingo!',
       }),
-      speaker_confirmed: (d) => ({
-        title: 'Orador Confirmado',
-        body: `${d.name} fue confirmado(a) para el ${getOrdinal(d.position ?? 1, language)} discurso el ${d.date}.`,
-      }),
-      speaker_withdrew: (d) => ({
-        title: '¡ATENCIÓN! Desistimiento',
-        body: `¡ATENCIÓN! ${d.name} NO podrá dar el ${getOrdinal(d.position ?? 1, language)} discurso el ${d.date}. ¡Asigne otro orador!`,
-      }),
+      speaker_confirmed: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: 'Oración Confirmada',
+            body: `${d.name} fue confirmado(a) para la ${prayerLabel} el ${d.date}.`,
+          };
+        }
+        return {
+          title: 'Orador Confirmado',
+          body: `${d.name} fue confirmado(a) para el ${getOrdinal(d.position ?? 1, language)} discurso el ${d.date}.`,
+        };
+      },
+      speaker_withdrew: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? 1, language);
+        if (prayerLabel) {
+          return {
+            title: '¡ATENCIÓN! Desistimiento de Oración',
+            body: `¡ATENCIÓN! ${d.name} NO podrá hacer la ${prayerLabel} el ${d.date}. ¡Asigne a otra persona!`,
+          };
+        }
+        return {
+          title: '¡ATENCIÓN! Desistimiento',
+          body: `¡ATENCIÓN! ${d.name} NO podrá dar el ${getOrdinal(d.position ?? 1, language)} discurso el ${d.date}. ¡Asigne otro orador!`,
+        };
+      },
     },
   };
 

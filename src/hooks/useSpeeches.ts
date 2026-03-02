@@ -40,6 +40,7 @@ export interface AssignSpeakerInput {
   speechId: string;
   memberId: string;
   speakerName: string;
+  speakerInformalName: string | null;
   speakerPhone: string | null;
   status?: SpeechStatus;
 }
@@ -250,6 +251,7 @@ export function useAssignSpeaker() {
         .update({
           member_id: input.memberId,
           speaker_name: input.speakerName,
+          speaker_informal_name: input.speakerInformalName,
           speaker_phone: input.speakerPhone,
           status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
         })
@@ -361,6 +363,7 @@ export function useRemoveAssignment() {
         .update({
           member_id: null,
           speaker_name: null,
+          speaker_informal_name: null,
           speaker_phone: null,
           status: 'not_assigned' as SpeechStatus,
         })

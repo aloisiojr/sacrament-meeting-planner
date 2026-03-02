@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-26"
-  last_updated_by: "batch-29-phase-1"
+  last_updated: "2026-03-01"
+  last_updated_by: "batch-30-phase-1"
   total_modules: 8
-  total_adrs: 116
-  total_crs_implemented: 149
+  total_adrs: 118
+  total_crs_implemented: 152
   pending_arch: "none"
   source_documents:
     - docs/arch/history/ARCH_INDEX.md
@@ -55,6 +55,7 @@ metadata:
     - docs/arch/ARCH_M159.yaml
     - docs/arch/ARCH_M161.yaml
     - docs/arch/ARCH_M050.yaml
+    - docs/arch/ARCH_M009.yaml
 
 # =============================================================================
 # TECH STACK
@@ -221,7 +222,7 @@ modules:
   - id: M002
     name: WardDataModule
     responsibility: "Dados mestres da ala: membros, topicos, colecoes, tipos de domingo, atores, hinos, log de atividades"
-    spec_features: [F002, F003, F004, F005, F006, F007, F013, F014, F015, F019, F141]
+    spec_features: [F002, F003, F004, F005, F006, F007, F013, F014, F015, F019, F141, F169]
     key_files:
       - src/app/(tabs)/settings/members.tsx
       - src/app/(tabs)/settings/topics.tsx
@@ -248,7 +249,7 @@ modules:
       - MemberManagementScreen (members.tsx)
       - TopicManagementScreen (topics.tsx)
       - ActivityLogScreen (history.tsx)
-    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118, 130, 137, 138, 142, 178, 180, 206]
+    modified_by_crs: [6, 8, 18, 20, 21, 22, 24, 39, 42, 54, 55, 66, 70, 71, 72, 77, 78, 79, 80, 83, 84, 85, 86, 88, 89, 90, 117, 118, 130, 137, 138, 142, 178, 180, 206, 242]
     notes: |
       CR-42 implementou CSV import/export com expo-file-system + expo-sharing.
       CR-54/55/66 corrigiram edge cases de CSV e header spacer.
@@ -275,6 +276,7 @@ modules:
         history.tsx renders translated descriptions via formatLogDescription(desc, t).
       CR-178/F116: topics.tsx uses wardLanguage (from AuthContext) for collection listing instead of getCurrentLanguage(). useTopics.ts 'Temas da Ala' hardcoded label replaced with t('topics.wardTopics').
       CR-180/F117: meeting_actors.can_music split into can_pianist + can_conductor. Migration 017. CHECK constraint prevents both true. useActors ActorRoleFilter updated. ActorSelector role mapping updated.
+      CR-242/F169: ActorSelector gains KeyboardAvoidingView (behavior="padding" on iOS) inside sheet View. Fixes keyboard covering inline TextInput when editing actors near bottom of list. Follows members.tsx/topics.tsx pattern (ADR-118).
 
   - id: M003
     name: SpeechModule
@@ -345,7 +347,7 @@ modules:
   - id: M004
     name: AgendaModule
     responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
-    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157, F158, F161, F162, F166]
+    spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157, F158, F161, F162, F166, F168]
     key_files:
       - src/app/(tabs)/agenda.tsx
       - src/app/presentation.tsx
@@ -363,7 +365,7 @@ modules:
     screens:
       - AgendaTab (agenda.tsx)
       - PresentationMode (presentation.tsx)
-    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217, 220, 230, 234, 235, 239]
+    modified_by_crs: [3, 25, 26, 27, 28, 29, 30, 38, 73, 74, 75, 122, 125, 121, 120, 123, 131, 132, 133, 136, 141, 151, 152, 153, 156, 157, 158, 159, 166, 167, 170, 171, 172, 173, 180, 181, 184, 185, 194, 196, 200, 209, 210, 212, 213, 214, 217, 220, 230, 234, 235, 239, 241]
     notes: |
       Lazy creation: registro da agenda criado ao expandir domingo.
       Auto-save em cada mudanca de campo (debounced para text inputs, CR-27).
@@ -415,11 +417,12 @@ modules:
       CR-234/F161: welcome_new_families field added to AgendaForm (FieldRow + DebouncedTextInput between Recognizing and Announcements). Auto-saves via updateField. Observer read-only. usePresentationMode adds welcome_new_families to Welcome card (conditional, multiline type). DB migration 022 adds TEXT DEFAULT NULL column to sunday_agendas. SundayAgenda TypeScript interface updated. i18n key agenda.welcomeNewFamilies in 3 locales (ADR-114).
       CR-235/F162: PlayIcon SVG replaced from triangle to circle-play (Circle + Path in icons/index.tsx). Agenda.tsx play button circular border container removed (circle-play has built-in circle). Size increased 18->24.
       CR-239/F166: dateUtils.ts hardcoded accent corrections: MONTH_FULL pt-BR 'Marco'->'Março', DAY_NAMES pt-BR 'Terca-feira'->'Terça-feira' and 'Sabado'->'Sábado', DAY_NAMES es 'Miercoles'->'Miércoles' and 'Sabado'->'Sábado'. Data-only, no logic changes.
+      CR-241/F168: DebouncedTextInput flicker fix. isFocusedRef added to skip sync useEffect during active typing. handleFocus/handleBlur manage ref. onFocus added to TextInput. Prevents character disappearance caused by query refetch overwriting localValue during typing (ADR-117).
 
   - id: M005
     name: NotificationModule
     responsibility: "Push notifications via fila no banco, Expo Push API e Edge Function cron"
-    spec_features: [F017]
+    spec_features: [F017, F167]
     key_files:
       - src/hooks/useNotifications.ts
       - src/lib/notificationUtils.ts
@@ -431,13 +434,14 @@ modules:
       - useNotificationHandler
     edge_functions:
       - process-notifications (cron every 1 minute)
-    modified_by_crs: [52, 53]
+    modified_by_crs: [52, 53, 240]
     notes: |
       5 casos de notificacao: designation (delayed 5min), weekly_assignment,
       weekly_confirmation, speaker_confirmed (immediate), speaker_withdrew (immediate).
       DB triggers enfileiram em notification_queue; cron EF processa e envia via Expo Push API.
       Observers nao recebem push. Token registrado no login/abertura do app.
       CR-91: enqueue_speech_notification() usa SECURITY DEFINER para bypass RLS (ADR-035).
+      CR-240/F167: getPrayerLabel() helper added to both notificationUtils.ts (client) and process-notifications/index.ts (server). speaker_confirmed and speaker_withdrew now produce prayer-specific titles and bodies for positions 0 (opening prayer) and 4 (closing prayer). Positions 1-3 unchanged. Titles: 'Oracao Confirmada'/'Prayer Confirmed'/'Oracion Confirmada' for prayers vs 'Orador Confirmado'/'Speaker Confirmed' for speeches. Withdrew uses 'outra pessoa'/'someone else' instead of 'outro orador'/'another speaker' for prayers.
 
   - id: M006
     name: SyncEngine
@@ -1683,6 +1687,24 @@ adrs:
       - "Complete diacritical correctness across all locale files in one batch"
       - "27 total es corrections instead of 11"
 
+  - id: ADR-117
+    title: "Use useRef instead of useState for DebouncedTextInput focus tracking (Batch 30)"
+    context: "F168 needs focus tracking to guard sync useEffect. Options: useState (triggers re-render) or useRef (no re-render)."
+    decision: "Use useRef(false). Focus state only guards a side effect, does not affect render output. Consistent with existing ref usage in component."
+    decided_in: "CR-241/F168"
+    consequences:
+      - "No re-render on focus/blur transitions"
+      - "Focus state immediately available in useEffect"
+
+  - id: ADR-118
+    title: "No keyboardVerticalOffset for ActorSelector KeyboardAvoidingView (Batch 30)"
+    context: "F169 adds KeyboardAvoidingView. members.tsx and topics.tsx use default offset (0). Bottom-sheet at screen bottom."
+    decision: "Start without keyboardVerticalOffset, matching existing pattern. Adjust in follow-up if needed."
+    decided_in: "CR-242/F169"
+    consequences:
+      - "Consistent with existing KeyboardAvoidingView usage"
+      - "May need follow-up offset adjustment"
+
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
@@ -2099,7 +2121,7 @@ file_structure:
 
   "src/components/":
     "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). CR-97: multi-select recognizing. CR-100: SpeakerField read-only + override. CR-121/F064: label '(Designacao de ultima hora)' quando hasOverride. CR-123/F067: campo Reconhecendo com Pressable customizado mostrando nomes um por linha. CR-131/F074: styles.searchInput simplificado para {flex:1}. CR-173/F111: last speech label simplified to t('speeches.lastSpeech'). CR-180/F117: pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. CR-181/F118: disabled placeholder for speech 2 when has_second_speech=false. CR-179/F120: SelectorField enhanced with onClear prop for X clear buttons on all selector fields. CR-182/F121: SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param). CR-194/F130: Member type import fix. CR-196/F132: disabled ReadOnlySpeakerRow always rendered (not conditionally hidden) when has_second_speech=false. CR-234/F161: welcome_new_families FieldRow + DebouncedTextInput between Recognizing and Announcements."
-    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor. CR-236/F163: Unicode checkbox replaced with SVG CheckSquareIcon/SquareIcon (colors.primary for selected, colors.textSecondary for unselected)."
+    "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. CR-97: multiSelect + selectedNames props. CR-137/F080: checkbox unicode (U+2611/U+2610) em multiSelect. CR-138/F081: actors.deleteConfirm i18n key. CR-180/F117: role mapping updated for can_pianist/can_conductor. CR-236/F163: Unicode checkbox replaced with SVG CheckSquareIcon/SquareIcon (colors.primary for selected, colors.textSecondary for unselected). CR-242/F169: KeyboardAvoidingView added inside sheet (behavior='padding' on iOS) for keyboard coverage during inline editing (ADR-118)."
     "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
     "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
     "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
@@ -2110,7 +2132,7 @@ file_structure:
     "StatusChangeModal.tsx": "Modal de mudanca de status. CR-116/F062: prop allowedStatuses para filtrar opcoes. CR-126/F069: STATUS_INDICATOR_COLORS com cores flat atualizadas."
     "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). CR-156/F097: directional arrows (above=down, below=up, expanded=hidden). CR-158/F097: optional cardTitleFontSize prop. CR-209/F145: chevron Unicode replaced with ChevronDownIcon/ChevronUpIcon SVG."
     "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete (CR-87: Unicode icons, CR-90: pointerEvents fix). CR-209/F145: Unicode/emoji icons replaced with SVG (PencilIcon, TrashIcon)."
-    "DebouncedTextInput.tsx": "TextInput com auto-save debounced"
+    "DebouncedTextInput.tsx": "TextInput com auto-save debounced. CR-241/F168: isFocusedRef prevents sync useEffect from overwriting localValue during active typing (flicker fix)."
     "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar (CR-84). flex:1 defensivo no container (CR-118/F065). CR-209/F145: XIcon SVG replaces Unicode."
     "OfflineBanner.tsx": "Banner vermelho de offline. CR-147/F090: useSafeAreaInsets para paddingTop, fontSize 14->15 / 12->13."
     "ErrorBoundary.tsx": "Error boundary do React"
@@ -2138,7 +2160,7 @@ file_structure:
     "connectionUtils.ts": "Utilitarios de conexao"
     "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
     "offlineGuard.ts": "Guard para operacoes online-only"
-    "notificationUtils.ts": "Utilitarios de notificacoes"
+    "notificationUtils.ts": "Utilitarios de notificacoes. CR-240/F167: getPrayerLabel() helper added. speaker_confirmed/speaker_withdrew produce prayer-specific text for positions 0 and 4."
     "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, getCountryByLabel (CR-117, CR-130/F072: usado para display correto de bandeira), splitPhoneNumber (CR-85, ADR-031, ADR-043)"
 
   "src/types/":

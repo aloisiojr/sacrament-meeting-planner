@@ -1,0 +1,391 @@
+# =============================================================================
+# ARCH_M009.yaml
+# Architecture for Batch 30: F167, F168, F169
+# F167 - Fix push notification text for prayer positions (CR-240)
+# F168 - Fix DebouncedTextInput flickering during typing (CR-241)
+# F169 - Add keyboard avoidance to ActorSelector modal (CR-242)
+# Created: 2026-03-01
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Batch 30 fixes three independent bugs:
+    (1) F167/CR-240: Push notification text for prayer positions (0 and 4)
+    shows broken messages like "0 discurso" instead of "oracao de abertura".
+    Fix adds getPrayerLabel() helper to both client-side notificationUtils.ts
+    and server-side process-notifications/index.ts, and updates speaker_confirmed
+    and speaker_withdrew text builders to use prayer-specific titles and bodies.
+    (2) F168/CR-241: DebouncedTextInput characters flicker during typing due
+    to the sync useEffect overwriting localValue when query refetch occurs.
+    Fix adds isFocusedRef to skip sync during active typing.
+    (3) F169/CR-242: Keyboard covers inline edit TextInput in ActorSelector
+    when editing actors near the bottom of the list. Fix adds
+    KeyboardAvoidingView with behavior="padding" on iOS, following the
+    established pattern from members.tsx and topics.tsx.
+  principles:
+    - "Minimal changes: each fix touches only the files strictly required"
+    - "Consistency: server and client notification text builders stay in sync (F167)"
+    - "Reuse existing patterns: KeyboardAvoidingView pattern from members.tsx (F169)"
+    - "No new dependencies: all fixes use built-in React Native and existing utilities"
+    - "Maintain backward compatibility: speech positions 1-3 unchanged (F167)"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  +----------------------------------------------------------------------+
+  |              Batch 30: F167 + F168 + F169                            |
+  |                                                                      |
+  |  F167 (CR-240): Prayer notification text fix                         |
+  |  +--------------------------+  +---------------------------------+   |
+  |  | notificationUtils.ts     |  | process-notifications/index.ts  |   |
+  |  | + getPrayerLabel()        |  | + getPrayerLabel()              |   |
+  |  | ~ speaker_confirmed()    |  | ~ buildConfirmedText()          |   |
+  |  | ~ speaker_withdrew()     |  | ~ buildWithdrewText()           |   |
+  |  +--------------------------+  +---------------------------------+   |
+  |  +-------------------------------------+                             |
+  |  | useNotifications-utils.test.ts       |                             |
+  |  | + prayer position tests (pos 0 & 4) |                             |
+  |  +-------------------------------------+                             |
+  |                                                                      |
+  |  F168 (CR-241): DebouncedTextInput flicker fix                       |
+  |  +----------------------------------+                                |
+  |  | DebouncedTextInput.tsx            |                                |
+  |  | + isFocusedRef                    |                                |
+  |  | + handleFocus()                   |                                |
+  |  | ~ handleBlur() (set ref false)    |                                |
+  |  | ~ sync useEffect (guard on focus) |                                |
+  |  | ~ TextInput (add onFocus)         |                                |
+  |  +----------------------------------+                                |
+  |                                                                      |
+  |  F169 (CR-242): ActorSelector keyboard avoidance                     |
+  |  +----------------------------------+                                |
+  |  | ActorSelector.tsx                 |                                |
+  |  | + import KeyboardAvoidingView     |                                |
+  |  | + import Platform                 |                                |
+  |  | + wrap sheet children in KAV      |                                |
+  |  +----------------------------------+                                |
+  +----------------------------------------------------------------------+
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- F167: Prayer notification text (client-side) ---
+
+  - name: "ClientPrayerNotificationText"
+    responsibility: "Add prayer-aware text to client-side notification text builder"
+    files:
+      - "src/lib/notificationUtils.ts"
+    cr_ids: [240]
+    changes:
+      - "Add getPrayerLabel(position, language) helper function before buildNotificationText"
+      - "Update speaker_confirmed handler in pt-BR: check getPrayerLabel, use prayer title/body when prayer position"
+      - "Update speaker_withdrew handler in pt-BR: check getPrayerLabel, use prayer title/body"
+      - "Update speaker_confirmed handler in en: same pattern"
+      - "Update speaker_withdrew handler in en: same pattern"
+      - "Update speaker_confirmed handler in es: same pattern"
+      - "Update speaker_withdrew handler in es: same pattern"
+    contract:
+      input: "buildNotificationText(type, language, {name, position, date})"
+      output_before: "Position 0/4: title='Orador Confirmado', body='...0 discurso...' (broken)"
+      output_after: |
+        Position 0: title='Oracao Confirmada'/'Prayer Confirmed'/'Oracion Confirmada',
+          body uses 'oracao de abertura'/'opening prayer'/'oracion de apertura'
+        Position 4: title='Oracao Confirmada'/'Prayer Confirmed'/'Oracion Confirmada',
+          body uses 'oracao de encerramento'/'closing prayer'/'oracion de clausura'
+        Positions 1-3: unchanged (Orador Confirmado / ordinal + discurso)
+        Same pattern for speaker_withdrew with ATENCAO prefix.
+    dependencies: []
+    notes: >
+      getPrayerLabel returns null for non-prayer positions (1-3), allowing
+      callers to fall through to existing ordinal + speech logic. The helper
+      is a pure function with no side effects.
+
+  # --- F167: Prayer notification text (server-side) ---
+
+  - name: "ServerPrayerNotificationText"
+    responsibility: "Add prayer-aware text to server-side notification text builders"
+    files:
+      - "supabase/functions/process-notifications/index.ts"
+    cr_ids: [240]
+    changes:
+      - "Add getPrayerLabel(position, language) helper function after getOrdinal"
+      - "Update buildConfirmedText: check getPrayerLabel, return prayer texts when prayer position"
+      - "Update buildWithdrewText: check getPrayerLabel, return prayer texts when prayer position"
+    contract:
+      input: "buildConfirmedText(language, name, position, date) / buildWithdrewText(language, name, position, date)"
+      output_before: "Position 0/4: uses getOrdinal fallback (returns '0'/'4'), body says '0 discurso'/'4 discurso'"
+      output_after: "Position 0/4: uses prayer-specific title and body (same text as client-side). Positions 1-3: unchanged."
+    dependencies: []
+    notes: >
+      Duplicated logic from client-side (intentional, per DD-25 / existing
+      architecture decision to keep client and server notification text
+      builders independent). Both must produce identical output for the
+      same inputs.
+
+  # --- F167: Tests ---
+
+  - name: "PrayerNotificationTests"
+    responsibility: "Add test coverage for prayer position notification text"
+    files:
+      - "src/__tests__/useNotifications-utils.test.ts"
+    cr_ids: [240]
+    changes:
+      - "Add speaker_confirmed tests for position 0 (opening prayer) across 3 languages"
+      - "Add speaker_confirmed tests for position 4 (closing prayer) across 3 languages"
+      - "Add speaker_withdrew tests for position 0 across 3 languages"
+      - "Add speaker_withdrew tests for position 4 across 3 languages"
+      - "Verify existing tests for positions 1-3 continue to pass"
+    contract:
+      input: "buildNotificationText with prayer positions (0, 4)"
+      output: >
+        Position 0: title contains prayer term (not speaker/orador), body contains opening prayer term
+        Position 4: title contains prayer term, body contains closing prayer term
+        Neither body contains 'discurso'/'speech'
+    dependencies: ["ClientPrayerNotificationText"]
+    notes: >
+      Tests verify the client-side buildNotificationText function only.
+      Server-side buildConfirmedText/buildWithdrewText are private functions
+      in the Edge Function and are not directly testable from Vitest.
+
+  # --- F168: DebouncedTextInput flicker fix ---
+
+  - name: "DebouncedTextInputFlickerFix"
+    responsibility: "Prevent sync useEffect from overwriting localValue during active typing"
+    files:
+      - "src/components/DebouncedTextInput.tsx"
+    cr_ids: [241]
+    changes:
+      - "Add isFocusedRef = useRef(false) after timerRef"
+      - "Guard sync useEffect: only setLocalValue when !isFocusedRef.current"
+      - "Add handleFocus callback: sets isFocusedRef.current = true, calls rest.onFocus"
+      - "Update handleBlur: sets isFocusedRef.current = false before flush()"
+      - "Add onFocus={handleFocus} to TextInput JSX"
+    contract:
+      input: "DebouncedTextInput with value prop that changes during typing"
+      output_before: "sync useEffect always calls setLocalValue(value), overwriting user's typed text"
+      output_after: "sync useEffect skips setLocalValue when input is focused; applies when not focused"
+    dependencies: []
+    notes: >
+      Uses useRef (not useState) for focus tracking to avoid unnecessary
+      re-renders (ADR-117). The flush() on blur ensures pending changes
+      are saved. The unmount cleanup is unaffected. All 6 DebouncedTextInput
+      instances in AgendaForm benefit automatically.
+
+  # --- F169: ActorSelector keyboard avoidance ---
+
+  - name: "ActorSelectorKeyboardAvoidance"
+    responsibility: "Wrap ActorSelector sheet content in KeyboardAvoidingView"
+    files:
+      - "src/components/ActorSelector.tsx"
+    cr_ids: [242]
+    changes:
+      - "Add KeyboardAvoidingView and Platform to react-native imports"
+      - "Wrap all children inside sheet View with KeyboardAvoidingView"
+      - "Set behavior='padding' on iOS, undefined on Android"
+      - "Set style={{ flex: 1 }} on KeyboardAvoidingView"
+    contract:
+      input: "ActorSelector modal open, user edits actor name near bottom of list"
+      output_before: "Keyboard covers the inline TextInput being edited"
+      output_after: "KeyboardAvoidingView pushes content up by keyboard height on iOS; Android uses system handling"
+    dependencies: []
+    notes: >
+      Follows identical pattern from members.tsx:525 and topics.tsx:366
+      (behavior="padding" on iOS, undefined on Android, style flex:1).
+      No keyboardVerticalOffset needed (ADR-118).
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "prayer_label_consistency"
+    components: ["ClientPrayerNotificationText", "ServerPrayerNotificationText"]
+    methods:
+      - name: "getPrayerLabel(position, language)"
+        input: "position: number (0 or 4), language: 'pt-BR' | 'en' | 'es'"
+        output: "string | null - prayer label or null for non-prayer positions"
+        notes: >
+          Both client and server implementations must return identical strings
+          for the same inputs. Position 0 -> opening prayer label, position 4 ->
+          closing prayer label, positions 1-3 -> null. The labels use proper
+          diacritical marks (oracao with tilde, oracion with accent).
+
+  - name: "notification_text_backward_compatibility"
+    components: ["ClientPrayerNotificationText", "ServerPrayerNotificationText"]
+    methods:
+      - name: "speaker_confirmed and speaker_withdrew for positions 1-3"
+        input: "position 1, 2, or 3 with any language"
+        output: "Exact same title and body as before the fix"
+        notes: >
+          The fix must not change output for speech positions.
+          Existing tests for positions 1-3 validate this.
+
+  - name: "debounced_input_external_handlers"
+    components: ["DebouncedTextInputFlickerFix"]
+    methods:
+      - name: "onFocus/onBlur prop forwarding"
+        input: "rest.onFocus and rest.onBlur callbacks from parent component"
+        output: "Both external handlers are called in addition to internal focus tracking"
+        notes: >
+          handleFocus calls rest.onFocus?.(e) after setting isFocusedRef.
+          handleBlur calls rest.onBlur?.(e) after setting isFocusedRef and flushing.
+          This preserves compatibility with any parent component that provides
+          onFocus/onBlur handlers.
+
+# =============================================================================
+# DATA MODEL CHANGES
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: "No database schema changes. All changes are to TypeScript source files."
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-117
+    title: "Use useRef instead of useState for DebouncedTextInput focus tracking (Batch 30)"
+    context: >
+      F168 needs to track whether the input is focused to guard the sync
+      useEffect. Options: (a) useState(false) with setIsFocused, or
+      (b) useRef(false) with isFocusedRef.current. The focus state is only
+      read inside the useEffect and does not affect rendering output.
+    decision: >
+      Use useRef(false). The focus state does not influence the component's
+      render output (only guards a side effect), so triggering a re-render
+      on focus/blur changes would be wasteful. Ref updates are synchronous
+      and available immediately in the useEffect.
+    decided_in: "CR-241/F168"
+    consequences:
+      - "No re-render on focus/blur transitions"
+      - "Focus state immediately available in useEffect without stale closure issues"
+      - "Consistent with other ref usage in the component (timerRef, latestValueRef)"
+
+  - id: ADR-118
+    title: "No keyboardVerticalOffset for ActorSelector KeyboardAvoidingView (Batch 30)"
+    context: >
+      F169 adds KeyboardAvoidingView to ActorSelector. Other screens
+      (members.tsx, topics.tsx) use behavior="padding" without
+      keyboardVerticalOffset. The ActorSelector is a bottom-sheet modal
+      positioned at the bottom of the screen.
+    decision: >
+      Start without keyboardVerticalOffset (default 0), matching the
+      pattern used in members.tsx and topics.tsx. The bottom-sheet
+      position means the default offset should work correctly. If visual
+      testing reveals partial coverage, an offset can be added as a
+      follow-up adjustment.
+    decided_in: "CR-242/F169"
+    consequences:
+      - "Consistent with existing KeyboardAvoidingView usage across the app"
+      - "Simple implementation with minimal risk"
+      - "May need follow-up offset if bottom-sheet geometry causes partial coverage"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F167, F157]
+    interaction: >
+      F157/CR-221 added prayer management (positions 0 and 4) to the speech
+      system. F167 fixes the notification text that was not updated when
+      F157 was implemented. The notification text builders did not account
+      for prayer positions, producing broken messages. F167 completes the
+      prayer support in the notification system.
+
+  - features: [F168, F161]
+    interaction: >
+      F161/CR-234 added a new DebouncedTextInput for welcome_new_families
+      in AgendaForm. F168 fixes a flickering bug in DebouncedTextInput
+      that affects all 6 instances including the F161-added field. No
+      conflict; the fix benefits all consumers automatically.
+
+  - features: [F169, F080]
+    interaction: >
+      F080/CR-137 established the ActorSelector multiSelect pattern with
+      checkbox icons. F169 adds KeyboardAvoidingView to the same component
+      for keyboard coverage during inline editing. No conflict; the KAV
+      wraps all existing content including multiSelect checkboxes.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+  - file: src/lib/notificationUtils.ts
+    feature: F167
+    cr_ids: [240]
+    changes:
+      - "Add getPrayerLabel() helper function"
+      - "Update speaker_confirmed for 3 languages: prayer-aware title and body"
+      - "Update speaker_withdrew for 3 languages: prayer-aware title and body"
+
+  - file: supabase/functions/process-notifications/index.ts
+    feature: F167
+    cr_ids: [240]
+    changes:
+      - "Add getPrayerLabel() helper function"
+      - "Update buildConfirmedText: prayer-aware title and body"
+      - "Update buildWithdrewText: prayer-aware title and body"
+
+  - file: src/__tests__/useNotifications-utils.test.ts
+    feature: F167
+    cr_ids: [240]
+    changes:
+      - "Add speaker_confirmed tests for prayer positions 0 and 4 (3 languages each)"
+      - "Add speaker_withdrew tests for prayer positions 0 and 4 (3 languages each)"
+
+  - file: src/components/DebouncedTextInput.tsx
+    feature: F168
+    cr_ids: [241]
+    changes:
+      - "Add isFocusedRef = useRef(false)"
+      - "Guard sync useEffect with !isFocusedRef.current check"
+      - "Add handleFocus callback"
+      - "Update handleBlur to set isFocusedRef.current = false"
+      - "Add onFocus={handleFocus} to TextInput"
+
+  - file: src/components/ActorSelector.tsx
+    feature: F169
+    cr_ids: [242]
+    changes:
+      - "Add KeyboardAvoidingView and Platform imports"
+      - "Wrap sheet children with KeyboardAvoidingView"
+
+files_not_modified:
+  - "src/hooks/useNotifications.ts (calls buildNotificationText, no change needed)"
+  - "src/i18n/locales/*.json (notification text is hardcoded, not i18n-based)"
+  - "src/components/AgendaForm.tsx (all 6 DebouncedTextInput instances benefit automatically)"
+  - "src/hooks/useRealtimeSync.ts (realtime sync logic unchanged)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 5 components, each with one responsibility
+  GATE-03_contracts_defined: true        # 3 cross-component contracts defined
+  GATE-04_adrs_recorded: true           # ADR-117, ADR-118 recorded
+  GATE-05_arch_saved: true              # ARCH_M009.yaml saved
+  GATE-06_arch_consolidated_updated: true   # ARCH_CONSOLIDATED updated
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 5 components (well under 10)

@@ -6,11 +6,11 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-02-26"
-  version: 39
-  last_updated_by: "batch-29-i18n-fixes"
+  last_updated: "2026-03-01"
+  version: 40
+  last_updated_by: "batch-30-notification-debounce-keyboard"
   total_phases: 6
-  total_cr_plans: 56
+  total_cr_plans: 57
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1122,6 +1122,39 @@ cr_plans:
       errors in single batch). STEP-01/02/03/04 parallelizaveis (todos
       independentes), STEP-05 depende de STEP-01/02/03/04, STEP-06 depende
       de todos.
+
+  - id: PLAN_P051
+    title: "Batch 30: Fix notification text, debounce flickering, keyboard avoidance (CR-240/241/242)"
+    status: pending
+    crs_covered: [240, 241, 242]
+    total_steps: 6
+    plan_ref: "docs/plans/PLAN_P051.yaml"
+    summary: >
+      Fix three independent bugs: (1) F167/CR-240: Push notification text for
+      prayer positions (0 and 4) shows broken messages like "0 discurso" instead
+      of "oracao de abertura". Add getPrayerLabel() helper to both client-side
+      notificationUtils.ts and server-side process-notifications/index.ts, update
+      speaker_confirmed and speaker_withdrew text builders for 3 languages (pt-BR,
+      en, es) with prayer-specific titles (Oracao Confirmada/Prayer Confirmed) and
+      bodies (oracao de abertura/opening prayer). Positions 1-3 unchanged. Withdrew
+      notifications use 'outra pessoa'/'someone else' for prayers instead of 'outro
+      orador'/'another speaker'. 12 new unit tests for prayer positions (6 confirmed
+      + 6 withdrew across 3 languages). (2) F168/CR-241: DebouncedTextInput
+      characters flicker during typing due to sync useEffect overwriting localValue
+      when query refetch occurs after debounced save. Add isFocusedRef (useRef per
+      ADR-117) to track focus state, guard sync useEffect with !isFocusedRef.current,
+      add handleFocus/handleBlur callbacks, add onFocus to TextInput JSX. All 6
+      DebouncedTextInput instances in AgendaForm benefit automatically.
+      (3) F169/CR-242: Keyboard covers inline edit TextInput in ActorSelector when
+      editing actors near bottom of list. Add KeyboardAvoidingView with
+      behavior="padding" on iOS and undefined on Android, wrapping sheet children
+      with style={{ flex: 1 }}, following pattern from members.tsx and topics.tsx.
+      No keyboardVerticalOffset per ADR-118. 3 features, 31 ACs (13+10+8), 9 ECs,
+      5 arquivos impactados (0 novos + 4 modificados + 1 teste), zero migracoes
+      SQL, zero dependencias novas. 2 ADRs: ADR-117 (useRef for focus tracking),
+      ADR-118 (no keyboardVerticalOffset). STEP-01/02 parallelizaveis (independentes),
+      STEP-03/04 parallelizaveis (independentes), STEP-05 depende STEP-03,
+      STEP-06 depende de todos.
 
 # =============================================================================
 # CRs pendentes sem plano

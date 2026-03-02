@@ -13,11 +13,11 @@ metadata:
     agenda completa da reuniao, com isolamento de dados entre alas, i18n
     (pt-BR, en, es), modo apresentacao, push notifications e audit log.
   created: "2026-02-18"
-  last_updated: "2026-02-26"
-  total_features: 151
-  total_change_requests: 223
+  last_updated: "2026-03-01"
+  total_features: 154
+  total_change_requests: 226
   implemented_crs: 96
-  pending_crs: 125
+  pending_crs: 128
   source_documents:
     - docs/PRODUCT_SPECIFICATION.md
     - docs/SPEC.final.md
@@ -85,6 +85,9 @@ metadata:
     - docs/specs/SPEC_F159.yaml
     - docs/specs/SPEC_F161.yaml
     - docs/specs/SPEC_F166.yaml
+    - docs/specs/SPEC_F167.yaml
+    - docs/specs/SPEC_F168.yaml
+    - docs/specs/SPEC_F169.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -283,7 +286,7 @@ permissions:
     observador: false  # usa apenas tema do sistema
 
 # =============================================================================
-# FEATURES (estado atual apos 125 features, 191 CRs, 96 implementados)
+# FEATURES (estado atual apos 128 features, 194 CRs, 96 implementados)
 # =============================================================================
 
 features:
@@ -3003,8 +3006,65 @@ features:
       - "11 acceptance criteria, 2 edge cases"
       - "4 arquivos impactados (3 locale JSON files, dateUtils.ts)"
 
+  # Batch 30 (F167-F169): notification text, debounce flickering, keyboard avoidance
+
+  - id: F167
+    name: "Fix push notification text for prayer positions"
+    status: pending
+    rfs: []
+    description: >
+      CR-240 fixes push notification text for prayer positions (0 = opening
+      prayer, 4 = closing prayer). Notification text builders always used
+      'discurso'/'speech' and ordinals that don't map positions 0/4, producing
+      broken messages like 'confirmado para o 0 discurso'. Fix distinguishes
+      prayers from speeches with position-specific labels in both client-side
+      (notificationUtils.ts) and server-side (process-notifications/index.ts).
+    modified_by_crs: [240]
+    spec_file: "docs/specs/SPEC_F167.yaml"
+    notes:
+      - "CR-240: Fix push notification text for opening/closing prayers"
+      - "13 acceptance criteria, 3 edge cases"
+      - "3 arquivos impactados (notificationUtils.ts, process-notifications/index.ts, tests)"
+      - "Prayer positions: 0 (abertura), 4 (encerramento)"
+      - "Affects speaker_confirmed and speaker_withdrew notification types"
+
+  - id: F168
+    name: "Fix DebouncedTextInput character flickering during typing"
+    status: pending
+    rfs: []
+    description: >
+      CR-241 fixes character flickering in DebouncedTextInput where typed
+      characters momentarily disappear. Root cause: useEffect syncing
+      localValue with value prop fires when mutation + query invalidation
+      updates the prop, overwriting user's typed text. Fix adds focus
+      tracking (isFocusedRef) to skip sync while input is focused.
+    modified_by_crs: [241]
+    spec_file: "docs/specs/SPEC_F168.yaml"
+    notes:
+      - "CR-241: Fix flickering/character disappearing in debounced text fields"
+      - "10 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (DebouncedTextInput.tsx)"
+      - "Affects all 6 DebouncedTextInput instances in AgendaForm"
+
+  - id: F169
+    name: "Add keyboard avoidance to ActorSelector modal"
+    status: pending
+    rfs: []
+    description: >
+      CR-242 fixes keyboard covering inline TextInput when editing actor
+      names low in the ActorSelector list. Adds KeyboardAvoidingView with
+      behavior='padding' on iOS inside the modal sheet, matching the pattern
+      used in members.tsx and topics.tsx.
+    modified_by_crs: [242]
+    spec_file: "docs/specs/SPEC_F169.yaml"
+    notes:
+      - "CR-242: Fix keyboard covering edit field in ActorSelector"
+      - "8 acceptance criteria, 3 edge cases"
+      - "1 arquivo impactado (ActorSelector.tsx)"
+      - "Follows existing KeyboardAvoidingView pattern from members.tsx/topics.tsx"
+
 # =============================================================================
-# PENDING CHANGE REQUESTS (120 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27 + Batch 28 + Batch 29)
+# PENDING CHANGE REQUESTS (123 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27 + Batch 28 + Batch 29 + Batch 30)
 # =============================================================================
 
 pending_crs:
@@ -5779,6 +5839,76 @@ pending_crs:
       - src/i18n/locales/en.json
       - src/i18n/locales/es.json
       - src/lib/dateUtils.ts
+
+  # --- Batch 30 (Notification text, Debounce flickering, Keyboard avoidance) ---
+
+  - id: 240
+    type: bug
+    area: "Push Notifications (F157)"
+    feature_id: F167
+    spec_file: "docs/specs/SPEC_F167.yaml"
+    related_crs: [221]
+    description: >
+      Fix push notification text for prayer positions (0=abertura, 4=encerramento).
+      Currently shows '0 discurso'/'4 discurso' instead of 'oracao de abertura'/
+      'oracao de encerramento'. Title also incorrectly says 'Orador Confirmado'
+      for prayers. Fix both client-side (notificationUtils.ts) and server-side
+      (process-notifications/index.ts) text builders to distinguish prayer
+      positions from speech positions.
+    acceptance_criteria:
+      - "Position 0 notification says 'oracao de abertura'/'opening prayer'"
+      - "Position 4 notification says 'oracao de encerramento'/'closing prayer'"
+      - "Positions 1-3 remain unchanged (ordinal + discurso/speech)"
+      - "Prayer confirmed title uses 'Oracao Confirmada'/'Prayer Confirmed'"
+      - "Prayer withdrew title uses 'Desistencia de Oracao'/'Prayer Withdrew'"
+      - "Both client and server text builders are updated consistently"
+      - "Tests cover positions 0 and 4 for confirmed and withdrew"
+    files_likely_impacted:
+      - src/lib/notificationUtils.ts
+      - supabase/functions/process-notifications/index.ts
+      - src/__tests__/useNotifications-utils.test.ts
+
+  - id: 241
+    type: bug
+    area: "AgendaForm text fields (DebouncedTextInput)"
+    feature_id: F168
+    spec_file: "docs/specs/SPEC_F168.yaml"
+    related_crs: [27]
+    description: >
+      Fix character flickering in DebouncedTextInput where typed characters
+      momentarily disappear during active typing. Caused by useEffect syncing
+      localValue with value prop when mutation + query invalidation triggers
+      refetch. Fix adds isFocusedRef to skip sync while input is focused.
+    acceptance_criteria:
+      - "isFocusedRef tracks input focus state"
+      - "Sync useEffect skips setLocalValue when input is focused"
+      - "Sync useEffect applies setLocalValue when input is NOT focused"
+      - "onFocus handler sets isFocusedRef to true"
+      - "onBlur handler sets isFocusedRef to false and flushes"
+      - "Characters do not disappear during rapid typing"
+      - "Realtime sync still updates unfocused inputs"
+    files_likely_impacted:
+      - src/components/DebouncedTextInput.tsx
+
+  - id: 242
+    type: bug
+    area: "ActorSelector modal (keyboard)"
+    feature_id: F169
+    spec_file: "docs/specs/SPEC_F169.yaml"
+    related_crs: []
+    description: >
+      Fix keyboard covering inline TextInput when editing actor names at
+      the bottom of the ActorSelector list. Add KeyboardAvoidingView with
+      behavior='padding' on iOS inside the modal sheet, matching pattern
+      used in members.tsx and topics.tsx.
+    acceptance_criteria:
+      - "KeyboardAvoidingView wraps sheet content inside modal"
+      - "iOS uses behavior='padding'"
+      - "Android uses no behavior (system handles it)"
+      - "Editing actor at bottom of list is visible above keyboard"
+      - "Modal appearance unchanged when keyboard is not visible"
+    files_likely_impacted:
+      - src/components/ActorSelector.tsx
 
   - id: DD-01
     title: "Sunday types: lista correta"

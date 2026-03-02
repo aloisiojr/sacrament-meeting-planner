@@ -46,7 +46,7 @@ import type { Member } from '../../../types/database';
 
 interface MemberEditorProps {
   member?: Member;
-  onSave: (data: { full_name: string; country_code: string; phone: string }) => void;
+  onSave: (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => void;
   onCancel: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
 }
@@ -54,6 +54,7 @@ interface MemberEditorProps {
 function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
   const { t } = useTranslation();
   const [fullName, setFullName] = useState(member?.full_name ?? '');
+  const [informalName, setInformalName] = useState(member?.informal_name ?? '');
   const [countryCode, setCountryCode] = useState(member?.country_code ?? '+55');
   const [countryLabel, setCountryLabel] = useState(
     () => COUNTRY_CODES.find((c) => c.code === (member?.country_code ?? '+55'))?.label ?? 'Brazil (+55)'
@@ -72,8 +73,8 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
   const handleSave = useCallback(() => {
     const trimmed = fullName.trim();
     if (!trimmed) return;
-    onSave({ full_name: trimmed, country_code: countryCode, phone: phone.trim() });
-  }, [fullName, countryCode, phone, onSave]);
+    onSave({ full_name: trimmed, informal_name: informalName.trim() || '', country_code: countryCode, phone: phone.trim() });
+  }, [fullName, informalName, countryCode, phone, onSave]);
 
   return (
     <View style={[styles.editor, { backgroundColor: colors.surface }]}>
@@ -82,12 +83,26 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
         style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
         value={fullName}
         onChangeText={setFullName}
+        onBlur={() => {
+          if (!informalName.trim() && fullName.trim()) {
+            setInformalName(fullName.trim().split(' ')[0]);
+          }
+        }}
         placeholder={t('members.fullName')}
         placeholderTextColor={colors.placeholder}
         returnKeyType="next"
         autoCapitalize="words"
         textContentType="name"
         autoComplete="name"
+      />
+      <TextInput
+        style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+        value={informalName}
+        onChangeText={setInformalName}
+        placeholder={t('members.informalNamePlaceholder')}
+        placeholderTextColor={colors.placeholder}
+        returnKeyType="next"
+        autoCapitalize="words"
       />
       <View style={styles.phoneRow}>
         <Pressable
@@ -182,7 +197,7 @@ interface MemberRowProps {
   onSwipeReveal: (id: string | null) => void;
   onEdit: (member: Member) => void;
   onDelete: (member: Member) => void;
-  onSave: (data: { full_name: string; country_code: string; phone: string }) => void;
+  onSave: (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => void;
   onCancel: () => void;
   disabled: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
@@ -229,6 +244,11 @@ function MemberRow({
           <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
             {member.full_name}
           </Text>
+          {member.informal_name && (
+            <Text style={[styles.memberInformalName, { color: colors.textSecondary }]} numberOfLines={1}>
+              {member.informal_name}
+            </Text>
+          )}
           {member.phone && (
             <Text style={[styles.memberPhone, { color: colors.textSecondary }]}>
               {getFlagForCode(member.country_code)} {member.country_code} {member.phone}
@@ -284,13 +304,13 @@ export default function MembersScreen() {
   }, []);
 
   const handleSaveNew = useCallback(
-    (data: { full_name: string; country_code: string; phone: string }) => {
+    (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => {
       if (!data.full_name) {
         setIsAdding(false);
         return;
       }
       createMember.mutate(
-        { full_name: data.full_name, country_code: data.country_code, phone: data.phone || null },
+        { full_name: data.full_name, informal_name: data.informal_name || data.full_name.split(' ')[0], country_code: data.country_code, phone: data.phone || null },
         { onSuccess: () => setIsAdding(false) }
       );
     },
@@ -305,13 +325,13 @@ export default function MembersScreen() {
 
   const handleSaveEdit = useCallback(
     (memberId: string) =>
-      (data: { full_name: string; country_code: string; phone: string }) => {
+      (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => {
         if (!data.full_name) {
           setEditingId(null);
           return;
         }
         updateMember.mutate(
-          { id: memberId, full_name: data.full_name, country_code: data.country_code, phone: data.phone || null },
+          { id: memberId, full_name: data.full_name, informal_name: data.informal_name || data.full_name.split(' ')[0], country_code: data.country_code, phone: data.phone || null },
           { onSuccess: () => setEditingId(null) }
         );
       },
@@ -784,6 +804,11 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  memberInformalName: {
+    fontSize: 13,
+    marginTop: 1,
+    fontStyle: 'italic',
   },
   memberPhone: {
     fontSize: 13,

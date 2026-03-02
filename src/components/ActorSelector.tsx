@@ -66,6 +66,18 @@ export function ActorSelector({
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
+  // Scroll to the edited item when keyboard appears or editingId changes
+  useEffect(() => {
+    if (editingId && keyboardHeight > 0) {
+      const index = filtered.findIndex((a) => a.id === editingId);
+      if (index >= 0) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+        }, 50);
+      }
+    }
+  }, [keyboardHeight, editingId, filtered]);
+
   const { data: actors } = useActors(roleFilter);
   const createActor = useCreateActor();
   const updateActor = useUpdateActor();
@@ -194,9 +206,6 @@ export function ActorSelector({
                 onPress={() => {
                   setEditingId(item.id);
                   setEditingName(item.name);
-                  setTimeout(() => {
-                    flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
-                  }, 100);
                 }}
               >
                 <Text style={[styles.actionIcon, { color: colors.textSecondary }]}>{'\u270E'}</Text>

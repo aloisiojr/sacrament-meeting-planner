@@ -163,8 +163,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
     'gave_up',
   ];
 
-  // Show topic row when there's a display value, or when can assign and speech exists (hide for prayer slots)
-  const showTopicRow = !isPrayer && !!(topicDisplay || (canAssign && speech));
+  // Show topic row whenever a speech exists (hide for prayer slots)
+  const showTopicRow = !isPrayer && !!speech;
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }, isPos2Disabled && styles.disabledContainer]}>

@@ -36,12 +36,13 @@
 # CR-239
 # CR-240, CR-241, CR-242
 # CR-243, CR-244
+# CR-246, CR-247
 # Generated: 2026-02-26
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-221, CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230, CR-234, CR-235, CR-236, CR-237, CR-238, CR-239, CR-240, CR-241, CR-242, CR-243, CR-244]
+  change_requests: [CR-82, CR-80, CR-83, CR-84, CR-85, CR-86, CR-90, CR-87, CR-88, CR-89, CR-91, CR-92, CR-93, CR-95, CR-98, CR-94, CR-96, CR-97, CR-99, CR-100, CR-101, CR-102, CR-103, CR-104, CR-108, CR-109, CR-105, CR-106, CR-107, CR-110, CR-111, CR-112, CR-113, CR-117, CR-122, CR-125, CR-114, CR-115, CR-116, CR-119, CR-121, CR-118, CR-120, CR-123, CR-126, CR-127, CR-129, CR-130, CR-128, CR-131, CR-132, CR-133, CR-134, CR-135, CR-136, CR-137, CR-138, CR-139, CR-140, CR-141, CR-142, CR-143, CR-144, CR-145, CR-146, CR-147, CR-148, CR-149, CR-156, CR-157, CR-158, CR-159, CR-160, CR-161, CR-162, CR-163, CR-155, CR-164, CR-172, CR-173, CR-174, CR-175, CR-176, CR-177, CR-178, CR-180, CR-181, CR-191, CR-179, CR-182, CR-183, CR-187, CR-189, CR-192, CR-184, CR-185, CR-186, CR-188, CR-193, CR-199, CR-200, CR-202, CR-203, CR-205, CR-206, CR-207, CR-204, CR-208, CR-209, CR-210, CR-221, CR-222, CR-223, CR-224, CR-225, CR-226, CR-227, CR-228, CR-229, CR-230, CR-234, CR-235, CR-236, CR-237, CR-238, CR-239, CR-240, CR-241, CR-242, CR-243, CR-244, CR-246, CR-247]
   plan_ref: plans/PLAN_P025.yaml
   arch_ref: arch/ARCH_M025.yaml
   spec_ref: "specs/SPEC_F088.yaml, specs/SPEC_F089.yaml, specs/SPEC_F090.yaml, specs/SPEC_F091.yaml, specs/SPEC_F092.yaml"
@@ -5880,3 +5881,111 @@ batch27_test_results:
       - id: CHG-820
         description: "Update cr003-qa test: AC-31.3 assertion changed from toBe(false) to toBe(true) for secretary speech:assign, reflecting CR-243 grant."
     acs_covered: [AC-170-09, AC-171-10]
+
+  # --- CR-246/CR-247 implementation commits (Batch 31 / F172+F173) ---
+
+  - step: STEP-01
+    cr: CR-247
+    hash: d470d4a
+    message: "feat(migration): add informal_name to members and speaker_informal_name to speeches (CR-247)"
+    files_changed:
+      - supabase/migrations/023_add_informal_name.sql
+    changes:
+      - id: CHG-821
+        description: "Migration 023: add informal_name TEXT to members, speaker_informal_name TEXT to speeches, backfill existing records with first word of name, update import_members RPC to accept informal_name with COALESCE fallback."
+    acs_covered: [AC-173-01, AC-173-02, AC-173-03]
+
+  - step: STEP-02
+    cr: CR-247
+    hash: 5a10c9d
+    message: "feat(types): add informal_name to Member, Speech, CreateMemberInput, UpdateMemberInput (CR-247)"
+    files_changed:
+      - src/types/database.ts
+    changes:
+      - id: CHG-822
+        description: "Extend TypeScript interfaces: Member gains informal_name, Speech gains speaker_informal_name, CreateMemberInput and UpdateMemberInput gain optional informal_name."
+    acs_covered: [AC-173-01]
+
+  - step: STEP-03
+    cr: CR-247
+    hash: 9982593
+    message: "feat(useSpeeches): snapshot speaker_informal_name on assign, clear on unassign (CR-247)"
+    files_changed:
+      - src/hooks/useSpeeches.ts
+    changes:
+      - id: CHG-823
+        description: "Add speakerInformalName to AssignSpeakerInput. Include speaker_informal_name in assign update payload. Clear to null in useRemoveAssignment."
+    acs_covered: [AC-173-04, AC-173-05]
+
+  - step: STEP-04
+    cr: [CR-246, CR-247]
+    hash: 95dcfa6
+    message: "feat(useMembers): cascade member data to future speeches, include informal_name in create (CR-246, CR-247)"
+    files_changed:
+      - src/hooks/useMembers.ts
+    changes:
+      - id: CHG-824
+        description: "useUpdateMember.onSuccess: async cascade updates speaker_name, speaker_phone, speaker_informal_name for future speeches (sunday_date >= today) via best-effort try/catch. Import speechKeys for invalidation."
+      - id: CHG-825
+        description: "useCreateMember: include informal_name in insert payload with auto-default to first word of full_name."
+    acs_covered: [AC-172-01, AC-172-02, AC-172-03, AC-172-04, AC-172-05, AC-173-02]
+
+  - step: STEP-05
+    cr: CR-247
+    hash: b67c8c9
+    message: "feat(callers): pass speakerInformalName in all assignSpeaker.mutate calls (CR-247)"
+    files_changed:
+      - src/app/(tabs)/speeches.tsx
+      - src/components/NextAssignmentsSection.tsx
+      - src/components/AgendaForm.tsx
+    changes:
+      - id: CHG-826
+        description: "Pass member.informal_name (or null for AgendaForm prayer selector) as speakerInformalName in all assignSpeaker.mutate call sites."
+    acs_covered: [AC-173-04]
+
+  - step: STEP-06
+    cr: CR-247
+    hash: eab596d
+    message: "feat(MemberEditor): add informal_name field between name and phone (CR-247)"
+    files_changed:
+      - src/app/(tabs)/settings/members.tsx
+    changes:
+      - id: CHG-827
+        description: "Add TextInput for informal_name between name and phone in MemberEditor. Auto-fill on name blur (first word of full_name). MemberRow shows informal_name in italic below full_name. Update all handler types and save callbacks to include informal_name."
+    acs_covered: [AC-173-06, AC-173-07, AC-173-08]
+
+  - step: STEP-07
+    cr: CR-247
+    hash: 27fe46b
+    message: "feat(csv): 3-column export (Name, Informal Name, Phone), backward-compatible 2/3-column import (CR-247)"
+    files_changed:
+      - src/lib/csvUtils.ts
+      - src/app/(tabs)/settings/members.tsx
+    changes:
+      - id: CHG-828
+        description: "CsvMember gains informal_name. parseCsv auto-detects 2 or 3-column format, defaults informal_name to first word of full_name. generateCsv outputs 3 columns. Import RPC payload includes informal_name."
+    acs_covered: [AC-173-09, AC-173-10]
+
+  - step: STEP-08
+    cr: CR-247
+    hash: d30a16a
+    message: "feat(whatsapp): resolve {nome} as speaker_informal_name in invite templates (CR-247)"
+    files_changed:
+      - src/components/InviteManagementSection.tsx
+    changes:
+      - id: CHG-829
+        description: "Use speaker_informal_name (fallback to speaker_name) as speakerName when building WhatsApp messages for both prayers and speeches in handleNotInvitedAction."
+    acs_covered: [AC-173-11]
+
+  - step: STEP-09
+    cr: CR-247
+    hash: 54e2162
+    message: "feat(i18n): add csvHeaderInformalName and informalNamePlaceholder keys (CR-247)"
+    files_changed:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en.json
+      - src/i18n/locales/es.json
+    changes:
+      - id: CHG-830
+        description: "Add members.csvHeaderInformalName and members.informalNamePlaceholder i18n keys in pt-BR, en, and es locale files."
+    acs_covered: [AC-173-06]

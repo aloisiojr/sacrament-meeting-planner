@@ -43,6 +43,15 @@ function getOrdinal(position: number, language: string): string {
   return ORDINALS[language]?.[position] ?? `${position}`;
 }
 
+function getPrayerLabel(position: number, language: string): string | null {
+  const labels: Record<string, Record<number, string>> = {
+    'pt-BR': { 0: 'oração de abertura', 4: 'oração de encerramento' },
+    en: { 0: 'opening prayer', 4: 'closing prayer' },
+    es: { 0: 'oración de apertura', 4: 'oración de clausura' },
+  };
+  return labels[language]?.[position] ?? null;
+}
+
 function formatNameList(names: string[], language: string): string {
   if (names.length === 0) return '';
   if (names.length === 1) return names[0];
@@ -101,6 +110,24 @@ function buildConfirmedText(
   position: number,
   date: string
 ): { title: string; body: string } {
+  const prayerLabel = getPrayerLabel(position, language);
+  if (prayerLabel) {
+    const texts: Record<string, { title: string; body: string }> = {
+      'pt-BR': {
+        title: 'Oração Confirmada',
+        body: `${name} foi confirmado(a) para a ${prayerLabel} em ${date}.`,
+      },
+      en: {
+        title: 'Prayer Confirmed',
+        body: `${name} has been confirmed to give the ${prayerLabel} on ${date}.`,
+      },
+      es: {
+        title: 'Oración Confirmada',
+        body: `${name} fue confirmado(a) para la ${prayerLabel} el ${date}.`,
+      },
+    };
+    return texts[language] ?? texts['pt-BR'];
+  }
   const ordinal = getOrdinal(position, language);
   const texts: Record<string, { title: string; body: string }> = {
     'pt-BR': {
@@ -125,6 +152,24 @@ function buildWithdrewText(
   position: number,
   date: string
 ): { title: string; body: string } {
+  const prayerLabel = getPrayerLabel(position, language);
+  if (prayerLabel) {
+    const texts: Record<string, { title: string; body: string }> = {
+      'pt-BR': {
+        title: 'ATENÇÃO! Desistência de Oração',
+        body: `ATENÇÃO! ${name} NÃO poderá fazer a ${prayerLabel} em ${date}. Designe outra pessoa!`,
+      },
+      en: {
+        title: 'ATTENTION! Prayer Withdrew',
+        body: `ATTENTION! ${name} will NOT be able to give the ${prayerLabel} on ${date}. Assign someone else!`,
+      },
+      es: {
+        title: '¡ATENCIÓN! Desistimiento de Oración',
+        body: `¡ATENCIÓN! ${name} NO podrá hacer la ${prayerLabel} el ${date}. ¡Asigne a otra persona!`,
+      },
+    };
+    return texts[language] ?? texts['pt-BR'];
+  }
   const ordinal = getOrdinal(position, language);
   const texts: Record<string, { title: string; body: string }> = {
     'pt-BR': {

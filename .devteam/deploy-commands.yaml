@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 17
-last_updated: "2026-03-02T02:59:55"
+version: 18
+last_updated: "2026-03-03T12:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -641,4 +641,20 @@ deploy_history:
     cr: "Batch 30 (F167, CR-240)"
     verification:
       - "supabase functions list mostra process-notifications como ACTIVE v7"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Migration 023_add_informal_name.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding (2 requests: schema+backfill, import_members function)"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - informal_name TEXT adicionado a members, speaker_informal_name TEXT adicionado a speeches, dados backfilled, import_members atualizado"
+    verified: true
+    cr: "CR-247"
+    verification:
+      - "information_schema.columns: members.informal_name TEXT, nullable"
+      - "information_schema.columns: speeches.speaker_informal_name TEXT, nullable"
+      - "Backfill: members.informal_name = first word of full_name (verified: Jose, Gabriel, Juan, etc.)"
+      - "Backfill: speeches.speaker_informal_name = first word of speaker_name (verified: Jherry, Laura, Luz, etc.)"
+      - "pg_proc: import_members with prosecdef=true, proconfig=[search_path=public]"
+      - "import_members includes informal_name in INSERT with COALESCE fallback to SPLIT_PART"
       - "REST API health check: HTTP 200"

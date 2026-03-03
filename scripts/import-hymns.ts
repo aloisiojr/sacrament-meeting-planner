@@ -21,8 +21,8 @@ import path from 'path';
 // --- Language Mapping ---
 export const LANGUAGE_MAP: Record<string, string> = {
   'PT-BR': 'pt-BR',
-  'EN-US': 'en',
-  'ES-ES': 'es',
+  'EN-US': 'en-US',
+  'ES-ES': 'es-LA',
 };
 
 export const EXPECTED_HEADER = 'Lingua,Numero,Titulo,Sacramental';

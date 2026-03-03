@@ -93,9 +93,17 @@ export function parseLogDescription(description: string): { actionType: string; 
 
 /**
  * Actor role i18n key mapping.
- * Maps database role fields to i18n keys for display.
+ * Maps database role values to i18n keys for display.
+ * Includes both old (can_X) and new (X) formats for backward compatibility
+ * with existing activity log entries.
  */
 const ACTOR_ROLE_I18N_KEYS: Record<string, string> = {
+  preside: 'activityLog.actorRoles.preside',
+  conduct: 'activityLog.actorRoles.conduct',
+  recognize: 'activityLog.actorRoles.recognize',
+  pianist: 'activityLog.actorRoles.pianist',
+  conductor: 'activityLog.actorRoles.conductor',
+  // Backward compatibility for old activity log entries
   can_preside: 'activityLog.actorRoles.preside',
   can_conduct: 'activityLog.actorRoles.conduct',
   can_recognize: 'activityLog.actorRoles.recognize',

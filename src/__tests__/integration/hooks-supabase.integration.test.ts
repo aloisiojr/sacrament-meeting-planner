@@ -107,8 +107,8 @@ afterEach(() => {
 describe('useActors integration', () => {
   it('fetches actors from Supabase (AC-082-01)', async () => {
     const mockActors = [
-      createMockActor({ id: 'a1', name: 'Bishop Jones', can_preside: true }),
-      createMockActor({ id: 'a2', name: 'Elder Smith', can_conduct: true }),
+      createMockActor({ id: 'a1', name: 'Bishop Jones', role: 'preside' }),
+      createMockActor({ id: 'a2', name: 'Elder Smith', role: 'conduct' }),
     ];
     mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: mockActors, error: null });
 
@@ -131,7 +131,7 @@ describe('useActors integration', () => {
     const { result } = renderHook(() => useCreateActor(), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({ name: 'New Actor', can_preside: true });
+      await result.current.mutateAsync({ name: 'New Actor', role: 'preside' });
     });
 
     expect(spy).toHaveBeenCalled();

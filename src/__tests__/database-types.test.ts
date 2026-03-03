@@ -292,16 +292,11 @@ describe('Database Types', () => {
         id: 'uuid-7',
         ward_id: 'uuid-1',
         name: 'Bispo Fulano',
-        can_preside: true,
-        can_conduct: true,
-        can_recognize: false,
-        can_pianist: false,
-        can_conductor: false,
+        role: 'preside',
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
-      expect(actor.can_preside).toBe(true);
-      expect(actor.can_pianist).toBe(false);
+      expect(actor.role).toBe('preside');
     });
 
     it('should construct a valid NotificationQueue object', () => {
@@ -388,18 +383,18 @@ describe('Database Types', () => {
       expect(input.country_code).toBeUndefined();
     });
 
-    it('should construct a valid CreateActorInput with optional booleans', () => {
+    it('should construct a valid CreateActorInput with role', () => {
       const input1: CreateActorInput = {
         name: 'New Actor',
-        can_preside: true,
+        role: 'preside',
       };
-      expect(input1.can_preside).toBe(true);
-      expect(input1.can_conduct).toBeUndefined();
+      expect(input1.role).toBe('preside');
 
       const input2: CreateActorInput = {
-        name: 'Minimal Actor',
+        name: 'Pianist Actor',
+        role: 'pianist',
       };
-      expect(input2.can_preside).toBeUndefined();
+      expect(input2.role).toBe('pianist');
     });
 
     it('should construct a valid ImportResult', () => {

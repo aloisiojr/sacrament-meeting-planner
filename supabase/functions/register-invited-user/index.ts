@@ -158,6 +158,14 @@ async function handleRegister(supabaseAdmin: any, input: RegisterInvitedInput) {
     );
   }
 
+  // Fetch ward language for user_metadata
+  const { data: ward } = await supabaseAdmin
+    .from('wards')
+    .select('language')
+    .eq('id', invitation.ward_id)
+    .single();
+  const wardLanguage = ward?.language || 'pt-BR';
+
   // Create user with app_metadata
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: invitation.email,
@@ -167,6 +175,9 @@ async function handleRegister(supabaseAdmin: any, input: RegisterInvitedInput) {
       ward_id: invitation.ward_id,
       role: invitation.role,
       full_name: input.fullName.trim(),
+    },
+    user_metadata: {
+      language: wardLanguage,
     },
   });
 

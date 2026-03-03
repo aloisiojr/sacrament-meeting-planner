@@ -1,0 +1,519 @@
+# =============================================================================
+# QA_PLAN_003.yaml
+# PRE validation plan for Phase 3:
+#   CR-253: Permission Model Rework (secretary + observer fixes)
+#   CR-255: Actor Role Enum Refactoring
+# =============================================================================
+
+metadata:
+  plan_id: QA_PLAN_003
+  created: "2026-03-03"
+  mode: PRE
+  phase: 3
+  change_requests: [CR-253, CR-255]
+  specs: [F005, F009, F014, F015]
+  business_rules: [BR009, BR010, BR014]
+  edge_cases: [EC009]
+
+# =============================================================================
+# PRE-VALIDATION: Current State Evidence
+# =============================================================================
+
+pre_validation:
+  validated: true
+  date: "2026-03-03"
+
+  current_state:
+
+    # --- CR-253: Permission Model ---
+
+    - id: PRE_253_01
+      area: permissions.ts
+      file: src/lib/permissions.ts
+      observation: |
+        Secretary currently has speech:assign AND speech:unassign (lines 44-45).
+        CR-253 requires REMOVING these from secretary for positions 1-3 (speech slots),
+        and ADDING prayer:assign + prayer:unassign for positions 0,4 (prayer slots).
+        Secretary keeps speech:change_status (line 46).
+      evidence: "permissions.ts lines 43-67: secretary Set includes speech:assign, speech:unassign, speech:change_status"
+
+    - id: PRE_253_02
+      area: permissions.ts
+      file: src/lib/permissions.ts
+      observation: |
+        Observer currently has only: member:read, agenda:read, presentation:start (lines 69-73).
+        CR-253 needs to verify observer is fully read-only on Home/Agendas/Speeches.
+        Observer also needs settings limited to app language/theme/about.
+      evidence: "permissions.ts lines 69-73: observer Set has 3 permissions"
+
+    - id: PRE_253_03
+      area: database.ts
+      file: src/types/database.ts
+      observation: |
+        Permission type (lines 10-34) does NOT include prayer:assign or prayer:unassign.
+        These new permission types must be added for CR-253.
+      evidence: "database.ts lines 10-34: Permission type union has 24 members, no prayer:* permissions"
+
+    - id: PRE_253_04
+      area: SpeechSlot.tsx
+      file: src/components/SpeechSlot.tsx
+      observation: |
+        SpeechSlot uses canAssign = hasPermission('speech:assign') globally (line 96).
+        It does NOT differentiate between prayer positions (0,4) and speech positions (1-3).
+        CR-253 requires position-based permission checks:
+        - pos 0,4 (prayer): use prayer:assign/prayer:unassign
+        - pos 1-3 (speech): use speech:assign/speech:unassign
+        The isPrayer prop exists (line 88) but is not used for permission branching.
+      evidence: "SpeechSlot.tsx line 96: const canAssign = hasPermission('speech:assign'); line 97: const canUnassign = hasPermission('speech:unassign')"
+
+    - id: PRE_253_05
+      area: SpeechSlot.tsx
+      file: src/components/SpeechSlot.tsx
+      observation: |
+        SpeechSlot header comment (lines 7-9) says:
+        "Secretary: change status only (cannot assign)" - this is the DESIRED behavior for speeches (pos 1-3).
+        But the code at line 96 grants canAssign based on speech:assign which secretary currently HAS.
+        So the comment describes the INTENDED behavior, not current behavior.
+      evidence: "SpeechSlot.tsx lines 7-9 comment vs line 96 permission check contradiction"
+
+    - id: PRE_253_06
+      area: StatusChangeModal
+      file: src/components/StatusChangeModal.tsx
+      observation: |
+        StatusChangeModal does NOT check permissions itself. It relies on the parent (SpeechSlot)
+        to gate access via canChangeStatus (line 98 of SpeechSlot). Secretary has speech:change_status
+        so the modal is accessible to secretary. No changes needed in StatusChangeModal itself.
+      evidence: "StatusChangeModal.tsx has no permission checks; SpeechSlot line 98 gates access"
+
+    - id: PRE_253_07
+      area: settings
+      file: src/app/(tabs)/settings/index.tsx
+      observation: |
+        Observer already sees only Group 2 (App Settings) because Group 1 (Ward Settings)
+        is gated by !isObserver (line 209). Group 2 items gated by permissions:
+        settings:users and history:read (which observer lacks) are hidden.
+        Observer sees: app language, theme, about, sign out. This matches CR-253 requirements.
+      evidence: "settings/index.tsx line 209: {!isObserver && (...)}; lines 291-320: Group 2 shows app language/theme/about to all"
+
+    - id: PRE_253_08
+      area: permissions.test.ts
+      file: src/__tests__/permissions.test.ts
+      observation: |
+        Test matrix (lines 14-38) currently asserts secretary HAS speech:assign and speech:unassign.
+        These tests must be updated when CR-253 changes permissions. Also:
+        - Line 123: asserts secretary has 23 permissions (will change)
+        - Line 93-102: specific secretary assertions include speech:assign
+        New prayer:assign/prayer:unassign permissions must be added to matrix.
+      evidence: "permissions.test.ts line 15: secretary speech:assign true; line 16: secretary speech:unassign true; line 123: expect 23 perms"
+
+    - id: PRE_253_09
+      area: speeches.tsx
+      file: src/app/(tabs)/speeches.tsx
+      observation: |
+        Speeches screen renders SpeechSlot for positions 0, 1, 2, 3, 4 with isPrayer prop
+        for positions 0 and 4 (lines 443-446 and 476-479). The position and isPrayer info
+        is passed to SpeechSlot, enabling position-based permission logic there.
+      evidence: "speeches.tsx lines 443-446: position={0} isPrayer; lines 476-479: position={4} isPrayer"
+
+    - id: PRE_253_10
+      area: BR009
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      observation: |
+        BR009 (line 999-1004) says secretary has 22 permissions incl. speech:assign and speech:unassign.
+        This must be updated for CR-253 to reflect:
+        - Remove speech:assign, speech:unassign from secretary
+        - Add prayer:assign, prayer:unassign to secretary
+        - Net count stays 22 (or becomes 22 if counting changes)
+      evidence: "SPEC_CONSOLIDATED.yaml line 1003: 'Secretary: all except home:next_assignments (22 permissions). Has speech:assign and speech:unassign.'"
+
+    # --- CR-255: Actor Role Enum ---
+
+    - id: PRE_255_01
+      area: database schema
+      file: supabase/migrations/001_initial_schema.sql
+      observation: |
+        meeting_actors table (lines 141-151) originally has can_preside, can_conduct,
+        can_recognize, can_music (4 booleans). Migration 017 split can_music into
+        can_pianist + can_conductor and added CHECK constraint.
+        Current state: 5 boolean columns (can_preside, can_conduct, can_recognize,
+        can_pianist, can_conductor).
+        CR-255 will replace all 5 with a single role TEXT column (enum).
+      evidence: "001_initial_schema.sql lines 141-151; 017_split_music_actor.sql adds can_pianist/can_conductor"
+
+    - id: PRE_255_02
+      area: database.ts types
+      file: src/types/database.ts
+      observation: |
+        MeetingActor interface (lines 155-166) has 5 boolean fields.
+        CreateActorInput (lines 320-327) has 5 optional booleans.
+        UpdateActorInput (lines 329-337) has 5 optional booleans.
+        All must be changed to single role field.
+      evidence: "database.ts lines 155-166: MeetingActor with can_preside..can_conductor booleans"
+
+    - id: PRE_255_03
+      area: useActors.ts
+      file: src/hooks/useActors.ts
+      observation: |
+        ActorRoleFilter type (lines 23-29) uses 'can_preside'|'can_conduct'|... string literals.
+        filterActorsByRole (line 44-47) accesses boolean fields as a[role].
+        enforceActorRules (line 37-39) is identity function.
+        useActors hook (line 88-89) uses query.eq(roleFilter, true) for server-side filtering.
+        useCreateActor (lines 110-118) spreads all 5 booleans on insert.
+        All must be adapted to single role field.
+      evidence: "useActors.ts lines 23-29: ActorRoleFilter type; lines 110-118: insert with 5 booleans"
+
+    - id: PRE_255_04
+      area: ActorSelector.tsx
+      file: src/components/ActorSelector.tsx
+      observation: |
+        handleAdd (lines 113-136) creates actor with role flags based on roleFilter string.
+        Example: can_preside: roleFilter === 'can_preside' (line 119).
+        Must be adapted to set single role field based on roleFilter.
+      evidence: "ActorSelector.tsx lines 117-124: CreateActorInput with roleFilter === 'can_*'"
+
+    - id: PRE_255_05
+      area: ActorSelector.tsx
+      file: src/components/ActorSelector.tsx
+      observation: |
+        ActorSelectorProps uses roleFilter: ActorRoleFilter (line 36).
+        This is called from AgendaForm with specific role filters like 'can_preside'.
+        The roleFilter string names will change from 'can_preside' to 'preside' etc.
+      evidence: "ActorSelector.tsx line 36: roleFilter: ActorRoleFilter"
+
+    - id: PRE_255_06
+      area: tests
+      file: src/__tests__/useActors-utils.test.ts
+      observation: |
+        All test utilities reference 5 boolean fields in makeActor helper (lines 10-23).
+        filterActorsByRole tests (lines 91-131) test boolean-based filtering.
+        actorKeys tests (lines 160-174) use 'can_preside'/'can_conduct' strings.
+        All must be adapted to single role field.
+      evidence: "useActors-utils.test.ts lines 10-23: makeActor with 5 booleans; lines 91-131: boolean filter tests"
+
+    - id: PRE_255_07
+      area: database-types.test.ts
+      file: src/__tests__/database-types.test.ts
+      observation: |
+        MeetingActor construction test (lines 290-305) uses 5 boolean fields.
+        CreateActorInput test (lines 391-403) uses optional booleans.
+        Must be adapted to single role field.
+      evidence: "database-types.test.ts lines 290-305: MeetingActor with booleans; lines 391-403: CreateActorInput"
+
+    - id: PRE_255_08
+      area: SPEC + ARCH
+      files: [docs/specs/SPEC_CONSOLIDATED.yaml, docs/arch/ARCH_CONSOLIDATED.yaml]
+      observation: |
+        F009 (SPEC lines 242-262) describes 5 boolean flags with CHECK constraint.
+        BR014 (line 1022-1024) describes pianist/conductor mutual exclusivity.
+        EC009 (line 1190-1191) describes actor with both pianist+conductor.
+        ARCH meeting_actors (lines 550-559) lists 5 booleans + CHECK constraint.
+        All must be updated for single role enum model.
+        BR014 and EC009 become obsolete (single role = no mutual exclusivity issue).
+      evidence: "SPEC F009, BR014, EC009 reference boolean flags. ARCH meeting_actors lines 550-559"
+
+    - id: PRE_255_09
+      area: migration
+      observation: |
+        Latest migration is 024. New migration will be 025_actor_role_enum.sql.
+        Migration must: add role TEXT column, migrate data from booleans,
+        drop 5 boolean columns, drop chk_pianist_conductor_exclusive constraint,
+        add CHECK on valid role values.
+        Migration order: (1) add role, (2) migrate, (3) drop booleans + constraint.
+      evidence: "supabase/migrations/ directory: latest is 024_language_code_update.sql"
+
+# =============================================================================
+# VALIDATION CHECKS (for POST validation)
+# =============================================================================
+
+validation_checks:
+
+  # --- CR-253: Permission Model ---
+
+  must_pass:
+    - id: CR253_MP1
+      cr: CR-253
+      description: "Secretary does NOT have speech:assign permission"
+      file: src/lib/permissions.ts
+      check: "secretary Set must NOT contain 'speech:assign'"
+
+    - id: CR253_MP2
+      cr: CR-253
+      description: "Secretary does NOT have speech:unassign permission"
+      file: src/lib/permissions.ts
+      check: "secretary Set must NOT contain 'speech:unassign'"
+
+    - id: CR253_MP3
+      cr: CR-253
+      description: "Secretary HAS prayer:assign permission"
+      file: src/lib/permissions.ts
+      check: "secretary Set contains 'prayer:assign'"
+
+    - id: CR253_MP4
+      cr: CR-253
+      description: "Secretary HAS prayer:unassign permission"
+      file: src/lib/permissions.ts
+      check: "secretary Set contains 'prayer:unassign'"
+
+    - id: CR253_MP5
+      cr: CR-253
+      description: "Secretary HAS speech:change_status permission (kept)"
+      file: src/lib/permissions.ts
+      check: "secretary Set contains 'speech:change_status'"
+
+    - id: CR253_MP6
+      cr: CR-253
+      description: "Bishopric HAS prayer:assign and prayer:unassign (new perms added)"
+      file: src/lib/permissions.ts
+      check: "bishopric Set contains 'prayer:assign' AND 'prayer:unassign'"
+
+    - id: CR253_MP7
+      cr: CR-253
+      description: "Permission type includes prayer:assign and prayer:unassign"
+      file: src/types/database.ts
+      check: "Permission type union includes 'prayer:assign' | 'prayer:unassign'"
+
+    - id: CR253_MP8
+      cr: CR-253
+      description: "SpeechSlot uses position-based permission check for assign"
+      file: src/components/SpeechSlot.tsx
+      check: "canAssign uses prayer:assign for isPrayer/pos 0,4 and speech:assign for pos 1-3"
+
+    - id: CR253_MP9
+      cr: CR-253
+      description: "SpeechSlot uses position-based permission check for unassign"
+      file: src/components/SpeechSlot.tsx
+      check: "canUnassign uses prayer:unassign for isPrayer/pos 0,4 and speech:unassign for pos 1-3"
+
+    - id: CR253_MP10
+      cr: CR-253
+      description: "Secretary sees read-only speaker/topic fields for positions 1-3"
+      file: src/components/SpeechSlot.tsx
+      check: "For pos 1-3, when canAssign is false, speaker and topic fields are disabled (no chevron, no press handler)"
+
+    - id: CR253_MP11
+      cr: CR-253
+      description: "Secretary CAN change status for positions 1-3"
+      file: src/components/SpeechSlot.tsx
+      check: "canChangeStatus uses speech:change_status (not gated by position)"
+
+    - id: CR253_MP12
+      cr: CR-253
+      description: "Observer has NO prayer:assign/prayer:unassign permissions"
+      file: src/lib/permissions.ts
+      check: "observer Set does NOT contain prayer:assign or prayer:unassign"
+
+    - id: CR253_MP13
+      cr: CR-253
+      description: "Observer settings limited to app language, theme, about"
+      file: src/app/(tabs)/settings/index.tsx
+      check: "Observer does not see Ward Settings group; sees app language, theme, about in App Settings"
+
+    - id: CR253_MP14
+      cr: CR-253
+      description: "SPEC BR009 updated with new permission counts"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "BR009 reflects secretary losing speech:assign/unassign and gaining prayer:assign/unassign"
+
+    - id: CR253_MP15
+      cr: CR-253
+      description: "ALL_PERMISSIONS list updated with prayer:assign and prayer:unassign"
+      file: src/lib/permissions.ts
+      check: "ALL_PERMISSIONS array includes 'prayer:assign' and 'prayer:unassign'"
+
+    - id: CR253_MP16
+      cr: CR-253
+      description: "Permission test matrix updated for new permissions"
+      file: src/__tests__/permissions.test.ts
+      check: "EXPECTED_MATRIX includes prayer:assign and prayer:unassign rows"
+
+    - id: CR253_MP17
+      cr: CR-253
+      description: "All tests pass after CR-253 changes"
+      check: "npx vitest run passes with 0 failures"
+
+    # --- CR-255: Actor Role Enum ---
+
+    - id: CR255_MP1
+      cr: CR-255
+      description: "Migration 025 exists and adds role column"
+      file: supabase/migrations/025_actor_role_enum.sql
+      check: "ALTER TABLE meeting_actors ADD COLUMN role TEXT"
+
+    - id: CR255_MP2
+      cr: CR-255
+      description: "Migration 025 migrates boolean data to role values"
+      file: supabase/migrations/025_actor_role_enum.sql
+      check: "UPDATE meeting_actors SET role = CASE ... for all 5 boolean flags"
+
+    - id: CR255_MP3
+      cr: CR-255
+      description: "Migration 025 drops 5 boolean columns"
+      file: supabase/migrations/025_actor_role_enum.sql
+      check: "DROP COLUMN can_preside, can_conduct, can_recognize, can_pianist, can_conductor"
+
+    - id: CR255_MP4
+      cr: CR-255
+      description: "Migration 025 drops old CHECK constraint"
+      file: supabase/migrations/025_actor_role_enum.sql
+      check: "DROP CONSTRAINT chk_pianist_conductor_exclusive"
+
+    - id: CR255_MP5
+      cr: CR-255
+      description: "Migration 025 adds CHECK on valid role values"
+      file: supabase/migrations/025_actor_role_enum.sql
+      check: "CHECK (role IN ('preside', 'conduct', 'recognize', 'pianist', 'conductor'))"
+
+    - id: CR255_MP6
+      cr: CR-255
+      description: "MeetingActor type uses role field instead of 5 booleans"
+      file: src/types/database.ts
+      check: "MeetingActor has role: ActorRole (string enum) and no can_* booleans"
+
+    - id: CR255_MP7
+      cr: CR-255
+      description: "CreateActorInput uses role field instead of 5 optional booleans"
+      file: src/types/database.ts
+      check: "CreateActorInput has role: ActorRole"
+
+    - id: CR255_MP8
+      cr: CR-255
+      description: "UpdateActorInput uses optional role field"
+      file: src/types/database.ts
+      check: "UpdateActorInput has role?: ActorRole"
+
+    - id: CR255_MP9
+      cr: CR-255
+      description: "ActorRoleFilter type uses new enum values"
+      file: src/hooks/useActors.ts
+      check: "ActorRoleFilter uses 'preside'|'conduct'|'recognize'|'pianist'|'conductor' (or 'all')"
+
+    - id: CR255_MP10
+      cr: CR-255
+      description: "filterActorsByRole filters by role field instead of boolean"
+      file: src/hooks/useActors.ts
+      check: "actors.filter(a => a.role === role) instead of a[role]"
+
+    - id: CR255_MP11
+      cr: CR-255
+      description: "useActors query uses .eq('role', roleFilter) for server-side filtering"
+      file: src/hooks/useActors.ts
+      check: "query.eq('role', roleFilter) instead of query.eq(roleFilter, true)"
+
+    - id: CR255_MP12
+      cr: CR-255
+      description: "useCreateActor inserts role field instead of 5 booleans"
+      file: src/hooks/useActors.ts
+      check: "insert({ ward_id, name, role }) instead of 5 boolean fields"
+
+    - id: CR255_MP13
+      cr: CR-255
+      description: "ActorSelector handleAdd sets role from roleFilter"
+      file: src/components/ActorSelector.tsx
+      check: "CreateActorInput { name, role: roleFilter } instead of 5 roleFilter === 'can_*'"
+
+    - id: CR255_MP14
+      cr: CR-255
+      description: "SPEC F009 updated for single role enum"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "F009 description mentions single role TEXT field, not 5 boolean flags"
+
+    - id: CR255_MP15
+      cr: CR-255
+      description: "SPEC BR014 removed or updated (no more pianist/conductor exclusivity issue)"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "BR014 removed or marked as superseded by CR-255"
+
+    - id: CR255_MP16
+      cr: CR-255
+      description: "SPEC EC009 removed or updated"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "EC009 removed or marked as superseded by CR-255"
+
+    - id: CR255_MP17
+      cr: CR-255
+      description: "ARCH meeting_actors schema updated"
+      file: docs/arch/ARCH_CONSOLIDATED.yaml
+      check: "meeting_actors key_columns shows role TEXT, not 5 booleans"
+
+    - id: CR255_MP18
+      cr: CR-255
+      description: "All tests pass after CR-255 changes"
+      check: "npx vitest run passes with 0 failures"
+
+  should_pass:
+    - id: CR253_SP1
+      cr: CR-253
+      description: "SpeechSlot header comment updated for secretary prayer permissions"
+      file: src/components/SpeechSlot.tsx
+      check: "Comment reflects: secretary can assign/unassign prayers (pos 0,4) and change status, but cannot assign/unassign speeches (pos 1-3)"
+
+    - id: CR253_SP2
+      cr: CR-253
+      description: "SPEC F014 acceptance criteria updated for prayer:assign"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "F014 mentions prayer:assign permission for prayer positions"
+
+    - id: CR253_SP3
+      cr: CR-253
+      description: "SPEC F015 acceptance criteria updated for read-only secretary"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "F015 mentions secretary read-only for topic assignment on speech slots"
+
+    - id: CR253_SP4
+      cr: CR-253
+      description: "SPEC F005 description updated with prayer permissions"
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      check: "F005 describes secretary with prayer:assign/unassign and without speech:assign/unassign"
+
+    - id: CR255_SP1
+      cr: CR-255
+      description: "enforceActorRules function simplified or removed"
+      file: src/hooks/useActors.ts
+      check: "enforceActorRules either removed or simplified for single role"
+
+    - id: CR255_SP2
+      cr: CR-255
+      description: "getPrimaryRole helper simplified"
+      file: src/hooks/useActors.ts
+      check: "getPrimaryRole uses actor.role directly instead of cascading if-else"
+
+    - id: CR255_SP3
+      cr: CR-255
+      description: "Actor test utilities updated"
+      file: src/__tests__/useActors-utils.test.ts
+      check: "makeActor uses role field, filterActorsByRole tests use role-based filtering"
+
+    - id: CR255_SP4
+      cr: CR-255
+      description: "database-types.test.ts actor tests updated"
+      file: src/__tests__/database-types.test.ts
+      check: "MeetingActor and CreateActorInput tests use role field"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_files_to_modify:
+    cr_253:
+      - src/types/database.ts           # Add prayer:assign/prayer:unassign to Permission type
+      - src/lib/permissions.ts          # Update PERMISSIONS_MAP + ALL_PERMISSIONS
+      - src/components/SpeechSlot.tsx   # Position-based permission branching
+      - src/__tests__/permissions.test.ts  # Update test matrix
+      - docs/specs/SPEC_CONSOLIDATED.yaml  # F005, F014, F015, BR009
+    cr_255:
+      - supabase/migrations/025_actor_role_enum.sql  # New migration
+      - src/types/database.ts           # MeetingActor, CreateActorInput, UpdateActorInput
+      - src/hooks/useActors.ts          # ActorRoleFilter, filter, hooks
+      - src/components/ActorSelector.tsx # handleAdd, roleFilter mapping
+      - src/__tests__/useActors-utils.test.ts  # Test utilities
+      - src/__tests__/database-types.test.ts   # Type construction tests
+      - docs/specs/SPEC_CONSOLIDATED.yaml  # F009, BR014 remove, EC009 remove
+      - docs/arch/ARCH_CONSOLIDATED.yaml   # meeting_actors schema
+
+  risk_areas:
+    - "CR-253: Position-based permission check in SpeechSlot must correctly handle isPrayer prop"
+    - "CR-255: Migration order critical - add role before dropping booleans"
+    - "CR-255: Boolean data migration must handle actors with multiple flags set (use priority: preside > conduct > recognize > pianist > conductor)"
+    - "CR-255: Server-side filtering in useActors changes from .eq(roleFilter, true) to .eq('role', roleFilter)"
+    - "CR-255: AgendaForm roleFilter prop values must be updated across all call sites"

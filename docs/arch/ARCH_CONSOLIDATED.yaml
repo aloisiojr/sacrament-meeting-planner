@@ -8,7 +8,7 @@ metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
   total_modules: 13
-  total_adrs: 14
+  total_adrs: 16
 
 # =============================================================================
 # TECH STACK
@@ -181,7 +181,7 @@ modules:
     name: Meeting Actors
     description: |
       CRUD for meeting actors (preside, conduct, recognize, pianist, conductor).
-      Each actor has independent boolean role flags. Used in AgendaForm for
+      Each actor has a single role enum field. Used in AgendaForm for
       role selection.
     features: [F009]
     components:
@@ -190,7 +190,7 @@ modules:
       - path: src/components/ActorSelector.tsx
         responsibility: Role-filtered actor selector with inline creation and KeyboardAvoidingView
     dependencies:
-      - "DB CHECK constraint (can_pianist + can_conductor mutual exclusion)"
+      - "DB CHECK constraint (role IN ('preside','conduct','recognize','pianist','conductor'))"
 
   # ---------------------------------------------------------------------------
   # M005 - Hymn Catalog
@@ -472,7 +472,7 @@ shared_libraries:
 database_schema:
   provider: Supabase (PostgreSQL)
   migrations_dir: supabase/migrations/
-  total_migrations: 24
+  total_migrations: 25
 
   tables:
     # --- Ward-scoped tables ---
@@ -554,9 +554,9 @@ database_schema:
         - "id (UUID PK)"
         - "ward_id (FK -> wards)"
         - "name"
-        - "can_preside, can_conduct, can_recognize, can_pianist, can_conductor (booleans)"
+        - "role (TEXT: 'preside', 'conduct', 'recognize', 'pianist', 'conductor')"
       constraints:
-        - "CHECK (NOT (can_pianist AND can_conductor))"
+        - "CHECK (role IN ('preside','conduct','recognize','pianist','conductor'))"
 
     - name: sunday_agendas
       scope: ward-scoped (RLS)
@@ -852,3 +852,30 @@ adrs:
       last-write-wins) but its integration with mutation hooks is deferred.
       Current offline strategy relies on serving stale data and blocking
       Edge Function operations when offline.
+
+  - id: ADR-015
+    title: Position-based permission branching for SpeechSlot
+    decision: |
+      SpeechSlot uses an inline ternary to determine which permission to check
+      based on position: isPrayer (pos 0,4) uses prayer:assign/prayer:unassign,
+      while speech positions (1-3) use speech:assign/speech:unassign.
+    rationale: |
+      Secretary role needs to manage prayer speakers but not speech speakers.
+      Rather than creating separate components or a complex permission hierarchy,
+      the position-aware check keeps the logic simple and contained within
+      SpeechSlot. The ternary is small and avoids a helper function for what
+      is effectively two cases.
+
+  - id: ADR-016
+    title: Single role enum for meeting actors
+    decision: |
+      Replace 5 independent boolean flags (can_preside, can_conduct, can_recognize,
+      can_pianist, can_conductor) with a single TEXT column 'role' constrained to
+      ('preside', 'conduct', 'recognize', 'pianist', 'conductor').
+    rationale: |
+      The boolean model allowed theoretically impossible states that required a
+      DB CHECK constraint to partially prevent. The single enum makes the data
+      model match the business reality: each actor has exactly one role. This
+      eliminates the chk_pianist_conductor_exclusive constraint, simplifies
+      filtering, and removes the enforceActorRules pass-through function.
+      Migration uses priority order matching the existing getPrimaryRole() logic.

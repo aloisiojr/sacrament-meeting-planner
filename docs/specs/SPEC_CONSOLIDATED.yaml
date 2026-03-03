@@ -8,8 +8,8 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  total_features: 39
-  total_business_rules: 28
+  total_features: 41
+  total_business_rules: 27
   total_design_decisions: 18
 
 # =============================================================================
@@ -146,18 +146,31 @@ features:
     area: auth
     description: |
       Three roles with granular permissions: bishopric (full access),
-      secretary (full access except home:next_assignments), and observer
+      secretary (limited speech access + full prayer access), and observer
       (read-only: member:read, agenda:read, presentation:start).
       Role stored in Supabase app_metadata. hasPermission function checks
       role against centralized PERMISSIONS_MAP. UI elements conditionally
       rendered based on permissions.
+
+      Permission model is position-aware for speech/prayer slots:
+      - Positions 1-3 (speeches): speech:assign / speech:unassign (bishopric only)
+      - Positions 0, 4 (prayers): prayer:assign / prayer:unassign (bishopric + secretary)
+      - Status changes: speech:change_status (bishopric + secretary, all positions)
+
+      Secretary sees speaker name and topic as read-only text for speech positions
+      (1-3): no chevron, no X button. Secretary CAN change status via LED at all
+      positions. Secretary CAN assign/unassign prayer speakers (pos 0, 4).
+      [Modified by CR-253]
     acceptance_criteria:
       - given: "User with bishopric role"
         when: "User accesses the app"
-        then: "All features are available including next assignments section on Home"
+        then: "All features are available including next assignments section on Home; can assign/unassign speakers and topics at all positions"
       - given: "User with secretary role"
-        when: "User accesses the app"
-        then: "All features available except next assignments section; has speech:assign and speech:unassign"
+        when: "User views SpeechSlot at position 1, 2, or 3"
+        then: "Speaker and topic fields are read-only (no chevron, no X); can change status via LED"
+      - given: "User with secretary role and manage_prayers enabled"
+        when: "User views SpeechSlot at position 0 or 4"
+        then: "Speaker field is interactive (can assign/unassign prayer speakers)"
       - given: "User with observer role"
         when: "User accesses the app"
         then: "Can only view members, read agenda, and start presentation mode; Settings shows limited options (app language, theme, about)"
@@ -244,22 +257,23 @@ features:
     area: ward_data
     description: |
       CRUD for meeting actors (people who preside, conduct, recognize, play
-      piano, or direct music). Each actor has independent boolean flags:
-      can_preside, can_conduct, can_recognize, can_pianist, can_conductor.
-      CHECK constraint prevents both can_pianist and can_conductor being true.
+      piano, or direct music). Each actor has a single `role` field with
+      values: 'preside', 'conduct', 'recognize', 'pianist', 'conductor'.
+      DB CHECK constraint ensures role is one of the valid values.
       Actors are used in AgendaForm for selecting presiding, conducting,
       recognizing, pianist, and conductor roles. ActorSelector component with
-      role filtering, inline editing, and KeyboardAvoidingView.
+      role filtering (by role value), inline editing, and KeyboardAvoidingView.
+      [Modified by CR-255]
     acceptance_criteria:
       - given: "User opens AgendaForm"
         when: "User taps on Presiding field"
-        then: "ActorSelector shows only actors with can_preside=true"
+        then: "ActorSelector shows only actors with role='preside'"
       - given: "User opens ActorSelector"
         when: "User creates a new actor inline"
-        then: "Actor is created with the appropriate role flag"
-      - given: "Actor has both can_pianist and can_conductor"
-        when: "Attempting to save"
-        then: "Database CHECK constraint prevents save"
+        then: "Actor is created with the single role value matching the selector context"
+      - given: "meeting_actors table schema"
+        when: "Actor is queried"
+        then: "Has a single 'role' column with value in ('preside', 'conduct', 'recognize', 'pianist', 'conductor')"
 
   - id: F010
     name: Hymn Catalog
@@ -357,15 +371,23 @@ features:
     name: Speaker Assignment
     area: speeches
     description: |
-      Assign a member as speaker to a speech slot. Opens MemberSelectorModal
-      with search. On assignment: sets member_id, snapshots speaker_name,
-      speaker_informal_name, speaker_phone, and transitions status to
-      assigned_not_invited. For unmanaged prayers (manage_prayers=false),
-      prayer positions (0, 4) auto-set to assigned_confirmed. Remove assignment
-      clears speaker fields and resets status to not_assigned (topic remains).
+      Assign a member as speaker to a speech slot. Position-aware permission
+      check: positions 1-3 require speech:assign (bishopric only); positions
+      0, 4 require prayer:assign (bishopric + secretary). Opens
+      MemberSelectorModal with search. On assignment: sets member_id,
+      snapshots speaker_name, speaker_informal_name, speaker_phone, and
+      transitions status to assigned_not_invited. For unmanaged prayers
+      (manage_prayers=false), prayer positions (0, 4) auto-set to
+      assigned_confirmed. Remove assignment: positions 1-3 require
+      speech:unassign; positions 0, 4 require prayer:unassign. Clears
+      speaker fields and resets status to not_assigned (topic remains).
+      [Modified by CR-253]
     acceptance_criteria:
-      - given: "User with speech:assign permission"
-        when: "User taps speaker field on SpeechSlot"
+      - given: "User with prayer:assign permission (bishopric or secretary)"
+        when: "User taps speaker field on prayer SpeechSlot (position 0 or 4)"
+        then: "MemberSelectorModal opens with searchable member list"
+      - given: "User with speech:assign permission (bishopric only)"
+        when: "User taps speaker field on speech SpeechSlot (position 1, 2, or 3)"
         then: "MemberSelectorModal opens with searchable member list"
       - given: "User selects a member"
         when: "Member is selected"
@@ -373,9 +395,9 @@ features:
       - given: "manage_prayers is false and user assigns a prayer (position 0 or 4)"
         when: "Member is selected for prayer position"
         then: "Status is auto-set to assigned_confirmed instead of assigned_not_invited"
-      - given: "User with speech:unassign permission"
-        when: "User taps X button on assigned speaker"
-        then: "Speaker is removed, status reset to not_assigned, topic assignment preserved"
+      - given: "User with secretary role (no speech:assign)"
+        when: "User views speech SpeechSlot (position 1, 2, or 3)"
+        then: "Speaker field shows name as read-only text; no chevron, no tap action"
 
   - id: F015
     name: Topic Assignment
@@ -384,11 +406,15 @@ features:
       Assign a topic to a speech slot. Opens TopicSelectorModal showing all
       active topics (ward + general collections). Topic title, link, and
       collection name are snapshotted. Clear topic button (X) resets topic
-      fields to empty. Topic row visible to all roles whenever a speech exists
-      (read-only for observer/secretary, editable for bishopric).
+      fields to empty. Topic row visible to all roles whenever a speech exists.
+      Position-aware permissions: positions 1-3 require speech:assign for
+      editing (bishopric only); secretary sees topic as read-only text.
+      Topic row is hidden for prayer positions (0, 4) since prayers don't
+      have topics.
+      [Modified by CR-253]
     acceptance_criteria:
-      - given: "User with speech:assign permission"
-        when: "User taps topic field on SpeechSlot"
+      - given: "User with speech:assign permission (bishopric)"
+        when: "User taps topic field on SpeechSlot at position 1, 2, or 3"
         then: "TopicSelectorModal opens showing active ward + collection topics"
       - given: "User selects a topic"
         when: "Topic is selected"
@@ -396,6 +422,9 @@ features:
       - given: "User taps X button on assigned topic"
         when: "Button is pressed"
         then: "Topic fields are cleared (set to empty string)"
+      - given: "Secretary views a SpeechSlot with assigned topic at position 1-3"
+        when: "SpeechSlot renders"
+        then: "Topic is visible but not editable (no chevron, no X button)"
       - given: "Observer views a SpeechSlot with assigned topic"
         when: "SpeechSlot renders"
         then: "Topic is visible but not editable (no chevron, no X button)"
@@ -958,6 +987,50 @@ features:
         when: "Migration 024 runs"
         then: "Wards updated to 'en-US' and 'es-LA' respectively"
 
+  - id: F041
+    name: Permission Model Rework
+    area: auth
+    description: |
+      Position-aware permission model for speech/prayer management. Adds
+      prayer:assign and prayer:unassign permissions. Secretary loses
+      speech:assign and speech:unassign but gains prayer:assign and
+      prayer:unassign. SpeechSlot checks position to determine which
+      permission to use: positions 0/4 (prayers) use prayer permissions,
+      positions 1-3 (speeches) use speech permissions. Secretary sees
+      speaker/topic at speech positions as read-only text.
+      [CR-253]
+    acceptance_criteria:
+      - given: "User with secretary role"
+        when: "User views SpeechSlot at position 1, 2, or 3"
+        then: "Speaker and topic fields are read-only; status change is allowed"
+      - given: "User with secretary role and manage_prayers enabled"
+        when: "User views SpeechSlot at position 0 or 4"
+        then: "Speaker field is interactive (can assign/unassign)"
+      - given: "User with bishopric role"
+        when: "User views any SpeechSlot"
+        then: "Full access to assign/unassign speakers, topics, and change status"
+
+  - id: F042
+    name: Actor Single Role Enum
+    area: ward_data
+    description: |
+      Simplifies actor model from 5 boolean flags (can_preside, can_conduct,
+      can_recognize, can_pianist, can_conductor) to a single `role` TEXT column
+      with CHECK constraint. Values: 'preside', 'conduct', 'recognize',
+      'pianist', 'conductor'. Migration 025 converts existing data using
+      priority order. ActorRoleFilter uses role values directly.
+      [CR-255]
+    acceptance_criteria:
+      - given: "meeting_actors table after migration 025"
+        when: "Schema is inspected"
+        then: "Has single 'role' column; no boolean flag columns; no chk_pianist_conductor_exclusive"
+      - given: "User creates actor via ActorSelector for 'Presiding' field"
+        when: "Actor is saved"
+        then: "Actor has role='preside'"
+      - given: "Existing actor had can_preside=true and can_conduct=true"
+        when: "Migration 025 runs"
+        then: "Actor has role='preside' (highest priority wins)"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -999,9 +1072,12 @@ business_rules:
   - id: BR009
     rule: "Permission matrix"
     description: |
-      Bishopric: all 23 permissions.
-      Secretary: all except home:next_assignments (22 permissions). Has speech:assign and speech:unassign.
+      Bishopric: 25 permissions (all permissions including prayer:assign, prayer:unassign).
+      Secretary: 22 permissions (all except home:next_assignments, speech:assign, speech:unassign;
+        has prayer:assign and prayer:unassign for prayer positions 0/4; has speech:change_status
+        for all positions).
       Observer: member:read, agenda:read, presentation:start (3 permissions).
+      [Modified by CR-253]
 
   - id: BR010
     rule: "Observer limited settings"
@@ -1020,8 +1096,8 @@ business_rules:
     description: "{nome} placeholder in WhatsApp templates resolves to speaker_informal_name || speaker_name || '' (informal name with fallback to full name)."
 
   - id: BR014
-    rule: "Music role constraint"
-    description: "Database CHECK constraint prevents an actor from having both can_pianist=true and can_conductor=true simultaneously."
+    rule: "Music role constraint [REMOVED by CR-255]"
+    description: "REMOVED: Was 'Database CHECK constraint prevents an actor from having both can_pianist=true and can_conductor=true simultaneously.' With single role enum, mutual exclusivity is inherent."
 
   - id: BR015
     rule: "Excluded from agenda"
@@ -1188,7 +1264,7 @@ edge_cases:
     description: "Ward language change to unsupported locale -> falls back to pt-BR"
 
   - id: EC009
-    description: "Actor with both can_pianist and can_conductor true -> prevented by DB CHECK constraint"
+    description: "REMOVED by CR-255: Was 'Actor with both can_pianist and can_conductor true -> prevented by DB CHECK constraint'. With single role enum, this is impossible by design."
 
   - id: EC010
     description: "Hymn search with numeric input -> matches hymn number prefix instead of title"

@@ -8,7 +8,7 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  total_features: 38
+  total_features: 39
   total_business_rules: 28
   total_design_decisions: 18
 
@@ -35,7 +35,7 @@ product_description: |
   - Real-time sync across devices via Supabase Realtime
   - Offline support with optimistic UI
   - Push notifications for assignment events
-  - Multi-language support (pt-BR, en, es)
+  - Multi-language support (pt-BR, en-US, es-LA)
   - Light/dark theme with system detection
 
   The app uses a ward-scoped multi-tenant architecture where all data is
@@ -220,7 +220,7 @@ features:
       Ward-specific topics CRUD. Topics have title and optional link. Sorted
       alphabetically. Accent-insensitive search. General topic collections can
       be activated/deactivated per ward. Collections are language-specific
-      (using DB locale codes: pt-BR, en-US, es-ES). When ward language changes,
+      (using locale codes: pt-BR, en-US, es-LA). When ward language changes,
       old language collections are deactivated and new language collections
       activated. Collection topics can be expanded inline with accordion pattern.
       Active topics aggregation combines ward topics + active general collection
@@ -716,7 +716,7 @@ features:
       templates). App language priority: user_metadata > device locale > pt-BR.
       Ward language change: updates ward.language, deactivates old language
       collections, activates new language collections, resets WhatsApp templates.
-      Supported languages: pt-BR, en, es.
+      Supported languages: pt-BR, en-US, es-LA.
     acceptance_criteria:
       - given: "User changes app language"
         when: "Language is selected in modal"
@@ -929,6 +929,34 @@ features:
       - given: "User uses SearchInput in any screen"
         when: "Text is entered"
         then: "Results filter immediately; X button clears search"
+
+  # ---------------------------------------------------------------------------
+  # Language Code Standardization
+  # ---------------------------------------------------------------------------
+
+  - id: F040
+    name: Language Code Standardization
+    area: i18n
+    description: |
+      Standardize all language codes from short codes (en, es) to full IETF-style
+      locale codes (en-US, es-LA) throughout the codebase, database, and documentation.
+      App language codes are now pt-BR, en-US, es-LA. DB locale codes match app codes
+      (identity mapping via DB_LOCALE_MAP). Database migration updates existing data.
+      Translation files renamed from en.json/es.json to en-US.json/es-LA.json.
+      All switch/case statements, Record keys, and type definitions updated.
+    acceptance_criteria:
+      - given: "SUPPORTED_LANGUAGES constant is checked"
+        when: "App is initialized"
+        then: "Contains exactly ['pt-BR', 'en-US', 'es-LA']"
+      - given: "User device locale starts with 'en'"
+        when: "detectDeviceLocale runs"
+        then: "Returns 'en-US'"
+      - given: "toDbLocale('en-US') is called"
+        when: "App queries collections by locale"
+        then: "Returns 'en-US' (identity mapping, no conversion needed)"
+      - given: "Database has wards with language='en' or 'es'"
+        when: "Migration 024 runs"
+        then: "Wards updated to 'en-US' and 'es-LA' respectively"
 
 # =============================================================================
 # BUSINESS RULES

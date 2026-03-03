@@ -1,0 +1,369 @@
+# =============================================================================
+# QA_PLAN_002.yaml
+# PRE-validation plan for Phase 2: CR-249 Language Code Standardization
+# =============================================================================
+
+metadata:
+  plan_id: QA_PLAN_002
+  date: "2026-03-03"
+  mode: PRE
+  cr: CR-249
+  scope: "Standardize language codes: en -> en-US, es -> es-LA in all docs and code"
+  type: feature_request
+  verdict: validated
+
+# =============================================================================
+# PRE-VALIDATION EVIDENCE
+# =============================================================================
+
+pre_validation:
+  user_request: "Standardize language codes: en -> en-US, es -> es-LA in all docs and code. Fix translations if incompatible."
+
+  feasibility: true
+  feasibility_evidence:
+    - "Current app codes are 'en' and 'es' (short form) while DB already uses 'en-US' and 'es-ES' (full form)"
+    - "DB_LOCALE_MAP in src/i18n/index.ts already maps en->en-US, so concept of full locale codes exists"
+    - "All language references are string-based (no enums or DB constraints on ward.language), making changes straightforward"
+    - "Translation files are plain JSON (en.json, es.json) - can be renamed without content changes"
+    - "SupportedLanguage type is derived from SUPPORTED_LANGUAGES const array - single point of change"
+
+  scope_analysis:
+    total_files_affected: ~30
+    categories:
+      - category: "Translation files (rename)"
+        files:
+          - "src/i18n/locales/en.json -> src/i18n/locales/en-US.json"
+          - "src/i18n/locales/es.json -> src/i18n/locales/es-LA.json"
+        evidence: "Glob confirms files exist at src/i18n/locales/en.json and src/i18n/locales/es.json"
+
+      - category: "i18n configuration"
+        files:
+          - "src/i18n/index.ts"
+        evidence: |
+          Lines 4-5: imports en, es
+          Line 8: SUPPORTED_LANGUAGES ['pt-BR', 'en', 'es']
+          Lines 11-15: LANGUAGE_LABELS with 'en', 'es' keys
+          Lines 17-21: DEFAULT_COUNTRY_CODES with 'en', 'es' keys
+          Lines 23-27: DEFAULT_TIMEZONES with 'en', 'es' keys
+          Lines 34-38: DB_LOCALE_MAP with 'en'->en-US, 'es'->es-ES (es-ES will change to es-LA)
+          Lines 49-53: resources with 'en', 'es' keys
+          Lines 76-77: detectDeviceLocale prefix match returns 'en', 'es'
+
+      - category: "Date utilities"
+        files:
+          - "src/lib/dateUtils.ts"
+        evidence: |
+          Lines 9, 18, 29: MONTH_ABBR/MONTH_FULL/DAY_NAMES with 'en', 'es' keys
+          Lines 100, 103, 199, 202, 223, 226: switch cases for 'en', 'es'
+
+      - category: "WhatsApp utilities"
+        files:
+          - "src/lib/whatsappUtils.ts"
+        evidence: |
+          Lines 62, 64, 73, 75, 84, 86, 101, 103, 111, 113: switch cases matching 'en', 'es'
+          Const names (DEFAULT_TEMPLATE_SPEECH_1_EN, etc.) contain _EN and _ES suffixes - cosmetic only
+
+      - category: "Notification utilities"
+        files:
+          - "src/lib/notificationUtils.ts"
+        evidence: |
+          Line 8: OrdinalLanguage type = 'pt-BR' | 'en' | 'es'
+          Lines 14-15: ORDINALS with 'en', 'es' keys
+          Line 32: formatNameList uses === 'en' and === 'es'
+          Lines 46-47: getPrayerLabel with 'en', 'es' keys
+          Lines 110, 154: buildNotificationText with 'en', 'es' keys
+
+      - category: "Edge Functions"
+        files:
+          - "supabase/functions/register-first-user/index.ts"
+          - "supabase/functions/process-notifications/index.ts"
+          - "supabase/functions/send-reset-email/index.ts"
+        evidence: |
+          register-first-user: Lines 99, 106 switch cases for 'en', 'es'.
+            Line 184: general_collections query uses raw input.language (currently 'en'/'es'),
+            needs to stay in sync with DB codes (after migration, DB will have 'en-US'/'es-LA').
+          process-notifications: Lines 38-39 ORDINALS with 'en','es'; Lines 48-51 prayer labels;
+            Lines 58, 77-78 formatNameList comparisons; All builder functions use 'en','es' keys.
+          send-reset-email: Lines 39, 59 template keys 'en','es'. Line 82 fallback templates['en'].
+            (CR-251 already changed fallback from pt-BR to en; CR-249 changes en to en-US.)
+
+      - category: "Auth & UI"
+        files:
+          - "src/contexts/AuthContext.tsx"
+          - "src/app/(auth)/register.tsx"
+        evidence: |
+          AuthContext: No explicit 'en'/'es' references - uses SUPPORTED_LANGUAGES dynamically. No changes needed.
+          register.tsx: No explicit 'en'/'es' references - uses SUPPORTED_LANGUAGES and LANGUAGE_LABELS dynamically. No changes needed.
+          Both consume the SupportedLanguage type which auto-updates from i18n/index.ts.
+
+      - category: "Import script"
+        files:
+          - "scripts/import-hymns.ts"
+        evidence: |
+          Line 23: LANGUAGE_MAP has 'EN-US': 'en' and 'ES-ES': 'es'.
+          After CR-249: 'EN-US': 'en-US', 'ES-ES': 'es-LA'.
+          This maps CSV input codes to DB codes. After migration, DB hymns will use
+          'en-US' and 'es-LA', so the mapping must match.
+
+      - category: "Database migration"
+        files:
+          - "supabase/migrations/024_language_code_update.sql (new)"
+        evidence: |
+          Need to update hymns.language: es-ES -> es-LA (en-US already correct in hymns table).
+          Need to update general_collections.language: es-ES -> es-LA.
+          Need to update wards.language: en -> en-US, es -> es-LA.
+          Last existing migration is 023_add_informal_name.sql.
+
+      - category: "Tests"
+        files:
+          - "src/__tests__/i18n-module.test.ts"
+          - "src/__tests__/i18n.test.ts"
+          - "src/__tests__/dateUtils.test.ts"
+          - "src/__tests__/whatsapp-utils.test.ts"
+          - "src/__tests__/useHymns-utils.test.ts"
+          - "src/__tests__/useTopics-utils.test.ts"
+          - "src/__tests__/useNotifications-utils.test.ts"
+        evidence: |
+          i18n-module.test.ts: Lines 23-24, 46-48, 62-63, 78-79, 85 reference 'en' and 'es'.
+          i18n.test.ts: Lines 3-4 import en.json, es.json (filenames change).
+          dateUtils.test.ts: Lines 100-101, 103, 108, 109, 111 reference 'en', 'es' as locale param.
+          whatsapp-utils.test.ts: Lines 119, 123, 147, 153, 168 reference 'en', 'es' as language param.
+          useHymns-utils.test.ts: Line 98 uses 'en' in hymnKeys.sacramental('en').
+          useTopics-utils.test.ts: Line 41 uses 'en' in topicKeys.collections comparison.
+          useNotifications-utils.test.ts: Line 72 OrdinalLanguage array ['pt-BR', 'en', 'es'].
+            Lines 21-24, 39, 43, 47, 55, 138-148, etc. use 'en' and 'es' language args.
+
+      - category: "Documentation"
+        files:
+          - "docs/specs/SPEC_CONSOLIDATED.yaml"
+          - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        evidence: |
+          SPEC: Line 38 "pt-BR, en, es"; Line 719 "pt-BR, en, es"; Line 91 "en (en-US)";
+            Line 223 "en-US, es-ES" (DB locale codes - es-ES changes to es-LA).
+          ARCH: Line 52 languages: ["pt-BR", "en", "es"].
+
+  compatibility_risks:
+    - risk: "DB migration changes language codes in hymns/general_collections/wards"
+      mitigation: "Migration is additive (UPDATE SET), reversible, and idempotent. No data loss."
+    - risk: "Existing ward.language values 'en'/'es' in DB won't match new app codes"
+      mitigation: "Migration 024 updates all existing wards. New wards created after deploy use new codes."
+    - risk: "register-first-user queries general_collections with raw input.language"
+      mitigation: |
+        Line 184 uses input.language || 'pt-BR' to query general_collections.
+        After CR-249, the app sends 'en-US' or 'es-LA' as input.language, and DB
+        general_collections will also have 'en-US'/'es-LA'. Query will match correctly.
+        However: the ward insert (line 128) sets language: wardLanguage which comes from
+        input.language. The switch cases (line 99/106) must also be updated to match 'en-US'/'es-LA'.
+    - risk: "send-reset-email template lookup uses ward.language directly"
+      mitigation: |
+        Template keys must change from 'en'/'es' to 'en-US'/'es-LA'. The fallback
+        templates['en'] must also change to templates['en-US'].
+    - risk: "process-notifications reads ward.language from DB to build notification text"
+      mitigation: |
+        After migration, ward.language will be 'en-US'/'es-LA'. All ORDINALS, prayer labels,
+        and builder function keys must match the new codes.
+    - risk: "Translation file content unchanged despite rename"
+      mitigation: "en.json and es.json content is language-correct; only filenames and import references change."
+
+# =============================================================================
+# VALIDATION CHECKS (for POST validation after implementation)
+# =============================================================================
+
+validation_checks:
+
+  # --- Translation files ---
+  - id: CR249_MP1
+    type: must_pass
+    description: "Translation file en.json renamed to en-US.json"
+    how_to_verify: "Check src/i18n/locales/en-US.json exists and en.json does NOT exist"
+
+  - id: CR249_MP2
+    type: must_pass
+    description: "Translation file es.json renamed to es-LA.json"
+    how_to_verify: "Check src/i18n/locales/es-LA.json exists and es.json does NOT exist"
+
+  # --- i18n config ---
+  - id: CR249_MP3
+    type: must_pass
+    description: "SUPPORTED_LANGUAGES updated to ['pt-BR', 'en-US', 'es-LA']"
+    how_to_verify: "grep SUPPORTED_LANGUAGES in src/i18n/index.ts, verify 'en-US' and 'es-LA'"
+
+  - id: CR249_MP4
+    type: must_pass
+    description: "LANGUAGE_LABELS keys updated to 'en-US' and 'es-LA'"
+    how_to_verify: "grep LANGUAGE_LABELS in src/i18n/index.ts"
+
+  - id: CR249_MP5
+    type: must_pass
+    description: "DEFAULT_COUNTRY_CODES keys updated to 'en-US' and 'es-LA'"
+    how_to_verify: "grep DEFAULT_COUNTRY_CODES in src/i18n/index.ts"
+
+  - id: CR249_MP6
+    type: must_pass
+    description: "DEFAULT_TIMEZONES keys updated to 'en-US' and 'es-LA'"
+    how_to_verify: "grep DEFAULT_TIMEZONES in src/i18n/index.ts"
+
+  - id: CR249_MP7
+    type: must_pass
+    description: "DB_LOCALE_MAP updated: 'en-US'->'en-US', 'es-LA'->'es-LA' (identity mapping now)"
+    how_to_verify: "grep DB_LOCALE_MAP in src/i18n/index.ts. Since app and DB codes now match for en-US, the map is identity. For es-LA, DB also becomes es-LA after migration."
+
+  - id: CR249_MP8
+    type: must_pass
+    description: "i18next resources use 'en-US' and 'es-LA' keys"
+    how_to_verify: "grep resources in src/i18n/index.ts"
+
+  - id: CR249_MP9
+    type: must_pass
+    description: "detectDeviceLocale returns 'en-US' for 'en' prefix, 'es-LA' for 'es' prefix"
+    how_to_verify: "Read detectDeviceLocale function, verify langPrefix mappings"
+
+  # --- dateUtils ---
+  - id: CR249_MP10
+    type: must_pass
+    description: "MONTH_ABBR, MONTH_FULL, DAY_NAMES keys changed from 'en'/'es' to 'en-US'/'es-LA'"
+    how_to_verify: "grep for 'en-US' and 'es-LA' keys in dateUtils.ts data structures"
+
+  - id: CR249_MP11
+    type: must_pass
+    description: "formatDate, formatDateHumanReadable, formatFullDate switch cases use 'en-US'/'es-LA'"
+    how_to_verify: "grep case 'en-US' and case 'es-LA' in dateUtils.ts"
+
+  # --- whatsappUtils ---
+  - id: CR249_MP12
+    type: must_pass
+    description: "getDefaultSpeechTemplate switch cases use 'en-US' and 'es-LA'"
+    how_to_verify: "grep case 'en-US' and case 'es-LA' in whatsappUtils.ts"
+
+  - id: CR249_MP13
+    type: must_pass
+    description: "getDefaultPrayerTemplate switch cases use 'en-US' and 'es-LA'"
+    how_to_verify: "grep case 'en-US' and case 'es-LA' in whatsappUtils.ts"
+
+  # --- notificationUtils ---
+  - id: CR249_MP14
+    type: must_pass
+    description: "OrdinalLanguage type uses 'en-US' | 'es-LA' instead of 'en' | 'es'"
+    how_to_verify: "grep OrdinalLanguage in notificationUtils.ts"
+
+  - id: CR249_MP15
+    type: must_pass
+    description: "ORDINALS, getPrayerLabel, formatNameList, buildNotificationText use 'en-US'/'es-LA' keys"
+    how_to_verify: "grep for 'en-US' and 'es-LA' in notificationUtils.ts"
+
+  # --- Edge Functions ---
+  - id: CR249_MP16
+    type: must_pass
+    description: "register-first-user switch cases use 'en-US' and 'es-LA'"
+    how_to_verify: "grep case 'en-US' and case 'es-LA' in register-first-user/index.ts"
+
+  - id: CR249_MP17
+    type: must_pass
+    description: "process-notifications ORDINALS, prayer labels, text builders use 'en-US'/'es-LA' keys"
+    how_to_verify: "grep for 'en-US' and 'es-LA' keys in process-notifications/index.ts"
+
+  - id: CR249_MP18
+    type: must_pass
+    description: "send-reset-email template keys use 'en-US' and 'es-LA'"
+    how_to_verify: "grep template keys in send-reset-email/index.ts. Fallback is templates['en-US']."
+
+  # --- Import script ---
+  - id: CR249_MP19
+    type: must_pass
+    description: "import-hymns LANGUAGE_MAP maps 'EN-US' to 'en-US' and 'ES-ES' to 'es-LA'"
+    how_to_verify: "grep LANGUAGE_MAP in scripts/import-hymns.ts"
+
+  # --- Database migration ---
+  - id: CR249_MP20
+    type: must_pass
+    description: "Migration 024 updates hymns language es-ES -> es-LA"
+    how_to_verify: "Read supabase/migrations/024_language_code_update.sql"
+
+  - id: CR249_MP21
+    type: must_pass
+    description: "Migration 024 updates general_collections language es-ES -> es-LA"
+    how_to_verify: "Read migration file"
+
+  - id: CR249_MP22
+    type: must_pass
+    description: "Migration 024 updates wards language en -> en-US and es -> es-LA"
+    how_to_verify: "Read migration file"
+
+  # --- Documentation ---
+  - id: CR249_MP23
+    type: must_pass
+    description: "SPEC_CONSOLIDATED references updated from 'en'/'es' to 'en-US'/'es-LA'"
+    how_to_verify: "grep 'pt-BR, en, es' in SPEC should return 0 matches; 'pt-BR, en-US, es-LA' should match"
+
+  - id: CR249_MP24
+    type: must_pass
+    description: "ARCH_CONSOLIDATED languages array updated to ['pt-BR', 'en-US', 'es-LA']"
+    how_to_verify: "grep languages in ARCH_CONSOLIDATED.yaml"
+
+  # --- Tests pass ---
+  - id: CR249_MP25
+    type: must_pass
+    description: "All tests pass (npx vitest run)"
+    how_to_verify: "Run npx vitest run, expect 0 failures"
+
+  # --- should_pass checks ---
+  - id: CR249_SP1
+    type: should_pass
+    description: "toDbLocale JSDoc comment updated (no longer mentions en->en-US mapping as a conversion)"
+    how_to_verify: "Read toDbLocale comment in src/i18n/index.ts"
+
+  - id: CR249_SP2
+    type: should_pass
+    description: "DB_LOCALE_MAP JSDoc comment updated (app codes now match DB codes)"
+    how_to_verify: "Read DB_LOCALE_MAP comment. Since app and DB codes are the same, the comment should reflect this."
+
+  - id: CR249_SP3
+    type: should_pass
+    description: "i18n-module.test.ts updated to reference 'en-US' and 'es-LA'"
+    how_to_verify: "grep 'en-US' and 'es-LA' in i18n-module.test.ts"
+
+  - id: CR249_SP4
+    type: should_pass
+    description: "i18n.test.ts imports renamed files (en-US.json, es-LA.json)"
+    how_to_verify: "grep import paths in i18n.test.ts"
+
+  - id: CR249_SP5
+    type: should_pass
+    description: "dateUtils.test.ts uses 'en-US' and 'es-LA' as locale parameters"
+    how_to_verify: "grep 'en-US' and 'es-LA' in dateUtils.test.ts"
+
+  - id: CR249_SP6
+    type: should_pass
+    description: "whatsapp-utils.test.ts uses 'en-US' and 'es-LA' as language parameters"
+    how_to_verify: "grep 'en-US' and 'es-LA' in whatsapp-utils.test.ts"
+
+  - id: CR249_SP7
+    type: should_pass
+    description: "useNotifications-utils.test.ts OrdinalLanguage array uses 'en-US' and 'es-LA'"
+    how_to_verify: "grep OrdinalLanguage array in useNotifications-utils.test.ts"
+
+  - id: CR249_SP8
+    type: should_pass
+    description: "No remaining bare 'en' or 'es' language codes in source files (excluding English words)"
+    how_to_verify: "grep for language-code-specific patterns like case 'en':, === 'en', 'en': { in src/ and supabase/"
+
+  - id: CR249_SP9
+    type: should_pass
+    description: "SPEC line 223 DB locale codes updated from es-ES to es-LA"
+    how_to_verify: "grep es-ES in SPEC_CONSOLIDATED.yaml should return 0 matches"
+
+  - id: CR249_SP10
+    type: should_pass
+    description: "SPEC line 91 en (en-US) notation simplified since codes now match"
+    how_to_verify: "Read SPEC F002 description"
+
+summary:
+  must_pass_count: 25
+  should_pass_count: 10
+  total_checks: 35
+  notes: |
+    CR-249 is a wide but shallow change: ~30 files need updates but each change is
+    a mechanical string replacement (en -> en-US, es -> es-LA). The riskiest part is
+    the DB migration which changes existing data. The register-first-user Edge Function
+    needs special attention because it queries general_collections by language code
+    and the code+DB must stay in sync.

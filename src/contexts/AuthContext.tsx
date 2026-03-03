@@ -101,7 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  // F116 (CR-178): App language from user_metadata, ward language stored separately
+  // App language from user_metadata, ward language stored separately
   // Language priority: user_metadata.language -> device locale -> ward language fallback
   useEffect(() => {
     if (!wardId) return;

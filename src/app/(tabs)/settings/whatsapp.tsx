@@ -412,7 +412,7 @@ export default function WhatsAppTemplateScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* CR-231: Segmented control always shown (3 speech tabs, or 5 with prayers) */}
+        {/* Segmented control always shown (3 speech tabs, or 5 with prayers) */}
         <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceVariant }]}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab;

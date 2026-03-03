@@ -52,7 +52,7 @@ export interface SpeechSlotProps {
   isSecondSpeechEnabled?: boolean;
   /** F118: Called when the 2nd speech toggle changes (only for position 2, Bispado). */
   onToggleSecondSpeech?: (enabled: boolean) => void;
-  /** CR-221: Whether this slot is a prayer (positions 0 or 4). Hides topic row and 2nd speech toggle. */
+  /** Whether this slot is a prayer (positions 0 or 4). Hides topic row and 2nd speech toggle. */
   isPrayer?: boolean;
 }
 

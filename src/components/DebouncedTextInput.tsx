@@ -1,7 +1,7 @@
 /**
  * DebouncedTextInput: TextInput wrapper that debounces save calls.
  * Saves on blur and after a configurable delay (default 800ms).
- * Prevents excessive mutation calls during typing (CR-27).
+ * Prevents excessive mutation calls during typing.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';

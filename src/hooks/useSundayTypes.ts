@@ -22,7 +22,7 @@ export const sundayTypeKeys = {
 
 /**
  * The default type for regular sundays (speeches).
- * Per F007/CR-56: "speeches" is stored in sunday_exceptions table
+ * "speeches" is stored in sunday_exceptions table
  * like any other reason. All sundays have an entry after auto-assignment.
  */
 export const SUNDAY_TYPE_SPEECHES = 'speeches' as const;

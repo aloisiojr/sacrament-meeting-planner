@@ -506,7 +506,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         </>
       ) : (
         <>
-          {/* Special meeting: dynamic section header based on type (CR-29) */}
+          {/* Special meeting: dynamic section header based on type */}
           <SectionHeader
             title={
               exceptionReason === 'testimony_meeting'

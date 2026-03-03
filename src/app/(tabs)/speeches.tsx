@@ -433,7 +433,7 @@ function SpeechesTabContent() {
           onDeleteSpeeches={handleDeleteSpeeches}
           typeDisabled={!canWriteSundayType}
         >
-          {/* CR-221: Prayer + Speech slots when expanded */}
+          {/* Prayer + Speech slots when expanded */}
           {isExpanded && isSpeechesType && (
             <>
               {/* Opening prayer slot (position 0) - only when managePrayers */}
@@ -486,7 +486,7 @@ function SpeechesTabContent() {
               })()}
             </>
           )}
-          {/* CR-221: For testimony/primary with managePrayers: only prayer slots */}
+          {/* For testimony/primary with managePrayers: only prayer slots */}
           {isExpanded && isTestimonyOrPrimary && managePrayers && (
             <>
               {(() => {

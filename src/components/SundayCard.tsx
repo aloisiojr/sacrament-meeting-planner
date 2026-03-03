@@ -44,7 +44,7 @@ export interface SundayCardProps {
   expanded?: boolean;
   /** F118: Whether the 2nd speech is enabled for this sunday. */
   hasSecondSpeech?: boolean;
-  /** CR-221: Whether managed prayers is enabled. */
+  /** Whether managed prayers is enabled. */
   managePrayers?: boolean;
   /** Called when the card header is pressed (expand/collapse). */
   onToggle?: () => void;
@@ -100,7 +100,7 @@ export interface SundayTypeDropdownProps {
   speeches: Speech[];
   date: string;
   onDeleteSpeeches?: (date: string, positions?: number[]) => void;
-  /** CR-221: Whether managed prayers is enabled. */
+  /** Whether managed prayers is enabled. */
   managePrayers?: boolean;
 }
 
@@ -458,7 +458,7 @@ export const SundayCard = React.memo(function SundayCard({
         <DateBlock date={date} locale={locale} />
 
         <View style={[styles.headerCenter, !expanded && { minHeight: collapsedMinHeight }]}>
-          {/* CR-221: For testimony/primary with managePrayers: show prayer lines instead of just exception text */}
+          {/* For testimony/primary with managePrayers: show prayer lines instead of just exception text */}
           {!isSpeechesType && isTestimonyOrPrimary && managePrayers && !expanded && (() => {
             const openingPrayer = speeches.find((s) => s.position === 0);
             const closingPrayer = speeches.find((s) => s.position === 4);
@@ -530,7 +530,7 @@ export const SundayCard = React.memo(function SundayCard({
           )}
           {isSpeechesType && !expanded && (
             <>
-              {/* CR-221: Opening prayer line (collapsed) */}
+              {/* Opening prayer line (collapsed) */}
               {managePrayers && (() => {
                 const openingPrayer = speeches.find((s) => s.position === 0);
                 return (
@@ -587,7 +587,7 @@ export const SundayCard = React.memo(function SundayCard({
                   </View>
                 );
               })}
-              {/* CR-221: Closing prayer line (collapsed) */}
+              {/* Closing prayer line (collapsed) */}
               {managePrayers && (() => {
                 const closingPrayer = speeches.find((s) => s.position === 4);
                 return (

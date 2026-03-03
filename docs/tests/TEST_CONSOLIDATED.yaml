@@ -4,15 +4,15 @@
 # =============================================================================
 
 type: test_consolidated
-version: 3
+version: 4
 last_updated: "2026-03-03"
 
 summary:
-  total_test_files: 31
-  total_tests: 644
+  total_test_files: 32
+  total_tests: 703
   framework: vitest
   categories:
-    module_named: 26
+    module_named: 27
     integration: 5
   infrastructure:
     setup: 1
@@ -82,11 +82,11 @@ module_tests:
     tests: 23
     module: src/types/database.ts
     covers:
-      - Role, Permission, SpeechStatus, SundayExceptionReason types
-      - NotificationType, NotificationTargetRole, NotificationStatus types
+      - Role, Permission (26 members), SpeechStatus, SundayExceptionReason types
+      - NotificationType, NotificationTargetRole, NotificationStatus, ActorRole types
       - Table type shapes (Ward, Member, Speech, SundayAgenda, Invitation, Hymn, MeetingActor, NotificationQueue)
       - Composite types (TopicWithCollection, SpeechBySunday, DateRange)
-      - Input types (CreateMemberInput, UpdateMemberInput, CreateActorInput, ImportResult)
+      - Input types (CreateMemberInput, UpdateMemberInput, CreateActorInput with role, ImportResult)
 
   - file: src/__tests__/app-setup.test.ts
     tests: 4
@@ -108,13 +108,14 @@ module_tests:
       - splitPhoneNumber (Brazilian, US, 3-digit country codes, empty, no prefix)
 
   - file: src/__tests__/permissions.test.ts
-    tests: 83
+    tests: 89
     module: src/lib/permissions.ts
     covers:
-      - Exhaustive permission matrix (3 roles x 24+ permissions)
-      - Role-specific permission verification
+      - Exhaustive permission matrix (3 roles x 26 permissions including prayer:assign/prayer:unassign)
+      - Role-specific permission verification (bishopric 26, secretary 23, observer 3)
+      - Secretary lacks speech:assign/speech:unassign, has prayer:assign/prayer:unassign
       - getPermissions per role
-      - ALL_PERMISSIONS and ALL_ROLES constants
+      - ALL_PERMISSIONS (26 entries) and ALL_ROLES constants
 
   - file: src/__tests__/activityLog.test.ts
     tests: 29
@@ -178,13 +179,12 @@ module_tests:
       - groupSpeechesBySunday (grouping, exceptions, empty dates)
 
   - file: src/__tests__/useActors-utils.test.ts
-    tests: 17
+    tests: 11
     module: src/hooks/useActors.ts
     covers:
-      - enforceActorRules (identity function)
-      - filterActorsByRole (all, can_preside, can_conduct, can_recognize, can_pianist)
+      - filterActorsByRole (all, preside, conduct, recognize, pianist - using single role field)
       - sortActors (alphabetical, immutability, case insensitive)
-      - actorKeys query key generation
+      - actorKeys query key generation (no can_ prefix)
 
   - file: src/__tests__/useAgenda-utils.test.ts
     tests: 16
@@ -264,6 +264,25 @@ module_tests:
       - SUPPORTED_LANGUAGES, LANGUAGE_LABELS, DEFAULT_COUNTRY_CODES, DEFAULT_TIMEZONES verification
       - Backward compatibility (old codes en, es, es-ES not in SUPPORTED_LANGUAGES)
 
+  - file: src/__tests__/f041-f042-phase3.test.ts
+    tests: 59
+    module: "src/lib/permissions.ts, src/hooks/useActors.ts, src/types/database.ts"
+    covers:
+      - "F041 (CR-253): Permission Model Rework - prayer:assign/prayer:unassign"
+      - "F042 (CR-255): Actor Single Role Enum - ActorRole type, single role field"
+      - Bishopric full access (26 permissions including prayer:*)
+      - Secretary lacks speech:assign/speech:unassign
+      - Secretary has prayer:assign/prayer:unassign
+      - Position-aware permission logic (isPrayer ternary)
+      - Observer unchanged (3 permissions)
+      - ActorRole 5 values (preside, conduct, recognize, pianist, conductor)
+      - MeetingActor has role field (no boolean flags)
+      - CreateActorInput/UpdateActorInput with role
+      - filterActorsByRole with single role field
+      - actorKeys without can_ prefix
+      - sortActors with role-based actors
+      - Cross-feature F041+F042 verification
+
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
 # =============================================================================
@@ -272,7 +291,7 @@ integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
     tests: 25
     covers:
-      - useActors (fetch, create, update, delete, error, empty wardId, mutation failure, unmount race)
+      - useActors (fetch, create with role field, update, delete, error, empty wardId, mutation failure, unmount race)
       - useAgenda (lazy create, update)
       - useSpeeches (fetch, assign speaker, change status, invalid transition)
       - useMembers (fetch, create, update, delete)
@@ -288,7 +307,8 @@ integration_tests:
     tests: 22
     covers:
       - Permission matrix (bishopric, secretary, observer roles)
-      - getPermissions, ALL_PERMISSIONS, ALL_ROLES
+      - Secretary lacks speech:assign/speech:unassign, has prayer:assign/prayer:unassign (CR-253)
+      - getPermissions, ALL_PERMISSIONS (26), ALL_ROLES
       - Auth context permission gating (bishopric, observer, secretary)
       - Unknown role handling
       - AuthContext loading state
@@ -634,6 +654,291 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # ===========================================================================
+  # F041 PERMISSION MODEL REWORK - TEST COVERAGE (CR-253)
+  # ===========================================================================
+
+  - feature: F041
+    tests:
+      # AC-F005-01: Bishopric full access
+      - name: "bishopric has speech:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "bishopric has prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "bishopric has prayer:unassign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "bishopric has 26 total permissions"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-01"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-02: Secretary speech positions read-only
+      - name: "secretary does NOT have speech:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position-aware logic: isPrayer=false uses speech:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-02"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-03: Secretary topic read-only
+      - name: "topic assignment uses same canAssign as speaker assignment"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-04: Secretary prayer assign
+      - name: "secretary has prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position-aware logic: isPrayer=true uses prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-04"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-05: Secretary prayer unassign
+      - name: "secretary has prayer:unassign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position-aware logic: isPrayer=true uses prayer:unassign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-05"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-06: Secretary change status any position
+      - name: "secretary has speech:change_status"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-06"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F005-07: Observer unchanged
+      - name: "observer has exactly 3 permissions"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-07"]
+        covers_ecs: []
+        status: passing
+
+      - name: "observer does NOT have prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F005-07"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F014-01/02: Position-aware routing
+      - name: "position 0 (opening prayer) uses prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position 1 (speech 1) uses speech:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position 4 (closing prayer) uses prayer:assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-01"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F014-03: Secretary cannot assign to speech positions
+      - name: "secretary at pos 1 (speech) cannot assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "secretary at pos 0 (prayer) CAN assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "bishopric at pos 1 (speech) CAN assign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F014-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F015-01/02: Topic assignment
+      - name: "secretary sees topic as read-only for pos 1-3"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F015-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "bishopric can assign topics to pos 1-3"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F015-02"]
+        covers_ecs: []
+        status: passing
+
+      # BR009: Permission matrix completeness
+      - name: "ALL_PERMISSIONS has 26 entries"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["BR009"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ALL_PERMISSIONS includes prayer:assign and prayer:unassign"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["BR009"]
+        covers_ecs: []
+        status: passing
+
+      - name: "secretary has 23 permissions"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["BR009"]
+        covers_ecs: []
+        status: passing
+
+  # ===========================================================================
+  # F042 ACTOR SINGLE ROLE ENUM - TEST COVERAGE (CR-255)
+  # ===========================================================================
+
+  - feature: F042
+    tests:
+      # AC-F009-01: Actor has single role field
+      - name: "MeetingActor has role property"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "MeetingActor does NOT have boolean flag properties"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "ActorRole covers all 5 roles"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-01"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F009-02: Actor creation sets single role
+      - name: "CreateActorInput has required role field"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "CreateActorInput works with all 5 roles"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "UpdateActorInput has optional role field"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-02"]
+        covers_ecs: []
+        status: passing
+
+      # AC-F009-03: Actor filtering uses role field
+      - name: "filterActorsByRole returns all for all filter"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "filterActorsByRole filters by preside"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "filterActorsByRole filters by conduct"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "filterActorsByRole filters by pianist"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "filterActorsByRole filters by conductor"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "filterActorsByRole handles multiple actors with same role"
+        file: src/__tests__/f041-f042-phase3.test.ts
+        type: unit
+        covers_acs: ["AC-F009-03"]
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -778,6 +1083,64 @@ coverage:
       covered: true
       tests: ["old code en is NOT in SUPPORTED_LANGUAGES", "old code es is NOT in SUPPORTED_LANGUAGES"]
 
+    # --- F041 (Phase 3 / CR-253) ---
+    - id: AC-F005-01
+      covered: true
+      tests: ["bishopric has speech:assign", "bishopric has prayer:assign", "bishopric has 26 total permissions"]
+    - id: AC-F005-02
+      covered: true
+      tests: ["secretary does NOT have speech:assign", "position-aware logic: isPrayer=false uses speech:assign"]
+    - id: AC-F005-03
+      covered: true
+      tests: ["topic assignment uses same canAssign as speaker assignment"]
+    - id: AC-F005-04
+      covered: true
+      tests: ["secretary has prayer:assign", "position-aware logic: isPrayer=true uses prayer:assign"]
+    - id: AC-F005-05
+      covered: true
+      tests: ["secretary has prayer:unassign", "position-aware logic: isPrayer=true uses prayer:unassign"]
+    - id: AC-F005-06
+      covered: true
+      tests: ["secretary has speech:change_status"]
+    - id: AC-F005-07
+      covered: true
+      tests: ["observer has exactly 3 permissions", "observer does NOT have prayer:assign"]
+    - id: AC-F014-01
+      covered: true
+      tests: ["position 0 (opening prayer) uses prayer:assign", "position 4 (closing prayer) uses prayer:assign"]
+    - id: AC-F014-02
+      covered: true
+      tests: ["position 1 (speech 1) uses speech:assign"]
+    - id: AC-F014-03
+      covered: true
+      tests: ["secretary at pos 1 (speech) cannot assign", "secretary at pos 0 (prayer) CAN assign", "bishopric at pos 1 (speech) CAN assign"]
+    - id: AC-F015-01
+      covered: true
+      tests: ["secretary sees topic as read-only for pos 1-3"]
+    - id: AC-F015-02
+      covered: true
+      tests: ["bishopric can assign topics to pos 1-3"]
+    - id: BR009
+      covered: true
+      tests: ["ALL_PERMISSIONS has 26 entries", "ALL_PERMISSIONS includes prayer:assign and prayer:unassign", "secretary has 23 permissions"]
+
+    # --- F042 (Phase 3 / CR-255) ---
+    - id: AC-F009-01
+      covered: true
+      tests: ["MeetingActor has role property", "MeetingActor does NOT have boolean flag properties", "ActorRole covers all 5 roles"]
+    - id: AC-F009-02
+      covered: true
+      tests: ["CreateActorInput has required role field", "CreateActorInput works with all 5 roles", "UpdateActorInput has optional role field"]
+    - id: AC-F009-03
+      covered: true
+      tests: ["filterActorsByRole filters by preside", "filterActorsByRole filters by conduct", "filterActorsByRole filters by pianist", "filterActorsByRole filters by conductor"]
+    - id: AC-F009-04
+      covered: false
+      reason: "Database migration (SQL). chk_pianist_conductor_exclusive removal cannot be verified in vitest."
+    - id: AC-F009-05
+      covered: false
+      reason: "Database migration (SQL). Boolean-to-role data migration cannot be tested in vitest."
+
   edge_cases:
     # F039 edge cases
     - id: EC-2col-rejected
@@ -864,8 +1227,19 @@ gaps:
     reason: "Same as AC-030."
     recommendation: "Verified by code review. LANGUAGE_MAP['ES-ES'] === 'es-LA'."
 
+  # F041 gaps (none - all app-side ACs covered)
+  # No gaps. All F041 ACs that can be tested in vitest are covered.
+
+  # F042 gaps
+  - id: AC-F009-04
+    reason: "Database migration 025 (SQL). DROP CONSTRAINT cannot be verified in vitest."
+    recommendation: "Verified by SQL review. DROP CONSTRAINT IF EXISTS chk_pianist_conductor_exclusive present in migration."
+  - id: AC-F009-05
+    reason: "Database migration 025 (SQL). Boolean-to-role data migration cannot be executed in vitest."
+    recommendation: "Verified by SQL review. UPDATE with CASE WHEN priority logic present in migration."
+
 stats:
-  total_tests: 644
-  passing: 644
+  total_tests: 703
+  passing: 703
   failing: 0
   skipped: 0

@@ -2,8 +2,7 @@
 // Creates an invitation with token + deep link for a new user.
 // Requires JWT with Bishopric or Secretary role (invitation:create permission).
 //
-// F143 (CR-208): Structured error logging, error codes, and diagnostic mode.
-// ADR-094: Structured error codes + diagnostic mode for production debugging.
+// F143 (CR-208): Structured error logging and error codes.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -16,7 +15,6 @@ const corsHeaders = {
 interface CreateInvitationInput {
   email: string;
   role: 'bishopric' | 'secretary' | 'observer';
-  diagnose?: boolean;
 }
 
 const VALID_ROLES = ['bishopric', 'secretary', 'observer'];
@@ -112,25 +110,6 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Invalid email format', code: 'validation/invalid-email' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Diagnostic mode: run all checks but skip DB insert
-    if (input.diagnose === true) {
-      return new Response(
-        JSON.stringify({
-          diagnostic: true,
-          checks: {
-            auth_header: 'pass',
-            jwt_validation: 'pass',
-            metadata_check: 'pass',
-            role_permission: 'pass',
-            payload_validation: 'pass',
-          },
-          user_id: user.id,
-          ward_id: wardId,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

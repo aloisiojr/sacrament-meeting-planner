@@ -1,2185 +1,851 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
-# Fonte unica de verdade da arquitetura do projeto Sacrament Meeting Planner
-# Gerado: 2026-02-18
+# Architecture documentation for Sacrament Meeting Planner
+# Last updated: 2026-03-03
 # =============================================================================
 
 metadata:
- project: Sacrament Meeting Planner
- last_updated: "2026-03-03"
- total_modules: 8
- total_adrs: 122
- pending_arch: "none"
+  project: Sacrament Meeting Planner
+  last_updated: "2026-03-03"
+  total_modules: 13
+  total_adrs: 14
 
 # =============================================================================
 # TECH STACK
 # =============================================================================
 
 tech_stack:
- runtime: "React Native + Expo SDK 54"
- language: "TypeScript"
- routing: "Expo Router (file-based, src/app/)"
- server_state: "TanStack Query v5"
- local_state: "React Context (theme, auth, locale)"
- backend: "Supabase"
- database: "PostgreSQL with RLS"
- auth: "Supabase Auth (email/password)"
- realtime: "Supabase Realtime channels"
- edge_functions: "Supabase Edge Functions (Deno runtime)"
- i18n: "react-i18next (pt-BR, en, es)"
- testing: "Vitest + React Testing Library"
- gestures: "react-native-gesture-handler ~2.28.0 + react-native-reanimated"
- file_system: "expo-file-system v19 (new File/Paths API)"
- notifications: "Expo Push Notifications"
- storage: "AsyncStorage (offline queue, theme preference)"
- deep_links: "expo-linking (sacrmeetplan://invite/{token}, sacrmeetplan://reset-password?token=...&type=recovery). Uses sacrmeetplan:// scheme. reset-redirect and invite-redirect are 302 redirect endpoints to external GitHub Pages. create-invitation returns HTTPS URL."
- csv: "expo-document-picker + expo-file-system + expo-sharing"
+  runtime:
+    framework: React Native
+    version: "0.81.5"
+    platform: Expo SDK 54
+    entry_point: expo-router/entry
+    architecture: New Architecture (Fabric) enabled
+    orientation: portrait only
+
+  language:
+    primary: TypeScript 5.9
+    config: strict mode
+
+  routing:
+    library: Expo Router 6
+    pattern: File-based routing
+    groups:
+      - "(auth)": "Authentication screens (login, register, forgot-password, invite/[token], reset-password)"
+      - "(tabs)": "Main app with bottom tab navigation (index, agenda, speeches, settings/)"
+
+  state_management:
+    server_state: TanStack React Query 5
+    local_state: React Context (AuthContext, ThemeContext)
+    persistence: AsyncStorage (theme preference, Supabase auth session)
+
+  ui:
+    gesture_handler: react-native-gesture-handler 2.28
+    animations: react-native-reanimated 4.1
+    svg: react-native-svg 15
+    safe_area: react-native-safe-area-context 5.6
+    screens: react-native-screens 4.16
+    icons: Custom SVG components (no icon library)
+
+  i18n:
+    library: i18next + react-i18next
+    languages: ["pt-BR", "en", "es"]
+    default: pt-BR
+    fallback: pt-BR
+
+  testing:
+    runner: Vitest 4
+    utilities: "@testing-library/react-native 13"
+
+  build:
+    bundler: Metro (via Expo)
+    linting: ESLint 9 with expo config
+    scripts:
+      start: "expo start"
+      test: "vitest"
+      test_run: "vitest run"
 
 # =============================================================================
-# SYSTEM DIAGRAM (ASCII)
-# =============================================================================
-
-system_diagram: |
- ┌─────────────────────────────────────────────────────────────────┐
- │ React Native + Expo SDK 54 │
- │ │
- │ ┌──────────────────────────────────────────────────────────┐ │
- │ │ UIShell (M008) - GestureHandlerRootView wrapper │ │
- │ │ Expo Router: (auth)/ | (tabs)/Home,Agenda,Speeches,Set │ │
- │ │ ThemeContext | I18nProvider | ErrorBoundary │ │
- │ └──────────────────────────────────────────────────────────┘ │
- │ │
- │ ┌──────────┐ ┌──────────────┐ ┌────────────┐ ┌──────────┐ │
- │ │ Auth │ │ SpeechModule │ │ Agenda │ │ WardData │ │
- │ │ Module │ │ (M003) │ │ Module │ │ Module │ │
- │ │ (M001) │ │ Speech CRUD │ │ (M004) │ │ (M002) │ │
- │ │ Login │ │ Status cycle │ │ Agenda │ │ Members │ │
- │ │ Signup │ │ WhatsApp │ │ Form │ │ Topics │ │
- │ │ Reset │ │ LEDs │ │ Present. │ │ Actors │ │
- │ │ Users │ │ │ │ Accordion │ │ Hymns │ │
- │ │ Perms │ │ │ │ │ │ Log │ │
- │ └──────────┘ └──────────────┘ └────────────┘ │ Sundays │ │
- │ └──────────┘ │
- │ ┌──────────────┐ ┌───────────────┐ ┌───────────────┐ │
- │ │ Notification │ │ SyncEngine │ │ OfflineManager│ │
- │ │ Module (M005)│ │ (M006) │ │ (M007) │ │
- │ │ Push queue │ │ Realtime WS │ │ MutationQueue │ │
- │ │ Expo Push │ │ Poll fallback│ │ Optimistic UI │ │
- │ └──────────────┘ └───────────────┘ │ Connection │ │
- │ └───────────────┘ │
- │ ┌──────────────────────────────────────────────────────────┐ │
- │ │ TanStack Query (server state cache + mutations) │ │
- │ └──────────────────────────┬───────────────────────────────┘ │
- └─────────────────────────────┼───────────────────────────────────┘
- │
- Supabase Client
- │
- ┌─────────────────────────────┼───────────────────────────────────┐
- │ Supabase Backend │
- │ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐ │
- │ │ Auth │ │ PostgREST│ │ Realtime │ │ Edge Functions │ │
- │ │ (JWT) │ │ (CRUD) │ │ (WS) │ │ 10 functions │ │
- │ └──────────┘ └──────────┘ └──────────┘ │ 1 push cron │ │
- │ └────────────────┘ │
- │ ┌──────────────────────────────────────────────────────────┐ │
- │ │ PostgreSQL (RLS on ward_id, triggers, migrations) │ │
- │ │ wards | members | speeches | sunday_agendas │ │
- │ │ ward_topics | meeting_actors | hymns | sunday_exceptions│ │
- │ │ general_collections | general_topics │ │
- │ │ ward_collection_config | invitations │ │
- │ │ activity_log | device_push_tokens | notification_queue │ │
- │ └──────────────────────────────────────────────────────────┘ │
- └─────────────────────────────────────────────────────────────────┘
-
-# =============================================================================
-# PROVIDER STACK (rendering order)
+# PROVIDER STACK
 # =============================================================================
 
 provider_stack:
- order:
- - "ErrorBoundary"
- - "GestureHandlerRootView (style={{ flex: 1 }})"
- - "QueryClientProvider"
- - "I18nextProvider"
- - "ThemeProvider"
- - "AuthProvider"
- - "SyncProvider (useConnection + useRealtimeSync + useNotifications + OfflineBanner)"
- - "NavigationGuard (redirects based on auth state)"
- - "StatusBar"
- - "Slot (Expo Router)"
- file: "src/app/_layout.tsx"
- notes:
- - "GestureHandlerRootView wraps the entire app tree inside ErrorBoundary"
- - "SyncProvider orchestrates connection monitoring, realtime sync, push notifications"
- - "OfflineBanner renders above Slot when device is offline"
+  backend:
+    service: Supabase
+    client: "@supabase/supabase-js 2.95"
+    features_used:
+      - Auth (email/password, session persistence, app_metadata for role/ward_id)
+      - Database (PostgreSQL with RLS)
+      - Realtime (WebSocket channels for live sync)
+      - Edge Functions (Deno runtime, 11 functions)
+
+  push_notifications:
+    service: Expo Push API
+    registration: expo-notifications
+    processing: Edge Function (process-notifications) on cron
+
+  external_pages:
+    hosting: GitHub Pages
+    purpose: Self-contained HTML pages for invitation acceptance and password reset
+    env_var: EXTERNAL_PAGES_URL
+
+  deep_links:
+    scheme: "sacrmeetplan://"
+    usage: Internal navigation via Expo Router
 
 # =============================================================================
 # MODULES
 # =============================================================================
 
 modules:
- - id: M001
- name: AuthModule
- responsibility: "Autenticacao, sessao, gerenciamento de usuarios, permissoes"
- spec_features: [F001, F018, F023, F101, F113, F114, F116, F131, F133, F134, F140, F143, F144, F170]
- key_files:
- - src/app/(auth)/login.tsx
- - src/app/(auth)/register.tsx
- - src/app/(auth)/forgot-password.tsx
- - src/app/(auth)/reset-password.tsx
- - src/app/(auth)/invite/[token].tsx
- - src/app/(tabs)/settings/users.tsx
- - src/contexts/AuthContext.tsx
- - src/lib/permissions.ts
- - src/lib/supabase.ts
- hooks: [useAuth]
- screens:
- - LoginScreen (login.tsx)
- - RegisterScreen (register.tsx)
- - ForgotPasswordScreen (forgot-password.tsx)
- - ResetPasswordScreen (reset-password.tsx)
- - InviteRegistrationScreen (invite/[token].tsx)
- - UserManagementScreen (users.tsx)
- edge_functions:
- - register-first-user
- - register-invited-user
- - create-invitation
- - list-users
- - update-user-role
- - update-user-name
- - delete-user
- - send-reset-email
- - reset-redirect
- - invite-redirect
- notes: |
- Includes forgot password. corrigiu acesso do secretario a EFs.
- Removed Authorization header manual (regression ).
- Session guard enabled with gateway JWT verification disabled.
- Includes campo full_name no registro e edicao de nome.
- Includes back button na tela Users.
- Forgot-password.tsx adiciona redirectTo com Linking.createURL para deep link correto.
- Forgot-password.tsx chama Edge Function send-reset-email em vez de resetPasswordForEmail.
- reset-password.tsx suporta token via deep link query params (verifyOtp) com fallback para PASSWORD_RECOVERY event.
- AuthContext expoe: session, user, role, wardId, userName, loading, signIn, signOut, hasPermission.
- Deep link scheme changed from sacrmeetman:// to sacrmeetplan:// in app.json, create-invitation, and send-reset-email.
- Send-reset-email now uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme in email href. New reset-redirect Edge Function serves HTML with auto-redirect to sacrmeetplan://reset-password deep link.
- AuthContext now loads app language from user_metadata.language on login instead of ward language. Exposes wardLanguage and updateAppLanguage. Per-user app language stored in Supabase Auth user_metadata. Observer gains limited Settings tab (app language, theme, about).
- WardLanguageChangeMutation.onSuccess in settings/index.tsx now calls setWardLanguage exposed from AuthContext to update local state immediately. AuthContextValue extended with setWardLanguage setter.
- Send-reset-email Edge Function now uses user_metadata.language (app language) as first priority for email template. Fallback: ward.language -> pt-BR.
- Reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
- Reset-redirect completely rewritten to serve self-contained password reset web page. Loads Supabase JS from CDN, calls verifyOtp + updateUser in browser. No deep link redirect.
- New invite-redirect Edge Function serves self-contained invitation acceptance web page. create-invitation returns HTTPS URL instead of sacrmeetplan:// deep link. invite/[token].tsx remains as unused fallback.
- Create-invitation gains structured error codes (code field), console.error at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true } runs checks without db insert).
- Reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to external hosting (GitHub Pages, docs/public/). EXTERNAL_PAGES_URL env var configurable.
- Secretary role gains speech:assign and speech:unassign permissions. Same assign/unassign capabilities as bishopric for speech and prayer slots.
 
- - id: M002
- name: WardDataModule
- responsibility: "Dados mestres da ala: membros, topicos, colecoes, tipos de domingo, atores, hinos, log de atividades"
- spec_features: [F002, F003, F004, F005, F006, F007, F013, F014, F015, F019, F141, F169, F172, F173]
- key_files:
- - src/app/(tabs)/settings/members.tsx
- - src/app/(tabs)/settings/topics.tsx
- - src/app/(tabs)/settings/history.tsx
- - src/hooks/useMembers.ts
- - src/hooks/useTopics.ts
- - src/hooks/useActors.ts
- - src/hooks/useHymns.ts
- - src/hooks/useActivityLog.ts
- - src/hooks/useSundayTypes.ts
- - src/lib/csvUtils.ts
- - src/lib/activityLog.ts
- - src/components/ActorSelector.tsx
- - src/components/MemberSelectorModal.tsx
- - src/components/TopicSelectorModal.tsx
- hooks:
- - useMembers
- - useTopics
- - useActors
- - useHymns
- - useActivityLog
- - useSundayTypes
- screens:
- - MemberManagementScreen (members.tsx)
- - TopicManagementScreen (topics.tsx)
- - ActivityLogScreen (history.tsx)
- notes: |
- Implements CSV import/export com expo-file-system + expo-sharing.
- /55/66 corrigiram edge cases de CSV e header spacer.
- /78 corrigiram export vazio e i18n de erros CSV com error codes.
- Made can_conduct e can_preside independentes.
- Includes auto-criacao de atores para bishopric.
- Increased icones do ActorSelector.
- Includes secao informativa na tela Members.
- Removed unique constraint de phone dos members (migration 012).
- Includes textos explicativos na tela Members (description + CSV help, i18n).
- Save/Cancel explicito em MemberEditor e TopicEditor (remove onBlur auto-save).
- SearchInput reutilizavel com botao X para limpar busca (10 campos migrados).
- countryCodes.ts como single source of truth (~200 paises, extracto de members.tsx + csvUtils.ts).
- Alert.alert de confirmacao antes de importar CSV.
- texto explicativo na tela Topics (description + collection toggle explanation).
- expand/collapse inline para ver temas de colecao (hook useCollectionTopics, accordion pattern).
- Fix botao Delete no SwipeableCard (pointerEvents='box-none').
- SearchInput fixo no topo em members.tsx e topics.tsx (fora do ScrollView).
- USA reordenado antes de Canada em countryCodes.ts. members.tsx usa label para highlight no dropdown.
- SearchInput flex:1 defensivo. Settings screens (members, topics, history, timezone) com close button.
- Members.tsx usa getCountryByLabel para exibir bandeira correta para paises com mesmo dial code.
- Activity log descriptions changed to structured format. All hooks use buildLogDescription.
- activityLog.ts gains buildLogDescription, parseLogDescription, formatLogDescription.
- history.tsx renders translated descriptions via formatLogDescription(desc, t).
- Topics.tsx uses wardLanguage (from AuthContext) for collection listing instead of getCurrentLanguage. useTopics.ts 'Temas da Ala' hardcoded label replaced with t('topics.wardTopics').
- Meeting_actors.can_music split into can_pianist + can_conductor. Migration 017. CHECK constraint prevents both true. useActors ActorRoleFilter updated. ActorSelector role mapping updated.
- ActorSelector gains KeyboardAvoidingView (behavior="padding" on iOS) inside sheet View. Fixes keyboard covering inline TextInput when editing actors near bottom of list. Follows members.tsx/topics.tsx pattern (ADR-118).
- UseUpdateMember.onSuccess gains async cascade that propagates speaker_name, speaker_phone, and speaker_informal_name to all future speeches (sunday_date >= today) for the edited member. Best-effort via try/catch. Invalidates speechKeys.all after cascade. Imports supabase and speechKeys. Also includes informal_name in useCreateMember insert with auto-default to first word of full_name (ADR-121).
- New informal_name field for members. Migration 023 adds informal_name to members and speaker_informal_name to speeches (with backfill). import_members RPC updated. database.ts types extended. MemberEditor gains informal_name TextInput with auto-fill on blur. MemberRow shows informal_name in secondary style. csvUtils.ts updated for 3-column export and 2/3-column import. i18n keys added (ADR-122).
+  # ---------------------------------------------------------------------------
+  # M001 - Authentication
+  # ---------------------------------------------------------------------------
+  - id: M001
+    name: Authentication
+    description: |
+      Email/password authentication via Supabase Auth. Manages login, logout,
+      registration (first user and invited user), password reset, and session
+      persistence. Role and ward_id extracted from app_metadata.
+    features: [F001, F002, F003, F004, F005]
+    components:
+      - path: src/contexts/AuthContext.tsx
+        responsibility: Auth state provider; derives role, wardId, userName from session; language management
+      - path: src/app/(auth)/login.tsx
+        responsibility: Login screen
+      - path: src/app/(auth)/register.tsx
+        responsibility: First user registration (creates ward)
+      - path: src/app/(auth)/forgot-password.tsx
+        responsibility: Request password reset email
+      - path: src/app/(auth)/reset-password.tsx
+        responsibility: Password reset confirmation
+      - path: src/app/(auth)/invite/[token].tsx
+        responsibility: Invited user registration via deep link
+      - path: src/app/(auth)/_layout.tsx
+        responsibility: Auth group layout
+      - path: src/lib/permissions.ts
+        responsibility: Centralized RBAC with PERMISSIONS_MAP and hasPermission function
+    dependencies:
+      - "@supabase/supabase-js (auth)"
+      - "Expo Router (navigation guard)"
 
- - id: M003
- name: SpeechModule
- responsibility: "Ciclo de vida de discursos (designacao, status, remocao) e integracao WhatsApp"
- spec_features: [F008, F010, F024, F051, F093, F098, F099, F100, F103, F107, F112, F115, F118, F130, F132, F136, F142, F150, F151, F154, F157, F158, F159, F163, F164, F171, F173]
- key_files:
- - src/app/(tabs)/speeches.tsx
- - src/hooks/useSpeeches.ts
- - src/hooks/useSundayList.ts
- - src/components/SundayCard.tsx
- - src/components/SpeechSlot.tsx
- - src/components/StatusLED.tsx
- - src/components/StatusChangeModal.tsx
- - src/lib/whatsapp.ts
- - src/lib/whatsappUtils.ts
- - src/lib/speechUtils.ts
- hooks:
- - useSpeeches
- - useSundayList
- screens:
- - SpeechesTab (speeches.tsx)
- notes: |
- Cada domingo tem exatamente 3 slots de discurso (1o, 2o, 3o).
- Lazy creation: registros criados ao expandir o card.
- Snapshot pattern: nome/telefone do orador e titulo/link do topico copiados como texto.
- Status lifecycle: not_assigned -> assigned_not_invited -> assigned_invited -> assigned_confirmed | gave_up.
- Speech slots condicionados a tipo === 'speeches' (nao usa mais isExcludedFromAgenda).
- Templates padrao de WhatsApp por idioma (DEFAULT_TEMPLATE_EN, DEFAULT_TEMPLATE_ES).
- buildWhatsAppUrl aceita parametro 'language' para selecionar template do idioma da ala.
- LEDs condicionados a isSpeechesType no SundayCard (ocultos para domingos sem discursos).
- Templates padrao com aspas ao redor de {titulo}; {colecao} e {link} passados em WhatsAppVariables.
- Transicao reversa assigned_invited -> assigned_not_invited adicionada a VALID_TRANSITIONS.
- BuildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem. Usado em handleDropdownWhatsApp.
- GetPositionLabel retorna t('speeches.lastSpeech') quando position===3.
- Botao X para remover atribuicao de tema. onClearTopic prop no SpeechSlot.
- StatusChangeModal recebe allowedStatuses prop. LED click em assigned_invited filtra para confirmed/gave_up.
- Layout reordenado [LED][Speaker][X]. topicField marginLeft 28px para alinhamento.
- Auto-scroll para card expandido em speeches.tsx com scrollToIndex(viewPosition:0, delay 300ms).
- Speeches.tsx remove getItemLayout (alturas fixas). Delay 300->400ms para scroll mais preciso.
- StatusLED redesenhado para circulo flat com novas cores (cinza, laranja, amarelo, verde, vinho). StatusChangeModal cores atualizadas.
- UseDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo. SundayTypeDropdown chama delete antes de type change.
- LED click filtra todos os status exceto not_assigned. LED desabilitado para assigned_confirmed e gave_up.
- Topic X button extraido do campo para sibling em topicRow container (padrao identico ao speaker row).
- VALID_TRANSITIONS expandido para full mesh entre status atribuidos. SpeechSlot LED clicavel para todos exceto not_assigned. InviteActionDropdown opcoes dinamicas. SUPERSEDES F062 e F071.
- SundayCard collapsed mostra nomes dos 3 discursantes (um por linha) + LEDs verticais. Usa i18n keys existentes (speeches.slot, speeches.lastSpeech).
- Position 3 label changed from t('speeches.lastSpeech') to t('speeches.slot', {number:'3o'}) in SundayCard and SpeechSlot (Speeches tab only). Agenda tab keeps 'Ultimo Discurso'.
- SundayCard collapsed speeches redesign: LEDs moved from right column to inline before label. Size 14->10. Font 11->13. marginBottom:4 between lines. No speaker = show only circle.
- SpeechSlot LED moved from speaker row to label row (right-aligned with status text). Speaker/topic fields use full width. topicRow marginLeft:28 removed.
- Speeches.selectSpeaker i18n changed to 'Selecionar Discursante' (pt-BR), 'Select Speaker' (en), 'Seleccionar Discursante' (es).
- SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED/F112.
- SpeechSlot layout restructured to fixed-width right column (36px) for true center-to-center alignment of StatusLED and X buttons. Supersedes ADR-074 paddingRight:5 approach (ADR-076).
- SpeechSlot StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only. Supersedes ADR-076 LED placement (ADR-078).
- Optional 2nd speech per Sunday. has_second_speech toggle on SpeechSlot position 2. Position 3 label reverts to t('speeches.lastSpeech') in expanded SpeechSlot. SundayCard collapsed: remove ordinal labels, filter position 2 when OFF, show 2 LEDs. Confirmation dialog only when assignments exist. Presentation mode, AgendaForm, InviteManagementSection all respect the flag.
- Fix TypeScript compilation errors in test mocks and production code. SundayAgenda mocks gain missing fields. speeches.tsx null-to-string fix. AgendaForm Member type import fix. Documentation can_piano -> can_pianist.
- Fix 2nd speech toggle: handleToggleSecondSpeech adds separate direct Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder (not single warning). AgendaForm shows disabled ReadOnlySpeakerRow. Agenda/Home collapsed cards use dynamic X/2 or X/3 based on has_second_speech.
- SpeechSlot labelRow gains paddingRight:36 to align StatusLED right edge with speaker field right edge. actionArea width is 36px, so labelRow content is offset to match (ADR-088).
- SpeechSlot and SundayCard Unicode icons (chevron, X) replaced with SVG icon components from icons module (ChevronDownIcon, XIcon). SearchInput XIcon replaces Unicode (ADR-096).
- SpeechSlot disabled 2nd speech fields now show standard placeholders (t('speeches.selectSpeaker'), t('speeches.selectTopic')) instead of explanation text (t('speeches.secondSpeechDisabledPlaceholder')).
- SundayCard collapsed headerCenter gains minHeight: 62 when !expanded && isSpeechesType for uniform card height regardless of 2 or 3 visible positions.
- SundayCard collapsed headerCenter minHeight condition simplified from !expanded && isSpeechesType to !expanded. All collapsed card types (speech and exception) now have uniform minHeight: 62. Supersedes F151 approach.
- Managed Prayers. Prayers stored as speeches positions 0 (opening) and 4 (closing). manage_prayers toggle on wards. useLazyCreateSpeeches extended for positions 0/4 by sunday type. SpeechSlot gains isPrayer prop (no topic row). SundayCard collapsed shows prayer lines (italic + prefix) when ON. useDeleteSpeechesByDate gains optional positions filter. Notification trigger checks manage_prayers for positions 0/4. Separate WhatsApp templates for opening/closing prayers. (ADR-102 through ADR-108).
- UI adjustments for managed prayers collapsed cards. StatusLED circles added to prayer lines. conditional prayer label (hide when no name). NextSundaysSection passes managePrayers to SundayCard. spacing gap after exception text in testimony/primary. speechRow marginBottom reduced from 4 to 1. dynamic minHeight replaces static 62px for uniform card height (ADR-110). (ADR-109 through ADR-111).
- Speech WhatsApp template split. Single wards.whatsapp_template replaced with 3 per-position columns: whatsapp_template_speech_{1,2,3}. {posicao} placeholder removed from templates, WhatsAppVariables, and resolveTemplate. getDefaultTemplate replaced by getDefaultSpeechTemplate(language, position). buildWhatsAppUrl gains position parameter. InviteManagementSection selects template column by speech.position. Settings WhatsApp screen expands to 5 tabs (3 speech + 2 prayer). Migration 020. (ADR-112, ADR-113).
- ActorSelector Unicode checkbox (U+2611/U+2610) replaced with SVG CheckSquareIcon/SquareIcon from icons module. Selected uses colors.primary, unselected uses colors.textSecondary.
- Speeches.selectTopic i18n capitalization fix ('tema'->'Tema', 'topic'->'Topic').
- ShowTopicRow condition simplified from `!isPrayer && !!(topicDisplay || (canAssign && speech))` to `!isPrayer && !!speech`. Topic row now visible to all roles (secretary, observer) whenever a speech exists, not only when canAssign is true. Field interactivity (pressable, chevron, X button) remains gated by canAssign. Observer sees read-only topic field (ADR-120).
- AssignSpeakerInput gains speakerInformalName field. useAssignSpeaker snapshots speaker_informal_name. useRemoveAssignment clears speaker_informal_name. All 3 callers (speeches.tsx, NextAssignmentsSection, AgendaForm) pass speakerInformalName. InviteManagementSection resolves {nome} as speaker_informal_name || speaker_name || ''.
+  # ---------------------------------------------------------------------------
+  # M002 - Member Management
+  # ---------------------------------------------------------------------------
+  - id: M002
+    name: Member Management
+    description: |
+      CRUD for ward members with CSV import/export. Members have full_name,
+      informal_name, country_code, and phone. Accent-insensitive search.
+      Member updates cascade to future speeches.
+    features: [F006, F007]
+    components:
+      - path: src/hooks/useMembers.ts
+        responsibility: TanStack Query hooks for member CRUD, cascade logic
+      - path: src/app/(tabs)/settings/members.tsx
+        responsibility: Members settings screen with search, add, edit, delete
+      - path: src/components/MemberSelectorModal.tsx
+        responsibility: Searchable member selection modal
+      - path: src/lib/csvUtils.ts
+        responsibility: CSV import/export with UTF-8 BOM, validation, error codes
+    dependencies:
+      - "expo-document-picker, expo-file-system, expo-sharing (CSV operations)"
+      - "import_members RPC (Supabase function)"
 
- - id: M004
- name: AgendaModule
- responsibility: "Formulario da agenda sacramental e Modo Apresentacao"
- spec_features: [F012, F016, F094, F095, F096, F097, F104, F105, F108, F109, F110, F111, F126, F127, F137, F145, F146, F148, F149, F150, F153, F156, F157, F158, F161, F162, F166, F168]
- key_files:
- - src/app/(tabs)/agenda.tsx
- - src/app/presentation.tsx
- - src/hooks/useAgenda.ts
- - src/hooks/usePresentationMode.ts
- - src/components/AgendaForm.tsx
- - src/components/AccordionCard.tsx
- - src/components/HymnSelector.tsx
- - src/components/PrayerSelector.tsx
- - src/components/DebouncedTextInput.tsx
- - src/lib/dateUtils.ts
- hooks:
- - useAgenda
- - usePresentationMode
- screens:
- - AgendaTab (agenda.tsx)
- - PresentationMode (presentation.tsx)
- notes: |
- Lazy creation: registro da agenda criado ao expandir domingo.
- Auto-save em cada mudanca de campo (debounced para text inputs).
- Changed Recognizing para usar ActorSelector com can_recognize.
- Includes nomes customizados para oracoes via MemberSelectorModal.
- domingos excluidos aparecem como cards nao-expandiveis.
- PrayerSelector recebe visible/onClose (padrao ActorSelector) para auto-abrir modal.
- Multi-select para 'Reconhecendo a Presenca' (toggle add/remove, ActorSelector com multiSelect prop).
- Labels 'speeches.speaker' alterados de 'Orador' para 'Discurso' (i18n only).
- SpeakerField reescrito para read-only + lapis + TextInput + X. Override em speaker_*_override.
- ExceptionLabel oculto para domingos com reason === 'speeches' na aba Agenda.
- Modo Apresentacao: read-only, accordion com 4 secoes (normal) ou 3 (especial).
- Label do SpeakerField posicao 3 usa t('speeches.lastSpeech'). Presentation mode idem.
- PrayerSelector recebe modalOnly={true} no AgendaForm para nao duplicar botao inline.
- SpeakerField mostra label "(Designacao de ultima hora)" quando hasOverride=true e !isEditing.
- Auto-scroll para card expandido em agenda.tsx com scrollToIndex(viewPosition:0, delay 300ms).
- Campo Reconhecendo com Pressable customizado mostrando nomes um por linha, altura proporcional.
- AgendaForm styles.searchInput simplificado para {flex:1}, herda estilos do SearchInput base.
- Agenda.tsx remove getItemLayout, ESTIMATED_ITEM_HEIGHT, initialScrollIndex. Usa useEffect para initial scroll. Delay 300->400ms.
- PrayerSelector hint text para discoverability + pre-populate no re-edit de nomes customizados.
- Agenda.tsx scrollToIndex inicial com viewPosition:0.5 para centralizar proximo domingo. onScrollToIndexFailed melhorado com retry.
- SundayTypeDropdown adicionado como primeiro campo no card expandido da Agenda. Exportado de SundayCard.tsx. Mesmos hooks que speeches.tsx.
- Campos Pianista e Regente adicionados na secao Boas-Vindas (ActorSelector can_music). Presentation mode inclui ambos.
- Toggle has_intermediate_hymn com persistencia no DB (migracao 016). Controla visibilidade do seletor de hino intermediario.
- Status lines no card de agenda contraido (Falta, Discursantes, Oracoes, Hinos). useAgendaRange para dados sem expandir.
- AccordionCard directional arrows: cards above expanded show down-arrow, below show up-arrow, expanded hides arrow.
- Recognized names join with '\n' and type 'multiline' in usePresentationMode (one name per line).
- Font size toggle in Presentation Mode header (useState: 'normal'|'large'). Normal=current+1. Large=~1.5x. Not persisted.
- Card titles in Presentation Mode use sectionXxx i18n keys (matching Agenda tab section headers).
- Presentation.tsx title changed to t('presentation.title') = 'Reunião Sacramental'. Font size fixed to 19 (no longer changes with toggle).
- Pt-BR.json section headers fixed: 'Boas-Vindas, Anúncios e Reconhecimentos', 'Designações e Sacramento', 'Último Discurso'. es.json sectionLastSpeech also fixed.
- UsePresentationMode.ts last speaker label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech').
- Agenda.tsx collapsed card: testimony_meeting and primary_presentation show 4 status lines (Falta, Type, Orações, Hinos). New i18n key agenda.statusPrayersLabel.
- UsePresentationMode.ts buildPresentationCards Card 2: add stake announcements field (label + text) when has_stake_announcements is true. New i18n key presentation.stakeAnnouncementsText.
- AgendaForm.tsx last speech label changed from `${t('speeches.lastSpeech')} - ${t('speeches.speaker')}` to t('speeches.lastSpeech'). Same fix as in usePresentationMode.ts.
- AgendaForm pianist field roleFilter changed from 'can_music' to 'can_pianist'. Conductor field roleFilter changed from 'can_music' to 'can_conductor'.
- AgendaForm shows disabled placeholder for speech 2 when has_second_speech=false. Speaker override for position 2 also disabled. usePresentationMode conditionally includes speech 2 in First Speeches card.
- Pencil button (U+270F) added to Presentation header. Navigates to Agenda tab with expandDate param (ADR-083). Agenda tab gains expandDate query param support (same ADR-082 pattern as speeches.tsx).
- Play button (U+25B6) in expanded agenda card header. Navigates to Presentation with date param. Presentation screen accepts optional date param (fallback getTodaySundayDate).
- Play icon fontSize increased in agenda.tsx (14->18) with marginRight 8->12 for better spacing from chevron.
- All Unicode/emoji icons in agenda.tsx, presentation.tsx, AgendaForm.tsx, AccordionCard.tsx replaced with SVG icon components from icons module (ADR-096).
- Play icon in agenda.tsx card header gets marginRight:8 for visual separation from chevron. Uses colors.textSecondary for sober appearance (ADR-097).
- I18n labels updated: agenda.wardBusiness (pt-BR, es) and agenda.stakeAnnouncements (pt-BR, en, es). Reflected in AgendaForm editing cards and Presentation mode via t calls.
- AgendaForm ReadOnlySpeakerRow gains disabled visual (opacity: 0.5, backgroundColor: colors.surfaceVariant) when disabled=true. Matches SpeechSlot disabled field pattern (ADR-098).
- AgendaForm 2nd speaker ReadOnlySpeakerRow shows label as placeholder (speakerName='') instead of explanation text when has_second_speech=false.
- Agenda.tsx play button Pressable gains circular border (width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:colors.textSecondary) with centered content. playButton marginRight increased from 8 to 16 for more spacing from chevron (ADR-099).
- ReadOnlySpeakerRow text styling reworked: speaker names get fontStyle:'italic' + color:colors.textSecondary (reduced contrast). Empty placeholder keeps textTertiary. 2nd speech disabled speakerName changed from '' to t('speeches.secondSpeechDisabledPlaceholder'). i18n 'configurado'->'ajustado' in 3 locales (ADR-101).
- Fix double-label bug in AgendaForm prayer fields. When managePrayers=true, ReadOnlySpeakerRow was called inside FieldRow, but ReadOnlySpeakerRow internally wraps in its own FieldRow -> double label. Fix: inline render View+Text+PencilIcon directly inside parent FieldRow for prayer positions (ADR-109).
- Welcome_new_families field added to AgendaForm (FieldRow + DebouncedTextInput between Recognizing and Announcements). Auto-saves via updateField. Observer read-only. usePresentationMode adds welcome_new_families to Welcome card (conditional, multiline type). DB migration 022 adds TEXT DEFAULT NULL column to sunday_agendas. SundayAgenda TypeScript interface updated. i18n key agenda.welcomeNewFamilies in 3 locales (ADR-114).
- PlayIcon SVG replaced from triangle to circle-play (Circle + Path in icons/index.tsx). Agenda.tsx play button circular border container removed (circle-play has built-in circle). Size increased 18->24.
- DateUtils.ts hardcoded accent corrections: MONTH_FULL pt-BR 'Marco'->'Março', DAY_NAMES pt-BR 'Terca-feira'->'Terça-feira' and 'Sabado'->'Sábado', DAY_NAMES es 'Miercoles'->'Miércoles' and 'Sabado'->'Sábado'. Data-only, no logic changes.
- DebouncedTextInput flicker fix. isFocusedRef added to skip sync useEffect during active typing. handleFocus/handleBlur manage ref. onFocus added to TextInput. Prevents character disappearance caused by query refetch overwriting localValue during typing (ADR-117).
+  # ---------------------------------------------------------------------------
+  # M003 - Topic Management
+  # ---------------------------------------------------------------------------
+  - id: M003
+    name: Topic Management
+    description: |
+      Ward-specific topics and general topic collections. Collections are
+      language-specific and can be activated/deactivated per ward. Active
+      topics combine ward topics + active collection topics.
+    features: [F008]
+    components:
+      - path: src/hooks/useTopics.ts
+        responsibility: TanStack Query hooks for topic CRUD, collection toggle, active topics aggregation
+      - path: src/app/(tabs)/settings/topics.tsx
+        responsibility: Topics settings screen with ward topics and collection management
+      - path: src/components/TopicSelectorModal.tsx
+        responsibility: Topic selection modal showing ward + collection topics
+    dependencies:
+      - "general_collections, general_topics tables (global, read-only)"
+      - "ward_collection_config table (ward-level activation)"
 
- - id: M005
- name: NotificationModule
- responsibility: "Push notifications via fila no banco, Expo Push API e Edge Function cron"
- spec_features: [F017, F167]
- key_files:
- - src/hooks/useNotifications.ts
- - src/lib/notificationUtils.ts
- - supabase/functions/process-notifications/index.ts
- - supabase/migrations/003_notification_triggers.sql
- - supabase/migrations/004_weekly_reminder_function.sql
- hooks:
- - useRegisterPushToken
- - useNotificationHandler
- edge_functions:
- - process-notifications (cron every 1 minute)
- notes: |
- 5 casos de notificacao: designation (delayed 5min), weekly_assignment,
- weekly_confirmation, speaker_confirmed (immediate), speaker_withdrew (immediate).
- DB triggers enfileiram em notification_queue; cron EF processa e envia via Expo Push API.
- Observers nao recebem push. Token registrado no login/abertura do app.
- Enqueue_speech_notification usa SECURITY DEFINER para bypass RLS (ADR-035).
- GetPrayerLabel helper added to both notificationUtils.ts (client) and process-notifications/index.ts (server). speaker_confirmed and speaker_withdrew now produce prayer-specific titles and bodies for positions 0 (opening prayer) and 4 (closing prayer). Positions 1-3 unchanged. Titles: 'Oracao Confirmada'/'Prayer Confirmed'/'Oracion Confirmada' for prayers vs 'Orador Confirmado'/'Speaker Confirmed' for speeches. Withdrew uses 'outra pessoa'/'someone else' instead of 'outro orador'/'another speaker' for prayers.
+  # ---------------------------------------------------------------------------
+  # M004 - Meeting Actors
+  # ---------------------------------------------------------------------------
+  - id: M004
+    name: Meeting Actors
+    description: |
+      CRUD for meeting actors (preside, conduct, recognize, pianist, conductor).
+      Each actor has independent boolean role flags. Used in AgendaForm for
+      role selection.
+    features: [F009]
+    components:
+      - path: src/hooks/useActors.ts
+        responsibility: TanStack Query hooks for actor CRUD with role filtering
+      - path: src/components/ActorSelector.tsx
+        responsibility: Role-filtered actor selector with inline creation and KeyboardAvoidingView
+    dependencies:
+      - "DB CHECK constraint (can_pianist + can_conductor mutual exclusion)"
 
- - id: M006
- name: SyncEngine
- responsibility: "Sincronizacao em tempo real via Supabase Realtime com fallback de polling"
- spec_features: [F011]
- key_files:
- - src/hooks/useRealtimeSync.ts
- - src/lib/sync.ts
- hooks:
- - useRealtimeSync
- synced_tables:
- - members
- - ward_topics
- - ward_collection_config
- - sunday_exceptions
- - speeches
- - sunday_agendas
- - meeting_actors
- notes: |
- WebSocket (Supabase Realtime) e o mecanismo primario.
- Polling fallback (2.5s) quando WebSocket indisponivel.
- Invalidacao granular via TABLE_TO_QUERY_KEY mapping em lib/sync.ts.
- Conectado ao app via SyncProvider em _layout.tsx.
+  # ---------------------------------------------------------------------------
+  # M005 - Hymn Catalog
+  # ---------------------------------------------------------------------------
+  - id: M005
+    name: Hymn Catalog
+    description: |
+      Read-only hymn catalog by language with number and title. Separate
+      sacramental hymns subset. Used in AgendaForm for hymn selection.
+    features: [F010]
+    components:
+      - path: src/hooks/useHymns.ts
+        responsibility: TanStack Query hooks for hymn queries with language filter
+      - path: src/components/HymnSelector.tsx
+        responsibility: Hymn selector with search by number (prefix match) or title (accent-insensitive)
+    dependencies:
+      - "hymns table (global, read-only, per language)"
 
- - id: M007
- name: OfflineManager
- responsibility: "Uso offline com UI otimista, fila de mutacoes e processamento ao reconectar"
- spec_features: [F022]
- key_files:
- - src/hooks/useConnection.ts
- - src/hooks/useOfflineQueueProcessor.ts
- - src/lib/offlineQueue.ts
- - src/lib/offlineGuard.ts
- - src/lib/connectionUtils.ts
- - src/components/OfflineBanner.tsx
- hooks:
- - useConnection
- - useOfflineQueueProcessor
- notes: |
- MutationQueue persistida em AsyncStorage (max 100 entries, FIFO).
- Last-write-wins conflict resolution via updated_at timestamps.
- Edge Function operations bloqueadas offline com mensagem "Requires connection".
- OfflineBanner renderizado acima de todo conteudo (incluindo telas de auth).
- offlineQueue integration com mutation hooks DEFERRED (code existe mas nao usado).
- UseConnection integra onlineManager.setOnline do TanStack Query para pausar queries offline.
- OfflineBanner usa useSafeAreaInsets para paddingTop e aumenta fontSize (14->15, 12->13).
+  # ---------------------------------------------------------------------------
+  # M006 - Speech Management
+  # ---------------------------------------------------------------------------
+  - id: M006
+    name: Speech Management
+    description: |
+      Complete speech lifecycle management. Speeches are lazily created when
+      Sunday cards expand. Snapshot pattern stores speaker/topic data as text
+      copies. Status lifecycle with full mesh transitions between assigned states.
+      Includes optional second speech toggle and managed prayers.
+    features: [F013, F014, F015, F016, F017, F018]
+    components:
+      - path: src/hooks/useSpeeches.ts
+        responsibility: TanStack Query hooks for speech CRUD, lazy creation, status changes, second speech toggle
+      - path: src/components/SpeechSlot.tsx
+        responsibility: Individual speech position UI with speaker/topic assignment
+      - path: src/components/StatusLED.tsx
+        responsibility: Colored status indicator circle
+      - path: src/components/StatusChangeModal.tsx
+        responsibility: Modal for changing speech status with valid transitions
+      - path: src/lib/speechUtils.ts
+        responsibility: Speech utility functions
+    dependencies:
+      - "M002 (member selection for speaker assignment)"
+      - "M003 (topic selection)"
+      - "Snapshot pattern (speaker_name, speaker_informal_name, speaker_phone, topic_title, topic_link, topic_collection)"
 
- - id: M008
- name: UIShell
- responsibility: "App shell (tabs, navegacao, tema, i18n), Home tab com secoes role-aware"
- spec_features: [F009, F020, F021, F050, F052, F053, F054, F106, F116, F119, F128, F129, F135, F137, F141, F142, F145, F146, F147, F148, F152, F155, F158, F159, F165, F166, F173]
- key_files:
- - src/app/_layout.tsx
- - src/app/(tabs)/_layout.tsx
- - src/app/(tabs)/index.tsx
- - src/app/(tabs)/settings/_layout.tsx
- - src/app/(tabs)/settings/index.tsx
- - src/app/(tabs)/settings/theme.tsx
- - src/app/(tabs)/settings/about.tsx
- - src/app/(tabs)/settings/whatsapp.tsx
- - src/app/(tabs)/settings/timezone.tsx
- - src/contexts/ThemeContext.tsx
- - src/i18n/index.ts
- - src/i18n/locales/pt-BR.json
- - src/i18n/locales/en.json
- - src/i18n/locales/es.json
- - src/providers/SyncProvider.tsx
- - src/components/ErrorBoundary.tsx
- - src/components/ExitConfirmation.tsx
- - src/components/NextSundaysSection.tsx
- - src/components/NextAssignmentsSection.tsx
- - src/components/InviteManagementSection.tsx
- - src/components/InviteActionDropdown.tsx
- - src/components/SwipeableCard.tsx
- - src/components/QueryErrorView.tsx
- - src/components/icons/index.ts
- hooks:
- - useTheme
- screens:
- - HomeTab (index.tsx)
- - SettingsIndex (settings/index.tsx)
- - ThemeScreen (settings/theme.tsx)
- - AboutScreen (settings/about.tsx)
- - WhatsAppScreen (settings/whatsapp.tsx)
- - TimezoneScreen (settings/timezone.tsx)
- notes: |
- 4 tabs: Home, Agenda, Speeches, Settings.
- Home sections: NextSundays (todos), NextAssignments (bishopric), InviteManagement (secretary + bishopric).
- Presentation Mode button visivel sempre na Home.
- Includes GestureHandlerRootView wrapper no root layout.
- Tema: system detection + manual toggle (automatic/light/dark).
- i18n: ward language setting -> device locale (fallback).
- Per-screen back buttons (ADR-018).
- Includes SearchInput reutilizavel com botao X (usado em 10 campos de busca).
- substituiu texto por icones Unicode nos botoes de swipe do SwipeableCard (pencil/trash).
- Fix botao Delete no SwipeableCard (pointerEvents='box-none', ADR-032).
- I18n key speeches.speaker alterada de 'Orador'/'Speaker' para 'Discurso'/'Speech'.
- Settings WhatsApp usa getDefaultTemplate(language) como fallback quando DB e null.
- InviteManagementSection passa collection/link e usa formatDateHumanReadable para {data}.
- NextSundaysSection corrige condicao de SpeechSlots para incluir reason === 'speeches'.
- InviteManagementSection botoes de acao trocam texto por icones (WhatsApp SVG + U+22EE tres pontinhos).
- InviteManagementSection troca Alert por InviteActionDropdown customizado com 5 opcoes.
- InviteManagementSection segunda linha mostra '{N}o Discurso - <LED> <status name>'.
- Bishopric agora ve InviteManagementSection (permissao home:invite_mgmt adicionada).
- SpeechSlot gap 8->12 e removeButton fontSize 20->24.
- HandleDropdownWhatsApp usa buildWhatsAppConversationUrl (sem ?text=) ao inves de buildWhatsAppUrl.
- InviteActionDropdown titulo usa t('speeches.changeStatus') ao inves de speaker_name.
- InviteManagementSection segunda linha usa t('speeches.lastSpeech') para position===3.
- NextSundaysSection wiring de onClearTopic para SpeechSlot.
- SundayCard.SundayTypeDropdown confirmacao Alert.alert ao mudar tipo com atribuicoes existentes.
- _layout.tsx QueryClient config: networkMode 'offlineFirst', offline-aware retry, silence MutationCache.onError when offline.
- I18n sundayExceptions.changeConfirmTitle/changeConfirmMessage atualizados com texto especifico.
- Index.tsx remove showMeetingButton condicao, botao visivel sempre. isTodaySunday nao mais importado.
- SundayCard collapsed header mostra 3 linhas de nomes de discursantes + LEDs verticais. Escondidos ao expandir.
- AccordionCard directional arrows in Presentation Mode (above=down, below=up, expanded=none).
- Recognized names one per line in Presentation Mode (join '\n' + multiline type).
- Font size toggle in Presentation Mode header (Aa/AA, normal/large, useState).
- Card titles use sectionXxx i18n keys matching Agenda tab.
- SundayCard pos 3 label '3o Discurso' (Home tab uses same SundayCard).
- SundayCard collapsed speeches redesign (LEDs inline, increased font, Home tab same).
- Speeches.selectSpeaker i18n values updated in all 3 locales.
- All 8 Settings sub-screens back button Pressable gets hitSlop={12} for 44px+ touch target. SpeechSlot statusSection paddingRight:5 to align LED circle with X remove button below. SUPERSEDED/F112.
- SundayCard collapsed: render Text(' ') when no speaker name to maintain consistent row height.
- SpeechSlot layout restructured to fixed-width right column for center-to-center alignment (supersedes paddingRight:5, ADR-076 supersedes ADR-074).
- App.json scheme changed from sacrmeetman to sacrmeetplan. Deep link scheme updated globally.
- Settings screen split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). WhatsApp placeholder names translated per app language. Topics screen uses wardLanguage. Observer gains limited Settings tab. i18n keys added.
- SundayCard collapsed: remove ordinal labels from speech rows, filter position 2 when has_second_speech=false. InviteManagementSection filters position 2. NextSundaysSection same changes.
- Reset-redirect Edge Function Content-Type fix (charset=utf-8) + Cache-Control headers. Root cause investigation for plain-text HTML rendering in Safari.
- Home tab Iniciar button gains play icon (U+25B6) before text. Passes date param to Presentation. Non-expandable AgendaPreviewCard below button showing agenda status (dateBlock + status lines + pencil button -> Agenda tab with expandDate). Uses getTodaySundayDate, useAgenda, useSpeeches, useSundayExceptions hooks.
- NextSundaysSection cards become non-expandable. All inline editing removed (SpeechSlot, modals, mutation hooks). Pencil button (U+270F) added to each card navigating to Speeches tab with expandDate param (ADR-082). ~130 lines of code removed (net simplification).
- Fix TypeScript errors in test mocks (add missing SundayAgenda fields), speeches.tsx (null-to-string assignment), AgendaForm.tsx (Member type import), DebouncedTextInput.tsx (blur event type), setup-integration.ts (wardLanguage mock), phase04 test (Record type). Documentation fixes: can_piano -> can_pianist in SPEC_F083, ARCH_M024, PLAN_P024; can_music -> can_pianist/can_conductor in SPEC_CONSOLIDATED.
- Settings screen wardLanguageChangeMutation.onSuccess calls setWardLanguage from AuthContext. AuthContextValue interface extended with setWardLanguage setter.
- Fix 2nd speech toggle bugs. handleToggleSecondSpeech adds separate Supabase update to clear topic fields (ADR-085). SpeechSlot disabled state shows 2 visible disabled fields with placeholder. AgendaForm always renders ReadOnlySpeakerRow for position 2 (disabled when has_second_speech=false). Agenda/Home collapsed cards use dynamic X/2 or X/3 speaker count.
- Send-reset-email Edge Function language resolution changed to priority chain: user_metadata.language -> ward.language -> 'pt-BR' (ADR-086).
- Reset-redirect Edge Function removes <script> tag. Relies on meta http-equiv refresh + <a href> button for redirection.
- Settings screen restructured from 3 unlabeled sections to 2 labeled groups: 'Configuracoes da Ala' (members, topics, whatsapp, wardLanguage, timezone) and 'Configuracoes do App' (users, history, appLanguage, theme, about). Group 1 label hidden for Observer. New i18n keys settings.wardSettingsGroup, settings.appSettingsGroup (ADR-087).
- Home tab play icon fontSize increased from 17 to 20 for visual height match with button text.
- Reset-redirect Edge Function completely rewritten. Now serves self-contained HTML password reset web page with Supabase JS from CDN. Calls verifyOtp + updateUser in browser. No deep link redirect. Multilingual (pt-BR/en/es) (ADR-089).
- New invite-redirect Edge Function serves self-contained HTML invitation acceptance web page. Uses fetch to call register-invited-user. create-invitation deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (ADR-090).
- Create-invitation Edge Function gains structured error codes (code field in JSON responses), console.error logging at each failure point with '[create-invitation]' prefix, and diagnostic mode ({ diagnose: true }) (ADR-094).
- Reset-redirect and invite-redirect converted from HTML-serving to 302 redirect endpoints. HTML pages moved to docs/public/ for GitHub Pages hosting. EXTERNAL_PAGES_URL env var configurable (ADR-095).
- All Unicode/emoji icons replaced with inline SVG components from centralized icons module (src/components/icons/index.ts). 14 icon exports using react-native-svg. WhatsAppIcon consolidated from 2 duplicate definitions. DD-25 updated to 'inline SVG (no icon library)' (ADR-096). 16 consumer files updated.
- Play icon placement adjustments. Home tab: PlayIcon stays inside button (SVG drop-in). Agenda tab: PlayIcon separated from chevron with marginRight:8. Single component handles both themes via color prop (ADR-097).
- Home tab agenda preview card borderColor changed from colors.border to colors.primary, borderWidth from 1 to 2. Matches SundayCard isNext style (ADR-098).
- I18n labels updated: agenda.wardBusiness (pt-BR 'Apoios e Desobrigacoes', es 'Apoyos y Relevos') and agenda.stakeAnnouncements (all 3 locales). en wardBusiness unchanged. Affects AgendaForm and usePresentationMode via t calls.
- InviteManagementSection handleNotInvitedAction restructured: changeStatus.mutate moved inside if(speaker_phone) block. New else block shows Alert.alert no-phone dialog with Cancel and Mark as invited buttons. Prevents silent status change for speakers without phone number. New i18n keys: invite.noPhoneTitle, invite.noPhoneMessage, invite.markAsInvited (all 3 locales) (ADR-099).
- LightColors palette shifted from neutral grays to Tailwind Slate blue-gray tones. background #FFFFFF->#F1F5F9, surface #F8F9FA->#E2E8F0, surfaceVariant #F0F1F3->#CBD5E1, border #D1D5DB->#94A3B8, divider #E5E7EB->#CBD5E1, tabBar #FFFFFF->#F1F5F9, tabBarInactive #9CA3AF->#64748B, inputBackground #F9FAFB->#F8FAFC, inputBorder #D1D5DB->#94A3B8, placeholder #9CA3AF->#94A3B8. Card stays #FFFFFF. Text colors unchanged. WCAG AA maintained (ADR-100).
- Settings manage_prayers toggle renamed from 'Oracoes Gerenciadas' to 'Usar Convites para Oracoes', moved to 2nd position in Ward Settings (after Members), description text added below label. i18n keys settings.managePrayers (updated) and settings.managePrayersDescription (new).
- NextSundaysSection now imports useWardManagePrayers and passes managePrayers prop to SundayCard components. Matches NextAssignmentsSection pattern.
- Speeches tab label gains custom tabBarLabel render function with numberOfLines={2} to allow 'Discursos e Oracoes' to wrap to 2 lines (ADR-111).
- WhatsApp speech template split. Settings whatsapp.tsx segmented control expands from 3 to 5 tabs (3 speech + 2 prayer). Each speech tab edits its own column. {posicao} placeholder removed from chip list and SAMPLE_DATA. Ward query selects 3 speech columns. wardLanguageChangeMutation in settings/index.tsx resets 3 speech columns. InviteManagementSection maps speech.position to column name. whatsapp.ts re-exports updated. i18n: remove placeholderPosition/tabSpeech, add tabSpeech1/tabSpeech2/tabSpeech3 (ADR-112, ADR-113).
- Settings wardLanguage item replaced with inline Pressable + description text (t('settings.wardLanguageDescription')). Explains that ward language only affects topic collection language and WhatsApp templates, not app UI. Follows managePrayers toggle pattern (ADR-115).
- I18n bugfix. Added missing common.yes and common.no keys to all 3 locale files (used by ExitConfirmation.tsx). Fixed 21 pt-BR accent errors (13 keys), 27 es accent errors (16 keys), and 5 dateUtils.ts hardcoded accent errors. No logic changes. Key count 330 -> 332 (ADR-116).
- InviteManagementSection speakerName resolution changed from `speech.speaker_name ?? ''` to `speech.speaker_informal_name || speech.speaker_name || ''` for both prayer and speech templates. {nome} in WhatsApp templates now resolves to informal name with fallback to full name. i18n keys members.informalName and members.informalNamePlaceholder added to all 3 locales.
+  # ---------------------------------------------------------------------------
+  # M007 - Sunday Types
+  # ---------------------------------------------------------------------------
+  - id: M007
+    name: Sunday Types
+    description: |
+      Sunday type management with auto-assignment rules. Types: speeches,
+      testimony_meeting, general_conference, stake_conference, ward_conference,
+      primary_presentation, other. Auto-assigns types based on month/week rules.
+    features: [F011]
+    components:
+      - path: src/hooks/useSundayTypes.ts
+        responsibility: TanStack Query hooks for sunday type CRUD, auto-assignment logic
+      - path: src/hooks/useSundayList.ts
+        responsibility: Generates Sunday date list with infinite scroll windowing
+    dependencies:
+      - "sunday_exceptions table"
+
+  # ---------------------------------------------------------------------------
+  # M008 - WhatsApp Integration
+  # ---------------------------------------------------------------------------
+  - id: M008
+    name: WhatsApp Integration
+    description: |
+      WhatsApp message integration for inviting speakers and prayer givers.
+      Per-position speech templates (3) and per-prayer templates (2). Template
+      placeholders: {nome}, {data}, {colecao}, {titulo}, {link}. Customizable
+      via Settings.
+    features: [F019, F020]
+    components:
+      - path: src/lib/whatsappUtils.ts
+        responsibility: Pure utility functions for URL building and template resolution
+      - path: src/lib/whatsapp.ts
+        responsibility: React Native wrapper for opening WhatsApp via Linking
+      - path: src/components/InviteManagementSection.tsx
+        responsibility: Home tab section managing invitation workflow with WhatsApp
+      - path: src/components/InviteActionDropdown.tsx
+        responsibility: Three-dot menu with status change options for invitations
+      - path: src/app/(tabs)/settings/whatsapp.tsx
+        responsibility: WhatsApp template customization screen (5-tab segmented control)
+    dependencies:
+      - "wa.me URL scheme"
+      - "Ward whatsapp_template_speech_1/2/3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer columns"
+
+  # ---------------------------------------------------------------------------
+  # M009 - Agenda Management
+  # ---------------------------------------------------------------------------
+  - id: M009
+    name: Agenda Management
+    description: |
+      Full meeting agenda editing and display. Agenda records lazily created.
+      Auto-save on field change with debounced text inputs. Collapsed cards
+      show status lines. Includes speaker overrides for last-minute changes.
+    features: [F021, F022]
+    components:
+      - path: src/hooks/useAgenda.ts
+        responsibility: TanStack Query hooks for agenda CRUD, lazy creation
+      - path: src/components/AgendaForm.tsx
+        responsibility: Full agenda editing form with sections (Welcome, Sacrament, Speeches, Closing)
+      - path: src/components/DebouncedTextInput.tsx
+        responsibility: Flicker-free text input with isFocusedRef preventing query overwrite
+      - path: src/app/(tabs)/agenda.tsx
+        responsibility: Agenda tab with Sunday card list
+    dependencies:
+      - "M004 (actor selection for presiding, conducting, etc.)"
+      - "M005 (hymn selection)"
+      - "M006 (speech data for speaker display)"
+      - "M007 (sunday type for card behavior)"
+
+  # ---------------------------------------------------------------------------
+  # M010 - Presentation Mode
+  # ---------------------------------------------------------------------------
+  - id: M010
+    name: Presentation Mode
+    description: |
+      Full-screen read-only view for conducting sacrament meetings. Accordion
+      cards with directional arrows. Font size toggle. Navigates to Agenda tab
+      for editing.
+    features: [F023]
+    components:
+      - path: src/hooks/usePresentationMode.ts
+        responsibility: Data aggregation for presentation view
+      - path: src/app/presentation.tsx
+        responsibility: Presentation screen (outside tab group)
+      - path: src/components/AccordionCard.tsx
+        responsibility: Expandable card with directional arrow indicators
+    dependencies:
+      - "M009 (agenda data)"
+      - "M006 (speech data)"
+
+  # ---------------------------------------------------------------------------
+  # M011 - Sync & Offline
+  # ---------------------------------------------------------------------------
+  - id: M011
+    name: Sync & Offline
+    description: |
+      Real-time multi-device sync via Supabase Realtime WebSocket. Subscribes
+      to 7 tables filtered by ward_id. Falls back to polling (2.5s) when
+      WebSocket disconnects. Offline-first architecture with TanStack Query
+      offlineFirst mode. OfflineBanner shown when disconnected.
+    features: [F032, F033]
+    components:
+      - path: src/providers/SyncProvider.tsx
+        responsibility: Orchestrates connection, realtime sync, offline queue, push token, notifications
+      - path: src/hooks/useRealtimeSync.ts
+        responsibility: Supabase Realtime channel subscription with polling fallback
+      - path: src/hooks/useConnection.ts
+        responsibility: Network monitoring via NetInfo with TanStack onlineManager integration
+      - path: src/lib/sync.ts
+        responsibility: Table-to-query-key mapping, polling interval config
+      - path: src/lib/connectionUtils.ts
+        responsibility: NetInfo state interpretation
+      - path: src/hooks/useOfflineQueueProcessor.ts
+        responsibility: Offline mutation queue processor (deferred integration)
+      - path: src/lib/offlineQueue.ts
+        responsibility: AsyncStorage-based mutation queue (max 100, FIFO, last-write-wins)
+      - path: src/lib/offlineGuard.ts
+        responsibility: Guard for blocking Edge Function operations when offline
+      - path: src/components/OfflineBanner.tsx
+        responsibility: Offline indicator banner with safe area insets
+    dependencies:
+      - "@react-native-community/netinfo"
+      - "Supabase Realtime (WebSocket channels)"
+      - "TanStack Query (cache invalidation)"
+
+  # ---------------------------------------------------------------------------
+  # M012 - Push Notifications
+  # ---------------------------------------------------------------------------
+  - id: M012
+    name: Push Notifications
+    description: |
+      Push notification system via Expo Push API. DB triggers enqueue
+      notifications on speech status changes. Edge Function processes queue
+      on cron. Token registered on login (non-observers). Notification tap
+      navigates to Home.
+    features: [F034]
+    components:
+      - path: src/hooks/useNotifications.ts
+        responsibility: Push token registration, notification tap handler
+      - path: src/lib/notificationUtils.ts
+        responsibility: Notification text builders, ordinal helpers
+    dependencies:
+      - "expo-notifications"
+      - "notification_queue table (DB trigger enqueue)"
+      - "process-notifications Edge Function (cron)"
+      - "device_push_tokens table"
+
+  # ---------------------------------------------------------------------------
+  # M013 - UI & Navigation
+  # ---------------------------------------------------------------------------
+  - id: M013
+    name: UI & Navigation
+    description: |
+      Application shell, tab navigation, theme system, error handling,
+      reusable UI components, and SVG icon system. Four-tab bottom
+      navigation. Light/dark theme with system detection.
+    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038]
+    components:
+      - path: src/app/_layout.tsx
+        responsibility: Root layout with provider stack (ErrorBoundary > GestureHandler > QueryClient > I18n > Theme > Auth > Sync)
+      - path: src/app/(tabs)/_layout.tsx
+        responsibility: Tab navigation layout (Home, Agenda, Speeches, Settings)
+      - path: src/app/(tabs)/index.tsx
+        responsibility: Home tab with Start Meeting, agenda preview, sections
+      - path: src/app/(tabs)/speeches.tsx
+        responsibility: Speeches tab with infinite scroll SundayCard list
+      - path: src/app/(tabs)/settings/index.tsx
+        responsibility: Settings screen (Ward Settings + App Settings groups)
+      - path: src/app/(tabs)/settings/theme.tsx
+        responsibility: Theme selection screen (automatic, light, dark)
+      - path: src/app/(tabs)/settings/about.tsx
+        responsibility: About screen
+      - path: src/app/(tabs)/settings/timezone.tsx
+        responsibility: Timezone settings screen
+      - path: src/app/(tabs)/settings/history.tsx
+        responsibility: Activity log viewer
+      - path: src/app/(tabs)/settings/users.tsx
+        responsibility: User management screen
+      - path: src/contexts/ThemeContext.tsx
+        responsibility: Theme provider with AsyncStorage persistence and system detection
+      - path: src/lib/theme.ts
+        responsibility: Light/dark color palettes, ThemeColors type definition
+      - path: src/components/icons/index.tsx
+        responsibility: 14+ SVG icon exports using react-native-svg
+      - path: src/components/SearchInput.tsx
+        responsibility: Reusable search input with clear button
+      - path: src/components/SwipeableCard.tsx
+        responsibility: Swipeable card with edit/delete gestures
+      - path: src/components/SundayCard.tsx
+        responsibility: Sunday card with date block, expand/collapse, speaker LEDs
+      - path: src/components/ErrorBoundary.tsx
+        responsibility: Top-level and per-tab error boundaries
+      - path: src/components/ExitConfirmation.tsx
+        responsibility: Back navigation prevention
+      - path: src/components/QueryErrorView.tsx
+        responsibility: Query error display with retry button
+      - path: src/components/NextAssignmentsSection.tsx
+        responsibility: Home tab section showing Sundays needing assignments (bishopric only)
+      - path: src/components/NextSundaysSection.tsx
+        responsibility: Home tab section showing upcoming Sundays
+      - path: src/components/PrayerSelector.tsx
+        responsibility: Prayer position selector with hint text
+    dependencies:
+      - "Expo Router (file-based routing)"
+      - "react-native-gesture-handler"
+      - "react-native-reanimated"
+      - "react-native-safe-area-context"
+      - "react-native-screens"
 
 # =============================================================================
-# MODULE DEPENDENCIES
+# SHARED LIBRARIES
 # =============================================================================
 
-module_dependencies:
- - from: M008
- to: M001
- reason: "session, role, permissions"
- - from: M008
- to: M003
- reason: "Home tab sections (NextSundays, InviteManagement)"
- - from: M008
- to: M004
- reason: "Presentation Mode button"
- - from: M003
- to: M002
- reason: "members, topics, sunday types"
- - from: M004
- to: M002
- reason: "actors, hymns, members"
- - from: M004
- to: M003
- reason: "speech assignment from Agenda"
- - from: M005
- to: M003
- reason: "speech events trigger notifications"
- - from: M005
- to: M001
- reason: "device tokens, role targeting"
- - from: M006
- to: M002
- reason: "cache invalidation for all tables"
- - from: M007
- to: M006
- reason: "reconnect triggers queue processing"
-
-# =============================================================================
-# ADRs (Architecture Decision Records)
-# =============================================================================
-
-adrs:
- - id: ADR-001
- title: "Store role in app_metadata instead of separate profiles table"
- context: "Need role-based access; profiles table adds complexity and sync issues"
- decision: "Use Supabase app_metadata for role, ward_id, and full_name"
- consequences:
- - "Simpler: no extra table, role available in JWT"
- - "Role changes require Edge Function (admin API only)"
-
- - id: ADR-002
- title: "Edge Functions for all user management operations"
- context: "Creating users and changing roles requires admin API; cannot be done via PostgREST"
- decision: "8 Edge Functions for user lifecycle"
- consequences:
- - "Secure: client never touches auth admin API"
- - "Requires Supabase Edge Functions deployment"
-
- - id: ADR-003
- title: "Snapshot pattern for denormalized speaker/topic data in speeches"
- context: "Deleting a member or topic must not break historical speech records"
- decision: "Store speaker_name, speaker_phone, speaker_informal_name, topic_title as text snapshots alongside FK"
- consequences:
- - "Historical data preserved after deletion"
- - "Name edits do NOT propagate to PAST speeches (by design)"
- - " (ADR-121): name/phone/informal_name edits now cascade to FUTURE speeches (sunday_date >= today)"
- - " (ADR-122): speaker_informal_name added as snapshot field"
-
- - id: ADR-004
- title: "CSV import overwrites entire member list"
- context: "Merge logic adds complexity; users expect CSV to be source of truth"
- decision: "DELETE all + INSERT new within transaction (import_members RPC)"
- consequences:
- - "Simple and predictable"
- - "Speech snapshots preserved (snapshot pattern)"
-
- - id: ADR-005
- title: "Lazy creation of speech records"
- context: "Pre-creating speeches for all visible sundays would create thousands of unused records"
- decision: "Create 3 speech records when card is first expanded"
- consequences:
- - "No orphan records for unexpanded sundays"
- - "First expand has a small write latency"
-
- - id: ADR-006
- title: "Speeches referenced by date JOIN instead of FK in agenda"
- context: "Speeches can be assigned from both Speeches tab and Agenda tab"
- decision: "JOIN speeches via (ward_id, sunday_date) instead of storing speech FKs in agenda"
- consequences:
- - "Single source of truth for speeches"
- - "Changes in either tab automatically reflected"
-
- - id: ADR-007
- title: "Queue-based push notifications via DB triggers"
- context: "Need delayed/grouped notifications and timezone-aware scheduling"
- decision: "notification_queue table with DB triggers for enqueue and cron Edge Function for dequeue/send"
- consequences:
- - "Reliable: survives Edge Function restarts"
- - "Grouping/delay logic is simple SQL"
-
- - id: ADR-008
- title: "Last-write-wins conflict resolution"
- context: "App is not designed for simultaneous multi-user editing; conflicts are rare"
- decision: "Use updated_at timestamp comparison; latest write wins"
- consequences:
- - "Simple implementation, no merge logic"
- - "Acceptable for single-active-user-per-ward model"
-
- - id: ADR-009
- title: "Expo Router file-based routing"
- context: "Need cross-platform navigation with deep link support for invitations"
- decision: "Expo Router with file-based routing"
- consequences:
- - "Convention over configuration for routes"
- - "Deep link support built-in for sacrmeetplan://invite/{token} (changed from wardmanager://)"
-
- - id: ADR-010
- title: "Replace sunday type enum with corrected list"
- context: "Original enum had incorrect values (e.g., missing speeches as default)"
- decision: "New enum: speeches, testimony_meeting, general_conference, stake_conference, ward_conference, primary_presentation, other"
-
- - id: ADR-011
- title: "ScrollView wrapper for Topics screen"
- context: "Collections section could overflow on smaller screens"
- decision: "Wrap Topics screen content in ScrollView"
-
- - id: ADR-012
- title: "Debounced auto-save for AgendaForm text inputs"
- context: "Keystroke-level mutations caused text input bugs and excessive writes"
- decision: "DebouncedTextInput component with configurable delay"
-
- - id: ADR-013
- title: "Inline actor management via bottom-sheet dialog"
- context: "Separate Actors screen was unintuitive; actors should be managed in context"
- decision: "ActorSelector component with create/edit/delete inline in agenda form"
-
- - id: ADR-017
- title: "Static imports for Expo SDK modules in CSV handlers"
- context: "Dynamic imports of expo-file-system and expo-sharing caused issues"
- decision: "Use static imports at top of file"
-
- - id: ADR-018
- title: "Per-screen back buttons instead of global headerLeft"
- context: "Settings sub-screens need consistent back navigation"
- decision: "Each settings sub-screen renders its own back button via Pressable + router.back"
-
- - id: ADR-019
- title: "Use Supabase built-in password reset flow"
- context: "Need forgot password feature"
- decision: "Use supabase.auth.resetPasswordForEmail. User resets via web browser."
- consequences:
- - "Simple implementation -- one API call"
- - "No custom email templates needed"
-
- - id: ADR-020
- title: "Independent can_conduct and can_preside actor fields"
- context: "Old rule 'can_conduct implies can_preside' did not match real ward practices"
- decision: "Remove enforceActorRules logic. Fields are independent."
- consequences:
- - "More flexible actor configuration"
- - "No data migration needed"
-
- - id: ADR-021
- title: "Auto-create actors for bishopric users in Edge Functions"
- context: "Bishopric users always need actor records for presiding/conducting"
- decision: "Edge Functions auto-insert meeting_actor when role is bishopric (SELECT+INSERT pattern)"
- consequences:
- - "Better UX: actors created automatically"
- - "Name derived from full_name (or email fallback)"
-
- - id: ADR-022
- title: "Extract server-side error details from FunctionsHttpError"
- context: "supabase.functions.invoke returns generic error messages"
- decision: "Parse error.context.json in callEdgeFunction to extract server error message"
-
- - id: ADR-023
- title: "Disable gateway-level 'Verify JWT with legacy secret' for Edge Functions"
- context: "Gateway rejects valid user JWTs signed with current secret (not legacy)"
- decision: "Turn OFF 'Verify JWT with legacy secret' in Supabase Dashboard. EFs handle own auth."
- consequences:
- - "Immediately fixes all 401 errors on authenticated EFs"
- - "No security regression -- EFs validate JWT via auth.getUser"
-
- - id: ADR-024
- title: "Validate session before Edge Function invoke to prevent ANON key fallback"
- context: "SDK silently falls back to ANON key when session is null"
- decision: "Add getSession check in callEdgeFunction. Throw if null instead of sending ANON key."
-
- - id: ADR-025
- title: "Guard useQuery with enabled: !!session for authenticated queries"
- context: "useQuery fires on mount regardless of auth state"
- decision: "Add enabled: !!session to useQuery hooks calling authenticated Edge Functions"
-
- - id: ADR-026
- title: "Use error codes in csvUtils.ts instead of English strings"
- context: "parseCsv returned hardcoded English error messages bypassing i18n"
- decision: "Return error code strings; UI layer maps codes to i18n keys"
- consequences:
- - "csvUtils.ts remains pure (no i18n dependency)"
- - "All error messages are translatable"
-
- - id: ADR-028
- title: "Use full_name in app_metadata and a separate update-user-name EF"
- context: "Need to store user display name without renaming update-user-role"
- decision: "Keep update-user-role unchanged. Create new update-user-name EF for self-name-update. Use app_metadata key 'full_name'."
- supersedes: "ADR-027 (rename to update-user, -- not implemented)"
- consequences:
- - "Simpler deployment: no function renaming"
- - "Clear separation: role changes (admin) vs name edits (self-service)"
-
- - id: ADR-029
- title: "Auto-create actor in register-first-user for bishopric role"
- context: "First bishopric user should get an actor auto-created with their real name"
- decision: "Best-effort auto-actor creation in register-first-user using fullName"
- consequences:
- - "Bishopric users get Preside/Conduct actor immediately after registration"
- - "Actor uses real name, not email prefix"
-
- - id: ADR-030
- title: "SearchInput as drop-in replacement with internal theming"
- context: "10 search fields across the app all follow the same pattern. QA PRE recommended a reusable component."
- decision: "SearchInput uses useTheme internally and does not accept colors prop. Accepts all TextInput props via spread."
- consequences:
- - "Simpler API: no colors prop needed at call sites"
- - "Consistent with existing standalone component patterns (ActorSelector, HymnSelector)"
-
- - id: ADR-031
- title: "Shared countryCodes.ts as single source of truth"
- context: "Country codes duplicated between members.tsx (21 entries) and csvUtils.ts regex."
- decision: "Create src/lib/countryCodes.ts exporting COUNTRY_CODES, getFlagForCode, and splitPhoneNumber. csvUtils.ts re-exports splitPhoneNumber for backward compatibility."
- consequences:
- - "Single place to add/modify country codes"
- - "splitPhoneNumber uses COUNTRY_CODES array for matching instead of hardcoded regex"
-
- - id: ADR-032
- title: "pointerEvents='box-none' to fix gesture/button touch overlap in SwipeableCard"
- context: "Animated.View (zIndex:1) covers action buttons even after translation. Delete button blocked."
- decision: "Use pointerEvents='box-none' on Animated.View. Move backgroundColor to inner wrapper View."
- consequences:
- - "Delete button receives touch events correctly"
- - "Edit button continues to work (no regression)"
- - "Pan gesture unaffected (GestureDetector handles its own touch management)"
-
- - id: ADR-033
- title: "Unicode icons for swipe action buttons instead of icon library"
- context: "User wants pencil/trash icons for swipe buttons. App has no icon library dependency."
- decision: "Use Unicode characters U+270F (Pencil) and U+1F5D1 (Wastebasket) as icon content. editLabel/deleteLabel props kept for accessibilityLabel only."
- superseded_by: "ADR-096"
- consequences:
- - "Zero new dependencies"
- - "Consistent with app's no-icon-library approach"
- - "accessibilityLabel preserved for screen readers"
-
- - id: ADR-034
- title: "Accordion pattern for collection topics (one expanded at a time)"
- context: "F034 shows collection topics inline. Multiple expanded collections could cause excessive scrolling."
- decision: "Use expandedCollectionId (string | null) for accordion pattern. Lazy-load topics via useCollectionTopics hook with TanStack Query caching."
- consequences:
- - "Cleaner UX: one list visible at a time"
- - "Consistent with SwipeableCard one-at-a-time pattern"
- - "TanStack Query caching makes re-expansion instant"
-
- - id: ADR-035
- title: "SECURITY DEFINER para trigger enqueue_speech_notification"
- context: "Trigger tenta INSERT em notification_queue no contexto do usuario autenticado, mas notification_queue tem RLS sem policies para authenticated users."
- decision: "Adicionar SECURITY DEFINER a funcao enqueue_speech_notification via nova migracao (013). Precedente: list_ward_users RPC ja usa SECURITY DEFINER."
- consequences:
- - "Trigger funciona sem erro de RLS"
- - "notification_queue permanece inacessivel a clientes"
- - "Padrao consistente com list_ward_users RPC"
-
- - id: ADR-036
- title: "PrayerSelector com props visible/onClose (padrao ActorSelector)"
- context: "PrayerSelector gerencia seu proprio estado de modal (modalVisible=false). AgendaForm renderiza PrayerSelector condicionalmente mas nao tem como auto-abrir o modal."
- decision: "Adicionar props opcionais visible e onClose ao PrayerSelector. useEffect sincroniza modalVisible com visible. AgendaForm passa visible={true} e onClose."
- consequences:
- - "Clicar no campo de oracao abre modal imediatamente"
- - "Padrao consistente com ActorSelector e HymnSelectorModal"
- - "Backward compatible (props opcionais)"
-
- - id: ADR-037
- title: "Multi-select mode no ActorSelector via props opcionais"
- context: "Campo 'Reconhecendo a Presenca' precisa de selecao multipla, mas todos os outros campos de ator sao single-select."
- decision: "Adicionar props opcionais multiSelect (boolean) e selectedNames (string[]) ao ActorSelector. Quando multiSelect=true, modal nao fecha apos selecao e renderiza checkmark nos selecionados."
- consequences:
- - "Usos existentes de ActorSelector nao precisam de mudanca (backward compatible)"
- - "Toggle logic (add/remove) fica no AgendaForm, nao no ActorSelector"
-
- - id: ADR-038
- title: "Speaker override como campos nullable na sunday_agendas"
- context: "F044 precisa persistir override de nome do discursante para troca de ultima hora. Opcoes: campos individuais, JSON field, ou estado local."
- decision: "3 campos TEXT nullable (speaker_1_override, speaker_2_override, speaker_3_override) na tabela sunday_agendas. Quando null, exibe speech.speaker_name."
- consequences:
- - "Tipo simples e direto, sem parsing de JSON"
- - "Segue padrao da tabela (campos individuais)"
- - "Backward compatible: null = comportamento atual"
-
- - id: ADR-039
- title: "Replicar padrao de condicao de speeches.tsx para NextSundaysSection"
- context: "Todos os domingos tem registro de excecao. NextSundaysSection usa !entry.exception que e sempre false."
- decision: "Replicar condicao de speeches.tsx:276: (!exception || exception.reason === 'speeches')."
- consequences:
- - "Consistencia entre speeches.tsx e NextSundaysSection.tsx"
- - "Padrao ja testado e validado"
- - "RLS existente cobre automaticamente (mesma tabela)"
-
- - id: ADR-040
- title: "SVG inline para icone WhatsApp ao inves de Unicode ou icon library"
- context: "F050 precisa de icone reconhecivel do WhatsApp. Nao existe glifo Unicode padrao. App segue DD-25 (sem icon library)."
- decision: "Usar SVG inline minimo do logo WhatsApp via react-native-svg (dependencia transitiva do Expo). Zero instalacao."
- extended_by: "ADR-096"
- consequences:
- - "Icone reconhecivel e profissional"
- - "Zero dependencias novas (react-native-svg ja presente)"
- - "Consiste com DD-25 (sem icon library)"
-
- - id: ADR-041
- title: "InviteActionDropdown como componente separado do StatusChangeModal"
- context: "F051 precisa de dropdown customizado. StatusChangeModal tem padrao similar mas opcoes diferentes (inclui 'Ver conversa')."
- decision: "Criar novo componente InviteActionDropdown.tsx com padrao visual do StatusChangeModal mas logica propria. Importar STATUS_INDICATOR_COLORS para consistencia."
- consequences:
- - "Separacao de responsabilidades clara"
- - "StatusChangeModal permanece inalterado"
- - "Padrao visual consistente via mesmas cores"
-
- - id: ADR-042
- title: "buildWhatsAppConversationUrl separada de buildWhatsAppUrl"
- context: "F055 precisa abrir conversa WhatsApp sem mensagem. buildWhatsAppUrl sempre anexa ?text=."
- decision: "Funcao separada buildWhatsAppConversationUrl(phone) em whatsappUtils.ts. Responsabilidade clara: abrir conversa vs enviar mensagem."
- consequences:
- - "Zero risco de regressao em envio de convite"
- - "Duplica limpeza de telefone (trivial, 3 linhas)"
-
- - id: ADR-043
- title: "Country label como chave de selecao para resolver ambiguidade de +1"
- context: "Canada e USA compartilham +1. getFlagForCode usa .find retornando primeiro match."
- decision: "Reordenar USA antes de Canada E usar label como chave de selecao no dropdown. Estado local countryLabel resolve ambiguidade na UI sem alterar schema."
- consequences:
- - "Resolve ambiguidade visual sem migracao de dados"
- - "Se usuario selecionou Canada, reabrir edicao mostrara USA (tradeoff aceito)"
-
- - id: ADR-044
- title: "Reutilizar mutation assignTopic com valores null para clear topic"
- context: "F060 precisa limpar atribuicao de tema. Opcoes: (a) criar mutation separada clearTopic, (b) reutilizar assignTopic passando null."
- decision: "Reutilizar assignTopic.mutate com topicTitle=null, topicLink=null, topicCollection=null. A mutation existente ja faz update parcial no speech."
- consequences:
- - "Zero codigo novo no hook useSpeeches"
- - "Semanticamente 'assign null' pode confundir, mas padrao claro no contexto"
-
- - id: ADR-045
- title: "Confirmacao de mudanca de tipo com Alert.alert nativo"
- context: "F061 precisa de dialogo de confirmacao ao mudar tipo de domingo com atribuicoes existentes. Opcoes: (a) Alert.alert nativo, (b) modal customizado."
- decision: "Usar Alert.alert nativo. Padrao consistente com delete member, import CSV, remove speech assignment."
- consequences:
- - "Consistencia com padroes existentes do app"
- - "Estilo nativo varia entre iOS e Android (aceito)"
-
- - id: ADR-046
- title: "flex:1 defensivo no container do SearchInput ao inves de por-consumer"
- context: "F065 precisa que SearchInput preencha espaco em layout row nas Settings. Opcoes: (a) cada consumer passa style={{flex:1}}, (b) adicionar flex:1 ao container interno."
- decision: "Adicionar flex:1 ao styles.container do SearchInput.tsx. Em layout column, flex:1 nao altera largura. Em layout row, preenche espaco disponivel."
- consequences:
- - "Mudanca unica no componente, zero mudanca nos 6+ consumers existentes"
- - "Novos consumers em layout row nao precisam lembrar de passar flex:1"
-
- - id: ADR-047
- title: "setTimeout(300ms) para auto-scroll apos expand ao inves de onLayout"
- context: "F066 precisa scrollar para o card expandido apos toggle. Card muda de tamanho ao expandir. Opcoes: (a) setTimeout fixo, (b) onLayout callback, (c) requestAnimationFrame."
- decision: "setTimeout(300ms) apos setExpandedDate. onScrollToIndexFailed existente como fallback."
- consequences:
- - "Simples, sem state adicional"
- - "Fallback existente cobre dispositivos lentos"
-
- - id: ADR-048
- title: "Pressable inline customizado para Reconhecendo ao inves de prop no SelectorField"
- context: "F067 precisa exibir nomes um por linha. SelectorField usa numberOfLines={1}. Opcoes: (a) prop multiLine no SelectorField, (b) Pressable customizado inline."
- decision: "Pressable customizado APENAS no bloco Reconhecendo. SelectorField generico inalterado."
- consequences:
- - "Zero risco de regressao em outros campos (presiding, conducting, hymns, prayers)"
- - "Controle total sobre layout vertical dos nomes"
-
- - id: ADR-049
- title: "Cores flat unicas no StatusLED ao inves de gradiente 3D por camada"
- context: "F069 troca design 3D (3 camadas com cores distintas) por circulo flat. Opcoes: (a) manter 3 cores e usar a inner, (b) redesenhar com cor unica por status."
- decision: "Cor unica por status, derivada da paleta Tailwind (orange-500, yellow-500, green-500, red-900). STATUS_COLORS simplificado para Record<SpeechStatus, string>."
- consequences:
- - "Implementacao simplificada (1 View ao inves de 3)"
- - "Consistencia com STATUS_INDICATOR_COLORS (mesmas cores)"
- - "Perde efeito visual 3D (decisao do usuario)"
-
- - id: ADR-050
- title: "Hook dedicado useDeleteSpeechesByDate ao inves de logica inline"
- context: "F070 precisa deletar speeches ao mudar tipo. Opcoes: (a) supabase.delete inline, (b) hook dedicado, (c) logica no useSetSundayType."
- decision: "Hook dedicado useDeleteSpeechesByDate em useSpeeches.ts. Separacao de responsabilidade: useSetSundayType cuida de sunday_exceptions, useDeleteSpeechesByDate cuida de speeches."
- consequences:
- - "Cada hook tem responsabilidade unica"
- - "Nao e transacao atomica (mitigado pela ordem: delete primeiro, type change depois)"
-
- - id: ADR-051
- title: "Remover getItemLayout ao inves de calcular alturas reais manualmente"
- context: "F075 precisa corrigir auto-scroll impreciso. getItemLayout retorna alturas fixas (70px speeches, 64px agenda) que nao correspondem as alturas reais."
- decision: "Remover getItemLayout de ambas as abas. FlatList mede alturas reais via onLayout de cada item. scrollToIndex calcula offset correto."
- consequences:
- - "scrollToIndex posiciona com precisao independente de alturas variadas"
- - "Perda de performance negligivel para listas de ~100 itens"
-
- - id: ADR-052
- title: "Substituir initialScrollIndex por useEffect em agenda.tsx"
- context: "initialScrollIndex depende de getItemLayout para funcionar. Com getItemLayout removido (ADR-051), initialScrollIndex nao funciona."
- decision: "Remover initialScrollIndex e usar useEffect existente com scrollToIndex(animated:false). Padrao ja usado em speeches.tsx."
- consequences:
- - "Padrao consistente entre speeches.tsx e agenda.tsx"
- - "Pequeno flash visual no primeiro render (aceito: mesmo tradeoff de speeches.tsx)"
-
- - id: ADR-053
- title: "Full mesh VALID_TRANSITIONS entre status atribuidos"
- context: "F077 precisa que todos os status atribuidos possam transicionar entre si. VALID_TRANSITIONS atual e restritivo."
- decision: "Expandir VALID_TRANSITIONS para full mesh: cada status atribuido pode ir para os outros 3 + not_assigned."
- consequences:
- - "StatusChangeModal e InviteActionDropdown mostram opcoes corretas automaticamente"
- - "Permite transicoes antes bloqueadas (usuario pediu explicitamente)"
-
- - id: ADR-054
- title: "Opcoes dinamicas via .map no InviteActionDropdown"
- context: "F077 precisa que InviteActionDropdown mostre opcoes dinamicas baseadas no status atual. Opcoes atuais sao hardcoded."
- decision: "Usar ALL_ASSIGNED_STATUSES.filter(s => s !== speech?.status).map. Nao reutilizar StatusChangeModal (tem opcao WhatsApp adicional, ADR-041)."
- consequences:
- - "Sempre mostra exatamente 3 opcoes corretas"
- - "Codigo mais simples e sem duplicacao de status"
-
- - id: ADR-055
- title: "viewPosition: 0.5 apenas no scroll inicial da aba Agenda (DD-53)"
- context: "F079 precisa centralizar o proximo domingo na Agenda. DD-53 decide: apenas Agenda."
- decision: "viewPosition: 0.5 no scrollToIndex do useEffect inicial em agenda.tsx. Speeches.tsx inalterado."
- consequences:
- - "Proximo domingo centralizado na tela ao abrir Agenda"
- - "Speeches tab inalterada (ja funciona corretamente)"
-
- - id: ADR-056
- title: "Checkbox Unicode (U+2611/U+2610) ao inves de View customizada"
- context: "F080 precisa de checkbox visual no ActorSelector multiselect. DD-25 proibe icon libraries."
- decision: "Usar Unicode U+2611 (checked) e U+2610 (unchecked) como <Text>. Simples e consistente com app."
- consequences:
- - "Zero dependencias (consistente com DD-25)"
- - "Aparencia pode variar entre plataformas (aceito: app ja usa Unicode extensivamente)"
-
- - id: ADR-057
- title: "Chainable Supabase mock via Proxy pattern for integration tests"
- context: "All hooks use PostgREST chainable query builder. Need reusable mock that mirrors chain pattern."
- decision: "Create mockSupabaseFrom helper in setup-integration.ts with Proxy-based chainable mock. Terminal methods resolve with configurable {data, error}."
- consequences:
- - "Single mock setup per test; mirrors real Supabase API"
- - "Must be maintained if SDK adds new methods (stable since v2)"
-
- - id: ADR-058
- title: "TestWrapper uses AuthContext.Provider directly, not AuthProvider"
- context: "Testing hooks needing useAuth. Real AuthProvider triggers getSession/onAuthStateChange side effects."
- decision: "TestWrapper wraps children in AuthContext.Provider with mock value. Auth-flow tests test real AuthProvider separately."
- consequences:
- - "Hooks get real context values without side effects"
- - "Auth-flow tests validate real AuthProvider independently"
-
- - id: ADR-059
- title: "vi.mock called per test file, not in shared setup"
- context: "setup-integration.ts could call vi.mock globally but vi.mock has module-scope hoisting."
- decision: "Each test file calls its own vi.mock. setup-integration.ts only exports helpers and factories."
- consequences:
- - "Explicit mock scope per file; no hidden cross-file mock contamination"
- - "Some vi.mock lines repeated across test files (acceptable)"
-
- - id: ADR-060
- title: "AuthContext export for direct Provider usage in tests"
- context: "TestWrapper needs <AuthContext.Provider> directly. AuthContext const not exported."
- decision: "Export AuthContext from AuthContext.tsx. Standard React testing pattern. Alternative: mock useAuth via vi.mock if export rejected."
- consequences:
- - "Standard React context testing pattern; minimal change"
- - "Alternative available if export is not desired"
-
- - id: ADR-061
- title: "Export SundayTypeDropdown from SundayCard.tsx for Agenda tab reuse"
- context: "F084 needs the same sunday type dropdown in Agenda tab. Component is currently unexported in SundayCard.tsx."
- decision: "Export existing SundayTypeDropdown function and SundayTypeDropdownProps interface. Zero code duplication."
- consequences:
- - "agenda.tsx imports and renders with same props as speeches.tsx"
- - "SundayCard.tsx internal usage unchanged"
-
- - id: ADR-062
- title: "Structured pipe-delimited format for activity log descriptions"
- context: "F085 needs i18n-aware activity log rendering. Options: JSON, pipe-delimited, or schema change."
- decision: "Pipe-delimited format: 'action_type|key1=value1|key2=value2'. Parse in UI via formatLogDescription. Old entries displayed as plain text via fallback."
- consequences:
- - "No schema change (description remains TEXT)"
- - "Backward compatible: old entries work via fallback"
- - "i18n rendering happens in UI, not at log creation time"
-
- - id: ADR-063
- title: "SET search_path = '' (empty string) for all PostgreSQL functions"
- context: "7 functions have mutable search_path (Supabase Database Linter warning). Options: 'public', '', or 'public, auth'."
- decision: "SET search_path = '' with explicit schema-qualified table references (public.*, auth.*). Most restrictive and secure."
- consequences:
- - "Fixes all function_search_path_mutable warnings"
- - "All table references must be explicitly qualified"
- - "Matches Supabase Database Linter recommendation"
-
- - id: ADR-064
- title: "Supersede ADR-019: customize password reset email template and redirect URL"
- context: "ADR-019 stated 'No custom email templates needed'. User reported Supabase branding and localhost URL in reset email."
- decision: "Customize email template in Supabase Dashboard. Add redirectTo with Linking.createURL for correct deep link. ADR-019 flow remains valid but template customization clause superseded."
- supersedes: "ADR-019 (partial -- template customization clause only)"
- consequences:
- - "Email shows app name instead of Supabase branding"
- - "Reset link points to app deep link, not localhost"
- - "Requires manual Supabase Dashboard configuration"
-
- - id: ADR-065
- title: "Integrate TanStack Query onlineManager with useConnection for offline query pausing"
- context: "F089 needs queries to stop retrying when offline. Options: per-query retry logic, global onlineManager, wrapper hook."
- decision: "onlineManager.setOnline(isOnline) in useConnection.ts. networkMode: 'offlineFirst' globally. Silence MutationCache.onError when offline."
- consequences:
- - "All queries automatically paused when offline"
- - "Cached data displayed via offlineFirst mode"
- - "No mutation error Alerts when offline"
- - "Auto-refetch on reconnect via onlineManager"
-
- - id: ADR-066
- title: "Range query for agenda data (useAgendaRange) to enable collapsed status lines"
- context: "F096 needs agenda field data for collapsed cards. Current useAgenda only fetches single sunday on expand. Status lines need data before expand."
- decision: "Add useAgendaRange hook with SELECT * FROM sunday_agendas WHERE range. Mirrors existing useSpeeches range pattern. Uses already-defined agendaKeys.byDateRange."
- consequences:
- - "Status lines show correct data without expanding card"
- - "One additional query per mount (same pattern as speeches range)"
- - "TanStack Query caching prevents duplicate fetches"
-
- - id: ADR-067
- title: "Persist has_intermediate_hymn as DB column instead of deriving from intermediate_hymn_id"
- context: "F095 toggle needs to distinguish 'never selected hymn' (ON, null) from 'explicitly turned off' (OFF). Cannot derive from hymn_id alone."
- decision: "New column has_intermediate_hymn BOOLEAN DEFAULT true in sunday_agendas. Migration 016."
- consequences:
- - "Clear semantic distinction between 'no hymn yet' and 'no hymn wanted'"
- - "Default true = backward compatible"
- - "One migration file (016_add_has_intermediate_hymn.sql)"
-
- - id: ADR-068
- title: "Font size toggle as React local state (useState) instead of persisted preference"
- context: " adds font size toggle in Presentation Mode. Options: useState (ephemeral), AsyncStorage, or DB column."
- decision: "Use useState<'normal' | 'large'>('normal'). Resets to 'normal' each time Presentation Mode opens."
- consequences:
- - "Simplest implementation (zero persistence code)"
- - "User must re-enable large font each session (acceptable for occasional use)"
- - "Can be upgraded to AsyncStorage later if user requests persistence"
-
- - id: ADR-069
- title: "Unified getPositionLabel removes position 3 special case in Speeches tab"
- context: " wants '3o Discurso' in Speeches tab but 'Ultimo Discurso' in Agenda tab. getPositionLabel currently always returns 'Ultimo Discurso' for position 3."
- decision: "Remove the if(position===3) special case from getPositionLabel. All positions use t('speeches.slot', {number: Nmo}). Agenda tab uses its own section header keys."
- consequences:
- - "Simpler getPositionLabel (no branching)"
- - "Context-appropriate labels: Speeches/Home tabs show '3o Discurso', Agenda shows 'Ultimo Discurso'"
-
- - id: ADR-070
- title: "Supersede ADR-064: Edge Function replaces Supabase Dashboard email template for password reset"
- context: "ADR-064 customized the Supabase Dashboard email template. User wants multilingual emails requiring Edge Function (Option B from SPEC F088)."
- decision: "Create Edge Function send-reset-email for user lookup, language detection, token generation via admin.generateLink, and email sending via Resend API. forgot-password.tsx calls Edge Function instead of resetPasswordForEmail."
- supersedes: "ADR-064 (full -- Edge Function replaces Dashboard template entirely)"
- consequences:
- - "Full control over email content, styling, and language"
- - "Requires Resend API key and verified sender domain"
- - "ADR-019 flow (resetPasswordForEmail) fully superseded"
-
- - id: ADR-071
- title: "Direct supabase.functions.invoke without session guard for unauthenticated Edge Functions"
- context: "callEdgeFunction (ADR-024) validates session before invoke. send-reset-email is intentionally unauthenticated."
- decision: "Call supabase.functions.invoke directly in forgot-password.tsx. SDK sends ANON key when no session exists. Same pattern as register-first-user and register-invited-user."
- consequences:
- - "No session guard prevents the call from succeeding"
- - "ANON key is sufficient for Edge Function gateway access"
- - "Consistent with existing auth screen patterns (register flows)"
-
- - id: ADR-072
- title: "verifyOtp with token_hash for deep link token-based session establishment"
- context: "reset-password.tsx relied on PASSWORD_RECOVERY event from onAuthStateChange. New Edge Function flow uses deep link with hashed_token."
- decision: "Use supabase.auth.verifyOtp({ token_hash, type: 'recovery' }) when token present in URL params. Keep PASSWORD_RECOVERY event listener as fallback."
- consequences:
- - "Session established from token without browser redirect"
- - "Token is one-time-use (Supabase enforced)"
- - "Expired tokens handled gracefully (verifyOtp returns error)"
- - "Dual-path approach ensures backward compatibility"
-
- - id: ADR-073
- title: "Resend API via fetch instead of SDK for Edge Function email sending"
- context: "Need to send transactional email from Deno-based Edge Function. Deno runtime limits Node module compatibility."
- decision: "Use Resend REST API via native fetch. POST to https://api.resend.com/emails. Zero additional imports beyond @supabase/supabase-js."
- consequences:
- - "Zero additional imports (fetch is built into Deno)"
- - "Same pattern as process-notifications sending to Expo Push API"
-
- - id: ADR-074
- title: "paddingRight on statusSection for visual alignment instead of fixed-width column restructure"
- context: "F103 needs StatusLED circle aligned with X remove button on speaker row. Options: paddingRight, fixed-width column, marginRight."
- decision: "Add paddingRight: 5 to styles.statusSection. Simplest CSS-only adjustment, no layout restructure needed."
- superseded_by: "ADR-076"
- consequences:
- - "Single style property change, zero layout restructuring"
- - "Approximate alignment (pixel-perfect depends on font metrics)"
-
- - id: ADR-075
- title: "hitSlop={12} for back button touch area instead of padding"
- context: "F106 needs larger back button touch area in 8 Settings screens. Current touch target ~60x20px, below 44x44 minimum."
- decision: "Use hitSlop={12} on back button Pressable. Extends touch area without changing layout. Matches SpeechSlot removeButton pattern."
- consequences:
- - "Touch target meets 44px minimum height recommendation"
- - "No visual or layout changes"
- - "Applied consistently across all 8 Settings sub-screens"
-
- - id: ADR-076
- title: "Fixed-width right column for SpeechSlot center-to-center alignment (supersedes ADR-074)"
- context: "F112/ needs true center-to-center alignment between StatusLED and X button. ADR-074 paddingRight:5 was insufficient."
- decision: "Restructure SpeechSlot to outerRow with leftColumn (flex:1) + rightColumn (width:36). All right-side elements centered in same column. Remove paddingRight:5."
- supersedes: "ADR-074 (full)"
- superseded_by: "ADR-081"
- consequences:
- - "True center-to-center alignment regardless of font metrics"
- - "Layout restructure (more complex but robust)"
- - "paddingRight:5 removed (ADR-074 superseded)"
-
- - id: ADR-077
- title: "HTTPS redirect Edge Function as email-to-deep-link bridge for password reset"
- context: "Email clients block custom URL schemes in <a href>. Password reset button not clickable."
- decision: "New Edge Function reset-redirect accepts GET with token+type params, returns HTML with auto-redirect to sacrmeetplan://reset-password. send-reset-email uses HTTPS URL pointing to reset-redirect."
- consequences:
- - "Email CTA button clickable in all email clients (HTTPS scheme)"
- - "New Edge Function to deploy (minimal: ~50 lines, no DB access)"
- - "Adds one extra HTTP hop (email -> browser -> redirect -> app)"
-
- - id: ADR-078
- title: "StatusLED moved to labelRow for right-edge alignment with speaker field (supersedes ADR-076 LED placement)"
- context: " requires right edge of StatusLED to align with right edge of speaker field. ADR-076 places LED in rightColumn (36px) which extends beyond the field."
- decision: "Move StatusLED from rightColumn back into labelRow (leftColumn flex:1), grouped with statusText in a Pressable. rightColumn retains X buttons only."
- supersedes: "ADR-076 (partial -- LED placement only; rightColumn for X buttons retained)"
- superseded_by: "ADR-081"
- consequences:
- - "LED right edge aligns with field right edge (same flex container)"
- - "StatusText and LED remain grouped and tappable"
- - "X buttons still in rightColumn (unchanged)"
-
- - id: ADR-079
- title: "Store per-user app language in Supabase Auth user_metadata instead of new table"
- context: "F116 needs per-user app language preference. Options: new table, AsyncStorage, or auth.users user_metadata."
- decision: "Use Supabase Auth user_metadata via supabase.auth.updateUser({ data: { language } }). No migration, no new table, built-in API, cross-device persistence."
- consequences:
- - "Zero database migration for app language storage"
- - "Built-in Supabase API (updateUser, getUser) for read/write"
- - "Per-user, cross-device persistence"
- - "Cannot query all users' language preferences from DB (not needed)"
-
- - id: ADR-080
- title: "Mutual exclusivity CHECK constraint for can_pianist and can_conductor"
- context: "F117 splits can_music into can_pianist and can_conductor. User stated actor is EITHER pianist OR conductor, NEVER both."
- decision: "Database CHECK constraint: NOT (can_pianist = true AND can_conductor = true). Person doing both roles needs two separate actor entries."
- consequences:
- - "DB-level enforcement prevents all invalid states"
- - "Multi-role actors (can_preside + can_pianist) still allowed (independent axes)"
- - "Person doing both roles needs two actor entries (user accepted)"
-
- - id: ADR-081
- title: "Row-per-element layout for SpeechSlot X button alignment (supersedes two-column approach)"
- context: "F124/ reports X buttons misaligned with fields. Two-column layout (ADR-076/ADR-078) requires manual height synchronization between statusLedPlaceholder and labelRow, which is fragile."
- decision: "Restructure SpeechSlot to row-per-element: each field (speaker, topic) in its own flexDirection:'row' with its X button as sibling. alignItems:'center' guarantees vertical alignment."
- supersedes: "ADR-076 (rightColumn layout for X buttons), ADR-078 (partial -- LED placement unchanged, rightColumn removed)"
- consequences:
- - "X button center always aligns with field center (same flex row)"
- - "No manual height synchronization needed"
- - "labelRow decoupled from field rows"
- - "rightColumn removed; replaced by per-row actionArea (width:36)"
-
- - id: ADR-082
- title: "Expo Router query param for cross-tab navigation with expanded card"
- context: "F121/ needs AgendaForm pencil button to navigate to Speeches tab AND auto-expand a specific Sunday card."
- decision: "Use Expo Router query params: router.push('/(tabs)/speeches?expandDate=YYYY-MM-DD'). Speeches tab reads expandDate via useLocalSearchParams and auto-expands the matching card."
- consequences:
- - "No new Context or global state needed"
- - "Standard Expo Router pattern"
- - "expandDate param cleared after handling to avoid re-triggering"
-
- - id: ADR-083
- title: "Extend ADR-082 expandDate pattern to Agenda tab for cross-screen navigation"
- context: "F126/ and F128/ need Agenda tab to accept expandDate query param. Same pattern as speeches.tsx (ADR-082)."
- decision: "Add expandDate query param support to agenda.tsx using the exact same useEffect pattern from speeches.tsx: read param, setExpandedDate, lazyCreate.mutate, scrollToIndex, clear param."
- consequences:
- - "Consistent navigation pattern across both tabs (Speeches and Agenda)"
- - "No new Context or global state required"
- - "Code is nearly identical to speeches.tsx implementation"
-
- - id: ADR-084
- title: "Inline AgendaPreviewCard in Home tab instead of extracting reusable component"
- context: "F128/ needs a non-expandable agenda status card on Home. The collapsed card in agenda.tsx is intertwined with local state."
- decision: "Inline the preview card directly in index.tsx. Replicate the status line computation logic from agenda.tsx collapsed card. No extraction of shared component."
- consequences:
- - "Some code duplication between agenda.tsx collapsed card and index.tsx preview card (~40 lines)"
- - "No risk of regression in agenda.tsx"
- - "Simpler implementation: preview card has no expand/collapse, no past dimming, no chevron"
-
- - id: ADR-085
- title: "Separate direct Supabase update for topic fields when toggling off 2nd speech"
- context: "handleToggleSecondSpeech calls removeAssignment for speaker data, but useRemoveAssignment only clears speaker fields. Topic fields are not cleared."
- decision: "Add a separate direct supabase.from('speeches').update to clear topic_title, topic_link, topic_collection after removeAssignment. useRemoveAssignment is NOT modified."
- consequences:
- - "useRemoveAssignment is not modified, zero risk of regression"
- - "Two separate database operations (acceptable for infrequent user action)"
-
- - id: ADR-086
- title: "User metadata language priority for password reset email"
- context: " separated app language (user_metadata.language) from ward language. send-reset-email still uses ward.language only."
- decision: "Resolve language with priority chain: user.user_metadata?.language -> ward.language -> 'pt-BR'. getEmailTemplate already handles unknown languages."
- consequences:
- - "Email arrives in the language the user sees in the app"
- - "Backward compatible: users without user_metadata.language still get ward language"
-
- - id: ADR-087
- title: "Settings reorganization from 3 sections to 2 labeled groups"
- context: "Settings tab has 3 unlabeled card sections mixing ward and app settings. Users cannot distinguish ward-specific vs app-specific settings."
- decision: "Restructure into 2 groups with visible labels: 'Configuracoes da Ala' (ward-scoped items) and 'Configuracoes do App' (user-scoped items). wardLanguage and timezone move to Group 1. users and history move to Group 2. Group 1 label hidden for Observer."
- consequences:
- - "Clearer mental model separating ward vs app settings"
- - "Observer experience unchanged (sees only app items)"
-
- - id: ADR-088
- title: "StatusLED alignment via labelRow paddingRight matching actionArea width"
- context: "StatusLED in labelRow spans full width but speaker field uses flex:1 followed by 36px actionArea. StatusLED right edge is 36px further right than speaker field right edge."
- decision: "Add paddingRight: 36 to labelRow style. This offsets the statusSection rightward boundary to match the speaker field right edge. No changes to actionArea."
- consequences:
- - "Visual alignment achieved with minimal CSS change"
- - "X button position unchanged (actionArea untouched)"
-
- - id: ADR-089
- title: "Replace deep link redirect with self-contained password reset web page"
- context: "reset-redirect served HTML with meta refresh redirect to sacrmeetplan:// deep link. Deep link does not work in browsers. Multiple iterations could not fix fundamental deep link unreliability."
- decision: "Rewrite reset-redirect to serve a complete password reset web page. Load Supabase JS from CDN, call verifyOtp with token, provide form for updateUser. No deep link. Existing endpoint URL preserved for backward compatibility with old emails."
- consequences:
- - "Password reset works reliably in all browsers without app installation"
- - "CDN dependency for Supabase JS client; onerror fallback handles failure"
-
- - id: ADR-090
- title: "New invite-redirect Edge Function replaces deep link for invitation acceptance"
- context: "create-invitation returns sacrmeetplan://invite/<token> deep link that does not work in practice. Invited users cannot open custom URL schemes from external apps."
- decision: "Create invite-redirect Edge Function serving self-contained HTML page with invitation form. Uses fetch to call register-invited-user (same API). create-invitation returns HTTPS URL instead of deep link."
- consequences:
- - "Invitation acceptance works reliably in all browsers without app installation"
- - "Old deep links for new invitations replaced; previous ones never worked anyway"
-
- - id: ADR-091
- title: "Use err.message with i18n fallback for invite mutation error display"
- context: "inviteMutation.onError discards error object and shows generic t('users.inviteFailed'). Server error in err.message is lost. MutationCache fires duplicate alert."
- decision: "Show err.message in Alert with t('users.inviteFailed') fallback. Add meta: { suppressGlobalError: true } to inviteMutation to suppress MutationCache duplicate."
- consequences:
- - "Users see actual server error messages (e.g., 'User already exists')"
- - "Single error alert instead of duplicate"
-
- - id: ADR-092
- title: "Reset whatsapp_template to NULL and initialized flag on ward language change"
- context: "Ward language change leaves old-language whatsapp_template in DB. whatsapp.tsx initialized flag prevents re-evaluation of template for new language."
- decision: "Update wards with { language, whatsapp_template: null } in single call. Invalidate ['ward', wardId]. Add useEffect in whatsapp.tsx to reset initialized when wardLanguage changes."
- consequences:
- - "Custom templates lost on language switch (intentional: old language template not useful)"
- - "Template screen shows correct default for new language immediately"
-
- - id: ADR-093
- title: "Fetch ward template via useQuery in InviteManagementSection instead of hardcoded empty string"
- context: "InviteManagementSection passes template='' to buildWhatsAppUrl, always using default. getCurrentLanguage returns app language instead of ward language."
- decision: "Add useQuery(['ward', wardId]) to fetch whatsapp_template. Use wardLanguage from useAuth for template language and date formatting. Reuses cache with whatsapp.tsx."
- consequences:
- - "WhatsApp messages sent from Home match template configured in Settings"
- - "Shared query key ['ward', wardId] propagates updates via TanStack Query cache"
-
- - id: ADR-094
- title: "Structured error codes and diagnostic mode in create-invitation Edge Function"
- context: "create-invitation returns plain English error messages without machine-readable codes. No way to identify exact failure point or test validation steps without creating an invitation."
- decision: "Add 'code' field (category/specific format) to all error responses. Add console.error with '[create-invitation]' prefix at each failure point. Add diagnostic mode: { diagnose: true } runs all checks without db insert, returns structured report."
- consequences:
- - "Error responses gain 'code' field (backward compatible: 'error' field unchanged)"
- - "Each failure point identifiable in Supabase Edge Function logs"
- - "Diagnostic mode enables production debugging without side effects"
-
- - id: ADR-095
- title: "External hosting via GitHub Pages to bypass Supabase Content-Type override"
- context: "Supabase Edge Functions override Content-Type from text/html to text/plain for GET responses returning HTML (CDN anti-phishing measure). Pages render as plain text in browsers."
- decision: "Move HTML pages to GitHub Pages (docs/public/). Edge Functions become 302 redirect endpoints. EXTERNAL_PAGES_URL env var configurable with fallback to GitHub Pages URL."
- consequences:
- - "HTML pages render correctly: GitHub Pages serves text/html"
- - "One extra HTTP redirect (invisible to user)"
- - "Edge Functions become simpler (~30 lines instead of ~450 lines)"
- - "Dependency on GitHub Pages availability (acceptable risk)"
-
- - id: ADR-096
- title: "Centralized SVG icons module replacing all Unicode/emoji characters"
- context: "App uses Unicode/emoji for all icons. Emojis ignore color prop (platform-specific colors). Unicode chars vary across platforms. WhatsAppIcon (inline SVG) duplicated in 2 files. DD-25 prohibits icon libraries."
- decision: "Create src/components/icons/index.ts with 14 SVG icon components (13 Lucide stroke-based + 1 WhatsAppIcon fill-based). Path data copied as constants (no Lucide package). WhatsAppIcon consolidated. DD-25 updated to 'inline SVG (no icon library)'. ADR-033 partially superseded for swipe icons."
- consequences:
- - "Monochromatic icons consistent across iOS and Android"
- - "All icons accept color prop and respect theme"
- - "Zero new dependencies (react-native-svg already present)"
- - "WhatsAppIcon consolidated from 2 duplicate definitions to 1 shared export"
- - "16 consumer files updated"
-
- - id: ADR-097
- title: "Play icon placement: inside button (Home) and separated from chevron (Agenda)"
- context: " requests play icon placement adjustments. Home tab play icon stays inside button (SVG replaces Unicode). Agenda tab play icon needs visual separation from chevron."
- decision: "Home: PlayIcon inside meetingButtonContent (same layout). Agenda: PlayIcon gets marginRight: 8 from chevron. Both use theme colors via color prop. Single PlayIcon handles both themes."
- consequences:
- - "Play icon visually separated from chevron in Agenda tab"
- - "Single PlayIcon handles both light and dark themes via color prop"
- - "Home tab layout unchanged (SVG drop-in for Unicode)"
-
- - id: ADR-098
- title: "Reuse existing visual patterns for disabled fields and primary borders"
- context: "F147 needs blue border on Home preview card. F149 needs disabled visual on ReadOnlySpeakerRow. F150 replaces explanation text with standard placeholders. F151 uses minHeight for uniform card heights. All patterns already exist in the codebase."
- decision: "Apply existing patterns to new locations: SundayCard isNext style for F147 border, SpeechSlot disabled field style for F149, existing i18n keys selectSpeaker/selectTopic for F150, speechRow dimensions for F151 minHeight. No new patterns introduced."
- consequences:
- - "Visual consistency: disabled fields match in SpeechSlot and AgendaForm"
- - "Visual consistency: primary border on Home preview matches SundayCard isNext"
- - "No new style constants or patterns introduced"
- - "minHeight 62px is hardcoded but acceptable for default font sizes"
-
- - id: ADR-099
- title: "Alert.alert for no-phone WhatsApp confirmation and pattern reuse"
- context: "F152 needs confirmation dialog when WhatsApp pressed but speaker has no phone. F153 adds circular border to play button. F154 extends F151 minHeight from speech-type-only to all collapsed card types. All patterns already exist in the codebase."
- decision: "Use Alert.alert for F152 (matching existing confirmation patterns). Apply circle border on Pressable for F153 (no extra wrapper). Simplify minHeight condition for F154 (remove isSpeechesType, superseding F151)."
- consequences:
- - "F152: No silent status change when speaker has no phone"
- - "F153: Circle border uses theme-aware color (colors.textSecondary)"
- - "F154: ALL collapsed cards have identical height regardless of type"
-
- - id: ADR-100
- title: "Tailwind Slate palette for light theme neutral tones"
- context: "Light theme uses pure neutral grays while dark theme uses Tailwind Slate blue-grays. Light background (#FFFFFF) is identical to card (#FFFFFF), causing zero visual separation. User wants bluish tones matching the dark theme character."
- decision: "Adopt Tailwind Slate palette for lightColors neutral tones (Slate-50 through Slate-500). Change background from #FFFFFF to #F1F5F9 (Slate-100) so white cards stand out. Keep text colors unchanged to preserve WCAG AA compliance. All components use semantic tokens via useTheme, so only theme.ts changes."
- consequences:
- - "Cards (#FFFFFF) now visually separate from background (#F1F5F9)"
- - "Consistent bluish character across both light and dark themes"
- - "Zero component changes: semantic token architecture absorbs the change"
- - "WCAG AA maintained: text #1A1A1A on Slate-100 is 14.1:1"
-
- - id: ADR-101
- title: "Italic + textSecondary for read-only speaker names in AgendaForm"
- context: "F149/ added disabled visual (opacity:0.5 + surfaceVariant background) to ReadOnlySpeakerRow. User reports this is too heavy-handed. Wants subtle distinction: italic + reduced color for speaker names. F149 disabled row visual should stay for actually disabled rows."
- decision: "Apply fontStyle:'italic' and color:colors.textSecondary to speaker name text when speakerName is present. Keep textTertiary without italic for empty placeholders. Pass disabled placeholder as speakerName when 2nd speech disabled. Change i18n 'configurado'->'ajustado'. Keep F149 disabled row visual as-is."
- consequences:
- - "Speaker names visually distinct from labels via italic + reduced contrast"
- - "Subtler than F149's opacity approach, but both effects coexist"
- - "Disabled placeholder message gets italic+textSecondary styling"
- - "SpeechSlot.tsx is NOT modified (scoped to AgendaForm only)"
-
- - id: ADR-102
- title: "Prayers as speeches positions 0/4 instead of separate table"
- context: " needs to manage prayers as first-class entities with status workflow, WhatsApp invitations, and push notifications. Options: (a) keep in sunday_agendas with status columns, (b) new prayers table, (c) reuse speeches table positions 0/4."
- decision: "Reuse speeches table with position 0 (opening prayer) and position 4 (closing prayer). Leverages existing status lifecycle, snapshot pattern (ADR-003), RLS policies, realtime subscription, mutation hooks, and notification trigger."
- consequences:
- - "Zero new tables, zero new RLS policies"
- - "Existing hooks and components extend naturally"
- - "Migration required to copy data from sunday_agendas to speeches"
- - "sunday_agendas loses prayer columns (breaking change for all consumers)"
-
- - id: ADR-103
- title: "Per-ward manage_prayers toggle on wards table"
- context: "Managed prayers could be per-ward, per-sunday, or per-user. Per-user and per-sunday add complexity with no clear benefit."
- decision: "Per-ward boolean toggle in wards table. When OFF, prayers are simple assignments (assigned_confirmed, no notifications). When ON, full speech workflow (status lifecycle, notifications, Speeches tab management)."
- consequences:
- - "Single boolean column, one toggle in settings"
- - "All users in the ward see the same prayer management mode"
- - "Toggling OFF preserves prayer data in DB"
-
- - id: ADR-104
- title: "Separate WhatsApp templates for opening and closing prayers"
- context: "Prayer invitations need different messages than speech invitations. Opening asks to arrive early, closing asks to join during intermediate hymn."
- decision: "Two separate template columns: whatsapp_template_opening_prayer and whatsapp_template_closing_prayer. Default templates differ by prayer type. Both use only {nome} and {data} placeholders."
- consequences:
- - "Wards can customize each prayer invitation independently"
- - "WhatsApp settings screen needs 3-tab segmented control"
- - "Template resolution logic selects correct template by position"
-
- - id: ADR-105
- title: "useLazyCreateSpeeches receives sundayType for position selection"
- context: "The current useLazyCreateSpeeches always creates positions [1,2,3]. With prayers, positions depend on sunday type."
- decision: "Change input from string (sundayDate) to object { sundayDate, sundayType }. Breaking change; all callers must be updated. speeches type: [0,1,2,3,4], testimony/primary: [0,4], conference/other: none."
- consequences:
- - "Single hook handles all position creation logic"
- - "Breaking change for callers in speeches.tsx"
- - "Idempotency preserved"
-
- - id: ADR-106
- title: "Notification trigger checks manage_prayers for prayer positions"
- context: "enqueue_speech_notification fires for ALL speeches changes. When manage_prayers=false, prayer assignments should not trigger notifications."
- decision: "Add SELECT on wards.manage_prayers inside trigger for positions 0/4. If false, RETURN NEW (skip notification). SECURITY DEFINER preserved."
- consequences:
- - "One additional SELECT per prayer position change (minimal perf impact)"
- - "No false notifications when manage_prayers is OFF"
-
- - id: ADR-107
- title: "SpeechSlot isPrayer prop for prayer-specific rendering"
- context: "Prayers differ from speeches: no topic field, different labels, no 2nd speech toggle. Options: new PrayerSlot component or conditional rendering."
- decision: "Add isPrayer prop to SpeechSlot. When true: hide topic row, use prayer labels, hide toggle. Avoids component duplication."
- consequences:
- - "Single component for both speeches and prayers"
- - "Minimal added complexity (one prop, 3 conditional checks)"
-
- - id: ADR-108
- title: "useDeleteSpeechesByDate accepts optional positions array"
- context: "Sunday type changes now have different deletion rules. Some transitions delete only speeches (1,2,3), some only prayers (0,4), some all."
- decision: "Add optional positions?: number[] parameter. When provided, DELETE includes AND position IN (...) filter. When omitted, deletes all (backward compatible)."
- consequences:
- - "Flexible deletion for type change rules"
- - "Backward compatible: omitting positions keeps current behavior"
-
- - id: ADR-109
- title: "Inline prayer content in AgendaForm instead of modifying ReadOnlySpeakerRow"
- context: " fixes double-label bug: ReadOnlySpeakerRow wraps in FieldRow internally, parent also wraps in FieldRow. Options: (a) add skipFieldRow prop, (b) inline content."
- decision: "Inline render View+Text+PencilIcon directly inside parent FieldRow for prayer fields. ReadOnlySpeakerRow unchanged, avoiding regressions for speech positions (1, 2, 3)."
- consequences:
- - "Zero regression risk for speech ReadOnlySpeakerRow calls"
- - "Small code duplication for prayer-specific inline rendering"
-
- - id: ADR-110
- title: "Dynamic minHeight replaces hardcoded 62px for collapsed card height"
- context: "F154 set static minHeight:62 for 3 lines. Managed prayers need 5 lines. Static value insufficient."
- decision: "Calculate minHeight dynamically: maxLines * lineHeight + (maxLines-1) * marginBottom. maxLines=5 when managePrayers=true, 3 when false."
- supersedes: "F154 static minHeight:62 approach"
- consequences:
- - "Height auto-adjusts when managePrayers toggle changes"
- - "Transparent formula, no magic numbers"
-
- - id: ADR-111
- title: "Custom tabBarLabel render function for multiline tab label"
- context: "'Discursos e Oracoes' tab label gets cut off. Need 2-line wrapping."
- decision: "Custom tabBarLabel on speeches tab with Text numberOfLines={2} and textAlign:'center'. Other tabs keep default single-line."
- consequences:
- - "Only speeches tab gets custom rendering"
- - "Short labels (managePrayers=false) render normally on single line"
-
- - id: ADR-112
- title: "Per-position speech template columns instead of template-level parameterization"
- context: " removes {posicao} placeholder. Options: (a) keep single column and embed ordinal at runtime, (b) split into 3 columns for per-position customization."
- decision: "Use 3 separate columns (whatsapp_template_speech_1, _speech_2, _speech_3), matching pattern prayer template split. Each template independently editable. Ordinal embedded in default text."
- consequences:
- - "Full per-position customization"
- - "Consistent with prayer template split pattern"
- - "3 additional columns in wards table"
-
- - id: ADR-113
- title: "Segmented control always visible with 3-5 tabs in WhatsApp settings"
- context: "Pre-, segmented control only shown when managePrayers=true. With 3 speech tabs, control must always appear."
- decision: "Always show segmented control. managePrayers=false: 3 speech tabs. managePrayers=true: 5 tabs (3 speech + 2 prayer). Abbreviated labels."
- consequences:
- - "Better discoverability of per-position templates"
- - "Abbreviated labels required to fit 5 tabs"
-
- - id: ADR-114
- title: "Free-text field for welcome_new_families instead of structured selector"
- context: " adds welcome field. Options: (a) free-text multiline like announcements, or (b) structured selector like ActorSelector. Families are typically not existing ward members."
- decision: "Use free-text multiline DebouncedTextInput (same as announcements). Simple TEXT column in DB. No member/actor relationship needed."
- consequences:
- - "Simple implementation reusing existing patterns"
- - "Flexible text input for any format"
-
- - id: ADR-115
- title: "Inline Pressable with description for wardLanguage instead of modifying SettingsItem"
- context: " adds description text to ward language setting. Only this item needs a description among all SettingsItem uses."
- decision: "Use inline Pressable layout for wardLanguage only, following managePrayers toggle pattern. Do not modify SettingsItem component."
- consequences:
- - "No changes to widely-used SettingsItem component"
- - "Slight code duplication acceptable for single-use requirement"
-
- - id: ADR-116
- title: "Fix all diacritical errors at once instead of only QA-documented ones"
- context: "QA documented 11 es accent errors. Audit found 16 additional. Options: fix only QA-documented or fix all."
- decision: "Fix all diacritical errors at once. The additional 16 es.json corrections carry no additional risk and prevent a follow-up pass."
- consequences:
- - "Complete diacritical correctness across all locale files in one pass"
- - "27 total es corrections instead of 11"
-
- - id: ADR-117
- title: "Use useRef instead of useState for DebouncedTextInput focus tracking"
- context: "F168 needs focus tracking to guard sync useEffect. Options: useState (triggers re-render) or useRef (no re-render)."
- decision: "Use useRef(false). Focus state only guards a side effect, does not affect render output. Consistent with existing ref usage in component."
- consequences:
- - "No re-render on focus/blur transitions"
- - "Focus state immediately available in useEffect"
-
- - id: ADR-118
- title: "No keyboardVerticalOffset for ActorSelector KeyboardAvoidingView"
- context: "F169 adds KeyboardAvoidingView. members.tsx and topics.tsx use default offset (0). Bottom-sheet at screen bottom."
- decision: "Start without keyboardVerticalOffset, matching existing pattern. Adjust in follow-up if needed."
- consequences:
- - "Consistent with existing KeyboardAvoidingView usage"
- - "May need follow-up offset adjustment"
-
- - id: ADR-119
- title: "Grant full speech:assign/unassign to secretary instead of prayer-only permission"
- context: " requests secretary can assign/unassign prayers. speech:assign controls both speeches and prayers (SpeechSlot). Options: (a) grant speech:assign, (b) create prayer-only permission."
- decision: "Grant speech:assign and speech:unassign to secretary. User confirmed same access as bishopric. No new permission type needed."
- consequences:
- - "Secretary can assign/unassign BOTH speeches and prayers"
- - "No new Permission type; existing types sufficient"
- - "Consistent with secretary already having agenda:assign_speaker"
- - "Observer role remains unaffected"
-
- - id: ADR-120
- title: "Decouple topic row visibility from permission checks"
- context: "showTopicRow depends on canAssign (speech:assign). Observer/secretary cannot see topic field when no topic assigned. Options: (a) simplify to !isPrayer && !!speech, (b) add topic:read permission."
- decision: "Simplify to !isPrayer && !!speech. Topic row visible to all roles when speech exists. Field interactivity remains gated by canAssign."
- consequences:
- - "Topic row always visible for non-prayer slots when speech exists"
- - "Observer sees read-only topic field (disabled, no chevron, no X)"
- - "Simpler condition, easier to reason about"
-
- - id: ADR-121
- title: "Client-side cascade in onSuccess instead of database trigger for member-to-speech propagation"
- context: "member phone/name edits not propagating to future speeches. Options: (a) database trigger on members.UPDATE, (b) client-side cascade in useUpdateMember.onSuccess."
- decision: "Client-side cascade in onSuccess. Async Supabase update wrapped in try/catch for best-effort. Simpler than trigger, follows existing mutation patterns, sufficient for low-frequency member edits."
- consequences:
- - "Simple implementation: ~10 lines in onSuccess"
- - "Best-effort: cascade failure does not break member update"
- - "Extensible: F173 adds speaker_informal_name to same cascade"
- - "No new migration for trigger logic"
-
- - id: ADR-122
- title: "Snapshot speaker_informal_name in speeches instead of live lookup from members"
- context: "informal_name needed for WhatsApp {nome}. Options: (a) snapshot as speaker_informal_name in speeches (like speaker_name), (b) live lookup via JOIN to members using member_id FK."
- decision: "Snapshot (Path A). Consistent with ADR-003. Preserved when member deleted (ON DELETE SET NULL). F172 cascade keeps future speeches in sync."
- consequences:
- - "Consistent with ADR-003: all speaker data is snapshotted"
- - "Historical data preserved after member deletion"
- - "No additional JOIN in speech queries"
+shared_libraries:
+  - path: src/lib/supabase.ts
+    responsibility: Supabase client initialization with resilient AsyncStorage adapter
+  - path: src/lib/dateUtils.ts
+    responsibility: Date formatting, Sunday calculations, date range utilities
+  - path: src/lib/countryCodes.ts
+    responsibility: Country code catalog (~200 entries) for phone number input
+  - path: src/lib/activityLog.ts
+    responsibility: Activity log helper functions for structured descriptions
+  - path: src/hooks/useActivityLog.ts
+    responsibility: Hook for logging user actions to activity_log table
+  - path: src/i18n/index.ts
+    responsibility: i18next initialization, device locale detection, language management
+  - path: src/types/database.ts
+    responsibility: TypeScript type definitions mirroring PostgreSQL schema
 
 # =============================================================================
 # DATABASE SCHEMA
 # =============================================================================
 
 database_schema:
- tables:
- # --- Ward-scoped tables (RLS on ward_id) ---
- - name: wards
- description: "Alas (multi-tenant root entity)"
- columns: [id, name, stake_name, language, timezone, whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, manage_prayers, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, created_at, updated_at]
- unique: ["(stake_name, name)"]
- rls: "id = auth.jwt.app_metadata.ward_id"
- notes: "manage_prayers (BOOLEAN DEFAULT false), whatsapp_template_opening_prayer, whatsapp_template_closing_prayer added/F157 (migration 019). (migration 020): whatsapp_template replaced with whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3."
+  provider: Supabase (PostgreSQL)
+  migrations_dir: supabase/migrations/
+  total_migrations: 23
 
- - name: members
- description: "Membros da ala"
- columns: [id, ward_id, full_name, informal_name, country_code, phone, created_at, updated_at]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
- notes: "phone unique constraint dropped. informal_name TEXT added (migration 023), backfilled with first word of full_name."
+  tables:
+    # --- Ward-scoped tables ---
+    - name: wards
+      scope: ward-scoped (RLS)
+      description: Ward configuration including name, stake, language, timezone, WhatsApp templates, manage_prayers flag
+      key_columns:
+        - "id (UUID PK)"
+        - "name, stake_name (UNIQUE together)"
+        - "language (default 'pt-BR')"
+        - "timezone (default 'America/Sao_Paulo')"
+        - "manage_prayers (boolean)"
+        - "whatsapp_template_speech_1/2/3 (per-position templates)"
+        - "whatsapp_template_opening_prayer, whatsapp_template_closing_prayer"
 
- - name: ward_topics
- description: "Topicos da ala (criados pelo usuario)"
- columns: [id, ward_id, title, link, created_at, updated_at]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
+    - name: members
+      scope: ward-scoped (RLS)
+      description: Ward members with name, informal name, country code, and phone
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id (FK -> wards)"
+        - "full_name"
+        - "informal_name (nullable, defaults to first word of full_name in app)"
+        - "country_code (default '+55')"
+        - "phone (nullable)"
+      relations:
+        - "speeches.member_id -> members.id (ON DELETE SET NULL)"
 
- - name: meeting_actors
- description: "Atores que podem presidir/conduzir/reconhecer/pianista/regente"
- columns: [id, ward_id, name, can_preside, can_conduct, can_recognize, can_pianist, can_conductor, created_at, updated_at]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
- notes: "can_conduct e can_preside sao independentes. can_music split into can_pianist + can_conductor with CHECK constraint (ADR-080). Migration 017."
+    - name: ward_topics
+      scope: ward-scoped (RLS)
+      description: Ward-specific topics with title and optional link
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id (FK -> wards)"
+        - "title, link"
 
- - name: speeches
- description: "Discursos e oracoes designados (5 slots por domingo: pos 0=abertura, 1-3=discursos, 4=encerramento)"
- columns: [id, ward_id, sunday_date, position, member_id, speaker_name, speaker_informal_name, speaker_phone, topic_title, topic_link, topic_collection, status, created_at, updated_at]
- unique: ["(ward_id, sunday_date, position)"]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
- notes: "Snapshot pattern: speaker_name/phone/informal_name e topic_title/link copiados como texto. positions 0 (opening prayer) and 4 (closing prayer) added. Prayers have no topic fields. speaker_informal_name TEXT added (migration 023), backfilled with first word of speaker_name. cascade update from useUpdateMember propagates to future speeches."
+    - name: ward_collection_config
+      scope: ward-scoped (RLS)
+      description: Per-ward activation of general topic collections
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id (FK -> wards)"
+        - "collection_id (FK -> general_collections)"
+        - "active (boolean)"
+      constraints:
+        - "UNIQUE (ward_id, collection_id)"
 
- - name: sunday_exceptions
- description: "Tipos de domingo (testimony_meeting, general_conference, etc.)"
- columns: [id, ward_id, date, reason, custom_reason]
- unique: ["(ward_id, date)"]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
- enum_values: [speeches, testimony_meeting, general_conference, stake_conference, ward_conference, primary_presentation, other]
+    - name: sunday_exceptions
+      scope: ward-scoped (RLS)
+      description: Sunday type assignments (speeches, testimony_meeting, general_conference, etc.)
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id (FK -> wards)"
+        - "date (DATE, must be Sunday)"
+        - "reason (enum), custom_reason"
+      constraints:
+        - "UNIQUE (ward_id, date)"
+        - "CHECK (DOW = 0, must be Sunday)"
 
- - name: sunday_agendas
- description: "Agenda completa da reuniao sacramental por domingo"
- columns: [id, ward_id, sunday_date, presiding_name, presiding_actor_id, conducting_name, conducting_actor_id, recognized_names, welcome_new_families, announcements, pianist_name, pianist_actor_id, conductor_name, conductor_actor_id, opening_hymn_id, sustaining_releasing, has_baby_blessing, baby_blessing_names, has_baptism_confirmation, baptism_confirmation_names, has_stake_announcements, sacrament_hymn_id, has_special_presentation, special_presentation_description, has_intermediate_hymn, intermediate_hymn_id, has_second_speech, closing_hymn_id, speaker_1_override, speaker_2_override, speaker_3_override, created_at, updated_at]
- unique: ["(ward_id, sunday_date)"]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
- notes: "speaker_*_override added/F044 (migration 014) for last-minute speaker swap. has_intermediate_hymn added/F095 (migration 016). has_second_speech added/F118 (migration 018). (migration 019): dropped opening_prayer_member_id, opening_prayer_name, closing_prayer_member_id, closing_prayer_name (data migrated to speeches positions 0/4). (migration 022): added welcome_new_families TEXT DEFAULT NULL."
+    - name: speeches
+      scope: ward-scoped (RLS)
+      description: Speech assignments with snapshot pattern for speaker/topic data
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id, sunday_date, position (0-4)"
+        - "member_id (FK -> members, ON DELETE SET NULL)"
+        - "speaker_name, speaker_informal_name, speaker_phone (snapshots)"
+        - "topic_title, topic_link, topic_collection (snapshots)"
+        - "status (enum: not_assigned, assigned_not_invited, assigned_invited, assigned_confirmed, gave_up)"
+      constraints:
+        - "UNIQUE (ward_id, sunday_date, position)"
+      triggers:
+        - "speech_notification_trigger: enqueues notifications on status changes"
 
- - name: ward_collection_config
- description: "Configuracao de colecoes ativas por ala"
- columns: [id, ward_id, collection_id, active]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
+    - name: meeting_actors
+      scope: ward-scoped (RLS)
+      description: People who can preside, conduct, recognize, play piano, or direct music
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id (FK -> wards)"
+        - "name"
+        - "can_preside, can_conduct, can_recognize, can_pianist, can_conductor (booleans)"
+      constraints:
+        - "CHECK (NOT (can_pianist AND can_conductor))"
 
- - name: invitations
- description: "Convites para novos usuarios"
- columns: [id, ward_id, email, role, token, expires_at, used_at, created_by, created_at]
- unique: [token]
- rls: "ward_id = auth.jwt.app_metadata.ward_id"
+    - name: sunday_agendas
+      scope: ward-scoped (RLS)
+      description: Full meeting agenda per Sunday with all sections
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id, sunday_date"
+        - "presiding/conducting/pianist/conductor name + actor_id pairs"
+        - "recognized_names (TEXT array)"
+        - "welcome_new_families, announcements"
+        - "opening/sacrament/intermediate/closing hymn_id (FK -> hymns)"
+        - "opening/closing prayer member_id + name"
+        - "has_baby_blessing, baby_blessing_names"
+        - "has_baptism_confirmation, baptism_confirmation_names"
+        - "has_stake_announcements, sustaining_releasing"
+        - "has_special_presentation, special_presentation_description"
+        - "has_intermediate_hymn"
+        - "speaker_1/2/3_override (last-minute substitutions)"
+        - "has_second_speech (default true)"
+      constraints:
+        - "UNIQUE (ward_id, sunday_date)"
 
- - name: activity_log
- description: "Log de atividades dos usuarios"
- columns: [id, ward_id, user_id, user_email, user_name, action_type, description, created_at]
- rls: "ward_id = auth.jwt.app_metadata.ward_id; INSERT only"
- retention: "2 years (cron job, migration 005)"
- notes: "user_name column added (migration 011)"
+    - name: activity_log
+      scope: ward-scoped (RLS, SELECT + INSERT only)
+      description: Audit log of user actions with structured pipe-delimited descriptions
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id, user_id, user_email, user_name"
+        - "action_type, description"
+        - "created_at"
 
- - name: device_push_tokens
- description: "Tokens de push notification por dispositivo"
- columns: [id, user_id, ward_id, expo_push_token, created_at, updated_at]
- unique: ["(user_id, expo_push_token)"]
- rls: "user_id = auth.uid"
+    - name: invitations
+      scope: ward-scoped (RLS)
+      description: User invitations with token, role, and expiration
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id, email, role, token (UNIQUE)"
+        - "expires_at, used_at, created_by"
 
- - name: notification_queue
- description: "Fila de notificacoes push"
- columns: [id, ward_id, type, sunday_date, speech_position, speaker_name, target_role, status, send_after, created_at]
- rls: "INSERT via DB triggers only (SECURITY DEFINER, ADR-035)"
+    - name: device_push_tokens
+      scope: user-scoped (RLS by user_id = auth.uid())
+      description: Expo push tokens per user/device
+      key_columns:
+        - "id (UUID PK)"
+        - "user_id, ward_id"
+        - "expo_push_token"
+      constraints:
+        - "UNIQUE (user_id, expo_push_token)"
 
- # --- Global tables (SELECT only for authenticated) ---
- - name: hymns
- description: "Catalogo de hinos (global, multi-idioma)"
- columns: [id, language, number, title, is_sacramental]
- unique: ["(language, number)"]
- rls: "SELECT for all authenticated users"
+    - name: notification_queue
+      scope: service-only (no RLS policies, only service_role access)
+      description: Push notification queue processed by Edge Function on cron
+      key_columns:
+        - "id (UUID PK)"
+        - "ward_id, type, sunday_date, speech_position, speaker_name"
+        - "target_role, status, send_after"
 
- - name: general_collections
- description: "Colecoes de topicos globais (ex: Conferencia Geral)"
- columns: [id, name, language]
- rls: "SELECT for all authenticated users"
+    # --- Global tables (read-only for clients) ---
+    - name: general_collections
+      scope: global (RLS: SELECT for authenticated)
+      description: Language-specific topic collections
+      key_columns: ["id (UUID PK)", "name", "language"]
 
- - name: general_topics
- description: "Topicos dentro de colecoes globais"
- columns: [id, collection_id, title, link]
- rls: "SELECT for all authenticated users"
+    - name: general_topics
+      scope: global (RLS: SELECT for authenticated)
+      description: Topics within general collections
+      key_columns: ["id (UUID PK)", "collection_id (FK)", "title", "link"]
 
- # --- Auth table (managed by Supabase) ---
- - name: auth.users
- description: "Usuarios do app (gerenciado pelo Supabase Auth)"
- app_metadata_fields:
- ward_id: "uuid"
- role: "bishopric | secretary | observer"
- full_name: "string"
- user_metadata_fields:
- language: "string (optional, 'pt-BR' | 'en' | 'es', added )"
+    - name: hymns
+      scope: global (RLS: SELECT for authenticated)
+      description: Hymn catalog per language
+      key_columns: ["id (UUID PK)", "language", "number", "title", "is_sacramental"]
+      constraints: ["UNIQUE (language, number)"]
 
- rpc_functions:
- - name: import_members
- description: "Atomically replaces all members (DELETE + INSERT)"
- params: [target_ward_id, new_members]
- migration: "007_import_members_rpc.sql"
+  rls_strategy: |
+    Ward-scoped multi-tenant isolation via auth.ward_id() helper function
+    that extracts ward_id from JWT app_metadata. All ward-scoped tables have
+    SELECT/INSERT/UPDATE/DELETE policies checking ward_id = auth.ward_id().
+    Global tables (hymns, general_collections, general_topics) allow SELECT
+    for all authenticated users. notification_queue has no policies (service-only).
+    device_push_tokens uses user_id = auth.uid() scoping.
 
- - name: list_ward_users
- description: "Lists all users in a ward (queries auth.users)"
- params: [target_ward_id]
- returns: [id, email, role, full_name, created_at]
- migration: "006_list_ward_users_rpc.sql (updated in 011)"
- security: DEFINER
-
- migrations:
- - "001_initial_schema.sql"
- - "002_rls_policies.sql"
- - "003_notification_triggers.sql"
- - "004_weekly_reminder_function.sql"
- - "005_activity_log_retention.sql"
- - "006_list_ward_users_rpc.sql"
- - "007_import_members_rpc.sql"
- - "008_fix_sunday_type_enum.sql"
- - "009_add_speeches_to_reason_enum.sql"
- - "010_enable_realtime_publication.sql"
- - "011_add_user_name_support.sql"
- - "012_drop_members_phone_unique_constraint.sql"
- - "013_fix_notification_trigger_security_definer.sql"
- - "014_add_speaker_overrides.sql"
- - "015_fix_function_search_path.sql"
- - "016_add_has_intermediate_hymn.sql"
- - "017_split_music_actor.sql"
- - "018_add_has_second_speech.sql"
- - "019_managed_prayers.sql"
- - "020_split_speech_template.sql"
- - "021_fix_weekly_reminders_manage_prayers.sql"
- - "022_add_welcome_new_families.sql"
-
- key_relationships:
- - "members.ward_id -> wards.id"
- - "speeches.ward_id -> wards.id"
- - "speeches.member_id -> members.id (nullable, ON DELETE SET NULL)"
- - "sunday_agendas.ward_id -> wards.id"
- - "sunday_agendas.*_hymn_id -> hymns.id (nullable)"
- - "sunday_agendas.*_actor_id -> meeting_actors.id (nullable)"
- - "meeting_actors.ward_id -> wards.id"
- - "ward_topics.ward_id -> wards.id"
- - "ward_collection_config.ward_id -> wards.id"
- - "ward_collection_config.collection_id -> general_collections.id"
- - "general_topics.collection_id -> general_collections.id"
- - "sunday_exceptions.ward_id -> wards.id"
- - "invitations.ward_id -> wards.id"
- - "activity_log.ward_id -> wards.id"
- - "device_push_tokens.ward_id -> wards.id"
- - "notification_queue.ward_id -> wards.id"
+  server_functions:
+    - name: update_updated_at_column()
+      type: trigger function
+      description: Auto-updates updated_at timestamp on row update (applied to 7 tables)
+    - name: enqueue_speech_notification()
+      type: trigger function (SECURITY DEFINER)
+      description: Enqueues push notifications on speech status changes
+    - name: import_members(ward_uuid, members_json)
+      type: RPC
+      description: Bulk import members from CSV data
 
 # =============================================================================
 # EDGE FUNCTIONS
 # =============================================================================
 
 edge_functions:
- - name: register-first-user
- auth: "None (called before login)"
- input: "{email, password, stakeName, wardName, role, language, timezone, fullName}"
- behavior: "Creates ward + user with app_metadata (ward_id, role, full_name). Auto-creates actor for bishopric."
- verify_jwt: false
+  runtime: Deno (Supabase Edge Functions)
+  directory: supabase/functions/
 
- - name: register-invited-user
- auth: "None (called before login)"
- input: "{token, password, fullName}"
- behavior: "Validates invitation token, creates user with app_metadata, marks invitation used."
- verify_jwt: false
+  functions:
+    # --- Auth & User Management ---
+    - name: register-first-user
+      description: Creates ward and registers first user with bishopric role
+      trigger: Manual (from register screen)
 
- - name: create-invitation
- auth: "JWT (bishopric or secretary)"
- input: "{email, role} or {email, role, diagnose: true} for diagnostic mode"
- behavior: "Creates invitation record with token and HTTPS URL. Auto-creates actor for bishopric invitees. deepLink changed from sacrmeetplan://invite/<token> to https://<SUPABASE_URL>/functions/v1/invite-redirect?token=<token>. structured error codes (code field), console.error at each failure point, diagnostic mode."
+    - name: register-invited-user
+      description: Registers user from invitation with assigned role and ward
+      trigger: Manual (from invitation acceptance page)
 
- - name: list-users
- auth: "JWT (bishopric or secretary)"
- input: "{}"
- behavior: "Calls list_ward_users RPC. Returns [{id, email, role, full_name, created_at}]."
+    - name: create-invitation
+      description: Creates invitation with token and HTTPS URL
+      trigger: Manual (from app, bishopric/secretary)
 
- - name: update-user-role
- auth: "JWT (bishopric or secretary)"
- input: "{targetUserId, newRole}"
- behavior: "Updates user role in app_metadata. Auto-creates actor when role -> bishopric."
+    - name: invite-redirect
+      description: Serves self-contained HTML invitation acceptance page (or redirects to external page)
+      trigger: HTTP GET (from invitation URL)
 
- - name: update-user-name
- auth: "JWT (any authenticated user)"
- input: "{fullName}"
- behavior: "Self-name-update only. Updates caller's own app_metadata.full_name."
+    - name: send-reset-email
+      description: Sends password reset email with HTTPS link
+      trigger: Manual (from forgot-password screen)
 
- - name: delete-user
- auth: "JWT (bishopric or secretary)"
- input: "{targetUserId}"
- behavior: "Deletes user. Cannot delete self."
+    - name: reset-redirect
+      description: Serves self-contained HTML password reset page (or redirects to external page)
+      trigger: HTTP GET (from reset email link)
 
- - name: process-notifications
- auth: "Service role (cron)"
- trigger: "Cron every 1 minute"
- behavior: "Processes pending notification_queue entries, groups designations by sunday, sends via Expo Push API."
+    - name: list-users
+      description: Lists ward users with name, email, and role
+      trigger: Manual (from users settings screen)
 
- - name: send-reset-email
- auth: "None (unauthenticated, ANON key only)"
- input: "{email}"
- behavior: "Looks up user, determines email language (priority: user_metadata.language -> ward.language -> pt-BR), generates recovery token via admin.generateLink, sends translated email via Resend API with HTTPS redirect URL (https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=...&type=recovery). changed scheme to sacrmeetplan://. changed deepLink from custom scheme to HTTPS redirect URL. changed language resolution from ward-only to user_metadata priority (ADR-086)."
- verify_jwt: false
+    - name: update-user-role
+      description: Updates a user's role in app_metadata
+      trigger: Manual (from users settings screen)
 
- - name: reset-redirect
- auth: "None (public endpoint, no JWT required)"
- input: "GET query params: token (required), type (required)"
- behavior: "Converted from HTML-serving to 302 redirect. Validates token format and type, then redirects to external page (EXTERNAL_PAGES_URL/reset-password.html?token=...&type=...). Previous behavior replaced. HTML now hosted externally on GitHub Pages to bypass Supabase Content-Type text/plain override."
- verify_jwt: false
+    - name: update-user-name
+      description: Updates a user's full_name in app_metadata
+      trigger: Manual (from users settings screen)
 
- - name: invite-redirect
- auth: "None (public endpoint, no JWT required)"
- input: "GET query params: token (required)"
- behavior: "Converted from HTML-serving to 302 redirect. Validates token UUID format, then redirects to external page (EXTERNAL_PAGES_URL/accept-invite.html?token=...). Previous behavior replaced. HTML now hosted externally on GitHub Pages to bypass Supabase Content-Type text/plain override."
- verify_jwt: false
+    - name: delete-user
+      description: Deletes a user from Supabase Auth
+      trigger: Manual (from users settings screen)
+
+    # --- Notifications ---
+    - name: process-notifications
+      description: Processes pending notification queue entries and sends via Expo Push API
+      trigger: Cron (every 1 minute)
 
 # =============================================================================
-# ROLES AND PERMISSIONS
+# PROVIDER HIERARCHY (Root Layout)
 # =============================================================================
 
-roles:
- bishopric:
- description: "Bispado -- acesso total"
- permissions:
- - "speech:assign, speech:unassign, speech:change_status"
- - "member:read, member:write, member:import"
- - "topic:write, collection:toggle"
- - "sunday_type:write"
- - "settings:access, settings:language, settings:whatsapp, settings:timezone, settings:users"
- - "invite:manage, invitation:create"
- - "home:next_assignments, home:invite_mgmt"
- - "agenda:read, agenda:write, agenda:assign_speaker"
- - "presentation:start"
- - "push:receive"
- - "history:read"
-
- secretary:
- description: "Secretario -- acesso amplo, sem designar discursos"
- permissions:
- - "speech:change_status"
- - "member:read, member:write, member:import"
- - "topic:write, collection:toggle"
- - "sunday_type:write"
- - "settings:access, settings:language, settings:whatsapp, settings:timezone, settings:users"
- - "invite:manage, invitation:create"
- - "home:invite_mgmt"
- - "agenda:read, agenda:write, agenda:assign_speaker"
- - "presentation:start"
- - "push:receive"
- - "history:read"
- notes: " added settings:users. fixed server-side access."
-
- observer:
- description: "Observador -- somente leitura"
- permissions:
- - "member:read"
- - "agenda:read"
- - "presentation:start"
- - "settings:limited (app language, theme, about only)"
- notes: "Observer gains limited Settings tab (app language, theme, about). Still no push notifications."
+provider_hierarchy:
+  description: |
+    Provider nesting order in src/app/_layout.tsx determines dependency
+    availability. Inner providers can access outer providers' context.
+  order:
+    - ErrorBoundary
+    - GestureHandlerRootView
+    - QueryClientProvider (TanStack Query)
+    - I18nextProvider (i18n)
+    - ThemeProvider (theme context + AsyncStorage)
+    - AuthProvider (Supabase auth, role, wardId)
+    - SyncProvider (connection, realtime, offline queue, push, notifications)
+    - NavigationGuard (auth-based routing)
+    - Slot (Expo Router)
 
 # =============================================================================
-# SECURITY MODEL
+# ARCHITECTURE DECISION RECORDS (ADRs)
 # =============================================================================
 
-security:
- authentication:
- provider: "Supabase Auth (email/password)"
- session: "JWT with app_metadata (role, ward_id, full_name)"
- token_refresh: "Automatic via Supabase SDK (autoRefreshToken: true)"
- password_reset: "Edge Function send-reset-email. Supersedes Supabase built-in resetPasswordForEmail (ADR-070 supersedes ADR-064 and ADR-019). Multilingual email via Resend API. email href uses HTTPS redirect URL (reset-redirect EF) instead of custom scheme (ADR-077). deep link scheme changed to sacrmeetplan://. email language resolved by user_metadata.language -> ward.language -> pt-BR (ADR-086). reset-redirect removes <script> tag (security improvement for sandboxed iframes). reset-redirect rewritten to serve self-contained password reset web page with Supabase JS (verifyOtp + updateUser); no deep link redirect (ADR-089)."
+adrs:
 
- authorization:
- rls: "All ward-scoped tables filtered by ward_id from JWT app_metadata"
- permissions: "Central role-to-permission map in lib/permissions.ts"
- edge_functions: "Verify JWT via auth.getUser(token); validate role + ward_id"
+  - id: ADR-001
+    title: Supabase as backend platform
+    decision: Use Supabase for auth, database, realtime, and edge functions
+    rationale: |
+      Supabase provides a complete backend-as-a-service with PostgreSQL,
+      built-in auth, Realtime WebSocket channels, and Deno Edge Functions.
+      This eliminates the need for a custom backend server while providing
+      enterprise-grade PostgreSQL with RLS for multi-tenant data isolation.
 
- data_isolation:
- mechanism: "PostgreSQL Row-Level Security"
- policy: "Users can only access rows where ward_id matches their app_metadata.ward_id"
- global_tables: "hymns, general_collections, general_topics (SELECT only for authenticated)"
+  - id: ADR-002
+    title: Role stored in Supabase app_metadata
+    decision: Store user role in Supabase app_metadata instead of a separate profiles table
+    rationale: |
+      Avoids an extra table and join. Role is available immediately in the
+      JWT token, enabling RLS policies and client-side checks without
+      additional queries. Managed via Edge Functions (register, update-role).
 
- gateway:
- verify_jwt_legacy: "OFF (ADR-023, production bugfix)"
- notes: "EFs handle their own auth validation. Gateway check was redundant and harmful."
+  - id: ADR-003
+    title: Snapshot pattern for speech data
+    decision: Copy speaker name/phone/topic data as text fields on speech records
+    rationale: |
+      Preserves historical data even if members or topics are deleted.
+      Avoids stale foreign key references. speaker_name, speaker_informal_name,
+      speaker_phone, topic_title, topic_link, topic_collection are all
+      snapshotted alongside their FK references.
 
- client_guards:
- session_validation: "callEdgeFunction validates session before invoke (ADR-024)"
- query_guard: "useQuery enabled: !!session for authenticated queries (ADR-025)"
+  - id: ADR-004
+    title: Lazy creation for speeches and agendas
+    decision: Create speech and agenda records on-demand when a Sunday card is first expanded
+    rationale: |
+      Avoids upfront creation of records for hundreds of future dates.
+      Records are created only when users interact with a specific Sunday,
+      keeping the database lean.
 
-# =============================================================================
-# CROSS-CUTTING CONCERNS
-# =============================================================================
+  - id: ADR-005
+    title: TanStack Query for server state management
+    decision: Use TanStack React Query for all server state with Supabase Realtime for cache invalidation
+    rationale: |
+      Provides caching, background refetching, stale-while-revalidate,
+      and offline support (offlineFirst networkMode). Combined with
+      Supabase Realtime WebSocket events that invalidate query cache keys
+      for real-time multi-device sync.
 
-cross_cutting:
- multi_tenancy:
- mechanism: "PostgreSQL RLS on ward_id; ward_id in auth.users app_metadata"
- scope: "All ward-specific data isolated per ward"
+  - id: ADR-006
+    title: Polling fallback for sync
+    decision: Fall back to 2.5s polling when WebSocket is disconnected
+    rationale: |
+      Ensures data freshness even when Realtime WebSocket connection is
+      unavailable. Polling automatically stops when WebSocket reconnects.
+      Immediate full refetch on reconnect ensures no missed events.
 
- i18n:
- framework: "react-i18next"
- languages: ["pt-BR", "en", "es"]
- locale_files: "src/i18n/locales/{pt-BR,en,es}.json"
- initialization: "Device locale -> user_metadata.language on login. Fallback: device locale -> ward language. Ward language no longer overrides i18n on login."
+  - id: ADR-007
+    title: Separate app language vs ward language
+    decision: Per-user app language (UI) vs ward-level language (collections and templates)
+    rationale: |
+      Allows multi-language households where each user sees the app in
+      their preferred language while keeping ward data (topic collections,
+      WhatsApp templates) consistent for the entire ward.
 
- permissions:
- file: "src/lib/permissions.ts"
- pattern: "Central role-to-permission map; hasPermission(role, perm) checked in UI and hooks"
+  - id: ADR-008
+    title: Inline SVG icons without icon library
+    decision: Use react-native-svg directly for 14+ custom icon components
+    rationale: |
+      Avoids adding large icon library dependencies. All icons are defined
+      in a centralized module (src/components/icons/index.tsx) with
+      consistent color and size props.
 
- theme:
- context: "src/contexts/ThemeContext.tsx"
- modes: ["automatic", "light", "dark"]
- persistence: "AsyncStorage"
- pattern: "System detection + manual toggle"
+  - id: ADR-009
+    title: Self-contained web pages for invite and reset flows
+    decision: Edge Functions redirect to external HTML pages (GitHub Pages) for invitation acceptance and password reset
+    rationale: |
+      Deep links are unreliable across platforms and app states. Self-contained
+      HTML pages hosted externally handle Supabase auth operations (verifyOtp,
+      updateUser, signUp) in the browser, providing a reliable cross-platform
+      experience. EXTERNAL_PAGES_URL env var makes hosting configurable.
 
- error_handling:
- boundary: "src/components/ErrorBoundary.tsx (root level)"
- query_errors: "src/components/QueryErrorView.tsx"
- mutation_errors: "Global MutationCache.onError with Alert. silenced when offline (isOffline check)."
- edge_function_errors: "callEdgeFunction extracts server error message (ADR-022)"
+  - id: ADR-010
+    title: sacrmeetplan deep link scheme
+    decision: Use sacrmeetplan:// as the app's deep link scheme
+    rationale: |
+      Custom URL scheme registered in app.json enables internal navigation
+      via Expo Router. Used for cross-tab navigation and external links
+      that should open in the app.
 
- gestures:
- wrapper: "GestureHandlerRootView in root layout"
- swipe: "SwipeableCard component for edit/delete actions"
- animations: "react-native-reanimated for accordion, LED, presentation transitions"
+  - id: ADR-011
+    title: Per-position WhatsApp templates
+    decision: Separate WhatsApp template columns for each speech position (3) and prayer type (2)
+    rationale: |
+      Allows different invitation messages for each position (e.g., "first
+      speech" vs "last speech" vs "opening prayer"). Users can customize
+      each template independently via the 5-tab WhatsApp settings screen.
 
- deep_links:
- scheme: "sacrmeetplan://invite/{token}"
- reset_scheme: "sacrmeetplan://reset-password?token=...&type=recovery"
- handler: "expo-linking routes to (auth)/invite/[token].tsx"
- reset_handler: "expo-linking routes to (auth)/reset-password.tsx"
- redirect: "send-reset-email uses HTTPS redirect URL (reset-redirect EF) so email buttons are clickable"
- notes: "Changed from wardmanager:// to sacrmeetman://. ADR-009 updated."
+  - id: ADR-012
+    title: DebouncedTextInput with isFocusedRef
+    decision: Use a ref-based focus tracking to prevent query refetch from overwriting text during typing
+    rationale: |
+      Standard debounced inputs lose characters when a background query
+      refetch updates the component's value prop during active typing.
+      The isFocusedRef pattern prevents the external value from overwriting
+      the local state while the input is focused.
 
- activity_logging:
- utility: "src/lib/activityLog.ts"
- pattern: "createLogger(wardId, userId, userEmail, userName?) returns logger function"
- storage: "activity_log table with 2-year retention"
- display: "history.tsx shows user_name with email fallback"
+  - id: ADR-013
+    title: Notification trigger via SECURITY DEFINER
+    decision: Use SECURITY DEFINER on enqueue_speech_notification to bypass RLS
+    rationale: |
+      The notification_queue table has no RLS policies (service-only access).
+      The trigger function needs SECURITY DEFINER to insert into notification_queue
+      when speech status changes, since the triggering user has no direct
+      access to that table.
 
-# =============================================================================
-# FILE STRUCTURE
-# =============================================================================
-
-file_structure:
- "src/app/":
- "_layout.tsx": "Root layout com providers (ErrorBoundary, GestureHandlerRootView, QueryClient, I18n, Theme, Auth, Sync). QueryClient networkMode offlineFirst, offline-aware retry, silence MutationCache when offline."
- "(auth)/":
- "_layout.tsx": "Auth group layout"
- "login.tsx": "Tela de login"
- "register.tsx": "Auto-registro (cria ala + usuario)"
- "forgot-password.tsx": "Recuperacao de senha via email. adiciona redirectTo com Linking.createURL para deep link."
- "invite/[token].tsx": "Registro via convite (deep link)"
- "(tabs)/":
- "_layout.tsx": "Tab navigator (Home, Agenda, Speeches, Settings). Observer gains Settings tab with limited access (app language, theme, about)."
- "index.tsx": "Home tab (3 sundays, next assignments, invite mgmt). botao Presentation Mode sempre visivel. play icon on Iniciar button, date param to Presentation, non-expandable AgendaPreviewCard with status lines and pencil -> Agenda tab. dynamic speaker count X/2 or X/3 based on has_second_speech."
- "agenda.tsx": "Agenda tab (lista de domingos expandiveis) + auto-scroll on expand. remove getItemLayout e initialScrollIndex para scroll preciso. viewPosition:0.5 no scroll inicial + onScrollToIndexFailed com retry. accepts expandDate query param (ADR-083) to auto-expand and scroll to a specific Sunday card. play button (U+25B6) in expanded card header navigates to Presentation with date param. collapsed card dynamic speaker count X/2 or X/3 based on has_second_speech. play button circular border removed (circle-play icon has built-in circle), size 18->24."
- "speeches.tsx": "Speeches tab (scroll infinito) + auto-scroll on expand. remove getItemLayout para scroll preciso. reads expandDate query param via useLocalSearchParams to auto-expand a Sunday card navigated from AgendaForm pencil button. handleToggleSecondSpeech adds separate Supabase update for topic fields (ADR-085). null-to-string fix in speech update. prayer SpeechSlots (positions 0/4) when manage_prayers ON. useLazyCreateSpeeches receives sundayType. handleAssignSpeaker status override for prayers."
- "settings/":
- "_layout.tsx": "Settings stack navigator"
- "index.tsx": "Settings menu (links para sub-telas). Split language into 'Idioma do App' (per-user) and 'Idioma da Ala' (ward-wide). Observer sees limited settings (app language, theme, about only). wardLanguageChangeMutation.onSuccess now calls setWardLanguage to update AuthContext immediately. wardLanguage item replaced with inline Pressable + description text (t('settings.wardLanguageDescription'))."
- "members.tsx": "CRUD membros + CSV import/export + info section + explanatory texts + Save/Cancel + SearchInput + import countryCodes + import confirm + SearchInput fixo no topo + close button"
- "topics.tsx": "CRUD topicos da ala + colecoes gerais + Save/Cancel + SearchInput + description text + collection expand/collapse + SearchInput fixo no topo + close button"
- "users.tsx": "Gerenciamento de usuarios (convite, role, nome, delete)"
- "history.tsx": "Log de atividades com busca e paginacao + close button"
- "whatsapp.tsx": "Editor de template WhatsApp com preview. placeholder names translated per app language. UI labels via t calls. Ward language for defaults/sample data. 5-tab segmented control (3 speech + 2 prayer, or 3 speech when managePrayers=false). {posicao} placeholder removed. 3 separate speech template states/mutations."
- "theme.tsx": "Toggle de tema (automatic/light/dark)"
- "about.tsx": "Info do app, creditos, disclaimer"
- "timezone.tsx": "Seletor de timezone da ala + close button"
- "presentation.tsx": "Modo Apresentacao (modal, read-only). font size toggle button (useState normal/large). PresentationFieldRow supports multiline recognized names. accepts optional date query param (fallback getTodaySundayDate). pencil button (U+270F) in header navigates to Agenda tab with expandDate."
-
- "src/providers/":
- "SyncProvider.tsx": "Orquestrador de sync, offline e notificacoes"
-
- "src/contexts/":
- "AuthContext.tsx": "Sessao, role, wardId, userName, permissoes. Loads app language from user_metadata.language on login. Exposes wardLanguage and updateAppLanguage. Exposes setWardLanguage setter for immediate ward language state update."
- "ThemeContext.tsx": "Tema dark/light com system detection"
-
- "src/hooks/":
- "useMembers.ts": "CRUD membros via TanStack Query"
- "useTopics.ts": "CRUD topicos + toggle colecoes + useCollectionTopics. hardcoded 'Temas da Ala' replaced with t('topics.wardTopics'). useCollections uses wardLanguage."
- "useSpeeches.ts": "CRUD discursos + status lifecycle. useDeleteSpeechesByDate hook para limpar speeches ao mudar tipo de domingo. VALID_TRANSITIONS expandido para full mesh entre status atribuidos."
- "useAgenda.ts": "CRUD agenda + lazy creation"
- "useActors.ts": "CRUD atores (inline no AgendaForm). ActorRoleFilter 'can_music' replaced with 'can_pianist' | 'can_conductor'. getPrimaryRole and createActor updated."
- "useSundayTypes.ts": "Auto-assign + override tipos de domingo"
- "useHymns.ts": "Busca de hinos (read-only)"
- "useActivityLog.ts": "Log paginado com busca"
- "usePresentationMode.ts": "Dados do modo apresentacao. usa speaker_*_override quando existir. recognized_names join '\\n' + multiline. card titles use sectionXxx i18n keys. stake announcements field in Card 2 when has_stake_announcements is true. conditionally includes speech 2 in First Speeches based on has_second_speech. welcome_new_families PresentationField in Welcome card (after recognized_names, before announcements)."
- "useSundayList.ts": "Lista de domingos com scroll infinito"
- "useRealtimeSync.ts": "Subscricao Supabase Realtime"
- "useConnection.ts": "Monitor de conexao (NetInfo). integra onlineManager.setOnline do TanStack Query."
- "useNotifications.ts": "Registro de token + handler de tap. projectId from Constants.expoConfig instead of undefined; fallback guard for Expo Go."
- "useOfflineQueueProcessor.ts": "Processa fila offline ao reconectar"
-
- "src/components/":
- "AgendaForm.tsx": "Formulario completo da agenda (4 secoes normal, 3 especial). multi-select recognizing. SpeakerField read-only + override. label '(Designacao de ultima hora)' quando hasOverride. campo Reconhecendo com Pressable customizado mostrando nomes um por linha. styles.searchInput simplificado para {flex:1}. last speech label simplified to t('speeches.lastSpeech'). pianist roleFilter='can_pianist', conductor roleFilter='can_conductor'. disabled placeholder for speech 2 when has_second_speech=false. SelectorField enhanced with onClear prop for X clear buttons on all selector fields. SpeakerField removed; replaced with ReadOnlySpeakerRow (read-only display + pencil nav to Speeches tab via expandDate param). Member type import fix. disabled ReadOnlySpeakerRow always rendered (not conditionally hidden) when has_second_speech=false. welcome_new_families FieldRow + DebouncedTextInput between Recognizing and Announcements."
- "ActorSelector.tsx": "Bottom-sheet para selecao/CRUD de atores. multiSelect + selectedNames props. checkbox unicode (U+2611/U+2610) em multiSelect. actors.deleteConfirm i18n key. role mapping updated for can_pianist/can_conductor. Unicode checkbox replaced with SVG CheckSquareIcon/SquareIcon (colors.primary for selected, colors.textSecondary for unselected). KeyboardAvoidingView added inside sheet (behavior='padding' on iOS) for keyboard coverage during inline editing (ADR-118)."
- "MemberSelectorModal.tsx": "Modal de selecao de membro com busca + custom name"
- "TopicSelectorModal.tsx": "Modal de selecao de topico (ward + general)"
- "HymnSelector.tsx": "Seletor de hinos por numero/titulo"
- "PrayerSelector.tsx": "Seletor de membro para oracoes. modalOnly prop suprime botao inline. hint text discoverability + pre-populate no re-edit de nomes customizados."
- "SundayCard.tsx": "Card expandivel por domingo. SundayTypeDropdown recebe speeches[] para confirmacao antes de mudar tipo. onDeleteSpeeches prop para limpar speeches ao mudar tipo. pos 3 label '3o Discurso' instead of 'Ultimo Discurso'. collapsed LEDs inline before label, size 14->10, font 11->13, no speaker shows circle only. collapsed view removes ordinal labels, filters position 2 when has_second_speech=false, 2 LEDs when OFF. ChevronDownIcon SVG replaces Unicode."
- "SpeechSlot.tsx": "Slot de discurso (orador, topico, status). onClearTopic + botao X no tema. allowedStatuses para LED filtrado. layout [LED][Field][X]. LED click filtra todos exceto not_assigned; desabilitado para assigned_confirmed e gave_up. Topic X button extraido para fora do campo em topicRow container. LED clicavel para todos status exceto not_assigned (remove bloqueios confirmed/gave_up). getPositionLabel unified (no pos 3 special case). LED moved from speaker row to label row right-aligned with status text; topicRow marginLeft:28 removed. fixed-width right column (36px) for center-to-center alignment of StatusLED and X buttons (supersedes paddingRight:5). StatusLED moved from rightColumn back into labelRow (leftColumn). Right edge of LED aligns with right edge of speaker field. rightColumn retains X buttons only (supersedes ADR-076 LED placement, ADR-078). row-per-element layout restructure -- each field row contains its own X button for guaranteed vertical alignment (ADR-081, supersedes ADR-076/ADR-078 rightColumn). disabled state shows 2 visible disabled fields with placeholder instead of single warning. Unicode chevron and X replaced with ChevronDownIcon and XIcon SVG."
- "StatusLED.tsx": "LED flat circle animado de status de discurso. redesenhado de 3D para flat com novas cores (cinza, laranja, amarelo, verde, vinho)."
- "StatusChangeModal.tsx": "Modal de mudanca de status. prop allowedStatuses para filtrar opcoes. STATUS_INDICATOR_COLORS com cores flat atualizadas."
- "AccordionCard.tsx": "Card expandivel para apresentacao (1 aberto por vez). directional arrows (above=down, below=up, expanded=hidden). optional cardTitleFontSize prop. chevron Unicode replaced with ChevronDownIcon/ChevronUpIcon SVG."
- "SwipeableCard.tsx": "Card com swipe-to-reveal para edit/delete. Unicode/emoji icons replaced with SVG (PencilIcon, TrashIcon)."
- "DebouncedTextInput.tsx": "TextInput com auto-save debounced. isFocusedRef prevents sync useEffect from overwriting localValue during active typing (flicker fix)."
- "SearchInput.tsx": "TextInput de busca reutilizavel com botao X para limpar. flex:1 defensivo no container. XIcon SVG replaces Unicode."
- "OfflineBanner.tsx": "Banner vermelho de offline. useSafeAreaInsets para paddingTop, fontSize 14->15 / 12->13."
- "ErrorBoundary.tsx": "Error boundary do React"
- "QueryErrorView.tsx": "View de erro para queries"
- "ExitConfirmation.tsx": "Confirmacao ao sair do app"
- "NextSundaysSection.tsx": "Secao Home: proximos 3 domingos. wiring de onClearTopic. cards become non-expandable; all inline editing removed (SpeechSlot, modals, mutation hooks); pencil button (U+270F) navigates to Speeches tab with expandDate."
- "NextAssignmentsSection.tsx": "Secao Home: proximas designacoes (bishopric)"
- "InviteManagementSection.tsx": "Secao Home: gerenciamento de convites (secretary). WhatsAppIcon consolidated to icons module, MoreVerticalIcon SVG replaces Unicode. ward query selects 3 speech template columns, speech branch maps position to column name, position variable removed from WhatsAppVariables."
- "InviteActionDropdown.tsx": "Dropdown customizado para acoes de convite. titulo usa t('speeches.changeStatus'). opcoes de status dinamicas via ALL_ASSIGNED_STATUSES.filter. WhatsAppIcon imported from icons module (local definition removed)."
-
- "src/components/icons/":
- "index.ts": "Centralized SVG icon components. 16 exports: HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon, TrashIcon, PlayIcon, PencilIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, CheckIcon, SquareIcon, CheckSquareIcon, MoreVerticalIcon (Lucide stroke-based), WhatsAppIcon (brand fill-based). Shared IconProps { size?: number; color?: string }. Uses react-native-svg. No icon library (DD-25/ADR-096). PlayIcon changed from triangle to circle-play. SquareIcon and CheckSquareIcon added."
-
- "src/lib/":
- "supabase.ts": "Cliente Supabase (anon key, resilientStorage)"
- "permissions.ts": "Mapa central de permissoes por role"
- "csvUtils.ts": "Parse/generate CSV com error codes i18n (ADR-026). splitPhoneNumber re-exportado de countryCodes.ts"
- "activityLog.ts": "Utility para logging de acoes (com userName)"
- "whatsapp.ts": "Construcao de URL WhatsApp. re-exports templates i18n. re-exports updated (getDefaultSpeechTemplate replaces getDefaultTemplate)."
- "whatsappUtils.ts": "Template placeholders e resolucao. templates DEFAULT_TEMPLATE_{EN,ES}, getDefaultTemplate. buildWhatsAppConversationUrl(phone) para abrir conversa sem mensagem. 9 per-position default templates, getDefaultSpeechTemplate(language, position), {posicao} removed from WhatsAppVariables/resolveTemplate, buildWhatsAppUrl gains position param."
- "dateUtils.ts": "Formatacao de datas localizadas"
- "speechUtils.ts": "Utilitarios de discursos"
- "theme.ts": "Paleta de cores para dark/light. lightColors neutral tones shifted to Tailwind Slate blue-gray palette"
- "sync.ts": "Mapping table -> query keys para cache invalidation"
- "connectionUtils.ts": "Utilitarios de conexao"
- "offlineQueue.ts": "Fila de mutacoes offline (AsyncStorage)"
- "offlineGuard.ts": "Guard para operacoes online-only"
- "notificationUtils.ts": "Utilitarios de notificacoes. getPrayerLabel helper added. speaker_confirmed/speaker_withdrew produce prayer-specific text for positions 0 and 4."
- "countryCodes.ts": "Lista completa de codigos internacionais (~200 paises), getFlagForCode, getCountryByLabel, splitPhoneNumber"
-
- "src/types/":
- "database.ts": "Tipos TypeScript para todas as tabelas do banco"
-
- "src/i18n/":
- "index.ts": "Configuracao react-i18next"
- "locales/pt-BR.json": "Traducoes portugues (padrao)"
- "locales/en.json": "Traducoes ingles"
- "locales/es.json": "Traducoes espanhol"
-
- "supabase/":
- "config.toml": "Configuracao local do Supabase"
- "migrations/": "22 migrations SQL"
- "functions/":
- "register-first-user/": "Registro do primeiro usuario (cria ala)"
- "register-invited-user/": "Registro via convite"
- "create-invitation/": "Cria convite com token. deepLink changed from sacrmeetplan://invite/<token> to HTTPS URL (invite-redirect EF). structured error codes, diagnostic mode, console.error logging."
- "list-users/": "Lista usuarios da ala"
- "update-user-role/": "Altera role de usuario"
- "update-user-name/": "Auto-edicao de nome"
- "delete-user/": "Remove usuario"
- "process-notifications/": "Cron: processa fila de push"
- "send-reset-email/": "Envia email de reset de senha multilingual via Resend API. scheme sacrmeetplan://. deepLink agora e HTTPS redirect URL. language resolution uses user_metadata.language as first priority (ADR-086)."
- "reset-redirect/": "Converted to 302 redirect endpoint. Validates token+type, redirects to external GitHub Pages (EXTERNAL_PAGES_URL/reset-password.html). Previous: self-contained HTML page."
- "invite-redirect/": "Converted to 302 redirect endpoint. Validates token UUID, redirects to external GitHub Pages (EXTERNAL_PAGES_URL/accept-invite.html). Previous: self-contained HTML page."
-
- "scripts/":
- "import-hymns.ts": "CLI script para importar hinos de CSV"
-
- "docs/":
- "public/":
- "reset-password.html": "External password reset page hosted on GitHub Pages. Self-contained HTML + CSS + JS. Loads Supabase JS from CDN, calls verifyOtp + updateUser. Multilingual (pt-BR/en/es)."
- "accept-invite.html": "External invitation acceptance page hosted on GitHub Pages. Self-contained HTML + CSS + JS. Uses fetch to call register-invited-user. Multilingual (pt-BR/en/es)."
-
-# =============================================================================
-# KEY FLOWS
-# =============================================================================
-
-key_flows:
- self_registration:
- steps:
- - "User preenche: Nome, Email, Password, Stake, Ward, Role, Language, Timezone"
- - "Client chama register-first-user EF com { fullName, email, password, ... }"
- - "EF valida, cria ward, cria user com app_metadata (ward_id, role, full_name)"
- - "Se role=bishopric: auto-cria meeting_actor (can_preside=true, can_conduct=true)"
- - "EF retorna session; client armazena via setSession"
- - "AuthContext pega full_name de app_metadata"
- - "App language loaded from user_metadata.language. Fallback: device locale -> ward language."
- - "NavigationGuard redireciona para (tabs)"
-
- invite_registration:
- steps:
- - "create-invitation returns HTTPS URL (https://.../invite-redirect?token=<uuid>) instead of deep link"
- - "Inviter shares HTTPS URL with invited user (via WhatsApp, email, etc.)"
- - "Invited user opens URL in browser -> invite-redirect EF returns 302 redirect to external accept-invite.html page"
- - "External page JS calls register-invited-user with { token } (validate-only mode via fetch)"
- - "On validation success: read-only fields (stake, ward, role, email) + registration form shown"
- - "User fills in Nome Completo and Password"
- - "Page JS calls register-invited-user with { token, password, fullName } via fetch"
- - "On success (201): success message shown with instructions to open app"
- - "App screen invite/[token].tsx remains as unused fallback for deep links (no changes)"
-
- password_reset:
- steps:
- - "User toca 'Esqueci minha senha' na tela de login"
- - "forgot-password.tsx chama Edge Function send-reset-email com {email}"
- - "send-reset-email EF: lookup user, get email language (priority: user_metadata.language -> ward.language -> pt-BR, /ADR-086), generateLink(recovery)"
- - "send-reset-email EF: builds HTTPS redirect URL (https://...supabase.co/functions/v1/reset-redirect?token=TOKEN&type=recovery)"
- - "send-reset-email EF: sends email via Resend API with HTTPS URL in <a href>"
- - "User clica botao no email -> browser abre HTTPS redirect URL"
- - "reset-redirect EF returns 302 redirect to external reset-password.html page on GitHub Pages (replaces inline HTML)"
- - "External HTML page loads Supabase JS from CDN, calls verifyOtp({ token_hash, type: 'recovery' })"
- - "On verifyOtp success: form with password + confirm password fields is shown"
- - "User enters new password -> page calls updateUser({ password }) -> success message shown"
- - "App screen reset-password.tsx remains as unused fallback (no changes)"
- steps:
- - "Bishopric expande SundayCard -> lazy creation de 3 speech records"
- - "Seleciona Speaker via MemberSelectorModal -> mutation seta member_id, snapshot name/phone, status=assigned_not_invited"
- - "Seleciona Topic via TopicSelectorModal -> mutation seta snapshot topic_title/link/collection"
- - "DB trigger enfileira notification (designation, send_after=now+5min)"
- - "Realtime atualiza todos os clients"
-
- agenda_configuration:
- steps:
- - "User abre Agenda tab -> scroll infinito de domingos"
- - "Domingos Gen Conf/Stake Conf aparecem como cards nao-expandiveis"
- - "User clica domingo -> lazy creation de sunday_agendas record"
- - "Formulario renderiza baseado no tipo: 4 secoes (normal) ou 3 (especial)"
- - "Cada mudanca auto-salva via mutation (debounced para text inputs)"
-
- presentation_mode:
- steps:
- - "Home tab sempre mostra 'Iniciar Reuniao Sacramental' com play icon (U+25B6)"
- - "Seg-Sab: abre modo apresentacao do proximo domingo. Domingo: abre do dia atual."
- - "User toca -> PresentationMode abre (full-screen, read-only). Date param passed for consistency."
- - "Header mostra data formatada localizada + pencil button (U+270F, -> Agenda tab) + font size toggle (Aa/AA) + close button (X). pencil button adicionado."
- - "Font size toggle: normal (current+1) ou large (~1.5x). useState, nao persiste."
- - "Accordion cards: 1 expandido por vez, Welcome aberto por padrao"
- - "Card titles: sectionWelcome, sectionSacrament, sectionFirstSpeeches, sectionLastSpeech"
- - "Arrows: cards above expanded show down-arrow, below show up-arrow, expanded hides arrow"
- - "Recognized names: one per line"
- - "Welcome new families: shown when non-empty"
- - "Presentation accepts optional date param. Agenda tab play button (U+25B6) navigates with date."
-
- csv_import_export:
- steps_export:
- - "User toca Export CSV em Members"
- - "generateCsv(members) cria CSV com BOM + header (funciona mesmo com lista vazia)"
- - "expo-file-system escreve arquivo; expo-sharing apresenta share sheet"
- steps_import:
- - "User toca Import CSV"
- - "Alert.alert de confirmacao exibido: avisa que lista sera substituida, designacoes nao afetadas"
- - "Cancelar: fecha dialogo, nada acontece"
- - "Confirmar: abre file picker via expo-document-picker"
- - "parseCsv retorna error codes (nao strings English) para i18n"
- - "Se valido: import_members RPC faz DELETE all + INSERT new"
- - "Erros mostrados com line numbers traduzidos (max 5, com '...and N more')"
-
- sync_flow:
- steps:
- - "SyncProvider monta useConnection -> NetInfo monitoring"
- - "useRealtimeSync subscreve canal Supabase para 7 tabelas ward-scoped"
- - "On event: CacheInvalidator mapeia table -> TanStack Query keys -> invalidateQueries"
- - "On WebSocket disconnect: fallback polling (2.5s interval)"
- - "On reconnect: refetch all, disable polling, resume Realtime"
-
-# =============================================================================
-# OBSERVABILITY
-# =============================================================================
-
-observability:
- activity_log:
- table: "activity_log"
- scope: "Ward-scoped, 2-year retention"
- logged_actions: "Member CRUD, topic CRUD, actor CRUD, speech assign/status, agenda changes, sunday type changes"
- not_logged: "Auto-assignments, lazy creation, push processing, token registration"
- display: "history.tsx with search, pagination, user_name fallback to email"
-
- push_queue:
- table: "notification_queue"
- statuses: ["pending", "sent", "cancelled"]
-
- connection_monitoring:
- component: "useConnection hook"
- tracks: "NetInfo status, WebSocket connected state"
- display: "OfflineBanner (red bar above all content)"
-
- error_reporting:
- query_errors: "console.error via QueryCache.onError"
- mutation_errors: "Alert via MutationCache.onError (suppressible per mutation). silenced when offline."
- edge_function_errors: "Server error extraction via error.context.json (ADR-022)"
+  - id: ADR-014
+    title: Offline-first with deferred mutation queue
+    decision: Use TanStack Query offlineFirst mode; MutationQueue exists but integration is deferred
+    rationale: |
+      offlineFirst networkMode serves cached data immediately when offline.
+      A MutationQueue implementation exists in AsyncStorage (max 100, FIFO,
+      last-write-wins) but its integration with mutation hooks is deferred.
+      Current offline strategy relies on serving stale data and blocking
+      Edge Function operations when offline.

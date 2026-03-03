@@ -8,4 +8,208 @@ metadata:
   last_updated: "2026-03-03"
   version: 1
 
-reviews: []
+reviews:
+  - id: REV-001
+    scope: "CR-248 - Project Cleanup & Consolidation"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    commits:
+      - hash: e1a0bb8
+        message: "refactor(cleanup): consolidate project removing all CR/batch history (CR-248 phase 1)"
+      - hash: 12e0d92
+        message: "test(cleanup): remove CR/SPEC/ARCH references from tests and populate TEST_CONSOLIDATED (CR-248 phase 3)"
+    verdict: changes_required
+
+    summary: |
+      The cleanup was largely successful: 245k+ lines of historical docs removed,
+      batch/CR/phase tests deleted, SPEC_CONSOLIDATED rewritten from scratch with
+      38 features, TEST_CONSOLIDATED populated with 577 tests, process docs zeroed,
+      archive created. No functional code was lost. However, two categories of
+      residual references remain that must be addressed before this can be approved.
+
+    issues:
+      - id: P1-001
+        severity: P1
+        title: "13 CR-XXX references remain in source code comments"
+        description: |
+          The user explicitly requested "remover comentarios CR do codigo-fonte".
+          Phase 1 commit (e1a0bb8) removed some CR comments but missed 13 references
+          across 7 source files. These are all in code comments (not functional code).
+        files:
+          - path: src/components/DebouncedTextInput.tsx
+            line: 4
+            content: "Prevents excessive mutation calls during typing (CR-27)."
+          - path: src/hooks/useSundayTypes.ts
+            line: 25
+            content: "Per F007/CR-56: 'speeches' is stored in sunday_exceptions table"
+          - path: src/contexts/AuthContext.tsx
+            line: 104
+            content: "F116 (CR-178): App language from user_metadata"
+          - path: src/components/AgendaForm.tsx
+            line: 509
+            content: "Special meeting: dynamic section header based on type (CR-29)"
+          - path: src/components/SundayCard.tsx
+            lines: [47, 103, 461, 533, 590]
+            content: "Multiple CR-221 references in JSDoc and JSX comments"
+          - path: src/components/SpeechSlot.tsx
+            line: 55
+            content: "CR-221: Whether this slot is a prayer"
+          - path: src/app/(tabs)/speeches.tsx
+            lines: [436, 489]
+            content: "CR-221 references in JSX comments"
+          - path: src/app/(tabs)/settings/whatsapp.tsx
+            line: 415
+            content: "CR-231: Segmented control always shown"
+        fix: |
+          Remove the CR-XXX portion of each comment while preserving the useful
+          descriptive text. For example:
+          - "CR-221: Whether managed prayers is enabled" -> "Whether managed prayers is enabled"
+          - "Per F007/CR-56: speeches is stored..." -> "speeches is stored..."
+          - "Special meeting: dynamic section header based on type (CR-29)" -> "Special meeting: dynamic section header based on type"
+
+      - id: P1-002
+        severity: P1
+        title: "ARCH_CONSOLIDATED spec_features reference 98 old-style feature IDs not in new SPEC"
+        description: |
+          SPEC_CONSOLIDATED was rewritten from scratch with new sequential IDs F001-F038.
+          However, ARCH_CONSOLIDATED still references the old feature IDs (F044-F173)
+          in its spec_features arrays for each module. These 98 old IDs do not exist
+          in the new SPEC, making the cross-references broken and meaningless.
+        files:
+          - path: docs/arch/ARCH_CONSOLIDATED.yaml
+            lines: [124, 179, 239, 306, 380, 403, 426, 449]
+            content: "spec_features arrays contain old IDs like F050, F093-F173"
+        fix: |
+          Re-map each module's spec_features to reference only the new F001-F038 IDs
+          from SPEC_CONSOLIDATED.yaml. Each module should list which of the 38 new
+          features it implements.
+
+      - id: P2-001
+        severity: P2
+        title: "TEST_CONSOLIDATED header references CR-248"
+        description: |
+          Line 3 of TEST_CONSOLIDATED.yaml contains:
+          "Consolidated test inventory - all surviving tests after CR-248 cleanup"
+          This is a minor cosmetic issue in a comment header.
+        files:
+          - path: docs/tests/TEST_CONSOLIDATED.yaml
+            line: 3
+            content: "# Consolidated test inventory - all surviving tests after CR-248 cleanup"
+        fix: |
+          Change to: "# Consolidated test inventory for all project tests"
+
+    verified_items:
+      - item: "Individual doc files deleted (SPEC_F*, ARCH_M*, PLAN_P*, QA_PLAN*)"
+        status: pass
+      - item: "history/ directories deleted"
+        status: pass
+      - item: ".devteam/phases/ deleted"
+        status: pass
+      - item: "Batch/CR/phase/bug/qa test files deleted"
+        status: pass
+      - item: "SPEC_CONSOLIDATED.yaml rewritten from scratch (38 features, no CR refs)"
+        status: pass
+      - item: "ARCH_CONSOLIDATED.yaml free of CR-XXX text references"
+        status: pass
+      - item: "CODE_LEDGER.yaml zeroed with structure"
+        status: pass
+      - item: "REVIEW_CONSOLIDATED.yaml zeroed with structure"
+        status: pass
+      - item: "QA_CONSOLIDATED.yaml zeroed with structure"
+        status: pass
+      - item: "PLAN_CONSOLIDATED.yaml zeroed with structure"
+        status: pass
+      - item: "TEST_CONSOLIDATED.yaml populated (30 files, 577 tests)"
+        status: pass
+      - item: "CHANGE_REQUESTS_ARCHIVE.yaml exists with warning header"
+        status: pass
+      - item: "No source code files deleted (only docs and tests)"
+        status: pass
+      - item: "No batch/BATCH/phase-/PHASE_ references in docs or src"
+        status: pass
+      - item: "Tests passing (577 confirmed by tester)"
+        status: pass
+      - item: "Test files clean of CR references"
+        status: pass
+
+    pending_deploys: []
+
+  - id: REV-002
+    scope: "CR-248 - Re-review after P1/P2 fixes"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    commits_reviewed:
+      - hash: 93b0c76
+        description: "Remove 13 CR-XXX references from source code + fix TEST_CONSOLIDATED header"
+      - description: "ARCH_CONSOLIDATED.yaml rewritten from scratch by architect (aligned with new SPEC F001-F038)"
+    verdict: approved
+
+    summary: |
+      All three issues from REV-001 have been resolved. The project cleanup
+      is now complete.
+
+    fixes_verified:
+      - issue: P1-001
+        title: "CR-XXX references in source code"
+        status: fixed
+        verification: |
+          grep for CR-\d+ in src/ returns zero matches. All 13 references
+          across 7 files have been removed.
+
+      - issue: P1-002
+        title: "ARCH spec_features referencing old feature IDs"
+        status: fixed
+        verification: |
+          ARCH_CONSOLIDATED.yaml was rewritten from scratch. Now contains
+          13 modules with features arrays referencing only F001-F038.
+          Feature ID sets match exactly between SPEC and ARCH (perfect 1:1
+          mapping of all 38 features). No old-style IDs (F039+) remain.
+
+      - issue: P2-001
+        title: "TEST_CONSOLIDATED header referencing CR-248"
+        status: fixed
+        verification: |
+          Header now reads "# Consolidated test inventory" with no CR reference.
+
+    additional_checks:
+      - check: "SPEC x ARCH feature consistency"
+        status: pass
+        details: |
+          ARCH features union = {F001..F038}, SPEC features = {F001..F038}.
+          All 38 features are accounted for in module assignments. No orphaned
+          features in either direction.
+
+      - check: "ARCH quality"
+        status: pass
+        details: |
+          New ARCH has 13 well-defined modules (vs 8 before), 14 ADRs,
+          complete database schema, edge functions, provider hierarchy,
+          and shared libraries sections. Clean, well-structured, no
+          historical references.
+
+      - check: "No CR/batch/phase references in docs or source"
+        status: pass
+        details: |
+          Full grep across src/ and docs consolidated files returns zero
+          matches for CR-\d+, batch, BATCH, phase-, PHASE_. Only expected
+          references remain in CHANGE_REQUESTS_ARCHIVE.yaml (historical
+          archive with warning header) and REVIEW_CONSOLIDATED.yaml
+          (review records documenting the cleanup).
+
+      - check: "No functional code lost"
+        status: pass
+        details: "All source files intact. Only docs and test files were deleted."
+
+    advisory_notes:
+      - note: |
+          docs/PRODUCT_SPECIFICATION.md (180KB) and docs/SPEC.final.md (99KB)
+          are the user's original specification documents that predate the CR
+          system. They are superseded by SPEC_CONSOLIDATED.yaml but may have
+          sentimental or reference value. The user may want to archive or
+          delete them in a future cleanup pass.
+      - note: |
+          docs/SUPABASE_QUERY_PERF.md and docs/SUPABASE_SECURITY.md are raw
+          data dumps from Supabase tooling, not CR-related documentation.
+          They can remain as-is or be cleaned up at the user's discretion.
+
+    pending_deploys: []

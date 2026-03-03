@@ -23,7 +23,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { SearchInput } from './SearchInput';
 import { CheckSquareIcon, SquareIcon } from './icons';
 import { useActors, useCreateActor, useUpdateActor, useDeleteActor, type ActorRoleFilter } from '../hooks/useActors';
-import type { MeetingActor, CreateActorInput } from '../types/database';
+import type { MeetingActor, CreateActorInput, ActorRole } from '../types/database';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.67);
@@ -116,11 +116,7 @@ export function ActorSelector({
 
     const input: CreateActorInput = {
       name: trimmed,
-      can_preside: roleFilter === 'can_preside',
-      can_conduct: roleFilter === 'can_conduct',
-      can_recognize: roleFilter === 'can_recognize',
-      can_pianist: roleFilter === 'can_pianist',
-      can_conductor: roleFilter === 'can_conductor',
+      role: roleFilter as ActorRole,
     };
 
     createActor.mutate(input, {

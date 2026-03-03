@@ -6,6 +6,225 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 1
+  version: 2
 
-validations: []
+validations:
+
+  # ===========================================================================
+  # Phase 1: Quick Fixes (QA_PLAN_001)
+  # ===========================================================================
+
+  - id: QA_001
+    plan: QA_PLAN_001
+    date: "2026-03-03"
+    scope: "Phase 1 - 6 quick fixes (CR-250, CR-251, CR-252, CR-254, CR-256, CR-257)"
+    verdict: passed
+    must_pass: 17/17
+    should_pass: 8/8
+    total_checks: 25/25
+    reviewer_verdict: "APPROVED (REV-003, 0 issues)"
+    tester_verdict: "PASSED (589 tests, 10 new)"
+
+    checks:
+
+      # --- CR-250: F001 SPEC fix ---
+      - id: CR250_MP1
+        cr: CR-250
+        type: must_pass
+        description: "SPEC F001 mentions both bishopric and secretary for first-user registration"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml line 77: 'user gets the selected role (bishopric or secretary) via register-first-user Edge Function'"
+
+      - id: CR250_MP2
+        cr: CR-250
+        type: must_pass
+        description: "No code changes were made (spec-only fix)"
+        result: PASS
+        evidence: "git log shows no commits modifying register-first-user/index.ts or register.tsx in Phase 1"
+
+      - id: CR250_SP1
+        cr: CR-250
+        type: should_pass
+        description: "SPEC F001 acceptance_criteria updated to reflect both roles"
+        result: PASS
+        evidence: "AC text: 'bishopric or secretary' at line 77"
+
+      # --- CR-251: F002 email fallback ---
+      - id: CR251_MP1
+        cr: CR-251
+        type: must_pass
+        description: "getEmailTemplate fallback changed from pt-BR to en"
+        result: PASS
+        evidence: "send-reset-email/index.ts line 82: templates[language] ?? templates['en']"
+
+      - id: CR251_MP2
+        cr: CR-251
+        type: must_pass
+        description: "Default language variable changed from pt-BR to en"
+        result: PASS
+        evidence: "send-reset-email/index.ts line 153: let language = 'en'"
+
+      - id: CR251_MP3
+        cr: CR-251
+        type: must_pass
+        description: "Ward language fallback changed from pt-BR to en"
+        result: PASS
+        evidence: "send-reset-email/index.ts line 165: language = ward?.language ?? 'en'"
+
+      - id: CR251_MP4
+        cr: CR-251
+        type: must_pass
+        description: "SPEC F002 description fallback updated from pt-BR to en"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml line 91: 'fallback to ward.language then en (en-US)'"
+
+      - id: CR251_SP1
+        cr: CR-251
+        type: should_pass
+        description: "No other fallbacks in the file remain as pt-BR"
+        result: PASS
+        evidence: "grep 'pt-BR' in send-reset-email/index.ts returns only 1 match: template key definition (line 19). No fallback references remain."
+
+      # --- CR-252: F003 diagnostic mode removal ---
+      - id: CR252_MP1
+        cr: CR-252
+        type: must_pass
+        description: "diagnose field removed from CreateInvitationInput interface"
+        result: PASS
+        evidence: "grep 'diagnos' in create-invitation/index.ts returns 0 matches"
+
+      - id: CR252_MP2
+        cr: CR-252
+        type: must_pass
+        description: "Diagnostic block (if input.diagnose === true) removed"
+        result: PASS
+        evidence: "create-invitation/index.ts now 212 lines (was 233). No diagnostic block exists. Line 116 goes directly to token generation."
+
+      - id: CR252_MP3
+        cr: CR-252
+        type: must_pass
+        description: "SPEC F003 description no longer mentions diagnostic mode"
+        result: PASS
+        evidence: "grep 'diagnos' in SPEC_CONSOLIDATED.yaml returns 0 matches"
+
+      - id: CR252_SP1
+        cr: CR-252
+        type: should_pass
+        description: "Header comments updated (remove diagnostic mode references)"
+        result: PASS
+        evidence: "Line 5: 'F143 (CR-208): Structured error logging and error codes.' -- no diagnostic mode or ADR-094 mention"
+
+      - id: CR252_SP2
+        cr: CR-252
+        type: should_pass
+        description: "Function still works correctly for normal invitation flow"
+        result: PASS
+        evidence: "Token generation (line 117), DB insert (lines 124-135), and response (lines 191-203) remain intact"
+
+      # --- CR-254: F007 CSV 3-column only ---
+      - id: CR254_MP1
+        cr: CR-254
+        type: must_pass
+        description: "Header validation requires 3+ columns (not 2+)"
+        result: PASS
+        evidence: "csvUtils.ts line 70: headerParts.length < 3"
+
+      - id: CR254_MP2
+        cr: CR-254
+        type: must_pass
+        description: "2-column fallback branch removed"
+        result: PASS
+        evidence: "grep 'hasThreeColumns' in csvUtils.ts returns 0 matches. No 2-column branching exists."
+
+      - id: CR254_MP3
+        cr: CR-254
+        type: must_pass
+        description: "Row validation requires 3+ columns"
+        result: PASS
+        evidence: "csvUtils.ts line 82: parts.length < 3"
+
+      - id: CR254_MP4
+        cr: CR-254
+        type: must_pass
+        description: "SPEC F007 description updated to 3-column only"
+        result: PASS
+        evidence: "F007 description line 200: 'Import supports 3-column (Name, Informal Name, Phone) format.' -- no 2-column mention"
+
+      - id: CR254_MP5
+        cr: CR-254
+        type: must_pass
+        description: "SPEC BR021 updated to 3-column only"
+        result: PASS
+        evidence: "BR021 line 1024: 'CSV import supports 3-column (Name, Informal Name, Phone) format only.'"
+
+      - id: CR254_SP1
+        cr: CR-254
+        type: should_pass
+        description: "JSDoc comment updated to 3-column only"
+        result: PASS
+        evidence: "csvUtils.ts line 49: 'Requires 3-column format: Name, Informal Name, Phone.' -- no 2-column mention"
+
+      - id: CR254_SP2
+        cr: CR-254
+        type: should_pass
+        description: "Error messages updated to reference 3 columns"
+        result: PASS
+        evidence: "Line 71: 'at least 3 columns: Nome, Nome Informal, Telefone Completo'; Line 83: 'at least 3 columns'"
+
+      # --- CR-256: F018 manage_prayers toggle ---
+      - id: CR256_MP1
+        cr: CR-256
+        type: must_pass
+        description: "manage_prayers toggle visible for both bishopric AND secretary"
+        result: PASS
+        evidence: "settings/index.tsx line 222: {!isObserver && (  -- allows both bishopric and secretary"
+
+      - id: CR256_MP2
+        cr: CR-256
+        type: must_pass
+        description: "SPEC F018 description mentions secretary"
+        result: PASS
+        evidence: "SPEC line 451: 'controlled by bishopric or secretary in Settings'"
+
+      - id: CR256_MP3
+        cr: CR-256
+        type: must_pass
+        description: "SPEC F018 AC updated"
+        result: PASS
+        evidence: "SPEC line 458: 'Bishopric or secretary enables manage_prayers in Settings'"
+
+      - id: CR256_MP4
+        cr: CR-256
+        type: must_pass
+        description: "SPEC F027 description updated"
+        result: PASS
+        evidence: "SPEC line 696: 'Manage prayers toggle with description (bishopric or secretary, 2nd item in Ward Settings)'"
+
+      - id: CR256_SP1
+        cr: CR-256
+        type: should_pass
+        description: "Guard uses existing isObserver variable (no new variable needed)"
+        result: PASS
+        evidence: "Uses existing isObserver (line 56) with negation: !isObserver. Clean, minimal change."
+
+      # --- CR-257: F034 cron interval ---
+      - id: CR257_MP1
+        cr: CR-257
+        type: must_pass
+        description: "Code comment updated to 5 minutes"
+        result: PASS
+        evidence: "process-notifications/index.ts line 2: 'cron every 5 minutes'"
+
+      - id: CR257_MP2
+        cr: CR-257
+        type: must_pass
+        description: "SPEC F034 description updated to 5 minutes"
+        result: PASS
+        evidence: "SPEC line 838: 'cron every 5 minutes'"
+
+      - id: CR257_SP1
+        cr: CR-257
+        type: should_pass
+        description: "No other references to '1 minute' cron for notifications remain"
+        result: PASS
+        evidence: "grep 'cron every 1 minute' in source code returns 0 matches. Only found in documentation/plan files (QA_PLAN, SPEC_F039, project-status) which correctly reference the old value for change tracking."

@@ -1,0 +1,368 @@
+# =============================================================================
+# QA_PLAN_001.yaml
+# PRE-validation plan for Phase 1 Quick Fixes (CR-250..257)
+# Generated: 2026-03-03
+# =============================================================================
+
+metadata:
+  plan_id: QA_PLAN_001
+  mode: PRE
+  type: bugfix
+  created: "2026-03-03"
+  scope: "Phase 1 - 6 quick fixes (CR-250, CR-251, CR-252, CR-254, CR-256, CR-257)"
+  validated: true
+
+# =============================================================================
+# CR-250: F001 - SPEC says only bishopric can register. Code already supports
+#         secretary too. Fix SPEC only.
+# =============================================================================
+
+cr_250:
+  id: CR-250
+  feature: F001
+  type: spec_fix
+  summary: "SPEC says only bishopric can register first user. Code already supports secretary too."
+  validated: true
+
+  evidence:
+    spec_current:
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      location: "F001 acceptance_criteria, line ~77"
+      text: "New ward is created, user gets bishopric role via register-first-user Edge Function"
+      issue: "SPEC only mentions bishopric role for first user registration"
+
+    code_actual:
+      - file: supabase/functions/register-first-user/index.ts
+        location: "line 18"
+        text: "role: 'bishopric' | 'secretary'"
+        finding: "RegisterInput interface already accepts both roles"
+      - file: supabase/functions/register-first-user/index.ts
+        location: "lines 49-55"
+        text: "if (input.role !== 'bishopric' && input.role !== 'secretary')"
+        finding: "Validation explicitly allows both bishopric and secretary"
+      - file: src/app/(auth)/register.tsx
+        location: "line 31, line 297"
+        text: "useState<'bishopric' | 'secretary'>('bishopric'); (['bishopric', 'secretary'] as const).map"
+        finding: "UI has radio buttons for both roles"
+
+    conclusion: "Code is correct; SPEC needs to mention secretary as valid first-user role"
+
+  validation_checks:
+    must_pass:
+      - id: CR250_MP1
+        description: "SPEC F001 description or acceptance_criteria mentions both bishopric and secretary for first-user registration"
+        check: "grep SPEC_CONSOLIDATED.yaml for F001 area mentioning 'secretary' in registration context"
+      - id: CR250_MP2
+        description: "No code changes were made (spec-only fix)"
+        check: "git diff should show no changes to register-first-user/index.ts or register.tsx"
+    should_pass:
+      - id: CR250_SP1
+        description: "SPEC F001 acceptance_criteria updated to reflect both roles"
+        check: "AC text mentions 'bishopric or secretary role'"
+
+# =============================================================================
+# CR-251: F002 - Reset email language fallback should be en-US not pt-BR.
+#         Fix code + SPEC.
+# =============================================================================
+
+cr_251:
+  id: CR-251
+  feature: F002
+  type: code_and_spec_fix
+  summary: "Reset email language fallback should be en-US not pt-BR."
+  validated: true
+
+  evidence:
+    spec_current:
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      location: "F002 description, line ~91"
+      text: "fallback to ward.language then pt-BR"
+      issue: "SPEC says fallback is pt-BR"
+
+    code_current:
+      - file: supabase/functions/send-reset-email/index.ts
+        location: "line 82"
+        text: "return templates[language] ?? templates['pt-BR']"
+        finding: "Template fallback is pt-BR"
+      - file: supabase/functions/send-reset-email/index.ts
+        location: "line 153"
+        text: "let language = 'pt-BR'"
+        finding: "Default language variable is pt-BR"
+      - file: supabase/functions/send-reset-email/index.ts
+        location: "line 165"
+        text: "language = ward?.language ?? 'pt-BR'"
+        finding: "Ward language fallback is pt-BR"
+
+    templates_available:
+      - "'pt-BR' (line 19)"
+      - "'en' (line 39)"
+      - "'es' (line 59)"
+      note: "Template key is 'en' not 'en-US'. CR says fallback should be en-US but template key is 'en'. Dev must use 'en' as fallback key to match existing templates."
+
+    conclusion: "Three places in code need pt-BR -> en change. SPEC fallback text also needs update. Note: template key is 'en' not 'en-US'."
+
+  validation_checks:
+    must_pass:
+      - id: CR251_MP1
+        description: "getEmailTemplate fallback changed from pt-BR to en"
+        check: "Line 82: templates[language] ?? templates['en']"
+      - id: CR251_MP2
+        description: "Default language variable changed from pt-BR to en"
+        check: "Line 153: let language = 'en'"
+      - id: CR251_MP3
+        description: "Ward language fallback changed from pt-BR to en"
+        check: "Line 165: ward?.language ?? 'en'"
+      - id: CR251_MP4
+        description: "SPEC F002 description fallback updated from pt-BR to en"
+        check: "grep SPEC for F002 description mentioning 'en' or 'en-US' as fallback"
+    should_pass:
+      - id: CR251_SP1
+        description: "No other fallbacks in the file remain as pt-BR"
+        check: "grep send-reset-email/index.ts for 'pt-BR' should return 0 matches (except template key)"
+
+# =============================================================================
+# CR-252: F003 - Remove diagnostic mode (diagnose flag) from
+#         create-invitation Edge Function. Dead code never called.
+# =============================================================================
+
+cr_252:
+  id: CR-252
+  feature: F003
+  type: dead_code_removal
+  summary: "Remove diagnostic mode (diagnose flag) from create-invitation. Dead code never called."
+  validated: true
+
+  evidence:
+    code_current:
+      - file: supabase/functions/create-invitation/index.ts
+        location: "line 19"
+        text: "diagnose?: boolean"
+        finding: "diagnose field in CreateInvitationInput interface"
+      - file: supabase/functions/create-invitation/index.ts
+        location: "lines 119-135"
+        text: "if (input.diagnose === true) { return Response... diagnostic: true, checks: {...} }"
+        finding: "17-line diagnostic block that short-circuits before DB insert"
+      - file: supabase/functions/create-invitation/index.ts
+        location: "lines 5-6"
+        text: "F143 (CR-208): Structured error logging, error codes, and diagnostic mode. ADR-094: Structured error codes + diagnostic mode for production debugging."
+        finding: "Header comments reference diagnostic mode"
+
+    spec_current:
+      file: docs/specs/SPEC_CONSOLIDATED.yaml
+      location: "F003 description, line ~111"
+      text: "Diagnostic mode available ({ diagnose: true }). Structured error codes in responses."
+      issue: "SPEC documents diagnostic mode"
+
+    caller_search:
+      note: "CR states dead code never called. Diagnose flag is optional and only used for debugging."
+
+    conclusion: "Remove diagnose from interface, diagnostic block, and header comments. Update SPEC F003."
+
+  validation_checks:
+    must_pass:
+      - id: CR252_MP1
+        description: "diagnose field removed from CreateInvitationInput interface"
+        check: "grep create-invitation/index.ts for 'diagnose' should return 0 matches"
+      - id: CR252_MP2
+        description: "Diagnostic block (if input.diagnose === true) removed"
+        check: "Lines 119-135 diagnostic response block no longer exists"
+      - id: CR252_MP3
+        description: "SPEC F003 description no longer mentions diagnostic mode"
+        check: "grep SPEC F003 for 'diagnos' should return 0 matches"
+    should_pass:
+      - id: CR252_SP1
+        description: "Header comments updated (remove diagnostic mode references)"
+        check: "Lines 5-6 no longer mention 'diagnostic mode' or 'ADR-094'"
+      - id: CR252_SP2
+        description: "Function still works correctly for normal invitation flow"
+        check: "Token generation, DB insert, and response remain intact (lines 137+)"
+
+# =============================================================================
+# CR-254: F007 - CSV import must support 3-column only (Name, Informal Name,
+#         Phone). Remove 2-column support.
+# =============================================================================
+
+cr_254:
+  id: CR-254
+  feature: F007
+  type: code_and_spec_fix
+  summary: "CSV import must support 3-column only. Remove 2-column support."
+  validated: true
+
+  evidence:
+    code_current:
+      - file: src/lib/csvUtils.ts
+        location: "line 49"
+        text: "Supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats."
+        finding: "JSDoc documents 2-column support"
+      - file: src/lib/csvUtils.ts
+        location: "lines 70-71"
+        text: "if (headerParts.length < 2) { ... 'CSV must have at least 2 columns' }"
+        finding: "Header validation allows 2+ columns"
+      - file: src/lib/csvUtils.ts
+        location: "line 75"
+        text: "const hasThreeColumns = headerParts.length >= 3"
+        finding: "Branch logic for 2 vs 3 columns"
+      - file: src/lib/csvUtils.ts
+        location: "lines 84-85"
+        text: "if (parts.length < 2) { ... 'Row must have at least 2 columns' }"
+        finding: "Row validation allows 2+ columns"
+      - file: src/lib/csvUtils.ts
+        location: "lines 93-99"
+        text: "if (hasThreeColumns) { ... } else { informalName = ''; fullPhone = parts[1].trim(); }"
+        finding: "2-column fallback: informalName empty, phone from column 2"
+
+    spec_current:
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "F007 description, line ~201"
+        text: "Import supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats."
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "BR021, line ~1025"
+        text: "CSV import supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats."
+
+    conclusion: "Remove 2-column branch. Require exactly 3 columns. Update header validation, row validation, JSDoc, SPEC F007, and BR021."
+
+  validation_checks:
+    must_pass:
+      - id: CR254_MP1
+        description: "Header validation requires 3+ columns (not 2+)"
+        check: "headerParts.length < 3 instead of < 2"
+      - id: CR254_MP2
+        description: "2-column fallback branch removed"
+        check: "No more 'hasThreeColumns' branching or 2-column else block"
+      - id: CR254_MP3
+        description: "Row validation requires 3+ columns"
+        check: "parts.length < 3 instead of < 2"
+      - id: CR254_MP4
+        description: "SPEC F007 description updated to 3-column only"
+        check: "No '2-column' mention in F007"
+      - id: CR254_MP5
+        description: "SPEC BR021 updated to 3-column only"
+        check: "BR021 description mentions only 3-column format"
+    should_pass:
+      - id: CR254_SP1
+        description: "JSDoc comment updated to 3-column only"
+        check: "parseCsv JSDoc no longer mentions '2-column'"
+      - id: CR254_SP2
+        description: "Error messages updated to reference 3 columns"
+        check: "Error messages say '3 columns' not '2 columns'"
+
+# =============================================================================
+# CR-256: F018 - Secretary should also be able to toggle manage_prayers,
+#         not just bishopric.
+# =============================================================================
+
+cr_256:
+  id: CR-256
+  feature: F018
+  type: code_and_spec_fix
+  summary: "Secretary should also be able to toggle manage_prayers, not just bishopric."
+  validated: true
+
+  evidence:
+    code_current:
+      - file: src/app/(tabs)/settings/index.tsx
+        location: "line 57"
+        text: "const isBishopric = role === 'bishopric'"
+        finding: "isBishopric flag used for manage_prayers visibility"
+      - file: src/app/(tabs)/settings/index.tsx
+        location: "line 223"
+        text: "{isBishopric && ("
+        finding: "manage_prayers toggle only renders for bishopric"
+
+    spec_current:
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "F018 description, line ~451-452"
+        text: "controlled by bishopric in Settings"
+        issue: "Says bishopric only"
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "F018 AC, line ~459"
+        text: "Bishopric enables manage_prayers in Settings"
+        issue: "AC mentions bishopric only"
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "F027 description, line ~697"
+        text: "Manage prayers toggle with description (bishopric only, 2nd item in Ward Settings)"
+        issue: "F027 says bishopric only"
+
+    conclusion: "Change isBishopric guard to include secretary. Update SPEC F018 description, F018 AC, and F027 description."
+
+  validation_checks:
+    must_pass:
+      - id: CR256_MP1
+        description: "manage_prayers toggle visible for both bishopric AND secretary"
+        check: "Guard changed from {isBishopric && ...} to {(isBishopric || isSecretary) && ...} or equivalent"
+      - id: CR256_MP2
+        description: "SPEC F018 description mentions secretary"
+        check: "F018 description says 'bishopric or secretary' or 'bishopric and secretary'"
+      - id: CR256_MP3
+        description: "SPEC F018 AC updated"
+        check: "AC says 'Bishopric or secretary enables manage_prayers'"
+      - id: CR256_MP4
+        description: "SPEC F027 description updated"
+        check: "F027 says 'bishopric and secretary' not 'bishopric only'"
+    should_pass:
+      - id: CR256_SP1
+        description: "Secretary variable defined (isSecretary or similar)"
+        check: "Variable like isSecretary = role === 'secretary' exists or inline check used"
+
+# =============================================================================
+# CR-257: F034 - Notification cron is every 5 minutes, not 1 minute.
+#         Fix code comment + SPEC.
+# =============================================================================
+
+cr_257:
+  id: CR-257
+  feature: F034
+  type: spec_and_comment_fix
+  summary: "Notification cron is every 5 minutes, not 1 minute. Fix code comment + SPEC."
+  validated: true
+
+  evidence:
+    code_current:
+      - file: supabase/functions/process-notifications/index.ts
+        location: "line 2"
+        text: "process-notifications: Supabase Edge Function (cron every 1 minute)."
+        finding: "Code comment says 1 minute"
+
+    spec_current:
+      - file: docs/specs/SPEC_CONSOLIDATED.yaml
+        location: "F034 description, line ~839"
+        text: "process-notifications Edge Function (cron every 1 minute)"
+        finding: "SPEC says 1 minute"
+
+    actual_schedule:
+      note: "CR-257 and project-status.yaml confirm the real schedule is every 5 minutes. The Supabase Dashboard cron is configured for 5-minute intervals."
+
+    conclusion: "Change '1 minute' to '5 minutes' in code comment and SPEC F034 description."
+
+  validation_checks:
+    must_pass:
+      - id: CR257_MP1
+        description: "Code comment updated to 5 minutes"
+        check: "Line 2 of process-notifications/index.ts says 'cron every 5 minutes'"
+      - id: CR257_MP2
+        description: "SPEC F034 description updated to 5 minutes"
+        check: "F034 description says 'cron every 5 minutes'"
+    should_pass:
+      - id: CR257_SP1
+        description: "No other references to '1 minute' cron for notifications remain"
+        check: "grep across codebase for 'cron every 1 minute' returns 0 matches"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_crs: 6
+  all_validated: true
+  total_must_pass: 17
+  total_should_pass: 8
+  total_checks: 25
+
+  risk_notes:
+    - cr: CR-251
+      note: "Template key is 'en' not 'en-US'. Dev must use 'en' as the fallback key to match existing template map."
+    - cr: CR-254
+      note: "Removing 2-column support is a breaking change for any existing users who import 2-column CSVs. Ensure export always generates 3 columns (already does)."
+    - cr: CR-256
+      note: "RLS/DB-level permissions for wards.manage_prayers may also need verification if there are row-level policies restricting updates."

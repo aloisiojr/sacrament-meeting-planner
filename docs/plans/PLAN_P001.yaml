@@ -1,0 +1,392 @@
+# =============================================================================
+# PLAN_P001.yaml - Implementation Plan for SPEC_F039 (Correction Package)
+# Phase 1 - Quick fixes: CR-250, CR-251, CR-252, CR-254, CR-256, CR-257
+# Generated: 2026-03-03
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement 6 corrections from the SPEC Correction Package (F039).
+  4 require code+doc changes (CR-251, CR-252, CR-254, CR-256) and
+  2 require doc/comment-only changes (CR-250, CR-257).
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # HAPPY PATH - Core corrections
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-251: Change email language fallback from 'pt-BR' to 'en' in
+      send-reset-email Edge Function. Update 4 occurrences: the default
+      language variable (line 153), the comment (line 152), the ward
+      fallback (line 165), and the template fallback in getEmailTemplate
+      (line 82).
+    files:
+      - supabase/functions/send-reset-email/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "Line 82: templates['en'] instead of templates['pt-BR']"
+      - "Line 152 comment: mentions 'en' instead of 'pt-BR'"
+      - "Line 153: let language = 'en' instead of 'pt-BR'"
+      - "Line 165: ward?.language ?? 'en' instead of 'pt-BR'"
+      - "grep -c 'pt-BR' supabase/functions/send-reset-email/index.ts returns only template content matches (the pt-BR template block), not fallback logic"
+    tests:
+      - type: unit
+        description: |
+          Test getEmailTemplate fallback: when language is undefined or
+          unrecognized, returns English template (not pt-BR). Verify
+          pt-BR template is still returned when language='pt-BR'.
+    covers:
+      acceptance_criteria:
+        - "COR-002-AC-1: No language set -> email in English (en)"
+        - "COR-002-AC-2: User language es -> email in Spanish"
+        - "COR-002-AC-3: Ward language pt-BR -> email in Portuguese"
+      edge_cases: []
+    risks:
+      - risk: "Missing one of the 4 pt-BR occurrences"
+        mitigation: "grep for all 'pt-BR' in the file after change; only template content block should remain"
+
+  - id: STEP-02
+    description: |
+      CR-252: Remove diagnostic mode from create-invitation Edge Function.
+      Remove: (1) diagnose field from CreateInvitationInput interface (line 19),
+      (2) diagnostic mode if-block (lines 118-135), (3) comment referencing
+      diagnostic mode (line 5, the ADR-094 reference).
+    files:
+      - supabase/functions/create-invitation/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "CreateInvitationInput interface has only email and role fields (no diagnose)"
+      - "No if-block checking input.diagnose exists in the file"
+      - "Comment on line 5 no longer references diagnostic mode"
+      - "Function still creates invitations normally (existing tests pass)"
+    tests:
+      - type: unit
+        description: |
+          Test that sending { email, role, diagnose: true } creates a
+          normal invitation (diagnose field is ignored). Verify the
+          function does not return a diagnostic response.
+    covers:
+      acceptance_criteria:
+        - "COR-003-AC-1: diagnose:true is ignored, invitation created normally"
+      edge_cases: []
+    risks:
+      - risk: "Removing lines shifts line numbers; could accidentally delete wrong block"
+        mitigation: "Use string-match editing (old_string/new_string), not line-number based"
+
+  - id: STEP-03
+    description: |
+      CR-254: Change CSV import to support 3-column format only. In
+      src/lib/csvUtils.ts: (1) update parseCsv comment to say 3-column only,
+      (2) change header validation from 'at least 2' to 'at least 3',
+      (3) remove the 2-column fallback logic (the hasThreeColumns branch
+      and else block), (4) change row validation from 'at least 2 columns'
+      to 'at least 3 columns', (5) update INVALID_HEADER error message.
+    files:
+      - src/lib/csvUtils.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "parseCsv comment says '3-column (Name, Informal Name, Phone) format'"
+      - "Header validation requires headerParts.length < 3 (not < 2)"
+      - "INVALID_HEADER message says 'at least 3 columns: Nome, Nome Informal, Telefone Completo'"
+      - "No hasThreeColumns variable or 2-column fallback logic exists"
+      - "Row validation requires parts.length < 3 (not < 2)"
+      - "INSUFFICIENT_COLUMNS message says 'at least 3 columns'"
+    tests:
+      - type: unit
+        description: |
+          Covered in STEP-04. Code and test updated in consecutive steps.
+    covers:
+      acceptance_criteria:
+        - "COR-004-AC-1: 3-column CSV parsed correctly"
+        - "COR-004-AC-2: 2-column CSV produces error"
+        - "COR-004-AC-3: Empty informal name defaults to first word"
+      edge_cases: []
+    risks:
+      - risk: "Removing 2-column support breaks existing tests"
+        mitigation: "Tests are updated in the immediately next step (STEP-04)"
+
+  - id: STEP-04
+    description: |
+      CR-254: Update csvUtils.test.ts to match 3-column-only format.
+      (1) Change all existing 2-column test CSVs to 3-column format
+      (add Nome Informal column to headers and data rows).
+      (2) Add new test: 2-column CSV should return INVALID_HEADER error.
+      (3) Add new test: 3-column with empty informal name defaults to
+      first word of full name.
+      (4) Add new test: row with only 2 columns returns INSUFFICIENT_COLUMNS.
+    files:
+      - src/__tests__/csvUtils.test.ts
+    dependencies: ["STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "All existing parseCsv tests use 3-column CSV format"
+      - "New test '2-column CSV returns INVALID_HEADER error' exists and passes"
+      - "New test '3-column with empty informal name defaults to first word' exists and passes"
+      - "New test 'row with 2 columns returns INSUFFICIENT_COLUMNS' exists and passes"
+      - "npm test -- csvUtils passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          The step IS the test update. Verify all tests pass after changes.
+    covers:
+      acceptance_criteria:
+        - "COR-004-AC-1: 3-column CSV parsed correctly (tests verify)"
+        - "COR-004-AC-2: 2-column CSV produces error (new test)"
+        - "COR-004-AC-3: Empty informal name defaults to first word (new test)"
+      edge_cases:
+        - "2-column CSV rejected with proper error code"
+        - "Row with insufficient columns rejected"
+    risks:
+      - risk: "Forgetting to update a test that still uses 2-column format"
+        mitigation: "Search for all 'Nome,Telefone' patterns in test file to find 2-column usages"
+
+  - id: STEP-05
+    description: |
+      CR-256: Change manage_prayers toggle guard in settings/index.tsx
+      from {isBishopric && (} to {!isObserver && (} on line 223. This
+      allows both bishopric and secretary roles to see and use the toggle.
+    files:
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "Line 223 (or equivalent): {!isObserver && ( instead of {isBishopric && ("
+      - "grep 'isBishopric' in the manage_prayers toggle area returns no matches"
+      - "The parent Ward Settings group guard (line 210) and the toggle guard use the same pattern (!isObserver)"
+    tests:
+      - type: unit
+        description: |
+          Test that settings screen renders manage_prayers toggle for
+          secretary role (not just bishopric). Test that observer role
+          does NOT see the toggle.
+    covers:
+      acceptance_criteria:
+        - "COR-005-AC-1: Secretary sees manage_prayers toggle"
+        - "COR-005-AC-2: Bishopric sees manage_prayers toggle"
+        - "COR-005-AC-3: Observer does NOT see manage_prayers toggle"
+      edge_cases: []
+    risks:
+      - risk: "Changing wrong conditional guard"
+        mitigation: "Verify surrounding context (managePrayers text, Switch component) matches line 223 area"
+
+  # =========================================================================
+  # DOC/COMMENT-ONLY CHANGES
+  # =========================================================================
+
+  - id: STEP-06
+    description: |
+      CR-257: Update cron interval comment in process-notifications
+      Edge Function from 'cron every 1 minute' to 'cron every 5 minutes'
+      (line 2 of index.ts).
+    files:
+      - supabase/functions/process-notifications/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-07", "STEP-08"]
+    done_when:
+      - "Line 2: 'cron every 5 minutes' instead of 'cron every 1 minute'"
+      - "grep '1 minute' supabase/functions/process-notifications/index.ts returns 0 matches"
+    tests:
+      - type: unit
+        description: |
+          No runtime test needed (comment-only change). Verified by grep.
+    covers:
+      acceptance_criteria:
+        - "COR-006-AC-1: Comment reflects actual 5-minute interval"
+      edge_cases: []
+    risks:
+      - risk: "None - comment-only change"
+        mitigation: "N/A"
+
+  - id: STEP-07
+    description: |
+      CR-257: Update ARCH_CONSOLIDATED.yaml to change process-notifications
+      trigger from 'Cron (every 1 minute)' to 'Cron (every 5 minutes)'.
+    files:
+      - docs/arch/ARCH_CONSOLIDATED.yaml
+    dependencies: []
+    parallelizable_with: ["STEP-06", "STEP-08"]
+    done_when:
+      - "ARCH_CONSOLIDATED.yaml contains 'Cron (every 5 minutes)' for process-notifications trigger"
+      - "grep 'every 1 minute' docs/arch/ARCH_CONSOLIDATED.yaml returns 0 matches"
+    tests:
+      - type: unit
+        description: |
+          No runtime test needed (doc-only change). Verified by grep.
+    covers:
+      acceptance_criteria:
+        - "COR-006-AC-1: Docs reflect actual 5-minute interval"
+      edge_cases: []
+    risks:
+      - risk: "None - doc-only change"
+        mitigation: "N/A"
+
+  - id: STEP-08
+    description: |
+      CR-250: Update SPEC_CONSOLIDATED.yaml to correct F001 acceptance
+      criteria. Change "user gets bishopric role" to "user gets the
+      selected role (bishopric or secretary)". This is doc-only; code
+      already supports both roles.
+    files:
+      - docs/specs/SPEC_CONSOLIDATED.yaml
+    dependencies: []
+    parallelizable_with: ["STEP-06", "STEP-07"]
+    done_when:
+      - "F001 AC in SPEC_CONSOLIDATED mentions 'selected role (bishopric or secretary)'"
+      - "No doc text implies first user registration is bishopric-only"
+    tests:
+      - type: unit
+        description: |
+          No runtime test needed (doc-only change). Verified by reading the corrected text.
+    covers:
+      acceptance_criteria:
+        - "COR-001-AC-1: Bishopric role registration documented"
+        - "COR-001-AC-2: Secretary role registration documented"
+      edge_cases: []
+    risks:
+      - risk: "None - doc-only change"
+        mitigation: "N/A"
+
+  # =========================================================================
+  # SPEC/DOC UPDATES for code corrections
+  # =========================================================================
+
+  - id: STEP-09
+    description: |
+      Update SPEC_CONSOLIDATED.yaml for all code-affecting corrections:
+      (1) CR-251/F002: email fallback language 'en (en-US)' instead of 'pt-BR'
+      (2) CR-252/F003: remove diagnostic mode mention
+      (3) CR-254/F007+BR021: CSV 3-column only
+      (4) CR-256/F018+F027: manage_prayers toggle accessible by bishopric or secretary
+      (5) CR-257/F034: cron every 5 minutes
+    files:
+      - docs/specs/SPEC_CONSOLIDATED.yaml
+    dependencies: ["STEP-08"]
+    parallelizable_with: []
+    done_when:
+      - "F002 description: fallback to 'en (en-US)' not 'pt-BR'"
+      - "F003 description: no mention of diagnostic mode"
+      - "F007 description: '3-column' format only, no '2-column' mention"
+      - "BR021: '3-column (Name, Informal Name, Phone) format only'"
+      - "F018 description: 'bishopric or secretary' not 'bishopric' only"
+      - "F027 description: 'bishopric or secretary' not 'bishopric only'"
+      - "F034 description: 'cron every 5 minutes' not 'cron every 1 minute'"
+    tests:
+      - type: unit
+        description: |
+          No runtime test needed (doc-only changes). Verified by grep.
+    covers:
+      acceptance_criteria:
+        - "COR-002 spec_change"
+        - "COR-003 spec_change"
+        - "COR-004 spec_change + business_rule_change"
+        - "COR-005 spec_change (F018 + F027)"
+        - "COR-006 spec_change"
+      edge_cases: []
+    risks:
+      - risk: "Missing one of the multiple spec text corrections"
+        mitigation: "Use the old_text/new_text from SPEC_F039.yaml as exact reference for each change"
+
+  - id: STEP-10
+    description: |
+      Run full test suite to verify no regressions from all corrections.
+      Verify all code changes pass linting, type-checking, and tests.
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria:
+        - "All COR-001 through COR-006 acceptance criteria verified"
+      edge_cases: []
+    risks:
+      - risk: "Unforeseen interaction between corrections"
+        mitigation: "Each correction is isolated to different files/functions; interaction risk is minimal"
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  - ac_id: COR-001-AC-1
+    description: "Bishopric role registration documented"
+    how_to_verify: "Read F001 AC in SPEC_CONSOLIDATED - mentions bishopric role"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: COR-001-AC-2
+    description: "Secretary role registration documented"
+    how_to_verify: "Read F001 AC in SPEC_CONSOLIDATED - mentions secretary role"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: COR-002-AC-1
+    description: "No language set -> email in English (en)"
+    how_to_verify: "Default language variable is 'en'; template fallback uses templates['en']"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: COR-002-AC-2
+    description: "User language 'es' -> email in Spanish"
+    how_to_verify: "User metadata language takes priority; Spanish template exists"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: COR-002-AC-3
+    description: "Ward language 'pt-BR' -> email in Portuguese"
+    how_to_verify: "Ward language fallback still works; pt-BR template exists"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: COR-003-AC-1
+    description: "diagnose:true ignored, invitation created normally"
+    how_to_verify: "diagnose field removed from interface; no diagnostic mode code path"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: COR-004-AC-1
+    description: "3-column CSV parsed correctly"
+    how_to_verify: "Test with 3-column CSV passes; members have correct name, informal_name, phone"
+    covered_by_steps: ["STEP-03", "STEP-04"]
+
+  - ac_id: COR-004-AC-2
+    description: "2-column CSV produces error"
+    how_to_verify: "Test with 2-column CSV returns INVALID_HEADER error"
+    covered_by_steps: ["STEP-03", "STEP-04"]
+
+  - ac_id: COR-004-AC-3
+    description: "Empty informal name defaults to first word of full name"
+    how_to_verify: "Test with empty informal_name column; defaults verified"
+    covered_by_steps: ["STEP-03", "STEP-04"]
+
+  - ac_id: COR-005-AC-1
+    description: "Secretary sees manage_prayers toggle"
+    how_to_verify: "Guard is !isObserver (not isBishopric); secretary passes !isObserver"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: COR-005-AC-2
+    description: "Bishopric sees manage_prayers toggle"
+    how_to_verify: "Guard is !isObserver; bishopric passes !isObserver"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: COR-005-AC-3
+    description: "Observer does NOT see manage_prayers toggle"
+    how_to_verify: "Guard is !isObserver; observer fails !isObserver check"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: COR-006-AC-1
+    description: "Comment and docs reflect actual 5-minute cron interval"
+    how_to_verify: "grep for 'every 1 minute' in both files returns 0; 'every 5 minutes' present"
+    covered_by_steps: ["STEP-06", "STEP-07"]

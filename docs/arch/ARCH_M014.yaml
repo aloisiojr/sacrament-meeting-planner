@@ -1,0 +1,154 @@
+# =============================================================================
+# ARCH_M014.yaml - Architecture Review for SPEC Correction Package (Phase 1)
+# CRs: CR-250, CR-251, CR-252, CR-254, CR-256, CR-257
+# Generated: 2026-03-03
+# =============================================================================
+
+metadata:
+  id: M014
+  spec: F039
+  type: correction_package
+  date: "2026-03-03"
+  phase: "Phase 1 - Quick fixes"
+  change_requests: [CR-250, CR-251, CR-252, CR-254, CR-256, CR-257]
+
+# =============================================================================
+# ARCHITECTURE IMPACT ASSESSMENT
+# =============================================================================
+
+architecture_impact: none
+summary: |
+  All 6 corrections are localized fixes to existing files. No new modules,
+  components, dependencies, ADRs, or database schema changes are required.
+  No changes to provider hierarchy, RLS policies, or data flow patterns.
+
+# =============================================================================
+# PER-CR ARCHITECTURE NOTES
+# =============================================================================
+
+corrections:
+
+  # ---------------------------------------------------------------------------
+  # CR-250: F001 Registration role (SPEC only)
+  # ---------------------------------------------------------------------------
+  - cr: CR-250
+    impact: none
+    modules_affected: []
+    files_changed: []
+    notes: |
+      Doc-only correction. Code already supports both bishopric and secretary
+      roles in register-first-user. No architecture impact.
+
+  # ---------------------------------------------------------------------------
+  # CR-251: F002 Email language fallback
+  # ---------------------------------------------------------------------------
+  - cr: CR-251
+    impact: none
+    modules_affected: [M001]
+    files_changed:
+      - path: supabase/functions/send-reset-email/index.ts
+        type: edge_function
+        changes: "Change default language fallback from 'pt-BR' to 'en' (4 occurrences)"
+    notes: |
+      Localized string change in a single Edge Function. The template map uses
+      'en' as the key (not 'en-US'), so the fallback value must be 'en'.
+      No new dependencies or architectural patterns introduced.
+    deploy: "supabase functions deploy send-reset-email --no-verify-jwt"
+
+  # ---------------------------------------------------------------------------
+  # CR-252: F003 Remove diagnostic mode
+  # ---------------------------------------------------------------------------
+  - cr: CR-252
+    impact: none
+    modules_affected: [M001]
+    files_changed:
+      - path: supabase/functions/create-invitation/index.ts
+        type: edge_function
+        changes: "Remove diagnose field from interface and diagnostic mode block"
+    notes: |
+      Dead code removal. The diagnostic mode was never called by the client.
+      Removing it simplifies the Edge Function without changing its public API
+      (clients never sent diagnose:true). No architecture impact.
+    deploy: "supabase functions deploy create-invitation"
+
+  # ---------------------------------------------------------------------------
+  # CR-254: F007 CSV import 3-column only
+  # ---------------------------------------------------------------------------
+  - cr: CR-254
+    impact: none
+    modules_affected: [M002]
+    files_changed:
+      - path: src/lib/csvUtils.ts
+        type: library
+        changes: "Remove 2-column parsing fallback, require 3-column header"
+      - path: src/__tests__/csvUtils.test.ts
+        type: test
+        changes: "Update tests: 2-column inputs should now produce errors"
+    notes: |
+      Simplifies CSV parsing logic by removing the 2-column fallback path.
+      The 3-column format (Name, Informal Name, Phone) is the only supported
+      format. No new components or dependencies needed.
+
+  # ---------------------------------------------------------------------------
+  # CR-256: F018 manage_prayers toggle access
+  # ---------------------------------------------------------------------------
+  - cr: CR-256
+    impact: none
+    modules_affected: [M013]
+    files_changed:
+      - path: src/app/(tabs)/settings/index.tsx
+        type: screen
+        changes: "Change guard from {isBishopric && ( to {!isObserver && ("
+    decision:
+      question: "Use !isObserver or (role === 'bishopric' || role === 'secretary')?"
+      answer: "Use !isObserver"
+      rationale: |
+        1. Consistency: The parent Ward Settings group (line 210) already uses
+           {!isObserver && (} as its guard. Using the same pattern for the
+           manage_prayers toggle within that group is consistent.
+        2. Role exhaustiveness: With exactly 3 roles (bishopric, secretary,
+           observer), !isObserver is logically equivalent to
+           bishopric || secretary. The roles are defined in ALL_ROLES constant
+           in src/lib/permissions.ts.
+        3. Future-proofing: If a 4th role is added, both the Ward Settings
+           group guard AND the inner toggle guard would need review. Since they
+           share the same parent container, they would naturally be updated
+           together. The !isObserver pattern makes this a single-point review
+           rather than two separate conditions.
+        4. RLS compatibility: The wards table UPDATE RLS policy allows any
+           authenticated user in the same ward (no role check). The UI guard
+           is the only access restriction, and !isObserver matches the
+           intended access level.
+    notes: |
+      UI-only change. The RLS policy on wards table allows UPDATE for any
+      authenticated user with matching ward_id, so no DB changes needed.
+      The manage_prayers toggle is already inside the Ward Settings group
+      which is guarded by !isObserver (line 210), so using the same guard
+      on the toggle itself is consistent.
+
+  # ---------------------------------------------------------------------------
+  # CR-257: F034 cron interval comment
+  # ---------------------------------------------------------------------------
+  - cr: CR-257
+    impact: none
+    modules_affected: [M012]
+    files_changed:
+      - path: supabase/functions/process-notifications/index.ts
+        type: edge_function
+        changes: "Update comment from 'cron every 1 minute' to 'cron every 5 minutes'"
+    doc_changes:
+      - path: docs/arch/ARCH_CONSOLIDATED.yaml
+        changes: "Update trigger from 'Cron (every 1 minute)' to 'Cron (every 5 minutes)'"
+    notes: |
+      Comment and doc correction only. The actual cron schedule is configured
+      externally in the Supabase Dashboard and is already set to 5 minutes.
+
+# =============================================================================
+# ARCH_CONSOLIDATED UPDATES
+# =============================================================================
+
+arch_consolidated_updates:
+  - section: edge_functions.functions (process-notifications)
+    line: 706
+    old: "trigger: Cron (every 1 minute)"
+    new: "trigger: Cron (every 5 minutes)"

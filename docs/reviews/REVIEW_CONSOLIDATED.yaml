@@ -213,3 +213,287 @@ reviews:
           They can remain as-is or be cleaned up at the user's discretion.
 
     pending_deploys: []
+
+  # ===========================================================================
+  # REV-003: Phase 1 - Quick fixes (CR-250, 251, 252, 254, 256, 257)
+  # ===========================================================================
+
+  - id: REV-003
+    scope: "F039 Phase 1 - Quick fixes (CR-250, CR-251, CR-252, CR-254, CR-256, CR-257)"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    spec: F039
+    arch: M014
+    commits:
+      - hash: 4a83fe8
+        message: "fix(send-reset-email): change email language fallback from pt-BR to en (CR-251)"
+      - hash: 4b3a41f
+        message: "fix(create-invitation): remove diagnostic mode (CR-252)"
+      - hash: 1bbdd9d
+        message: "fix(csvUtils): require 3-column CSV format only (CR-254)"
+      - hash: b310ed8
+        message: "fix(settings): allow secretary to toggle manage_prayers (CR-256)"
+      - hash: f9625c9
+        message: "docs(process-notifications): correct cron interval comment to 5 minutes (CR-257)"
+    verdict: approved
+
+    summary: |
+      All 5 code commits for Phase 1 are correct, complete, and match the SPEC
+      (F039) and ARCH (M014) specifications. Chain validation SPEC->ARCH->CODE
+      is fully aligned. 589 tests pass (30 test files, 0 failures). The doc
+      corrections to SPEC_CONSOLIDATED, ARCH_CONSOLIDATED, and the code changes
+      are all consistent with each other. No P0 or P1 issues found.
+
+    # =========================================================================
+    # PER-CR VERIFICATION
+    # =========================================================================
+
+    cr_reviews:
+
+      # -----------------------------------------------------------------------
+      # CR-251: Email language fallback
+      # -----------------------------------------------------------------------
+      - cr: CR-251
+        title: "Change email language fallback from pt-BR to en"
+        verdict: pass
+        verification:
+          - check: "Line 82: templates fallback changed from 'pt-BR' to 'en'"
+            status: pass
+            file: supabase/functions/send-reset-email/index.ts
+            detail: "return templates[language] ?? templates['en'];"
+          - check: "Line 152: Comment updated to say 'en'"
+            status: pass
+            detail: "// Priority: user_metadata.language > ward.language > 'en'"
+          - check: "Line 153: Default language changed from 'pt-BR' to 'en'"
+            status: pass
+            detail: "let language = 'en';"
+          - check: "Line 165: Ward fallback changed from 'pt-BR' to 'en'"
+            status: pass
+            detail: "language = ward?.language ?? 'en';"
+          - check: "All 4 'pt-BR' fallbacks changed to 'en'"
+            status: pass
+            detail: "grep for pt-BR in send-reset-email shows zero fallback references. The only remaining 'pt-BR' is the template key itself (line 19), which is correct."
+        notes: |
+          SPEC_CONSOLIDATED F002 updated to say "en (en-US)". Code uses 'en' which
+          matches the template map key. All 4 occurrences changed as specified.
+
+      # -----------------------------------------------------------------------
+      # CR-252: Remove diagnostic mode
+      # -----------------------------------------------------------------------
+      - cr: CR-252
+        title: "Remove diagnostic mode from create-invitation"
+        verdict: pass
+        verification:
+          - check: "diagnose field removed from CreateInvitationInput interface"
+            status: pass
+            detail: "Interface now has only email and role fields. No diagnose field."
+          - check: "Diagnostic mode block removed (was lines 118-135)"
+            status: pass
+            detail: "grep for 'diagnos' in create-invitation returns zero matches."
+          - check: "Header comment updated"
+            status: pass
+            detail: |
+              Old: "F143 (CR-208): Structured error logging, error codes, and diagnostic mode."
+              New: "F143 (CR-208): Structured error logging and error codes."
+              The 'and diagnostic mode' text removed. ADR-094 line also removed.
+          - check: "isBishopric variable removed from settings/index.tsx (CR-256 side-effect)"
+            status: pass
+            detail: "const isBishopric = role === 'bishopric' was removed since it's no longer used."
+        notes: |
+          Clean dead code removal. The diagnostic block, interface field, and
+          related comments were all removed. No functional behavior changes.
+
+      # -----------------------------------------------------------------------
+      # CR-254: CSV 3-column only
+      # -----------------------------------------------------------------------
+      - cr: CR-254
+        title: "Require 3-column CSV format only"
+        verdict: pass
+        verification:
+          - check: "Header validation changed from 'at least 2' to 'at least 3'"
+            status: pass
+            file: src/lib/csvUtils.ts
+            detail: "if (headerParts.length < 3) with INVALID_HEADER error"
+          - check: "2-column fallback logic removed (hasThreeColumns branch)"
+            status: pass
+            detail: "hasThreeColumns variable and conditional branch eliminated. Direct 3-column parsing only."
+          - check: "Row validation changed from 'at least 2' to 'at least 3'"
+            status: pass
+            detail: "if (parts.length < 3) with INSUFFICIENT_COLUMNS error"
+          - check: "Comment updated to say '3-column format'"
+            status: pass
+            detail: "JSDoc now says 'Requires 3-column format: Name, Informal Name, Phone.'"
+          - check: "Error messages updated"
+            status: pass
+            detail: |
+              INVALID_HEADER: 'CSV must have at least 3 columns: Nome, Nome Informal, Telefone Completo'
+              INSUFFICIENT_COLUMNS: 'Row must have at least 3 columns'
+          - check: "Tests updated for 3-column enforcement"
+            status: pass
+            detail: |
+              26 tests in csvUtils.test.ts. Key new tests:
+              - 'rejects 2-column CSV (requires 3 columns)' -> expects INVALID_HEADER
+              - 'rejects row with only 2 columns (INSUFFICIENT_COLUMNS)' -> expects INSUFFICIENT_COLUMNS
+              - 'rejects 1-column header CSV' -> expects INVALID_HEADER
+              - 'defaults informal name to first word of full name when empty'
+        notes: |
+          SPEC_CONSOLIDATED F007 and BR021 both updated to 3-column only.
+          Code, tests, and docs are all consistent.
+
+      # -----------------------------------------------------------------------
+      # CR-256: manage_prayers toggle access
+      # -----------------------------------------------------------------------
+      - cr: CR-256
+        title: "Allow secretary to toggle manage_prayers"
+        verdict: pass
+        verification:
+          - check: "Guard changed from {isBishopric && ( to {!isObserver && ("
+            status: pass
+            file: src/app/(tabs)/settings/index.tsx
+            detail: "Line 222: {!isObserver && ("
+          - check: "isBishopric variable removed (no longer used)"
+            status: pass
+            detail: "const isBishopric = role === 'bishopric' was removed from the component."
+          - check: "Consistent with parent Ward Settings guard"
+            status: pass
+            detail: "Parent group (line 209) also uses {!isObserver && (}, so inner toggle is consistent."
+          - check: "Integration tests added for all 3 roles"
+            status: pass
+            detail: |
+              Tests in permissions-roles.integration.test.ts:
+              - bishopric: manage_prayers toggle visible
+              - secretary: manage_prayers toggle visible
+              - observer: manage_prayers toggle hidden
+        notes: |
+          SPEC_CONSOLIDATED F018 and F027 both updated to say "bishopric or secretary".
+          RLS policy already allows any authenticated user with ward_id match to
+          UPDATE the wards table, so no DB changes needed. UI-only fix.
+
+      # -----------------------------------------------------------------------
+      # CR-257: Cron interval comment
+      # -----------------------------------------------------------------------
+      - cr: CR-257
+        title: "Correct cron interval comment to 5 minutes"
+        verdict: pass
+        verification:
+          - check: "Code comment updated from '1 minute' to '5 minutes'"
+            status: pass
+            file: supabase/functions/process-notifications/index.ts
+            detail: "Line 2: 'process-notifications: Supabase Edge Function (cron every 5 minutes).'"
+          - check: "ARCH_CONSOLIDATED updated"
+            status: pass
+            file: docs/arch/ARCH_CONSOLIDATED.yaml
+            detail: "Line 706: 'trigger: Cron (every 5 minutes)'"
+          - check: "SPEC_CONSOLIDATED F034 updated"
+            status: pass
+            detail: "F034 description now says 'cron every 5 minutes'"
+        notes: "Doc and comment-only change. No runtime behavior affected."
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_to_arch:
+        status: pass
+        detail: |
+          SPEC_F039 defines 6 corrections (COR-001 through COR-006).
+          ARCH_M014 provides architecture assessment for all 6, confirming
+          'architecture_impact: none' for all. Modules and files match.
+
+      arch_to_code:
+        status: pass
+        detail: |
+          All files listed in ARCH_M014 were changed in the commits:
+          - send-reset-email/index.ts (CR-251)
+          - create-invitation/index.ts (CR-252)
+          - csvUtils.ts + csvUtils.test.ts (CR-254)
+          - settings/index.tsx (CR-256)
+          - process-notifications/index.ts (CR-257)
+          No extra files changed beyond what ARCH specified.
+
+      spec_consolidated_updates:
+        status: pass
+        detail: |
+          All 8 SPEC_CONSOLIDATED corrections verified in-place:
+          - F001: "selected role (bishopric or secretary)" in acceptance criteria
+          - F002: "en (en-US)" fallback in description
+          - F003: No "diagnostic mode" mention
+          - F007: "3-column (Name, Informal Name, Phone) format" only
+          - BR021: "3-column format only" with informal name default
+          - F018: "bishopric or secretary" in description and acceptance criteria
+          - F027: "bishopric or secretary" in description and acceptance criteria
+          - F034: "cron every 5 minutes" in description
+
+      arch_consolidated_updates:
+        status: pass
+        detail: |
+          ARCH_CONSOLIDATED process-notifications trigger updated to
+          "Cron (every 5 minutes)". Confirmed at line 706.
+
+    # =========================================================================
+    # TEST VERIFICATION
+    # =========================================================================
+
+    test_verification:
+      total_tests: 589
+      total_files: 30
+      all_passing: true
+      new_tests:
+        - file: src/__tests__/csvUtils.test.ts
+          count: 26
+          covers: "CR-254 (3-column enforcement, 2-column rejection, informal name defaults)"
+        - file: src/__tests__/integration/permissions-roles.integration.test.ts
+          covers: "CR-256 (manage_prayers toggle visibility for all 3 roles)"
+      coverage_gaps:
+        - cr: CR-251
+          reason: "Edge Function (Deno runtime) cannot be imported in vitest Node environment"
+          risk: low
+          mitigation: "Manual verification of all 4 fallback changes via code review"
+        - cr: CR-252
+          reason: "Edge Function (Deno runtime) - dead code removal"
+          risk: low
+          mitigation: "grep confirms zero references to 'diagnos' in the file"
+        - cr: CR-257
+          reason: "Comment-only change, no behavioral code"
+          risk: none
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # ADVISORY NOTES
+    # =========================================================================
+
+    advisory_notes:
+      - id: ADV-001
+        severity: P2
+        title: "Pre-existing CR-208 reference in create-invitation comment"
+        description: |
+          Line 5 of create-invitation/index.ts contains:
+          "// F143 (CR-208): Structured error logging and error codes."
+          This CR-208 reference predates Phase 1 and was not in scope for this
+          correction package. The coder correctly updated the text (removed
+          "and diagnostic mode") but preserved the CR-208 reference.
+          This should be cleaned up in a future pass if CR references are
+          being eliminated from source code.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - cr: CR-251
+        command: "supabase functions deploy send-reset-email --no-verify-jwt"
+        reason: "Edge Function code changed (language fallback)"
+        urgency: low
+        notes: "Functional change: default email language will be English instead of Portuguese"
+
+      - cr: CR-252
+        command: "supabase functions deploy create-invitation"
+        reason: "Edge Function code changed (diagnostic mode removed)"
+        urgency: low
+        notes: "Dead code removal only. No behavioral change for clients."

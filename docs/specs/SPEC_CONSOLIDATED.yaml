@@ -74,7 +74,7 @@ features:
         then: "Session is cleared, user is redirected to login, query cache is cleared"
       - given: "No ward exists"
         when: "First user registers via register screen"
-        then: "New ward is created, user gets bishopric role via register-first-user Edge Function"
+        then: "New ward is created, user gets the selected role (bishopric or secretary) via register-first-user Edge Function"
       - given: "User has an invitation token"
         when: "User opens invitation link and fills registration form"
         then: "User is registered with the role and ward from the invitation via register-invited-user Edge Function"
@@ -88,7 +88,7 @@ features:
       reset-redirect Edge Function which serves a self-contained password
       reset web page (loads Supabase JS from CDN, calls verifyOtp + updateUser
       in browser). Email language determined by user_metadata.language with
-      fallback to ward.language then pt-BR.
+      fallback to ward.language then en (en-US).
     acceptance_criteria:
       - given: "User forgot their password"
         when: "User enters email on forgot-password screen and taps submit"
@@ -108,8 +108,7 @@ features:
       Function. Invitation generates an HTTPS URL (not deep link) that opens
       invite-redirect Edge Function, which serves a self-contained HTML
       invitation acceptance page. Invitation has role, email, expiration,
-      and a unique token. Diagnostic mode available ({ diagnose: true }).
-      Structured error codes in responses.
+      and a unique token. Structured error codes in responses.
     acceptance_criteria:
       - given: "Bishopric or secretary with invitation:create permission"
         when: "User creates an invitation with email and role"
@@ -198,8 +197,8 @@ features:
     description: |
       CSV import and export for member data. Export generates 3-column CSV
       (Nome, Nome Informal, Telefone Completo) with UTF-8 BOM for Excel
-      compatibility. Import supports 2-column (Name, Phone) or 3-column
-      (Name, Informal Name, Phone) formats. Confirmation Alert before import.
+      compatibility. Import supports 3-column (Name, Informal Name, Phone)
+      format. Confirmation Alert before import.
       Error codes for validation failures (EMPTY_FILE, INVALID_HEADER,
       INSUFFICIENT_COLUMNS, NAME_REQUIRED, NO_DATA). Uses expo-document-picker,
       expo-file-system, and expo-sharing.
@@ -449,14 +448,14 @@ features:
     area: speeches
     description: |
       Optional ward-level toggle (manage_prayers on wards table, controlled by
-      bishopric in Settings). When enabled: prayer positions (0 opening, 4 closing)
+      bishopric or secretary in Settings). When enabled: prayer positions (0 opening, 4 closing)
       appear as SpeechSlot with isPrayer (no topic row), prayers shown on collapsed
       cards (italic + prefix), separate WhatsApp templates for opening/closing
       prayers, notification titles/bodies are prayer-specific. Prayer slots
       created via lazy creation based on Sunday type. Tab label changes to
       "Discursos e Oracoes" when enabled.
     acceptance_criteria:
-      - given: "Bishopric enables manage_prayers in Settings"
+      - given: "Bishopric or secretary enables manage_prayers in Settings"
         when: "Toggle is turned on"
         then: "Prayer slots (positions 0, 4) appear in expanded SundayCards for speech-type Sundays"
       - given: "manage_prayers is true and Sunday is testimony_meeting"
@@ -694,7 +693,7 @@ features:
       timezone) and App Settings (all users: users, history, app language,
       theme, about). Ward language inline with description text explaining
       it only affects topic collections and WhatsApp templates. Manage prayers
-      toggle with description (bishopric only, 2nd item in Ward Settings).
+      toggle with description (bishopric or secretary, 2nd item in Ward Settings).
       Sign out button at bottom with confirmation dialog.
     acceptance_criteria:
       - given: "Non-observer user opens Settings"
@@ -703,7 +702,7 @@ features:
       - given: "Observer opens Settings"
         when: "Screen loads"
         then: "Only 'App Settings' group shown (app language, theme, about)"
-      - given: "Bishopric user views Ward Settings"
+      - given: "Bishopric or secretary user views Ward Settings"
         when: "Section renders"
         then: "Manage prayers toggle is shown as 2nd item with description text"
 
@@ -836,7 +835,7 @@ features:
       designation (delayed 5min), weekly_assignment, weekly_confirmation,
       speaker_confirmed (immediate), speaker_withdrew (immediate). DB triggers
       enqueue to notification_queue table. process-notifications Edge Function
-      (cron every 1 minute) processes queue and sends via Expo Push API.
+      (cron every 5 minutes) processes queue and sends via Expo Push API.
       Token registered on login/app open (non-observers only). Observers
       don't receive push. Prayer-specific notification titles and bodies
       for positions 0 and 4. Notification tap navigates to Home tab.
@@ -1021,8 +1020,8 @@ business_rules:
     description: "Activity log writes are fire-and-forget. Failures do not affect the main operation."
 
   - id: BR021
-    rule: "CSV import format flexibility"
-    description: "CSV import supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats. Phone can be empty. Name is required."
+    rule: "CSV import format"
+    description: "CSV import supports 3-column (Name, Informal Name, Phone) format only. Phone can be empty. Informal Name can be empty (defaults to first word of Name). Name is required."
 
   - id: BR022
     rule: "Deep link scheme"

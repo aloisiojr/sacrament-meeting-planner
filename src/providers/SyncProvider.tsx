@@ -4,6 +4,7 @@ import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useOfflineQueueProcessor } from '../hooks/useOfflineQueueProcessor';
 import { useRegisterPushToken, useNotificationHandler } from '../hooks/useNotifications';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { OnlineStatusProvider } from '../contexts/OnlineStatusContext';
 
 interface SyncProviderProps {
   children: React.ReactNode;
@@ -34,9 +35,9 @@ export function SyncProvider({ children }: SyncProviderProps) {
   useNotificationHandler();
 
   return (
-    <>
+    <OnlineStatusProvider isOnline={isOnline}>
       <OfflineBanner visible={showOfflineBanner} />
       {children}
-    </>
+    </OnlineStatusProvider>
   );
 }

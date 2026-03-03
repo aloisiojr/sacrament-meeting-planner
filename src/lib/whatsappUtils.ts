@@ -59,9 +59,9 @@ export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
 export function getDefaultSpeechTemplate(language: string, position: 1 | 2 | 3): string {
   if (position === 1) {
     switch (language) {
-      case 'en':
+      case 'en-US':
         return DEFAULT_TEMPLATE_SPEECH_1_EN;
-      case 'es':
+      case 'es-LA':
         return DEFAULT_TEMPLATE_SPEECH_1_ES;
       case 'pt-BR':
       default:
@@ -70,9 +70,9 @@ export function getDefaultSpeechTemplate(language: string, position: 1 | 2 | 3):
   }
   if (position === 2) {
     switch (language) {
-      case 'en':
+      case 'en-US':
         return DEFAULT_TEMPLATE_SPEECH_2_EN;
-      case 'es':
+      case 'es-LA':
         return DEFAULT_TEMPLATE_SPEECH_2_ES;
       case 'pt-BR':
       default:
@@ -81,9 +81,9 @@ export function getDefaultSpeechTemplate(language: string, position: 1 | 2 | 3):
   }
   // position === 3
   switch (language) {
-    case 'en':
+    case 'en-US':
       return DEFAULT_TEMPLATE_SPEECH_3_EN;
-    case 'es':
+    case 'es-LA':
       return DEFAULT_TEMPLATE_SPEECH_3_ES;
     case 'pt-BR':
     default:
@@ -98,9 +98,9 @@ export function getDefaultSpeechTemplate(language: string, position: 1 | 2 | 3):
 export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string {
   if (type === 'opening') {
     switch (language) {
-      case 'en':
+      case 'en-US':
         return DEFAULT_OPENING_PRAYER_TEMPLATE_EN;
-      case 'es':
+      case 'es-LA':
         return DEFAULT_OPENING_PRAYER_TEMPLATE_ES;
       case 'pt-BR':
       default:
@@ -108,9 +108,9 @@ export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'cl
     }
   }
   switch (language) {
-    case 'en':
+    case 'en-US':
       return DEFAULT_CLOSING_PRAYER_TEMPLATE_EN;
-    case 'es':
+    case 'es-LA':
       return DEFAULT_CLOSING_PRAYER_TEMPLATE_ES;
     case 'pt-BR':
     default:

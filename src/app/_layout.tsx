@@ -2,7 +2,11 @@ import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache, onlineManager } from '@tanstack/react-query';
+import { QueryClient, QueryCache, MutationCache, onlineManager } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { I18nextProvider } from 'react-i18next';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
@@ -10,6 +14,14 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SyncProvider } from '../providers/SyncProvider';
 import i18n from '../i18n';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+const SEVEN_DAYS_MS = 1000 * 60 * 60 * 24 * 7;
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: '@query_cache',
+  throttleTime: 1000,
+});
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -37,6 +49,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: SEVEN_DAYS_MS,
       networkMode: 'offlineFirst' as const,
       retry: (failureCount: number, error: any) => {
         if (!onlineManager.isOnline()) return false;
@@ -113,13 +126,20 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: asyncStoragePersister,
+            maxAge: SEVEN_DAYS_MS,
+            buster: Constants.expoConfig?.version ?? '1.0.0',
+          }}
+        >
           <I18nextProvider i18n={i18n}>
             <ThemeProvider>
               <InnerLayout />
             </ThemeProvider>
           </I18nextProvider>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

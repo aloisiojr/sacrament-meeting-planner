@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { SearchInput } from './SearchInput';
 import { useMembers } from '../hooks/useMembers';
+import { useSpeechCounts } from '../hooks/useSpeechCounts';
 import type { Member } from '../types/database';
 
 export interface MemberSelectorModalProps {
@@ -37,6 +38,7 @@ export function MemberSelectorModal({
   const [search, setSearch] = useState('');
 
   const { data: members } = useMembers(search);
+  const { data: speechCounts } = useSpeechCounts();
 
   const handleSelect = useCallback(
     (member: Member) => {
@@ -97,6 +99,11 @@ export function MemberSelectorModal({
               >
                 {item.full_name}
               </Text>
+              {(speechCounts.get(item.id) ?? 0) > 0 && (
+                <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+                  {t('members.speechCount', { count: speechCounts.get(item.id) ?? 0 })}
+                </Text>
+              )}
             </Pressable>
           )}
           ListEmptyComponent={
@@ -147,6 +154,10 @@ const styles = StyleSheet.create({
   },
   memberName: {
     fontSize: 16,
+  },
+  memberSpeechCount: {
+    fontSize: 12,
+    marginTop: 2,
   },
   empty: {
     padding: 40,

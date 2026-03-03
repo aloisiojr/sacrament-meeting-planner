@@ -11,6 +11,8 @@ export type Permission =
   | 'speech:assign'
   | 'speech:unassign'
   | 'speech:change_status'
+  | 'prayer:assign'
+  | 'prayer:unassign'
   | 'member:read'
   | 'member:write'
   | 'member:import'

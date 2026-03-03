@@ -93,8 +93,8 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 
   const [statusModalVisible, setStatusModalVisible] = useState(false);
 
-  const canAssign = hasPermission('speech:assign');
-  const canUnassign = hasPermission('speech:unassign');
+  const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign');
+  const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign');
   const canChangeStatus = hasPermission('speech:change_status');
   const isObserver = role === 'observer';
   const isBispado = role === 'bishopric';

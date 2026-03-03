@@ -1,132 +1,62 @@
 import { describe, it, expect } from 'vitest';
 import {
-  enforceActorRules,
   filterActorsByRole,
   sortActors,
   actorKeys,
 } from '../hooks/useActors';
-import type { MeetingActor, CreateActorInput, UpdateActorInput } from '../types/database';
+import type { MeetingActor } from '../types/database';
 
 function makeActor(overrides: Partial<MeetingActor> & { name: string }): MeetingActor {
   return {
     id: overrides.id ?? `uuid-${Math.random().toString(36).slice(2)}`,
     ward_id: overrides.ward_id ?? 'ward-1',
     name: overrides.name,
-    can_preside: overrides.can_preside ?? false,
-    can_conduct: overrides.can_conduct ?? false,
-    can_recognize: overrides.can_recognize ?? false,
-    can_pianist: overrides.can_pianist ?? false,
-    can_conductor: overrides.can_conductor ?? false,
+    role: overrides.role ?? 'preside',
     created_at: overrides.created_at ?? '2026-01-01T00:00:00Z',
     updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
   };
 }
 
 describe('useActors utilities', () => {
-  describe('enforceActorRules (identity function)', () => {
-    it('should return input unchanged (identity) - can_conduct=true does NOT auto-set can_preside', () => {
-      const input: CreateActorInput = {
-        name: 'Bishop',
-        can_conduct: true,
-        can_preside: false,
-      };
-      const result = enforceActorRules(input);
-      expect(result.can_preside).toBe(false);
-      expect(result.can_conduct).toBe(true);
-    });
-
-    it('should NOT change can_preside when can_conduct is false', () => {
-      const input: CreateActorInput = {
-        name: 'Pianist',
-        can_conduct: false,
-        can_preside: false,
-      };
-      const result = enforceActorRules(input);
-      expect(result.can_preside).toBe(false);
-    });
-
-    it('should NOT change can_preside when can_conduct is undefined', () => {
-      const input: CreateActorInput = {
-        name: 'Observer',
-        can_preside: false,
-      };
-      const result = enforceActorRules(input);
-      expect(result.can_preside).toBe(false);
-    });
-
-    it('should preserve all other fields', () => {
-      const input: CreateActorInput = {
-        name: 'Test Actor',
-        can_conduct: true,
-        can_recognize: true,
-        can_pianist: true,
-      };
-      const result = enforceActorRules(input);
-      expect(result.name).toBe('Test Actor');
-      expect(result.can_recognize).toBe(true);
-      expect(result.can_pianist).toBe(true);
-    });
-
-    it('should return input unchanged for UpdateActorInput', () => {
-      const input: UpdateActorInput = {
-        id: 'actor-1',
-        can_conduct: true,
-      };
-      const result = enforceActorRules(input);
-      // Identity function: does NOT add can_preside
-      expect(result.can_preside).toBeUndefined();
-    });
-
-    it('should return the same reference (identity)', () => {
-      const input: CreateActorInput = {
-        name: 'Test',
-        can_conduct: true,
-        can_preside: false,
-      };
-      const result = enforceActorRules(input);
-      expect(result).toBe(input);
-    });
-  });
-
   describe('filterActorsByRole', () => {
     const actors = [
-      makeActor({ name: 'Bishop', can_preside: true, can_conduct: true }),
-      makeActor({ name: 'Counselor', can_preside: true, can_conduct: false }),
-      makeActor({ name: 'Pianist', can_pianist: true }),
-      makeActor({ name: 'Secretary', can_recognize: true }),
+      makeActor({ name: 'Bishop', role: 'preside' }),
+      makeActor({ name: 'Counselor', role: 'conduct' }),
+      makeActor({ name: 'Pianist', role: 'pianist' }),
+      makeActor({ name: 'Secretary', role: 'recognize' }),
     ];
 
     it('should return all actors for "all" filter', () => {
       expect(filterActorsByRole(actors, 'all')).toEqual(actors);
     });
 
-    it('should filter by can_preside', () => {
-      const result = filterActorsByRole(actors, 'can_preside');
-      expect(result).toHaveLength(2);
-      expect(result.map((a) => a.name)).toEqual(['Bishop', 'Counselor']);
-    });
-
-    it('should filter by can_conduct', () => {
-      const result = filterActorsByRole(actors, 'can_conduct');
+    it('should filter by preside', () => {
+      const result = filterActorsByRole(actors, 'preside');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Bishop');
     });
 
-    it('should filter by can_recognize', () => {
-      const result = filterActorsByRole(actors, 'can_recognize');
+    it('should filter by conduct', () => {
+      const result = filterActorsByRole(actors, 'conduct');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Counselor');
+    });
+
+    it('should filter by recognize', () => {
+      const result = filterActorsByRole(actors, 'recognize');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Secretary');
     });
 
-    it('should filter by can_pianist', () => {
-      const result = filterActorsByRole(actors, 'can_pianist');
+    it('should filter by pianist', () => {
+      const result = filterActorsByRole(actors, 'pianist');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Pianist');
     });
 
     it('should return empty array when no actors match', () => {
-      const noMusicActors = [makeActor({ name: 'Bob' })];
-      expect(filterActorsByRole(noMusicActors, 'can_pianist')).toHaveLength(0);
+      const noMusicActors = [makeActor({ name: 'Bob', role: 'preside' })];
+      expect(filterActorsByRole(noMusicActors, 'pianist')).toHaveLength(0);
     });
   });
 
@@ -161,14 +91,14 @@ describe('useActors utilities', () => {
     it('should generate correct query keys', () => {
       expect(actorKeys.all).toEqual(['actors']);
       expect(actorKeys.list('ward-1')).toEqual(['actors', 'list', 'ward-1']);
-      expect(actorKeys.byRole('ward-1', 'can_preside')).toEqual([
-        'actors', 'byRole', 'ward-1', 'can_preside',
+      expect(actorKeys.byRole('ward-1', 'preside')).toEqual([
+        'actors', 'byRole', 'ward-1', 'preside',
       ]);
     });
 
     it('should generate unique keys for different roles', () => {
-      expect(actorKeys.byRole('ward-1', 'can_preside')).not.toEqual(
-        actorKeys.byRole('ward-1', 'can_conduct')
+      expect(actorKeys.byRole('ward-1', 'preside')).not.toEqual(
+        actorKeys.byRole('ward-1', 'conduct')
       );
     });
   });

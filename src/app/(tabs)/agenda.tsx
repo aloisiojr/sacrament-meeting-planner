@@ -523,9 +523,19 @@ function AgendaSundayCard({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Open presentation"
-            style={styles.playButton}
+            style={[
+              styles.playButton,
+              {
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: colors.primary,
+                justifyContent: 'center',
+                alignItems: 'center',
+              },
+            ]}
           >
-            <PlayIcon size={24} color={colors.textSecondary} />
+            <PlayIcon size={20} color={colors.onPrimary} />
           </Pressable>
         )}
         {expandable && (

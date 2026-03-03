@@ -135,7 +135,6 @@ export function useUpdateMember() {
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
       }
-      // CR-246: Cascade phone/name/informal_name update to future speeches
       const today = new Date().toISOString().split('T')[0];
       const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
       try {

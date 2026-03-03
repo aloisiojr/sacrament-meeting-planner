@@ -57,7 +57,6 @@ export default function SettingsScreen() {
   const isBishopric = role === 'bishopric';
   const currentAppLanguage = getCurrentLanguage();
 
-  // CR-221: Managed prayers toggle (Bispado only)
   const { managePrayers } = useWardManagePrayers();
 
   const toggleManagePrayersMutation = useMutation({

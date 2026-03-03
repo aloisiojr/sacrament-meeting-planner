@@ -109,7 +109,6 @@ function SpeechesTabContent() {
   const isObserver = role === 'observer';
   const canWriteSundayType = hasPermission('sunday_type:write');
 
-  // CR-221: Check if manage_prayers is enabled
   const { managePrayers } = useWardManagePrayers();
 
   // Fetch speeches and exceptions for the visible range
@@ -240,7 +239,6 @@ function SpeechesTabContent() {
   // Speaker assignment
   const handleAssignSpeaker = useCallback(
     (speechId: string, member: Member) => {
-      // CR-221: When managePrayers=false and position is 0/4, auto-confirm
       const speech = (speeches ?? []).find((s) => s.id === speechId);
       const statusOverride = !managePrayers && speech && (speech.position === 0 || speech.position === 4)
         ? 'assigned_confirmed' as SpeechStatus

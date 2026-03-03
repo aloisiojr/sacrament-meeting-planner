@@ -124,7 +124,6 @@ describe('Permission matrix integration', () => {
 
     it('does not have bishopric-exclusive permission home:next_assignments', () => {
       const role: Role = 'secretary';
-      // CR-243: Secretary now has speech:assign and speech:unassign
       expect(hasPermission(role, 'speech:assign')).toBe(true);
       expect(hasPermission(role, 'speech:unassign')).toBe(true);
       // Secretary still does NOT have home:next_assignments (bishopric-only)

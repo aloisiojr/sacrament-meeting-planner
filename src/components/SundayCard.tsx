@@ -130,7 +130,6 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
       return;
     }
 
-    // CR-221: Determine which positions to delete based on type transition and managePrayers
     const getPositionsToDelete = (): number[] | undefined => {
       if (!managePrayers) return undefined; // delete all (legacy behavior)
 
@@ -145,7 +144,6 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
       return undefined;
     };
 
-    // CR-221: Determine confirmation message based on what will be deleted
     const getConfirmMessage = (): string | null => {
       if (!managePrayers) return null; // use default
 
@@ -220,7 +218,6 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
       return;
     }
 
-    // CR-221: managePrayers-aware type change logic
     const positions = getPositionsToDelete();
     const confirmMsg = getConfirmMessage();
 
@@ -436,8 +433,6 @@ export const SundayCard = React.memo(function SundayCard({
     onRemoveException?.(date);
   }, [date, onRemoveException]);
 
-  // CR-229: Dynamic minHeight for uniform collapsed card height (ADR-110)
-  // CR-232: Reduced LINE_HEIGHT for prayer cards (5 lines) to keep card compact
   const LINE_HEIGHT = managePrayers ? 16 : 18;
   const MARGIN_BOTTOM = 1;
   const maxLines = managePrayers ? 5 : 3;

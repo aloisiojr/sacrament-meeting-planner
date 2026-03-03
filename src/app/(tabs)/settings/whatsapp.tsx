@@ -36,7 +36,6 @@ const PLACEHOLDER_TOKENS = [
   '{link}',
 ] as const;
 
-// CR-221: Prayer templates only use {nome} and {data}
 const PRAYER_PLACEHOLDER_I18N_KEYS = [
   'whatsapp.placeholderName',
   'whatsapp.placeholderDate',
@@ -79,7 +78,6 @@ export default function WhatsAppTemplateScreen() {
   const closingSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
 
-  // CR-221: Segmented control state
   const { managePrayers } = useWardManagePrayers();
   const [activeTab, setActiveTab] = useState<ActiveTab>('speech_1');
 
@@ -110,7 +108,6 @@ export default function WhatsAppTemplateScreen() {
   const [speech3Template, setSpeech3Template] = useState('');
   const [speech3Initialized, setSpeech3Initialized] = useState(false);
 
-  // CR-221: Prayer template states
   const [openingTemplate, setOpeningTemplate] = useState('');
   const [openingInitialized, setOpeningInitialized] = useState(false);
   const [closingTemplate, setClosingTemplate] = useState('');
@@ -161,7 +158,6 @@ export default function WhatsAppTemplateScreen() {
     }
   }, [ward, speech3Initialized, wardLanguage]);
 
-  // CR-221: Initialize opening prayer template from DB
   useEffect(() => {
     if (ward && !openingInitialized) {
       const val = ward.whatsapp_template_opening_prayer;
@@ -176,7 +172,6 @@ export default function WhatsAppTemplateScreen() {
     }
   }, [ward, openingInitialized, wardLanguage]);
 
-  // CR-221: Initialize closing prayer template from DB
   useEffect(() => {
     if (ward && !closingInitialized) {
       const val = ward.whatsapp_template_closing_prayer;
@@ -255,7 +250,6 @@ export default function WhatsAppTemplateScreen() {
     },
   });
 
-  // CR-221: Auto-save mutation for opening prayer template
   const saveOpeningMutation = useMutation({
     mutationFn: async (newTemplate: string) => {
       const { error } = await supabase
@@ -272,7 +266,6 @@ export default function WhatsAppTemplateScreen() {
     },
   });
 
-  // CR-221: Auto-save mutation for closing prayer template
   const saveClosingMutation = useMutation({
     mutationFn: async (newTemplate: string) => {
       const { error } = await supabase
@@ -325,7 +318,6 @@ export default function WhatsAppTemplateScreen() {
     [saveSpeech3Mutation]
   );
 
-  // CR-221: Handle opening prayer template change
   const handleOpeningChange = useCallback(
     (text: string) => {
       setOpeningTemplate(text);
@@ -337,7 +329,6 @@ export default function WhatsAppTemplateScreen() {
     [saveOpeningMutation]
   );
 
-  // CR-221: Handle closing prayer template change
   const handleClosingChange = useCallback(
     (text: string) => {
       setClosingTemplate(text);

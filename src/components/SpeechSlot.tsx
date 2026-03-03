@@ -59,7 +59,6 @@ export interface SpeechSlotProps {
 // --- Position Labels ---
 
 function getPositionLabel(position: number, t: (key: string, opts?: Record<string, unknown>) => string, isPrayer?: boolean): string {
-  // CR-221: Prayer labels for positions 0 and 4
   if (isPrayer) {
     if (position === 0) return t('prayers.opening');
     if (position === 4) return t('prayers.closing');

@@ -95,7 +95,6 @@ describe('Permissions', () => {
       expect(hasPermission('secretary', 'speech:unassign')).toBe(true);
       expect(hasPermission('secretary', 'home:next_assignments')).toBe(false);
 
-      // CR-23: Secretary now has settings:users
       expect(hasPermission('secretary', 'settings:users')).toBe(true);
 
       // Secretary-specific permission

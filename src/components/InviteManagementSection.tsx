@@ -46,7 +46,6 @@ export function InviteManagementSection() {
   const changeStatus = useChangeStatus();
   const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
 
-  // CR-221: Check if manage_prayers is enabled
   const { managePrayers } = useWardManagePrayers();
 
   // F142: Fetch ward's custom WhatsApp template from database
@@ -88,7 +87,6 @@ export function InviteManagementSection() {
     () => {
       const items = getInviteItems(speeches ?? [], locale, formatDate);
       // F118: Filter out position 2 invite items when has_second_speech is false
-      // CR-221: Filter out prayer positions (0, 4) when managePrayers is false
       return items.filter((item) => {
         if (item.speech.position === 2) {
           const hasSecond = agendaMap.get(item.speech.sunday_date);
@@ -107,7 +105,6 @@ export function InviteManagementSection() {
     async (speech: Speech) => {
       // Open WhatsApp and set status to invited
       if (speech.speaker_phone) {
-        // CR-221: Select WhatsApp template based on position
         let url: string;
         if (speech.position === 0 || speech.position === 4) {
           // Prayer: use prayer-specific template with {nome} and {data} placeholders

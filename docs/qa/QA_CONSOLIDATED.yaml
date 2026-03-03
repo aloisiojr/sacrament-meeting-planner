@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 5
+  version: 6
 
 validations:
 
@@ -1018,3 +1018,165 @@ validations:
         description: "register.tsx (first-user) already calls changeLanguage(language) after session - verify still works"
         result: PASS
         evidence: "register.tsx line 109: changeLanguage(language) still present after setSession. Works correctly."
+
+  # ===========================================================================
+  # Phase 5: Speech Count per Member (QA_PLAN_005)
+  # ===========================================================================
+
+  - id: QA_005
+    plan: QA_PLAN_005
+    date: "2026-03-03"
+    scope: "Phase 5 - CR-258: Speech count per member in last 6 months"
+    verdict: passed
+    must_pass: 12/12
+    should_pass: 7/7
+    total_checks: 19/19
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (794 tests, 18 new)"
+
+    checks:
+
+      # --- CR-258: DB / Backend ---
+
+      - id: CR258_MP1
+        cr: CR-258
+        type: must_pass
+        description: "Speech count query only includes positions 1, 2, 3 (speeches, not prayers)"
+        result: PASS
+        evidence: "src/hooks/useSpeechCounts.ts line 40: .in('position', [1, 2, 3]) - explicitly filters to speech positions only, excluding prayers (0, 4)"
+
+      - id: CR258_MP2
+        cr: CR-258
+        type: must_pass
+        description: "Speech count query filters by sunday_date >= 6 months ago"
+        result: PASS
+        evidence: "src/hooks/useSpeechCounts.ts lines 25-29: cutoffDate computed as new Date().setMonth(getMonth() - 6); line 42: .gte('sunday_date', cutoffDate). Also line 43: .lte('sunday_date', today) to exclude future speeches."
+
+      - id: CR258_MP3
+        cr: CR-258
+        type: must_pass
+        description: "Speech count query scoped by ward_id (RLS or explicit filter)"
+        result: PASS
+        evidence: "src/hooks/useSpeechCounts.ts line 39: .eq('ward_id', wardId) - explicit ward_id filter. wardId comes from useAuth() context."
+
+      - id: CR258_MP4
+        cr: CR-258
+        type: must_pass
+        description: "Smart DB strategy: no N+1 queries (batch approach)"
+        result: PASS
+        evidence: "src/hooks/useSpeechCounts.ts lines 36-52: Single Supabase query fetches all speech records (member_id only) for the ward, then counts client-side in a Map. Integration test AC-046-06 at useSpeechCounts.integration.test.ts line 187-207 confirms exactly 1 supabase.from('speeches') call."
+
+      # --- CR-258: UI - Member list in settings ---
+
+      - id: CR258_MP5
+        cr: CR-258
+        type: must_pass
+        description: "Member list in settings shows speech count text below member info"
+        result: PASS
+        evidence: "src/app/(tabs)/settings/members.tsx lines 260-264: {speechCount > 0 && (<Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>{t('members.speechCount', { count: speechCount })}</Text>)}. MemberRow receives speechCount prop (line 205, 219). MembersScreen passes speechCounts.get(item.id) ?? 0 at line 549."
+
+      - id: CR258_MP6
+        cr: CR-258
+        type: must_pass
+        description: "Member list hides speech count text when count is zero"
+        result: PASS
+        evidence: "src/app/(tabs)/settings/members.tsx line 260: {speechCount > 0 && ...} - conditional rendering only when count > 0."
+
+      # --- CR-258: UI - MemberSelectorModal ---
+
+      - id: CR258_MP7
+        cr: CR-258
+        type: must_pass
+        description: "MemberSelectorModal shows speech count text for each member"
+        result: PASS
+        evidence: "src/components/MemberSelectorModal.tsx lines 102-106: {(speechCounts.get(item.id) ?? 0) > 0 && (<Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>{t('members.speechCount', { count: speechCounts.get(item.id) ?? 0 })}</Text>)}. useSpeechCounts imported at line 19, called at line 41."
+
+      - id: CR258_MP8
+        cr: CR-258
+        type: must_pass
+        description: "MemberSelectorModal hides speech count text when count is zero"
+        result: PASS
+        evidence: "src/components/MemberSelectorModal.tsx line 102: {(speechCounts.get(item.id) ?? 0) > 0 && ...} - conditional rendering only when count > 0."
+
+      # --- CR-258: i18n ---
+
+      - id: CR258_MP9
+        cr: CR-258
+        type: must_pass
+        description: "i18n key for speech count text exists in all 3 locales (pt-BR, en-US, es-LA)"
+        result: PASS
+        evidence: "pt-BR.json lines 192-193: speechCount_one/speechCount_other. en-US.json lines 192-193: speechCount_one/speechCount_other. es-LA.json lines 192-193: speechCount_one/speechCount_other."
+
+      - id: CR258_MP10
+        cr: CR-258
+        type: must_pass
+        description: "pt-BR text follows the requested format: 'X discursos nos ultimos 6 meses'"
+        result: PASS
+        evidence: "pt-BR.json: speechCount_one='{{count}} discurso nos ultimos 6 meses', speechCount_other='{{count}} discursos nos ultimos 6 meses'. Matches user request 'X discursos nos ultimos 6 meses' with proper singular/plural."
+
+      # --- CR-258: Tests ---
+
+      - id: CR258_MP11
+        cr: CR-258
+        type: must_pass
+        description: "All existing tests still pass after changes"
+        result: PASS
+        evidence: "npx vitest run: 35 test files, 794 tests passed, 0 failures. Up from 703 tests (91 new tests total across phases, 18 new for CR-258)."
+
+      - id: CR258_MP12
+        cr: CR-258
+        type: must_pass
+        description: "New tests cover speech count logic"
+        result: PASS
+        evidence: "2 new test files: (1) src/__tests__/useSpeechCounts-utils.test.ts (5 tests) - query key factory. (2) src/__tests__/integration/useSpeechCounts.integration.test.ts (13 tests) - covers: empty Map (EC-046-02), count per member (AC-046-06), zero count hidden (AC-046-03), null data (EC-046-01), query failure (EC-046-09), wardId empty, query key shape, single bulk call (AC-046-06), singular (AC-046-04), plural (AC-046-05), sync integration (AC-046-09, 3 tests)."
+
+      # --- CR-258: should_pass ---
+
+      - id: CR258_SP1
+        cr: CR-258
+        type: should_pass
+        description: "DB index on speeches(member_id) or speeches(member_id, sunday_date) exists or is created"
+        result: PASS
+        evidence: "supabase/migrations/027_speech_count_index.sql: CREATE INDEX idx_speeches_member_count ON speeches(ward_id, member_id, position, sunday_date) WHERE member_id IS NOT NULL. Partial index with composite columns covers the exact query pattern."
+
+      - id: CR258_SP2
+        cr: CR-258
+        type: should_pass
+        description: "Speech count data is cached via React Query with appropriate cache key"
+        result: PASS
+        evidence: "src/hooks/useSpeechCounts.ts: queryKey: speechCountKeys.byWard(wardId) = ['speechCounts', wardId]. Dedicated key separate from speechKeys. Integration test confirms query key shape."
+
+      - id: CR258_SP3
+        cr: CR-258
+        type: should_pass
+        description: "i18n handles singular vs plural correctly (1 discurso vs 2 discursos)"
+        result: PASS
+        evidence: "Uses i18next _one/_other pattern: speechCount_one (count=1) and speechCount_other (count!=1). All 3 locales use this pattern."
+
+      - id: CR258_SP4
+        cr: CR-258
+        type: should_pass
+        description: "en-US translation is natural English"
+        result: PASS
+        evidence: "en-US.json: speechCount_one='{{count}} speech in the last 6 months', speechCount_other='{{count}} speeches in the last 6 months'. Natural English."
+
+      - id: CR258_SP5
+        cr: CR-258
+        type: should_pass
+        description: "es-LA translation is natural Spanish"
+        result: PASS
+        evidence: "es-LA.json: speechCount_one='{{count}} discurso en los ultimos 6 meses', speechCount_other='{{count}} discursos en los ultimos 6 meses'. Natural Spanish."
+
+      - id: CR258_SP6
+        cr: CR-258
+        type: should_pass
+        description: "Speech count text uses textSecondary color and small font (consistent with existing info lines)"
+        result: PASS
+        evidence: "members.tsx line 261: { color: colors.textSecondary }. Style memberSpeechCount (line 829-832): fontSize: 12, marginTop: 2. MemberSelectorModal line 103: { color: colors.textSecondary }. Style memberSpeechCount (line 158-161): fontSize: 12, marginTop: 2. Consistent with memberPhone style (fontSize: 13, marginTop: 2)."
+
+      - id: CR258_SP7
+        cr: CR-258
+        type: should_pass
+        description: "Speech count query invalidated when a speech assignment changes"
+        result: PASS
+        evidence: "src/lib/sync.ts line 49: speeches table maps to [speechKeys.all, speechCountKeys.all]. When realtime sync detects a speech change, both speech and speechCount queries are invalidated. Integration test at useSpeechCounts.integration.test.ts lines 243-271 confirms speechCountKeys.all is in TABLE_TO_QUERY_KEYS.speeches."

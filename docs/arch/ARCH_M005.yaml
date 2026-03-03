@@ -1,0 +1,650 @@
+# =============================================================================
+# ARCH_M005.yaml - Architecture for Phase 2 (Speech Count Feature)
+# CR-258: Speech Count per Member (Last 6 Months)
+# Generated: 2026-03-03
+# Artifact ID: 005
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+artifact_id: "005"
+
+metadata:
+  specs: [F046]
+  crs: [CR-258]
+  type: feature
+  date: "2026-03-03"
+  phase: "Phase 2 - Speech Count Feature"
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    Show the count of speeches each member gave in the last 6 months in two
+    locations: the member list (Settings) and the speaker selector modal.
+    A single bulk query fetches all counts to avoid N+1. A new DB index
+    optimizes the query. i18n supports singular/plural in 3 languages.
+  principles:
+    - "Single bulk query with client-side aggregation (no N+1)"
+    - "New dedicated hook with independent query key and caching"
+    - "Read-only informational data visible to all roles"
+    - "Partial DB index for optimized counting"
+    - "Zero count = no text rendered (not '0 discursos')"
+
+# =============================================================================
+# ARCHITECTURE IMPACT ASSESSMENT
+# =============================================================================
+
+architecture_impact: low
+summary: |
+  F046 (CR-258) adds a new read-only data hook (useSpeechCounts) and renders
+  supplementary text in two existing components. No new modules, no new
+  permissions, no schema changes beyond a new index. The feature reads from
+  the existing speeches table and does not modify any data.
+
+  Scope of changes:
+  - 1 new file: src/hooks/useSpeechCounts.ts (new hook)
+  - 1 new migration: supabase/migrations/027_speech_count_index.sql
+  - 2 modified UI files: members.tsx, MemberSelectorModal.tsx
+  - 3 modified i18n files: pt-BR.json, en-US.json, es-LA.json
+  - 1 modified sync file: src/lib/sync.ts (add speechCounts to speeches invalidation)
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F046 (Speech Count):
+
+    [speeches table] <-- partial index (027_speech_count_index.sql)
+          |
+          v
+    [useSpeechCounts hook] -- query key: ['speechCounts', wardId]
+          |                    returns: Map<string, number>
+          |
+          +---> [MemberRow in members.tsx] -- renders count text below phone
+          |
+          +---> [MemberSelectorModal.tsx] -- renders count text below full_name
+
+    Invalidation:
+    [speech mutations] --> invalidate speechKeys.all
+                      --> Realtime speeches event --> sync.ts --> invalidate speechCounts too
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-017
+    title: Client-side aggregation for speech counts
+    decision: |
+      Fetch individual rows from speeches table via Supabase JS client and
+      count per member_id in JavaScript using a Map, rather than using a
+      PostgreSQL RPC function with GROUP BY + COUNT.
+    rationale: |
+      Supabase JS client does not support GROUP BY + COUNT natively in its
+      query builder. Creating an RPC function would add server-side complexity
+      for a query that returns small result sets (a ward's speeches over 6
+      months is typically 50-200 rows). Client-side counting with Map is O(n)
+      and trivial.
+
+      Trade-offs considered:
+      - RPC: Requires new PostgreSQL function, deploy step, maintenance.
+        Returns exact counts but adds server-side code for minimal gain.
+      - Client-side: Fetches slightly more data (individual rows vs aggregated
+        rows), but the data volume is small and the Map aggregation is fast.
+      - The partial index ensures the DB query itself is efficient regardless
+        of aggregation strategy.
+
+  - id: ADR-018
+    title: Dedicated query key for speech counts
+    decision: |
+      Use a separate query key ['speechCounts', wardId] for the useSpeechCounts
+      hook instead of piggybacking on speechKeys.all or embedding counts in the
+      member query.
+    rationale: |
+      Speech counts have different invalidation triggers than member data.
+      Members change on member CRUD; speech counts change on speech mutations.
+      Coupling them would cause unnecessary refetches. A dedicated query key
+      allows TanStack Query to cache and invalidate speech counts independently.
+
+      The sync.ts TABLE_TO_QUERY_KEYS mapping for the 'speeches' table is
+      updated to also invalidate the speechCounts query key, ensuring realtime
+      sync keeps counts fresh across devices.
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # C1: useSpeechCounts hook
+  # ---------------------------------------------------------------------------
+  - id: C1
+    name: "useSpeechCounts - Bulk speech count hook"
+    file: src/hooks/useSpeechCounts.ts
+    type: new_file
+    responsibility: |
+      TanStack Query hook that fetches all speech records for the ward in the
+      last 6 months (positions 1-3 only, member_id IS NOT NULL, sunday_date
+      <= today), counts occurrences per member_id client-side, and returns
+      a Map<string, number>.
+    contracts:
+      - name: "speechCountKeys"
+        type: query_key_factory
+        definition: |
+          export const speechCountKeys = {
+            all: ['speechCounts'] as const,
+            byWard: (wardId: string) => ['speechCounts', wardId] as const,
+          };
+        notes: |
+          Follows the same query key pattern as other hooks (speechKeys,
+          memberKeys, etc.). The 'all' key is used for broad invalidation
+          and registered in sync.ts.
+
+      - name: "useSpeechCounts()"
+        type: hook
+        input: "none (wardId from useAuth)"
+        output: |
+          {
+            data: Map<string, number>;  // member_id -> speech count
+            isLoading: boolean;
+          }
+        implementation: |
+          export function useSpeechCounts(): { data: Map<string, number>; isLoading: boolean } {
+            const { wardId } = useAuth();
+
+            const cutoffDate = useMemo(() => {
+              const d = new Date();
+              d.setMonth(d.getMonth() - 6);
+              return d.toISOString().split('T')[0];
+            }, []);
+
+            const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+            const { data, isLoading } = useQuery({
+              queryKey: speechCountKeys.byWard(wardId),
+              queryFn: async () => {
+                const { data: rows, error } = await supabase
+                  .from('speeches')
+                  .select('member_id')
+                  .eq('ward_id', wardId)
+                  .in('position', [1, 2, 3])
+                  .not('member_id', 'is', null)
+                  .gte('sunday_date', cutoffDate)
+                  .lte('sunday_date', today);
+
+                if (error) throw error;
+
+                const counts = new Map<string, number>();
+                for (const row of rows ?? []) {
+                  const id = row.member_id as string;
+                  counts.set(id, (counts.get(id) ?? 0) + 1);
+                }
+                return counts;
+              },
+              enabled: !!wardId,
+            });
+
+            return { data: data ?? new Map(), isLoading };
+          }
+        notes: |
+          - cutoffDate: 6 calendar months back from today using Date.setMonth.
+          - today upper bound: excludes future speeches (only "last 6 months").
+          - .select('member_id'): minimal payload, only the column needed.
+          - .not('member_id', 'is', null): Supabase syntax for IS NOT NULL.
+          - .in('position', [1, 2, 3]): excludes prayers (positions 0, 4).
+          - Client-side Map aggregation: O(n) where n = matching rows.
+          - Returns empty Map when no data or loading, so consumers can
+            safely call .get(id) without null checks.
+          - cutoffDate and today are memoized to prevent unnecessary refetches.
+            They are stable for the lifetime of the component mount. If the
+            user keeps the app open past midnight, the next query invalidation
+            will create a new component instance with fresh dates.
+
+  # ---------------------------------------------------------------------------
+  # C2: MemberRow speech count display
+  # ---------------------------------------------------------------------------
+  - id: C2
+    name: "MemberRow - Display speech count in members.tsx"
+    file: src/app/(tabs)/settings/members.tsx
+    type: code_change
+    responsibility: |
+      Add speech count text below the phone number line in MemberRow.
+      The count is passed to MemberRow from MembersScreen, which calls
+      useSpeechCounts() once and passes the Map down.
+    contracts:
+      - name: "MemberRowProps extension"
+        type: interface_change
+        before: |
+          interface MemberRowProps {
+            member: Member;
+            isEditing: boolean;
+            activeSwipeId: string | null;
+            onSwipeReveal: (id: string | null) => void;
+            onEdit: (member: Member) => void;
+            onDelete: (member: Member) => void;
+            onSave: (data: { ... }) => void;
+            onCancel: () => void;
+            disabled: boolean;
+            colors: ReturnType<typeof useTheme>['colors'];
+          }
+        after: |
+          interface MemberRowProps {
+            member: Member;
+            isEditing: boolean;
+            activeSwipeId: string | null;
+            onSwipeReveal: (id: string | null) => void;
+            onEdit: (member: Member) => void;
+            onDelete: (member: Member) => void;
+            onSave: (data: { ... }) => void;
+            onCancel: () => void;
+            disabled: boolean;
+            colors: ReturnType<typeof useTheme>['colors'];
+            speechCount: number;
+          }
+        notes: |
+          speechCount is the pre-looked-up count for this member.
+          MembersScreen does: speechCounts.get(member.id) ?? 0
+
+      - name: "MemberRow speech count rendering"
+        type: jsx_addition
+        location: "After the phone Text element, inside memberInfo View"
+        code: |
+          {speechCount > 0 && (
+            <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+              {t('members.speechCount', { count: speechCount })}
+            </Text>
+          )}
+        notes: |
+          - Only renders when speechCount > 0 (BR-046-04).
+          - Uses i18next interpolation with count for plural handling.
+          - Style matches memberPhone visual weight (fontSize: 12, marginTop: 2).
+
+      - name: "New style: memberSpeechCount"
+        type: style_addition
+        definition: |
+          memberSpeechCount: {
+            fontSize: 12,
+            marginTop: 2,
+          },
+        notes: |
+          Matches memberPhone style (fontSize: 13, marginTop: 2) but slightly
+          smaller (12) to visually subordinate it as tertiary info.
+
+      - name: "MembersScreen useSpeechCounts call"
+        type: hook_usage
+        location: "In MembersScreen function body, after useMembers"
+        code: |
+          const { data: speechCounts } = useSpeechCounts();
+        notes: |
+          Single call, result passed to all MemberRow instances via renderItem.
+
+      - name: "renderItem update"
+        type: prop_addition
+        location: "In renderItem callback, MemberRow component"
+        code: |
+          <MemberRow
+            ...existing props...
+            speechCount={speechCounts.get(item.id) ?? 0}
+          />
+        notes: |
+          Map.get returns undefined for missing keys; ?? 0 provides default.
+
+    behavioral_change: |
+      Members with 1+ speeches in the last 6 months show a count text line
+      below their info. Members with 0 speeches show no additional text.
+      The text is translated and uses singular/plural forms.
+
+  # ---------------------------------------------------------------------------
+  # C3: MemberSelectorModal speech count display
+  # ---------------------------------------------------------------------------
+  - id: C3
+    name: "MemberSelectorModal - Display speech count"
+    file: src/components/MemberSelectorModal.tsx
+    type: code_change
+    responsibility: |
+      Add speech count text below each member's full_name in the selector
+      modal. The modal calls useSpeechCounts() internally.
+    contracts:
+      - name: "Import useSpeechCounts"
+        type: import_addition
+        code: |
+          import { useSpeechCounts } from '../hooks/useSpeechCounts';
+
+      - name: "Hook call in MemberSelectorModal"
+        type: hook_usage
+        location: "Inside MemberSelectorModal function body, after useMembers"
+        code: |
+          const { data: speechCounts } = useSpeechCounts();
+        notes: |
+          Called inside the modal component. TanStack Query deduplicates
+          with the same call in MembersScreen if both are mounted, so
+          only one network request is made.
+
+      - name: "Speech count rendering in renderItem"
+        type: jsx_addition
+        location: "Below the item.full_name Text element, inside the Pressable"
+        before: |
+          <Pressable
+            style={[styles.memberItem, ...]}
+            onPress={() => handleSelect(item)}
+          >
+            <Text style={[styles.memberName, ...]} numberOfLines={1}>
+              {item.full_name}
+            </Text>
+          </Pressable>
+        after: |
+          <Pressable
+            style={[styles.memberItem, ...]}
+            onPress={() => handleSelect(item)}
+          >
+            <Text style={[styles.memberName, ...]} numberOfLines={1}>
+              {item.full_name}
+            </Text>
+            {(speechCounts.get(item.id) ?? 0) > 0 && (
+              <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+                {t('members.speechCount', { count: speechCounts.get(item.id) ?? 0 })}
+              </Text>
+            )}
+          </Pressable>
+        notes: |
+          Uses inline lookup from speechCounts Map. The double .get() is
+          acceptable since Map.get is O(1) and the JSX is simple.
+
+      - name: "New style: memberSpeechCount"
+        type: style_addition
+        definition: |
+          memberSpeechCount: {
+            fontSize: 12,
+            marginTop: 2,
+          },
+        notes: |
+          Same style as in members.tsx for visual consistency.
+
+    behavioral_change: |
+      When opening the speaker selector modal, members with speeches in
+      the last 6 months show count text below their name. This helps
+      the user avoid over-assigning the same person.
+
+  # ---------------------------------------------------------------------------
+  # C4: Database migration - speech count index
+  # ---------------------------------------------------------------------------
+  - id: C4
+    name: "Migration 027: Speech count partial index"
+    file: supabase/migrations/027_speech_count_index.sql
+    type: migration
+    responsibility: |
+      Create a partial composite index on speeches table to optimize the
+      bulk speech count query.
+    contracts:
+      - name: "CREATE INDEX"
+        type: sql_ddl
+        sql: |
+          -- Migration 027: Add partial index for speech count query (CR-258)
+          -- Covers: WHERE ward_id = ? AND position IN (1,2,3) AND member_id IS NOT NULL
+          --         AND sunday_date >= ? AND sunday_date <= ?
+          -- Used by: useSpeechCounts hook
+          CREATE INDEX idx_speeches_member_count
+            ON speeches(ward_id, member_id, position, sunday_date)
+            WHERE member_id IS NOT NULL;
+        notes: |
+          - Composite index columns ordered by selectivity: ward_id (equality),
+            member_id (GROUP BY / output), position (IN filter), sunday_date (range).
+          - Partial index (WHERE member_id IS NOT NULL) excludes unassigned
+            speech slots, keeping the index smaller.
+          - The existing indexes (idx_speeches_ward_id, idx_speeches_sunday_date)
+            do not cover member_id, so they cannot satisfy the GROUP BY
+            (or in this case, the client-side aggregation scan).
+          - This index makes the query an efficient index scan even for
+            large wards with years of speech history.
+    behavioral_change: |
+      No visible change. Query performance improvement for the speech count
+      query. The index is created concurrently-safe (no CONCURRENTLY needed
+      since this runs during migration, not on a live table with active traffic).
+
+  # ---------------------------------------------------------------------------
+  # C5: i18n keys for speech count text
+  # ---------------------------------------------------------------------------
+  - id: C5
+    name: "i18n keys for speech count (3 languages, singular/plural)"
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    type: code_change
+    responsibility: |
+      Add i18n keys for the speech count text with singular/plural support
+      using i18next's built-in plural rules.
+    contracts:
+      - name: "pt-BR keys"
+        type: json_addition
+        location: "Inside 'members' object in pt-BR.json"
+        keys: |
+          "speechCount_one": "{{count}} discurso nos ultimos 6 meses",
+          "speechCount_other": "{{count}} discursos nos ultimos 6 meses"
+        notes: |
+          Portuguese plural rule: _one for count=1, _other for count!=1.
+          i18next uses the key suffix to select the correct form based on
+          the count interpolation variable.
+
+      - name: "en-US keys"
+        type: json_addition
+        location: "Inside 'members' object in en-US.json"
+        keys: |
+          "speechCount_one": "{{count}} speech in the last 6 months",
+          "speechCount_other": "{{count}} speeches in the last 6 months"
+
+      - name: "es-LA keys"
+        type: json_addition
+        location: "Inside 'members' object in es-LA.json"
+        keys: |
+          "speechCount_one": "{{count}} discurso en los ultimos 6 meses",
+          "speechCount_other": "{{count}} discursos en los ultimos 6 meses"
+
+    behavioral_change: |
+      Calling t('members.speechCount', { count: N }) returns the correct
+      singular or plural form in the active language. i18next automatically
+      selects _one or _other based on the count value and language rules.
+
+  # ---------------------------------------------------------------------------
+  # C6: Sync table mapping update
+  # ---------------------------------------------------------------------------
+  - id: C6
+    name: "sync.ts - Add speechCounts to speeches invalidation"
+    file: src/lib/sync.ts
+    type: code_change
+    responsibility: |
+      When the speeches table changes via Realtime or polling, also
+      invalidate the speechCounts query key so counts stay fresh.
+    contracts:
+      - name: "Import speechCountKeys"
+        type: import_addition
+        code: |
+          import { speechCountKeys } from '../hooks/useSpeechCounts';
+
+      - name: "TABLE_TO_QUERY_KEYS update"
+        type: mapping_change
+        before: |
+          speeches: [speechKeys.all],
+        after: |
+          speeches: [speechKeys.all, speechCountKeys.all],
+        notes: |
+          When a Realtime event fires for the speeches table, both
+          speechKeys.all and speechCountKeys.all are invalidated.
+          This ensures speech counts update when another device
+          assigns/unassigns a speaker.
+
+    behavioral_change: |
+      Speech counts now update in real-time across devices when speeches
+      change. Previously only speech data (SundayCards) would refresh.
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph:
+  description: |
+    C4 (migration) has no code dependencies - it can be deployed first.
+    C1 (hook) is required by C2 and C3 (UI components).
+    C5 (i18n) is required by C2 and C3 (they call t('members.speechCount')).
+    C6 (sync) depends on C1 (imports speechCountKeys).
+
+  flow: |
+    C4 (migration) --------- independent, deploy first
+    C5 (i18n keys) --------- independent, no imports
+    C1 (useSpeechCounts) --- depends on: supabase client, useAuth
+    C6 (sync.ts) ----------- depends on: C1 (speechCountKeys import)
+    C2 (members.tsx) ------- depends on: C1 (useSpeechCounts), C5 (i18n)
+    C3 (MemberSelectorModal) depends on: C1 (useSpeechCounts), C5 (i18n)
+
+  compilation_order: |
+    1. C4 (migration) - no compile step
+    2. C5 (i18n JSON) - no compile dependencies
+    3. C1 (hook) - must exist before C2, C3, C6
+    4. C6 (sync) - imports from C1
+    5. C2 (members.tsx) - imports from C1, uses C5 keys
+    6. C3 (MemberSelectorModal) - imports from C1, uses C5 keys
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+
+implementation_order:
+  description: |
+    Ordered by dependency. Migration first (no code deps), then foundation
+    (hook, i18n), then consumers (UI, sync).
+  steps:
+    - step: 1
+      component: C4
+      action: "Create migration 027_speech_count_index.sql"
+      reason: "No dependencies. Creates the index that optimizes C1's query."
+
+    - step: 2
+      component: C5
+      action: "Add i18n keys to all 3 locale files"
+      reason: "No code dependencies. Provides translation keys for C2, C3."
+
+    - step: 3
+      component: C1
+      action: "Create src/hooks/useSpeechCounts.ts"
+      reason: "Foundation hook required by C2, C3, and C6."
+
+    - step: 4
+      component: C6
+      action: "Update sync.ts to invalidate speechCounts on speech changes"
+      reason: "Ensures realtime sync invalidates the new query key."
+
+    - step: 5
+      component: C2
+      action: "Add speech count display to MemberRow in members.tsx"
+      reason: "First UI consumer. Imports useSpeechCounts and i18n keys."
+
+    - step: 6
+      component: C3
+      action: "Add speech count display to MemberSelectorModal.tsx"
+      reason: "Second UI consumer. Same pattern as C2."
+
+# =============================================================================
+# DEPLOY ORDER
+# =============================================================================
+
+deploy_order:
+  steps:
+    - step: 1
+      action: "Run migration 027_speech_count_index.sql"
+      component: C4
+      reason: "Creates index. Safe to run before app deploy; index does not affect existing queries."
+
+    - step: 2
+      action: "Deploy app update with all code changes"
+      components: [C1, C2, C3, C5, C6]
+      reason: "All code changes ship together in a single app update."
+
+  notes: |
+    The migration (step 1) creates an index only, no schema changes.
+    It can be deployed at any time before or after the app update.
+    The app update (step 2) includes the hook, UI changes, i18n keys,
+    and sync mapping. All are needed together for the feature to work.
+
+# =============================================================================
+# RISK ANALYSIS
+# =============================================================================
+
+risks:
+
+  - id: R1
+    risk: "Client-side aggregation performance with large datasets"
+    severity: low
+    mitigation: |
+      A ward with 100 members and biweekly speeches over 6 months produces
+      ~300 speech rows. Iterating 300 rows and building a Map is sub-millisecond.
+      Even extreme cases (500 members, weekly speeches) produce ~3000 rows,
+      which is still trivial for client-side aggregation.
+
+  - id: R2
+    risk: "Stale cutoff date when app stays open past midnight"
+    severity: negligible
+    mitigation: |
+      cutoffDate and today are computed via useMemo on component mount.
+      If the user keeps the app open past midnight, the dates become stale
+      by 1 day. The next query invalidation (from speech mutation or
+      realtime event) will cause a re-render with fresh dates. This is
+      acceptable since the count changes by at most 1 in edge cases.
+
+  - id: R3
+    risk: "Network failure hides all speech counts"
+    severity: low
+    mitigation: |
+      If useSpeechCounts query fails, data is an empty Map. No count text
+      is shown for any member (graceful degradation). The member list and
+      speaker selector continue to function normally. TanStack Query
+      retries automatically (3 retries by default).
+
+  - id: R4
+    risk: "Speech count text increases MemberRow height"
+    severity: low
+    mitigation: |
+      The text (fontSize: 12, marginTop: 2) adds ~16px to MemberRow height
+      only for members with speeches. This is consistent with the existing
+      variable height (some members show phone, some don't). FlatList handles
+      variable heights natively.
+
+# =============================================================================
+# ARCH_CONSOLIDATED UPDATES
+# =============================================================================
+
+arch_consolidated_updates:
+
+  - section: metadata.total_modules
+    old: "13"
+    new: "13"
+    note: "No new modules. useSpeechCounts is part of M006 (Speech Management)."
+
+  - section: metadata.total_adrs
+    old: "16"
+    new: "18"
+    note: "Added ADR-017 (client-side aggregation) and ADR-018 (dedicated query key)."
+
+  - section: database_schema.total_migrations
+    old: "26"
+    new: "27"
+
+  - section: modules.M006.components
+    add: |
+      - path: src/hooks/useSpeechCounts.ts
+        responsibility: TanStack Query hook for bulk speech count (last 6 months) with client-side aggregation
+
+  - section: modules.M006.features
+    old: "[F013, F014, F015, F016, F017, F018]"
+    new: "[F013, F014, F015, F016, F017, F018, F046]"
+
+  - section: shared_libraries (sync.ts note)
+    note: |
+      sync.ts TABLE_TO_QUERY_KEYS for 'speeches' now includes speechCountKeys.all
+      in addition to speechKeys.all.

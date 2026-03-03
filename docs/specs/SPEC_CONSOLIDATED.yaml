@@ -8,9 +8,9 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  total_features: 41
-  total_business_rules: 27
-  total_design_decisions: 18
+  total_features: 42
+  total_business_rules: 32
+  total_design_decisions: 25
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -1031,6 +1031,30 @@ features:
         when: "Migration 025 runs"
         then: "Actor has role='preside' (highest priority wins)"
 
+  - id: F046
+    name: Speech Count per Member (Last 6 Months)
+    area: speeches
+    description: |
+      Shows the count of speeches each member gave in the last 6 months.
+      Positions 1-3 only (prayers excluded). Displayed in two locations:
+      (1) member list in Settings, (2) speaker selector modal. Text format:
+      "X discursos nos ultimos 6 meses" (translated, singular/plural).
+      Hidden if count is zero. Single bulk query with GROUP BY for efficiency.
+      [CR-258]
+    acceptance_criteria:
+      - given: "A member has 3 speeches (positions 1-3) in the last 6 months"
+        when: "User views Settings > Members"
+        then: "Text '3 discursos nos ultimos 6 meses' appears below member info in textSecondary color"
+      - given: "A member has 2 speeches in the last 6 months"
+        when: "User opens speaker selector modal"
+        then: "Text '2 discursos nos ultimos 6 meses' appears below member name"
+      - given: "A member has 0 speeches in the last 6 months"
+        when: "Member is displayed in any list"
+        then: "No speech count text is shown"
+      - given: "A member has 2 speeches and 3 prayers in the last 6 months"
+        when: "Speech count is calculated"
+        then: "Count is 2 (only positions 1-3 counted, not 0/4)"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1155,6 +1179,26 @@ business_rules:
     rule: "Presentation mode font toggle"
     description: "Font size toggle in Presentation Mode header cycles between normal and large. Not persisted across sessions."
 
+  - id: BR029
+    rule: "Speech count positions filter"
+    description: "Speech count per member only includes positions 1, 2, 3 (speeches). Positions 0 and 4 (prayers) are excluded."
+
+  - id: BR030
+    rule: "Speech count rolling window"
+    description: "Speech count window is rolling 6 calendar months from today's date. Speeches older than 6 months are excluded."
+
+  - id: BR031
+    rule: "Speech count zero hidden"
+    description: "If a member's speech count is 0, no text is displayed. The count line is completely hidden, not shown as '0 discursos'."
+
+  - id: BR032
+    rule: "Speech count bulk query"
+    description: "Speech counts for all ward members are fetched in a single bulk query with GROUP BY, avoiding N+1 query problem."
+
+  - id: BR033
+    rule: "Speech count singular/plural"
+    description: "Speech count text uses singular/plural forms per language: pt-BR (discurso/discursos), en-US (speech/speeches), es-LA (discurso/discursos)."
+
 # =============================================================================
 # DESIGN DECISIONS
 # =============================================================================
@@ -1233,6 +1277,34 @@ design_decisions:
     decision: "Notification trigger via SECURITY DEFINER"
     rationale: "enqueue_speech_notification function uses SECURITY DEFINER to bypass RLS when enqueueing notifications from database triggers."
 
+  - id: DD019
+    decision: "Bulk query with GROUP BY for speech counts"
+    rationale: "Single query fetching all member speech counts avoids N+1 problem. Returns only members with counts > 0, keeping result set small."
+
+  - id: DD020
+    decision: "Dedicated useSpeechCounts hook"
+    rationale: "Separate from useMembers to avoid coupling. Speech counts have different invalidation triggers (speech mutations) than member data (member mutations)."
+
+  - id: DD021
+    decision: "Map<string, number> for speech count data"
+    rationale: "Map provides O(1) lookup by member_id when rendering each member row. Members not in the Map have count 0."
+
+  - id: DD022
+    decision: "Composite partial index for speech count query"
+    rationale: "Index on speeches(ward_id, member_id, position, sunday_date) WHERE member_id IS NOT NULL enables efficient grouped counting."
+
+  - id: DD023
+    decision: "Client-side aggregation from Supabase rows"
+    rationale: "Supabase JS client lacks native GROUP BY + COUNT. Expected data volume (ward speeches over 6 months) is small enough for client-side counting."
+
+  - id: DD024
+    decision: "Speech count visible to all roles"
+    rationale: "Count is derived from speech data already visible to all roles. It is purely informational and read-only."
+
+  - id: DD025
+    decision: "6-month window as calendar months"
+    rationale: "JavaScript Date.setMonth(m - 6) handles calendar month arithmetic including leap year and month boundary edge cases."
+
 # =============================================================================
 # EDGE CASES
 # =============================================================================
@@ -1280,3 +1352,15 @@ edge_cases:
 
   - id: EC014
     description: "Theme preference not yet loaded from AsyncStorage -> loading state prevents render flash"
+
+  - id: EC015
+    description: "Member only has prayers (positions 0,4), no speeches (positions 1-3) -> speech count is 0, no text shown"
+
+  - id: EC016
+    description: "Speech count query fails (network error) -> no count text shown, member list and selector work normally"
+
+  - id: EC017
+    description: "Member deleted (speeches.member_id set to NULL) -> deleted member's speeches excluded from count automatically"
+
+  - id: EC018
+    description: "CSV import replaces all members -> counts reset since old member_ids become NULL in speeches table"

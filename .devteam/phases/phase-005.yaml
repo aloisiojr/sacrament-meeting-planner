@@ -1,0 +1,34 @@
+phase_id: 2
+description: "Speech count feature: last 6 months per member with smart DB strategy (CR-258)"
+status: completed
+features:
+  - id: F046
+    name: "Speech Count per Member (Last 6 Months)"
+    status: completed
+change_requests: [258]
+artifacts_produced:
+  - "docs/specs/SPEC_F005.yaml"
+  - "docs/arch/ARCH_M005.yaml"
+  - "docs/plans/PLAN_P005.yaml"
+  - "docs/qa/QA_PLAN_005.yaml"
+commits:
+  - {hash: "f68be6d", message: "feat(migration): add partial index for speech count query (CR-258)"}
+  - {hash: "0534e7d", message: "feat(i18n): add speechCount singular/plural keys in 3 languages (CR-258)"}
+  - {hash: "fc64aff", message: "feat(useSpeechCounts): add bulk speech count hook with client-side aggregation (CR-258)"}
+  - {hash: "f899e8e", message: "feat(sync): invalidate speechCounts on speech table changes (CR-258)"}
+  - {hash: "c84e991", message: "feat(members): display speech count below member info in member list (CR-258)"}
+  - {hash: "cf4c358", message: "feat(MemberSelectorModal): display speech count below member name in selector (CR-258)"}
+  - {hash: "eab3ed1", message: "test(sync): update sync test to expect speechCounts in speeches query keys (CR-258)"}
+  - {hash: "97a15a9", message: "docs(ledger): add phase 5 commits for CR-258"}
+  - {hash: "7671232", message: "test(phase-5): add 18 tests for F046 (CR-258)"}
+  - {hash: "f722fce", message: "docs(tests): update TEST_CONSOLIDATED for phase 5 (CR-258)"}
+decisions:
+  - "ADR-017: Client-side aggregation instead of RPC/view"
+  - "ADR-018: Dedicated query key ['speechCounts', wardId]"
+handoff_notes: "Migration 027_speech_count_index.sql needs to be deployed via supabase db push. App update via standard deployment."
+pending_deploys:
+  - type: "db_migration"
+    file: "supabase/migrations/027_speech_count_index.sql"
+    description: "Partial composite index for speech count queries"
+  - type: "app_update"
+    description: "New build with speech count feature"

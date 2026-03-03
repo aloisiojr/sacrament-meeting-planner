@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 6
-  last_updated_by: "phase-004"
+  version: 7
+  last_updated_by: "phase-005"
 
 reviews:
   - id: REV-001
@@ -1440,3 +1440,241 @@ reviews:
       tests_total: 776
       tests_passing: 776
       test_files: 33
+
+  # ===========================================================================
+  # REV-005: Phase 5 - CR-258 Speech Count per Member (Last 6 Months)
+  # ===========================================================================
+
+  - id: REV-005
+    scope: "CR-258 - Speech Count per Member (Last 6 Months)"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    phase: 5
+    iteration: 1
+    feature: F046
+    commits:
+      - hash: f68be6d
+        step: STEP-01
+        message: "feat(migration): add partial index for speech count query (CR-258)"
+      - hash: 0534e7d
+        step: STEP-02
+        message: "feat(i18n): add speechCount singular/plural keys in 3 languages (CR-258)"
+      - hash: fc64aff
+        step: STEP-03
+        message: "feat(useSpeechCounts): add bulk speech count hook with client-side aggregation (CR-258)"
+      - hash: f899e8e
+        step: STEP-04
+        message: "feat(sync): invalidate speechCounts on speech table changes (CR-258)"
+      - hash: c84e991
+        step: STEP-05
+        message: "feat(members): display speech count below member info in member list (CR-258)"
+      - hash: cf4c358
+        step: STEP-06
+        message: "feat(MemberSelectorModal): display speech count below member name in selector (CR-258)"
+      - hash: eab3ed1
+        step: STEP-07
+        message: "test(sync): update sync test to expect speechCounts in speeches query keys (CR-258)"
+    verdict: approved
+
+    summary: |
+      CR-258 (Speech Count per Member) is fully implemented with 7 commits
+      following the PLAN exactly. Chain validation passes on all 4 levels.
+      The implementation creates a new useSpeechCounts hook with bulk query
+      and client-side aggregation, adds a partial DB index, displays counts
+      in MemberRow and MemberSelectorModal, adds i18n keys in 3 languages
+      with singular/plural support, and updates sync.ts for realtime
+      invalidation. All 794 tests pass (18 new for F046). No P0 or P1 issues
+      found. One migration (027) needs deployment.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        verdict: pass
+        notes: |
+          CR-258 request: "Show speech count in last 6 months per member. Display
+          in (1) member list in settings, (2) assignment speaker list. Text:
+          'X discursos nos ultimos 6 meses'. Hide if zero. Smart DB strategy
+          to avoid excessive queries."
+
+          SPEC_F005 F046 covers ALL of these: 12 acceptance criteria mapping to
+          the two display locations, hide-if-zero, singular/plural text, bulk
+          query strategy, 6-month window, prayer exclusion, index optimization,
+          i18n in 3 languages, all roles visibility, and query invalidation.
+
+      arch_vs_spec:
+        verdict: pass
+        notes: |
+          ARCH_M005 maps directly to SPEC_F005. 6 components (C1-C6) cover
+          all ACs: C1 (useSpeechCounts hook), C2 (MemberRow), C3 (MemberSelectorModal),
+          C4 (migration), C5 (i18n), C6 (sync). ADR-017 (client-side aggregation)
+          and ADR-018 (dedicated query key) are sound. Dependency graph and
+          implementation order are correct.
+
+      plan_vs_arch:
+        verdict: pass
+        notes: |
+          PLAN_P005 has 7 steps mapping 1:1 to ARCH components plus a
+          verification step. Step dependencies respect ARCH dependency graph.
+          done_when criteria are specific and testable. Validation matrix covers
+          all 12 ACs and 10 edge cases.
+
+      code_vs_plan:
+        verdict: pass
+        notes: |
+          CODE_LEDGER shows 7 commits (f68be6d through eab3ed1) matching
+          PLAN steps 1-7. Each commit modifies exactly the files listed in the
+          corresponding PLAN step. Code implements precisely what was specified:
+          - STEP-01: migration with correct partial index syntax
+          - STEP-02: i18n keys with _one/_other suffixes in all 3 locales
+          - STEP-03: useSpeechCounts with exact query, Map aggregation, memoized dates
+          - STEP-04: sync.ts with speechCountKeys.all added to speeches entry
+          - STEP-05: MemberRow with speechCount prop, conditional rendering, style
+          - STEP-06: MemberSelectorModal with inline speechCounts.get lookup
+          - STEP-07: sync integration test updated
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW DETAILS
+    # =========================================================================
+
+    code_review:
+
+      migration_027:
+        file: supabase/migrations/027_speech_count_index.sql
+        verdict: pass
+        notes: |
+          Correct partial composite index:
+          CREATE INDEX idx_speeches_member_count
+            ON speeches(ward_id, member_id, position, sunday_date)
+            WHERE member_id IS NOT NULL;
+          Column order is appropriate (ward_id for equality, then member_id
+          for grouping, position for IN filter, sunday_date for range).
+          Partial index correctly excludes NULL member_id rows.
+          Comment references CR-258.
+
+      useSpeechCounts_hook:
+        file: src/hooks/useSpeechCounts.ts
+        verdict: pass
+        notes: |
+          Clean implementation:
+          - speechCountKeys factory with .all and .byWard (correct pattern)
+          - cutoffDate and today memoized with useMemo (correct deps: [])
+          - Query: .select('member_id').eq('ward_id', wardId).in('position', [1,2,3])
+            .not('member_id', 'is', null).gte('sunday_date', cutoffDate)
+            .lte('sunday_date', today) -- matches ARCH exactly
+          - Client-side Map aggregation: O(n) loop, correct get/set pattern
+          - enabled: !!wardId -- correct guard
+          - Returns data ?? new Map() -- safe default for consumers
+          - No unnecessary dependencies, clean 58-line file
+
+      sync_ts:
+        file: src/lib/sync.ts
+        verdict: pass
+        notes: |
+          speechCountKeys imported from correct path.
+          TABLE_TO_QUERY_KEYS.speeches now includes both speechKeys.all and
+          speechCountKeys.all. Existing functionality unchanged.
+
+      members_tsx:
+        file: src/app/(tabs)/settings/members.tsx
+        verdict: pass
+        notes: |
+          - useSpeechCounts imported and called in MembersScreen
+          - MemberRowProps extended with speechCount: number
+          - speechCount passed via speechCounts.get(item.id) ?? 0 in renderItem
+          - speechCounts added to renderItem useCallback dependencies
+          - Conditional rendering: speechCount > 0 && <Text ...>
+          - Style: memberSpeechCount { fontSize: 12, marginTop: 2 }
+          - Text uses t('members.speechCount', { count: speechCount })
+          - Editing mode correctly shows MemberEditor (no speech count shown)
+
+      member_selector_modal:
+        file: src/components/MemberSelectorModal.tsx
+        verdict: pass
+        notes: |
+          - useSpeechCounts imported and called inside MemberSelectorModal
+          - Inline lookup: (speechCounts.get(item.id) ?? 0) > 0 &&
+          - Same style as members.tsx (fontSize: 12, marginTop: 2)
+          - Text uses same i18n key with count interpolation
+          - Consistent with MemberRow implementation
+
+      i18n_keys:
+        files:
+          - src/i18n/locales/pt-BR.json
+          - src/i18n/locales/en-US.json
+          - src/i18n/locales/es-LA.json
+        verdict: pass
+        notes: |
+          All 3 files have identical key structure:
+          - speechCount_one: singular form (count=1)
+          - speechCount_other: plural form (count!=1)
+          pt-BR: "discurso/discursos nos ultimos 6 meses"
+          en-US: "speech/speeches in the last 6 months"
+          es-LA: "discurso/discursos en los ultimos 6 meses"
+          Keys are inside the "members" object. Valid JSON confirmed by
+          existing i18n tests passing.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+    # No P0, P1, or P2 issues found. Implementation is clean and complete.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Run database migration 027_speech_count_index.sql"
+        command: "supabase db push (or apply 027_speech_count_index.sql)"
+        reason: "Creates partial composite index idx_speeches_member_count for optimized speech count query"
+        urgency: low
+        notes: |
+          Index-only migration, no schema changes. Safe to run before or after
+          app deploy. The feature works without the index (just slower), so
+          deploy order is flexible.
+
+      - step: 2
+        action: "Deploy app update"
+        reason: "CR-258: speech count display in member list and speaker selector"
+        urgency: low
+        notes: |
+          All code changes (hook, UI, i18n, sync) ship together. The feature
+          is purely additive and read-only; no risk of breaking existing functionality.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M005.yaml"
+        - "docs/plans/PLAN_P005.yaml"
+        - "docs/qa/QA_PLAN_005.yaml"
+        - "docs/specs/SPEC_F005.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 8
+      total_commits: 7
+      tests_total: 794
+      tests_passing: 794
+      test_files: 35

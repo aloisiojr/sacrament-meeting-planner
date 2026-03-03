@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-03 (Phase 1: CR-259, CR-260, CR-261)
+# Last updated: 2026-03-03 (Phase 2: CR-258)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
   total_modules: 13
-  total_adrs: 16
+  total_adrs: 18
 
 # =============================================================================
 # TECH STACK
@@ -219,10 +219,12 @@ modules:
       Sunday cards expand. Snapshot pattern stores speaker/topic data as text
       copies. Status lifecycle with full mesh transitions between assigned states.
       Includes optional second speech toggle and managed prayers.
-    features: [F013, F014, F015, F016, F017, F018]
+    features: [F013, F014, F015, F016, F017, F018, F046]
     components:
       - path: src/hooks/useSpeeches.ts
         responsibility: TanStack Query hooks for speech CRUD, lazy creation, status changes, second speech toggle
+      - path: src/hooks/useSpeechCounts.ts
+        responsibility: TanStack Query hook for bulk speech count (last 6 months) with client-side aggregation
       - path: src/components/SpeechSlot.tsx
         responsibility: Individual speech position UI with speaker/topic assignment
       - path: src/components/StatusLED.tsx
@@ -472,7 +474,7 @@ shared_libraries:
 database_schema:
   provider: Supabase (PostgreSQL)
   migrations_dir: supabase/migrations/
-  total_migrations: 26
+  total_migrations: 27
 
   tables:
     # --- Ward-scoped tables ---
@@ -879,3 +881,24 @@ adrs:
       eliminates the chk_pianist_conductor_exclusive constraint, simplifies
       filtering, and removes the enforceActorRules pass-through function.
       Migration uses priority order matching the existing getPrimaryRole() logic.
+
+  - id: ADR-017
+    title: Client-side aggregation for speech counts
+    decision: |
+      Fetch individual speech rows via Supabase JS and count per member_id
+      in JavaScript using a Map, rather than using a PostgreSQL RPC function
+      with GROUP BY + COUNT.
+    rationale: |
+      Supabase JS client does not support GROUP BY + COUNT natively. Creating
+      an RPC would add server-side complexity for small result sets (50-200
+      rows typical). Client-side Map aggregation is O(n) and trivial.
+
+  - id: ADR-018
+    title: Dedicated query key for speech counts
+    decision: |
+      Use a separate query key ['speechCounts', wardId] for the useSpeechCounts
+      hook instead of piggybacking on speechKeys or embedding in member queries.
+    rationale: |
+      Speech counts change on speech mutations while member data changes on
+      member CRUD. A dedicated key allows independent caching and invalidation.
+      The sync.ts mapping invalidates speechCountKeys.all on speech table changes.

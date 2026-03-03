@@ -1,0 +1,485 @@
+# =============================================================================
+# PLAN_P005.yaml - Implementation Plan for Phase 2 (Speech Count Feature)
+# CR-258: Speech Count per Member (Last 6 Months)
+# Generated: 2026-03-03
+# Artifact ID: 005
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement F046 - Speech Count per Member (Last 6 Months): show the count
+  of speeches each member gave in the last 6 months in two locations
+  (member list in Settings, and speaker selector modal). Uses a single
+  bulk query with client-side aggregation, a dedicated TanStack Query hook,
+  a new DB index, i18n keys in 3 languages, and realtime sync invalidation.
+
+strategy:
+  order: "Foundation (migration + i18n + hook) -> Sync -> UI consumers -> Verification"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # STEP-01: Database migration - partial composite index
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-258/F046: Create migration 027_speech_count_index.sql with a partial
+      composite index on speeches(ward_id, member_id, position, sunday_date)
+      WHERE member_id IS NOT NULL. This index optimizes the bulk speech count
+      query used by useSpeechCounts. The partial index excludes rows with
+      NULL member_id (unassigned slots), keeping the index smaller and faster.
+
+      Component: C4 from ARCH_M005.
+    files:
+      - supabase/migrations/027_speech_count_index.sql
+    dependencies: []
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "File supabase/migrations/027_speech_count_index.sql exists"
+      - "Contains CREATE INDEX idx_speeches_member_count ON speeches(ward_id, member_id, position, sunday_date) WHERE member_id IS NOT NULL"
+      - "Has a comment referencing CR-258"
+      - "No ALTER TABLE or schema-changing statements"
+    tests:
+      - type: unit
+        description: |
+          SQL syntax is validated by reading the file. The CREATE INDEX is
+          idempotent-safe during migration. Correctness verified during deploy.
+    covers:
+      acceptance_criteria:
+        - "AC-046-11: DB index idx_speeches_member_count exists on speeches(ward_id, member_id, position, sunday_date)"
+      edge_cases: []
+    risks:
+      - risk: "Index creation on large table could be slow"
+        mitigation: "Speech tables are small (hundreds of rows per ward). Migration runs during deploy, not live."
+
+  # =========================================================================
+  # STEP-02: i18n keys for speech count text (3 languages)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-258/F046: Add i18n keys for speech count text with singular/plural
+      support in all 3 locale files. i18next uses _one/_other suffixes for
+      plural handling.
+
+      Add inside the "members" object of each file:
+      - pt-BR.json: speechCount_one / speechCount_other
+      - en-US.json: speechCount_one / speechCount_other
+      - es-LA.json: speechCount_one / speechCount_other
+
+      Component: C5 from ARCH_M005.
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "pt-BR.json members object has speechCount_one: '{{count}} discurso nos ultimos 6 meses'"
+      - "pt-BR.json members object has speechCount_other: '{{count}} discursos nos ultimos 6 meses'"
+      - "en-US.json members object has speechCount_one: '{{count}} speech in the last 6 months'"
+      - "en-US.json members object has speechCount_other: '{{count}} speeches in the last 6 months'"
+      - "es-LA.json members object has speechCount_one: '{{count}} discurso en los ultimos 6 meses'"
+      - "es-LA.json members object has speechCount_other: '{{count}} discursos en los ultimos 6 meses'"
+      - "All 3 JSON files are valid JSON (no trailing commas)"
+      - "Existing i18n tests pass (all 3 locales have the same keys)"
+    tests:
+      - type: unit
+        description: |
+          Existing i18n.test.ts validates that all 3 locale files have the
+          same keys. After adding the same 2 keys to all 3 files, the test
+          should pass without modification.
+    covers:
+      acceptance_criteria:
+        - "AC-046-10: Text is translated in all 3 languages (pt-BR, en-US, es-LA)"
+        - "AC-046-04: Singular form uses speechCount_one"
+        - "AC-046-05: Plural form uses speechCount_other"
+      edge_cases: []
+    risks:
+      - risk: "Trailing comma in JSON after key addition"
+        mitigation: "Use Edit tool with surrounding context to ensure valid JSON"
+
+  # =========================================================================
+  # STEP-03: Create useSpeechCounts hook
+  # =========================================================================
+
+  - id: STEP-03
+    description: |
+      CR-258/F046: Create src/hooks/useSpeechCounts.ts - a new TanStack Query
+      hook that fetches all speech records for the ward in the last 6 months
+      (positions 1-3 only, member_id IS NOT NULL, sunday_date >= cutoff and
+      <= today), counts occurrences per member_id client-side, and returns
+      Map<string, number>.
+
+      Exports:
+      - speechCountKeys: query key factory with .all and .byWard(wardId)
+      - useSpeechCounts(): { data: Map<string, number>; isLoading: boolean }
+
+      Implementation details from ARCH_M005 C1:
+      - cutoffDate: useMemo(() => new Date().setMonth(month - 6))
+      - today: useMemo(() => new Date().toISOString().split('T')[0])
+      - Query: supabase.from('speeches').select('member_id')
+          .eq('ward_id', wardId).in('position', [1, 2, 3])
+          .not('member_id', 'is', null).gte('sunday_date', cutoffDate)
+          .lte('sunday_date', today)
+      - Client-side Map aggregation: iterate rows, count per member_id
+      - enabled: !!wardId
+      - Returns empty Map when no data or loading
+
+      Component: C1 from ARCH_M005.
+    files:
+      - src/hooks/useSpeechCounts.ts
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "File src/hooks/useSpeechCounts.ts exists"
+      - "Exports speechCountKeys with .all = ['speechCounts'] and .byWard(wardId) = ['speechCounts', wardId]"
+      - "Exports useSpeechCounts() returning { data: Map<string, number>; isLoading: boolean }"
+      - "Query uses .select('member_id').eq('ward_id', wardId).in('position', [1, 2, 3]).not('member_id', 'is', null)"
+      - "Query filters .gte('sunday_date', cutoffDate).lte('sunday_date', today)"
+      - "cutoffDate is 6 months ago via Date.setMonth(month - 6), memoized"
+      - "today is memoized as ISO date string"
+      - "Client-side counts into Map<string, number>"
+      - "enabled: !!wardId"
+      - "Returns empty Map as default (data ?? new Map())"
+    tests:
+      - type: unit
+        description: |
+          Test useSpeechCounts hook with mocked Supabase:
+          1. Returns empty Map when no speech records
+          2. Counts only positions 1, 2, 3 (excludes 0, 4)
+          3. Excludes speeches with null member_id
+          4. Counts multiple speeches per member correctly
+          5. Returns Map with correct member_id -> count mapping
+          6. Query key is ['speechCounts', wardId]
+          7. enabled is false when wardId is empty
+    covers:
+      acceptance_criteria:
+        - "AC-046-06: Bulk query fetches all counts in one request (single .select call)"
+        - "AC-046-07: Prayers excluded (position IN (1,2,3) only)"
+        - "AC-046-08: Only last 6 months counted (gte cutoff, lte today)"
+        - "AC-046-03: Zero count hidden (Map has no entry, consumers check > 0)"
+      edge_cases:
+        - "EC-046-01: Ward has no members -> useSpeechCounts returns empty Map"
+        - "EC-046-02: Ward has members but no speech records -> empty Map"
+        - "EC-046-03: Deleted member speeches have NULL member_id -> excluded by .not('member_id', 'is', null)"
+        - "EC-046-04: All speeches are prayers (pos 0,4) -> empty Map, no count text"
+        - "EC-046-05: Speech exactly on cutoff date (boundary) -> included by .gte"
+        - "EC-046-09: Query fails -> data is empty Map, no count text shown"
+        - "EC-046-10: Leap year/month boundary -> Date.setMonth handles correctly"
+    risks:
+      - risk: "Client-side aggregation performance with large datasets"
+        mitigation: "Max ~300 rows per ward over 6 months. Map aggregation is sub-millisecond."
+
+  # =========================================================================
+  # STEP-04: Update sync.ts to invalidate speechCounts on speech changes
+  # =========================================================================
+
+  - id: STEP-04
+    description: |
+      CR-258/F046: Update src/lib/sync.ts to import speechCountKeys from
+      useSpeechCounts and add speechCountKeys.all to the speeches entry
+      in TABLE_TO_QUERY_KEYS. This ensures realtime/polling sync invalidates
+      speech counts when speeches change on another device.
+
+      Changes:
+      1. Add import: import { speechCountKeys } from '../hooks/useSpeechCounts';
+      2. Update TABLE_TO_QUERY_KEYS speeches entry:
+         Before: speeches: [speechKeys.all],
+         After:  speeches: [speechKeys.all, speechCountKeys.all],
+
+      Component: C6 from ARCH_M005.
+    files:
+      - src/lib/sync.ts
+    dependencies: ["STEP-03"]
+    parallelizable_with: []
+    done_when:
+      - "sync.ts imports speechCountKeys from '../hooks/useSpeechCounts'"
+      - "TABLE_TO_QUERY_KEYS.speeches array includes speechCountKeys.all"
+      - "Existing speechKeys.all entry is unchanged"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          Verify TABLE_TO_QUERY_KEYS.speeches contains both speechKeys.all
+          and speechCountKeys.all. Existing sync tests should pass unchanged.
+    covers:
+      acceptance_criteria:
+        - "AC-046-09: Count updates when speeches change (via realtime sync invalidation)"
+      edge_cases:
+        - "EC-046-08: Member CSV import replaces all members -> speeches FK ON DELETE SET NULL -> speechKeys.all invalidated -> speechCountKeys.all also invalidated"
+    risks:
+      - risk: "Sync invalidation causes unnecessary refetches"
+        mitigation: "TanStack Query deduplicates concurrent invalidations. The speechCounts query is lightweight."
+
+  # =========================================================================
+  # STEP-05: Add speech count display to MemberRow in members.tsx
+  # =========================================================================
+
+  - id: STEP-05
+    description: |
+      CR-258/F046: Update src/app/(tabs)/settings/members.tsx to display
+      speech count below each member's info in MemberRow.
+
+      Changes:
+      1. Import useSpeechCounts from '../../../hooks/useSpeechCounts'
+      2. Add speechCount: number to MemberRowProps interface
+      3. In MemberRow JSX (after the phone Text), add conditional rendering:
+         {speechCount > 0 && (
+           <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+             {t('members.speechCount', { count: speechCount })}
+           </Text>
+         )}
+      4. Add memberSpeechCount style: { fontSize: 12, marginTop: 2 }
+      5. In MembersScreen: call const { data: speechCounts } = useSpeechCounts()
+      6. In renderItem: pass speechCount={speechCounts.get(item.id) ?? 0} to MemberRow
+      7. Add speechCounts to renderItem dependencies
+
+      Component: C2 from ARCH_M005.
+    files:
+      - src/app/(tabs)/settings/members.tsx
+    dependencies: ["STEP-02", "STEP-03"]
+    parallelizable_with: ["STEP-06"]
+    done_when:
+      - "MemberRowProps interface includes speechCount: number"
+      - "MemberRow renders speechCount text when speechCount > 0"
+      - "MemberRow does NOT render speechCount text when speechCount is 0"
+      - "Text uses t('members.speechCount', { count: speechCount })"
+      - "Text uses style [styles.memberSpeechCount, { color: colors.textSecondary }]"
+      - "memberSpeechCount style is { fontSize: 12, marginTop: 2 }"
+      - "MembersScreen calls useSpeechCounts()"
+      - "renderItem passes speechCount={speechCounts.get(item.id) ?? 0}"
+      - "Speech count text appears below phone (or below informalName if no phone)"
+      - "MemberRow in editing mode (isEditing=true) does NOT show speech count"
+    tests:
+      - type: unit
+        description: |
+          1. Render MemberRow with speechCount=3 -> verify text "3 discursos..."
+          2. Render MemberRow with speechCount=1 -> verify text "1 discurso..."
+          3. Render MemberRow with speechCount=0 -> verify no speech count text
+          4. Render MemberRow with isEditing=true -> verify MemberEditor shown (no speech count)
+          5. Verify MembersScreen calls useSpeechCounts and passes data to renderItem
+    covers:
+      acceptance_criteria:
+        - "AC-046-01: Speech count visible in member list (Settings) in textSecondary color"
+        - "AC-046-03: Zero count hides text completely (speechCount > 0 check)"
+        - "AC-046-04: Singular form for exactly 1 speech"
+        - "AC-046-05: Plural form for 2+ speeches"
+        - "AC-046-12: All roles can see speech counts (no permission check, read-only)"
+      edge_cases:
+        - "EC-046-06: Search filter active -> speech counts remain accurate per member"
+        - "EC-046-07: MemberEditor open -> speech count not shown during editing"
+    risks:
+      - risk: "Speech count text increases MemberRow height"
+        mitigation: "Only adds ~16px for members with speeches. FlatList handles variable heights natively."
+
+  # =========================================================================
+  # STEP-06: Add speech count display to MemberSelectorModal
+  # =========================================================================
+
+  - id: STEP-06
+    description: |
+      CR-258/F046: Update src/components/MemberSelectorModal.tsx to display
+      speech count below each member's name in the selector modal.
+
+      Changes:
+      1. Import useSpeechCounts from '../hooks/useSpeechCounts'
+      2. In MemberSelectorModal function body, after useMembers:
+         const { data: speechCounts } = useSpeechCounts();
+      3. In renderItem, after the item.full_name Text, add:
+         {(speechCounts.get(item.id) ?? 0) > 0 && (
+           <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+             {t('members.speechCount', { count: speechCounts.get(item.id) ?? 0 })}
+           </Text>
+         )}
+      4. Add memberSpeechCount style: { fontSize: 12, marginTop: 2 }
+
+      Component: C3 from ARCH_M005.
+    files:
+      - src/components/MemberSelectorModal.tsx
+    dependencies: ["STEP-02", "STEP-03"]
+    parallelizable_with: ["STEP-05"]
+    done_when:
+      - "MemberSelectorModal imports useSpeechCounts"
+      - "Calls useSpeechCounts() inside the component"
+      - "Renders speech count text below full_name when count > 0"
+      - "Does NOT render speech count text when count is 0"
+      - "Text uses t('members.speechCount', { count }) with textSecondary color"
+      - "memberSpeechCount style is { fontSize: 12, marginTop: 2 }"
+    tests:
+      - type: unit
+        description: |
+          1. Render MemberSelectorModal with member having speeches ->
+             verify count text below name
+          2. Render MemberSelectorModal with member having 0 speeches ->
+             verify no count text
+          3. Verify useSpeechCounts is called inside the modal
+          4. Verify text uses correct translation key with count interpolation
+    covers:
+      acceptance_criteria:
+        - "AC-046-02: Speech count visible in speaker selector modal in textSecondary color"
+        - "AC-046-03: Zero count hides text completely"
+        - "AC-046-12: All roles can see speech counts"
+      edge_cases:
+        - "EC-046-06: Search filter active in modal -> speech counts remain accurate"
+    risks:
+      - risk: "TanStack Query deduplication between MembersScreen and MemberSelectorModal"
+        mitigation: "TanStack Query automatically deduplicates queries with the same key. Only one network request."
+
+  # =========================================================================
+  # STEP-07: Final verification
+  # =========================================================================
+
+  - id: STEP-07
+    description: |
+      Run full test suite to verify no regressions from all changes.
+      Verify all code changes pass linting, type-checking, and tests.
+      Confirm the complete feature works end-to-end:
+      - useSpeechCounts hook fetches and aggregates correctly
+      - MemberRow shows speech count text
+      - MemberSelectorModal shows speech count text
+      - Zero counts are hidden
+      - i18n singular/plural works in all 3 languages
+      - sync.ts invalidates speechCounts on speech changes
+      - DB index migration is correct SQL
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+      - "All new tests pass"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria:
+        - "AC-046-09: Count updates when speeches change (verified via sync invalidation in STEP-04)"
+      edge_cases:
+        - "EC-046-08: Member CSV import -> speechCounts invalidated via speeches table change"
+    risks:
+      - risk: "Unforeseen interaction between new hook and existing hooks"
+        mitigation: "useSpeechCounts is read-only and independent. No mutations, no shared state."
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # AC-046-01 through AC-046-12
+  - ac_id: AC-046-01
+    description: "Speech count visible in member list (Settings)"
+    how_to_verify: "MemberRow renders speechCount text in textSecondary color when speechCount > 0"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-046-02
+    description: "Speech count visible in speaker selector modal"
+    how_to_verify: "MemberSelectorModal renders count text below full_name in textSecondary color"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-046-03
+    description: "Zero count hides text completely"
+    how_to_verify: "Both MemberRow and MemberSelectorModal check > 0 before rendering; Map returns undefined for missing keys, ?? 0 gives 0"
+    covered_by_steps: ["STEP-03", "STEP-05", "STEP-06"]
+
+  - ac_id: AC-046-04
+    description: "Singular form for exactly 1 speech"
+    how_to_verify: "i18n key speechCount_one used when count=1: '1 discurso nos ultimos 6 meses'"
+    covered_by_steps: ["STEP-02", "STEP-05", "STEP-06"]
+
+  - ac_id: AC-046-05
+    description: "Plural form for 2+ speeches"
+    how_to_verify: "i18n key speechCount_other used when count!=1: 'N discursos nos ultimos 6 meses'"
+    covered_by_steps: ["STEP-02", "STEP-05", "STEP-06"]
+
+  - ac_id: AC-046-06
+    description: "Bulk query fetches all counts in one request"
+    how_to_verify: "useSpeechCounts makes single .select('member_id') query with GROUP BY done client-side"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-046-07
+    description: "Prayers excluded from count"
+    how_to_verify: "Query uses .in('position', [1, 2, 3]) - positions 0 and 4 are excluded"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-046-08
+    description: "Only last 6 months counted"
+    how_to_verify: "Query uses .gte('sunday_date', cutoffDate).lte('sunday_date', today) where cutoff = 6 months ago"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-046-09
+    description: "Count updates when speeches change"
+    how_to_verify: "sync.ts TABLE_TO_QUERY_KEYS.speeches includes speechCountKeys.all; invalidated on speech mutations and realtime events"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: AC-046-10
+    description: "Text translated in all 3 languages"
+    how_to_verify: "speechCount_one / speechCount_other keys in pt-BR.json, en-US.json, es-LA.json"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-046-11
+    description: "DB index exists for optimized query"
+    how_to_verify: "Migration 027 creates idx_speeches_member_count on speeches(ward_id, member_id, position, sunday_date) WHERE member_id IS NOT NULL"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-046-12
+    description: "All roles can see speech counts"
+    how_to_verify: "No permission check in useSpeechCounts or UI rendering. Speech count is read-only informational data."
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  # Edge cases
+  - ac_id: EC-046-01
+    description: "Ward has no members"
+    how_to_verify: "useSpeechCounts returns empty Map; no count text shown"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-02
+    description: "Ward has members but no speech records"
+    how_to_verify: "useSpeechCounts returns empty Map; no count text shown"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-03
+    description: "Deleted member speeches have NULL member_id"
+    how_to_verify: ".not('member_id', 'is', null) excludes them from query"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-04
+    description: "All speeches are prayers (positions 0, 4 only)"
+    how_to_verify: ".in('position', [1, 2, 3]) excludes positions 0 and 4"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-05
+    description: "Speech exactly on cutoff date (boundary)"
+    how_to_verify: ".gte('sunday_date', cutoffDate) includes speeches on the exact cutoff date"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-06
+    description: "Search filter active in member list or speaker selector"
+    how_to_verify: "speechCounts comes from useSpeechCounts (not filtered by search); search only filters which members are displayed"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: EC-046-07
+    description: "MemberEditor open (editing mode)"
+    how_to_verify: "MemberRow returns MemberEditor when isEditing=true; speech count only in read-only view"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: EC-046-08
+    description: "Member CSV import replaces all members"
+    how_to_verify: "Import triggers speeches table change (FK ON DELETE SET NULL) -> sync invalidates speechCountKeys.all"
+    covered_by_steps: ["STEP-04", "STEP-07"]
+
+  - ac_id: EC-046-09
+    description: "useSpeechCounts query fails (network error)"
+    how_to_verify: "data defaults to empty Map (data ?? new Map()); no count text shown; TanStack Query retries"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-046-10
+    description: "Leap year / month boundary for 6-month calculation"
+    how_to_verify: "JavaScript Date.setMonth(month - 6) handles edge cases correctly"
+    covered_by_steps: ["STEP-03"]

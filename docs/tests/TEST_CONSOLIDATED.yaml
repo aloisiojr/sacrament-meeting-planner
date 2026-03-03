@@ -4,16 +4,16 @@
 # =============================================================================
 
 type: test_consolidated
-version: 4
+version: 5
 last_updated: "2026-03-03"
 
 summary:
-  total_test_files: 33
-  total_tests: 776
+  total_test_files: 35
+  total_tests: 794
   framework: vitest
   categories:
-    module_named: 28
-    integration: 5
+    module_named: 29
+    integration: 6
   infrastructure:
     setup: 1
     integration_setup: 1
@@ -301,6 +301,15 @@ module_tests:
       - Ward language null fallback to pt-BR
       - Language priority chain (user_metadata.language > device locale > pt-BR)
 
+  - file: src/__tests__/useSpeechCounts-utils.test.ts
+    tests: 5
+    module: src/hooks/useSpeechCounts.ts
+    covers:
+      - speechCountKeys.all = ['speechCounts']
+      - speechCountKeys.byWard(wardId) = ['speechCounts', wardId]
+      - Different wardIds produce different keys
+      - Keys are readonly tuples with correct lengths
+
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
 # =============================================================================
@@ -362,6 +371,14 @@ integration_tests:
       - Offline queue (enqueue, dequeue, readQueue, clearQueue, getQueueSize, peek, capacity limit)
       - Sync table-to-query key mapping
       - Queue persistence across cycles
+
+  - file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+    tests: 13
+    covers:
+      - useSpeechCounts (empty Map when no records, count aggregation per member, zero count, null data, query failure, empty wardId, query key, bulk single call, singular count, plural count)
+      - sync.ts TABLE_TO_QUERY_KEYS.speeches includes speechCountKeys.all
+      - sync.ts TABLE_TO_QUERY_KEYS.speeches still includes speechKeys.all
+      - sync.ts TABLE_TO_QUERY_KEYS.speeches has exactly 2 entries
 
 # =============================================================================
 # F039 CORRECTION PACKAGE - TEST COVERAGE
@@ -1270,6 +1287,144 @@ test_suites:
         covers_ecs: ["EC-045-01"]
         status: passing
 
+  - feature: F046
+    tests:
+      # AC-046-03: Zero count hidden
+      - name: "returns 0 for member not in Map (AC-046-03)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-046-04: Singular form
+      - name: "handles multiple members with exactly 1 speech each (AC-046-04 singular)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-04"]
+        covers_ecs: []
+        status: passing
+
+      # AC-046-05: Plural form
+      - name: "handles member with many speeches (AC-046-05 plural)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-05"]
+        covers_ecs: []
+        status: passing
+
+      # AC-046-06: Bulk query
+      - name: "counts speeches per member correctly (AC-046-06)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-06"]
+        covers_ecs: []
+        status: passing
+
+      - name: "makes a single Supabase call per fetch (AC-046-06 bulk query)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-06"]
+        covers_ecs: []
+        status: passing
+
+      # AC-046-09: Sync invalidation
+      - name: "speeches table in TABLE_TO_QUERY_KEYS includes speechCountKeys.all"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-09"]
+        covers_ecs: ["EC-046-08"]
+        status: passing
+
+      - name: "speeches table still includes speechKeys.all"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-09"]
+        covers_ecs: []
+        status: passing
+
+      - name: "speeches table has exactly 2 query key entries"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-09"]
+        covers_ecs: []
+        status: passing
+
+      # EC-046-01: Ward has no members
+      - name: "returns empty Map when query returns null data (EC-046-01)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: []
+        covers_ecs: ["EC-046-01"]
+        status: passing
+
+      # EC-046-02: No speech records
+      - name: "returns empty Map when no speech records exist (EC-046-02)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: []
+        covers_ecs: ["EC-046-02"]
+        status: passing
+
+      # EC-046-09: Query fails
+      - name: "returns empty Map when query fails (EC-046-09)"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: []
+        covers_ecs: ["EC-046-09"]
+        status: passing
+
+      # Query key and enabled guard
+      - name: "uses query key speechCounts wardId"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: ["AC-046-06"]
+        covers_ecs: []
+        status: passing
+
+      - name: "does not fetch when wardId is empty"
+        file: src/__tests__/integration/useSpeechCounts.integration.test.ts
+        type: integration
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      # speechCountKeys utility
+      - name: "has .all = speechCounts"
+        file: src/__tests__/useSpeechCounts-utils.test.ts
+        type: unit
+        covers_acs: ["AC-046-09"]
+        covers_ecs: []
+        status: passing
+
+      - name: ".byWard returns speechCounts wardId"
+        file: src/__tests__/useSpeechCounts-utils.test.ts
+        type: unit
+        covers_acs: ["AC-046-06"]
+        covers_ecs: []
+        status: passing
+
+      - name: ".byWard returns different keys for different wardIds"
+        file: src/__tests__/useSpeechCounts-utils.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: ".all is a readonly tuple"
+        file: src/__tests__/useSpeechCounts-utils.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: ".byWard returns a readonly tuple"
+        file: src/__tests__/useSpeechCounts-utils.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -1517,6 +1672,44 @@ coverage:
       covered: true
       tests: ["fetches ward language from wards table", "filters ward query by invitation.ward_id", "uses .single() for ward query"]
 
+    # --- F046 (Phase 5 / CR-258) ---
+    - id: AC-046-01
+      covered: false
+      reason: "MemberRow UI rendering requires React Native runtime (cannot test in vitest node env)."
+    - id: AC-046-02
+      covered: false
+      reason: "MemberSelectorModal UI rendering requires React Native runtime."
+    - id: AC-046-03
+      covered: true
+      tests: ["returns 0 for member not in Map (AC-046-03)"]
+    - id: AC-046-04
+      covered: true
+      tests: ["handles multiple members with exactly 1 speech each (AC-046-04 singular)"]
+    - id: AC-046-05
+      covered: true
+      tests: ["handles member with many speeches (AC-046-05 plural)"]
+    - id: AC-046-06
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)", "makes a single Supabase call per fetch (AC-046-06 bulk query)", "uses query key speechCounts wardId"]
+    - id: AC-046-07
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
+    - id: AC-046-08
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
+    - id: AC-046-09
+      covered: true
+      tests: ["speeches table in TABLE_TO_QUERY_KEYS includes speechCountKeys.all", "speeches table still includes speechKeys.all", "speeches table has exactly 2 query key entries"]
+    - id: AC-046-10
+      covered: true
+      tests: ["i18n.test.ts (existing) validates key parity across 3 locales including speechCount_one/speechCount_other"]
+    - id: AC-046-11
+      covered: false
+      reason: "Database migration SQL. Cannot execute CREATE INDEX in vitest node environment."
+    - id: AC-046-12
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
+
   edge_cases:
     # F039 edge cases
     - id: EC-2col-rejected
@@ -1555,6 +1748,38 @@ coverage:
     - id: EC-045-03
       covered: false
       reason: "FK constraint behavior. Existing database constraint prevents this scenario. No new code to test."
+
+    # F046 edge cases (Phase 5 / CR-258)
+    - id: EC-046-01
+      covered: true
+      tests: ["returns empty Map when query returns null data (EC-046-01)"]
+    - id: EC-046-02
+      covered: true
+      tests: ["returns empty Map when no speech records exist (EC-046-02)"]
+    - id: EC-046-03
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
+    - id: EC-046-04
+      covered: true
+      tests: ["returns empty Map when no speech records exist (EC-046-02)"]
+    - id: EC-046-05
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
+    - id: EC-046-06
+      covered: false
+      reason: "Search filter is handled by useMembers, not useSpeechCounts. speechCounts Map is independent of search."
+    - id: EC-046-07
+      covered: false
+      reason: "MemberEditor rendering requires React Native runtime. Verified by code review."
+    - id: EC-046-08
+      covered: true
+      tests: ["speeches table in TABLE_TO_QUERY_KEYS includes speechCountKeys.all"]
+    - id: EC-046-09
+      covered: true
+      tests: ["returns empty Map when query fails (EC-046-09)"]
+    - id: EC-046-10
+      covered: true
+      tests: ["counts speeches per member correctly (AC-046-06)"]
 
 gaps:
   # F039 gaps (unchanged)
@@ -1642,6 +1867,32 @@ gaps:
   # F044 gaps - none. All ACs covered.
   # F045 gaps - none. All ACs covered.
 
+  # F046 gaps
+  - id: AC-046-01
+    reason: "MemberRow UI rendering (React Native component). Cannot render RN components in vitest node environment."
+    recommendation: "Verified by integration test: useSpeechCounts returns correct Map; MemberRow receives speechCount prop. Code review confirms conditional rendering."
+  - id: AC-046-02
+    reason: "MemberSelectorModal UI rendering (React Native component). Cannot render RN components in vitest node environment."
+    recommendation: "Verified by integration test: useSpeechCounts returns correct Map. Code review confirms conditional rendering in modal."
+  - id: AC-046-10
+    reason: "i18n key existence. Already verified by existing i18n.test.ts (key parity across 3 locales)."
+    recommendation: "No additional test needed. Existing i18n.test.ts validates speechCount_one/speechCount_other in all 3 locales."
+  - id: AC-046-11
+    reason: "Database migration SQL (027_speech_count_index.sql). Cannot execute CREATE INDEX in vitest."
+    recommendation: "Verified by SQL review. CREATE INDEX on speeches(ward_id, member_id, position, sunday_date) WHERE member_id IS NOT NULL."
+  - id: AC-046-12
+    reason: "No permission check needed. useSpeechCounts has no permission gate - all roles see counts."
+    recommendation: "Verified by code review. Hook has no hasPermission check. Read-only informational data."
+  - id: EC-046-06
+    reason: "Search filter is handled by useMembers, not useSpeechCounts. speechCounts Map is independent of search."
+    recommendation: "Verified by code review. speechCounts comes from separate hook, unaffected by search filter."
+  - id: EC-046-07
+    reason: "MemberEditor rendering (React Native component). Cannot render in vitest node environment."
+    recommendation: "Verified by code review. MemberRow returns MemberEditor when isEditing=true, speech count only in read-only view."
+  - id: EC-046-08
+    reason: "CSV import -> FK cascade -> sync invalidation chain. Integration test verifies speechCountKeys.all in TABLE_TO_QUERY_KEYS."
+    recommendation: "Covered indirectly by sync integration test. speeches table change invalidates speechCountKeys.all."
+
   # F045 edge case gaps
   - id: EC-045-02
     reason: "Existing behavior - user changes app language in settings. No new code in this CR."
@@ -1651,7 +1902,7 @@ gaps:
     recommendation: "No test needed. Database constraint handles this case."
 
 stats:
-  total_tests: 776
-  passing: 776
+  total_tests: 794
+  passing: 794
   failing: 0
   skipped: 0

@@ -208,30 +208,18 @@ Deno.serve(async (req) => {
         // Check if actor with same name already exists
         const { data: existing } = await supabaseAdmin
           .from('meeting_actors')
-          .select('id, can_preside, can_conduct')
+          .select('id, role')
           .eq('ward_id', ward.id)
           .ilike('name', actorName)
           .maybeSingle();
 
-        if (existing) {
-          // Update flags if needed
-          if (!existing.can_preside || !existing.can_conduct) {
-            await supabaseAdmin
-              .from('meeting_actors')
-              .update({ can_preside: true, can_conduct: true })
-              .eq('id', existing.id);
-          }
-        } else {
+        if (!existing) {
           await supabaseAdmin
             .from('meeting_actors')
             .insert({
               ward_id: ward.id,
               name: actorName,
-              can_preside: true,
-              can_conduct: true,
-              can_recognize: false,
-              can_pianist: false,
-              can_conductor: false,
+              role: 'preside',
             });
         }
       } catch (actorErr) {

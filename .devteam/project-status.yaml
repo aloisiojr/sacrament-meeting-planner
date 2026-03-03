@@ -1,53 +1,42 @@
 project:
-  name: "9 Corrections and Improvements"
+  name: "UX Improvements, Speech Count, and Offline Mode"
   type: feature_request
   created_at: "2026-03-03"
   user_request: |
-    9 pedidos de correção e melhoria baseados na revisão da SPEC pelo usuário:
-    1. CR-249: Padronizar códigos de idioma: en->en-US, es->es-LA em docs e código
-    2. CR-250: F001 - Secretário também pode criar ala (SPEC only, código já correto)
-    3. CR-251: F002 - Fallback de idioma do email de reset deve ser en-US, não pt-BR
-    4. CR-252: F003 - Remover diagnostic mode do create-invitation (código morto)
-    5. CR-253: F005/F015 - Corrigir permissões do secretário e observer
-    6. CR-254: F007 - CSV import somente 3 colunas
-    7. CR-255: F009 - Ator com role único (enum) em vez de 5 booleans
-    8. CR-256: F018 - Secretário pode toggle manage_prayers
-    9. CR-257: F034 - Cron de notificações é 5min, não 1min
-
-    Decisões do usuário:
-    - Diagnostic mode: REMOVER
-    - Tópicos para secretário (pos 1-3): READ-ONLY
-    - Secretário pode mudar status de discursantes: SIM
-    - Ator role: CAMPO ÚNICO ENUM (preside, conduct, recognize, pianist, conductor)
+    5 pedidos do usuário:
+    1. CR-258: Contagem de discursos nos últimos 6 meses por membro. Mostrar em (1) lista de membros em configurações, (2) lista de discursantes na designação. Texto "X discursos nos últimos 6 meses". Se zero, não mostra. Estratégia inteligente para evitar chamadas excessivas ao DB.
+    2. CR-259: Trocar ícone de play no card expandido de edição da agenda. Usar estilo idêntico ao botão "Iniciar Reunião Sacramental" mas somente o ícone play. Mesmo formato, cor de fundo, cor da fonte, ícone. Mesma posição.
+    3. CR-260: Remover "alterações na agenda" do histórico em configurações. Remover entradas existentes manualmente. Código não deve mais criar entradas de alteração de agenda.
+    4. CR-261: Ao criar novo usuário (convite ou nova ala), definir idioma do app = idioma da ala.
+    5. CR-262: Modo offline otimizado. Cache local: agenda do próximo domingo, designações dos próximos 3 domingos. Offline: Home com botão iniciar reunião + modo apresentação funcionando, card da agenda contraído (read-only), 3 cards designações contraídos (read-only). Agendas: só próximo domingo expansível, campos disabled. Discursos: só próximos 3 domingos expansíveis, campos disabled. Gerenciador de convites escondido.
 
 phases:
   total: 3
-  current: 3
+  current: 1
   summary:
     - phase: 1
-      artifact_id: "001"
-      description: "Quick fixes: F001 SPEC, F002 fallback, F003 diagnostic, F007 CSV, F018 manage_prayers, F034 cron"
+      artifact_id: "004"
+      description: "Quick UX fixes: play icon (CR-259), remove agenda history (CR-260), user language from ward (CR-261)"
       status: completed
-      crs: [250, 251, 252, 254, 256, 257]
+      crs: [259, 260, 261]
     - phase: 2
-      artifact_id: "002"
-      description: "Language code standardization: en->en-US, es->es-LA everywhere including DB migration"
-      status: completed
-      crs: [249]
+      artifact_id: "005"
+      description: "Speech count feature: last 6 months per member with smart DB strategy (CR-258)"
+      status: pending
+      crs: [258]
     - phase: 3
-      artifact_id: "003"
-      description: "Permission model rework + Actor role enum refactoring"
-      status: completed
-      crs: [253, 255]
+      artifact_id: "006"
+      description: "Offline mode: local cache of critical data with read-only UI when offline (CR-262)"
+      status: pending
+      crs: [262]
 
 current_phase:
-  id: 3
+  id: 1
   started_at: "2026-03-03"
-  completed_at: "2026-03-03"
-  features: [F005, F009, F014, F015]
-  change_requests: [253, 255]
+  features: [F_PLAY_ICON, F_REMOVE_AGENDA_HISTORY, F_USER_LANGUAGE_FROM_WARD]
+  change_requests: [259, 260, 261]
   current_agent: "orchestrator"
-  current_step: "Phase 3 completed - project done"
+  current_step: "Phase 1 completed"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -62,192 +51,4 @@ pending_deploys: []
 last_updated: "2026-03-03"
 
 artifact_counter:
-  current: 3  # Phase 1=001, Phase 2=002, Phase 3=003. Next phase will use 004.
-
-# ============================================================
-# PHASE INSTRUCTIONS
-# ============================================================
-
-phase_1_instructions: |
-  ## PHASE 1: Quick Fixes (CR-250, 251, 252, 254, 256, 257)
-
-  6 correções simples, sem migração de banco, mudanças localizadas.
-
-  ### CR-250: F001 SPEC fix (secretary can create ward)
-  - SPEC ONLY: O código já aceita secretary em register-first-user
-  - Corrigir F001 acceptance criteria: "No ward exists" -> user can be bishopric OR secretary
-  - Adicionar AC para secretary registrando
-
-  ### CR-251: F002 email language fallback (en-US)
-  - Código: supabase/functions/send-reset-email/index.ts
-    - Mudar fallback final de 'pt-BR' para 'en-US' (~linhas 152, 167)
-    - Na função getEmailTemplate(), mudar fallback de templates['pt-BR'] para templates['en-US'] (~linha 82)
-  - SPEC: F002 description, mudar "fallback to ward.language then pt-BR" -> "then en-US"
-
-  ### CR-252: F003 remove diagnostic mode
-  - Código: supabase/functions/create-invitation/index.ts
-    - Remover diagnose do CreateInvitationInput interface (~linha 19)
-    - Remover bloco if(input.diagnose === true) e response (~linhas 118-135)
-  - SPEC: F003 description, remover "Diagnostic mode available ({ diagnose: true })."
-
-  ### CR-254: F007 CSV 3-column only
-  - Código: src/lib/csvUtils.ts
-    - Remover lógica de 2-column detection (~linhas 70-75, 93-99)
-    - Sempre esperar 3 colunas: Nome, Nome Informal, Telefone
-    - Retornar erro INVALID_HEADER se < 3 colunas
-  - SPEC: F007 description, remover "Import supports 2-column or 3-column"
-    -> "Import requires 3-column format (Name, Informal Name, Phone)"
-  - BR021: Atualizar para refletir somente 3 colunas
-
-  ### CR-256: F018 secretary manage_prayers
-  - Código: src/app/(tabs)/settings/index.tsx
-    - Mudar `const isBishopric = role === 'bishopric'` (~linha 57)
-    - Para `const canTogglePrayers = role === 'bishopric' || role === 'secretary'`
-    - Usar canTogglePrayers no lugar de isBishopric no JSX (~linha 223)
-  - SPEC: F018, mudar "controlled by bishopric" -> "controlled by bishopric or secretary"
-  - SPEC: F018 AC, mudar "Bishopric enables" -> "Bishopric or secretary enables"
-  - SPEC: F027, mudar "Manage prayers toggle with description (bishopric only" -> "(bishopric and secretary"
-
-  ### CR-257: F034 cron 5 minutes
-  - Código: supabase/functions/process-notifications/index.ts
-    - Mudar comentário header de "cron every 1 minute" para "cron every 5 minutes"
-  - SPEC: F034 description, mudar "cron every 1 minute" -> "cron every 5 minutes"
-  - ARCH: edge_functions.functions[process-notifications].trigger, se mencionar 1 minute
-
-  ### TESTES
-  - Rodar npx vitest run para garantir que nada quebrou
-  - CSV test pode precisar de atualização se testa 2-column import
-
-phase_2_instructions: |
-  ## PHASE 2: Language Code Standardization (CR-249)
-
-  Mudar en->en-US e es->es-LA em TODO o projeto.
-
-  ### Arquivos de tradução
-  - Renomear src/i18n/locales/en.json -> src/i18n/locales/en-US.json
-  - Renomear src/i18n/locales/es.json -> src/i18n/locales/es-LA.json
-
-  ### Configuração i18n (src/i18n/index.ts)
-  - SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA']
-  - LANGUAGE_LABELS: { 'en-US': 'English', 'es-LA': 'Español' }
-  - DEFAULT_COUNTRY_CODES: { 'en-US': '+1', 'es-LA': '+52' }
-  - DEFAULT_TIMEZONES: { 'en-US': 'America/New_York', 'es-LA': 'America/Mexico_City' }
-  - DB_LOCALE_MAP: Agora os app codes são iguais ao DB codes para pt-BR e en-US.
-    Para es-LA, precisamos decidir: o DB usa es-ES para hymns/collections.
-    Opção: mapear es-LA -> es-LA no DB e criar migration para atualizar.
-    Ou mapear es-LA -> es-ES no DB. Preferível: mudar DB para es-LA (consistência).
-  - i18next resources: chaves 'en-US' e 'es-LA' em vez de 'en' e 'es'
-  - Fallback: manter 'pt-BR'
-  - Detecção de locale: 'en' prefix -> 'en-US', 'es' prefix -> 'es-LA'
-
-  ### Date utilities (src/lib/dateUtils.ts)
-  - MONTH_ABBR, MONTH_FULL, DAY_NAMES: chaves en->en-US, es->es-LA
-  - Funções formatDate, formatDateHumanReadable, formatFullDate: switch cases
-
-  ### WhatsApp utilities (src/lib/whatsappUtils.ts)
-  - getDefaultSpeechTemplate, getDefaultPrayerTemplate: switch cases en->en-US, es->es-LA
-  - buildWhatsAppUrl: default language parameter
-
-  ### Notification utilities (src/lib/notificationUtils.ts)
-  - OrdinalLanguage type: en->en-US, es->es-LA
-  - ORDINALS, prayer labels, notification text builders
-
-  ### Edge Functions
-  - register-first-user/index.ts: switch cases for templates, collection query
-  - process-notifications/index.ts: ORDINALS, prayer labels, text builders, fallbacks
-  - send-reset-email/index.ts: template keys (COM a mudança do CR-251 já aplicada na Phase 1)
-
-  ### Auth context (src/contexts/AuthContext.tsx)
-  - Fallbacks de 'pt-BR' permanecem (é o fallback geral do app)
-
-  ### Register screen (src/app/(auth)/register.tsx)
-  - Default language selection
-
-  ### Import script (scripts/import-hymns.ts)
-  - LANGUAGE_MAP: 'EN-US': 'en-US', 'ES-ES': 'es-LA'
-
-  ### Database migration
-  - Criar supabase/migrations/024_language_code_update.sql:
-    UPDATE hymns SET language = 'es-LA' WHERE language = 'es-ES';
-    UPDATE general_collections SET language = 'es-LA' WHERE language = 'es-ES';
-    UPDATE wards SET language = 'en-US' WHERE language = 'en';
-    UPDATE wards SET language = 'es-LA' WHERE language = 'es';
-
-  ### Testes
-  - Atualizar todos os testes que referenciam 'en' ou 'es':
-    i18n-module.test.ts, whatsapp-utils.test.ts, useHymns-utils.test.ts,
-    useTopics-utils.test.ts, dateUtils.test.ts
-
-  ### Docs (SPEC e ARCH)
-  - SPEC: product_description, F008, F020, F028, BR021
-  - ARCH: tech_stack.i18n.languages, todas menções a 'en' ou 'es'
-
-phase_3_instructions: |
-  ## PHASE 3: Permission Model + Actor Refactoring (CR-253, CR-255)
-
-  ### CR-253: Secretary/Observer Permission Rework
-
-  #### Modelo de permissões atualizado
-  Secretário:
-  - VÊ todas as partes do app
-  - NÃO pode atribuir/remover speakers (posições 1-3)
-  - NÃO pode atribuir/remover tópicos (posições 1-3)
-  - PODE atribuir/remover prayer speakers (posições 0, 4)
-  - PODE mudar status de speakers (posições 1-3)
-  - PODE fazer tudo mais (member CRUD, agenda edit, etc.)
-
-  Observer:
-  - VÊ Home, Agendas, Speeches (tudo read-only)
-  - Settings: somente app language, theme, about
-
-  #### Mudanças no código
-  - src/lib/permissions.ts:
-    - Remover speech:assign e speech:unassign do secretary
-    - Adicionar prayer:assign e prayer:unassign ao secretary
-    - Manter speech:change_status no secretary
-    - Verificar que observer tem as permissões corretas
-
-  - src/components/SpeechSlot.tsx:
-    - Checar posição: se pos 0 ou 4 (prayer), usar prayer:assign/prayer:unassign
-    - Se pos 1-3 (speech), usar speech:assign/speech:unassign
-    - Secretary: speaker name/topic ficam read-only para pos 1-3
-
-  - src/components/StatusChangeModal.tsx (ou onde status change é handled):
-    - Secretary pode mudar status mesmo para pos 1-3
-
-  #### SPEC
-  - F005: Corrigir description e ACs do secretary
-  - F014: Adicionar nota sobre secretary não poder atribuir speakers para pos 1-3
-  - F015: Corrigir para "read-only for observer and secretary on speech positions"
-  - BR009: Atualizar permission matrix
-
-  ### CR-255: Actor Single Role Enum
-
-  #### Database migration
-  - Criar supabase/migrations/025_actor_single_role.sql:
-    - Adicionar coluna role TEXT NOT NULL DEFAULT 'preside'
-    - Migrar dados: IF can_preside THEN 'preside', IF can_conduct THEN 'conduct', etc.
-    - Dropar colunas can_preside, can_conduct, can_recognize, can_pianist, can_conductor
-    - Dropar constraint chk_pianist_conductor_exclusive
-    - Adicionar CHECK (role IN ('preside', 'conduct', 'recognize', 'pianist', 'conductor'))
-
-  #### Código
-  - src/types/database.ts: Atualizar MeetingActor type
-  - src/hooks/useActors.ts:
-    - ActorRoleFilter: mudar de boolean flags para string role
-    - Queries: filtrar por role = 'preside' em vez de can_preside = true
-    - Create: aceitar role em vez de 5 booleans
-    - enforceActorRules: remover (não precisa mais)
-  - src/components/ActorSelector.tsx: Adaptar para role enum
-
-  #### SPEC
-  - F009: Reescrever para role enum
-  - BR014: Remover (constraint de pianist/conductor não existe mais)
-  - EC009: Remover (não se aplica mais)
-
-  #### ARCH
-  - M004 meeting_actors: Atualizar schema
-  - ADR novo ou update: Decisão de simplificar para role único
-
-  #### Testes
-  - useActors-utils.test.ts: Atualizar para novo modelo
+  current: 4  # Phase 1=004. Next phases: 005, 006.

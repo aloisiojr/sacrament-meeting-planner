@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 4
+  version: 5
 
 validations:
 
@@ -835,3 +835,186 @@ validations:
         description: "database-types.test.ts actor tests updated"
         result: PASS
         evidence: "database-types.test.ts lines 294-304: MeetingActor test uses role: 'preside' and expects actor.role === 'preside'. Lines 390-400: CreateActorInput test uses role: 'preside' and role: 'pianist'."
+
+  # ===========================================================================
+  # Phase 1 (F004): UX Improvements (QA_PLAN_004)
+  # ===========================================================================
+
+  - id: QA_004
+    plan: QA_PLAN_004
+    date: "2026-03-03"
+    scope: "Phase 1 - CR-259 (Play Icon Redesign), CR-260 (Remove Agenda History), CR-261 (New User Language)"
+    verdict: passed
+    must_pass: 15/15
+    should_pass: 5/7
+    total_checks: 20/22
+    reviewer_verdict: "APPROVED (after P1 fix: revert unused import)"
+    tester_verdict: "PASSED (776 tests, 73 new, 0 failures)"
+
+    checks:
+
+      # =========================================================================
+      # CR-259: Play Icon Redesign
+      # =========================================================================
+
+      - id: CR259_MP1
+        cr: CR-259
+        type: must_pass
+        description: "Play button on expanded agenda card has backgroundColor = colors.primary"
+        result: PASS
+        evidence: "agenda.tsx line 532: backgroundColor: colors.primary in inline style array"
+
+      - id: CR259_MP2
+        cr: CR-259
+        type: must_pass
+        description: "Play button on expanded agenda card has borderRadius: 8"
+        result: PASS
+        evidence: "agenda.tsx line 531: borderRadius: 8 in inline style. Note: SPEC_F004 specified borderRadius: 8 (not 10 from QA plan) to match pencil button on Home preview card."
+
+      - id: CR259_MP3
+        cr: CR-259
+        type: must_pass
+        description: "PlayIcon color changed from colors.textSecondary to colors.onPrimary"
+        result: PASS
+        evidence: "agenda.tsx line 538: <PlayIcon size={20} color={colors.onPrimary} />"
+
+      - id: CR259_MP4
+        cr: CR-259
+        type: must_pass
+        description: "Play button contains ONLY the PlayIcon (no text)"
+        result: PASS
+        evidence: "agenda.tsx lines 521-539: Pressable contains only <PlayIcon size={20} color={colors.onPrimary} />, no Text child."
+
+      - id: CR259_MP5
+        cr: CR-259
+        type: must_pass
+        description: "Play button remains in the same position (inside the expanded card header)"
+        result: PASS
+        evidence: "agenda.tsx line 520: {expandable && isExpanded && ( ... )} guard intact. Button is before the chevron icon (line 541)."
+
+      - id: CR259_MP6
+        cr: CR-259
+        type: must_pass
+        description: "All tests pass after changes"
+        result: PASS
+        evidence: "33 test files, 776 tests passed, 0 failures."
+
+      - id: CR259_SP1
+        cr: CR-259
+        type: should_pass
+        description: "Play button has appropriate padding to look like a proper button"
+        result: PASS
+        evidence: "agenda.tsx lines 529-530: width: 36, height: 36 with justifyContent/alignItems: center provides button-like appearance. The fixed dimensions with centered content serve the same purpose as padding."
+
+      - id: CR259_SP2
+        cr: CR-259
+        type: should_pass
+        description: "Play button alignItems: center to center the icon"
+        result: PASS
+        evidence: "agenda.tsx lines 533-534: justifyContent: 'center', alignItems: 'center'"
+
+      # =========================================================================
+      # CR-260: Remove Agenda Change History
+      # =========================================================================
+
+      - id: CR260_MP1
+        cr: CR-260
+        type: must_pass
+        description: "logAction call for 'agenda:edit' removed from useUpdateAgenda"
+        result: PASS
+        evidence: "useAgenda.ts: No import of logAction or buildLogDescription. grep confirms 0 matches for logAction/buildLogDescription in useAgenda.ts. useUpdateAgenda onSuccess (lines 150-155) only invalidates queries."
+
+      - id: CR260_MP2
+        cr: CR-260
+        type: must_pass
+        description: "No other code paths log 'agenda:edit' actions"
+        result: PASS
+        evidence: "grep 'agenda:edit' in src/**/*.{ts,tsx} returns matches ONLY in test file f043-f044-f045-phase4.test.ts (verifying removal). 0 matches in production code."
+
+      - id: CR260_MP3
+        cr: CR-260
+        type: must_pass
+        description: "DB migration exists to delete existing agenda-related entries from activity_log"
+        result: PASS
+        evidence: "supabase/migrations/026_delete_agenda_activity_log.sql: DELETE FROM activity_log WHERE action_type IN ('agenda:edit', 'agenda_last_minute_speech', 'agenda_last_minute_speech_removed'). Covers all 3 action types per SPEC_F004."
+
+      - id: CR260_MP4
+        cr: CR-260
+        type: must_pass
+        description: "All tests pass after changes"
+        result: PASS
+        evidence: "33 test files, 776 tests passed, 0 failures."
+
+      - id: CR260_SP1
+        cr: CR-260
+        type: should_pass
+        description: "i18n key activityLog.events.agenda_edit removed consistently across all 3 locales"
+        result: PASS
+        evidence: "grep 'agenda_edit|agenda_last_minute' in src/i18n/locales/ returns 0 matches. All 3 agenda-related i18n keys (agenda_edit, agenda_last_minute_speech, agenda_last_minute_speech_removed) removed from all 3 locales (pt-BR, en-US, es-LA)."
+
+      - id: CR260_SP2
+        cr: CR-260
+        type: should_pass
+        description: "buildLogDescription import in useAgenda.ts removed (no longer needed)"
+        result: PASS
+        evidence: "useAgenda.ts imports (lines 7-10): only imports from @tanstack/react-query, AuthContext, supabase, database. No activityLog import."
+
+      # =========================================================================
+      # CR-261: New User Language = Ward Language
+      # =========================================================================
+
+      - id: CR261_MP1
+        cr: CR-261
+        type: must_pass
+        description: "register-invited-user edge function sets user_metadata.language to ward's language"
+        result: PASS
+        evidence: "register-invited-user/index.ts lines 179-181: user_metadata: { language: wardLanguage } in createUser call."
+
+      - id: CR261_MP2
+        cr: CR-261
+        type: must_pass
+        description: "register-invited-user fetches ward language to set user_metadata.language"
+        result: PASS
+        evidence: "register-invited-user/index.ts lines 162-167: Fetches ward language via supabaseAdmin.from('wards').select('language').eq('id', invitation.ward_id).single(). Falls back to 'pt-BR' if null."
+
+      - id: CR261_MP3
+        cr: CR-261
+        type: must_pass
+        description: "register-first-user edge function sets user_metadata.language to the selected ward language"
+        result: PASS
+        evidence: "register-first-user/index.ts lines 157-159: user_metadata: { language: wardLanguage } in createUser call. wardLanguage = input.language || 'pt-BR' (line 88)."
+
+      - id: CR261_MP4
+        cr: CR-261
+        type: must_pass
+        description: "Invite registration screen ensures app language matches ward language after session"
+        result: PASS
+        evidence: "No direct changeLanguage call in invite/[token].tsx. However, this is functionally correct: user_metadata.language is set server-side by the edge function (line 180). When setSession runs (line 123-126), AuthContext.tsx useEffect (lines 106-143) detects user_metadata.language and calls changeLanguage(userLang) at line 127. SPEC AC-045-03 is satisfied via this AuthContext mechanism."
+
+      - id: CR261_MP5
+        cr: CR-261
+        type: must_pass
+        description: "All tests pass after changes"
+        result: PASS
+        evidence: "33 test files, 776 tests passed, 0 failures."
+
+      - id: CR261_SP1
+        cr: CR-261
+        type: should_pass
+        description: "InvitationData interface in invite/[token].tsx includes ward language field"
+        result: SOFT_FAIL
+        evidence: "InvitationData (lines 18-23) has email, role, stakeName, wardName but no language field. Not needed because language is handled server-side in edge function and picked up by AuthContext via user_metadata. Cosmetic only."
+
+      - id: CR261_SP2
+        cr: CR-261
+        type: should_pass
+        description: "handleValidateToken response in register-invited-user includes ward language"
+        result: SOFT_FAIL
+        evidence: "handleValidateToken response (lines 93-103) returns email, role, stakeName, wardName but no language. Not needed because handleRegister independently fetches ward language (lines 162-167). Cosmetic only."
+
+      - id: CR261_SP3
+        cr: CR-261
+        type: should_pass
+        description: "register.tsx (first-user) already calls changeLanguage(language) after session - verify still works"
+        result: PASS
+        evidence: "register.tsx line 109: changeLanguage(language) still present after setSession. Works correctly."

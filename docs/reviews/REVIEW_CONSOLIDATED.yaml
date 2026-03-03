@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 3
-  last_updated_by: "phase-3"
+  version: 6
+  last_updated_by: "phase-004"
 
 reviews:
   - id: REV-001
@@ -1294,3 +1294,149 @@ reviews:
       tests_total: 703
       tests_passing: 703
       test_files: 32
+
+  # ===========================================================================
+  # REV-006: Phase 004 (CR-259, CR-260, CR-261) - Quick UX Fixes
+  # ===========================================================================
+
+  - id: REV-006
+    scope: "Phase 004: CR-259 (Play Icon), CR-260 (Remove Agenda History), CR-261 (User Language from Ward)"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    iteration: 1
+    commits:
+      - hash: 7fb10dc
+        message: "feat(agenda): restyle play button to filled primary container (CR-259)"
+      - hash: 9d1523b
+        message: "refactor(useAgenda): remove agenda:edit logAction call and unused imports (CR-260)"
+      - hash: 63b114a
+        message: "refactor(i18n): remove agenda-related activity log keys from all locales (CR-260)"
+      - hash: 83fbe83
+        message: "feat(migration): add migration 026 to delete agenda activity log entries (CR-260)"
+      - hash: 3e5a932
+        message: "feat(register-first-user): set user_metadata.language to ward language (CR-261)"
+      - hash: 1e50b40
+        message: "feat(register-invited-user): fetch ward language and set user_metadata.language (CR-261)"
+    verdict: approved
+
+    summary: |
+      All 6 committed code changes across 3 CRs are correct, well-structured, and
+      align with SPEC, ARCH, and PLAN. Chain validation passes on all 4 links. The
+      implementation is minimal and focused. No P0 or P1 issues found. One P2
+      advisory for pre-existing dead code in useAgenda.ts (not introduced by this phase).
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request: pass
+      spec_vs_request_notes: |
+        SPEC F043 covers CR-259 (play icon redesign) with 4 ACs.
+        SPEC F044 covers CR-260 (remove agenda history) with 4 ACs.
+        SPEC F045 covers CR-261 (user language from ward) with 5 ACs.
+        All user requirements are covered. No scope creep.
+
+      arch_vs_spec: pass
+      arch_vs_spec_notes: |
+        ARCH M004 defines 6 components (C1-C6) that map to all SPEC ACs.
+        C1 for F043 (agenda.tsx style change).
+        C2-C4 for F044 (logAction removal, i18n cleanup, migration).
+        C5-C6 for F045 (register-first-user, register-invited-user).
+        All components align with SPEC. No extra components.
+
+      plan_vs_arch: pass
+      plan_vs_arch_notes: |
+        PLAN P004 has 7 steps (STEP-01 to STEP-07).
+        STEP-01 implements C1, STEP-02 implements C2, STEP-03 implements C3,
+        STEP-04 implements C4, STEP-05 implements C5, STEP-06 implements C6,
+        STEP-07 is verification. All steps match ARCH components.
+
+      code_vs_plan: pass
+      code_vs_plan_notes: |
+        6 commits match STEP-01 through STEP-06. Each commit modifies
+        exactly the files specified in the PLAN. Implementation details
+        match the PLAN's done_when criteria. No extra changes.
+
+      chain_intact: true
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+
+      - id: R6-1
+        severity: P2
+        category: quality
+        location: "src/hooks/useAgenda.ts:164"
+        description: |
+          Pre-existing dead code: useUpdateAgendaByDate destructures
+          `user` and `userName` from useAuth() but never uses them.
+          This was NOT introduced by CR-260 (the function never had a
+          logAction call), so it is pre-existing technical debt.
+        suggestion: |
+          Clean up in a future refactoring pass: change line 164 from
+          `const { wardId, user, userName } = useAuth()` to
+          `const { wardId } = useAuth()`.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Run database migration 026_delete_agenda_activity_log.sql"
+        command: "supabase db push (or apply 026_delete_agenda_activity_log.sql)"
+        reason: "Delete existing agenda-related activity_log entries per CR-260"
+        urgency: low
+        notes: |
+          Data-only migration (DELETE, no schema changes). Safe to run before
+          or after app deploy. Safe on empty tables.
+
+      - step: 2
+        action: "Deploy Edge Functions (register-first-user, register-invited-user)"
+        command: "supabase functions deploy register-first-user && supabase functions deploy register-invited-user"
+        reason: "CR-261: new users get user_metadata.language set from ward language"
+        urgency: low
+        notes: |
+          Edge Functions deploy independently. New users created after deploy
+          will have user_metadata.language set. Existing users are unaffected.
+
+      - step: 3
+        action: "Deploy app update"
+        reason: "CR-259 (play button style) and CR-260 (remove logAction + i18n keys)"
+        urgency: low
+        notes: |
+          All three deploy steps are independent and can happen in any order.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M004.yaml"
+        - "docs/plans/PLAN_P004.yaml"
+        - "docs/qa/QA_PLAN_004.yaml"
+        - "docs/specs/SPEC_F004.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 1
+      files_reviewed: 8
+      total_commits: 6
+      tests_total: 776
+      tests_passing: 776
+      test_files: 33

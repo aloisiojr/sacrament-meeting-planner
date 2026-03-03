@@ -1,0 +1,276 @@
+# =============================================================================
+# SPEC_F004.yaml
+# Phase 1: Quick UX Fixes (CR-259, CR-260, CR-261)
+# Status: DRAFT - pending_user_confirmation
+# Created: 2026-03-03
+# =============================================================================
+
+type: spec_draft
+status: complete
+artifact_id: "004"
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # CR-259: Play Icon Redesign on Expanded Agenda Card
+  # ---------------------------------------------------------------------------
+
+  - id: F043
+    name: Play Icon Redesign on Expanded Agenda Card
+    cr: 259
+    description: |
+      Replace the current play icon on the expanded agenda card (edit mode) with
+      a styled button that matches the "Iniciar Reuniao Sacramental" (Start
+      Sacrament Meeting) button from the Home tab. The button should use only
+      the play icon (no text), but adopt the same visual style: same background
+      color (colors.primary), same icon color (colors.onPrimary), same border
+      radius, same rounded shape. The button remains in the same position (to
+      the left of the chevron, in the card header area).
+
+      Current state:
+      - Home tab: "Start Meeting" button = full-width rounded button with
+        colors.primary background, PlayIcon(20, colors.onPrimary), + text
+      - Agenda expanded card: bare PlayIcon(24, colors.textSecondary) as a
+        simple pressable, no background, no container styling
+
+      Desired state:
+      - Agenda expanded card: a 36x36 rounded button (borderRadius: 8) with
+        colors.primary background, PlayIcon centered inside, colors.onPrimary
+        icon color. No text. Same position (to the left of the chevron).
+        Dimensions match the pencil button on the Home preview card.
+
+    acceptance_criteria:
+      - id: AC-043-01
+        description: "Play button on expanded agenda card has primary background"
+        given: "User expands an agenda card (non-excluded type)"
+        when: "Card is expanded"
+        then: "Play button shows with colors.primary background and rounded shape, matching the Home Start Meeting button style"
+
+      - id: AC-043-02
+        description: "Play button icon uses onPrimary color"
+        given: "Expanded agenda card renders"
+        when: "Play button is visible"
+        then: "PlayIcon inside the button uses colors.onPrimary color (white on primary)"
+
+      - id: AC-043-03
+        description: "Play button position is unchanged"
+        given: "Expanded agenda card renders"
+        when: "Play button is visible"
+        then: "Button remains to the left of the chevron-up icon in the card header"
+
+      - id: AC-043-04
+        description: "Play button navigates to presentation mode"
+        given: "User taps the styled play button"
+        when: "Button is pressed"
+        then: "Navigates to Presentation Mode with the card's date, same behavior as before"
+
+  # ---------------------------------------------------------------------------
+  # CR-260: Remove Agenda Change History
+  # ---------------------------------------------------------------------------
+
+  - id: F044
+    name: Remove Agenda Change History
+    cr: 260
+    description: |
+      Remove ALL agenda-related entries from the activity log (history).
+      Three action types to remove: agenda:edit, agenda_last_minute_speech,
+      and agenda_last_minute_speech_removed.
+
+      Three parts:
+      1. CODE: Stop generating all agenda-related log entries. Remove the
+         logAction calls for agenda:edit, agenda_last_minute_speech, and
+         agenda_last_minute_speech_removed from their respective hooks/components.
+      2. DATA: Delete existing entries from the activity_log table in the
+         database via migration:
+         DELETE FROM activity_log WHERE action_type IN
+         ('agenda:edit', 'agenda_last_minute_speech', 'agenda_last_minute_speech_removed');
+      3. I18N: Remove the i18n keys for all 3 action types from all translation
+         files (pt-BR, en-US, es-LA). Clean up dead code.
+
+      The history screen (Settings > History) continues to work normally for
+      all other entry types.
+
+    acceptance_criteria:
+      - id: AC-044-01
+        description: "Code no longer logs any agenda-related actions"
+        given: "User edits any agenda field, or a last-minute speech is added/removed"
+        when: "Auto-save fires and mutation succeeds"
+        then: "No activity_log entry is created with action_type in ('agenda:edit', 'agenda_last_minute_speech', 'agenda_last_minute_speech_removed')"
+
+      - id: AC-044-02
+        description: "Existing agenda-related entries are removed from database"
+        given: "Database has existing activity_log entries with agenda-related action_types"
+        when: "Migration runs"
+        then: "All rows with action_type IN ('agenda:edit', 'agenda_last_minute_speech', 'agenda_last_minute_speech_removed') are deleted from activity_log"
+
+      - id: AC-044-03
+        description: "History screen continues to work for other entry types"
+        given: "User navigates to Settings > History after the change"
+        when: "History screen loads"
+        then: "All non-agenda log entries are displayed normally (member, topic, speech, actor, etc.)"
+
+      - id: AC-044-04
+        description: "I18n keys for agenda actions are removed"
+        given: "Translation files (pt-BR, en-US, es-LA)"
+        when: "Code is deployed"
+        then: "No i18n keys exist for agenda_edit, agenda_last_minute_speech, or agenda_last_minute_speech_removed"
+
+  # ---------------------------------------------------------------------------
+  # CR-261: New User Language = Ward Language
+  # ---------------------------------------------------------------------------
+
+  - id: F045
+    name: New User Language Defaults to Ward Language
+    cr: 261
+    description: |
+      When creating a new user (either via register-first-user or
+      register-invited-user Edge Functions), set the user's app language
+      (user_metadata.language) to the ward's language. This ensures that
+      new users immediately see the app in the same language as the ward,
+      instead of relying on device locale detection.
+
+      For register-first-user: the ward language is provided in the input
+      (input.language). Set user_metadata.language = input.language || 'pt-BR'.
+
+      For register-invited-user: the ward language must be fetched from the
+      wards table (invitation.ward_id -> wards.language). Set
+      user_metadata.language = ward.language.
+
+      Current state:
+      - register-first-user: creates user with app_metadata only (ward_id,
+        role, full_name). No user_metadata.language is set.
+      - register-invited-user: creates user with app_metadata only (ward_id,
+        role, full_name). No user_metadata.language is set.
+      - App language detection: user_metadata.language > device locale > pt-BR
+
+      Desired state:
+      - Both edge functions set user_metadata: { language: wardLanguage }
+        during user creation, so the new user's app language matches the ward.
+
+    acceptance_criteria:
+      - id: AC-045-01
+        description: "register-first-user sets user_metadata.language"
+        given: "New user registers as first user with ward language 'en-US'"
+        when: "register-first-user Edge Function creates the auth user"
+        then: "User is created with user_metadata.language = 'en-US'"
+
+      - id: AC-045-02
+        description: "register-invited-user sets user_metadata.language from ward"
+        given: "Invited user registers for a ward with language 'es-LA'"
+        when: "register-invited-user Edge Function creates the auth user"
+        then: "User is created with user_metadata.language = 'es-LA'"
+
+      - id: AC-045-03
+        description: "App displays in ward language for new user"
+        given: "New user's user_metadata.language is set to ward language"
+        when: "User logs in for the first time"
+        then: "App UI displays in the ward's language (user_metadata.language takes priority over device locale)"
+
+      - id: AC-045-04
+        description: "register-first-user defaults to pt-BR if no language specified"
+        given: "New user registers without specifying a language"
+        when: "register-first-user Edge Function runs"
+        then: "User is created with user_metadata.language = 'pt-BR'"
+
+      - id: AC-045-05
+        description: "register-invited-user fetches ward language"
+        given: "Invitation exists for ward_id X"
+        when: "register-invited-user needs the ward language"
+        then: "Ward language is fetched from the wards table using invitation.ward_id"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+
+edge_cases:
+
+  - id: EC-043-01
+    feature: F043
+    case: "Theme change while viewing expanded agenda card"
+    expected: "Play button background and icon colors update to new theme's primary/onPrimary"
+
+  - id: EC-044-01
+    feature: F044
+    case: "Migration runs on database with no agenda:edit entries"
+    expected: "Migration completes successfully (DELETE affects 0 rows, no error)"
+
+  - id: EC-044-02
+    feature: F044
+    case: "Activity log entries with description containing 'agenda:edit' in non-action_type fields"
+    expected: "Not affected. Migration only deletes based on action_type column, not description text"
+
+  - id: EC-045-01
+    feature: F045
+    case: "Ward has no language set (NULL)"
+    expected: "Fallback to 'pt-BR' for user_metadata.language"
+
+  - id: EC-045-02
+    feature: F045
+    case: "User changes app language after registration"
+    expected: "User's chosen language overrides the initial ward language (user_metadata.language is updated)"
+
+  - id: EC-045-03
+    feature: F045
+    case: "Invitation for a ward that was deleted between invitation creation and registration"
+    expected: "register-invited-user already validates invitation; ward deletion would cause FK error on user creation"
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+# All resolved:
+# OQ-1: RESOLVED -> 36x36, borderRadius: 8 (matches pencil button on Home preview card)
+# OQ-2: RESOLVED -> Remove i18n keys (clean up dead code)
+# OQ-3: RESOLVED -> Remove all 3 types: agenda:edit, agenda_last_minute_speech, agenda_last_minute_speech_removed
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: "The play button on the expanded agenda card should be icon-only (no text), since the user said 'somente o icone play'"
+    reason: "User explicitly stated 'somente o icone play' - only the play icon"
+    impact_if_wrong: "Would need to add text label to the button"
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: "The migration to delete agenda:edit entries uses action_type column for filtering, not description"
+    reason: "The activity_log table has an explicit action_type column which is the proper way to identify entry types"
+    impact_if_wrong: "Could miss entries if some were logged differently"
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: "For register-invited-user, the ward language should be fetched from the wards table using the invitation's ward_id"
+    reason: "The invitation record has ward_id but not the ward language. A query to wards table is needed."
+    impact_if_wrong: "Would need a different approach to get the ward language"
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: "Setting user_metadata.language is done at user creation time via createUser's user_metadata option, not via a separate updateUser call"
+    reason: "Supabase admin.createUser supports setting both app_metadata and user_metadata in a single call, which is more efficient"
+    impact_if_wrong: "Would need an additional API call to set user_metadata after creation"
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: "The play button background color should use colors.primary (same as Start Meeting button)"
+    reason: "User said 'mesmo formato, cor de fundo, cor da fonte, icone' referring to the Start Meeting button"
+    impact_if_wrong: "Would need different color treatment"
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []
+# No inconsistencies found with SPEC_CONSOLIDATED.
+# All three CRs modify or extend existing features without contradicting them:
+# - F043 extends F023/F024 (Presentation Mode / Home Tab) with visual update only
+# - F044 modifies F012 (Activity Log) by removing one action_type
+# - F045 extends F001/F003 (Authentication / User Invitation) with user_metadata

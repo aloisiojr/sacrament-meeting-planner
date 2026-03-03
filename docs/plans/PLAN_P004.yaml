@@ -1,0 +1,387 @@
+# =============================================================================
+# PLAN_P004.yaml - Implementation Plan for Phase 1 (Quick UX Fixes)
+# CR-259: Play Icon Redesign on Expanded Agenda Card
+# CR-260: Remove Agenda Change History
+# CR-261: New User Language = Ward Language
+# Generated: 2026-03-03
+# Artifact ID: 004
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement 3 independent UX improvements:
+  (1) F043 - Restyle the play icon on expanded agenda cards to a filled button
+  (2) F044 - Remove all agenda-related activity log entries (code, data, i18n)
+  (3) F045 - Set new user language to ward language at registration time
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # F043: Play Icon Redesign (CR-259)
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-259/F043: Restyle the play button on the expanded agenda card in
+      src/app/(tabs)/agenda.tsx (lines 520-529). Replace the bare PlayIcon
+      Pressable with a styled 36x36 container: borderRadius 8,
+      backgroundColor colors.primary, PlayIcon centered with size 20 and
+      colors.onPrimary color. Keep the existing hitSlop, accessibilityRole,
+      accessibilityLabel, and navigation behavior unchanged. The existing
+      marginRight in styles.playButton is preserved.
+    files:
+      - src/app/(tabs)/agenda.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "Play button has inline style: width: 36, height: 36, borderRadius: 8, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center'"
+      - "PlayIcon inside the button uses size={20} and color={colors.onPrimary}"
+      - "Pressable still has hitSlop={8}, accessibilityRole='button', accessibilityLabel='Open presentation'"
+      - "onPress still navigates to /presentation with the card's date"
+      - "marginRight from styles.playButton is preserved (style array approach)"
+    tests:
+      - type: unit
+        description: |
+          Verify the play button renders with the correct styles by checking
+          the rendered component. Test that pressing the button still navigates
+          to the presentation screen. Existing agenda.test.tsx tests should
+          continue to pass without modification.
+    covers:
+      acceptance_criteria:
+        - "AC-043-01: Play button has primary background and rounded shape"
+        - "AC-043-02: PlayIcon uses onPrimary color"
+        - "AC-043-03: Button position unchanged (left of chevron)"
+        - "AC-043-04: Button navigates to presentation mode"
+      edge_cases:
+        - "EC-043-01: Theme change updates colors (uses colors.primary/onPrimary from theme)"
+    risks:
+      - risk: "Visual mismatch with theme in dark mode"
+        mitigation: "Uses colors.primary and colors.onPrimary which adapt to theme"
+
+  # =========================================================================
+  # F044: Remove Agenda Change History (CR-260)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-260/F044: Remove the logAction call for 'agenda:edit' from
+      src/hooks/useAgenda.ts. In useUpdateAgenda.onSuccess (line 156-158),
+      remove the if (user) block that calls logAction and buildLogDescription.
+      Also remove the import of logAction and buildLogDescription from
+      '../lib/activityLog' (line 10) since no other usages exist in the file.
+      Remove 'userName' from the useAuth() destructuring in useUpdateAgenda
+      (line 130) if no longer needed.
+    files:
+      - src/hooks/useAgenda.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "import { logAction, buildLogDescription } from '../lib/activityLog' is removed"
+      - "No logAction call exists in useAgenda.ts"
+      - "useAuth() destructuring in useUpdateAgenda no longer includes userName"
+      - "The if (user) block in onSuccess is removed"
+      - "useUpdateAgenda still invalidates queries in onSuccess"
+      - "npm test -- useAgenda passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Verify that useUpdateAgenda.onSuccess no longer calls logAction.
+          Existing useAgenda-utils.test.ts tests should pass unchanged.
+    covers:
+      acceptance_criteria:
+        - "AC-044-01: Code no longer logs agenda:edit actions"
+      edge_cases: []
+    risks:
+      - risk: "Removing unused userName from useAuth destructuring breaks something"
+        mitigation: "Check if userName is used elsewhere in useUpdateAgenda; if not, safe to remove"
+
+  - id: STEP-03
+    description: |
+      CR-260/F044: Remove 3 i18n keys from all 3 locale files:
+      - activityLog.events.agenda_edit (line 327 in each file)
+      - activityLog.events.agenda_last_minute_speech (line 328)
+      - activityLog.events.agenda_last_minute_speech_removed (line 329)
+      Files: src/i18n/locales/pt-BR.json, en-US.json, es-LA.json.
+      These are dead code: agenda_edit was only used by the logAction call
+      removed in STEP-02; the other two have no corresponding logAction
+      calls in the codebase at all.
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "grep 'agenda_edit' in all 3 locale files returns 0 matches"
+      - "grep 'agenda_last_minute_speech' in all 3 locale files returns 0 matches"
+      - "grep 'agenda_last_minute_speech_removed' in all 3 locale files returns 0 matches"
+      - "JSON files are still valid JSON (no trailing commas)"
+      - "npm test -- i18n passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          The existing i18n.test.ts validates that all 3 locale files have
+          the same keys. After removing the same 3 keys from all 3 files,
+          the test should pass without modification.
+    covers:
+      acceptance_criteria:
+        - "AC-044-04: I18n keys for agenda actions are removed from all locales"
+      edge_cases: []
+    risks:
+      - risk: "Trailing comma in JSON after key removal"
+        mitigation: "Use Edit tool with surrounding context to ensure valid JSON"
+
+  - id: STEP-04
+    description: |
+      CR-260/F044: Create migration 026_delete_agenda_activity_log.sql that
+      deletes all existing activity_log entries with action_type IN
+      ('agenda:edit', 'agenda_last_minute_speech',
+      'agenda_last_minute_speech_removed'). This is a data-only migration
+      (DELETE, no schema changes). Safe on empty tables.
+    files:
+      - supabase/migrations/026_delete_agenda_activity_log.sql
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-05", "STEP-06"]
+    done_when:
+      - "File supabase/migrations/026_delete_agenda_activity_log.sql exists"
+      - "Contains DELETE FROM activity_log WHERE action_type IN ('agenda:edit', 'agenda_last_minute_speech', 'agenda_last_minute_speech_removed')"
+      - "Has a comment referencing CR-260"
+      - "No ALTER TABLE or CREATE statements"
+    tests:
+      - type: unit
+        description: |
+          SQL syntax is validated by reading the file. The DELETE statement
+          is safe on empty tables (0 rows affected). Migration correctness
+          is verified during deploy.
+    covers:
+      acceptance_criteria:
+        - "AC-044-02: Existing agenda-related entries are removed from database"
+      edge_cases:
+        - "EC-044-01: Migration succeeds on database with no agenda:edit entries (DELETE affects 0 rows)"
+        - "EC-044-02: Only action_type column is used for filtering, not description text"
+    risks:
+      - risk: "Irreversible data deletion"
+        mitigation: "Intentional per CR-260. Agenda log entries are informational only."
+
+  # =========================================================================
+  # F045: New User Language = Ward Language (CR-261)
+  # =========================================================================
+
+  - id: STEP-05
+    description: |
+      CR-261/F045: Add user_metadata.language to the createUser call in
+      supabase/functions/register-first-user/index.ts (line 148). The ward
+      language is already available as the wardLanguage variable
+      (const wardLanguage = input.language || 'pt-BR', line 88). Add
+      user_metadata: { language: wardLanguage } to the createUser options
+      object alongside the existing app_metadata.
+    files:
+      - supabase/functions/register-first-user/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-06"]
+    done_when:
+      - "createUser call includes user_metadata: { language: wardLanguage }"
+      - "wardLanguage still defaults to 'pt-BR' (line 88 unchanged)"
+      - "app_metadata is unchanged"
+      - "No new variables or imports needed"
+    tests:
+      - type: unit
+        description: |
+          Verify createUser is called with user_metadata.language set to
+          the ward language. Test with explicit language ('en-US') and
+          with no language (defaults to 'pt-BR').
+    covers:
+      acceptance_criteria:
+        - "AC-045-01: register-first-user sets user_metadata.language = 'en-US'"
+        - "AC-045-04: register-first-user defaults to pt-BR if no language specified"
+      edge_cases: []
+    risks:
+      - risk: "Supabase createUser rejects user_metadata parameter"
+        mitigation: "Supabase admin.createUser supports user_metadata as a documented option"
+
+  - id: STEP-06
+    description: |
+      CR-261/F045: In supabase/functions/register-invited-user/index.ts,
+      add a query to fetch the ward language from the wards table using
+      invitation.ward_id, then add user_metadata: { language: wardLanguage }
+      to the createUser call.
+
+      In handleRegister, after the invitation lookup and validation (line 131-158),
+      before the createUser call (line 162), add:
+        const { data: ward } = await supabaseAdmin
+          .from('wards')
+          .select('language')
+          .eq('id', invitation.ward_id)
+          .single();
+        const wardLanguage = ward?.language || 'pt-BR';
+
+      Then add user_metadata to the createUser call alongside app_metadata.
+    files:
+      - supabase/functions/register-invited-user/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "Ward language query exists: select('language').eq('id', invitation.ward_id).single()"
+      - "wardLanguage variable defined with fallback: ward?.language || 'pt-BR'"
+      - "createUser call includes user_metadata: { language: wardLanguage }"
+      - "app_metadata is unchanged"
+      - "Ward query uses supabaseAdmin (service_role, bypasses RLS)"
+    tests:
+      - type: unit
+        description: |
+          Verify that handleRegister fetches ward language from the wards
+          table and passes it to createUser as user_metadata.language.
+          Test with ward language 'es-LA' and with null ward language
+          (fallback to 'pt-BR').
+    covers:
+      acceptance_criteria:
+        - "AC-045-02: register-invited-user sets user_metadata.language = ward language"
+        - "AC-045-05: register-invited-user fetches ward language from wards table"
+      edge_cases:
+        - "EC-045-01: Ward has null language -> fallback to 'pt-BR'"
+    risks:
+      - risk: "Ward query fails if ward was deleted"
+        mitigation: "FK constraint from invitations.ward_id -> wards.id prevents this. If somehow broken, .single() throws and returns 500."
+
+  # =========================================================================
+  # VERIFICATION
+  # =========================================================================
+
+  - id: STEP-07
+    description: |
+      Run full test suite to verify no regressions from all changes.
+      Verify all code changes pass linting, type-checking, and tests.
+      Confirm AC-044-03 (History screen works for other entry types)
+      and AC-045-03 (App displays in ward language for new user) are
+      satisfied by existing behavior (no code changes needed for these).
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria:
+        - "AC-044-03: History screen works for other entry types (no code change, verified by existing tests)"
+        - "AC-045-03: App displays in ward language (existing user_metadata.language priority chain)"
+      edge_cases:
+        - "EC-045-02: User changes app language after registration (existing behavior, no code change)"
+        - "EC-045-03: Invitation for deleted ward (FK error, existing behavior)"
+    risks:
+      - risk: "Unforeseen interaction between changes"
+        mitigation: "All 3 features are fully independent; no shared code paths"
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # F043 (CR-259)
+  - ac_id: AC-043-01
+    description: "Play button on expanded agenda card has primary background"
+    how_to_verify: "Read agenda.tsx - play button style includes backgroundColor: colors.primary, borderRadius: 8"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-043-02
+    description: "Play button icon uses onPrimary color"
+    how_to_verify: "Read agenda.tsx - PlayIcon uses color={colors.onPrimary}"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-043-03
+    description: "Play button position is unchanged"
+    how_to_verify: "Button remains before chevron in JSX; styles.playButton marginRight preserved"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-043-04
+    description: "Play button navigates to presentation mode"
+    how_to_verify: "onPress unchanged: router.push({ pathname: '/presentation', params: { date } })"
+    covered_by_steps: ["STEP-01"]
+
+  # F044 (CR-260)
+  - ac_id: AC-044-01
+    description: "Code no longer logs any agenda-related actions"
+    how_to_verify: "logAction call removed from useUpdateAgenda.onSuccess; no other agenda logAction calls exist"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-044-02
+    description: "Existing agenda-related entries removed from database"
+    how_to_verify: "Migration 026 DELETEs rows with action_type IN the 3 agenda types"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-044-03
+    description: "History screen continues to work for other entry types"
+    how_to_verify: "No code changes to activityLog.ts, useActivityLog hook, or history screen. Only agenda-specific entries removed."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-044-04
+    description: "I18n keys for agenda actions are removed"
+    how_to_verify: "grep for agenda_edit, agenda_last_minute_speech, agenda_last_minute_speech_removed returns 0 in all locale files"
+    covered_by_steps: ["STEP-03"]
+
+  # F045 (CR-261)
+  - ac_id: AC-045-01
+    description: "register-first-user sets user_metadata.language"
+    how_to_verify: "createUser call includes user_metadata: { language: wardLanguage }"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-045-02
+    description: "register-invited-user sets user_metadata.language from ward"
+    how_to_verify: "Ward language fetched from wards table; createUser includes user_metadata: { language: wardLanguage }"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-045-03
+    description: "App displays in ward language for new user"
+    how_to_verify: "Existing app priority chain: user_metadata.language > device locale > pt-BR. No app code change needed."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-045-04
+    description: "register-first-user defaults to pt-BR if no language specified"
+    how_to_verify: "wardLanguage = input.language || 'pt-BR' (existing line 88)"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: AC-045-05
+    description: "register-invited-user fetches ward language"
+    how_to_verify: "New query: select('language').eq('id', invitation.ward_id).single()"
+    covered_by_steps: ["STEP-06"]
+
+  # Edge cases
+  - ac_id: EC-043-01
+    description: "Theme change while viewing expanded agenda card"
+    how_to_verify: "Uses colors.primary/onPrimary from theme (reactive to theme changes)"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-044-01
+    description: "Migration runs on database with no agenda:edit entries"
+    how_to_verify: "DELETE statement; affects 0 rows on empty table, no error"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: EC-044-02
+    description: "Only action_type column used for filtering"
+    how_to_verify: "WHERE clause uses action_type IN (...), not description"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: EC-045-01
+    description: "Ward has no language set (NULL)"
+    how_to_verify: "wardLanguage = ward?.language || 'pt-BR' provides fallback"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: EC-045-02
+    description: "User changes app language after registration"
+    how_to_verify: "Existing behavior: user_metadata.language is updated when user changes language in app"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: EC-045-03
+    description: "Invitation for deleted ward"
+    how_to_verify: "FK constraint invitations.ward_id -> wards.id prevents this; existing error handling"
+    covered_by_steps: ["STEP-07"]

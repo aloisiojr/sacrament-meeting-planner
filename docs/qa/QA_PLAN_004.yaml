@@ -1,0 +1,257 @@
+# =============================================================================
+# QA_PLAN_004.yaml
+# PRE-validation plan for Phase 1 (artifact 004)
+# CRs: 259, 260, 261
+# Generated: 2026-03-03
+# =============================================================================
+
+metadata:
+  artifact_id: "004"
+  phase: "Phase 1"
+  mode: PRE
+  type: feature_request
+  date: "2026-03-03"
+  scope: "3 CRs: play icon styling (CR-259), remove agenda history (CR-260), new user language (CR-261)"
+
+# =============================================================================
+# CR-259: Play icon no card expandido de edicao da agenda
+# =============================================================================
+# User request: Replace the play icon on the expanded agenda edit card with a
+# button identical to the "Iniciar Reuniao Sacramental" button (same shape,
+# background color, font color, play icon) but with ONLY the play icon (no text).
+# Same position.
+#
+# Current state analysis:
+#   - Play icon location: src/app/(tabs)/agenda.tsx lines 520-529
+#     Currently a simple Pressable with PlayIcon size=24, color=colors.textSecondary
+#     Style: styles.playButton = { marginRight: 16 } (no background, no border-radius)
+#   - "Iniciar Reuniao Sacramental" button: src/app/(tabs)/index.tsx lines 131-143
+#     Pressable with style={[styles.meetingButton, { backgroundColor: colors.primary }]}
+#     Contains PlayIcon size=20 color={colors.onPrimary} + text
+#     meetingButton style (lines 270-276): paddingVertical: 14, borderRadius: 10, alignItems: center
+#     playIconWrapper style (lines 283-284): marginRight: 8
+#   - PlayIcon component: src/components/icons/index.tsx lines 199-216
+#     Lucide circle-play SVG icon (circle with play triangle)
+#
+# What needs to change:
+#   - The Pressable at agenda.tsx lines 520-529 needs to be styled like the
+#     meetingButton (backgroundColor: colors.primary, borderRadius: 10)
+#   - The PlayIcon color should change from colors.textSecondary to colors.onPrimary
+#   - The button should only contain the PlayIcon (no text) - currently already only icon
+#   - Size/padding should match the "Iniciar" button format
+# =============================================================================
+
+cr_259_checks:
+
+  must_pass:
+
+    - id: CR259_MP1
+      description: "Play button on expanded agenda card has backgroundColor = colors.primary"
+      how_to_verify: "Read src/app/(tabs)/agenda.tsx, find the Pressable around PlayIcon in expanded card. Verify its style includes { backgroundColor: colors.primary }."
+      current_state: "No background color. Style is just styles.playButton = { marginRight: 16 }"
+      expected_state: "Style includes backgroundColor: colors.primary"
+
+    - id: CR259_MP2
+      description: "Play button on expanded agenda card has borderRadius: 10 (matching meetingButton)"
+      how_to_verify: "Check the style of the play button Pressable. Should have borderRadius: 10."
+      current_state: "No borderRadius. Style is just { marginRight: 16 }"
+      expected_state: "borderRadius: 10"
+
+    - id: CR259_MP3
+      description: "PlayIcon color changed from colors.textSecondary to colors.onPrimary"
+      how_to_verify: "Check the color prop of PlayIcon in the expanded agenda card."
+      current_state: "agenda.tsx line 528: color={colors.textSecondary}"
+      expected_state: "color={colors.onPrimary}"
+
+    - id: CR259_MP4
+      description: "Play button contains ONLY the PlayIcon (no text)"
+      how_to_verify: "Verify the Pressable only contains PlayIcon, not a Text element."
+      current_state: "Already only has PlayIcon (no text). Should remain this way."
+      expected_state: "Only PlayIcon, no Text child"
+
+    - id: CR259_MP5
+      description: "Play button remains in the same position (inside the expanded card header)"
+      how_to_verify: "Verify the Pressable is still inside the {expandable && isExpanded && ...} guard, before the chevron."
+      current_state: "agenda.tsx lines 520-529, inside expandable && isExpanded guard"
+      expected_state: "Same position, same conditional rendering"
+
+    - id: CR259_MP6
+      description: "All tests pass after changes"
+      how_to_verify: "Run npx vitest run and confirm no failures."
+      current_state: "703 tests passing"
+      expected_state: "All tests still pass"
+
+  should_pass:
+
+    - id: CR259_SP1
+      description: "Play button has appropriate padding to look like a proper button (not just an icon)"
+      how_to_verify: "Check style has padding (e.g., paddingVertical/paddingHorizontal or padding) similar to meetingButton."
+      current_state: "No padding. Style is { marginRight: 16 }"
+      expected_state: "Has padding to give button-like appearance"
+
+    - id: CR259_SP2
+      description: "Play button alignItems: center to center the icon"
+      how_to_verify: "Check that the button style has alignItems/justifyContent center."
+      current_state: "No alignment styles"
+      expected_state: "alignItems: center, justifyContent: center (or equivalent)"
+
+# =============================================================================
+# CR-260: Remover historico de alteracoes de agenda
+# =============================================================================
+# User request: Remove 'alteracoes na agenda' entries from the history in settings.
+# Manually remove existing entries. Make the code stop generating new entries.
+#
+# Current state analysis:
+#   - agenda:edit entries are logged in: src/hooks/useAgenda.ts line 157
+#     logAction(wardId, user.id, user.email ?? '', 'agenda:edit',
+#       buildLogDescription('agenda:edit', { data: data.sunday_date }), userName)
+#   - This is the ONLY place agenda:edit is logged (confirmed by grep)
+#   - i18n key: activityLog.events.agenda_edit = "Agenda do dia {{data}} editada"
+#   - History screen: src/app/(tabs)/settings/history.tsx - displays ALL entries
+#     from activity_log table, no filtering by action_type
+#   - useActivityLog hook: src/hooks/useActivityLog.ts - queries all entries
+#     from activity_log with no action_type filter
+#   - Existing DB entries with action_type='agenda:edit' need a migration to DELETE
+#
+# What needs to change:
+#   - Remove logAction call from useUpdateAgenda onSuccess (useAgenda.ts line 157)
+#   - Create a DB migration to DELETE FROM activity_log WHERE action_type = 'agenda:edit'
+#   - Optionally: remove the i18n key activityLog.events.agenda_edit (or keep for safety)
+# =============================================================================
+
+cr_260_checks:
+
+  must_pass:
+
+    - id: CR260_MP1
+      description: "logAction call for 'agenda:edit' removed from useUpdateAgenda"
+      how_to_verify: "Read src/hooks/useAgenda.ts useUpdateAgenda onSuccess callback. Confirm no logAction with 'agenda:edit'."
+      current_state: "useAgenda.ts line 157: logAction(wardId, user.id, user.email ?? '', 'agenda:edit', ...)"
+      expected_state: "No logAction call for 'agenda:edit' in useUpdateAgenda"
+
+    - id: CR260_MP2
+      description: "No other code paths log 'agenda:edit' actions"
+      how_to_verify: "Grep for 'agenda:edit' across the entire src/ directory. Should find 0 matches in .ts/.tsx files (excluding i18n)."
+      current_state: "Only 1 match in useAgenda.ts line 157"
+      expected_state: "0 matches in code files"
+
+    - id: CR260_MP3
+      description: "DB migration exists to delete existing 'agenda:edit' entries from activity_log"
+      how_to_verify: "Check supabase/migrations/ for a new migration with DELETE FROM activity_log WHERE action_type = 'agenda:edit'."
+      current_state: "No such migration exists"
+      expected_state: "New migration file with DELETE statement"
+
+    - id: CR260_MP4
+      description: "All tests pass after changes"
+      how_to_verify: "Run npx vitest run and confirm no failures."
+      current_state: "703 tests passing"
+      expected_state: "All tests still pass"
+
+  should_pass:
+
+    - id: CR260_SP1
+      description: "i18n key activityLog.events.agenda_edit kept or removed consistently across all 3 locales"
+      how_to_verify: "Check if agenda_edit key exists in pt-BR.json, en-US.json, es-LA.json. Should be either ALL present (for backward compat) or ALL removed."
+      current_state: "Present in all 3 locale files"
+      expected_state: "Consistent handling across locales (kept for backward compat OR all removed)"
+
+    - id: CR260_SP2
+      description: "buildLogDescription import in useAgenda.ts still present if other log calls remain, or removed if no longer needed"
+      how_to_verify: "Check if useAgenda.ts still uses logAction/buildLogDescription for other action types. If not, the import should be cleaned up."
+      current_state: "Import at line 10, used only for agenda:edit"
+      expected_state: "If no other logAction calls remain in the file, imports should be removed"
+
+# =============================================================================
+# CR-261: Idioma do novo usuario = idioma da ala
+# =============================================================================
+# User request: When creating a new user (whether via invitation or creating a
+# new ward), set the app language to match the ward language.
+#
+# Current state analysis:
+#
+# Flow 1: register-first-user (creating a new ward + first user)
+#   - src/app/(auth)/register.tsx: User selects language manually (line 32, default pt-BR)
+#   - The selected language is sent as body.language to the edge function
+#   - Edge function creates the ward with this language AND the user
+#   - After registration, changeLanguage(language) is called (line 109)
+#   - In this flow, user manually picks a language AND it becomes the ward language.
+#     So by definition user language = ward language. ALREADY CORRECT.
+#   - HOWEVER: user_metadata.language is NOT set during registration!
+#     The changeLanguage(language) at line 109 only changes i18n runtime.
+#     When user next logs in, AuthContext (line 124) checks user_metadata.language
+#     which is undefined -> falls back to device locale -> falls back to ward language.
+#     So the behavior is mostly correct but could be more explicit.
+#
+# Flow 2: register-invited-user (accepting an invitation)
+#   - src/app/(auth)/invite/[token].tsx: No language selection at all
+#   - Edge function register-invited-user: creates user with app_metadata but
+#     NO user_metadata.language set (line 162-171)
+#   - After registration, session is set but NO changeLanguage call (line 122-128)
+#   - When user logs in, AuthContext (line 124) checks user_metadata.language -> undefined
+#     -> checks device locale -> if not supported, falls back to ward language
+#   - ISSUE: If invited user's device locale is e.g. en-US but the ward is pt-BR,
+#     the user gets en-US instead of pt-BR (ward language).
+#   - FIX NEEDED: Set user_metadata.language = ward.language during registration
+#     AND call changeLanguage() after session is set.
+#
+# Key files:
+#   - supabase/functions/register-invited-user/index.ts (edge function)
+#   - supabase/functions/register-first-user/index.ts (edge function)
+#   - src/app/(auth)/invite/[token].tsx (invite registration screen)
+#   - src/app/(auth)/register.tsx (first-user registration screen)
+#   - src/contexts/AuthContext.tsx lines 104-143 (language detection logic)
+# =============================================================================
+
+cr_261_checks:
+
+  must_pass:
+
+    - id: CR261_MP1
+      description: "register-invited-user edge function sets user_metadata.language to ward's language"
+      how_to_verify: "Read supabase/functions/register-invited-user/index.ts handleRegister function. Check that createUser call includes user_metadata with language field set to the ward's language."
+      current_state: "createUser at lines 162-171 only sets app_metadata (ward_id, role, full_name). No user_metadata."
+      expected_state: "createUser includes user_metadata: { language: ward.language } (requires fetching ward language first)"
+
+    - id: CR261_MP2
+      description: "register-invited-user fetches ward language to set user_metadata.language"
+      how_to_verify: "Check that the invitation lookup query includes ward language (via join or separate query)."
+      current_state: "handleRegister queries invitations without ward join (line 132-136: select('*'))"
+      expected_state: "Query includes ward language (e.g., select('*, wards(language)') or separate ward query)"
+
+    - id: CR261_MP3
+      description: "register-first-user edge function sets user_metadata.language to the selected ward language"
+      how_to_verify: "Read supabase/functions/register-first-user/index.ts createUser call. Check user_metadata includes language."
+      current_state: "createUser at lines 148-157 only sets app_metadata. No user_metadata."
+      expected_state: "createUser includes user_metadata: { language: wardLanguage }"
+
+    - id: CR261_MP4
+      description: "Invite registration screen calls changeLanguage after session is set"
+      how_to_verify: "Read src/app/(auth)/invite/[token].tsx handleRegister success path. Verify changeLanguage is called with ward language after setSession."
+      current_state: "Lines 122-128: setSession is called but no changeLanguage. Comment says 'Navigation handled by auth state change'."
+      expected_state: "changeLanguage called with ward language after setSession"
+
+    - id: CR261_MP5
+      description: "All tests pass after changes"
+      how_to_verify: "Run npx vitest run and confirm no failures."
+      current_state: "703 tests passing"
+      expected_state: "All tests still pass"
+
+  should_pass:
+
+    - id: CR261_SP1
+      description: "InvitationData interface in invite/[token].tsx includes ward language field"
+      how_to_verify: "Check InvitationData interface at line 18-23 for a language field."
+      current_state: "Interface has: email, role, stakeName, wardName (no language)"
+      expected_state: "Interface includes language field"
+
+    - id: CR261_SP2
+      description: "handleValidateToken response in register-invited-user includes ward language"
+      how_to_verify: "Check the validate-token response JSON to include language from ward."
+      current_state: "Response includes email, role, stakeName, wardName (lines 94-101). No language."
+      expected_state: "Response includes language field from ward"
+
+    - id: CR261_SP3
+      description: "register.tsx (first-user) already calls changeLanguage(language) after session - verify still works"
+      how_to_verify: "Verify line 109 still calls changeLanguage(language) after setSession."
+      current_state: "Line 109: changeLanguage(language) - already correct"
+      expected_state: "Still present and working"

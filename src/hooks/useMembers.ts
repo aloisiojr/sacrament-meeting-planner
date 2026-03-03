@@ -144,7 +144,7 @@ export function useUpdateMember() {
           .update({
             speaker_name: data.full_name,
             speaker_phone: fullPhone,
-            speaker_informal_name: data.informal_name || data.full_name.split(' ')[0],
+            speaker_informal_name: data.informal_name,
           })
           .eq('member_id', data.id)
           .gte('sunday_date', today);

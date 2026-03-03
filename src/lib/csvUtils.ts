@@ -169,7 +169,7 @@ export function generateCsv(
   const header = `${h.name},${h.informalName},${h.phone}`;
   const rows = members.map((m) => {
     const name = escapeCsvField(m.full_name);
-    const informalName = escapeCsvField(m.informal_name || m.full_name.split(' ')[0]);
+    const informalName = escapeCsvField(m.informal_name || '');
     const fullPhone = m.phone ? `${m.country_code}${m.phone}` : '';
     return `${name},${informalName},${fullPhone}`;
   });

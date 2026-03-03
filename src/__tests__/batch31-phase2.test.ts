@@ -468,9 +468,9 @@ describe('F173: Informal name field for members (CR-247)', () => {
   // ---------------------------------------------------------------------------
 
   describe('AC-173-10: useUpdateMember cascade includes speaker_informal_name', () => {
-    it('cascade updates speaker_informal_name with fallback to first word', () => {
+    it('cascade updates speaker_informal_name directly from member data', () => {
       expect(useMembersSource).toContain(
-        "speaker_informal_name: data.informal_name || data.full_name.split(' ')[0]"
+        "speaker_informal_name: data.informal_name,"
       );
     });
   });
@@ -586,13 +586,13 @@ describe('F173: Informal name field for members (CR-247)', () => {
       expect(lines[1]).toBe('Maria Silva,Mari,+5511999999999');
     });
 
-    it('generateCsv defaults informal_name to first word of full_name when null', () => {
+    it('generateCsv exports informal_name as-is, empty when null', () => {
       const members = [
         { full_name: 'Maria Silva', informal_name: null, country_code: '+55', phone: '11999999999' },
       ];
       const csv = generateCsv(members);
       const lines = csv.split('\n');
-      expect(lines[1]).toBe('Maria Silva,Maria,+5511999999999');
+      expect(lines[1]).toBe('Maria Silva,,+5511999999999');
     });
   });
 
@@ -745,7 +745,7 @@ describe('F173: Informal name field for members (CR-247)', () => {
       ];
       const csv = generateCsv(members);
       const lines = csv.split('\n');
-      expect(lines[1]).toBe('Madonna,Madonna,+5511999999999');
+      expect(lines[1]).toBe('Madonna,,+5511999999999');
     });
   });
 
@@ -782,9 +782,9 @@ describe('F173: Informal name field for members (CR-247)', () => {
       );
     });
 
-    it('useUpdateMember cascade falls back to first word when informal_name is falsy', () => {
+    it('useUpdateMember cascade propagates informal_name directly', () => {
       expect(useMembersSource).toContain(
-        "speaker_informal_name: data.informal_name || data.full_name.split(' ')[0]"
+        "speaker_informal_name: data.informal_name,"
       );
     });
   });
@@ -852,9 +852,9 @@ describe('F173: Informal name field for members (CR-247)', () => {
       expect(useMembersSource).toContain('speaker_phone: fullPhone');
     });
 
-    it('cascade speaker_informal_name uses data.informal_name with fallback', () => {
+    it('cascade speaker_informal_name uses data.informal_name directly', () => {
       expect(useMembersSource).toContain(
-        "speaker_informal_name: data.informal_name || data.full_name.split(' ')[0]"
+        "speaker_informal_name: data.informal_name,"
       );
     });
   });

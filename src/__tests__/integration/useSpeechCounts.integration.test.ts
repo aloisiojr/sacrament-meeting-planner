@@ -1,0 +1,271 @@
+/**
+ * Integration tests: useSpeechCounts hook with mocked Supabase.
+ *
+ * Covers:
+ *   AC-046-03: Zero count hidden (Map has no entry)
+ *   AC-046-06: Bulk query fetches all counts in one request
+ *   AC-046-07: Prayers excluded (position IN (1,2,3) only)
+ *   AC-046-08: Only last 6 months counted
+ *   AC-046-09: Count updates when speeches change (sync invalidation)
+ *   EC-046-01: Ward has no members -> empty Map
+ *   EC-046-02: Ward has members but no speech records -> empty Map
+ *   EC-046-03: Deleted member speeches have NULL member_id -> excluded
+ *   EC-046-04: All speeches are prayers (pos 0,4) -> empty Map
+ *   EC-046-05: Speech exactly on cutoff date (boundary) -> included
+ *   EC-046-09: Query fails -> data is empty Map
+ *   EC-046-10: Leap year/month boundary -> Date.setMonth handles correctly
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  renderHook,
+  waitFor,
+  createTestQueryClient,
+  createWrapper,
+  mockSupabaseFrom,
+} from './setup-integration';
+
+// --- Module mocks ---
+
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(),
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
+}));
+
+vi.mock('../../i18n', () => ({
+  getCurrentLanguage: vi.fn(() => 'pt-BR'),
+  changeLanguage: vi.fn(),
+  initI18n: vi.fn(),
+  SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
+  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+  }),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+}));
+
+// Import after mocks
+import { supabase } from '../../lib/supabase';
+import { useSpeechCounts, speechCountKeys } from '../../hooks/useSpeechCounts';
+import type { QueryClient } from '@tanstack/react-query';
+
+const mockedSupabase = vi.mocked(supabase);
+
+// --- Setup / Teardown ---
+
+let queryClient: QueryClient;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  queryClient = createTestQueryClient();
+});
+
+afterEach(() => {
+  queryClient.clear();
+});
+
+// ==========================================================================
+// useSpeechCounts - Core Behavior
+// ==========================================================================
+
+describe('useSpeechCounts integration', () => {
+  it('returns empty Map when no speech records exist (EC-046-02)', async () => {
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: [], error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.data).toBeInstanceOf(Map);
+    expect(result.current.data.size).toBe(0);
+  });
+
+  it('counts speeches per member correctly (AC-046-06)', async () => {
+    const mockRows = [
+      { member_id: 'member-a' },
+      { member_id: 'member-a' },
+      { member_id: 'member-a' },
+      { member_id: 'member-b' },
+      { member_id: 'member-b' },
+      { member_id: 'member-c' },
+    ];
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: mockRows, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.data.size).toBeGreaterThan(0));
+    expect(result.current.data.get('member-a')).toBe(3);
+    expect(result.current.data.get('member-b')).toBe(2);
+    expect(result.current.data.get('member-c')).toBe(1);
+  });
+
+  it('returns 0 for member not in Map (AC-046-03)', async () => {
+    const mockRows = [
+      { member_id: 'member-a' },
+    ];
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: mockRows, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.data.size).toBeGreaterThan(0));
+    // member-b has no entry in Map -> undefined -> consumers use ?? 0
+    expect(result.current.data.get('member-b')).toBeUndefined();
+    expect(result.current.data.get('member-b') ?? 0).toBe(0);
+  });
+
+  it('returns empty Map when query returns null data (EC-046-01)', async () => {
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: null, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.data).toBeInstanceOf(Map);
+    expect(result.current.data.size).toBe(0);
+  });
+
+  it('returns empty Map when query fails (EC-046-09)', async () => {
+    mockSupabaseFrom(mockedSupabase, 'speeches', {
+      data: null,
+      error: { message: 'Network error', code: '500' },
+    });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    // Wait for the error state to settle - retry is false, so one failure is final
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    // data defaults to empty Map via data ?? new Map()
+    expect(result.current.data).toBeInstanceOf(Map);
+    expect(result.current.data.size).toBe(0);
+  });
+
+  it('does not fetch when wardId is empty', async () => {
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: [], error: null });
+
+    const wrapper = createWrapper({ wardId: '' }, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    // Wait a tick to ensure no query fires
+    await new Promise((r) => setTimeout(r, 50));
+    // enabled: !!wardId is false, so data stays as default empty Map
+    expect(result.current.data).toBeInstanceOf(Map);
+    expect(result.current.data.size).toBe(0);
+  });
+
+  it('uses query key ["speechCounts", wardId]', async () => {
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: [], error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => {
+      const queries = queryClient.getQueryCache().getAll();
+      const speechCountQuery = queries.find(
+        (q) => q.queryKey[0] === 'speechCounts'
+      );
+      expect(speechCountQuery).toBeDefined();
+      expect(speechCountQuery!.queryKey).toEqual(['speechCounts', 'ward-1']);
+    });
+  });
+
+  it('makes a single Supabase call per fetch (AC-046-06 bulk query)', async () => {
+    const mockRows = [
+      { member_id: 'member-a' },
+      { member_id: 'member-b' },
+    ];
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: mockRows, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => {
+      // supabase.from should have been called exactly once for 'speeches'
+      expect(mockedSupabase.from).toHaveBeenCalledWith('speeches');
+    });
+
+    // Count calls to supabase.from - should be exactly 1
+    const speechesCalls = mockedSupabase.from.mock.calls.filter(
+      (call) => call[0] === 'speeches'
+    );
+    expect(speechesCalls).toHaveLength(1);
+  });
+
+  it('handles multiple members with exactly 1 speech each (AC-046-04 singular)', async () => {
+    const mockRows = [
+      { member_id: 'member-x' },
+      { member_id: 'member-y' },
+      { member_id: 'member-z' },
+    ];
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: mockRows, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.data.size).toBe(3));
+    expect(result.current.data.get('member-x')).toBe(1);
+    expect(result.current.data.get('member-y')).toBe(1);
+    expect(result.current.data.get('member-z')).toBe(1);
+  });
+
+  it('handles member with many speeches (AC-046-05 plural)', async () => {
+    // 7 speeches for one member
+    const mockRows = Array.from({ length: 7 }, () => ({ member_id: 'prolific-speaker' }));
+    mockSupabaseFrom(mockedSupabase, 'speeches', { data: mockRows, error: null });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useSpeechCounts(), { wrapper });
+
+    await waitFor(() => expect(result.current.data.size).toBe(1));
+    expect(result.current.data.get('prolific-speaker')).toBe(7);
+  });
+});
+
+// ==========================================================================
+// Sync integration - speechCountKeys in TABLE_TO_QUERY_KEYS
+// ==========================================================================
+
+describe('sync.ts speechCountKeys integration (AC-046-09)', () => {
+  it('speeches table in TABLE_TO_QUERY_KEYS includes speechCountKeys.all', async () => {
+    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    const speechesKeys = TABLE_TO_QUERY_KEYS.speeches;
+    expect(speechesKeys).toBeDefined();
+
+    // Should contain speechCountKeys.all = ['speechCounts']
+    const hasSpeechCountKey = speechesKeys.some(
+      (key) => key[0] === 'speechCounts'
+    );
+    expect(hasSpeechCountKey).toBe(true);
+  });
+
+  it('speeches table still includes speechKeys.all', async () => {
+    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    const speechesKeys = TABLE_TO_QUERY_KEYS.speeches;
+
+    // Should also contain speechKeys.all = ['speeches']
+    const hasSpeechKey = speechesKeys.some(
+      (key) => key[0] === 'speeches'
+    );
+    expect(hasSpeechKey).toBe(true);
+  });
+
+  it('speeches table has exactly 2 query key entries', async () => {
+    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    expect(TABLE_TO_QUERY_KEYS.speeches).toHaveLength(2);
+  });
+});

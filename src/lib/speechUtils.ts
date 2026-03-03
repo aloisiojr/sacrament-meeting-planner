@@ -56,7 +56,7 @@ export interface InviteItem {
 export function getInviteItems(
   speeches: Speech[],
   locale: string,
-  formatDateFn: (date: string, locale: 'pt-BR' | 'en' | 'es') => string
+  formatDateFn: (date: string, locale: 'pt-BR' | 'en-US' | 'es-LA') => string
 ): InviteItem[] {
   return speeches
     .filter(
@@ -70,6 +70,6 @@ export function getInviteItems(
     })
     .map((speech) => ({
       speech,
-      compactDate: formatDateFn(speech.sunday_date, locale as 'pt-BR' | 'en' | 'es'),
+      compactDate: formatDateFn(speech.sunday_date, locale as 'pt-BR' | 'en-US' | 'es-LA'),
     }));
 }

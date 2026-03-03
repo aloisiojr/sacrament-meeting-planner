@@ -95,11 +95,11 @@ describe('useHymns utilities', () => {
     it('should generate correct query keys', () => {
       expect(hymnKeys.all).toEqual(['hymns']);
       expect(hymnKeys.list('pt-BR')).toEqual(['hymns', 'list', 'pt-BR']);
-      expect(hymnKeys.sacramental('en')).toEqual(['hymns', 'sacramental', 'en']);
+      expect(hymnKeys.sacramental('en-US')).toEqual(['hymns', 'sacramental', 'en-US']);
     });
 
     it('should generate unique keys for different languages', () => {
-      expect(hymnKeys.list('pt-BR')).not.toEqual(hymnKeys.list('en'));
+      expect(hymnKeys.list('pt-BR')).not.toEqual(hymnKeys.list('en-US'));
     });
   });
 });

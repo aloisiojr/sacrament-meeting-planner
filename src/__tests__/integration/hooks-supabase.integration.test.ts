@@ -53,7 +53,7 @@ vi.mock('../../i18n', () => ({
   getCurrentLanguage: vi.fn(() => 'pt-BR'),
   changeLanguage: vi.fn(),
   initI18n: vi.fn(),
-  SUPPORTED_LANGUAGES: ['pt-BR', 'en', 'es'],
+  SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
   default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
 }));
 

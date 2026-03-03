@@ -7,6 +7,7 @@ import { memberKeys } from '../hooks/useMembers';
 import { topicKeys } from '../hooks/useTopics';
 import { sundayTypeKeys } from '../hooks/useSundayTypes';
 import { speechKeys } from '../hooks/useSpeeches';
+import { speechCountKeys } from '../hooks/useSpeechCounts';
 import { agendaKeys } from '../hooks/useAgenda';
 import { actorKeys } from '../hooks/useActors';
 
@@ -45,7 +46,7 @@ export const TABLE_TO_QUERY_KEYS: Record<SyncedTable, readonly (readonly string[
   ward_topics: [topicKeys.all],
   ward_collection_config: [topicKeys.all],
   sunday_exceptions: [sundayTypeKeys.all],
-  speeches: [speechKeys.all],
+  speeches: [speechKeys.all, speechCountKeys.all],
   sunday_agendas: [agendaKeys.all],
   meeting_actors: [actorKeys.all],
 };

@@ -2,44 +2,44 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import ptBR from './locales/pt-BR.json';
-import en from './locales/en.json';
-import es from './locales/es.json';
+import enUS from './locales/en-US.json';
+import esLA from './locales/es-LA.json';
 
-export const SUPPORTED_LANGUAGES = ['pt-BR', 'en', 'es'] as const;
+export const SUPPORTED_LANGUAGES = ['pt-BR', 'en-US', 'es-LA'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   'pt-BR': 'Portugues (Brasil)',
-  en: 'English',
-  es: 'Espanol',
+  'en-US': 'English',
+  'es-LA': 'Espanol',
 };
 
 export const DEFAULT_COUNTRY_CODES: Record<SupportedLanguage, string> = {
   'pt-BR': '+55',
-  en: '+1',
-  es: '+52',
+  'en-US': '+1',
+  'es-LA': '+52',
 };
 
 export const DEFAULT_TIMEZONES: Record<SupportedLanguage, string> = {
   'pt-BR': 'America/Sao_Paulo',
-  en: 'America/New_York',
-  es: 'America/Mexico_City',
+  'en-US': 'America/New_York',
+  'es-LA': 'America/Mexico_City',
 };
 
 /**
- * Map i18n language codes to database locale codes used in general_collections.
- * The DB uses full locale codes (en-US, es-ES, pt-BR) while the app uses
- * short codes (en, es, pt-BR). This mapping bridges the gap.
+ * Map app language codes to database locale codes used in general_collections.
+ * After CR-249, app codes and DB codes are unified (identity mapping).
+ * Retained for forward compatibility if codes ever need to diverge again.
  */
 const DB_LOCALE_MAP: Record<SupportedLanguage, string> = {
   'pt-BR': 'pt-BR',
-  en: 'en-US',
-  es: 'es-ES',
+  'en-US': 'en-US',
+  'es-LA': 'es-LA',
 };
 
 /**
- * Convert an i18n language code to the database locale code used in general_collections.
- * E.g., 'en' -> 'en-US', 'es' -> 'es-ES', 'pt-BR' -> 'pt-BR'.
+ * Convert an app language code to the database locale code used in general_collections.
+ * After CR-249, this is an identity mapping: 'en-US' -> 'en-US', 'es-LA' -> 'es-LA'.
  * Returns the input unchanged if not a recognized SupportedLanguage.
  */
 export function toDbLocale(language: string): string {
@@ -48,8 +48,8 @@ export function toDbLocale(language: string): string {
 
 const resources = {
   'pt-BR': { translation: ptBR },
-  en: { translation: en },
-  es: { translation: es },
+  'en-US': { translation: enUS },
+  'es-LA': { translation: esLA },
 };
 
 /**
@@ -73,8 +73,8 @@ function detectDeviceLocale(): SupportedLanguage {
     // Check language prefix match (e.g., 'pt' matches 'pt-BR', 'es-MX' matches 'es')
     const langPrefix = deviceLocale.split('-')[0];
     if (langPrefix === 'pt') return 'pt-BR';
-    if (langPrefix === 'en') return 'en';
-    if (langPrefix === 'es') return 'es';
+    if (langPrefix === 'en') return 'en-US';
+    if (langPrefix === 'es') return 'es-LA';
 
     return 'pt-BR';
   } catch {

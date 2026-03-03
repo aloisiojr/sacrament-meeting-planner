@@ -1,0 +1,675 @@
+# =============================================================================
+# ARCH_M052.yaml
+# Architecture for Batch 31 Phase 2: F172, F173
+# F172 - Cascade member data update to future speeches (CR-246)
+# F173 - Informal name field for members (CR-247)
+# Created: 2026-03-02
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: >
+    Batch 31 Phase 2 delivers two synergistic features that improve member data
+    accuracy in WhatsApp invitations:
+    (1) F172/CR-246: Fix stale snapshot data by cascading member phone/name edits
+    to all future speeches. Root cause: ADR-003 snapshot pattern copies data at
+    assignment time but never updates it. The fix adds a cascade in
+    useUpdateMember.onSuccess that propagates speaker_name and speaker_phone to
+    speeches where member_id matches and sunday_date >= today.
+    (2) F173/CR-247: Add informal_name field to members (e.g., "Maria" instead of
+    "Maria Santos da Silva") used in WhatsApp {nome} placeholder. Follows
+    ADR-003 snapshot pattern with new speaker_informal_name column in speeches.
+    Both features share the cascade mechanism: F172 establishes the cascade for
+    speaker_name and speaker_phone; F173 extends it to also propagate
+    speaker_informal_name. The migration adds both new columns and updates the
+    import_members RPC.
+  principles:
+    - "Cascade only future speeches (sunday_date >= today); past speeches preserved per ADR-003"
+    - "Best-effort cascade: member update succeeds regardless of cascade outcome"
+    - "Snapshot pattern extended: speaker_informal_name follows same pattern as speaker_name/speaker_phone"
+    - "Backwards-compatible CSV: import accepts both 2-column (legacy) and 3-column (new) formats"
+    - "Auto-default: informal_name defaults to first word of full_name when not provided"
+    - "Fallback resolution: {nome} uses speaker_informal_name || speaker_name"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  +----------------------------------------------------------------------+
+  |              Batch 31 Phase 2: F172 + F173                           |
+  |                                                                      |
+  |  F172 (CR-246): Cascade member data to future speeches               |
+  |                                                                      |
+  |  +--------------------------+      +-----------------------------+   |
+  |  | useUpdateMember          |      | speeches table              |   |
+  |  | (useMembers.ts)          |      | (Supabase)                  |   |
+  |  |                          |      |                             |   |
+  |  | onSuccess: async (data)  | ---> | UPDATE speeches SET         |   |
+  |  |   cascade to speeches    |      |   speaker_name,             |   |
+  |  |   where member_id=data.id|      |   speaker_phone,            |   |
+  |  |   AND sunday_date>=today |      |   speaker_informal_name     |   |
+  |  +--------------------------+      | WHERE member_id = X         |   |
+  |                                    |   AND sunday_date >= today  |   |
+  |  F173 (CR-247): Informal name      +-----------------------------+   |
+  |                                                                      |
+  |  +-------------------+   +-------------------+   +--------------+   |
+  |  | members table     |   | Migration 023     |   | MemberEditor |   |
+  |  | + informal_name   |   | ALTER TABLE x2    |   | + informal   |   |
+  |  +-------------------+   | UPDATE backfill   |   |   name field |   |
+  |                          | UPDATE RPC         |   +--------------+   |
+  |  +-------------------+   +-------------------+                      |
+  |  | speeches table    |                          +--------------+    |
+  |  | + speaker_        |                          | CSV export   |    |
+  |  |   informal_name   |                          | 3 columns    |    |
+  |  +-------------------+                          | CSV import   |    |
+  |                                                 | 2 or 3 cols  |    |
+  |  +-------------------+   +-------------------+  +--------------+    |
+  |  | useAssignSpeaker  |   | InviteManagement  |                     |
+  |  | + speaker_        |   | {nome} resolves   |                     |
+  |  |   informal_name   |   | informal || full  |                     |
+  |  +-------------------+   +-------------------+                     |
+  |                                                                      |
+  |  +-------------------+                                              |
+  |  | useRemoveAssign.  |                                              |
+  |  | + clear speaker_  |                                              |
+  |  |   informal_name   |                                              |
+  |  +-------------------+                                              |
+  +----------------------------------------------------------------------+
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # --- C1: Database Migration ---
+
+  - name: "InformalNameMigration"
+    responsibility: "Add informal_name to members and speaker_informal_name to speeches; update import_members RPC"
+    files:
+      - "supabase/migrations/023_add_informal_name.sql"
+    cr_ids: [247]
+    changes:
+      - "ALTER TABLE members ADD COLUMN informal_name TEXT"
+      - "Backfill members.informal_name with SPLIT_PART(TRIM(full_name), ' ', 1)"
+      - "ALTER TABLE speeches ADD COLUMN speaker_informal_name TEXT"
+      - "Backfill speeches.speaker_informal_name with SPLIT_PART(TRIM(speaker_name), ' ', 1) where speaker_name is not null"
+      - "CREATE OR REPLACE FUNCTION import_members: add informal_name column with COALESCE fallback to first word"
+    contract:
+      input: "Migration applied to PostgreSQL"
+      output: "members.informal_name and speeches.speaker_informal_name columns exist; existing records backfilled; import_members accepts informal_name"
+    dependencies: []
+    notes: >
+      The migration backfills existing data so all members and speeches have
+      informal_name values immediately. The import_members RPC uses COALESCE
+      to auto-generate informal_name from first word of full_name when not
+      provided or empty, matching the JS-side behavior.
+
+  # --- C2: TypeScript Types ---
+
+  - name: "TypeDefinitionUpdates"
+    responsibility: "Add informal_name and speaker_informal_name to TypeScript interfaces"
+    files:
+      - "src/types/database.ts"
+    cr_ids: [246, 247]
+    changes:
+      - "Member interface: add informal_name: string | null (after full_name)"
+      - "Speech interface: add speaker_informal_name: string | null (after speaker_name)"
+      - "CreateMemberInput: add informal_name?: string | null"
+      - "UpdateMemberInput: add informal_name?: string | null"
+    contract:
+      input: "TypeScript compiler checks all usages"
+      output: "All interfaces match the new database schema"
+    dependencies: ["InformalNameMigration"]
+    notes: >
+      Type changes propagate to all consumers. Existing code that reads Member
+      or Speech will see the new nullable fields. No breaking changes since
+      all new fields are optional/nullable.
+
+  # --- C3: Cascade Logic (F172 core + F173 synergy) ---
+
+  - name: "MemberUpdateCascade"
+    responsibility: "Cascade member data changes to future speeches on member update"
+    files:
+      - "src/hooks/useMembers.ts"
+    cr_ids: [246, 247]
+    changes:
+      - "Import supabase from '../lib/supabase'"
+      - "Import speechKeys from './useSpeeches'"
+      - "useUpdateMember.onSuccess: make async, add cascade logic after member update"
+      - "Cascade updates speaker_name, speaker_phone, and speaker_informal_name for future speeches (sunday_date >= today)"
+      - "Invalidate speechKeys.all after cascade"
+      - "Wrap cascade in try/catch for best-effort behavior"
+    contract:
+      input: "useUpdateMember.onSuccess(data: Member) where data has id, full_name, informal_name, country_code, phone"
+      output: >
+        All speeches WHERE member_id = data.id AND sunday_date >= today
+        are updated with:
+        - speaker_name = data.full_name
+        - speaker_phone = data.phone ? data.country_code + data.phone : null
+        - speaker_informal_name = data.informal_name || data.full_name.split(' ')[0]
+        Then speechKeys.all is invalidated.
+      error_handling: "try/catch around cascade; member update already succeeded in onSuccess; cascade failure is silent"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The cascade constructs speaker_phone as country_code + phone to match
+      the format used in useAssignSpeaker. speaker_informal_name uses
+      informal_name with fallback to first word of full_name for consistency
+      with the auto-default behavior. The cascade is best-effort because
+      the member data is already correct; speeches will be corrected on
+      the next assign if the cascade fails.
+
+  # --- C4: Assign Speaker Extension ---
+
+  - name: "AssignSpeakerInformalName"
+    responsibility: "Include speaker_informal_name snapshot when assigning a speaker to a speech"
+    files:
+      - "src/hooks/useSpeeches.ts"
+    cr_ids: [247]
+    changes:
+      - "AssignSpeakerInput: add speakerInformalName: string | null"
+      - "useAssignSpeaker mutationFn: add speaker_informal_name: input.speakerInformalName to the update object"
+      - "useRemoveAssignment mutationFn: add speaker_informal_name: null to the update object (clear on unassign)"
+    contract:
+      input: "AssignSpeakerInput { speechId, memberId, speakerName, speakerInformalName, speakerPhone, status? }"
+      output: "Speech record updated with speaker_informal_name alongside other snapshot fields"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      All 3 callers of assignSpeaker.mutate (speeches.tsx, NextAssignmentsSection,
+      AgendaForm) must pass speakerInformalName from the member data. The
+      useRemoveAssignment also clears speaker_informal_name when unassigning.
+
+  # --- C5: Caller Updates ---
+
+  - name: "AssignSpeakerCallerUpdates"
+    responsibility: "Pass speakerInformalName from member data in all assignSpeaker.mutate calls"
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/components/NextAssignmentsSection.tsx"
+      - "src/components/AgendaForm.tsx"
+    cr_ids: [247]
+    changes:
+      - "speeches.tsx handleAssignSpeaker: add speakerInformalName: member.informal_name"
+      - "NextAssignmentsSection handleAssignSpeaker: add speakerInformalName: member.informal_name"
+      - "AgendaForm assignSpeaker.mutate: add speakerInformalName: null (AgendaForm uses PrayerSelector name, not Member object)"
+    contract:
+      input: "Member object with informal_name field (nullable)"
+      output: "assignSpeaker.mutate called with speakerInformalName field"
+    dependencies: ["AssignSpeakerInformalName"]
+    notes: >
+      speeches.tsx and NextAssignmentsSection receive a Member object from
+      MemberSelectorModal, so member.informal_name is directly available.
+      AgendaForm uses PrayerSelector which provides a name string (not a
+      Member object), so speakerInformalName is null; the cascade from F172
+      will fill it in if the member is later edited.
+
+  # --- C6: Member Editor UI ---
+
+  - name: "MemberEditorInformalName"
+    responsibility: "Add informal_name field to MemberEditor with auto-fill on blur"
+    files:
+      - "src/app/(tabs)/settings/members.tsx"
+    cr_ids: [247]
+    changes:
+      - "MemberEditorProps.onSave: add informal_name to data shape"
+      - "MemberEditor: add useState for informalName (initialized from member?.informal_name)"
+      - "MemberEditor: add onBlur handler on full_name field that auto-fills informalName with first word when empty"
+      - "MemberEditor: add TextInput between full_name and phone fields for informal_name"
+      - "MemberEditor: update handleSave to include informal_name in onSave data"
+      - "useCreateMember call site: pass informal_name from editor data"
+      - "useUpdateMember call site: pass informal_name from editor data"
+      - "MemberRow: display informal_name in secondary text style below full_name"
+    contract:
+      input: "User enters full_name and optionally informal_name"
+      output: >
+        On blur of full_name: if informalName is empty, auto-fill with
+        first word of fullName. On save: informal_name is included in
+        the CreateMemberInput or UpdateMemberInput.
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The auto-fill only triggers on blur and only when the informal_name
+      field is empty, so user-typed values are preserved. The MemberRow
+      shows informal_name in a smaller, secondary font below the full name.
+
+  # --- C7: Create Member Extension ---
+
+  - name: "CreateMemberInformalName"
+    responsibility: "Include informal_name when creating a member, with auto-default to first name"
+    files:
+      - "src/hooks/useMembers.ts"
+    cr_ids: [247]
+    changes:
+      - "useCreateMember mutationFn: include informal_name in the insert object"
+      - "Auto-default: if input.informal_name is empty/null, set to input.full_name.split(' ')[0]"
+    contract:
+      input: "CreateMemberInput with optional informal_name"
+      output: "Member created with informal_name (auto-defaulted to first word of full_name if not provided)"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The auto-default in JS matches the COALESCE/SPLIT_PART logic in the
+      import_members RPC. Both produce the first word of full_name when
+      informal_name is not provided.
+
+  # --- C8: CSV Export/Import ---
+
+  - name: "CsvInformalNameSupport"
+    responsibility: "Export 3-column CSV with informal_name; import both 2-column and 3-column formats"
+    files:
+      - "src/lib/csvUtils.ts"
+    cr_ids: [247]
+    changes:
+      - "CsvMember interface: add informal_name: string"
+      - "CsvHeaders interface: add informalName: string"
+      - "CSV_DEFAULT_HEADERS: add informalName: 'Nome Informal'"
+      - "generateCsv: export 3 columns (Nome, Nome Informal, Telefone Completo)"
+      - "generateCsv parameter type: add informal_name to member shape"
+      - "parseCsv: detect column count from header; if 3+, parse informal_name from column 2; if 2, auto-generate from first word"
+    contract:
+      input_export: "Array of members with full_name, informal_name, country_code, phone"
+      output_export: "CSV string with BOM, header 'Nome,Nome Informal,Telefone Completo', data rows"
+      input_import_3col: "CSV with header 'Nome,Nome Informal,Telefone Completo'"
+      output_import_3col: "CsvMember[] with informal_name from column 2"
+      input_import_2col: "CSV with header 'Nome,Telefone Completo' (legacy)"
+      output_import_2col: "CsvMember[] with informal_name auto-generated from first word of full_name"
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The parser uses column position, not header text, for parsing. This
+      ensures it works regardless of the header language. The 2-column
+      detection is based on headerParts.length: if < 3, phone comes from
+      column 2 and informal_name is auto-generated.
+
+  # --- C9: WhatsApp Template Resolution ---
+
+  - name: "WhatsAppInformalNameResolution"
+    responsibility: "Resolve {nome} placeholder to speaker_informal_name with fallback to speaker_name"
+    files:
+      - "src/components/InviteManagementSection.tsx"
+    cr_ids: [247]
+    changes:
+      - "handleNotInvitedAction prayer template: speakerName uses speech.speaker_informal_name || speech.speaker_name || ''"
+      - "handleNotInvitedAction speech template: speakerName uses speech.speaker_informal_name || speech.speaker_name || ''"
+    contract:
+      input: "Speech with speaker_informal_name (nullable) and speaker_name (nullable)"
+      output: >
+        speakerName resolved as: speaker_informal_name || speaker_name || ''
+        This value is passed to resolveTemplate which replaces {nome} placeholder.
+    dependencies: ["TypeDefinitionUpdates"]
+    notes: >
+      The resolution uses JS || operator for clean fallback: if
+      speaker_informal_name is null or empty string, falls back to
+      speaker_name. If both are null, falls back to empty string.
+      whatsappUtils.ts resolveTemplate is not modified; the caller
+      passes the resolved name.
+
+  # --- C10: i18n Strings ---
+
+  - name: "I18nInformalNameStrings"
+    responsibility: "Add i18n keys for the informal_name field label, placeholder, and CSV header"
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    cr_ids: [247]
+    changes:
+      - "Add members.informalName key (pt-BR: 'Nome informal', en: 'Informal name', es: 'Nombre informal')"
+      - "Add members.informalNamePlaceholder key (pt-BR: 'Ex: Maria', en: 'e.g., Maria', es: 'Ej: Maria')"
+    contract:
+      input: "t('members.informalName') / t('members.informalNamePlaceholder')"
+      output: "Translated string in the current app language"
+    dependencies: []
+    notes: >
+      The CSV header uses CSV_DEFAULT_HEADERS constant which is
+      hardcoded in Portuguese ('Nome Informal') since CSV is always
+      exported in Portuguese format (existing pattern from CSV_DEFAULT_HEADERS.name = 'Nome').
+
+# =============================================================================
+# CONTRACTS (Cross-Component Integration)
+# =============================================================================
+
+contracts:
+
+  - name: "member_update_to_cascade"
+    components: ["MemberUpdateCascade", "TypeDefinitionUpdates"]
+    methods:
+      - name: "useUpdateMember.onSuccess cascade"
+        input: "Member data from successful update (id, full_name, informal_name, country_code, phone)"
+        output: >
+          Supabase UPDATE on speeches WHERE member_id = data.id AND sunday_date >= today.
+          Sets speaker_name, speaker_phone, speaker_informal_name.
+          Then invalidates speechKeys.all.
+        notes: >
+          The cascade is async but does not block the UI. The member query
+          cache is already invalidated before the cascade runs. The speech
+          query cache is invalidated after the cascade completes.
+
+  - name: "assign_speaker_snapshot"
+    components: ["AssignSpeakerInformalName", "AssignSpeakerCallerUpdates"]
+    methods:
+      - name: "assignSpeaker.mutate with speakerInformalName"
+        input: "AssignSpeakerInput with speakerInformalName: member.informal_name"
+        output: "Speech record updated with speaker_informal_name snapshot"
+        notes: >
+          Three callers: speeches.tsx passes member.informal_name directly.
+          NextAssignmentsSection passes member.informal_name directly.
+          AgendaForm passes null (prayer selector doesn't have Member object).
+
+  - name: "whatsapp_nome_resolution"
+    components: ["WhatsAppInformalNameResolution"]
+    methods:
+      - name: "speakerName resolution for {nome}"
+        input: "speech.speaker_informal_name, speech.speaker_name"
+        output: "speech.speaker_informal_name || speech.speaker_name || ''"
+        notes: >
+          This is the final resolution point. The resolved name is passed
+          to resolveTemplate (for prayers) or buildWhatsAppUrl (for speeches)
+          as the speakerName variable. The {nome} placeholder in templates
+          is replaced with this value.
+
+  - name: "csv_roundtrip"
+    components: ["CsvInformalNameSupport", "TypeDefinitionUpdates"]
+    methods:
+      - name: "generateCsv -> parseCsv roundtrip"
+        input: "Members with full_name, informal_name, country_code, phone"
+        output: "CsvMember[] with full_name, informal_name, phone"
+        notes: >
+          Export always produces 3 columns. Import accepts both 2 and 3
+          columns. A CSV exported from the new version and re-imported
+          will preserve informal_name values. A CSV from the old version
+          (2 columns) will auto-generate informal_name on import.
+
+  - name: "member_editor_to_hooks"
+    components: ["MemberEditorInformalName", "CreateMemberInformalName", "MemberUpdateCascade"]
+    methods:
+      - name: "MemberEditor.onSave -> useCreateMember / useUpdateMember"
+        input: "{ full_name, informal_name, country_code, phone }"
+        output: "Member created/updated with informal_name; if update, cascade runs"
+        notes: >
+          The editor auto-fills informal_name on blur of full_name when empty.
+          The user can override. On save, the value flows to the mutation
+          hook. For updates, the cascade propagates to future speeches.
+
+# =============================================================================
+# DATA MODEL CHANGES
+# =============================================================================
+
+data_model:
+  entities:
+    - name: members
+      changes:
+        - "ADD COLUMN informal_name TEXT (nullable)"
+        - "Backfill: SPLIT_PART(TRIM(full_name), ' ', 1)"
+    - name: speeches
+      changes:
+        - "ADD COLUMN speaker_informal_name TEXT (nullable)"
+        - "Backfill: SPLIT_PART(TRIM(speaker_name), ' ', 1) WHERE speaker_name IS NOT NULL"
+    - name: import_members (RPC)
+      changes:
+        - "INSERT now includes informal_name with COALESCE(NULLIF(TRIM(informal_name), ''), SPLIT_PART(TRIM(full_name), ' ', 1))"
+  notes: >
+    No new tables, indexes, or RLS policies needed. The new columns are
+    nullable TEXT with no constraints. The backfill ensures existing data
+    is populated. The import_members RPC is re-created with the new column.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: >
+    No new security concerns. The cascade runs in the same RLS context as
+    the member update (authenticated user with write access to their ward).
+    The speeches table RLS already allows updates within the same ward.
+    The informal_name field is plain text with no special security
+    considerations. The CSV export/import follows existing patterns.
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: >
+    No new logging for the cascade itself (best-effort, silent on failure).
+    Member create/update logs already capture the member name. The cascade
+    operates on the same ward's speeches and is covered by existing RLS audit.
+    The existing activity_log entry for 'member:update' will indirectly
+    indicate when a cascade may have occurred.
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+
+  - id: ADR-121
+    title: "Client-side cascade in onSuccess instead of database trigger for member-to-speech propagation (Batch 31)"
+    context: >
+      CR-246 requires propagating member phone/name changes to future speeches.
+      Options: (a) database trigger on members.UPDATE that cascades to speeches,
+      (b) client-side cascade in useUpdateMember.onSuccess.
+    decision: >
+      Client-side cascade in onSuccess. The cascade runs as an async Supabase
+      update after the member update succeeds. It is wrapped in try/catch
+      for best-effort behavior. A database trigger would require a new migration
+      with PL/pgSQL, add server-side complexity, and be harder to extend
+      (e.g., adding speaker_informal_name from F173). The client-side approach
+      is simpler, follows existing mutation patterns, and is sufficient because
+      member edits are low-frequency operations.
+    decided_in: "CR-246/F172"
+    consequences:
+      - "Simple implementation: 10 lines in onSuccess"
+      - "Best-effort: cascade failure does not break member update"
+      - "Extensible: F173 adds speaker_informal_name to the same cascade object"
+      - "No new migration for trigger logic"
+      - "Trade-off: if app crashes after member update but before cascade, speeches may have stale data until next edit or assign"
+
+  - id: ADR-122
+    title: "Snapshot speaker_informal_name in speeches instead of live lookup from members (Batch 31)"
+    context: >
+      CR-247 adds an informal_name field. Options: (a) snapshot as
+      speaker_informal_name in speeches (like speaker_name, speaker_phone),
+      (b) live lookup via JOIN to members table using member_id FK.
+    decision: >
+      Snapshot as speaker_informal_name (Path A). Consistent with ADR-003
+      snapshot pattern. If a member is deleted (ON DELETE SET NULL on member_id),
+      the informal name is preserved in the speech record. The F172 cascade
+      mechanism ensures future speeches stay in sync when the member is edited.
+      A live lookup would break when member_id is NULL (deleted members) and
+      would add a JOIN to every speech query.
+    decided_in: "CR-247/F173"
+    consequences:
+      - "Consistent with ADR-003: all speaker data is snapshotted"
+      - "Historical data preserved after member deletion"
+      - "F172 cascade keeps future speeches in sync on edit"
+      - "No additional JOIN in speech queries"
+      - "Trade-off: one more field in the cascade update object"
+
+# =============================================================================
+# CROSS-FEATURE INTERACTIONS
+# =============================================================================
+
+cross_feature_interactions:
+
+  - features: [F172, F173]
+    interaction: >
+      F172 establishes the cascade mechanism for speaker_name and speaker_phone.
+      F173 extends this same cascade to also propagate speaker_informal_name.
+      Both share the onSuccess handler in useUpdateMember. The cascade update
+      object includes all three fields. Without F172, F173 would still work
+      (informal_name snapshotted at assign time) but stale snapshots would not
+      be corrected on member edit. Without F173, F172 would still fix the
+      phone/name cascade bug.
+
+  - features: [F172, F003]
+    interaction: >
+      F003 (ADR-003) defines the snapshot pattern. F172 refines it: snapshots
+      are still taken at assignment time, but now also updated for FUTURE
+      speeches when the source member data changes. Past speeches remain
+      frozen. This is an evolution of ADR-003, not a contradiction.
+
+  - features: [F173, F004]
+    interaction: >
+      F004 (CSV import/export) is extended by F173 to include informal_name
+      as a third column. The import is backwards-compatible with the existing
+      2-column format. The export always produces 3 columns.
+
+  - features: [F173, F157]
+    interaction: >
+      F157 (managed prayers) uses SpeechSlot and InviteManagementSection for
+      prayer invitations. F173's {nome} resolution (speaker_informal_name ||
+      speaker_name) applies to both prayer and speech templates equally.
+      Prayer templates use {nome} just like speech templates.
+
+  - features: [F173, F159]
+    interaction: >
+      F159 (split WhatsApp templates) provides per-position templates. F173
+      changes what {nome} resolves to (informal name with fallback), but does
+      not change the template structure. The resolution happens in
+      InviteManagementSection before calling buildWhatsAppUrl or
+      resolvePrayerTemplate.
+
+  - features: [F172, F170]
+    interaction: >
+      F170 grants secretary speech:assign/unassign. The cascade in F172 is
+      triggered by member:update (not speech:assign). Both bishopric and
+      secretary have member:write permission, so both can trigger the cascade
+      when editing a member. No additional permission needed.
+
+# =============================================================================
+# FILES IMPACTED
+# =============================================================================
+
+files_impacted:
+
+  # F172 files
+  - file: src/hooks/useMembers.ts
+    feature: F172
+    cr_ids: [246, 247]
+    changes:
+      - "Import supabase and speechKeys"
+      - "useUpdateMember.onSuccess: make async, add cascade logic"
+      - "useCreateMember.mutationFn: include informal_name with auto-default (F173)"
+
+  # F173 files - Database
+  - file: supabase/migrations/023_add_informal_name.sql
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "New file: migration for informal_name and speaker_informal_name columns"
+      - "Backfill existing data"
+      - "Update import_members RPC"
+
+  # F173 files - Types
+  - file: src/types/database.ts
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "Member: add informal_name: string | null"
+      - "Speech: add speaker_informal_name: string | null"
+      - "CreateMemberInput: add informal_name?: string | null"
+      - "UpdateMemberInput: add informal_name?: string | null"
+
+  # F173 files - Hooks
+  - file: src/hooks/useSpeeches.ts
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "AssignSpeakerInput: add speakerInformalName: string | null"
+      - "useAssignSpeaker: add speaker_informal_name to update object"
+      - "useRemoveAssignment: add speaker_informal_name: null to update object"
+
+  # F173 files - Callers
+  - file: src/app/(tabs)/speeches.tsx
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "handleAssignSpeaker: add speakerInformalName: member.informal_name"
+
+  - file: src/components/NextAssignmentsSection.tsx
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "handleAssignSpeaker callback: add speakerInformalName: member.informal_name"
+
+  - file: src/components/AgendaForm.tsx
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "assignSpeaker.mutate call: add speakerInformalName: null"
+
+  # F173 files - UI
+  - file: src/app/(tabs)/settings/members.tsx
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "MemberEditorProps.onSave: add informal_name to data shape"
+      - "MemberEditor: add informalName state, auto-fill on blur, TextInput"
+      - "MemberEditor: update handleSave to include informal_name"
+      - "MemberRow: display informal_name in secondary style"
+      - "useCreateMember/useUpdateMember call sites: pass informal_name"
+
+  # F173 files - CSV
+  - file: src/lib/csvUtils.ts
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "CsvMember: add informal_name: string"
+      - "CsvHeaders: add informalName: string"
+      - "CSV_DEFAULT_HEADERS: add informalName: 'Nome Informal'"
+      - "generateCsv: 3-column output with informal_name"
+      - "parseCsv: support 2-column and 3-column input"
+
+  # F173 files - WhatsApp
+  - file: src/components/InviteManagementSection.tsx
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "speakerName for prayer template: use speaker_informal_name || speaker_name || ''"
+      - "speakerName for speech template: use speaker_informal_name || speaker_name || ''"
+
+  # F173 files - i18n
+  - file: src/i18n/locales/pt-BR.json
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "Add members.informalName and members.informalNamePlaceholder"
+
+  - file: src/i18n/locales/en.json
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "Add members.informalName and members.informalNamePlaceholder"
+
+  - file: src/i18n/locales/es.json
+    feature: F173
+    cr_ids: [247]
+    changes:
+      - "Add members.informalName and members.informalNamePlaceholder"
+
+files_not_modified:
+  - "src/lib/whatsappUtils.ts (resolveTemplate unchanged; caller passes resolved name)"
+  - "src/lib/whatsapp.ts (buildWhatsAppUrl unchanged; receives speakerName already resolved)"
+  - "src/components/SpeechSlot.tsx (does not display informal name; uses speaker_name for slot label)"
+  - "src/components/SundayCard.tsx (collapsed view uses speaker_name, not informal_name)"
+  - "src/components/MemberSelectorModal.tsx (shows full_name only; informal_name visible in Members screen)"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_arch_consolidated: true
+  GATE-02_single_responsibility: true    # 10 components, each with one clear responsibility
+  GATE-03_contracts_defined: true        # 5 contracts defined
+  GATE-04_adrs_recorded: true           # ADR-121, ADR-122 recorded
+  GATE-05_arch_saved: true              # ARCH_M052.yaml saved
+  GATE-06_arch_consolidated_updated: true    # ARCH_CONSOLIDATED updated
+  GATE-07_arch_summary_filled: true     # Summary provided below
+  GATE-08_max_components: true          # 10 components (at limit)

@@ -1,0 +1,545 @@
+# =============================================================================
+# PLAN_P053.yaml
+# Plan for Batch 31 Phase 2: F172, F173
+# F172 - Cascade member data update to future speeches (CR-246)
+# F173 - Informal name field for members (CR-247)
+# Created: 2026-03-02
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: >
+  Implement two synergistic features: (1) F172/CR-246: Fix stale snapshot data
+  by adding a cascade in useUpdateMember.onSuccess that propagates speaker_name,
+  speaker_phone, and speaker_informal_name to all future speeches (sunday_date
+  >= today) assigned to the edited member. (2) F173/CR-247: Add an
+  informal_name field to the members table and speaker_informal_name snapshot
+  field to the speeches table. The informal_name is used in WhatsApp {nome}
+  placeholder (with fallback to full_name). Includes database migration,
+  TypeScript types, hooks, MemberEditor UI, CSV export/import, and i18n.
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with code in the final step"
+
+steps:
+  # =========================================================================
+  # STEP-01: Database Migration (Foundation for both F172 and F173)
+  # =========================================================================
+
+  - id: STEP-01
+    description: >
+      Create database migration file supabase/migrations/023_add_informal_name.sql.
+      This migration: (a) adds informal_name TEXT column to members table,
+      (b) backfills existing members with SPLIT_PART(TRIM(full_name), ' ', 1),
+      (c) adds speaker_informal_name TEXT column to speeches table,
+      (d) backfills existing speeches with SPLIT_PART(TRIM(speaker_name), ' ', 1)
+      where speaker_name is not null, (e) replaces the import_members RPC to
+      include informal_name with COALESCE fallback to first word of full_name.
+      Exact SQL code in SPEC_F173.yaml implementation_details section.
+    files: ["supabase/migrations/023_add_informal_name.sql"]
+    dependencies: []
+    parallelizable_with: ["STEP-02"]
+    done_when:
+      - "File supabase/migrations/023_add_informal_name.sql exists"
+      - "ALTER TABLE members ADD COLUMN informal_name TEXT is present"
+      - "UPDATE members SET informal_name = SPLIT_PART(TRIM(full_name), ' ', 1) backfill is present"
+      - "ALTER TABLE speeches ADD COLUMN speaker_informal_name TEXT is present"
+      - "UPDATE speeches SET speaker_informal_name = SPLIT_PART(TRIM(speaker_name), ' ', 1) backfill is present"
+      - "CREATE OR REPLACE FUNCTION import_members includes informal_name with COALESCE fallback"
+    tests:
+      - type: unit
+        description: "Migration SQL is syntactically valid and contains all 5 operations"
+    covers:
+      acceptance_criteria: ["AC-173-01", "AC-173-02", "AC-173-03"]
+      edge_cases: ["EC-173-05"]
+    risks:
+      - risk: "Migration applied on database with NULL full_name values"
+        mitigation: "SPLIT_PART of NULL returns NULL which is acceptable for informal_name. TRIM handles empty strings."
+
+  # =========================================================================
+  # STEP-02: TypeScript Types (Foundation for all TS changes)
+  # =========================================================================
+
+  - id: STEP-02
+    description: >
+      Update src/types/database.ts with 4 type changes:
+      (a) Add informal_name: string | null to Member interface (after full_name).
+      (b) Add speaker_informal_name: string | null to Speech interface (after speaker_name).
+      (c) Add informal_name?: string | null to CreateMemberInput.
+      (d) Add informal_name?: string | null to UpdateMemberInput.
+      Exact code in SPEC_F173.yaml implementation_details section.
+    files: ["src/types/database.ts"]
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "Member interface has informal_name: string | null after full_name"
+      - "Speech interface has speaker_informal_name: string | null after speaker_name"
+      - "CreateMemberInput has informal_name?: string | null"
+      - "UpdateMemberInput has informal_name?: string | null"
+    tests:
+      - type: unit
+        description: "TypeScript compiler accepts all new type definitions"
+    covers:
+      acceptance_criteria: ["AC-173-04", "AC-173-05", "AC-173-06", "AC-173-07"]
+      edge_cases: []
+    risks:
+      - risk: "Existing code breaks due to missing informal_name in object literals"
+        mitigation: "All new fields are optional/nullable, so existing code that constructs Member or Speech objects without these fields will still compile"
+
+  # =========================================================================
+  # STEP-03: Hooks - useSpeeches.ts (Assign/Unassign snapshot extension)
+  # =========================================================================
+
+  - id: STEP-03
+    description: >
+      Update src/hooks/useSpeeches.ts with 3 changes:
+      (a) Add speakerInformalName: string | null to AssignSpeakerInput interface.
+      (b) In useAssignSpeaker mutationFn, add speaker_informal_name: input.speakerInformalName
+      to the Supabase .update() object.
+      (c) In useRemoveAssignment mutationFn, add speaker_informal_name: null to the
+      .update() object (clear snapshot on unassign).
+      Exact code changes in SPEC_F173.yaml and ARCH_M052.yaml.
+    files: ["src/hooks/useSpeeches.ts"]
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-04"]
+    done_when:
+      - "AssignSpeakerInput has speakerInformalName: string | null field"
+      - "useAssignSpeaker .update() includes speaker_informal_name: input.speakerInformalName"
+      - "useRemoveAssignment .update() includes speaker_informal_name: null"
+    tests:
+      - type: unit
+        description: "assignSpeaker mutation sends speaker_informal_name in the update payload"
+      - type: unit
+        description: "removeAssignment mutation clears speaker_informal_name to null"
+    covers:
+      acceptance_criteria: ["AC-173-08"]
+      edge_cases: []
+    risks:
+      - risk: "Callers of assignSpeaker.mutate not yet passing speakerInformalName"
+        mitigation: "STEP-05 updates all callers. TypeScript will flag missing field."
+
+  # =========================================================================
+  # STEP-04: Hooks - useMembers.ts (Cascade + Create extension)
+  # =========================================================================
+
+  - id: STEP-04
+    description: >
+      Update src/hooks/useMembers.ts with 3 changes:
+      (a) Add imports for supabase (from '../lib/supabase') and speechKeys
+      (from './useSpeeches').
+      (b) Modify useUpdateMember.onSuccess to be async and add cascade logic
+      after existing logAction. The cascade: constructs fullPhone as
+      data.country_code + data.phone (or null), constructs today as
+      new Date().toISOString().split('T')[0], then awaits supabase.from('speeches')
+      .update({ speaker_name: data.full_name, speaker_phone: fullPhone,
+      speaker_informal_name: data.informal_name || data.full_name.split(' ')[0] })
+      .eq('member_id', data.id).gte('sunday_date', today). After cascade,
+      invalidates speechKeys.all. Entire cascade wrapped in try/catch for
+      best-effort behavior.
+      (c) In useCreateMember mutationFn, include informal_name in the .insert()
+      object with auto-default: input.informal_name || input.full_name.split(' ')[0].
+      Exact code in SPEC_F172.yaml and ARCH_M052.yaml.
+    files: ["src/hooks/useMembers.ts"]
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-03"]
+    done_when:
+      - "import { supabase } from '../lib/supabase' is present"
+      - "import { speechKeys } from './useSpeeches' is present"
+      - "useUpdateMember.onSuccess is async"
+      - "Cascade updates speaker_name, speaker_phone, speaker_informal_name for future speeches"
+      - "Cascade uses .eq('member_id', data.id).gte('sunday_date', today)"
+      - "queryClient.invalidateQueries({ queryKey: speechKeys.all }) after cascade"
+      - "Cascade wrapped in try/catch"
+      - "useCreateMember inserts informal_name with auto-default to first word of full_name"
+    tests:
+      - type: unit
+        description: "useUpdateMember cascade updates future speeches with new name/phone/informal_name"
+      - type: unit
+        description: "useUpdateMember cascade does NOT update past speeches"
+      - type: unit
+        description: "useUpdateMember cascade is best-effort (silent on failure)"
+      - type: unit
+        description: "useCreateMember includes informal_name with auto-default"
+    covers:
+      acceptance_criteria: ["AC-172-01", "AC-172-02", "AC-172-03", "AC-172-04", "AC-172-05", "AC-172-06", "AC-172-07", "AC-172-08", "AC-172-09", "AC-173-09", "AC-173-10"]
+      edge_cases: ["EC-172-01", "EC-172-02", "EC-172-03", "EC-172-04", "EC-172-05"]
+    risks:
+      - risk: "Circular import between useMembers.ts and useSpeeches.ts"
+        mitigation: "speechKeys is just a query key factory (static object), not a hook. Import is safe and does not create circular dependency."
+      - risk: "Cascade fails silently and speeches remain stale"
+        mitigation: "Best-effort by design (DD-172-02). Next assign will snapshot correct data."
+
+  # =========================================================================
+  # STEP-05: Caller Updates (Pass speakerInformalName to assignSpeaker)
+  # =========================================================================
+
+  - id: STEP-05
+    description: >
+      Update all 3 callers of assignSpeaker.mutate to include speakerInformalName:
+      (a) src/app/(tabs)/speeches.tsx - handleAssignSpeaker: add
+      speakerInformalName: member.informal_name to the mutate call.
+      (b) src/components/NextAssignmentsSection.tsx - handleAssignSpeaker callback:
+      add speakerInformalName: member.informal_name to the mutate call.
+      (c) src/components/AgendaForm.tsx - assignSpeaker.mutate call for prayers:
+      add speakerInformalName: null (prayer selector uses name string, not Member
+      object; cascade from F172 will fill it in if member is later edited).
+      See ARCH_M052.yaml component "AssignSpeakerCallerUpdates" for details.
+    files:
+      - "src/app/(tabs)/speeches.tsx"
+      - "src/components/NextAssignmentsSection.tsx"
+      - "src/components/AgendaForm.tsx"
+    dependencies: ["STEP-03"]
+    parallelizable_with: ["STEP-06", "STEP-07", "STEP-08", "STEP-09"]
+    done_when:
+      - "speeches.tsx assignSpeaker.mutate includes speakerInformalName: member.informal_name"
+      - "NextAssignmentsSection.tsx assignSpeaker.mutate includes speakerInformalName: member.informal_name"
+      - "AgendaForm.tsx assignSpeaker.mutate includes speakerInformalName: null"
+      - "No TypeScript errors in any caller file"
+    tests:
+      - type: unit
+        description: "speeches.tsx passes member.informal_name as speakerInformalName"
+      - type: unit
+        description: "NextAssignmentsSection passes member.informal_name as speakerInformalName"
+      - type: unit
+        description: "AgendaForm passes null as speakerInformalName for prayers"
+    covers:
+      acceptance_criteria: ["AC-173-08"]
+      edge_cases: ["EC-173-06"]
+    risks:
+      - risk: "AgendaForm prayer assignment has null speakerInformalName"
+        mitigation: "Intentional per ARCH_M052: PrayerSelector provides name string, not Member object. The cascade will fix it on member edit."
+
+  # =========================================================================
+  # STEP-06: MemberEditor UI (informal_name field + auto-fill)
+  # =========================================================================
+
+  - id: STEP-06
+    description: >
+      Update src/app/(tabs)/settings/members.tsx with 6 changes:
+      (a) Update MemberEditorProps.onSave signature to include informal_name in data.
+      (b) Add useState for informalName (initialized from member?.informal_name ?? '').
+      (c) Add onBlur handler on full_name TextInput that auto-fills informalName
+      with fullName.trim().split(' ')[0] when informalName is empty.
+      (d) Add a new DebouncedTextInput between full_name and phone fields for
+      informalName with label t('members.informalName') and placeholder
+      t('members.informalNamePlaceholder').
+      (e) Update handleSave to include informal_name: informalName.trim() || null
+      in the onSave call.
+      (f) Update MemberRow to display member.informal_name in secondary text
+      style below the full_name (smaller font, textSecondary color).
+      (g) Update useCreateMember and useUpdateMember call sites to pass
+      informal_name from editor data.
+      See SPEC_F173.yaml and ARCH_M052.yaml for exact code patterns.
+    files: ["src/app/(tabs)/settings/members.tsx"]
+    dependencies: ["STEP-02", "STEP-04"]
+    parallelizable_with: ["STEP-05", "STEP-07", "STEP-08", "STEP-09"]
+    done_when:
+      - "MemberEditorProps.onSave includes informal_name in data shape"
+      - "MemberEditor has informalName useState initialized from member?.informal_name"
+      - "full_name TextInput has onBlur that auto-fills informalName when empty"
+      - "New TextInput for informalName between name and phone fields with i18n labels"
+      - "handleSave includes informal_name: informalName.trim() || null"
+      - "MemberRow displays informal_name in secondary text style"
+      - "useCreateMember call passes informal_name"
+      - "useUpdateMember call passes informal_name"
+    tests:
+      - type: unit
+        description: "MemberEditor renders informal_name field between name and phone"
+      - type: unit
+        description: "Auto-fill sets informalName on blur of fullName when informalName is empty"
+      - type: unit
+        description: "Auto-fill does NOT overwrite user-typed informalName"
+      - type: unit
+        description: "MemberRow displays informal_name in secondary style"
+    covers:
+      acceptance_criteria: ["AC-173-11", "AC-173-12", "AC-173-13", "AC-173-14"]
+      edge_cases: ["EC-173-01", "EC-173-02", "EC-173-03"]
+    risks:
+      - risk: "Auto-fill on blur may interfere with existing DebouncedTextInput auto-save"
+        mitigation: "The onBlur handler only modifies local state (informalName), not the saved data. The actual save is triggered by the Save button."
+
+  # =========================================================================
+  # STEP-07: CSV Export/Import (3-column support)
+  # =========================================================================
+
+  - id: STEP-07
+    description: >
+      Update src/lib/csvUtils.ts with 5 changes:
+      (a) Add informal_name: string to CsvMember interface.
+      (b) Add informalName: string to CsvHeaders interface.
+      (c) Add informalName: 'Nome Informal' to CSV_DEFAULT_HEADERS.
+      (d) Update generateCsv: add informal_name parameter to member type,
+      output 3-column header (Nome,Nome Informal,Telefone Completo),
+      add informalName column to data rows.
+      (e) Update parseCsv: detect column count from header. If 3+ columns,
+      parse informal_name from column 2 and phone from column 3.
+      If 2 columns (legacy), parse phone from column 2 and auto-generate
+      informal_name from full_name.split(' ')[0].
+      Exact code in SPEC_F173.yaml implementation_details.
+    files: ["src/lib/csvUtils.ts"]
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-05", "STEP-06", "STEP-08", "STEP-09"]
+    done_when:
+      - "CsvMember has informal_name: string field"
+      - "CsvHeaders has informalName: string field"
+      - "CSV_DEFAULT_HEADERS has informalName: 'Nome Informal'"
+      - "generateCsv outputs 3 columns: Nome,Nome Informal,Telefone Completo"
+      - "parseCsv handles 3-column input (informal_name from col 2, phone from col 3)"
+      - "parseCsv handles 2-column legacy input (phone from col 2, auto-generate informal_name)"
+    tests:
+      - type: unit
+        description: "generateCsv produces 3-column CSV with informal_name column"
+      - type: unit
+        description: "parseCsv parses 3-column CSV correctly"
+      - type: unit
+        description: "parseCsv parses 2-column legacy CSV with auto-generated informal_name"
+    covers:
+      acceptance_criteria: ["AC-173-15", "AC-173-16", "AC-173-17"]
+      edge_cases: ["EC-173-04"]
+    risks:
+      - risk: "CSV with non-standard headers (e.g., English headers) breaks parsing"
+        mitigation: "Parser uses column position, not header text. Header language is irrelevant."
+
+  # =========================================================================
+  # STEP-08: WhatsApp Template Resolution (informal_name priority)
+  # =========================================================================
+
+  - id: STEP-08
+    description: >
+      Update src/components/InviteManagementSection.tsx with 2 changes:
+      (a) In handleNotInvitedAction for prayer template, change
+      speakerName: speech.speaker_name ?? '' to
+      speakerName: speech.speaker_informal_name || speech.speaker_name || ''.
+      (b) In handleNotInvitedAction for speech template, make the same change:
+      speakerName: speech.speaker_informal_name || speech.speaker_name || ''.
+      Exact code in SPEC_F173.yaml implementation_details.
+    files: ["src/components/InviteManagementSection.tsx"]
+    dependencies: ["STEP-02"]
+    parallelizable_with: ["STEP-05", "STEP-06", "STEP-07", "STEP-09"]
+    done_when:
+      - "Prayer template speakerName uses speech.speaker_informal_name || speech.speaker_name || ''"
+      - "Speech template speakerName uses speech.speaker_informal_name || speech.speaker_name || ''"
+      - "No direct reference to speaker_name alone for {nome} resolution"
+    tests:
+      - type: unit
+        description: "{nome} resolves to speaker_informal_name when available"
+      - type: unit
+        description: "{nome} falls back to speaker_name when speaker_informal_name is null/empty"
+    covers:
+      acceptance_criteria: ["AC-173-18", "AC-173-19"]
+      edge_cases: []
+    risks:
+      - risk: "speaker_informal_name is empty string instead of null"
+        mitigation: "JS || operator treats empty string as falsy, so fallback to speaker_name works correctly."
+
+  # =========================================================================
+  # STEP-09: i18n Strings (3 locales)
+  # =========================================================================
+
+  - id: STEP-09
+    description: >
+      Add i18n keys to all 3 locale files:
+      (a) src/i18n/locales/pt-BR.json: add members.informalName = "Nome informal",
+      members.informalNamePlaceholder = "Ex: Maria".
+      (b) src/i18n/locales/en.json: add members.informalName = "Informal name",
+      members.informalNamePlaceholder = "e.g., Maria".
+      (c) src/i18n/locales/es.json: add members.informalName = "Nombre informal",
+      members.informalNamePlaceholder = "Ej: Maria".
+      Exact strings in SPEC_F173.yaml implementation_details.
+    files:
+      - "src/i18n/locales/pt-BR.json"
+      - "src/i18n/locales/en.json"
+      - "src/i18n/locales/es.json"
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-05", "STEP-06", "STEP-07", "STEP-08"]
+    done_when:
+      - "pt-BR.json has members.informalName = 'Nome informal'"
+      - "pt-BR.json has members.informalNamePlaceholder = 'Ex: Maria'"
+      - "en.json has members.informalName = 'Informal name'"
+      - "en.json has members.informalNamePlaceholder = 'e.g., Maria'"
+      - "es.json has members.informalName = 'Nombre informal'"
+      - "es.json has members.informalNamePlaceholder = 'Ej: Maria'"
+    tests:
+      - type: unit
+        description: "All 3 locale files have the 2 new keys with correct translations"
+    covers:
+      acceptance_criteria: ["AC-173-11"]
+      edge_cases: []
+    risks:
+      - risk: "Key naming inconsistency with existing keys"
+        mitigation: "Following existing members.* namespace pattern used by other member-related keys."
+
+  # =========================================================================
+  # STEP-10: Tests (All features validated)
+  # =========================================================================
+
+  - id: STEP-10
+    description: >
+      Create or update test files to validate F172 and F173:
+      (a) Test useUpdateMember cascade: mock supabase.from('speeches').update()
+      and verify it is called with { speaker_name, speaker_phone, speaker_informal_name }
+      filtered by member_id and sunday_date >= today.
+      (b) Test cascade does NOT affect past speeches (sunday_date < today).
+      (c) Test cascade is best-effort (no error thrown on failure).
+      (d) Test useCreateMember includes informal_name with auto-default.
+      (e) Test useAssignSpeaker includes speaker_informal_name.
+      (f) Test useRemoveAssignment clears speaker_informal_name.
+      (g) Test CSV parseCsv with 2-column and 3-column formats.
+      (h) Test CSV generateCsv outputs 3 columns.
+      (i) Test WhatsApp {nome} resolution with informal_name and fallback.
+      (j) Run npx vitest run and verify 0 failures.
+    files: ["src/__tests__/batch31-phase2.test.ts"]
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09"]
+    parallelizable_with: []
+    done_when:
+      - "Test file src/__tests__/batch31-phase2.test.ts exists"
+      - "Tests cover cascade to future speeches"
+      - "Tests cover cascade NOT affecting past speeches"
+      - "Tests cover cascade best-effort (silent on failure)"
+      - "Tests cover createMember with informal_name auto-default"
+      - "Tests cover assignSpeaker with speaker_informal_name"
+      - "Tests cover removeAssignment clearing speaker_informal_name"
+      - "Tests cover parseCsv 2-column and 3-column formats"
+      - "Tests cover generateCsv 3-column output"
+      - "Tests cover WhatsApp {nome} resolution with fallback"
+      - "npx vitest run passes with 0 failures"
+    tests:
+      - type: unit
+        description: "Full test suite for F172 cascade and F173 informal_name across all layers"
+    covers:
+      acceptance_criteria: ["AC-172-10", "AC-173-20"]
+      edge_cases: ["EC-172-01", "EC-172-02", "EC-172-03", "EC-172-04", "EC-172-05", "EC-173-01", "EC-173-02", "EC-173-03", "EC-173-04", "EC-173-05", "EC-173-06"]
+    risks:
+      - risk: "Mocking Supabase for cascade tests may be complex"
+        mitigation: "Follow existing test patterns from batch31-f170-f171.test.ts and integration test mocking patterns in the codebase"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+
+  # F172 ACs
+  - ac_id: AC-172-01
+    how_to_verify: "After member phone edit, check future speech records: speaker_phone matches new phone"
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-02
+    how_to_verify: "After member name edit, check future speech records: speaker_name matches new name"
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-03
+    how_to_verify: "Edit member with 3 future speeches + 1 past: 3 future updated, 1 past unchanged"
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-04
+    how_to_verify: "Past speech speaker_phone remains old value after member edit. Filter .gte('sunday_date', today) excludes past."
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-05
+    how_to_verify: "After member phone edit, navigate to invite management: WhatsApp URL uses new phone"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+
+  - ac_id: AC-172-06
+    how_to_verify: "Prayer positions 0 and 4 are included in cascade (no position filter in cascade query)"
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-07
+    how_to_verify: "queryClient.invalidateQueries({ queryKey: speechKeys.all }) called after cascade"
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-08
+    how_to_verify: "Cascade constructs fullPhone as data.country_code + data.phone, matching useAssignSpeaker format"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-172-09
+    how_to_verify: "Member with no future speeches: cascade query runs but affects 0 rows. No error."
+    covered_by_steps: ["STEP-04", "STEP-10"]
+
+  - ac_id: AC-172-10
+    how_to_verify: "npx vitest run passes with 0 failures"
+    covered_by_steps: ["STEP-10"]
+
+  # F173 ACs
+  - ac_id: AC-173-01
+    how_to_verify: "Migration 023 contains ALTER TABLE members ADD COLUMN informal_name TEXT"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-173-02
+    how_to_verify: "Migration 023 contains ALTER TABLE speeches ADD COLUMN speaker_informal_name TEXT"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-173-03
+    how_to_verify: "import_members RPC in migration includes informal_name with COALESCE fallback"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-173-04
+    how_to_verify: "src/types/database.ts Member interface has informal_name: string | null"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-173-05
+    how_to_verify: "src/types/database.ts Speech interface has speaker_informal_name: string | null"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-173-06
+    how_to_verify: "src/types/database.ts CreateMemberInput has informal_name?: string | null"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-173-07
+    how_to_verify: "src/types/database.ts UpdateMemberInput has informal_name?: string | null"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-173-08
+    how_to_verify: "AssignSpeakerInput has speakerInformalName; update includes speaker_informal_name"
+    covered_by_steps: ["STEP-03", "STEP-05"]
+
+  - ac_id: AC-173-09
+    how_to_verify: "useCreateMember inserts informal_name with auto-default to first word"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-173-10
+    how_to_verify: "Cascade includes speaker_informal_name: data.informal_name || data.full_name.split(' ')[0]"
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-173-11
+    how_to_verify: "MemberEditor shows informal_name TextInput between name and phone fields"
+    covered_by_steps: ["STEP-06", "STEP-09"]
+
+  - ac_id: AC-173-12
+    how_to_verify: "On blur of full_name, informalName auto-fills with first word when empty"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-173-13
+    how_to_verify: "handleSave includes informal_name in onSave data"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-173-14
+    how_to_verify: "MemberRow shows informal_name in secondary text style"
+    covered_by_steps: ["STEP-06"]
+
+  - ac_id: AC-173-15
+    how_to_verify: "generateCsv outputs header 'Nome,Nome Informal,Telefone Completo'"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-173-16
+    how_to_verify: "parseCsv correctly parses 3-column CSV with informal_name from column 2"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-173-17
+    how_to_verify: "parseCsv parses 2-column legacy CSV and auto-generates informal_name"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-173-18
+    how_to_verify: "speakerName resolves to speaker_informal_name when available (||  fallback)"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-173-19
+    how_to_verify: "speakerName falls back to speaker_name when speaker_informal_name is null/empty"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-173-20
+    how_to_verify: "npx vitest run passes with 0 failures"
+    covered_by_steps: ["STEP-10"]

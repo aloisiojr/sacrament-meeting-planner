@@ -90,6 +90,8 @@ metadata:
     - docs/specs/SPEC_F169.yaml
     - docs/specs/SPEC_F170.yaml
     - docs/specs/SPEC_F171.yaml
+    - docs/specs/SPEC_F172.yaml
+    - docs/specs/SPEC_F173.yaml
   detail_references: >
     Acceptance criteria individuais de cada feature estao nos arquivos
     docs/specs/history/SPEC_F*.md. Este arquivo nao duplica os ACs
@@ -3068,7 +3070,7 @@ features:
       - "1 arquivo impactado (ActorSelector.tsx)"
       - "Follows existing KeyboardAvoidingView pattern from members.tsx/topics.tsx"
 
-  # Batch 31 (F170-F171): secretary prayer permissions, topic field visibility
+  # Batch 31 (F170-F173): secretary prayer permissions, topic field visibility, cascade update, informal name
 
   - id: F170
     name: "Grant secretary speech:assign and speech:unassign permissions"
@@ -3104,6 +3106,44 @@ features:
       - "10 acceptance criteria, 3 edge cases"
       - "1 arquivo impactado (SpeechSlot.tsx)"
       - "Removes canAssign dependency from showTopicRow condition"
+
+  # Batch 31 Phase 2 (F172-F173): cascade member update, informal name
+
+  - id: F172
+    name: "Cascade member data update to future speeches"
+    status: pending
+    rfs: []
+    description: >
+      CR-246 fixes a bug where editing a member's phone number in Settings
+      does not update the snapshot fields (speaker_phone, speaker_name) in
+      future speeches. The fix adds a cascade update in useUpdateMember's
+      onSuccess callback that updates all speeches where member_id matches
+      and sunday_date >= today. Past speeches are preserved per ADR-003.
+    modified_by_crs: [246]
+    spec_file: "docs/specs/SPEC_F172.yaml"
+    notes:
+      - "CR-246: Cascade phone/name update to future speeches"
+      - "10 acceptance criteria, 5 edge cases, 5 design decisions"
+      - "1 arquivo impactado (useMembers.ts)"
+      - "Root cause: ADR-003 snapshot pattern - speaker_phone never updated after assign"
+
+  - id: F173
+    name: "Informal name for members used in WhatsApp invites"
+    status: pending
+    rfs: []
+    description: >
+      CR-247 adds informal_name field to members (and speaker_informal_name
+      snapshot to speeches). Used in WhatsApp templates via {nome} placeholder
+      with fallback to full_name. Default value auto-generated from first word
+      of full_name. Included in CSV export/import. New field in MemberEditor UI.
+      Migration backfills existing records.
+    modified_by_crs: [247]
+    spec_file: "docs/specs/SPEC_F173.yaml"
+    notes:
+      - "CR-247: Informal name field for friendlier WhatsApp invites"
+      - "20 acceptance criteria, 6 edge cases, 6 design decisions"
+      - "10 arquivos impactados (migration, types, hooks, UI, CSV, i18n)"
+      - "Synergy with F172: cascade also propagates speaker_informal_name"
 
 # =============================================================================
 # PENDING CHANGE REQUESTS (125 CRs pendentes de implementacao - Batch 7 Phase 2 + Batch 8 + Batch 9 + Batch 10 + Batch 11 + Batch 12 + Batch 13 + Batch 14 + Batch 15 + Batch 16 + Batch 17 + Batch 18 + Batch 19 + Batch 20 + Batch 21 + Batch 22 + Batch 23 + Batch 24 + Batch 25 + Batch 26 + Batch 27 + Batch 28 + Batch 29 + Batch 30 + Batch 31)
@@ -7275,3 +7315,36 @@ cr_history:
     files:
       - "docs/specs/SPEC_F159.yaml (CR-231 - Split speech WhatsApp template into 3)"
     summary: "Quebrar template unico de WhatsApp para discursos em 3 templates individuais (1o, 2o, 3o discurso). Remover placeholder {posicao}. DB: substituir whatsapp_template por 3 colunas (speech_1/2/3). Templates default com ordinal embutido. Settings: 5 tabs. Edge function: 3 colunas. i18n: remover placeholderPosition, adicionar tabSpeech1/2/3 (F159)."
+
+  batch_28:
+    range: "CR-232 a CR-238"
+    status: "todas implementadas"
+    files:
+      - "docs/specs/SPEC_F161.yaml (CR-232 - Approve/decline via push notification)"
+      - "docs/specs/SPEC_F166.yaml (CR-233 - Collapse 2nd speech card)"
+      - "docs/specs/SPEC_F167.yaml (CR-234 - Update default speech template)"
+      - "docs/specs/SPEC_F168.yaml (CR-235 - Hide speech exception label from Speeches tab)"
+      - "docs/specs/SPEC_F169.yaml (CR-236 a CR-238 - Explanatory text, collapsed card order, keyboard fix)"
+    summary: "Push notification approve/decline (F161), collapse 2nd speech when disabled (F166), update default speech templates (F167), hide exception label from Speeches tab (F168), explanatory texts + collapsed card order + keyboard fix (F169)."
+
+  batch_29:
+    range: "CR-239"
+    status: "implementada"
+    files: []
+    summary: "Verificacao completa da i18n do app."
+
+  batch_30:
+    range: "CR-240 a CR-242"
+    status: "todas implementadas"
+    files: []
+    summary: "Fix push notification text for prayers (CR-240), fix DebouncedTextInput character disappearing (CR-241), fix ActorSelector keyboard covering field (CR-242)."
+
+  batch_31:
+    range: "CR-243 a CR-247"
+    status: "2 implementadas fase 1 (243, 244), 1 cancelada (245), 2 pendentes fase 2 (246, 247)"
+    files:
+      - "docs/specs/SPEC_F170.yaml (CR-243 - Secretary prayer permissions)"
+      - "docs/specs/SPEC_F171.yaml (CR-244 - Topic field visibility)"
+      - "docs/specs/SPEC_F172.yaml (CR-246 - Cascade member data to future speeches)"
+      - "docs/specs/SPEC_F173.yaml (CR-247 - Informal name field)"
+    summary: "Phase 1 (implemented): Secretary gets speech:assign/unassign permissions (F170), topic row visible for all roles (F171). CR-245 cancelled (user template error, not code bug). Phase 2 (pending): Cascade member phone/name update to future speeches (F172), informal_name field for members with WhatsApp integration, CSV export/import, auto-default from first name (F173)."

@@ -1,0 +1,346 @@
+# =============================================================================
+# SPEC_F172.yaml
+# Batch 31 Phase 2: Cascade member phone/name update to future speeches (CR-246)
+# Created: 2026-03-02
+# Status: SPEC (complete)
+# =============================================================================
+
+type: spec
+status: complete
+batch: 31
+phase: 2
+created: "2026-03-02"
+last_updated: "2026-03-02"
+request_type: bugfix
+execution_order: >
+  1 feature (F172) covering 1 CR (CR-246).
+  Changes in useMembers.ts (cascade update on member edit) and useSpeeches.ts
+  (no changes needed; speeches table already has speaker_phone as snapshot).
+  The fix adds a cascade update in useUpdateMember.onSuccess to propagate
+  phone (and name) changes to all future speeches assigned to the edited member.
+execution_rationale: >
+  Root cause: ADR-003 Snapshot Pattern. When a speaker is assigned via
+  useAssignSpeaker (useSpeeches.ts:248-254), speaker_name and speaker_phone
+  are copied (snapshotted) into the speeches table. After that, editing the
+  member's phone in Settings (useUpdateMember in useMembers.ts:114-138) only
+  updates the members table; the snapshot in speeches is never refreshed.
+  When the user clicks the WhatsApp icon, InviteManagementSection reads
+  speech.speaker_phone (the stale snapshot) instead of the live member data.
+
+  Fix approach: After a successful member update, query all future speeches
+  for that member (member_id = updated member, sunday_date >= today) and
+  update their speaker_name and speaker_phone snapshots to match the new
+  member data. Past speeches are NOT updated (historical records preserved
+  per ADR-003 intent). This cascade approach is consistent with ADR-003
+  because it only updates speeches that have not yet occurred.
+
+# =============================================================================
+# CONTEXT
+# =============================================================================
+#
+# Current state (pre-fix):
+# - useUpdateMember (useMembers.ts:114-138) updates members table only.
+#   onSuccess only invalidates memberKeys query and logs the action.
+# - useAssignSpeaker (useSpeeches.ts:248-254) snapshots speaker_name and
+#   speaker_phone into the speeches table at assignment time.
+# - InviteManagementSection.tsx reads speech.speaker_phone for WhatsApp
+#   (lines 109, 127, 139, 190-191). It NEVER reads from the members table.
+# - User flow: click WhatsApp icon -> sees wrong number -> goes to Settings
+#   -> edits member phone -> goes back -> clicks WhatsApp again -> still
+#   sees OLD number because speech.speaker_phone was not updated.
+# - ADR-003 says "Name edits do NOT propagate to existing speeches (by
+#   design)" - this was for HISTORICAL speeches. Future speeches should
+#   use current data.
+# - member_id FK in speeches table: ON DELETE SET NULL (snapshot preserved).
+# - Speeches positions: 0 (opening prayer), 1-3 (speeches), 4 (closing prayer).
+# =============================================================================
+
+# =============================================================================
+# F172: Cascade member phone/name update to future speeches - CR-246
+# =============================================================================
+
+features:
+
+  - id: F172
+    name: "Cascade member data update to future speeches"
+    cr_id: 246
+    type: bugfix
+    related_crs: [247]
+    related_features: [F003, F023, F157]
+    description: >
+      CR-246 fixes a bug where editing a member's phone number in Settings
+      does not update the snapshot fields (speaker_phone, speaker_name) in
+      future speeches assigned to that member. The fix adds a cascade
+      update in useUpdateMember's onSuccess callback that updates all
+      speeches where member_id matches the edited member and sunday_date
+      is today or later.
+
+      After the fix, the user can:
+      1. Click WhatsApp icon and notice wrong phone number
+      2. Go to Settings > Members and edit the phone
+      3. Return to the speech/invite screen
+      4. Click WhatsApp icon again -> uses the corrected phone number
+
+      The cascade updates both speaker_phone and speaker_name to ensure
+      consistency. Past speeches (sunday_date < today) are NOT updated,
+      preserving historical records per ADR-003.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA
+    # =========================================================================
+
+    acceptance_criteria:
+
+      - id: AC-172-01
+        description: "Future speeches updated when member phone changes"
+        given: "A member 'Maria Silva' with phone '+5511999999999' is assigned to a future speech (sunday_date >= today)"
+        when: "The user edits the member's phone to '+5511888888888' in Settings > Members and saves"
+        then: "The speech record's speaker_phone is updated to '+5511888888888'. The speeches query cache is invalidated, and the UI reflects the new phone."
+        status: pending
+
+      - id: AC-172-02
+        description: "Future speeches updated when member name changes"
+        given: "A member 'Maria Silva' is assigned to a future speech"
+        when: "The user edits the member's name to 'Maria Santos' in Settings > Members and saves"
+        then: "The speech record's speaker_name is updated to 'Maria Santos'. The UI reflects the new name in the speech slot and invite management."
+        status: pending
+
+      - id: AC-172-03
+        description: "Multiple future speeches updated in one operation"
+        given: "A member is assigned to 3 future speeches (different Sundays) and 1 past speech"
+        when: "The user edits the member's phone in Settings"
+        then: "All 3 future speeches have their speaker_phone updated. The 1 past speech retains the old phone number."
+        status: pending
+
+      - id: AC-172-04
+        description: "Past speeches are NOT updated"
+        given: "A member was assigned to a speech last Sunday (sunday_date < today) with phone '+5511999999999'"
+        when: "The user edits the member's phone to '+5511888888888'"
+        then: "The past speech's speaker_phone remains '+5511999999999'. Historical data is preserved per ADR-003."
+        status: pending
+
+      - id: AC-172-05
+        description: "WhatsApp uses updated phone after member edit"
+        given: "A member's phone was just updated via Settings > Members"
+        when: "The user navigates to Invite Management and clicks the WhatsApp icon for that member's future speech"
+        then: "The WhatsApp URL uses the new phone number. The wa.me link opens with the corrected number."
+        status: pending
+
+      - id: AC-172-06
+        description: "Prayer slots (positions 0 and 4) also updated"
+        given: "A member is assigned to a future opening prayer (position 0) and closing prayer (position 4)"
+        when: "The user edits the member's phone in Settings"
+        then: "Both prayer speeches have their speaker_phone updated. The cascade applies to all positions (0, 1, 2, 3, 4)."
+        status: pending
+
+      - id: AC-172-07
+        description: "Speeches query cache invalidated after cascade"
+        given: "The cascade update has completed"
+        when: "The onSuccess handler finishes"
+        then: "queryClient.invalidateQueries is called for speechKeys.all, ensuring the UI re-fetches speech data with updated snapshots."
+        status: pending
+
+      - id: AC-172-08
+        description: "No cascade when only country_code changes (phone itself unchanged)"
+        given: "A member has phone '999999999' and country_code '+55'. They are assigned to a future speech with speaker_phone '+55999999999'"
+        when: "The user changes country_code to '+1' but keeps phone '999999999'"
+        then: "The cascade runs and updates speaker_phone to '+1999999999' for future speeches, reflecting the new full phone."
+        status: pending
+
+      - id: AC-172-09
+        description: "Member with no future speeches - cascade is a no-op"
+        given: "A member has no speeches assigned (or only past speeches)"
+        when: "The user edits the member's phone"
+        then: "The cascade update query runs but affects 0 rows. No errors occur. The member update succeeds normally."
+        status: pending
+
+      - id: AC-172-10
+        description: "Full test suite passes"
+        given: "All useMembers.ts changes are applied"
+        when: "npx vitest run is executed"
+        then: "All tests pass with 0 failures."
+        status: pending
+
+    edge_cases:
+      - id: EC-172-01
+        case: "Member phone set to empty/null"
+        expected: "speaker_phone in future speeches is updated to null. WhatsApp icon will show 'no phone' dialog (F152 behavior)."
+        status: pending
+
+      - id: EC-172-02
+        case: "Member assigned to speech on today's date"
+        expected: "Today's speech IS included in the cascade (sunday_date >= today). This is correct because the meeting might not have happened yet."
+        status: pending
+
+      - id: EC-172-03
+        case: "Concurrent edits: member updated while speech is being assigned"
+        expected: "Last-write-wins per offline strategy. The cascade uses the latest member data from the mutation response."
+        status: pending
+
+      - id: EC-172-04
+        case: "Member deleted after update"
+        expected: "ON DELETE SET NULL on member_id FK. Snapshot fields (speaker_name, speaker_phone) are preserved. The cascade only runs on update, not delete."
+        status: pending
+
+      - id: EC-172-05
+        case: "Network error during cascade update"
+        expected: "The member update itself succeeds (it's in onSuccess). The cascade is best-effort. If the Supabase update for speeches fails, it is caught silently. The member data is correct; speeches may be stale until next assign."
+        status: pending
+
+    # =========================================================================
+    # FILES IMPACTED
+    # =========================================================================
+
+    files_impacted:
+      - src/hooks/useMembers.ts
+
+    files_not_modified:
+      - src/hooks/useSpeeches.ts (no changes needed; snapshot fields already exist)
+      - src/components/InviteManagementSection.tsx (no changes; already reads speech.speaker_phone)
+      - src/types/database.ts (no new types needed)
+      - supabase/migrations/ (no schema changes; speeches table already has speaker_phone)
+
+    # =========================================================================
+    # IMPLEMENTATION DETAILS
+    # =========================================================================
+
+    implementation_details:
+
+      - location: "src/hooks/useMembers.ts:1-10 (imports)"
+        action: "Add imports for supabase and speechKeys"
+        new_code: |
+          import { supabase } from '../lib/supabase';
+          import { speechKeys } from './useSpeeches';
+        rationale: >
+          Need supabase client for the cascade update query and speechKeys
+          to invalidate the speeches query cache after the cascade.
+
+      - location: "src/hooks/useMembers.ts:131-137 (useUpdateMember onSuccess)"
+        current_code: |
+          onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+            if (user) {
+              logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
+            }
+          },
+        new_code: |
+          onSuccess: async (data) => {
+            queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+            if (user) {
+              logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
+            }
+            // CR-246: Cascade phone/name update to future speeches
+            const today = new Date().toISOString().split('T')[0];
+            const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
+            try {
+              await supabase
+                .from('speeches')
+                .update({
+                  speaker_name: data.full_name,
+                  speaker_phone: fullPhone,
+                })
+                .eq('member_id', data.id)
+                .gte('sunday_date', today);
+              queryClient.invalidateQueries({ queryKey: speechKeys.all });
+            } catch {
+              // Best-effort: member update already succeeded
+            }
+          },
+        rationale: >
+          After a successful member update, cascade the new full_name and
+          phone (country_code + phone) to all future speeches assigned to
+          this member. The full phone is constructed as country_code + phone
+          to match the format used in useAssignSpeaker (which receives the
+          full phone from the caller). Past speeches (sunday_date < today)
+          are preserved. The speeches query cache is invalidated to refresh
+          the UI. Errors are caught silently because the member update
+          itself has already succeeded.
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+
+  - id: DD-172-01
+    question: "Should past speeches be updated too?"
+    decision: "No, only future speeches (sunday_date >= today)"
+    rationale: >
+      ADR-003 intentionally preserves historical data. A phone number
+      correction is relevant for upcoming invitations, not for records of
+      past meetings. Past speeches retain the phone number that was used
+      at the time of the actual meeting. This is consistent with the
+      original ADR-003 intent: the snapshot preserves the state at the
+      time of the event.
+    decided_in: CR-246
+
+  - id: DD-172-02
+    question: "Should the cascade be done in the client (onSuccess) or via a database trigger?"
+    decision: "Client-side in onSuccess"
+    rationale: >
+      A database trigger on members.UPDATE would require a new migration
+      and add complexity. The client-side approach is simpler, follows
+      existing patterns (all mutation side-effects are in onSuccess), and
+      is sufficient because member edits are low-frequency operations.
+      The cascade is best-effort; if it fails, the member data is still
+      correct and the next assign will snapshot the correct data.
+    decided_in: CR-246
+
+  - id: DD-172-03
+    question: "How to construct speaker_phone for the cascade?"
+    decision: "Concatenate data.country_code + data.phone, matching the format used in useAssignSpeaker"
+    rationale: >
+      In useAssignSpeaker, the caller passes speakerPhone as the full
+      phone number (country_code + phone). InviteManagementSection reads
+      speech.speaker_phone directly and passes it to buildWhatsAppUrl.
+      The cascade must produce the same format. When data.phone is null
+      or empty, speaker_phone should be set to null.
+    decided_in: CR-246
+
+  - id: DD-172-04
+    question: "Should speaker_name also be cascaded, or only speaker_phone?"
+    decision: "Cascade both speaker_name and speaker_phone"
+    rationale: >
+      If the user edits a member's name, future speeches should reflect
+      the new name. This is consistent with the CR-246 intent (keeping
+      designations in sync with member data). It also provides synergy
+      with CR-247 (informal_name) which may add a speaker_informal_name
+      snapshot in the future.
+    decided_in: CR-246
+
+  - id: DD-172-05
+    question: "Should the cascade include today's date or strictly future dates?"
+    decision: "Include today (sunday_date >= today, not >)"
+    rationale: >
+      Today's meeting may not have happened yet. If the user is correcting
+      a phone number on Sunday morning before the meeting, the invite for
+      today should use the corrected number.
+    decided_in: CR-246
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+
+  assumptions:
+    - id: A-172-01
+      text: >
+        The cascade update runs with the authenticated user's RLS context.
+        The user must have write access to speeches in their ward. Bishopric
+        and secretary both have member:write permission and can trigger this
+        cascade. RLS on speeches allows updates within the same ward.
+    - id: A-172-02
+      text: >
+        The full phone format in speaker_phone is country_code + phone
+        (e.g., "+5511999999999"). This matches what useAssignSpeaker
+        receives from the SpeakerSelector component. The cascade
+        replicates this concatenation.
+    - id: A-172-03
+      text: >
+        The onSuccess callback is made async to await the cascade update.
+        This is supported by TanStack Query - onSuccess can be async
+        without blocking the mutation result.
+
+  inconsistencies: []

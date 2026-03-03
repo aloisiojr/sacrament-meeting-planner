@@ -37,7 +37,8 @@
 # CR-234, CR-235, CR-236, CR-237, CR-238 (PRE) - Batch 28 Phase 1
 # CR-240, CR-241, CR-242 (PRE+POST) - Batch 30 Phase 1
 # CR-243, CR-244 (PRE+POST) - Batch 31 Phase 1
-# Updated: 2026-03-02
+# CR-246, CR-247 (PRE+POST) - Batch 31 Phase 2
+# Updated: 2026-03-03
 # =============================================================================
 
 # #############################################################################
@@ -14294,3 +14295,409 @@ cr_244:
       full_suite_failed: 8
       full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 31"
 
+# #############################################################################
+# CR-246: Phone update in settings must reflect in speech/prayer WhatsApp links
+#         (F172) - Batch 31 Phase 2
+# #############################################################################
+
+cr_246:
+  cr_id: CR-246
+  title: "Cascade member phone/name update to future speeches"
+  type: bugfix
+  spec: specs/SPEC_F172.yaml
+  qa_plan: qa/QA_PLAN_053.yaml
+
+  pre_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    summary: |
+      Bug confirmed. SNAPSHOT PATTERN (ADR-003) stores speaker_phone at
+      assignment time. useUpdateMember does NOT cascade changes to speeches.
+      WhatsApp icon always uses stale snapshot. Fix: add cascade update in
+      useUpdateMember.onSuccess for future speeches.
+
+  post_validation:
+    timestamp: "2026-03-03"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: 95dcfa6
+        message: "feat(useMembers): cascade member data to future speeches, include informal_name in create"
+      - hash: 4d868a6
+        message: "test(batch31): add F172/F173 tests and update existing tests for informal_name"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 96
+    tester_tests_total: 96
+
+    # =========================================================================
+    # Reproduction Steps Retested
+    # =========================================================================
+    reproduction_retest:
+      status: fixed
+      evidence:
+        - "useMembers.ts:138-154 - onSuccess is now async and cascades to future speeches"
+        - "useMembers.ts:142-150 - supabase.from('speeches').update({speaker_name, speaker_phone, speaker_informal_name}).eq('member_id', data.id).gte('sunday_date', today)"
+        - "useMembers.ts:151 - queryClient.invalidateQueries({ queryKey: speechKeys.all }) after cascade"
+        - "Flow: member phone update -> cascade to speeches -> invalidate speech cache -> UI shows new phone"
+
+    # =========================================================================
+    # must_pass Results
+    # =========================================================================
+    must_pass_results:
+      - id: MP-01
+        description: "When a member's phone is updated, future speech records with that member_id must have speaker_phone updated"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:133 - onSuccess is async"
+          - "src/hooks/useMembers.ts:142-150 - supabase.from('speeches').update({speaker_name: data.full_name, speaker_phone: fullPhone, speaker_informal_name: ...}).eq('member_id', data.id).gte('sunday_date', today)"
+          - "Cascade updates speaker_phone = data.country_code + data.phone for all future speeches"
+
+      - id: MP-02
+        description: "Past speech records (sunday_date < today) must NOT be updated when member phone changes"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:150 - .gte('sunday_date', today) ensures only today and future"
+          - "src/hooks/useMembers.ts:139 - today = new Date().toISOString().split('T')[0]"
+          - "Past speeches (sunday_date < today) are excluded by the gte filter"
+
+      - id: MP-03
+        description: "After phone update, InviteManagementSection WhatsApp URL uses the new phone"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:151 - queryClient.invalidateQueries({ queryKey: speechKeys.all })"
+          - "src/components/InviteManagementSection.tsx:109 - if (speech.speaker_phone) reads updated snapshot"
+          - "src/components/InviteManagementSection.tsx:128 - url built from speech.speaker_phone (now updated)"
+          - "Cache invalidation forces re-fetch of speech data with new speaker_phone"
+
+      - id: MP-04
+        description: "After phone update, InviteActionDropdown 'View conversation' uses the new phone"
+        status: PASSED
+        evidence:
+          - "src/components/InviteManagementSection.tsx:190-191 - buildWhatsAppConversationUrl(speech.speaker_phone)"
+          - "speech.speaker_phone is updated by cascade, then cache invalidated"
+          - "InviteActionDropdown receives updated speech object"
+
+      - id: MP-05
+        description: "Speech query cache is invalidated after phone cascade update"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:151 - queryClient.invalidateQueries({ queryKey: speechKeys.all })"
+          - "speechKeys imported at line 10: import { speechKeys } from './useSpeeches'"
+          - "All speech queries (byDateRange, bySunday) are nested under speechKeys.all"
+
+      - id: MP-06
+        description: "Country code is correctly included in the updated speaker_phone"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:140 - const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null"
+          - "Format matches useAssignSpeaker callers: speeches.tsx:254 uses member.phone (which callers build as country_code+phone)"
+          - "When phone is null, fullPhone becomes null (correct - no phone available)"
+
+    # =========================================================================
+    # should_pass Results
+    # =========================================================================
+    should_pass_results:
+      - id: SP-01
+        description: "Prayer positions (0, 4) are also updated when member phone changes"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:149 - .eq('member_id', data.id) with NO position filter"
+          - "Cascade applies to ALL speeches for this member, regardless of position (0-4)"
+          - "Prayer slots (0, 4) are in the speeches table and get the same cascade"
+
+      - id: SP-02
+        description: "When phone is removed (set to empty), speaker_phone becomes null and WhatsApp shows no-phone alert"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:140 - fullPhone = data.phone ? ... : null"
+          - "When phone is empty/null, speaker_phone is set to null in cascade"
+          - "src/components/InviteManagementSection.tsx:158-174 - Alert shown when !speech.speaker_phone"
+
+      - id: SP-03
+        description: "When member name changes, speaker_name is also updated for future speeches"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:145 - speaker_name: data.full_name in cascade update"
+          - "Both speaker_name and speaker_phone are cascaded together"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch31-phase2.test.ts"
+      tests_passed: 96
+      tests_total: 96
+      full_suite_passed: 7287
+      full_suite_total: 7295
+      full_suite_failed: 8
+      full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 31"
+
+# #############################################################################
+# CR-247: Informal name field for members (F173) - Batch 31 Phase 2
+# #############################################################################
+
+cr_247:
+  cr_id: CR-247
+  title: "Informal name field for members used in WhatsApp invites"
+  type: feature
+  spec: specs/SPEC_F173.yaml
+  qa_plan: qa/QA_PLAN_053.yaml
+
+  pre_validation:
+    timestamp: "2026-03-02"
+    status: passed
+    summary: |
+      Feature well-defined. All affected layers identified: database (new column),
+      types, hooks, UI (MemberEditor), CSV (3-column), WhatsApp ({nome} placeholder),
+      i18n. Snapshot approach (Path A) chosen for consistency with ADR-003.
+
+  post_validation:
+    timestamp: "2026-03-03"
+    status: passed
+    phase: "2 of 2"
+    commits:
+      - hash: d470d4a
+        message: "feat(migration): add informal_name to members and speaker_informal_name to speeches"
+      - hash: 5a10c9d
+        message: "feat(types): add informal_name to Member, Speech, CreateMemberInput, UpdateMemberInput"
+      - hash: 9982593
+        message: "feat(useSpeeches): snapshot speaker_informal_name on assign, clear on unassign"
+      - hash: 95dcfa6
+        message: "feat(useMembers): cascade member data to future speeches, include informal_name in create"
+      - hash: b67c8c9
+        message: "feat(callers): pass speakerInformalName in all assignSpeaker.mutate calls"
+      - hash: eab596d
+        message: "feat(MemberEditor): add informal_name field between name and phone"
+      - hash: 27fe46b
+        message: "feat(csv): 3-column export, backward-compatible 2/3-column import"
+      - hash: d30a16a
+        message: "feat(whatsapp): resolve {nome} as speaker_informal_name in invite templates"
+      - hash: 54e2162
+        message: "feat(i18n): add csvHeaderInformalName and informalNamePlaceholder keys"
+      - hash: 4d868a6
+        message: "test(batch31): add F172/F173 tests and update existing tests for informal_name"
+
+    reviewer_verdict: approved
+    reviewer_issues: 0
+
+    tester_verdict: approved
+    tester_tests_passed: 96
+    tester_tests_total: 96
+
+    # =========================================================================
+    # must_pass Results
+    # =========================================================================
+    must_pass_results:
+      - id: MP-07
+        description: "Members table has informal_name column (nullable TEXT)"
+        status: PASSED
+        evidence:
+          - "supabase/migrations/023_add_informal_name.sql:5 - ALTER TABLE public.members ADD COLUMN informal_name TEXT"
+          - "No NOT NULL constraint - column is nullable"
+          - "Backfill at line 8-10: UPDATE ... SET informal_name = SPLIT_PART(TRIM(full_name), ' ', 1)"
+
+      - id: MP-08
+        description: "Member TypeScript interface includes informal_name: string | null"
+        status: PASSED
+        evidence:
+          - "src/types/database.ts:94 - informal_name: string | null"
+          - "Placed between full_name (line 93) and country_code (line 95)"
+
+      - id: MP-09
+        description: "CreateMemberInput includes optional informal_name"
+        status: PASSED
+        evidence:
+          - "src/types/database.ts:302 - informal_name?: string | null"
+          - "Optional field with ? modifier"
+
+      - id: MP-10
+        description: "Default informal_name = first name extracted from full_name"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:94 - informal_name: input.informal_name || input.full_name.split(' ')[0]"
+          - "When informal_name not provided or empty, extracts first word"
+          - "Migration backfill: SPLIT_PART(TRIM(full_name), ' ', 1) for existing records"
+
+      - id: MP-11
+        description: "{nome} placeholder resolves to informal_name with fallback to full_name"
+        status: PASSED
+        evidence:
+          - "src/components/InviteManagementSection.tsx:121 - speakerName: speech.speaker_informal_name || speech.speaker_name || ''"
+          - "src/components/InviteManagementSection.tsx:143 - speakerName: speech.speaker_informal_name || speech.speaker_name || ''"
+          - "Uses JavaScript || operator: if informal_name is null/empty, falls back to speaker_name"
+          - "Applied to both prayer templates (line 121) and speech templates (line 143)"
+
+      - id: MP-12
+        description: "CSV export includes informal_name column"
+        status: PASSED
+        evidence:
+          - "src/lib/csvUtils.ts:169 - header = `${h.name},${h.informalName},${h.phone}` (3 columns)"
+          - "src/lib/csvUtils.ts:172 - informalName = escapeCsvField(m.informal_name || m.full_name.split(' ')[0])"
+          - "src/lib/csvUtils.ts:174 - return `${name},${informalName},${fullPhone}` (3-column output)"
+
+      - id: MP-13
+        description: "CSV import handles 3-column format with informal_name"
+        status: PASSED
+        evidence:
+          - "src/lib/csvUtils.ts:75 - const hasThreeColumns = headerParts.length >= 3"
+          - "src/lib/csvUtils.ts:93-95 - if (hasThreeColumns): informalName = parts[1], fullPhone = parts[2]"
+          - "src/lib/csvUtils.ts:117 - members.push({ full_name: fullName, informal_name: informalName, phone: fullPhone })"
+
+      - id: MP-14
+        description: "CSV import is backward-compatible with 2-column format"
+        status: PASSED
+        evidence:
+          - "src/lib/csvUtils.ts:96-98 - else (2 columns): informalName = '', fullPhone = parts[1]"
+          - "src/lib/csvUtils.ts:108-110 - if (!informalName) informalName = fullName.split(' ')[0] (auto-compute)"
+          - "2-column CSV still works: name from col 1, phone from col 2, informal_name auto-generated"
+
+      - id: MP-15
+        description: "MemberEditor UI shows informal_name field"
+        status: PASSED
+        evidence:
+          - "src/app/(tabs)/settings/members.tsx:57 - const [informalName, setInformalName] = useState(member?.informal_name ?? '')"
+          - "src/app/(tabs)/settings/members.tsx:98-106 - TextInput for informalName between name and phone"
+          - "src/app/(tabs)/settings/members.tsx:102 - placeholder={t('members.informalNamePlaceholder')}"
+          - "src/app/(tabs)/settings/members.tsx:86-89 - onBlur auto-fill: setInformalName(fullName.trim().split(' ')[0])"
+
+      - id: MP-16
+        description: "import_members RPC handles informal_name"
+        status: PASSED
+        evidence:
+          - "supabase/migrations/023_add_informal_name.sql:35 - INSERT INTO members (ward_id, full_name, informal_name, country_code, phone)"
+          - "supabase/migrations/023_add_informal_name.sql:39-42 - COALESCE(NULLIF(TRIM(informal_name), ''), SPLIT_PART(TRIM(full_name), ' ', 1))"
+          - "When informal_name is empty/null, defaults to first word of full_name"
+
+      - id: MP-17
+        description: "i18n keys exist for informal_name in all 3 languages"
+        status: PASSED
+        evidence:
+          - "pt-BR.json:179 - csvHeaderInformalName: 'Nome Informal'"
+          - "pt-BR.json:191 - informalNamePlaceholder: 'Nome informal (ex: apelido ou primeiro nome)'"
+          - "en.json:179 - csvHeaderInformalName: 'Informal Name'"
+          - "en.json:191 - informalNamePlaceholder: 'Informal name (e.g. nickname or first name)'"
+          - "es.json:179 - csvHeaderInformalName: 'Nombre Informal'"
+          - "es.json:191 - informalNamePlaceholder: 'Nombre informal (ej: apodo o primer nombre)'"
+
+    # =========================================================================
+    # should_pass Results
+    # =========================================================================
+    should_pass_results:
+      - id: SP-04
+        description: "When member is created with full_name 'Maria Silva', informal_name defaults to 'Maria'"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:94 - informal_name: input.informal_name || input.full_name.split(' ')[0]"
+          - "'Maria Silva'.split(' ')[0] = 'Maria'"
+
+      - id: SP-05
+        description: "When informal_name is manually cleared, {nome} falls back to full_name in WhatsApp invite"
+        status: PASSED
+        evidence:
+          - "src/components/InviteManagementSection.tsx:121,143 - speech.speaker_informal_name || speech.speaker_name || ''"
+          - "When speaker_informal_name is null/empty, || operator falls back to speaker_name"
+
+      - id: SP-06
+        description: "WhatsApp invite for speech uses informal_name instead of full_name"
+        status: PASSED
+        evidence:
+          - "src/components/InviteManagementSection.tsx:143 - speakerName: speech.speaker_informal_name || speech.speaker_name || ''"
+          - "speaker_informal_name takes priority over speaker_name for {nome} in speech templates"
+
+      - id: SP-07
+        description: "WhatsApp invite for prayer uses informal_name instead of full_name"
+        status: PASSED
+        evidence:
+          - "src/components/InviteManagementSection.tsx:121 - speakerName: speech.speaker_informal_name || speech.speaker_name || ''"
+          - "Same fallback pattern for prayer templates"
+
+      - id: SP-08
+        description: "CSV round-trip preserves informal_name (export then import)"
+        status: PASSED
+        evidence:
+          - "Export: csvUtils.ts:172 - outputs informal_name in column 2"
+          - "Import: csvUtils.ts:93-95 - reads informal_name from column 2 (3-column format)"
+          - "Round-trip preserves the value through export->import cycle"
+
+      - id: SP-09
+        description: "Member list in settings shows both full_name and informal_name"
+        status: PASSED
+        evidence:
+          - "src/app/(tabs)/settings/members.tsx:244-245 - Text showing member.full_name"
+          - "src/app/(tabs)/settings/members.tsx:247-251 - Conditional render: {member.informal_name && <Text>...{member.informal_name}</Text>}"
+          - "src/app/(tabs)/settings/members.tsx:810-813 - memberInformalName style: fontSize: 13, fontStyle: 'italic'"
+
+    # =========================================================================
+    # Additional Checks (from SPEC acceptance criteria)
+    # =========================================================================
+    additional_checks:
+      - id: AC-173-02
+        description: "speeches table has speaker_informal_name column"
+        status: PASSED
+        evidence:
+          - "supabase/migrations/023_add_informal_name.sql:13 - ALTER TABLE public.speeches ADD COLUMN speaker_informal_name TEXT"
+          - "Backfill at lines 16-18: SET speaker_informal_name = SPLIT_PART(TRIM(speaker_name), ' ', 1)"
+
+      - id: AC-173-05
+        description: "Speech type includes speaker_informal_name"
+        status: PASSED
+        evidence:
+          - "src/types/database.ts:145 - speaker_informal_name: string | null"
+
+      - id: AC-173-07
+        description: "UpdateMemberInput includes informal_name"
+        status: PASSED
+        evidence:
+          - "src/types/database.ts:310 - informal_name?: string | null"
+
+      - id: AC-173-08
+        description: "useAssignSpeaker snapshots speaker_informal_name"
+        status: PASSED
+        evidence:
+          - "src/hooks/useSpeeches.ts:43 - speakerInformalName: string | null in AssignSpeakerInput"
+          - "src/hooks/useSpeeches.ts:254 - speaker_informal_name: input.speakerInformalName in update"
+
+      - id: AC-173-10
+        description: "useUpdateMember cascade includes speaker_informal_name (synergy with F172)"
+        status: PASSED
+        evidence:
+          - "src/hooks/useMembers.ts:147 - speaker_informal_name: data.informal_name || data.full_name.split(' ')[0]"
+          - "Cascade updates all three snapshot fields: speaker_name, speaker_phone, speaker_informal_name"
+
+      - id: AC-173-12
+        description: "MemberEditor auto-fills informal_name on blur of full_name"
+        status: PASSED
+        evidence:
+          - "src/app/(tabs)/settings/members.tsx:86-89 - onBlur(() => { if (!informalName.trim() && fullName.trim()) { setInformalName(fullName.trim().split(' ')[0]) } })"
+          - "Auto-fill only when informalName is empty - does not overwrite user input"
+
+      - id: callers-01
+        description: "All callers of assignSpeaker pass speakerInformalName"
+        status: PASSED
+        evidence:
+          - "src/app/(tabs)/speeches.tsx:253 - speakerInformalName: member.informal_name"
+          - "src/components/NextAssignmentsSection.tsx:101 - speakerInformalName: member.informal_name"
+          - "src/components/AgendaForm.tsx:654 - speakerInformalName: null (prayer from actor, no member)"
+
+      - id: unassign-01
+        description: "useRemoveAssignment clears speaker_informal_name"
+        status: PASSED
+        evidence:
+          - "src/hooks/useSpeeches.ts:366 - speaker_informal_name: null in the unassign update"
+          - "Clears all snapshot fields: member_id, speaker_name, speaker_informal_name, speaker_phone"
+
+    # =========================================================================
+    # Test Results
+    # =========================================================================
+    test_results:
+      file: "src/__tests__/batch31-phase2.test.ts"
+      tests_passed: 96
+      tests_total: 96
+      full_suite_passed: 7287
+      full_suite_total: 7295
+      full_suite_failed: 8
+      full_suite_failed_note: "8 pre-existing failures in batch15/batch23/batch25 unrelated to Batch 31"

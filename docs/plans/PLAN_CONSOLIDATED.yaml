@@ -7,10 +7,10 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-02"
-  version: 41
-  last_updated_by: "batch-31-secretary-permissions-topic-visibility"
+  version: 42
+  last_updated_by: "batch-31-phase-2-cascade-informal-name"
   total_phases: 6
-  total_cr_plans: 58
+  total_cr_plans: 59
   phases_completed: true
   cr_plans_completed: true
   pending_crs_without_plan: []
@@ -1177,6 +1177,32 @@ cr_plans:
       secretary), ADR-120 (decouple topic visibility from permissions). STEP-01 and
       STEP-02 parallelizaveis (independentes), STEP-03 depende de STEP-01 e STEP-02.
 
+  - id: PLAN_P053
+    title: "Batch 31 Phase 2: Cascade Member Data + Informal Name (CR-246/CR-247)"
+    status: pending
+    crs_covered: [246, 247]
+    total_steps: 10
+    plan_ref: "docs/plans/PLAN_P053.yaml"
+    summary: >
+      2 synergistic features: cascade member phone/name updates to future speeches
+      via useUpdateMember.onSuccess (F172/CR-246) and add informal_name field to
+      members with speaker_informal_name snapshot in speeches (F173/CR-247). F172
+      establishes cascade for speaker_name + speaker_phone; F173 extends it to also
+      propagate speaker_informal_name. Includes migration 023 (2 ALTER TABLE + backfill
+      + import_members RPC update), TypeScript types (Member, Speech, Create/UpdateMemberInput),
+      useSpeeches.ts (AssignSpeakerInput + snapshot + unassign clear), useMembers.ts
+      (async cascade + createMember informal_name), 3 callers (speeches.tsx,
+      NextAssignmentsSection, AgendaForm), MemberEditor UI (informalName field + auto-fill
+      on blur + MemberRow secondary display), CSV export/import (3-column with backwards
+      compatibility), WhatsApp {nome} resolution (speaker_informal_name || speaker_name),
+      i18n (2 keys in 3 locales). 2 features, 30 ACs, 11 ECs, 13 arquivos impactados
+      (1 novo migration + 12 modificados + 1 teste novo), 1 migracao SQL,
+      zero dependencias novas. 2 ADRs: ADR-121 (client-side cascade in onSuccess),
+      ADR-122 (snapshot speaker_informal_name). STEP-01/02/09 parallelizaveis,
+      STEP-03/04 dependem de STEP-02 (parallelizaveis entre si), STEP-05 depende
+      STEP-03, STEP-06 depende STEP-02+04, STEP-07/08 dependem STEP-02,
+      STEP-05/06/07/08/09 parallelizaveis entre si, STEP-10 depende de todos.
+
 # =============================================================================
 # CRs pendentes sem plano
 # =============================================================================
@@ -1638,6 +1664,12 @@ pending_with_plan:
   - cr_id: 244
     plan_id: PLAN_P052
     description: "Simplificar showTopicRow em SpeechSlot.tsx para mostrar topic row sempre que speech existe"
+  - cr_id: 246
+    plan_id: PLAN_P053
+    description: "Cascade member phone/name update para future speeches via useUpdateMember.onSuccess"
+  - cr_id: 247
+    plan_id: PLAN_P053
+    description: "Campo informal_name em members + speaker_informal_name snapshot em speeches + WhatsApp {nome} fallback"
 
 # =============================================================================
 # Convencoes de implementacao
@@ -1659,6 +1691,25 @@ conventions:
 # =============================================================================
 
 changelog:
+  - version: 42
+    phase: "batch-31-phase-2-cascade-informal-name"
+    changes:
+      - "Added PLAN_P053 for Batch 31 Phase 2 (F172-F173, CRs 246/247)"
+      - "2 synergistic features: cascade member data to future speeches, informal_name field for WhatsApp invites"
+      - "10 steps, 30 ACs, 11 ECs, 13 arquivos impactados (1 novo migration + 12 modificados + 1 teste)"
+      - "1 migracao SQL (023_add_informal_name.sql), zero dependencias novas"
+      - "2 ADRs: ADR-121 (client-side cascade in onSuccess instead of DB trigger), ADR-122 (snapshot speaker_informal_name instead of live lookup)"
+      - "F172 adds async cascade in useUpdateMember.onSuccess: speaker_name + speaker_phone + speaker_informal_name for future speeches (sunday_date >= today)"
+      - "F172 cascade is best-effort (try/catch), constructs fullPhone as country_code + phone, invalidates speechKeys.all"
+      - "F173 adds informal_name TEXT to members, speaker_informal_name TEXT to speeches, backfills with first word of name"
+      - "F173 extends useAssignSpeaker with speakerInformalName, useRemoveAssignment clears it to null"
+      - "F173 updates 3 callers (speeches.tsx, NextAssignmentsSection, AgendaForm) to pass speakerInformalName"
+      - "F173 MemberEditor: new field between name/phone, auto-fill on blur, MemberRow secondary display"
+      - "F173 CSV: 3-column export (Nome,Nome Informal,Telefone Completo), import supports 2-col legacy + 3-col new"
+      - "F173 WhatsApp: {nome} resolves to speaker_informal_name || speaker_name || ''"
+      - "F173 i18n: 2 new keys (informalName, informalNamePlaceholder) in 3 locales (pt-BR, en, es)"
+      - "F172+F173 synergy: cascade propagates all 3 snapshot fields (name, phone, informal_name) together"
+      - "STEP-01/02/09 parallelizaveis, STEP-03/04 dependem STEP-02, STEP-05/06/07/08 parallelizaveis apos dependencias, STEP-10 depende de todos"
   - version: 41
     phase: "batch-31-secretary-permissions-topic-visibility"
     changes:

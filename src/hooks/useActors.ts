@@ -22,28 +22,20 @@ export const actorKeys = {
 
 export type ActorRoleFilter =
   | 'all'
-  | 'can_preside'
-  | 'can_conduct'
-  | 'can_recognize'
-  | 'can_pianist'
-  | 'can_conductor';
+  | 'preside'
+  | 'conduct'
+  | 'recognize'
+  | 'pianist'
+  | 'conductor';
 
 // --- Utilities ---
-
-/**
- * Actor rules pass-through (no auto-enforce).
- * can_preside and can_conduct are independent flags.
- */
-export function enforceActorRules(input: CreateActorInput | UpdateActorInput): typeof input {
-  return input;
-}
 
 /**
  * Filter actors by role capability.
  */
 export function filterActorsByRole(actors: MeetingActor[], role: ActorRoleFilter): MeetingActor[] {
   if (role === 'all') return actors;
-  return actors.filter((a) => a[role]);
+  return actors.filter((a) => a.role === role);
 }
 
 /**
@@ -59,12 +51,7 @@ export function sortActors(actors: MeetingActor[]): MeetingActor[] {
  * Get the primary role key of an actor for activity logging.
  */
 function getPrimaryRole(actor: MeetingActor | CreateActorInput): string {
-  if (actor.can_preside) return 'can_preside';
-  if (actor.can_conduct) return 'can_conduct';
-  if (actor.can_pianist) return 'can_pianist';
-  if (actor.can_conductor) return 'can_conductor';
-  if (actor.can_recognize) return 'can_recognize';
-  return 'can_recognize';
+  return actor.role;
 }
 
 // --- Hooks ---
@@ -86,7 +73,7 @@ export function useActors(roleFilter: ActorRoleFilter = 'all') {
 
       // Apply server-side filter for specific roles
       if (roleFilter !== 'all') {
-        query = query.eq(roleFilter, true);
+        query = query.eq('role', roleFilter);
       }
 
       const { data, error } = await query;
@@ -104,17 +91,12 @@ export function useCreateActor() {
 
   return useMutation({
     mutationFn: async (input: CreateActorInput): Promise<MeetingActor> => {
-      const enforced = enforceActorRules(input);
       const { data, error } = await supabase
         .from('meeting_actors')
         .insert({
           ward_id: wardId,
-          name: enforced.name,
-          can_preside: enforced.can_preside ?? false,
-          can_conduct: enforced.can_conduct ?? false,
-          can_recognize: enforced.can_recognize ?? false,
-          can_pianist: enforced.can_pianist ?? false,
-          can_conductor: enforced.can_conductor ?? false,
+          name: input.name,
+          role: input.role,
         })
         .select()
         .single();
@@ -138,8 +120,7 @@ export function useUpdateActor() {
 
   return useMutation({
     mutationFn: async (input: UpdateActorInput): Promise<MeetingActor> => {
-      const enforced = enforceActorRules(input) as UpdateActorInput;
-      const { id, ...fields } = enforced;
+      const { id, ...fields } = input;
       const { data, error } = await supabase
         .from('meeting_actors')
         .update(fields)

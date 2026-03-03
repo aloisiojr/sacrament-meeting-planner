@@ -1,3 +1,13 @@
+<!-- ================================================================
+ARQUIVO HISTORICO - NAO USAR
+================================================================
+AGENTES: NAO leiam este arquivo. Ele e a versao final da especificacao
+original, anterior ao sistema de CRs. Toda informacao relevante e
+atualizada esta em docs/specs/SPEC_CONSOLIDATED.yaml.
+
+HUMANOS: Este arquivo serve apenas como referencia historica.
+================================================================ -->
+
 # SPEC.final — Gerenciador da Reuniao Sacramental
 
 **Data:** 14 de Fevereiro de 2026

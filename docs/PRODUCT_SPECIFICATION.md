@@ -1,6 +1,17 @@
-# Especificação de Produto: Gerenciador de Reunião Sacramental
+<!-- ================================================================
+ARQUIVO HISTORICO - NAO USAR
+================================================================
+AGENTES: NAO leiam este arquivo. Ele e a especificacao original do
+produto, anterior ao sistema de CRs. Toda informacao relevante e
+atualizada esta em docs/specs/SPEC_CONSOLIDATED.yaml.
 
-**Versão:** 1.0
+HUMANOS: Este arquivo serve apenas como referencia historica da
+especificacao inicial do projeto.
+================================================================ -->
+
+# Especificacao de Produto: Gerenciador de Reuniao Sacramental
+
+**Versao:** 1.0
 **Data:** 14 de Fevereiro de 2026
 **Autor:** Aloisio Almeida Jr
 

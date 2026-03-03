@@ -1,5 +1,5 @@
 /**
- * process-notifications: Supabase Edge Function (cron every 1 minute).
+ * process-notifications: Supabase Edge Function (cron every 5 minutes).
  * Processes pending notification_queue entries where send_after <= now().
  * Groups designation entries by (ward_id, sunday_date).
  * Sends via Expo Push API. Handles invalid tokens.

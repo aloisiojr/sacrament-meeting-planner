@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 2
+  version: 3
 
 change_requests:
   - cr: CR-251
@@ -132,6 +132,116 @@ change_requests:
           - src/__tests__/useHymns-utils.test.ts
         type: refactor
 
+  - cr: CR-253
+    spec: F041
+    phase: 3
+    description: "Permission model rework: prayer permissions and position-aware SpeechSlot"
+    commits:
+      - hash: f8c9c02
+        step: "STEP-01"
+        message: "feat(permissions): add prayer:assign/prayer:unassign and update secretary permissions (CR-253)"
+        files_changed:
+          - src/types/database.ts
+          - src/lib/permissions.ts
+        type: feat
+
+      - hash: 31f2cb7
+        step: "STEP-02"
+        message: "feat(SpeechSlot): make canAssign/canUnassign position-aware for prayer vs speech (CR-253)"
+        files_changed:
+          - src/components/SpeechSlot.tsx
+        type: feat
+
+      - hash: 3ba7280
+        step: "STEP-03"
+        message: "test(permissions): update permission matrix tests for prayer permissions and secretary changes (CR-253)"
+        files_changed:
+          - src/__tests__/permissions.test.ts
+        type: test
+
+      - hash: a4d6311
+        step: "STEP-11a"
+        message: "test(integration): update permissions-roles tests for secretary prayer permissions (CR-253)"
+        files_changed:
+          - src/__tests__/integration/permissions-roles.integration.test.ts
+        type: test
+
+  - cr: CR-255
+    spec: F042
+    phase: 3
+    description: "Actor single role enum: replace 5 boolean flags with single role TEXT field"
+    commits:
+      - hash: 5403ddf
+        step: "STEP-04"
+        message: "refactor(types): add ActorRole type and replace boolean flags with single role field (CR-255)"
+        files_changed:
+          - src/types/database.ts
+        type: refactor
+
+      - hash: 14f3b78
+        step: "STEP-05"
+        message: "refactor(useActors): replace boolean flags with single role field and remove enforceActorRules (CR-255)"
+        files_changed:
+          - src/hooks/useActors.ts
+        type: refactor
+
+      - hash: 6f30f03
+        step: "STEP-06"
+        message: "refactor(ActorSelector): use single role field in handleAdd (CR-255)"
+        files_changed:
+          - src/components/ActorSelector.tsx
+        type: refactor
+
+      - hash: bf7c770
+        step: "STEP-07"
+        message: "refactor(AgendaForm): update roleFilter values from can_X to direct role names (CR-255)"
+        files_changed:
+          - src/components/AgendaForm.tsx
+        type: refactor
+
+      - hash: 5aaeba3
+        step: "STEP-08"
+        message: "test(useActors): update tests for single role field and remove enforceActorRules tests (CR-255)"
+        files_changed:
+          - src/__tests__/useActors-utils.test.ts
+        type: test
+
+      - hash: e4aaa21
+        step: "STEP-09"
+        message: "feat(migration): add migration 025 to replace actor boolean flags with single role enum (CR-255)"
+        files_changed:
+          - supabase/migrations/025_actor_single_role.sql
+        type: feat
+
+      - hash: eeb4bb9
+        step: "STEP-11b"
+        message: "refactor(tests): update remaining actor boolean references to single role field (CR-255)"
+        files_changed:
+          - src/__tests__/database-types.test.ts
+          - src/lib/activityLog.ts
+          - src/__tests__/integration/setup-integration.ts
+          - src/__tests__/integration/hooks-supabase.integration.test.ts
+        type: refactor
+
+  - cr: "CR-253+CR-255"
+    phase: 3
+    description: "Phase 3 documentation"
+    commits:
+      - hash: 5a9eab9
+        step: "STEP-10"
+        message: "docs(phase-3): add Phase 3 architecture, spec, plan, and QA docs (CR-253, CR-255)"
+        files_changed:
+          - docs/specs/SPEC_CONSOLIDATED.yaml
+          - docs/arch/ARCH_CONSOLIDATED.yaml
+          - docs/plans/PLAN_CONSOLIDATED.yaml
+          - docs/arch/ARCH_M005.yaml
+          - docs/plans/PLAN_P003.yaml
+          - docs/specs/SPEC_F041.yaml
+          - docs/specs/SPEC_F042.yaml
+          - docs/qa/QA_PLAN_003.yaml
+          - .devteam/project-status.yaml
+        type: docs
+
 commits:
   - sha: 4a83fe8
     cr: CR-251
@@ -172,3 +282,39 @@ commits:
   - sha: bcaedfc
     cr: CR-249
     message: "refactor(i18n): update remaining old language codes in speechUtils and integration tests (CR-249)"
+  - sha: f8c9c02
+    cr: CR-253
+    message: "feat(permissions): add prayer:assign/prayer:unassign and update secretary permissions (CR-253)"
+  - sha: 31f2cb7
+    cr: CR-253
+    message: "feat(SpeechSlot): make canAssign/canUnassign position-aware for prayer vs speech (CR-253)"
+  - sha: 3ba7280
+    cr: CR-253
+    message: "test(permissions): update permission matrix tests for prayer permissions and secretary changes (CR-253)"
+  - sha: a4d6311
+    cr: CR-253
+    message: "test(integration): update permissions-roles tests for secretary prayer permissions (CR-253)"
+  - sha: 5403ddf
+    cr: CR-255
+    message: "refactor(types): add ActorRole type and replace boolean flags with single role field (CR-255)"
+  - sha: 14f3b78
+    cr: CR-255
+    message: "refactor(useActors): replace boolean flags with single role field and remove enforceActorRules (CR-255)"
+  - sha: 6f30f03
+    cr: CR-255
+    message: "refactor(ActorSelector): use single role field in handleAdd (CR-255)"
+  - sha: bf7c770
+    cr: CR-255
+    message: "refactor(AgendaForm): update roleFilter values from can_X to direct role names (CR-255)"
+  - sha: 5aaeba3
+    cr: CR-255
+    message: "test(useActors): update tests for single role field and remove enforceActorRules tests (CR-255)"
+  - sha: e4aaa21
+    cr: CR-255
+    message: "feat(migration): add migration 025 to replace actor boolean flags with single role enum (CR-255)"
+  - sha: 5a9eab9
+    cr: "CR-253+CR-255"
+    message: "docs(phase-3): add Phase 3 architecture, spec, plan, and QA docs (CR-253, CR-255)"
+  - sha: eeb4bb9
+    cr: CR-255
+    message: "refactor(tests): update remaining actor boolean references to single role field (CR-255)"

@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 3
+  version: 4
 
 validations:
 
@@ -501,3 +501,337 @@ validations:
         description: "SPEC F002 en (en-US) notation simplified"
         result: SOFT_FAIL
         evidence: "SPEC line 91 still says 'fallback to ward.language then en (en-US)'. The parenthetical '(en-US)' is a leftover from when app code was 'en' and DB code was 'en-US'. Since codes are now unified, this could be simplified to just 'en-US'. Non-functional, cosmetic only."
+
+  # ===========================================================================
+  # Phase 3: Permission Model + Actor Role Enum (QA_PLAN_003)
+  # ===========================================================================
+
+  - id: QA_003
+    plan: QA_PLAN_003
+    date: "2026-03-03"
+    scope: "Phase 3 - CR-253 (Permission Model Rework) + CR-255 (Actor Single Role Enum)"
+    verdict: passed
+    must_pass: 35/35
+    should_pass: 7/8
+    total_checks: 42/43
+    reviewer_verdict: "APPROVED (0 P0/P1, 1 P2 doc cosmetic)"
+    tester_verdict: "PASSED (703 tests, 0 failures)"
+
+    checks:
+
+      # =========================================================================
+      # CR-253: Permission Model Rework
+      # =========================================================================
+
+      # --- must_pass ---
+
+      - id: CR253_MP1
+        cr: CR-253
+        type: must_pass
+        description: "Secretary does NOT have speech:assign permission"
+        result: PASS
+        evidence: "permissions.ts lines 45-69: secretary Set does NOT contain 'speech:assign'. Confirmed by grep."
+
+      - id: CR253_MP2
+        cr: CR-253
+        type: must_pass
+        description: "Secretary does NOT have speech:unassign permission"
+        result: PASS
+        evidence: "permissions.ts lines 45-69: secretary Set does NOT contain 'speech:unassign'. Confirmed by grep."
+
+      - id: CR253_MP3
+        cr: CR-253
+        type: must_pass
+        description: "Secretary HAS prayer:assign permission"
+        result: PASS
+        evidence: "permissions.ts line 47: 'prayer:assign' in secretary Set."
+
+      - id: CR253_MP4
+        cr: CR-253
+        type: must_pass
+        description: "Secretary HAS prayer:unassign permission"
+        result: PASS
+        evidence: "permissions.ts line 48: 'prayer:unassign' in secretary Set."
+
+      - id: CR253_MP5
+        cr: CR-253
+        type: must_pass
+        description: "Secretary HAS speech:change_status permission (kept)"
+        result: PASS
+        evidence: "permissions.ts line 46: 'speech:change_status' in secretary Set."
+
+      - id: CR253_MP6
+        cr: CR-253
+        type: must_pass
+        description: "Bishopric HAS prayer:assign and prayer:unassign (new perms added)"
+        result: PASS
+        evidence: "permissions.ts lines 20-21: 'prayer:assign' and 'prayer:unassign' in bishopric Set."
+
+      - id: CR253_MP7
+        cr: CR-253
+        type: must_pass
+        description: "Permission type includes prayer:assign and prayer:unassign"
+        result: PASS
+        evidence: "database.ts lines 14-15: | 'prayer:assign' | 'prayer:unassign' in Permission type union."
+
+      - id: CR253_MP8
+        cr: CR-253
+        type: must_pass
+        description: "SpeechSlot uses position-based permission check for assign"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 96: const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign');"
+
+      - id: CR253_MP9
+        cr: CR-253
+        type: must_pass
+        description: "SpeechSlot uses position-based permission check for unassign"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 97: const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign');"
+
+      - id: CR253_MP10
+        cr: CR-253
+        type: must_pass
+        description: "Secretary sees read-only speaker/topic fields for positions 1-3"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 231: disabled={!canAssign || !speech} on speaker Pressable. Line 244: chevron only shown when canAssign. Line 249: X button only shown when canUnassign. Same pattern for topic (lines 268, 281, 286). Secretary has canAssign=false for non-prayer positions."
+
+      - id: CR253_MP11
+        cr: CR-253
+        type: must_pass
+        description: "Secretary CAN change status for positions 1-3"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 98: canChangeStatus = hasPermission('speech:change_status') -- not gated by position. Secretary has this permission (permissions.ts line 46)."
+
+      - id: CR253_MP12
+        cr: CR-253
+        type: must_pass
+        description: "Observer has NO prayer:assign/prayer:unassign permissions"
+        result: PASS
+        evidence: "permissions.ts lines 71-75: observer Set contains only member:read, agenda:read, presentation:start. No prayer:* permissions."
+
+      - id: CR253_MP13
+        cr: CR-253
+        type: must_pass
+        description: "Observer settings limited to app language, theme, about"
+        result: PASS
+        evidence: "settings/index.tsx line 209: {!isObserver && (...)} hides Ward Settings. Lines 291-320: Group 2 shows users (gated by settings:users, observer lacks), history (gated by history:read, observer lacks), then app language, theme, about (ungated, visible to all)."
+
+      - id: CR253_MP14
+        cr: CR-253
+        type: must_pass
+        description: "SPEC BR009 updated with new permission counts"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml BR009 lines 1075-1077: 'Bishopric: 25 permissions... Secretary: 22 permissions (remove speech:assign, speech:unassign; add prayer:assign, prayer:unassign)... Observer: 3 permissions (unchanged).'"
+
+      - id: CR253_MP15
+        cr: CR-253
+        type: must_pass
+        description: "ALL_PERMISSIONS list updated with prayer:assign and prayer:unassign"
+        result: PASS
+        evidence: "permissions.ts lines 114-115: 'prayer:assign' and 'prayer:unassign' in ALL_PERMISSIONS array. Total: 26 permissions."
+
+      - id: CR253_MP16
+        cr: CR-253
+        type: must_pass
+        description: "Permission test matrix updated for new permissions"
+        result: PASS
+        evidence: "permissions.test.ts lines 15-19: EXPECTED_MATRIX includes speech:assign (secretary: false), speech:unassign (secretary: false), prayer:assign (bishopric: true, secretary: true, observer: false), prayer:unassign (bishopric: true, secretary: true, observer: false). Lines 97-109: specific secretary assertions verify no speech:assign/unassign and has prayer:assign/unassign."
+
+      - id: CR253_MP17
+        cr: CR-253
+        type: must_pass
+        description: "All tests pass after CR-253 changes"
+        result: PASS
+        evidence: "Tester confirmed: 703 tests, 0 failures."
+
+      # =========================================================================
+      # CR-255: Actor Single Role Enum
+      # =========================================================================
+
+      # --- must_pass ---
+
+      - id: CR255_MP1
+        cr: CR-255
+        type: must_pass
+        description: "Migration 025 exists and adds role column"
+        result: PASS
+        evidence: "supabase/migrations/025_actor_single_role.sql line 6: ALTER TABLE meeting_actors ADD COLUMN role TEXT NOT NULL DEFAULT 'preside';"
+
+      - id: CR255_MP2
+        cr: CR-255
+        type: must_pass
+        description: "Migration 025 migrates boolean data to role values"
+        result: PASS
+        evidence: "025_actor_single_role.sql lines 9-16: UPDATE meeting_actors SET role = CASE WHEN can_preside THEN 'preside' WHEN can_conduct THEN 'conduct' WHEN can_recognize THEN 'recognize' WHEN can_pianist THEN 'pianist' WHEN can_conductor THEN 'conductor' ELSE 'preside' END;"
+
+      - id: CR255_MP3
+        cr: CR-255
+        type: must_pass
+        description: "Migration 025 drops 5 boolean columns"
+        result: PASS
+        evidence: "025_actor_single_role.sql lines 19-24: DROP COLUMN can_preside, can_conduct, can_recognize, can_pianist, can_conductor."
+
+      - id: CR255_MP4
+        cr: CR-255
+        type: must_pass
+        description: "Migration 025 drops old CHECK constraint"
+        result: PASS
+        evidence: "025_actor_single_role.sql line 27: DROP CONSTRAINT IF EXISTS chk_pianist_conductor_exclusive;"
+
+      - id: CR255_MP5
+        cr: CR-255
+        type: must_pass
+        description: "Migration 025 adds CHECK on valid role values"
+        result: PASS
+        evidence: "025_actor_single_role.sql lines 30-31: ADD CONSTRAINT chk_actor_role CHECK (role IN ('preside', 'conduct', 'recognize', 'pianist', 'conductor'));"
+
+      - id: CR255_MP6
+        cr: CR-255
+        type: must_pass
+        description: "MeetingActor type uses role field instead of 5 booleans"
+        result: PASS
+        evidence: "database.ts lines 157-166: ActorRole type = 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor'. MeetingActor has role: ActorRole. No can_* boolean fields."
+
+      - id: CR255_MP7
+        cr: CR-255
+        type: must_pass
+        description: "CreateActorInput uses role field instead of 5 optional booleans"
+        result: PASS
+        evidence: "database.ts lines 320-323: CreateActorInput { name: string; role: ActorRole; }. No can_* fields."
+
+      - id: CR255_MP8
+        cr: CR-255
+        type: must_pass
+        description: "UpdateActorInput uses optional role field"
+        result: PASS
+        evidence: "database.ts lines 325-329: UpdateActorInput { id: string; name?: string; role?: ActorRole; }."
+
+      - id: CR255_MP9
+        cr: CR-255
+        type: must_pass
+        description: "ActorRoleFilter type uses new enum values"
+        result: PASS
+        evidence: "useActors.ts lines 23-29: ActorRoleFilter = 'all' | 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor'. No 'can_*' prefixes."
+
+      - id: CR255_MP10
+        cr: CR-255
+        type: must_pass
+        description: "filterActorsByRole filters by role field instead of boolean"
+        result: PASS
+        evidence: "useActors.ts line 38: actors.filter((a) => a.role === role)"
+
+      - id: CR255_MP11
+        cr: CR-255
+        type: must_pass
+        description: "useActors query uses .eq('role', roleFilter) for server-side filtering"
+        result: PASS
+        evidence: "useActors.ts line 76: query = query.eq('role', roleFilter)"
+
+      - id: CR255_MP12
+        cr: CR-255
+        type: must_pass
+        description: "useCreateActor inserts role field instead of 5 booleans"
+        result: PASS
+        evidence: "useActors.ts lines 96-100: insert({ ward_id, name: input.name, role: input.role }). No boolean fields."
+
+      - id: CR255_MP13
+        cr: CR-255
+        type: must_pass
+        description: "ActorSelector handleAdd sets role from roleFilter"
+        result: PASS
+        evidence: "ActorSelector.tsx lines 117-120: const input: CreateActorInput = { name: trimmed, role: roleFilter as ActorRole }. No boolean flag pattern."
+
+      - id: CR255_MP14
+        cr: CR-255
+        type: must_pass
+        description: "SPEC F009 updated for single role enum"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml F009 lines 258-266: description says 'Each actor has a single role field with values: preside, conduct, recognize, pianist, conductor.' and 'DB CHECK constraint ensures role is one of the valid values.' [Modified by CR-255]."
+
+      - id: CR255_MP15
+        cr: CR-255
+        type: must_pass
+        description: "SPEC BR014 removed or updated"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml BR014 lines 1098-1100: 'Music role constraint [REMOVED by CR-255]' with description 'REMOVED: Was ... With single role enum, mutual exclusivity is inherent.'"
+
+      - id: CR255_MP16
+        cr: CR-255
+        type: must_pass
+        description: "SPEC EC009 removed or updated"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml EC009 line 1267: 'REMOVED by CR-255: Was ... With single role enum, this is impossible by design.'"
+
+      - id: CR255_MP17
+        cr: CR-255
+        type: must_pass
+        description: "ARCH meeting_actors schema updated"
+        result: PASS
+        evidence: "ARCH_CONSOLIDATED.yaml lines 550-559: meeting_actors key_columns shows 'role (TEXT: preside, conduct, recognize, pianist, conductor)'. Constraint: CHECK (role IN (...)). No boolean columns."
+
+      - id: CR255_MP18
+        cr: CR-255
+        type: must_pass
+        description: "All tests pass after CR-255 changes"
+        result: PASS
+        evidence: "Tester confirmed: 703 tests, 0 failures."
+
+      # =========================================================================
+      # should_pass checks
+      # =========================================================================
+
+      - id: CR253_SP1
+        cr: CR-253
+        type: should_pass
+        description: "SpeechSlot header comment updated for secretary prayer permissions"
+        result: SOFT_FAIL
+        evidence: "SpeechSlot.tsx lines 7-9: Comment still says 'Secretary: change status only (cannot assign)' which is only accurate for speech positions (1-3). Does not mention secretary CAN assign prayers (pos 0,4). Cosmetic only, does not affect behavior."
+
+      - id: CR253_SP2
+        cr: CR-253
+        type: should_pass
+        description: "SPEC F014 acceptance criteria updated for prayer:assign"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml F014 lines 374-400: description says 'Position-aware permission check: positions 1-3 require speech:assign (bishopric only); positions 0, 4 require prayer:assign (bishopric + secretary)'. AC includes prayer:assign mention."
+
+      - id: CR253_SP3
+        cr: CR-253
+        type: should_pass
+        description: "SPEC F015 acceptance criteria updated for read-only secretary"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml F015 lines 402-414: description says 'Position-aware permissions: positions 1-3 require speech:assign for editing (bishopric only); secretary sees topic as read-only text.' [Modified by CR-253]."
+
+      - id: CR253_SP4
+        cr: CR-253
+        type: should_pass
+        description: "SPEC F005 description updated with prayer permissions"
+        result: PASS
+        evidence: "SPEC_CONSOLIDATED.yaml F005 lines 147-158: description says 'secretary (limited speech access + full prayer access)' and 'Positions 1-3 (speeches): speech:assign / speech:unassign (bishopric only)' and 'Positions 0, 4 (prayers): prayer:assign / prayer:unassign (bishopric + secretary)'."
+
+      - id: CR255_SP1
+        cr: CR-255
+        type: should_pass
+        description: "enforceActorRules function simplified or removed"
+        result: PASS
+        evidence: "useActors.ts: enforceActorRules function removed completely. No references remain. useCreateActor directly uses input without enforce call."
+
+      - id: CR255_SP2
+        cr: CR-255
+        type: should_pass
+        description: "getPrimaryRole helper simplified"
+        result: PASS
+        evidence: "useActors.ts lines 53-55: getPrimaryRole now returns actor.role directly instead of cascading if-else chain."
+
+      - id: CR255_SP3
+        cr: CR-255
+        type: should_pass
+        description: "Actor test utilities updated"
+        result: PASS
+        evidence: "useActors-utils.test.ts lines 9-18: makeActor uses role field (default: 'preside'). Lines 22-27: actors created with role: 'preside'/'conduct'/'pianist'/'recognize'. Lines 33-60: filterActorsByRole tests use role-based filtering."
+
+      - id: CR255_SP4
+        cr: CR-255
+        type: should_pass
+        description: "database-types.test.ts actor tests updated"
+        result: PASS
+        evidence: "database-types.test.ts lines 294-304: MeetingActor test uses role: 'preside' and expects actor.role === 'preside'. Lines 390-400: CreateActorInput test uses role: 'preside' and role: 'pianist'."

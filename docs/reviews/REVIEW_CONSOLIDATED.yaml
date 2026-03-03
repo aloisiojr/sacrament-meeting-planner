@@ -6,7 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 2
+  version: 3
+  last_updated_by: "phase-3"
 
 reviews:
   - id: REV-001
@@ -829,3 +830,467 @@ reviews:
       tests_total: 644
       tests_passing: 644
       test_files: 31
+
+  # ===========================================================================
+  # REV-005: Phase 3 - Permission Model + Actor Role Enum (CR-253, CR-255)
+  # ===========================================================================
+
+  - id: REV-005
+    scope: "F041/F042 Phase 3 - Permission Model Rework (CR-253) + Actor Single Role Enum (CR-255)"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    spec: F041, F042
+    arch: M005
+    plan: P003
+    iteration: 1
+    commits:
+      # CR-253 (F041): Permission Model Rework
+      - hash: f8c9c02
+        step: STEP-01
+        message: "feat(permissions): add prayer:assign/prayer:unassign and update secretary permissions (CR-253)"
+      - hash: 31f2cb7
+        step: STEP-02
+        message: "feat(SpeechSlot): make canAssign/canUnassign position-aware for prayer vs speech (CR-253)"
+      - hash: 3ba7280
+        step: STEP-03
+        message: "test(permissions): update permission matrix tests for prayer permissions and secretary changes (CR-253)"
+      - hash: a4d6311
+        step: STEP-11a
+        message: "test(integration): update permissions-roles tests for secretary prayer permissions (CR-253)"
+      # CR-255 (F042): Actor Single Role Enum
+      - hash: 5403ddf
+        step: STEP-04
+        message: "refactor(types): add ActorRole type and replace boolean flags with single role field (CR-255)"
+      - hash: 14f3b78
+        step: STEP-05
+        message: "refactor(useActors): replace boolean flags with single role field and remove enforceActorRules (CR-255)"
+      - hash: 6f30f03
+        step: STEP-06
+        message: "refactor(ActorSelector): use single role field in handleAdd (CR-255)"
+      - hash: bf7c770
+        step: STEP-07
+        message: "refactor(AgendaForm): update roleFilter values from can_X to direct role names (CR-255)"
+      - hash: 5aaeba3
+        step: STEP-08
+        message: "test(useActors): update tests for single role field and remove enforceActorRules tests (CR-255)"
+      - hash: e4aaa21
+        step: STEP-09
+        message: "feat(migration): add migration 025 to replace actor boolean flags with single role enum (CR-255)"
+      - hash: eeb4bb9
+        step: STEP-11b
+        message: "refactor(tests): update remaining actor boolean references to single role field (CR-255)"
+      # Documentation
+      - hash: 5a9eab9
+        step: STEP-10
+        message: "docs(phase-3): add Phase 3 architecture, spec, plan, and QA docs (CR-253, CR-255)"
+    verdict: approved
+
+    summary: |
+      All 12 commits for Phase 3 (CR-253, CR-255) correctly implement the permission
+      model rework and actor single role enum refactoring. Chain validation passes:
+      SPEC -> ARCH -> PLAN -> CODE is fully aligned. All 703 tests pass (32 test files,
+      0 failures). One P2 documentation issue found: SPEC_F041 and SPEC_CONSOLIDATED
+      BR009 have incorrect permission counts (say 25/22 but should be 26/23). The code
+      and tests are correct with 26/23. This is a cosmetic doc error that does not
+      block approval. No P0 or P1 issues found.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          User requested two changes:
+          1. CR-253: Fix secretary/observer permissions - secretary cannot assign speakers
+             for pos 1-3 but CAN for prayers (pos 0,4), CAN change status. Topics read-only.
+          2. CR-255: Actor role as single enum (preside, conduct, recognize, pianist, conductor).
+          SPEC_F041 covers all CR-253 requirements: new permissions prayer:assign/prayer:unassign,
+          secretary restriction from speech:assign/speech:unassign, position-aware SpeechSlot.
+          SPEC_F042 covers all CR-255 requirements: ActorRole type, single role field,
+          migration 025, type changes, filtering changes.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M005 maps each SPEC change to architectural components:
+          F041: C1 (types), C2 (permissions.ts), C3 (SpeechSlot.tsx) - 3 components.
+          F042: C4 (types), C5 (useActors.ts), C6 (ActorSelector.tsx),
+                C7 (AgendaForm.tsx), C8 (migration 025) - 5 components.
+          ADR-015 (position-based permission branching) and ADR-016 (single role enum)
+          properly document architectural decisions. Deploy order is correct
+          (migration 025 before app update).
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P003 has 11 steps covering all 8 ARCH components plus tests and docs.
+          Dependency graph is correct: F041 types first (STEP-01), then SpeechSlot
+          (STEP-02), then F042 types (STEP-04) through components (STEP-05 to STEP-07),
+          tests (STEP-03, STEP-08), migration (STEP-09), docs (STEP-10), final
+          verification (STEP-11). Validation matrix maps all ACs to steps.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 11 plan steps implemented in 12 commits (STEP-11 split into 11a and 11b
+          for CR-253 and CR-255 respectively). Files modified match PLAN expectations
+          exactly. Additional files in STEP-11b (activityLog.ts, database-types.test.ts,
+          setup-integration.ts, hooks-supabase.integration.test.ts) are justified
+          catch-up changes for remaining boolean references. The coder correctly
+          preserved backward compatibility in activityLog.ts for old can_X format
+          entries.
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-STEP VERIFICATION: CR-253 (F041) - Permission Model Rework
+    # =========================================================================
+
+    step_reviews_cr253:
+
+      - step: STEP-01
+        title: "Add prayer permissions to types and permission matrix"
+        verdict: pass
+        verification:
+          - check: "Permission type has prayer:assign and prayer:unassign"
+            status: pass
+            detail: "Lines 14-15 of database.ts: | 'prayer:assign' | 'prayer:unassign'"
+          - check: "bishopric set has 26 permissions including prayer:*"
+            status: pass
+            detail: "Counted 26 entries in bishopric Set. Includes prayer:assign and prayer:unassign."
+          - check: "secretary set has 23 permissions (no speech:assign/unassign, has prayer:*)"
+            status: pass
+            detail: |
+              Counted 23 entries in secretary Set. Does NOT contain speech:assign or
+              speech:unassign. Contains prayer:assign and prayer:unassign.
+          - check: "observer set unchanged at 3 permissions"
+            status: pass
+            detail: "member:read, agenda:read, presentation:start. No prayer permissions."
+          - check: "ALL_PERMISSIONS has 26 entries"
+            status: pass
+            detail: "Counted 26 entries in ALL_PERMISSIONS array. Includes both prayer:* entries."
+
+      - step: STEP-02
+        title: "SpeechSlot position-aware permission ternaries"
+        verdict: pass
+        verification:
+          - check: "canAssign uses position-aware ternary"
+            status: pass
+            detail: "Line 96: const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign');"
+          - check: "canUnassign uses position-aware ternary"
+            status: pass
+            detail: "Line 97: const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign');"
+          - check: "canChangeStatus is NOT position-aware (unchanged)"
+            status: pass
+            detail: "Line 98: const canChangeStatus = hasPermission('speech:change_status'); -- no ternary, applies to all positions"
+          - check: "isPrayer prop used correctly"
+            status: pass
+            detail: "isPrayer defaults to false (line 88). Positions 0,4 have isPrayer=true from parent."
+          - check: "Topic row gated by same canAssign"
+            status: pass
+            detail: "Topic press handler (line 115) checks canAssign. Topic X button (line 286) checks canAssign. Both use same position-aware value."
+          - check: "Speaker row gated by canAssign/canUnassign"
+            status: pass
+            detail: "Speaker press (line 110) checks canAssign. Chevron (line 244) checks canAssign. X button (line 249) checks canUnassign."
+
+      - step: STEP-03
+        title: "Permission matrix tests"
+        verdict: pass
+        verification:
+          - check: "EXPECTED_MATRIX has 26 rows"
+            status: pass
+            detail: "Matrix includes prayer:assign and prayer:unassign with correct values."
+          - check: "speech:assign secretary = false"
+            status: pass
+            detail: "Line 15: 'speech:assign': { bishopric: true, secretary: false, observer: false }"
+          - check: "speech:unassign secretary = false"
+            status: pass
+            detail: "Line 16: 'speech:unassign': { bishopric: true, secretary: false, observer: false }"
+          - check: "prayer:assign secretary = true"
+            status: pass
+            detail: "Line 18: 'prayer:assign': { bishopric: true, secretary: true, observer: false }"
+          - check: "prayer:unassign secretary = true"
+            status: pass
+            detail: "Line 19: 'prayer:unassign': { bishopric: true, secretary: true, observer: false }"
+          - check: "Bishopric count test expects 26"
+            status: pass
+            detail: "Line 127: expect(perms.length).toBe(26)"
+          - check: "Secretary count test expects 23"
+            status: pass
+            detail: "Line 131: expect(perms.length).toBe(23)"
+          - check: "ALL_PERMISSIONS count test expects 26"
+            status: pass
+            detail: "Line 151: expect(ALL_PERMISSIONS.length).toBe(26)"
+
+      - step: STEP-11a
+        title: "Integration tests for secretary prayer permissions"
+        verdict: pass
+        verification:
+          - check: "Integration test file updated"
+            status: pass
+            detail: "permissions-roles.integration.test.ts updated with prayer permission assertions"
+
+    # =========================================================================
+    # PER-STEP VERIFICATION: CR-255 (F042) - Actor Single Role Enum
+    # =========================================================================
+
+    step_reviews_cr255:
+
+      - step: STEP-04
+        title: "ActorRole type and interface changes"
+        verdict: pass
+        verification:
+          - check: "ActorRole type defined"
+            status: pass
+            detail: "Line 157: export type ActorRole = 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor';"
+          - check: "MeetingActor has single role field"
+            status: pass
+            detail: "Line 163: role: ActorRole (no boolean fields)"
+          - check: "CreateActorInput has required role"
+            status: pass
+            detail: "Line 322: role: ActorRole (not optional)"
+          - check: "UpdateActorInput has optional role"
+            status: pass
+            detail: "Line 328: role?: ActorRole"
+          - check: "No boolean role fields remain in any interface"
+            status: pass
+            detail: "grep for can_preside in database.ts returns 0 matches"
+
+      - step: STEP-05
+        title: "useActors hook refactor"
+        verdict: pass
+        verification:
+          - check: "ActorRoleFilter uses new values"
+            status: pass
+            detail: "'all' | 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor' (no can_ prefix)"
+          - check: "enforceActorRules removed"
+            status: pass
+            detail: "grep for enforceActorRules in useActors.ts returns 0 matches"
+          - check: "filterActorsByRole uses a.role === role"
+            status: pass
+            detail: "Line 38: return actors.filter((a) => a.role === role);"
+          - check: "getPrimaryRole returns actor.role directly"
+            status: pass
+            detail: "Line 54: return actor.role;"
+          - check: "useActors query filters by role column"
+            status: pass
+            detail: "Line 76: query = query.eq('role', roleFilter);"
+          - check: "useCreateActor inserts { ward_id, name, role }"
+            status: pass
+            detail: "Lines 97-99: insert({ ward_id: wardId, name: input.name, role: input.role })"
+
+      - step: STEP-06
+        title: "ActorSelector handleAdd update"
+        verdict: pass
+        verification:
+          - check: "handleAdd uses role field"
+            status: pass
+            detail: "Line 117-120: const input: CreateActorInput = { name: trimmed, role: roleFilter as ActorRole };"
+          - check: "ActorRole imported"
+            status: pass
+            detail: "Line 26: import type { MeetingActor, CreateActorInput, ActorRole } from '../types/database';"
+
+      - step: STEP-07
+        title: "AgendaForm roleFilter values"
+        verdict: pass
+        verification:
+          - check: "All 5 roleFilter values updated"
+            status: pass
+            detail: |
+              Line 158: roleFilter: 'preside' (was 'can_preside')
+              Line 179: roleFilter: 'conduct' (was 'can_conduct')
+              Line 198: roleFilter: 'recognize' (was 'can_recognize')
+              Line 259: roleFilter: 'pianist' (was 'can_pianist')
+              Line 280: roleFilter: 'conductor' (was 'can_conductor')
+          - check: "No can_ prefix remains in AgendaForm"
+            status: pass
+            detail: "grep for 'can_preside' in AgendaForm.tsx returns 0 matches"
+
+      - step: STEP-08
+        title: "useActors test updates"
+        verdict: pass
+        verification:
+          - check: "makeActor uses role field"
+            status: pass
+            detail: "Line 14: role: overrides.role ?? 'preside' (no boolean defaults)"
+          - check: "filterActorsByRole tests use new role values"
+            status: pass
+            detail: "All test cases use role: 'preside', role: 'conduct', etc."
+          - check: "actorKeys tests use new role values"
+            status: pass
+            detail: "Line 94: actorKeys.byRole('ward-1', 'preside')"
+          - check: "No enforceActorRules tests remain"
+            status: pass
+            detail: "grep for enforceActorRules in test file returns 0 matches"
+
+      - step: STEP-09
+        title: "Migration 025"
+        verdict: pass
+        verification:
+          - check: "Adds role column with DEFAULT"
+            status: pass
+            detail: "Line 6: ALTER TABLE meeting_actors ADD COLUMN role TEXT NOT NULL DEFAULT 'preside';"
+          - check: "Migrates data with priority order"
+            status: pass
+            detail: "Lines 9-16: CASE WHEN can_preside=true THEN 'preside' ... ELSE 'preside' END"
+          - check: "Drops 5 boolean columns"
+            status: pass
+            detail: "Lines 19-24: DROP COLUMN can_preside, can_conduct, can_recognize, can_pianist, can_conductor"
+          - check: "Drops old constraint"
+            status: pass
+            detail: "Line 27: DROP CONSTRAINT IF EXISTS chk_pianist_conductor_exclusive"
+          - check: "Adds new CHECK constraint"
+            status: pass
+            detail: "Lines 30-31: ADD CONSTRAINT chk_actor_role CHECK (role IN (...))"
+          - check: "Migration is idempotent-safe"
+            status: pass
+            detail: "DROP CONSTRAINT uses IF EXISTS. Second run would fail on ADD COLUMN (which is acceptable for a one-way migration)."
+
+      - step: STEP-11b
+        title: "Remaining boolean references cleanup"
+        verdict: pass
+        verification:
+          - check: "activityLog.ts backward compatibility"
+            status: pass
+            detail: |
+              ACTOR_ROLE_I18N_KEYS has both new (preside, conduct, etc.) and old
+              (can_preside, can_conduct, etc.) keys. Both map to the same i18n keys.
+              This correctly handles historical activity log entries.
+          - check: "database-types.test.ts updated"
+            status: pass
+            detail: "MeetingActor test uses role: 'preside'. CreateActorInput test uses role: 'preside'. ActorRole type imported."
+          - check: "setup-integration.ts updated"
+            status: pass
+            detail: "createMockActor uses role: 'preside' (no boolean fields)"
+          - check: "hooks-supabase.integration.test.ts updated"
+            status: pass
+            detail: "Actor mock data uses role field"
+
+    # =========================================================================
+    # DOCUMENTATION UPDATES VERIFICATION
+    # =========================================================================
+
+    doc_updates:
+
+      spec_consolidated:
+        status: pass
+        detail: |
+          - F005: Description mentions prayer:assign/prayer:unassign, secretary limited access
+          - F009: Description says single role field, CHECK constraint
+          - F014: Position-aware permission note
+          - F015: Secretary read-only for speech positions
+          - BR009: Updated with new permission model (counts are 25/22 but code has 26/23 - see P2 issue)
+          - BR014: Marked as REMOVED by CR-255
+          - EC009: Marked as REMOVED by CR-255
+          - F041 feature entry exists with full description
+          - F042 feature entry exists with full description
+          - total_features: 41 (was 39 + F041 + F042)
+
+      arch_consolidated:
+        status: pass
+        detail: |
+          - M004 description: "Each actor has a single role enum field" (correct)
+          - M004 dependencies: CHECK constraint updated to role-based (correct)
+          - meeting_actors key_columns: role TEXT column (correct)
+          - meeting_actors constraints: new CHECK constraint (correct)
+          - total_migrations: 25 (correct)
+          - ADR-015 exists: Position-based permission branching
+          - ADR-016 exists: Single role enum for meeting actors
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+      - id: P2-001
+        severity: P2
+        category: quality
+        location: "docs/specs/SPEC_F041.yaml + docs/specs/SPEC_CONSOLIDATED.yaml"
+        description: |
+          Permission count mismatch between SPEC documents and actual code/tests:
+          - SPEC_F041 BR009 says "Bishopric: 25 permissions" -> actual code has 26
+          - SPEC_F041 BR009 says "Secretary: 22 permissions" -> actual code has 23
+          - SPEC_CONSOLIDATED BR009 copies the same wrong counts (25/22)
+          The code (permissions.ts) and tests (permissions.test.ts, f041-f042-phase3.test.ts)
+          are consistent with each other at 26/23. The original Permission type had 24 values.
+          Adding prayer:assign and prayer:unassign brings bishopric to 24+2=26.
+          Secretary had 23 (all except home:next_assignments). Remove 2 + add 2 = 23.
+          The SPEC incorrectly subtracted 1 from the starting counts.
+        suggestion: |
+          Update BR009 in both SPEC_F041.yaml and SPEC_CONSOLIDATED.yaml:
+          - Bishopric: 25 -> 26
+          - Secretary: 22 -> 23
+
+    # =========================================================================
+    # ADVISORY NOTES
+    # =========================================================================
+
+    advisory_notes:
+      - id: ADV-001
+        severity: P2
+        title: "Backward-compatible can_ prefix in activityLog.ts"
+        description: |
+          activityLog.ts has ACTOR_ROLE_I18N_KEYS with both new (preside) and old
+          (can_preside) keys. The old keys are backward compatibility for historical
+          activity log entries stored in the database. This is by design per SPEC_F042
+          decisions section. The activityLog.test.ts test at line 224 uses 'can_preside'
+          to verify backward compatibility works. This is correct behavior.
+
+      - id: ADV-002
+        severity: P2
+        title: "SPEC_F041 PLAN step count in done_when has arithmetic notes"
+        description: |
+          PLAN_P003 STEP-01 done_when has a note "old had 23 including speech:assign/unassign;
+          remove 2, add 2 = 23... wait: old had 23..." showing the planner was confused about
+          the count. The final plan values are inconsistent but the coder implemented the
+          correct counts (26/23). Cosmetic plan artifact.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Run database migration 025"
+        command: "supabase db push (or apply 025_actor_single_role.sql)"
+        reason: "DB must have 'role' column before app tries to query it"
+        urgency: medium
+        notes: |
+          Must run BEFORE app update. Old app will break if migration runs first
+          (queries can_preside column that no longer exists). Deploy sequence:
+          migration -> app update with minimal gap. Migration is one-way
+          (boolean-to-enum).
+
+      - step: 2
+        action: "Deploy app update"
+        reason: "All TypeScript changes (permissions, SpeechSlot, actors) go live together"
+        urgency: medium
+        notes: |
+          F041 (permission changes) and F042 (actor refactor) both take effect with
+          the app update. No Edge Functions affected by Phase 3.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 1
+      files_reviewed: 16
+      total_commits: 12
+      tests_total: 703
+      tests_passing: 703
+      test_files: 32

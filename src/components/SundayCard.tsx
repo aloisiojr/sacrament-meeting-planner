@@ -58,6 +58,8 @@ export interface SundayCardProps {
   onDeleteSpeeches?: (date: string, positions?: number[]) => void;
   /** Whether type dropdown is disabled (Observer). */
   typeDisabled?: boolean;
+  /** Whether to show the expand/collapse chevron. Default true. */
+  showChevron?: boolean;
   /** Optional render function for right side of header (e.g., pencil button). */
   renderHeaderRight?: () => React.ReactNode;
   /** Children to render when expanded (speech slots, etc.). */
@@ -400,6 +402,7 @@ export const SundayCard = React.memo(function SundayCard({
   onRemoveException,
   onDeleteSpeeches,
   typeDisabled = false,
+  showChevron = true,
   renderHeaderRight,
   children,
 }: SundayCardProps) {
@@ -450,7 +453,7 @@ export const SundayCard = React.memo(function SundayCard({
       {/* Header */}
       <Pressable
         style={styles.header}
-        onPress={onToggle}
+        onPress={showChevron ? onToggle : undefined}
         accessibilityRole="button"
         accessibilityLabel={`Sunday ${formatDate(date, locale)}`}
         accessibilityState={{ expanded }}

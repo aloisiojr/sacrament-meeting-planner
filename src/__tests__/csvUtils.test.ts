@@ -6,8 +6,8 @@ import {
 } from '../lib/csvUtils';
 
 describe('parseCsv', () => {
-  it('parses a valid CSV with header and data', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,+5511999999999\nMaria Santos,+5521888888888';
+  it('parses a valid 3-column CSV with header and data', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,+5511999999999\nMaria Santos,Maria,+5521888888888';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(2);
@@ -15,8 +15,15 @@ describe('parseCsv', () => {
     expect(result.members[1]).toEqual({ full_name: 'Maria Santos', informal_name: 'Maria', phone: '+5521888888888' });
   });
 
+  it('rejects 2-column CSV (requires 3 columns)', () => {
+    const csv = 'Nome,Telefone Completo\nJoao Silva,+5511999999999';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(false);
+    expect(result.errors[0].code).toBe('INVALID_HEADER');
+  });
+
   it('handles UTF-8 BOM prefix', () => {
-    const csv = '\uFEFFNome,Telefone Completo\nJoao Silva,+5511999999999';
+    const csv = '\uFEFFNome,Nome Informal,Telefone Completo\nJoao Silva,Joao,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(1);
@@ -24,7 +31,7 @@ describe('parseCsv', () => {
   });
 
   it('handles empty phone numbers', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,';
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members[0]).toEqual({ full_name: 'Joao Silva', informal_name: 'Joao', phone: '' });
@@ -37,51 +44,58 @@ describe('parseCsv', () => {
   });
 
   it('rejects CSV with only header', () => {
-    const csv = 'Nome,Telefone Completo';
+    const csv = 'Nome,Nome Informal,Telefone Completo';
     const result = parseCsv(csv);
     expect(result.success).toBe(false);
   });
 
   it('accepts phone without + prefix', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,11999999999';
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,11999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members[0].phone).toBe('11999999999');
   });
 
   it('accepts duplicate phone numbers', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,+5511999999999\nMaria Santos,+5511999999999';
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,+5511999999999\nMaria Santos,Maria,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(2);
   });
 
   it('rejects rows without name', () => {
-    const csv = 'Nome,Telefone Completo\n,+5511999999999';
+    const csv = 'Nome,Nome Informal,Telefone Completo\n,,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(false);
     expect(result.errors[0].field).toBe('Nome');
   });
 
   it('handles quoted fields with commas', () => {
-    const csv = 'Nome,Telefone Completo\n"Silva, Joao",+5511999999999';
+    const csv = 'Nome,Nome Informal,Telefone Completo\n"Silva, Joao",Joao,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members[0].full_name).toBe('Silva, Joao');
   });
 
   it('skips empty lines', () => {
-    const csv = 'Nome,Telefone Completo\nJoao Silva,+5511999999999\n\nMaria Santos,+5521888888888';
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,+5511999999999\n\nMaria Santos,Maria,+5521888888888';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(2);
   });
 
   it('handles Windows-style line endings', () => {
-    const csv = 'Nome,Telefone Completo\r\nJoao Silva,+5511999999999';
+    const csv = 'Nome,Nome Informal,Telefone Completo\r\nJoao Silva,Joao,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(1);
+  });
+
+  it('defaults informal name to first word of full name when empty', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Carlos Silva,,+5511999999999';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(true);
+    expect(result.members[0].informal_name).toBe('Joao');
   });
 });
 

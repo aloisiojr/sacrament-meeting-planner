@@ -46,7 +46,7 @@ export interface CsvParseResult {
 
 /**
  * Parse a CSV string into an array of CsvMember.
- * Supports 2-column (Name, Phone) or 3-column (Name, Informal Name, Phone) formats.
+ * Requires 3-column format: Name, Informal Name, Phone.
  * Phone format: +xxyyyyyyyy (country code + number)
  */
 export function parseCsv(csvContent: string): CsvParseResult {
@@ -67,12 +67,10 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const header = lines[0].trim();
   const headerParts = header.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
 
-  if (headerParts.length < 2) {
-    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 2 columns: Nome, Telefone Completo', code: 'INVALID_HEADER' });
+  if (headerParts.length < 3) {
+    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 3 columns: Nome, Nome Informal, Telefone Completo', code: 'INVALID_HEADER' });
     return { success: false, members: [], errors };
   }
-
-  const hasThreeColumns = headerParts.length >= 3;
 
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
@@ -81,22 +79,14 @@ export function parseCsv(csvContent: string): CsvParseResult {
 
     const parts = parseCsvLine(line);
 
-    if (parts.length < 2) {
-      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 2 columns', code: 'INSUFFICIENT_COLUMNS' });
+    if (parts.length < 3) {
+      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 3 columns', code: 'INSUFFICIENT_COLUMNS' });
       continue;
     }
 
     const fullName = parts[0].trim();
-    let informalName: string;
-    let fullPhone: string;
-
-    if (hasThreeColumns) {
-      informalName = (parts[1] ?? '').trim();
-      fullPhone = (parts[2] ?? '').trim();
-    } else {
-      informalName = '';
-      fullPhone = parts[1].trim();
-    }
+    let informalName = (parts[1] ?? '').trim();
+    let fullPhone = (parts[2] ?? '').trim();
 
     // Validate name
     if (!fullName) {

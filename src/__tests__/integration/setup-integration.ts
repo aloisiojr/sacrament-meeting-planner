@@ -3,7 +3,7 @@
  * Provides TestWrapper, renderHook, mock factories, and Supabase mock helpers.
  *
  * IMPORTANT: This file does NOT call vi.mock(). Each test file must
- * call its own vi.mock() at the top level (ADR-059).
+ * call its own vi.mock() at the top level.
  *
  * Uses react-test-renderer for renderHook (no react-native dependency).
  */

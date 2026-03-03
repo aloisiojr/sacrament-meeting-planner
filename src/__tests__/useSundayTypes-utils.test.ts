@@ -9,7 +9,7 @@ import {
 
 /**
  * Tests for pure utility functions in useSundayTypes hook.
- * Tests auto-assignment logic per F007 AC-021.
+ * Tests auto-assignment logic for sunday types.
  */
 
 describe('useSundayTypes utilities', () => {

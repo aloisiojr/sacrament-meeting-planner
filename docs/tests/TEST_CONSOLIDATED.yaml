@@ -1,10 +1,308 @@
 # =============================================================================
 # TEST_CONSOLIDATED.yaml
-# Consolidated test results
+# Consolidated test inventory - all surviving tests after CR-248 cleanup
 # =============================================================================
 
 type: test_consolidated
 version: 1
 last_updated: "2026-03-03"
 
-test_suites: []
+summary:
+  total_test_files: 30
+  total_tests: 577
+  framework: vitest
+  categories:
+    module_named: 25
+    integration: 5
+  infrastructure:
+    setup: 1
+    integration_setup: 1
+
+# =============================================================================
+# INFRASTRUCTURE
+# =============================================================================
+
+infrastructure:
+  - file: src/__tests__/setup.ts
+    description: "Vitest setup file - mocks AsyncStorage for React Native modules"
+    type: setup
+
+  - file: src/__tests__/integration/setup-integration.ts
+    description: "Shared integration test infrastructure - TestWrapper, renderHook, mock factories, Supabase mock helpers"
+    type: setup
+
+# =============================================================================
+# MODULE-NAMED TESTS (pure utility functions, no React Native runtime needed)
+# =============================================================================
+
+module_tests:
+  - file: src/__tests__/dateUtils.test.ts
+    tests: 31
+    module: src/lib/dateUtils.ts
+    covers:
+      - isSunday, parseLocalDate, toISODateString
+      - zeroPad, zeroPadDay, getMonthAbbr, formatDate
+      - generateSundayRange, getNextSundays, getPreviousSundays
+
+  - file: src/__tests__/i18n.test.ts
+    tests: 13
+    module: src/i18n/locales/*.json
+    covers:
+      - Locale key parity across pt-BR, en, es
+      - Login title/subtitle translations
+      - Speech status, month abbreviation, theme, and sunday exception translations
+
+  - file: src/__tests__/i18n-module.test.ts
+    tests: 10
+    module: src/i18n/index.ts
+    covers:
+      - SUPPORTED_LANGUAGES (pt-BR, en, es)
+      - LANGUAGE_LABELS, DEFAULT_COUNTRY_CODES, DEFAULT_TIMEZONES
+      - SupportedLanguage type coverage
+
+  - file: src/__tests__/theme.test.ts
+    tests: 10
+    module: src/lib/theme.ts
+    covers:
+      - lightColors and darkColors hex validity
+      - WCAG AA contrast ratios (text, secondary text, primary)
+      - Color palette completeness and key matching
+
+  - file: src/__tests__/theme-extended.test.ts
+    tests: 15
+    module: src/lib/theme.ts
+    covers:
+      - THEME_STORAGE_KEY value
+      - ThemeMode and ResolvedTheme types
+      - Additional contrast checks (error, onPrimary)
+      - ThemeContextValue contract
+      - Light vs dark visual distinction
+
+  - file: src/__tests__/database-types.test.ts
+    tests: 22
+    module: src/types/database.ts
+    covers:
+      - Role, Permission, SpeechStatus, SundayExceptionReason types
+      - NotificationType, NotificationTargetRole, NotificationStatus types
+      - Table type shapes (Ward, Member, Speech, SundayAgenda, Invitation, Hymn, MeetingActor, NotificationQueue)
+      - Composite types (TopicWithCollection, SpeechBySunday, DateRange)
+      - Input types (CreateMemberInput, UpdateMemberInput, CreateActorInput, ImportResult)
+
+  - file: src/__tests__/app-setup.test.ts
+    tests: 4
+    module: package.json
+    covers:
+      - App name, main entry point
+      - Required dependencies presence
+      - Expo SDK version
+
+  - file: src/__tests__/csvUtils.test.ts
+    tests: 19
+    module: src/lib/csvUtils.ts
+    covers:
+      - parseCsv (valid CSV, BOM, empty phone, empty CSV, header-only, quoted fields, Windows line endings)
+      - generateCsv (BOM prefix, null phone, comma escaping)
+      - splitPhoneNumber (Brazilian, US, 3-digit country codes, empty, no prefix)
+
+  - file: src/__tests__/permissions.test.ts
+    tests: 79
+    module: src/lib/permissions.ts
+    covers:
+      - Exhaustive permission matrix (3 roles x 24 permissions)
+      - Role-specific permission verification
+      - getPermissions per role
+      - ALL_PERMISSIONS and ALL_ROLES constants
+
+  - file: src/__tests__/activityLog.test.ts
+    tests: 17
+    module: src/lib/activityLog.ts
+    covers:
+      - logAction (success, parameters, optional userName)
+      - createLogger factory
+      - buildLogDescription (pipe-delimited format, escaping)
+      - parseLogDescription (plain text, pipe-delimited, escaping, roundtrip)
+      - formatLogDescription (i18n integration, speech status, actor role, sunday type)
+
+  - file: src/__tests__/useMembers-utils.test.ts
+    tests: 12
+    module: src/hooks/useMembers.ts
+    covers:
+      - normalizeForSearch (lowercase, diacritics, accents)
+      - filterMembers (empty search, partial match, case insensitive)
+      - sortMembers (alphabetical, immutability, case insensitive)
+      - memberKeys query key generation
+
+  - file: src/__tests__/useTopics-utils.test.ts
+    tests: 7
+    module: src/hooks/useTopics.ts
+    covers:
+      - topicKeys (all, wardTopics, activeTopics, collections, collectionConfig)
+      - Unique keys for different wards and languages
+
+  - file: src/__tests__/useHymns-utils.test.ts
+    tests: 12
+    module: src/hooks/useHymns.ts
+    covers:
+      - filterHymns (empty search, numeric prefix match, text search, accent insensitive)
+      - formatHymnDisplay (number-title format)
+      - hymnKeys query key generation
+
+  - file: src/__tests__/useSundayList-utils.test.ts
+    tests: 7
+    module: src/hooks/useSundayList.ts
+    covers:
+      - addMonths (forward, backward, year boundary)
+      - findNextSunday (Sunday, non-Sunday, Saturday, Wednesday)
+      - getInitialDateRange (12 months past and future)
+
+  - file: src/__tests__/useSundayTypes-utils.test.ts
+    tests: 24
+    module: src/hooks/useSundayTypes.ts
+    covers:
+      - getSundayOfMonth (1st through 5th Sunday)
+      - getAutoAssignedType (regular months, April/October conference months)
+      - SUNDAY_TYPE_OPTIONS (7 options, no removed enum values)
+      - sundayTypeKeys query key generation
+
+  - file: src/__tests__/useSpeeches-utils.test.ts
+    tests: 13
+    module: src/hooks/useSpeeches.ts
+    covers:
+      - speechKeys query key generation
+      - VALID_TRANSITIONS map (all 5 statuses)
+      - isValidTransition (valid, invalid, removal from any state)
+      - getAvailableStatuses
+      - groupSpeechesBySunday (grouping, exceptions, empty dates)
+
+  - file: src/__tests__/useActors-utils.test.ts
+    tests: 13
+    module: src/hooks/useActors.ts
+    covers:
+      - enforceActorRules (identity function)
+      - filterActorsByRole (all, can_preside, can_conduct, can_recognize, can_pianist)
+      - sortActors (alphabetical, immutability, case insensitive)
+      - actorKeys query key generation
+
+  - file: src/__tests__/useAgenda-utils.test.ts
+    tests: 16
+    module: src/hooks/useAgenda.ts
+    covers:
+      - isExcludedFromAgenda (general/stake conference excluded, others included)
+      - isSpecialMeeting (testimony, ward conference, primary presentation, other)
+      - EXCLUDED_EXCEPTION_TYPES constant
+
+  - file: src/__tests__/usePresentationMode-utils.test.ts
+    tests: 13
+    module: src/hooks/usePresentationMode.ts
+    covers:
+      - isTodaySunday, getTodaySundayDate
+      - buildPresentationCards (null agenda, normal meeting, special meeting)
+      - Speaker names, hymn lookups, special presentation, intermediate hymn
+      - Meeting type in special meeting cards
+
+  - file: src/__tests__/useNotifications-utils.test.ts
+    tests: 30
+    module: src/lib/notificationUtils.ts
+    covers:
+      - getOrdinal (pt-BR, en, es)
+      - formatNameList (empty, single, two names, three names per language)
+      - buildNotificationText for all 5 types (designation, weekly_assignment, weekly_confirmation, speaker_confirmed, speaker_withdrew)
+      - Prayer position handling (position 0 opening, position 4 closing)
+
+  - file: src/__tests__/useConnection-utils.test.ts
+    tests: 6
+    module: src/lib/connectionUtils.ts
+    covers:
+      - isNetInfoOnline (connected+reachable, null reachable, not connected, null connected, connected but not reachable)
+
+  - file: src/__tests__/nextAssignments-utils.test.ts
+    tests: 8
+    module: src/lib/speechUtils.ts
+    covers:
+      - areNext3FullyAssigned (all assigned, not_assigned, gave_up, exception skip, missing speeches)
+      - findNextPendingSunday (first pending after index 3, no pending, exception skip)
+
+  - file: src/__tests__/sync-utils.test.ts
+    tests: 11
+    module: src/lib/sync.ts
+    covers:
+      - SYNCED_TABLES (7 tables)
+      - getQueryKeysForTable (all tables, unknown, empty)
+      - POLLING_INTERVAL_MS
+
+  - file: src/__tests__/offline-utils.test.ts
+    tests: 13
+    module: src/lib/offlineQueue.ts, src/lib/offlineGuard.ts
+    covers:
+      - hasCapacity, shouldRetry, getMaxQueueSize, getMaxRetries
+      - ONLINE_ONLY_OPERATIONS (6 operations)
+      - requiresConnection (online-only vs normal)
+
+  - file: src/__tests__/whatsapp-utils.test.ts
+    tests: 18
+    module: src/lib/whatsappUtils.ts
+    covers:
+      - resolveTemplate (placeholder replacement, missing placeholders, double space cleanup)
+      - buildWhatsAppUrl (phone formatting, country code, custom template, default template)
+      - getDefaultSpeechTemplate (pt-BR, en, es, fallback)
+      - Language parameter for template selection
+
+# =============================================================================
+# INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
+# =============================================================================
+
+integration_tests:
+  - file: src/__tests__/integration/hooks-supabase.integration.test.ts
+    tests: 25
+    covers:
+      - useActors (fetch, create, update, delete, error, empty wardId, mutation failure, unmount race)
+      - useAgenda (lazy create, update)
+      - useSpeeches (fetch, assign speaker, change status, invalid transition)
+      - useMembers (fetch, create, update, delete)
+      - useHymns (fetch)
+      - useTopics (create)
+      - useSundayList (generate sundays)
+      - useSundayTypes (set type)
+      - useActivityLog (fetch)
+      - TestQueryClient configuration
+      - Shared QueryClient cache
+
+  - file: src/__tests__/integration/permissions-roles.integration.test.ts
+    tests: 14
+    covers:
+      - Permission matrix (bishopric, secretary, observer roles)
+      - getPermissions, ALL_PERMISSIONS, ALL_ROLES
+      - Auth context permission gating (bishopric, observer, secretary)
+      - Unknown role handling
+      - AuthContext loading state
+
+  - file: src/__tests__/integration/speech-lifecycle.integration.test.ts
+    tests: 19
+    covers:
+      - VALID_TRANSITIONS map (all 5 statuses)
+      - isValidTransition (valid, invalid, self-transitions)
+      - getAvailableStatuses
+      - Assign speaker lifecycle (assign, topic, unassign)
+      - Full lifecycle sequence validation
+      - Invalid transition error messages
+
+  - file: src/__tests__/integration/sunday-types-auto.integration.test.ts
+    tests: 24
+    covers:
+      - getSundayOfMonth (1st through 5th)
+      - getAutoAssignedType (regular months, conference months)
+      - SUNDAY_TYPE constants
+      - useAutoAssignSundayTypes (missing dates, existing dates, empty array)
+      - useSundayExceptions (fetch)
+      - useRemoveSundayException (revert to speeches)
+      - Edge case dates (Jan 1, Dec 31, leap year)
+      - Boundary Sunday number
+
+  - file: src/__tests__/integration/sync-realtime.integration.test.ts
+    tests: 20
+    covers:
+      - Sync configuration (SYNCED_TABLES, TABLE_TO_QUERY_KEYS, getQueryKeysForTable, POLLING_INTERVAL_MS)
+      - Connection utilities (isNetInfoOnline)
+      - Offline queue (enqueue, dequeue, readQueue, clearQueue, getQueueSize, peek, capacity limit)
+      - Sync table-to-query key mapping
+      - Queue persistence across cycles

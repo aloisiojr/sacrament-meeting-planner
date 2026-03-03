@@ -104,7 +104,7 @@ describe('isValidTransition', () => {
   it('returns false for invalid transitions', () => {
     expect(isValidTransition('not_assigned', 'assigned_confirmed')).toBe(false);
     expect(isValidTransition('not_assigned', 'gave_up')).toBe(false);
-    // F077: assigned_confirmed and gave_up can now transition to any other assigned status
+    // assigned_confirmed and gave_up can transition to any other assigned status
     expect(isValidTransition('assigned_confirmed', 'assigned_invited')).toBe(true);
     expect(isValidTransition('gave_up', 'assigned_confirmed')).toBe(true);
   });

@@ -23,7 +23,7 @@ function makeActor(overrides: Partial<MeetingActor> & { name: string }): Meeting
 }
 
 describe('useActors utilities', () => {
-  describe('enforceActorRules (identity function - CR-71)', () => {
+  describe('enforceActorRules (identity function)', () => {
     it('should return input unchanged (identity) - can_conduct=true does NOT auto-set can_preside', () => {
       const input: CreateActorInput = {
         name: 'Bishop',

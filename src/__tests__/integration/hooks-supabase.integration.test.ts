@@ -22,7 +22,7 @@ import {
   createMockActivityLog,
 } from './setup-integration';
 
-// --- Module mocks (per ADR-059: each test file owns its mocks) ---
+// --- Module mocks (each test file owns its mocks) ---
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {

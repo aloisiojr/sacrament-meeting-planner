@@ -8,7 +8,7 @@ import {
 import type { Role, Permission } from '../lib/permissions';
 
 /**
- * The complete expected permission matrix from F023.
+ * The complete expected permission matrix.
  * true = role has permission, false = role does not.
  */
 const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
@@ -40,7 +40,7 @@ const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
 
 describe('Permissions', () => {
   describe('hasPermission - exhaustive matrix test', () => {
-    // Test every cell of the F023 permission matrix
+    // Test every cell of the permission matrix
     for (const permission of ALL_PERMISSIONS) {
       for (const role of ALL_ROLES) {
         const expected = EXPECTED_MATRIX[permission][role];

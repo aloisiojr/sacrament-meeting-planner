@@ -42,14 +42,14 @@ describe('parseCsv', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts phone without + prefix (CR-78: relaxed phone validation)', () => {
+  it('accepts phone without + prefix', () => {
     const csv = 'Nome,Telefone Completo\nJoao Silva,11999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members[0].phone).toBe('11999999999');
   });
 
-  it('accepts duplicate phone numbers (CR-78: no duplicate check)', () => {
+  it('accepts duplicate phone numbers', () => {
     const csv = 'Nome,Telefone Completo\nJoao Silva,+5511999999999\nMaria Santos,+5511999999999';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);

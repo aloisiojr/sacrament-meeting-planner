@@ -97,9 +97,9 @@ describe('Theme Module', () => {
     });
   });
 
-  describe('ThemeContextValue contract (ARCH_M008)', () => {
+  describe('ThemeContextValue contract', () => {
     it('should define toggleMode in the interface', () => {
-      // Verify the interface shape matches ARCH_M008 contract
+      // Verify the interface shape matches the ThemeContextValue contract
       const mockValue: ThemeContextValue = {
         mode: 'light',
         preference: 'automatic',

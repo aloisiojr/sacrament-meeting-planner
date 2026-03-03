@@ -79,7 +79,7 @@ function getEmailTemplate(
     },
   };
 
-  return templates[language] ?? templates['pt-BR'];
+  return templates[language] ?? templates['en'];
 }
 
 Deno.serve(async (req) => {
@@ -149,8 +149,8 @@ Deno.serve(async (req) => {
     }
 
     // Get language for email template
-    // Priority: user_metadata.language > ward.language > 'pt-BR'
-    let language = 'pt-BR';
+    // Priority: user_metadata.language > ward.language > 'en'
+    let language = 'en';
     const userMetaLanguage = user.user_metadata?.language;
     if (userMetaLanguage && typeof userMetaLanguage === 'string') {
       language = userMetaLanguage;
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           .select('language')
           .eq('id', wardId)
           .single();
-        language = ward?.language ?? 'pt-BR';
+        language = ward?.language ?? 'en';
       }
     }
 

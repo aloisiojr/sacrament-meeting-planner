@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 2
+  version: 3
 
 validations:
 
@@ -228,3 +228,276 @@ validations:
         description: "No other references to '1 minute' cron for notifications remain"
         result: PASS
         evidence: "grep 'cron every 1 minute' in source code returns 0 matches. Only found in documentation/plan files (QA_PLAN, SPEC_F039, project-status) which correctly reference the old value for change tracking."
+
+  # ===========================================================================
+  # Phase 2: Language Code Standardization (QA_PLAN_002)
+  # ===========================================================================
+
+  - id: QA_002
+    plan: QA_PLAN_002
+    date: "2026-03-03"
+    scope: "Phase 2 - CR-249: Standardize language codes en->en-US, es->es-LA"
+    verdict: passed
+    must_pass: 25/25
+    should_pass: 9/10
+    total_checks: 34/35
+    reviewer_verdict: "APPROVED (REV-004, 0 issues)"
+    tester_verdict: "PASSED (644 tests, 31 files, 0 failures)"
+
+    checks:
+
+      # --- Translation files ---
+      - id: CR249_MP1
+        cr: CR-249
+        type: must_pass
+        description: "Translation file en.json renamed to en-US.json"
+        result: PASS
+        evidence: "src/i18n/locales/en-US.json exists. Glob for src/i18n/locales/*.json returns: pt-BR.json, en-US.json, es-LA.json. No en.json found."
+
+      - id: CR249_MP2
+        cr: CR-249
+        type: must_pass
+        description: "Translation file es.json renamed to es-LA.json"
+        result: PASS
+        evidence: "src/i18n/locales/es-LA.json exists. No es.json found."
+
+      # --- i18n config ---
+      - id: CR249_MP3
+        cr: CR-249
+        type: must_pass
+        description: "SUPPORTED_LANGUAGES updated to ['pt-BR', 'en-US', 'es-LA']"
+        result: PASS
+        evidence: "src/i18n/index.ts line 8: export const SUPPORTED_LANGUAGES = ['pt-BR', 'en-US', 'es-LA'] as const;"
+
+      - id: CR249_MP4
+        cr: CR-249
+        type: must_pass
+        description: "LANGUAGE_LABELS keys updated to 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 13-14: 'en-US': 'English', 'es-LA': 'Espanol'"
+
+      - id: CR249_MP5
+        cr: CR-249
+        type: must_pass
+        description: "DEFAULT_COUNTRY_CODES keys updated to 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 19-20: 'en-US': '+1', 'es-LA': '+52'"
+
+      - id: CR249_MP6
+        cr: CR-249
+        type: must_pass
+        description: "DEFAULT_TIMEZONES keys updated to 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 25-26: 'en-US': 'America/New_York', 'es-LA': 'America/Mexico_City'"
+
+      - id: CR249_MP7
+        cr: CR-249
+        type: must_pass
+        description: "DB_LOCALE_MAP updated: identity mapping (en-US->en-US, es-LA->es-LA)"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 36-37: 'en-US': 'en-US', 'es-LA': 'es-LA'"
+
+      - id: CR249_MP8
+        cr: CR-249
+        type: must_pass
+        description: "i18next resources use 'en-US' and 'es-LA' keys"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 51-52: 'en-US': { translation: enUS }, 'es-LA': { translation: esLA }"
+
+      - id: CR249_MP9
+        cr: CR-249
+        type: must_pass
+        description: "detectDeviceLocale returns 'en-US' for 'en' prefix, 'es-LA' for 'es' prefix"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 76-77: if (langPrefix === 'en') return 'en-US'; if (langPrefix === 'es') return 'es-LA';"
+
+      # --- dateUtils ---
+      - id: CR249_MP10
+        cr: CR-249
+        type: must_pass
+        description: "MONTH_ABBR, MONTH_FULL, DAY_NAMES keys changed to 'en-US'/'es-LA'"
+        result: PASS
+        evidence: "dateUtils.ts lines 9, 18, 28: 'en-US' and 'es-LA' keys in all three Record structures"
+
+      - id: CR249_MP11
+        cr: CR-249
+        type: must_pass
+        description: "formatDate, formatDateHumanReadable, formatFullDate switch cases updated"
+        result: PASS
+        evidence: "dateUtils.ts lines 100, 103, 199, 202, 223, 226: case 'en-US' and case 'es-LA' in all three functions"
+
+      # --- whatsappUtils ---
+      - id: CR249_MP12
+        cr: CR-249
+        type: must_pass
+        description: "getDefaultSpeechTemplate switch cases use 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "whatsappUtils.ts lines 62, 64, 73, 75, 84, 86: case 'en-US' and case 'es-LA' for all 3 positions"
+
+      - id: CR249_MP13
+        cr: CR-249
+        type: must_pass
+        description: "getDefaultPrayerTemplate switch cases use 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "whatsappUtils.ts lines 101, 103, 111, 113: case 'en-US' and case 'es-LA' for opening/closing"
+
+      # --- notificationUtils ---
+      - id: CR249_MP14
+        cr: CR-249
+        type: must_pass
+        description: "OrdinalLanguage type uses 'en-US' | 'es-LA'"
+        result: PASS
+        evidence: "notificationUtils.ts line 8: export type OrdinalLanguage = 'pt-BR' | 'en-US' | 'es-LA';"
+
+      - id: CR249_MP15
+        cr: CR-249
+        type: must_pass
+        description: "ORDINALS, getPrayerLabel, formatNameList, buildNotificationText use 'en-US'/'es-LA'"
+        result: PASS
+        evidence: "notificationUtils.ts: ORDINALS lines 14-15 'en-US'/'es-LA'; formatNameList line 32 === 'en-US'/=== 'es-LA'; getPrayerLabel lines 46-47; buildNotificationText lines 110/154 'en-US'/'es-LA'"
+
+      # --- Edge Functions ---
+      - id: CR249_MP16
+        cr: CR-249
+        type: must_pass
+        description: "register-first-user switch cases use 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "register-first-user/index.ts lines 99, 106: case 'en-US' and case 'es-LA'"
+
+      - id: CR249_MP17
+        cr: CR-249
+        type: must_pass
+        description: "process-notifications uses 'en-US'/'es-LA' in all text builders"
+        result: PASS
+        evidence: "process-notifications/index.ts: ORDINALS lines 38-39, getPrayerLabel lines 49-50, formatNameList line 58, buildDesignationText lines 77/81, buildWeeklyText lines 95/99, all builder functions use 'en-US'/'es-LA' keys"
+
+      - id: CR249_MP18
+        cr: CR-249
+        type: must_pass
+        description: "send-reset-email template keys use 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "send-reset-email/index.ts lines 39, 59: 'en-US' and 'es-LA' template keys. Line 82: fallback templates['en-US']"
+
+      # --- Import script ---
+      - id: CR249_MP19
+        cr: CR-249
+        type: must_pass
+        description: "import-hymns LANGUAGE_MAP maps 'EN-US' to 'en-US' and 'ES-ES' to 'es-LA'"
+        result: PASS
+        evidence: "scripts/import-hymns.ts lines 24-25: 'EN-US': 'en-US', 'ES-ES': 'es-LA'"
+
+      # --- Database migration ---
+      - id: CR249_MP20
+        cr: CR-249
+        type: must_pass
+        description: "Migration 024 updates hymns language es-ES -> es-LA"
+        result: PASS
+        evidence: "supabase/migrations/024_language_code_update.sql line 5: UPDATE hymns SET language = 'es-LA' WHERE language = 'es-ES';"
+
+      - id: CR249_MP21
+        cr: CR-249
+        type: must_pass
+        description: "Migration 024 updates general_collections language es-ES -> es-LA"
+        result: PASS
+        evidence: "024_language_code_update.sql line 9: UPDATE general_collections SET language = 'es-LA' WHERE language = 'es-ES';"
+
+      - id: CR249_MP22
+        cr: CR-249
+        type: must_pass
+        description: "Migration 024 updates wards language en -> en-US and es -> es-LA"
+        result: PASS
+        evidence: "024_language_code_update.sql lines 13-14: UPDATE wards SET language = 'en-US' WHERE language = 'en'; UPDATE wards SET language = 'es-LA' WHERE language = 'es';"
+
+      # --- Documentation ---
+      - id: CR249_MP23
+        cr: CR-249
+        type: must_pass
+        description: "SPEC_CONSOLIDATED references updated to 'en-US'/'es-LA'"
+        result: PASS
+        evidence: "grep 'pt-BR, en, es' returns 0 matches. grep 'pt-BR, en-US, es-LA' returns matches at lines 38, 719. grep 'es-ES' returns 0 matches."
+
+      - id: CR249_MP24
+        cr: CR-249
+        type: must_pass
+        description: "ARCH_CONSOLIDATED languages array updated"
+        result: PASS
+        evidence: "ARCH_CONSOLIDATED.yaml line 52: languages: [\"pt-BR\", \"en-US\", \"es-LA\"]"
+
+      # --- Tests ---
+      - id: CR249_MP25
+        cr: CR-249
+        type: must_pass
+        description: "All tests pass (npx vitest run)"
+        result: PASS
+        evidence: "31 test files, 644 tests passed, 0 failures. Duration 830ms."
+
+      # --- should_pass checks ---
+      - id: CR249_SP1
+        cr: CR-249
+        type: should_pass
+        description: "toDbLocale JSDoc comment updated for identity mapping"
+        result: PASS
+        evidence: "src/i18n/index.ts line 42: 'After CR-249, this is an identity mapping: en-US -> en-US, es-LA -> es-LA.'"
+
+      - id: CR249_SP2
+        cr: CR-249
+        type: should_pass
+        description: "DB_LOCALE_MAP JSDoc comment updated"
+        result: PASS
+        evidence: "src/i18n/index.ts lines 30-32: 'After CR-249, app codes and DB codes are unified (identity mapping). Retained for forward compatibility if codes ever need to diverge again.'"
+
+      - id: CR249_SP3
+        cr: CR-249
+        type: should_pass
+        description: "i18n-module.test.ts updated to reference 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "i18n-module.test.ts lines 22-23: toContain('en-US')/toContain('es-LA'); lines 46-47: labels['en-US']/'es-LA'; lines 61-62: codes['en-US']/'es-LA'; lines 78-79: timezones['en-US']/'es-LA'; line 85: SupportedLanguage[] = ['pt-BR', 'en-US', 'es-LA']"
+
+      - id: CR249_SP4
+        cr: CR-249
+        type: should_pass
+        description: "i18n.test.ts imports renamed files"
+        result: PASS
+        evidence: "i18n.test.ts lines 3-4: import enUS from '../i18n/locales/en-US.json'; import esLA from '../i18n/locales/es-LA.json'; Variables renamed to enUS/esLA throughout."
+
+      - id: CR249_SP5
+        cr: CR-249
+        type: should_pass
+        description: "dateUtils.test.ts uses 'en-US' and 'es-LA' as locale parameters"
+        result: PASS
+        evidence: "dateUtils.test.ts lines 99-111, 128-133, 145: all locale parameters changed from 'en'/'es' to 'en-US'/'es-LA'"
+
+      - id: CR249_SP6
+        cr: CR-249
+        type: should_pass
+        description: "whatsapp-utils.test.ts uses 'en-US' and 'es-LA'"
+        result: PASS
+        evidence: "whatsapp-utils.test.ts lines 119, 123, 147, 151-153, 162: all language parameters changed to 'en-US'/'es-LA'"
+
+      - id: CR249_SP7
+        cr: CR-249
+        type: should_pass
+        description: "useNotifications-utils.test.ts OrdinalLanguage array updated"
+        result: PASS
+        evidence: "useNotifications-utils.test.ts: All 'en'/'es' language args changed to 'en-US'/'es-LA' throughout. Lines 21-24, 39, 43, 47, 55, 72, 138-148 etc."
+
+      - id: CR249_SP8
+        cr: CR-249
+        type: should_pass
+        description: "No remaining bare 'en' or 'es' language codes in source files"
+        result: PASS
+        evidence: "grep for case 'en':/case 'es':/=== 'en'/=== 'es'/'en': {/'es': { in src/ and supabase/ returns only 2 matches in detectDeviceLocale (langPrefix === 'en'/'es') which are correct prefix detection, not language code keys."
+
+      - id: CR249_SP9
+        cr: CR-249
+        type: should_pass
+        description: "SPEC DB locale codes updated from es-ES to es-LA"
+        result: PASS
+        evidence: "grep 'es-ES' in SPEC_CONSOLIDATED.yaml returns 0 matches. Line 223 now reads 'pt-BR, en-US, es-LA'."
+
+      - id: CR249_SP10
+        cr: CR-249
+        type: should_pass
+        description: "SPEC F002 en (en-US) notation simplified"
+        result: SOFT_FAIL
+        evidence: "SPEC line 91 still says 'fallback to ward.language then en (en-US)'. The parenthetical '(en-US)' is a leftover from when app code was 'en' and DB code was 'en-US'. Since codes are now unified, this could be simplified to just 'en-US'. Non-functional, cosmetic only."

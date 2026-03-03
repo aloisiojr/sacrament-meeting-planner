@@ -1,0 +1,40 @@
+phase_id: 2
+description: "Language code standardization: en->en-US, es->es-LA everywhere including DB migration"
+status: completed
+features:
+  - id: F040
+    name: "Language Code Standardization"
+    status: completed
+change_requests: [249]
+artifacts_produced:
+  - "docs/specs/SPEC_F040.yaml"
+  - "docs/arch/ARCH_M040.yaml"
+  - "docs/plans/PLAN_P002.yaml"
+  - "docs/qa/QA_PLAN_002.yaml"
+  - "src/__tests__/f040-language-codes.test.ts"
+  - "supabase/migrations/024_language_code_update.sql"
+commits:
+  - {hash: "b0ed8d3", message: "refactor(i18n): rename locale files and update i18n module to en-US/es-LA codes (CR-249)"}
+  - {hash: "635a850", message: "refactor(dateUtils): update Record keys and switch cases to en-US/es-LA (CR-249)"}
+  - {hash: "2d7183b", message: "refactor(whatsappUtils): update switch cases to en-US/es-LA (CR-249)"}
+  - {hash: "08e17e4", message: "refactor(notificationUtils): update types and Record keys to en-US/es-LA (CR-249)"}
+  - {hash: "69cf1cd", message: "refactor(edge-functions): update language codes to en-US/es-LA in all 3 Edge Functions (CR-249)"}
+  - {hash: "eada216", message: "refactor(import-hymns): update LANGUAGE_MAP and create migration 024 for language codes (CR-249)"}
+  - {hash: "bcaedfc", message: "refactor(i18n): update remaining old language codes in speechUtils and integration tests (CR-249)"}
+  - {hash: "e0ebda8", message: "test(i18n): update all test files to use en-US/es-LA language codes (CR-249)"}
+  - {hash: "e095f11", message: "test(f040): add tests for CR-249 language code standardization"}
+decisions:
+  - "DB_LOCALE_MAP becomes identity mapping (app codes = DB codes)"
+  - "es-ES in DB migrated to es-LA (migration 024)"
+  - "detectDeviceLocale: 'en' prefix -> 'en-US', 'es' prefix -> 'es-LA'"
+  - "Fallback remains pt-BR"
+handoff_notes: "Phase 2 complete. All language codes standardized. Deploy order: migration 024 -> Edge Functions -> app update."
+pending_deploys:
+  - type: "db_migration"
+    file: "supabase/migrations/024_language_code_update.sql"
+    description: "Update hymns/general_collections es-ES->es-LA, wards en->en-US and es->es-LA"
+  - type: "edge_functions"
+    files: ["register-first-user", "process-notifications", "send-reset-email"]
+    description: "All 3 Edge Functions updated with new language codes"
+  - type: "app_update"
+    description: "New build with en-US/es-LA codes throughout"

@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
-  version: 1
+  version: 2
 
 reviews:
   - id: REV-001
@@ -497,3 +497,335 @@ reviews:
         reason: "Edge Function code changed (diagnostic mode removed)"
         urgency: low
         notes: "Dead code removal only. No behavioral change for clients."
+
+  # ===========================================================================
+  # REV-004: Phase 2 - Language Code Standardization (CR-249)
+  # ===========================================================================
+
+  - id: REV-004
+    scope: "F040 Phase 2 - Language Code Standardization (CR-249)"
+    date: "2026-03-03"
+    reviewer: reviewer-agent
+    spec: F040
+    arch: M040
+    plan: P002
+    iteration: 1
+    commits:
+      - hash: b0ed8d3
+        step: STEP-01
+        message: "refactor(i18n): rename locale files and update i18n module to en-US/es-LA codes (CR-249)"
+      - hash: 635a850
+        step: STEP-02
+        message: "refactor(dateUtils): update Record keys and switch cases to en-US/es-LA (CR-249)"
+      - hash: 2d7183b
+        step: STEP-03
+        message: "refactor(whatsappUtils): update switch cases to en-US/es-LA (CR-249)"
+      - hash: 08e17e4
+        step: STEP-04
+        message: "refactor(notificationUtils): update types and Record keys to en-US/es-LA (CR-249)"
+      - hash: 69cf1cd
+        step: STEP-05
+        message: "refactor(edge-functions): update language codes to en-US/es-LA in all 3 Edge Functions (CR-249)"
+      - hash: eada216
+        step: STEP-06
+        message: "refactor(import-hymns): update LANGUAGE_MAP and create migration 024 for language codes (CR-249)"
+      - hash: e0ebda8
+        step: STEP-07
+        message: "test(i18n): update all test files to use en-US/es-LA language codes (CR-249)"
+      - hash: bcaedfc
+        step: STEP-11
+        message: "refactor(i18n): update remaining old language codes in speechUtils and integration tests (CR-249)"
+    verdict: approved
+
+    summary: |
+      All 8 commits for Phase 2 (CR-249) correctly standardize language codes from
+      en/es to en-US/es-LA across the entire codebase. Chain validation passes:
+      SPEC_F040 -> ARCH_M040 -> PLAN_P002 -> CODE is fully aligned. All 644 tests
+      pass (31 test files, 0 failures). The coder appropriately added STEP-11
+      (not in original plan) to catch remaining old codes in speechUtils.ts and
+      integration tests. Database migration 024 is idempotent and correct.
+      Documentation (SPEC_CONSOLIDATED, ARCH_CONSOLIDATED) updated consistently.
+      No P0 or P1 issues found.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          User requested "Padronizar codigos de idioma: en->en-US, es->es-LA em docs e codigo".
+          SPEC_F040 covers all areas: i18n config, date/whatsapp/notification utils,
+          3 Edge Functions, import script, DB migration, tests, and docs. 33 acceptance
+          criteria defined, comprehensive and faithful to user intent.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M040 maps each SPEC change to an architectural component (C1-C11).
+          All 15 SPEC changes have a corresponding component. ADR-007 update,
+          deploy order, and risk analysis are all sound. Architecture impact
+          correctly assessed as "moderate" (cross-cutting but mechanical).
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P002 has 10 steps covering all 11 ARCH components. Dependency graph
+          is correct: STEP-01 first (source of truth), then utilities and Edge
+          Functions in parallel, tests last. Validation matrix maps all 33 ACs to steps.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 10 plan steps implemented in 8 commits (some steps combined).
+          Additional STEP-11 added by coder to fix previously-missed old codes
+          in speechUtils.ts and integration tests. This deviation is justified
+          since the PLAN did not anticipate these files but the coder correctly
+          caught them during implementation. Files modified match PLAN expectations
+          plus the additional speechUtils.ts and 5 integration test files.
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-STEP VERIFICATION
+    # =========================================================================
+
+    step_reviews:
+
+      - step: STEP-01
+        title: "Translation file renames + i18n module"
+        verdict: pass
+        verification:
+          - check: "en.json renamed to en-US.json"
+            status: pass
+            detail: "src/i18n/locales/ contains en-US.json, es-LA.json, pt-BR.json. No en.json or es.json."
+          - check: "SUPPORTED_LANGUAGES updated"
+            status: pass
+            detail: "['pt-BR', 'en-US', 'es-LA'] as const"
+          - check: "DB_LOCALE_MAP is identity"
+            status: pass
+            detail: "{ 'pt-BR': 'pt-BR', 'en-US': 'en-US', 'es-LA': 'es-LA' }"
+          - check: "detectDeviceLocale returns en-US/es-LA for prefix match"
+            status: pass
+            detail: "langPrefix === 'en' -> 'en-US', langPrefix === 'es' -> 'es-LA'"
+          - check: "resources use new keys"
+            status: pass
+            detail: "'en-US': { translation: enUS }, 'es-LA': { translation: esLA }"
+          - check: "All exports correct"
+            status: pass
+            detail: "LANGUAGE_LABELS, DEFAULT_COUNTRY_CODES, DEFAULT_TIMEZONES all keyed by en-US/es-LA"
+
+      - step: STEP-02
+        title: "dateUtils Record keys and switch cases"
+        verdict: pass
+        verification:
+          - check: "MONTH_ABBR, MONTH_FULL, DAY_NAMES keys"
+            status: pass
+            detail: "All use 'en-US' and 'es-LA' keys. No bare 'en' or 'es'."
+          - check: "formatDate switch case"
+            status: pass
+            detail: "case 'en-US': month day format. es-LA falls through to default (day month)."
+          - check: "formatDateHumanReadable switch case"
+            status: pass
+            detail: "case 'en-US': Month Day, Year. es-LA falls through to default."
+          - check: "formatFullDate switch case"
+            status: pass
+            detail: "case 'en-US': DayName, Month Day, Year. es-LA falls through to default."
+
+      - step: STEP-03
+        title: "whatsappUtils switch cases"
+        verdict: pass
+        verification:
+          - check: "getDefaultSpeechTemplate switch cases"
+            status: pass
+            detail: "case 'en-US' and case 'es-LA' in all 3 position blocks."
+          - check: "getDefaultPrayerTemplate switch cases"
+            status: pass
+            detail: "case 'en-US' and case 'es-LA' in both opening/closing blocks."
+          - check: "grep for case 'en' and case 'es' returns 0"
+            status: pass
+            detail: "No standalone 'en' or 'es' switch cases remain."
+
+      - step: STEP-04
+        title: "notificationUtils types and Record keys"
+        verdict: pass
+        verification:
+          - check: "OrdinalLanguage type"
+            status: pass
+            detail: "'pt-BR' | 'en-US' | 'es-LA'"
+          - check: "ORDINALS Record keys"
+            status: pass
+            detail: "Keys are 'pt-BR', 'en-US', 'es-LA'"
+          - check: "formatNameList comparisons"
+            status: pass
+            detail: "language === 'en-US' ? ' and ' : language === 'es-LA' ? ' y ' : ' e '"
+          - check: "getPrayerLabel keys"
+            status: pass
+            detail: "Record keys 'pt-BR', 'en-US', 'es-LA'"
+          - check: "buildNotificationText top-level Record keys"
+            status: pass
+            detail: "All 3 language blocks use 'pt-BR', 'en-US', 'es-LA'"
+
+      - step: STEP-05
+        title: "Edge Functions (register-first-user, process-notifications, send-reset-email)"
+        verdict: pass
+        verification:
+          - check: "register-first-user switch cases"
+            status: pass
+            detail: "case 'en-US' and case 'es-LA'. No bare 'en' or 'es'."
+          - check: "process-notifications ORDINALS, getPrayerLabel, formatNameList, all text builders"
+            status: pass
+            detail: "All Record keys use 'en-US' and 'es-LA'. Fallbacks remain 'pt-BR'."
+          - check: "send-reset-email template keys"
+            status: pass
+            detail: "Templates Record: 'pt-BR', 'en-US', 'es-LA'. Fallback: templates['en-US']. Default: let language = 'en-US'. Ward fallback: ward?.language ?? 'en-US'."
+
+      - step: STEP-06
+        title: "Import hymns script + DB migration"
+        verdict: pass
+        verification:
+          - check: "LANGUAGE_MAP values"
+            status: pass
+            detail: "{ 'PT-BR': 'pt-BR', 'EN-US': 'en-US', 'ES-ES': 'es-LA' }"
+          - check: "Migration file exists"
+            status: pass
+            detail: "supabase/migrations/024_language_code_update.sql"
+          - check: "Migration SQL correct"
+            status: pass
+            detail: |
+              UPDATE hymns SET language = 'es-LA' WHERE language = 'es-ES';
+              UPDATE general_collections SET language = 'es-LA' WHERE language = 'es-ES';
+              UPDATE wards SET language = 'en-US' WHERE language = 'en';
+              UPDATE wards SET language = 'es-LA' WHERE language = 'es';
+          - check: "Migration is idempotent"
+            status: pass
+            detail: "WHERE clauses prevent double-update. Running twice is safe."
+
+      - step: STEP-07
+        title: "Test file updates"
+        verdict: pass
+        verification:
+          - check: "i18n-module.test.ts updated"
+            status: pass
+          - check: "whatsapp-utils.test.ts updated"
+            status: pass
+          - check: "dateUtils.test.ts updated"
+            status: pass
+          - check: "i18n.test.ts imports updated"
+            status: pass
+          - check: "useNotifications-utils.test.ts updated"
+            status: pass
+          - check: "useTopics-utils.test.ts updated"
+            status: pass
+          - check: "All 644 tests pass"
+            status: pass
+            detail: "31 test files, 644 tests, 0 failures."
+
+      - step: STEP-11 (additional, not in original plan)
+        title: "speechUtils and integration tests"
+        verdict: pass
+        verification:
+          - check: "speechUtils.ts type signatures updated"
+            status: pass
+            detail: "formatDateFn type changed from 'pt-BR' | 'en' | 'es' to 'pt-BR' | 'en-US' | 'es-LA'"
+          - check: "Integration tests updated"
+            status: pass
+            detail: |
+              5 integration test files and useHymns-utils.test.ts updated
+              to use en-US/es-LA instead of en/es.
+
+    # =========================================================================
+    # DOC UPDATES VERIFICATION
+    # =========================================================================
+
+    doc_updates:
+      spec_consolidated:
+        status: pass
+        detail: |
+          - product_description: "pt-BR, en-US, es-LA" (correct)
+          - F008: "locale codes: pt-BR, en-US, es-LA" (correct)
+          - F028: "Supported languages: pt-BR, en-US, es-LA" (correct)
+          - F040 feature entry exists (correct)
+          - total_features: 39 (correct, was 38 + F040)
+          - No old 'en' or 'es' standalone language codes remain
+
+      arch_consolidated:
+        status: pass
+        detail: |
+          - tech_stack.i18n.languages: ["pt-BR", "en-US", "es-LA"] (correct)
+          - total_migrations: 24 (correct)
+          - ADR-007: note about unified codes after CR-249 (correct)
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # ADVISORY NOTES
+    # =========================================================================
+
+    advisory_notes:
+      - id: ADV-001
+        severity: P2
+        title: "Pre-existing CR references in register-first-user comments"
+        description: |
+          Lines 90-91 of supabase/functions/register-first-user/index.ts contain:
+          "// CR-231: Per-position default speech templates (3 per language)"
+          "// CR-248: Add {nome} placeholder, update text, add prayer templates"
+          These CR references predate Phase 2 and were not in scope for CR-249.
+          Should be cleaned up in a future pass if CR references are being
+          eliminated from source code.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Run database migration"
+        command: "supabase db push (or apply 024_language_code_update.sql)"
+        reason: "DB data must use new codes before app/functions read them"
+        urgency: medium
+        notes: "Must run BEFORE Edge Functions and app update. Migration is idempotent."
+
+      - step: 2
+        action: "Deploy Edge Functions"
+        commands:
+          - "supabase functions deploy register-first-user"
+          - "supabase functions deploy process-notifications"
+          - "supabase functions deploy send-reset-email --no-verify-jwt"
+        reason: "Edge Functions must handle new language codes from DB"
+        urgency: medium
+        notes: "Deploy after migration. All 3 functions have updated language code keys."
+
+      - step: 3
+        action: "Deploy app update"
+        reason: "App sends new codes and expects new codes from DB"
+        urgency: medium
+        notes: "Deploy after migration and Edge Functions."
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files: []
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 20
+      total_commits: 8
+      tests_total: 644
+      tests_passing: 644
+      test_files: 31

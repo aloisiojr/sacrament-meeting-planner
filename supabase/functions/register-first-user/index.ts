@@ -88,26 +88,35 @@ Deno.serve(async (req) => {
     const wardLanguage = input.language || 'pt-BR';
 
     // CR-231: Per-position default speech templates (3 per language)
+    // CR-248: Add {nome} placeholder, update text, add prayer templates
     let defaultSpeech1Template: string;
     let defaultSpeech2Template: string;
     let defaultSpeech3Template: string;
+    let defaultOpeningPrayerTemplate: string;
+    let defaultClosingPrayerTemplate: string;
 
     switch (wardLanguage) {
       case 'en':
-        defaultSpeech1Template = 'Hi! The Bishopric would like to invite you to give the first speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
-        defaultSpeech2Template = 'Hi! The Bishopric would like to invite you to give the second speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
-        defaultSpeech3Template = 'Hi! The Bishopric would like to invite you to give the third speech on Sunday {data}! You will speak about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
+        defaultOpeningPrayerTemplate = 'Hi {nome}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}. To help with reverence, we ask that you arrive 15 minutes before the meeting starts and sit with the bishopric on the stand. Can we count on you?';
+        defaultClosingPrayerTemplate = 'Hi {nome}, how are you? You have been assigned to give the closing prayer at Sacrament Meeting on {data}. We would like to ask you to join the bishopric on the stand during the intermediate hymn. Can we count on you?';
         break;
       case 'es':
-        defaultSpeech1Template = 'Hola, como estas? El Obispado te quiere invitar a dar el primer discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
-        defaultSpeech2Template = 'Hola, como estas? El Obispado te quiere invitar a dar el segundo discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
-        defaultSpeech3Template = 'Hola, como estas? El Obispado te quiere invitar a dar el tercer discurso el domingo {data}! Hablaras sobre un tema de {colecao} con el titulo "{titulo}" {link}. Podemos confirmar tu discurso?';
+        defaultSpeech1Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
+        defaultSpeech2Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
+        defaultSpeech3Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
+        defaultOpeningPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de apertura en la Reunión Sacramental del día {data}. Para ayudar con la reverencia, te pedimos que llegues 15 minutos antes del inicio de la reunión y te sientes junto con el obispado en el púlpito. ¿Podemos contar contigo?';
+        defaultClosingPrayerTemplate = 'Hola {nome}, ¿cómo estás? Has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}. Nos gustaría pedirte que te unas al obispado en el púlpito durante el himno intermedio. ¿Podemos contar contigo?';
         break;
       case 'pt-BR':
       default:
-        defaultSpeech1Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o primeiro discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
-        defaultSpeech2Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o segundo discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
-        defaultSpeech3Template = 'Olá, tudo bom! O Bispado gostaria de te convidar para fazer o terceiro discurso no domingo dia {data}! Você falará sobre um tema da {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultSpeech1Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultSpeech2Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultSpeech3Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
+        defaultOpeningPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de abertura na Reunião Sacramental do dia {data}. Para ajudar na reverência, pedimos que você chegue 15min antes do início da reunião e se sente junto com o bispado ao púlpito. Podemos contar com você?';
+        defaultClosingPrayerTemplate = 'Oi {nome}, tudo bom? Você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}. Gostaríamos de pedir para que se junte ao bispado no púlpito durante o hino intermediário. Podemos contar com você?';
         break;
     }
 
@@ -121,6 +130,8 @@ Deno.serve(async (req) => {
         whatsapp_template_speech_1: defaultSpeech1Template,
         whatsapp_template_speech_2: defaultSpeech2Template,
         whatsapp_template_speech_3: defaultSpeech3Template,
+        whatsapp_template_opening_prayer: defaultOpeningPrayerTemplate,
+        whatsapp_template_closing_prayer: defaultClosingPrayerTemplate,
       })
       .select()
       .single();

@@ -54,6 +54,8 @@ export interface SpeechSlotProps {
   onToggleSecondSpeech?: (enabled: boolean) => void;
   /** Whether this slot is a prayer (positions 0 or 4). Hides topic row and 2nd speech toggle. */
   isPrayer?: boolean;
+  /** When true, all interactions are suppressed (offline read-only mode). */
+  disabled?: boolean;
 }
 
 // --- Position Labels ---
@@ -86,6 +88,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   isSecondSpeechEnabled,
   onToggleSecondSpeech,
   isPrayer = false,
+  disabled = false,
 }: SpeechSlotProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -93,11 +96,11 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 
   const [statusModalVisible, setStatusModalVisible] = useState(false);
 
-  const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign');
-  const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign');
-  const canChangeStatus = hasPermission('speech:change_status');
-  const isObserver = role === 'observer';
-  const isBispado = role === 'bishopric';
+  const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign') && !disabled;
+  const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign') && !disabled;
+  const canChangeStatus = hasPermission('speech:change_status') && !disabled;
+  const isObserver = role === 'observer' || disabled;
+  const isBispado = role === 'bishopric' && !disabled;
 
   // F118: For position 2, check if toggle is enabled (only when not a prayer slot)
   const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false;

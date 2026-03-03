@@ -44,6 +44,8 @@ export interface AgendaFormProps {
   sundayDate: string;
   exceptionReason: SundayExceptionReason | null;
   customReason?: string | null;
+  /** When true, all form fields are disabled (offline read-only mode). */
+  disabled?: boolean;
 }
 
 type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer';
@@ -56,14 +58,14 @@ interface SelectorState {
 
 // --- Component ---
 
-export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exceptionReason, customReason }: AgendaFormProps) {
+export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exceptionReason, customReason, disabled = false }: AgendaFormProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
   const router = useRouter();
   const locale = getCurrentLanguage();
 
-  const isObserver = !hasPermission('agenda:write');
+  const isObserver = !hasPermission('agenda:write') || disabled;
 
   const { data: agenda } = useAgenda(sundayDate);
   const updateAgenda = useUpdateAgenda();

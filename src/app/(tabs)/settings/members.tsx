@@ -40,6 +40,7 @@ import {
   checkFutureSpeeches,
   memberKeys,
 } from '../../../hooks/useMembers';
+import { useSpeechCounts } from '../../../hooks/useSpeechCounts';
 import type { Member } from '../../../types/database';
 
 // --- Inline Editor ---
@@ -201,6 +202,7 @@ interface MemberRowProps {
   onCancel: () => void;
   disabled: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
+  speechCount: number;
 }
 
 function MemberRow({
@@ -214,6 +216,7 @@ function MemberRow({
   onCancel,
   disabled,
   colors,
+  speechCount,
 }: MemberRowProps) {
   const { t } = useTranslation();
 
@@ -252,6 +255,11 @@ function MemberRow({
           {member.phone && (
             <Text style={[styles.memberPhone, { color: colors.textSecondary }]}>
               {getFlagForCode(member.country_code)} {member.country_code} {member.phone}
+            </Text>
+          )}
+          {speechCount > 0 && (
+            <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
+              {t('members.speechCount', { count: speechCount })}
             </Text>
           )}
         </View>
@@ -293,6 +301,7 @@ export default function MembersScreen() {
   const canWrite = hasPermission('member:write');
 
   const { data: members, isLoading } = useMembers(search);
+  const { data: speechCounts } = useSpeechCounts();
   const createMember = useCreateMember();
   const updateMember = useUpdateMember();
   const deleteMember = useDeleteMember();
@@ -537,9 +546,10 @@ export default function MembersScreen() {
         onCancel={() => setEditingId(null)}
         disabled={!canWrite}
         colors={colors}
+        speechCount={speechCounts.get(item.id) ?? 0}
       />
     ),
-    [editingId, activeSwipeId, handleEdit, handleDelete, handleSaveEdit, canWrite, colors]
+    [editingId, activeSwipeId, handleEdit, handleDelete, handleSaveEdit, canWrite, colors, speechCounts]
   );
 
   return (
@@ -814,6 +824,10 @@ const styles = StyleSheet.create({
   },
   memberPhone: {
     fontSize: 13,
+    marginTop: 2,
+  },
+  memberSpeechCount: {
+    fontSize: 12,
     marginTop: 2,
   },
   empty: {

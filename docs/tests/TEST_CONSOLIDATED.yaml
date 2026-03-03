@@ -4,15 +4,15 @@
 # =============================================================================
 
 type: test_consolidated
-version: 2
+version: 3
 last_updated: "2026-03-03"
 
 summary:
-  total_test_files: 30
-  total_tests: 589
+  total_test_files: 31
+  total_tests: 644
   framework: vitest
   categories:
-    module_named: 25
+    module_named: 26
     integration: 5
   infrastructure:
     setup: 1
@@ -48,7 +48,7 @@ module_tests:
     tests: 13
     module: src/i18n/locales/*.json
     covers:
-      - Locale key parity across pt-BR, en, es
+      - Locale key parity across pt-BR, en-US, es-LA
       - Login title/subtitle translations
       - Speech status, month abbreviation, theme, and sunday exception translations
 
@@ -56,12 +56,12 @@ module_tests:
     tests: 10
     module: src/i18n/index.ts
     covers:
-      - SUPPORTED_LANGUAGES (pt-BR, en, es)
+      - SUPPORTED_LANGUAGES (pt-BR, en-US, es-LA)
       - LANGUAGE_LABELS, DEFAULT_COUNTRY_CODES, DEFAULT_TIMEZONES
       - SupportedLanguage type coverage
 
   - file: src/__tests__/theme.test.ts
-    tests: 10
+    tests: 11
     module: src/lib/theme.ts
     covers:
       - lightColors and darkColors hex validity
@@ -79,7 +79,7 @@ module_tests:
       - Light vs dark visual distinction
 
   - file: src/__tests__/database-types.test.ts
-    tests: 22
+    tests: 23
     module: src/types/database.ts
     covers:
       - Role, Permission, SpeechStatus, SundayExceptionReason types
@@ -108,16 +108,16 @@ module_tests:
       - splitPhoneNumber (Brazilian, US, 3-digit country codes, empty, no prefix)
 
   - file: src/__tests__/permissions.test.ts
-    tests: 79
+    tests: 83
     module: src/lib/permissions.ts
     covers:
-      - Exhaustive permission matrix (3 roles x 24 permissions)
+      - Exhaustive permission matrix (3 roles x 24+ permissions)
       - Role-specific permission verification
       - getPermissions per role
       - ALL_PERMISSIONS and ALL_ROLES constants
 
   - file: src/__tests__/activityLog.test.ts
-    tests: 17
+    tests: 29
     module: src/lib/activityLog.ts
     covers:
       - logAction (success, parameters, optional userName)
@@ -127,7 +127,7 @@ module_tests:
       - formatLogDescription (i18n integration, speech status, actor role, sunday type)
 
   - file: src/__tests__/useMembers-utils.test.ts
-    tests: 12
+    tests: 18
     module: src/hooks/useMembers.ts
     covers:
       - normalizeForSearch (lowercase, diacritics, accents)
@@ -143,7 +143,7 @@ module_tests:
       - Unique keys for different wards and languages
 
   - file: src/__tests__/useHymns-utils.test.ts
-    tests: 12
+    tests: 14
     module: src/hooks/useHymns.ts
     covers:
       - filterHymns (empty search, numeric prefix match, text search, accent insensitive)
@@ -151,7 +151,7 @@ module_tests:
       - hymnKeys query key generation
 
   - file: src/__tests__/useSundayList-utils.test.ts
-    tests: 7
+    tests: 9
     module: src/hooks/useSundayList.ts
     covers:
       - addMonths (forward, backward, year boundary)
@@ -178,7 +178,7 @@ module_tests:
       - groupSpeechesBySunday (grouping, exceptions, empty dates)
 
   - file: src/__tests__/useActors-utils.test.ts
-    tests: 13
+    tests: 17
     module: src/hooks/useActors.ts
     covers:
       - enforceActorRules (identity function)
@@ -195,7 +195,7 @@ module_tests:
       - EXCLUDED_EXCEPTION_TYPES constant
 
   - file: src/__tests__/usePresentationMode-utils.test.ts
-    tests: 13
+    tests: 11
     module: src/hooks/usePresentationMode.ts
     covers:
       - isTodaySunday, getTodaySundayDate
@@ -204,13 +204,13 @@ module_tests:
       - Meeting type in special meeting cards
 
   - file: src/__tests__/useNotifications-utils.test.ts
-    tests: 30
+    tests: 43
     module: src/lib/notificationUtils.ts
     covers:
-      - getOrdinal (pt-BR, en, es)
+      - getOrdinal (pt-BR, en-US, es-LA)
       - formatNameList (empty, single, two names, three names per language)
       - buildNotificationText for all 5 types (designation, weekly_assignment, weekly_confirmation, speaker_confirmed, speaker_withdrew)
-      - Prayer position handling (position 0 opening, position 4 closing)
+      - Prayer position handling (position 0 opening, position 4 closing) in all 3 languages
 
   - file: src/__tests__/useConnection-utils.test.ts
     tests: 6
@@ -234,7 +234,7 @@ module_tests:
       - POLLING_INTERVAL_MS
 
   - file: src/__tests__/offline-utils.test.ts
-    tests: 13
+    tests: 15
     module: src/lib/offlineQueue.ts, src/lib/offlineGuard.ts
     covers:
       - hasCapacity, shouldRetry, getMaxQueueSize, getMaxRetries
@@ -242,13 +242,27 @@ module_tests:
       - requiresConnection (online-only vs normal)
 
   - file: src/__tests__/whatsapp-utils.test.ts
-    tests: 18
+    tests: 20
     module: src/lib/whatsappUtils.ts
     covers:
       - resolveTemplate (placeholder replacement, missing placeholders, double space cleanup)
       - buildWhatsAppUrl (phone formatting, country code, custom template, default template)
-      - getDefaultSpeechTemplate (pt-BR, en, es, fallback)
+      - getDefaultSpeechTemplate (pt-BR, en-US, es-LA, fallback)
       - Language parameter for template selection
+
+  - file: src/__tests__/f040-language-codes.test.ts
+    tests: 55
+    module: "src/i18n/index.ts, src/lib/dateUtils.ts, src/lib/whatsappUtils.ts, src/lib/notificationUtils.ts"
+    covers:
+      - "F040 (CR-249): Language code standardization verification"
+      - toDbLocale identity mapping (pt-BR, en-US, es-LA)
+      - formatDateHumanReadable with en-US, es-LA, pt-BR
+      - formatFullDate with en-US, es-LA, pt-BR (weekday names)
+      - getDefaultPrayerTemplate (en-US, es-LA, pt-BR, fallback for opening and closing)
+      - getDefaultSpeechTemplate with new codes (en-US, es-LA)
+      - getOrdinal, formatNameList, buildNotificationText with new codes
+      - SUPPORTED_LANGUAGES, LANGUAGE_LABELS, DEFAULT_COUNTRY_CODES, DEFAULT_TIMEZONES verification
+      - Backward compatibility (old codes en, es, es-ES not in SUPPORTED_LANGUAGES)
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -271,7 +285,7 @@ integration_tests:
       - Shared QueryClient cache
 
   - file: src/__tests__/integration/permissions-roles.integration.test.ts
-    tests: 19
+    tests: 22
     covers:
       - Permission matrix (bishopric, secretary, observer roles)
       - getPermissions, ALL_PERMISSIONS, ALL_ROLES
@@ -303,7 +317,7 @@ integration_tests:
       - Boundary Sunday number
 
   - file: src/__tests__/integration/sync-realtime.integration.test.ts
-    tests: 20
+    tests: 22
     covers:
       - Sync configuration (SYNCED_TABLES, TABLE_TO_QUERY_KEYS, getQueryKeysForTable, POLLING_INTERVAL_MS)
       - Connection utilities (isNetInfoOnline)
@@ -411,8 +425,218 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # ===========================================================================
+  # F040 LANGUAGE CODE STANDARDIZATION - TEST COVERAGE (CR-249)
+  # ===========================================================================
+
+  - feature: F040
+    tests:
+      # AC-001: SUPPORTED_LANGUAGES
+      - name: "contains exactly pt-BR, en-US, es-LA"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-001"]
+        covers_ecs: []
+        status: passing
+
+      - name: "does NOT contain old short codes (en, es)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-001"]
+        covers_ecs: []
+        status: passing
+
+      - name: "does NOT contain old DB codes (es-ES)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-001"]
+        covers_ecs: []
+        status: passing
+
+      # AC-005, AC-006: toDbLocale identity mapping
+      - name: "toDbLocale returns en-US unchanged (AC-005)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-005"]
+        covers_ecs: []
+        status: passing
+
+      - name: "toDbLocale returns es-LA unchanged (AC-006)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-006"]
+        covers_ecs: []
+        status: passing
+
+      - name: "toDbLocale passes through unknown codes unchanged"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-005", "AC-006"]
+        covers_ecs: []
+        status: passing
+
+      # AC-007, AC-008: formatDate
+      - name: "formats as FEB 08 for en-US (AC-007)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-007"]
+        covers_ecs: []
+        status: passing
+
+      - name: "formats as 08 FEB for es-LA (AC-008)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-008"]
+        covers_ecs: []
+        status: passing
+
+      # AC-009: formatDateHumanReadable
+      - name: "returns February 15, 2026 for en-US (AC-009)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-009"]
+        covers_ecs: []
+        status: passing
+
+      # AC-010: formatFullDate
+      - name: "returns Sunday, February 15, 2026 for en-US (AC-010)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-010"]
+        covers_ecs: []
+        status: passing
+
+      # AC-011: getDefaultSpeechTemplate en-US
+      - name: "returns English template for en-US position 1 (AC-011)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-011"]
+        covers_ecs: []
+        status: passing
+
+      # AC-012: getDefaultSpeechTemplate es-LA
+      - name: "returns Spanish template for es-LA position 1 (AC-012)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-012"]
+        covers_ecs: []
+        status: passing
+
+      # AC-013: getDefaultPrayerTemplate en-US
+      - name: "returns English opening prayer for en-US (AC-013)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-013"]
+        covers_ecs: []
+        status: passing
+
+      - name: "returns English closing prayer for en-US"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-013"]
+        covers_ecs: []
+        status: passing
+
+      - name: "returns Spanish opening prayer for es-LA"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-013"]
+        covers_ecs: []
+        status: passing
+
+      - name: "returns Spanish closing prayer for es-LA"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-013"]
+        covers_ecs: []
+        status: passing
+
+      - name: "prayer template falls back to pt-BR for unknown language"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-014"]
+        covers_ecs: []
+        status: passing
+
+      # AC-014: Speech template fallback
+      - name: "falls back to pt-BR for unknown language (AC-014)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-014"]
+        covers_ecs: []
+        status: passing
+
+      # AC-015, AC-016: getOrdinal
+      - name: "returns 1st for en-US (AC-015)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-015"]
+        covers_ecs: []
+        status: passing
+
+      - name: "returns 2do for es-LA (AC-016)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-016"]
+        covers_ecs: []
+        status: passing
+
+      # AC-017, AC-018: formatNameList
+      - name: "joins two names with and for en-US (AC-017)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-017"]
+        covers_ecs: []
+        status: passing
+
+      - name: "joins two names with y for es-LA (AC-018)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-018"]
+        covers_ecs: []
+        status: passing
+
+      # AC-019: buildNotificationText
+      - name: "returns Speech Assignment title for en-US (AC-019)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-019"]
+        covers_ecs: []
+        status: passing
+
+      # AC-032: Register screen language codes
+      - name: "SUPPORTED_LANGUAGES provides codes for register screen (AC-032)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-032"]
+        covers_ecs: []
+        status: passing
+
+      # AC-033: Backward compatibility
+      - name: "old code en is NOT in SUPPORTED_LANGUAGES (AC-033)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-033"]
+        covers_ecs: []
+        status: passing
+
+      - name: "old code es is NOT in SUPPORTED_LANGUAGES (AC-033)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-033"]
+        covers_ecs: []
+        status: passing
+
+      - name: "old code es-ES is NOT in SUPPORTED_LANGUAGES (AC-033)"
+        file: src/__tests__/f040-language-codes.test.ts
+        type: unit
+        covers_acs: ["AC-033"]
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
+    # --- F039 (Phase 1) ---
     - id: COR-001-AC-1
       covered: false
       reason: "Doc-only change (SPEC text correction). No behavioral code to test."
@@ -453,7 +677,109 @@ coverage:
       covered: false
       reason: "Comment-only change. No behavioral code to test."
 
+    # --- F040 (Phase 2 / CR-249) ---
+    - id: AC-001
+      covered: true
+      tests: ["contains exactly pt-BR, en-US, es-LA", "does NOT contain old short codes"]
+    - id: AC-002
+      covered: false
+      reason: "detectDeviceLocale is a private function (not exported) in src/i18n/index.ts. Cannot be directly imported and tested."
+    - id: AC-003
+      covered: false
+      reason: "detectDeviceLocale is a private function (not exported). Cannot be directly tested."
+    - id: AC-004
+      covered: false
+      reason: "detectDeviceLocale is a private function (not exported). Cannot be directly tested."
+    - id: AC-005
+      covered: true
+      tests: ["toDbLocale returns en-US unchanged"]
+    - id: AC-006
+      covered: true
+      tests: ["toDbLocale returns es-LA unchanged"]
+    - id: AC-007
+      covered: true
+      tests: ["formats as FEB 08 for en-US"]
+    - id: AC-008
+      covered: true
+      tests: ["formats as 08 FEB for es-LA"]
+    - id: AC-009
+      covered: true
+      tests: ["returns February 15, 2026 for en-US"]
+    - id: AC-010
+      covered: true
+      tests: ["returns Sunday, February 15, 2026 for en-US"]
+    - id: AC-011
+      covered: true
+      tests: ["returns English template for en-US position 1"]
+    - id: AC-012
+      covered: true
+      tests: ["returns Spanish template for es-LA position 1"]
+    - id: AC-013
+      covered: true
+      tests: ["returns English opening prayer for en-US", "returns English closing prayer for en-US"]
+    - id: AC-014
+      covered: true
+      tests: ["falls back to pt-BR for unknown language"]
+    - id: AC-015
+      covered: true
+      tests: ["returns 1st for en-US"]
+    - id: AC-016
+      covered: true
+      tests: ["returns 2do for es-LA"]
+    - id: AC-017
+      covered: true
+      tests: ["joins two names with and for en-US"]
+    - id: AC-018
+      covered: true
+      tests: ["joins two names with y for es-LA"]
+    - id: AC-019
+      covered: true
+      tests: ["returns Speech Assignment title for en-US"]
+    - id: AC-020
+      covered: false
+      reason: "register-first-user is a Deno Edge Function, cannot be imported in vitest."
+    - id: AC-021
+      covered: false
+      reason: "register-first-user is a Deno Edge Function, cannot be imported in vitest."
+    - id: AC-022
+      covered: false
+      reason: "process-notifications is a Deno Edge Function, cannot be imported in vitest."
+    - id: AC-023
+      covered: false
+      reason: "send-reset-email is a Deno Edge Function, cannot be imported in vitest."
+    - id: AC-024
+      covered: false
+      reason: "send-reset-email is a Deno Edge Function, cannot be imported in vitest."
+    - id: AC-025
+      covered: false
+      reason: "Database migration (SQL). Cannot be tested in vitest."
+    - id: AC-026
+      covered: false
+      reason: "Database migration (SQL). Cannot be tested in vitest."
+    - id: AC-027
+      covered: false
+      reason: "Database migration (SQL). Cannot be tested in vitest."
+    - id: AC-028
+      covered: false
+      reason: "Database migration (SQL). Cannot be tested in vitest."
+    - id: AC-029
+      covered: false
+      reason: "Database migration (SQL). Cannot be tested in vitest."
+    - id: AC-030
+      covered: false
+      reason: "import-hymns script uses Deno/Supabase runtime. Cannot be imported in vitest."
+    - id: AC-031
+      covered: false
+      reason: "import-hymns script uses Deno/Supabase runtime. Cannot be imported in vitest."
+    - id: AC-032
+      covered: true
+      tests: ["SUPPORTED_LANGUAGES provides codes for register screen"]
+    - id: AC-033
+      covered: true
+      tests: ["old code en is NOT in SUPPORTED_LANGUAGES", "old code es is NOT in SUPPORTED_LANGUAGES"]
+
   edge_cases:
+    # F039 edge cases
     - id: EC-2col-rejected
       covered: true
       tests: ["rejects 1-column header CSV"]
@@ -468,6 +794,7 @@ coverage:
       tests: ["handles CSV with extra columns beyond 3 (ignores extras)"]
 
 gaps:
+  # F039 gaps (unchanged)
   - id: COR-001-AC-1
     reason: "Doc-only correction to SPEC_CONSOLIDATED. No runtime code changed."
     recommendation: "No test needed. Verified by reading corrected SPEC text."
@@ -490,8 +817,55 @@ gaps:
     reason: "Comment-only change (no runtime behavior affected)."
     recommendation: "No test needed. Verified by grep."
 
+  # F040 gaps
+  - id: AC-002
+    reason: "detectDeviceLocale is a private (non-exported) function in src/i18n/index.ts. It cannot be imported and tested directly."
+    recommendation: "Export detectDeviceLocale for testing, or test indirectly via initI18n with mocked Intl."
+  - id: AC-003
+    reason: "Same as AC-002. detectDeviceLocale is private."
+    recommendation: "Same as AC-002."
+  - id: AC-004
+    reason: "Same as AC-002. detectDeviceLocale is private."
+    recommendation: "Same as AC-002."
+  - id: AC-020
+    reason: "register-first-user is a standalone Deno Edge Function. Cannot be imported in vitest Node.js environment."
+    recommendation: "Verified by code review. Switch case 'en-US' and 'es-LA' confirmed present."
+  - id: AC-021
+    reason: "Same as AC-020."
+    recommendation: "Same as AC-020."
+  - id: AC-022
+    reason: "process-notifications is a standalone Deno Edge Function. Cannot be imported in vitest."
+    recommendation: "Verified by code review. Record keys use 'en-US' and 'es-LA'."
+  - id: AC-023
+    reason: "send-reset-email is a standalone Deno Edge Function. Cannot be imported in vitest."
+    recommendation: "Verified by code review. Default language is 'en-US'."
+  - id: AC-024
+    reason: "Same as AC-023."
+    recommendation: "Same as AC-023."
+  - id: AC-025
+    reason: "Database migration SQL. Cannot be executed in vitest test environment."
+    recommendation: "Verified by SQL review. UPDATE wards SET language='en-US' WHERE language='en'."
+  - id: AC-026
+    reason: "Same as AC-025."
+    recommendation: "Verified by SQL review. UPDATE wards SET language='es-LA' WHERE language='es'."
+  - id: AC-027
+    reason: "Same as AC-025."
+    recommendation: "Verified by SQL review. UPDATE hymns SET language='es-LA' WHERE language='es-ES'."
+  - id: AC-028
+    reason: "Same as AC-025."
+    recommendation: "Verified by SQL review. UPDATE general_collections SET language='es-LA' WHERE language='es-ES'."
+  - id: AC-029
+    reason: "Same as AC-025."
+    recommendation: "Verified by SQL review. No UPDATE WHERE language='pt-BR' exists."
+  - id: AC-030
+    reason: "import-hymns is a standalone script using Deno/Supabase. Cannot be imported in vitest."
+    recommendation: "Verified by code review. LANGUAGE_MAP['EN-US'] === 'en-US'."
+  - id: AC-031
+    reason: "Same as AC-030."
+    recommendation: "Verified by code review. LANGUAGE_MAP['ES-ES'] === 'es-LA'."
+
 stats:
-  total_tests: 589
-  passing: 589
+  total_tests: 644
+  passing: 644
   failing: 0
   skipped: 0

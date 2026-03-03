@@ -6,8 +6,8 @@ import type { SupportedLanguage } from '../i18n';
  */
 const MONTH_ABBR: Record<SupportedLanguage, string[]> = {
   'pt-BR': ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'],
-  en: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
-  es: ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'],
+  'en-US': ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+  'es-LA': ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'],
 };
 
 /**
@@ -15,8 +15,8 @@ const MONTH_ABBR: Record<SupportedLanguage, string[]> = {
  */
 const MONTH_FULL: Record<SupportedLanguage, string[]> = {
   'pt-BR': ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
-  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-  es: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  'en-US': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  'es-LA': ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
 };
 
 /**
@@ -25,8 +25,8 @@ const MONTH_FULL: Record<SupportedLanguage, string[]> = {
  */
 const DAY_NAMES: Record<SupportedLanguage, string[]> = {
   'pt-BR': ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
-  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-  es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  'en-US': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  'es-LA': ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
 };
 
 /**
@@ -88,8 +88,8 @@ export function getMonthAbbr(month: number, locale: SupportedLanguage = 'pt-BR')
 /**
  * Format a date according to the locale pattern.
  * - pt-BR: "08 FEV" (day month)
- * - en: "FEB 08" (month day)
- * - es: "08 FEB" (day month)
+ * - en-US: "FEB 08" (month day)
+ * - es-LA: "08 FEB" (day month)
  */
 export function formatDate(date: Date | string, locale: SupportedLanguage = 'pt-BR'): string {
   const d = typeof date === 'string' ? parseLocalDate(date) : date;
@@ -97,10 +97,10 @@ export function formatDate(date: Date | string, locale: SupportedLanguage = 'pt-
   const month = getMonthAbbr(d.getMonth() + 1, locale);
 
   switch (locale) {
-    case 'en':
+    case 'en-US':
       return `${month} ${day}`;
     case 'pt-BR':
-    case 'es':
+    case 'es-LA':
     default:
       return `${day} ${month}`;
   }
@@ -186,8 +186,8 @@ export function getPreviousSundays(from: Date | string, count: number): Date[] {
 /**
  * Format a date as a human-readable string for activity log descriptions.
  * - pt-BR: "15 de Fevereiro de 2026"
- * - en: "February 15, 2026"
- * - es: "15 de Febrero de 2026"
+ * - en-US: "February 15, 2026"
+ * - es-LA: "15 de Febrero de 2026"
  */
 export function formatDateHumanReadable(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
   const d = parseLocalDate(dateStr);
@@ -196,10 +196,10 @@ export function formatDateHumanReadable(dateStr: string, language: SupportedLang
   const year = d.getFullYear();
 
   switch (language) {
-    case 'en':
+    case 'en-US':
       return `${month} ${day}, ${year}`;
     case 'pt-BR':
-    case 'es':
+    case 'es-LA':
     default:
       return `${day} de ${month} de ${year}`;
   }
@@ -209,8 +209,8 @@ export function formatDateHumanReadable(dateStr: string, language: SupportedLang
  * Format a date with day of week name for display headers.
  * Uses the ward's configured language (not device locale).
  * - pt-BR: "Domingo, 16 de Fevereiro de 2026"
- * - en: "Sunday, February 16, 2026"
- * - es: "Domingo, 16 de Febrero de 2026"
+ * - en-US: "Sunday, February 16, 2026"
+ * - es-LA: "Domingo, 16 de Febrero de 2026"
  */
 export function formatFullDate(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
   const d = parseLocalDate(dateStr);
@@ -220,10 +220,10 @@ export function formatFullDate(dateStr: string, language: SupportedLanguage = 'p
   const year = d.getFullYear();
 
   switch (language) {
-    case 'en':
+    case 'en-US':
       return `${dayName}, ${month} ${day}, ${year}`;
     case 'pt-BR':
-    case 'es':
+    case 'es-LA':
     default:
       return `${dayName}, ${day} de ${month} de ${year}`;
   }

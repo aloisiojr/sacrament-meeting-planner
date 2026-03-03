@@ -5,14 +5,14 @@
 
 // --- Types ---
 
-export type OrdinalLanguage = 'pt-BR' | 'en' | 'es';
+export type OrdinalLanguage = 'pt-BR' | 'en-US' | 'es-LA';
 
 // --- Ordinals ---
 
 const ORDINALS: Record<OrdinalLanguage, Record<number, string>> = {
   'pt-BR': { 1: '1\u00BA', 2: '2\u00BA', 3: '3\u00BA' },
-  en: { 1: '1st', 2: '2nd', 3: '3rd' },
-  es: { 1: '1er', 2: '2do', 3: '3er' },
+  'en-US': { 1: '1st', 2: '2nd', 3: '3rd' },
+  'es-LA': { 1: '1er', 2: '2do', 3: '3er' },
 };
 
 /**
@@ -29,7 +29,7 @@ export function formatNameList(names: string[], language: OrdinalLanguage): stri
   if (names.length === 0) return '';
   if (names.length === 1) return names[0];
 
-  const conjunction = language === 'en' ? ' and ' : language === 'es' ? ' y ' : ' e ';
+  const conjunction = language === 'en-US' ? ' and ' : language === 'es-LA' ? ' y ' : ' e ';
   if (names.length === 2) return names.join(conjunction);
 
   const allButLast = names.slice(0, -1).join(', ');
@@ -43,8 +43,8 @@ export function formatNameList(names: string[], language: OrdinalLanguage): stri
 function getPrayerLabel(position: number, language: OrdinalLanguage): string | null {
   const labels: Record<OrdinalLanguage, Record<number, string>> = {
     'pt-BR': { 0: 'oração de abertura', 4: 'oração de encerramento' },
-    en: { 0: 'opening prayer', 4: 'closing prayer' },
-    es: { 0: 'oración de apertura', 4: 'oración de clausura' },
+    'en-US': { 0: 'opening prayer', 4: 'closing prayer' },
+    'es-LA': { 0: 'oración de apertura', 4: 'oración de clausura' },
   };
   return labels[language]?.[position] ?? null;
 }
@@ -107,7 +107,7 @@ export function buildNotificationText(
         };
       },
     },
-    en: {
+    'en-US': {
       designation: (d) => {
         const nameList = formatNameList(d.names ?? [], language);
         const verb = (d.names?.length ?? 0) > 1 ? 'were assigned' : 'was assigned';
@@ -151,7 +151,7 @@ export function buildNotificationText(
         };
       },
     },
-    es: {
+    'es-LA': {
       designation: (d) => {
         const nameList = formatNameList(d.names ?? [], language);
         const verb = (d.names?.length ?? 0) > 1 ? 'fueron asignados' : 'fue asignado(a)';

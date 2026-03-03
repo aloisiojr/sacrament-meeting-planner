@@ -82,16 +82,16 @@ describe('I18N-001: Missing common.yes and common.no keys', () => {
     });
   });
 
-  // --- AC-166-03: All 3 locale files have identical key sets (332 keys) ---
+  // --- AC-166-03: All 3 locale files have identical key sets (334 keys) ---
   describe('AC-166-03: Key parity across all 3 locale files', () => {
     const ptBRKeys = collectKeys(ptBR as Record<string, unknown>).sort();
     const enKeys = collectKeys(en as Record<string, unknown>).sort();
     const esKeys = collectKeys(es as Record<string, unknown>).sort();
 
-    it('all 3 locale files have 332 keys', () => {
-      expect(ptBRKeys.length).toBe(332);
-      expect(enKeys.length).toBe(332);
-      expect(esKeys.length).toBe(332);
+    it('all 3 locale files have 334 keys', () => {
+      expect(ptBRKeys.length).toBe(334);
+      expect(enKeys.length).toBe(334);
+      expect(esKeys.length).toBe(334);
     });
 
     it('key sets are identical across all 3 locales', () => {

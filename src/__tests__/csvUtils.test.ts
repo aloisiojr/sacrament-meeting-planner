@@ -11,8 +11,8 @@ describe('parseCsv', () => {
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(2);
-    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', phone: '+5511999999999' });
-    expect(result.members[1]).toEqual({ full_name: 'Maria Santos', phone: '+5521888888888' });
+    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', informal_name: 'Joao', phone: '+5511999999999' });
+    expect(result.members[1]).toEqual({ full_name: 'Maria Santos', informal_name: 'Maria', phone: '+5521888888888' });
   });
 
   it('handles UTF-8 BOM prefix', () => {
@@ -27,7 +27,7 @@ describe('parseCsv', () => {
     const csv = 'Nome,Telefone Completo\nJoao Silva,';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
-    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', phone: '' });
+    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', informal_name: 'Joao', phone: '' });
   });
 
   it('rejects empty CSV', () => {
@@ -88,33 +88,33 @@ describe('parseCsv', () => {
 describe('generateCsv', () => {
   it('generates CSV with BOM, header, and data rows', () => {
     const members = [
-      { full_name: 'Joao Silva', country_code: '+55', phone: '11999999999' },
-      { full_name: 'Maria Santos', country_code: '+55', phone: '21888888888' },
+      { full_name: 'Joao Silva', informal_name: 'Joao', country_code: '+55', phone: '11999999999' },
+      { full_name: 'Maria Santos', informal_name: 'Maria', country_code: '+55', phone: '21888888888' },
     ];
     const csv = generateCsv(members);
     expect(csv.startsWith('\uFEFF')).toBe(true);
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('\uFEFFNome,Telefone Completo');
-    expect(lines[1]).toBe('Joao Silva,+5511999999999');
-    expect(lines[2]).toBe('Maria Santos,+5521888888888');
+    expect(lines[0]).toBe('\uFEFFNome,Nome Informal,Telefone Completo');
+    expect(lines[1]).toBe('Joao Silva,Joao,+5511999999999');
+    expect(lines[2]).toBe('Maria Santos,Maria,+5521888888888');
   });
 
   it('handles null phone', () => {
     const members = [
-      { full_name: 'Joao Silva', country_code: '+55', phone: null },
+      { full_name: 'Joao Silva', informal_name: 'Joao', country_code: '+55', phone: null },
     ];
     const csv = generateCsv(members);
     const lines = csv.split('\n');
-    expect(lines[1]).toBe('Joao Silva,');
+    expect(lines[1]).toBe('Joao Silva,Joao,');
   });
 
   it('escapes names with commas', () => {
     const members = [
-      { full_name: 'Silva, Joao', country_code: '+55', phone: '11999999999' },
+      { full_name: 'Silva, Joao', informal_name: 'Joao', country_code: '+55', phone: '11999999999' },
     ];
     const csv = generateCsv(members);
     const lines = csv.split('\n');
-    expect(lines[1]).toBe('"Silva, Joao",+5511999999999');
+    expect(lines[1]).toBe('"Silva, Joao",Joao,+5511999999999');
   });
 });
 

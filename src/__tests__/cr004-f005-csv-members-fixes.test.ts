@@ -214,15 +214,15 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
   describe('Empty CSV export generates file with headers', () => {
     it('generateCsv with empty array should return header row', () => {
       const result = generateCsv([]);
-      // Should contain BOM + header
-      expect(result).toContain('Nome,Telefone Completo');
+      // Should contain BOM + header (3-column format since F173)
+      expect(result).toContain('Nome,Nome Informal,Telefone Completo');
     });
 
     it('generateCsv with empty array should have only 1 line (header)', () => {
       const result = generateCsv([]);
       const lines = result.replace(/^\uFEFF/, '').trim().split('\n');
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toBe('Nome,Telefone Completo');
+      expect(lines[0]).toBe('Nome,Nome Informal,Telefone Completo');
     });
 
     it('generateCsv should include UTF-8 BOM for Excel compatibility', () => {
@@ -234,24 +234,24 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
   describe('generateCsv with data', () => {
     it('should generate correct CSV for members with phone', () => {
       const members = [
-        { full_name: 'Maria Silva', country_code: '+55', phone: '11999999999' },
-        { full_name: 'John Doe', country_code: '+1', phone: '2125551234' },
+        { full_name: 'Maria Silva', informal_name: 'Maria', country_code: '+55', phone: '11999999999' },
+        { full_name: 'John Doe', informal_name: 'John', country_code: '+1', phone: '2125551234' },
       ];
       const result = generateCsv(members);
       const lines = result.replace(/^\uFEFF/, '').trim().split('\n');
       expect(lines).toHaveLength(3);
-      expect(lines[0]).toBe('Nome,Telefone Completo');
-      expect(lines[1]).toBe('Maria Silva,+5511999999999');
-      expect(lines[2]).toBe('John Doe,+12125551234');
+      expect(lines[0]).toBe('Nome,Nome Informal,Telefone Completo');
+      expect(lines[1]).toBe('Maria Silva,Maria,+5511999999999');
+      expect(lines[2]).toBe('John Doe,John,+12125551234');
     });
 
     it('should handle members without phone', () => {
       const members = [
-        { full_name: 'Jose Santos', country_code: '+55', phone: null },
+        { full_name: 'Jose Santos', informal_name: 'Jose', country_code: '+55', phone: null },
       ];
       const result = generateCsv(members);
       const lines = result.replace(/^\uFEFF/, '').trim().split('\n');
-      expect(lines[1]).toBe('Jose Santos,');
+      expect(lines[1]).toBe('Jose Santos,Jose,');
     });
 
     it('should escape names with commas', () => {
@@ -441,9 +441,9 @@ describe('CR-66: Empty CSV export & import error formatting', () => {
 describe('CSV round-trip: export then import', () => {
   it('should round-trip members through generateCsv -> parseCsv', () => {
     const original = [
-      { full_name: 'Maria Silva', country_code: '+55', phone: '11999999999' },
-      { full_name: 'John Doe', country_code: '+1', phone: '2125551234' },
-      { full_name: 'Ana Santos', country_code: '+55', phone: null },
+      { full_name: 'Maria Silva', informal_name: 'Maria', country_code: '+55', phone: '11999999999' },
+      { full_name: 'John Doe', informal_name: 'John', country_code: '+1', phone: '2125551234' },
+      { full_name: 'Ana Santos', informal_name: 'Ana', country_code: '+55', phone: null },
     ];
 
     const csv = generateCsv(original);
@@ -462,7 +462,7 @@ describe('CSV round-trip: export then import', () => {
 
   it('should round-trip names with special characters', () => {
     const original = [
-      { full_name: 'Jose, Maria e Filhos', country_code: '+55', phone: '11999999999' },
+      { full_name: 'Jose, Maria e Filhos', informal_name: 'Jose', country_code: '+55', phone: '11999999999' },
     ];
 
     const csv = generateCsv(original);
@@ -516,23 +516,23 @@ describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
 
   describe('generateCsv with custom headers', () => {
     it('should use custom English headers', () => {
-      const result = generateCsv([], { name: 'Name', phone: 'Full Phone' });
+      const result = generateCsv([], { name: 'Name', informalName: 'Informal Name', phone: 'Full Phone' });
       const content = result.replace(/^\uFEFF/, '').trim();
-      expect(content).toBe('Name,Full Phone');
+      expect(content).toBe('Name,Informal Name,Full Phone');
     });
 
     it('should use custom Spanish headers with data', () => {
       const members = [
-        { full_name: 'Maria', country_code: '+55', phone: '11999999999' },
+        { full_name: 'Maria', informal_name: 'Maria', country_code: '+55', phone: '11999999999' },
       ];
-      const result = generateCsv(members, { name: 'Nombre', phone: 'Telefono Completo' });
+      const result = generateCsv(members, { name: 'Nombre', informalName: 'Nombre Informal', phone: 'Telefono Completo' });
       const lines = result.replace(/^\uFEFF/, '').trim().split('\n');
-      expect(lines[0]).toBe('Nombre,Telefono Completo');
+      expect(lines[0]).toBe('Nombre,Nombre Informal,Telefono Completo');
     });
 
     it('should default to pt-BR headers when none provided', () => {
       const result = generateCsv([]);
-      expect(result).toContain('Nome,Telefone Completo');
+      expect(result).toContain('Nome,Nome Informal,Telefone Completo');
     });
   });
 
@@ -698,12 +698,12 @@ describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
 
   describe('Round-trip with multi-language headers', () => {
     const members = [
-      { full_name: 'Maria Silva', country_code: '+55', phone: '11999999999' },
-      { full_name: 'John Doe', country_code: '+1', phone: '2125551234' },
+      { full_name: 'Maria Silva', informal_name: 'Maria', country_code: '+55', phone: '11999999999' },
+      { full_name: 'John Doe', informal_name: 'John', country_code: '+1', phone: '2125551234' },
     ];
 
     it('should round-trip with English headers', () => {
-      const csv = generateCsv(members, { name: 'Name', phone: 'Full Phone' });
+      const csv = generateCsv(members, { name: 'Name', informalName: 'Informal Name', phone: 'Full Phone' });
       const parsed = parseCsv(csv);
       expect(parsed.success).toBe(true);
       expect(parsed.members).toHaveLength(2);
@@ -712,7 +712,7 @@ describe('CR-77/CR-78 Phase 2: Relaxed parseCsv, logging, and cleanup', () => {
     });
 
     it('should round-trip with Spanish headers', () => {
-      const csv = generateCsv(members, { name: 'Nombre', phone: 'Telefono Completo' });
+      const csv = generateCsv(members, { name: 'Nombre', informalName: 'Nombre Informal', phone: 'Telefono Completo' });
       const parsed = parseCsv(csv);
       expect(parsed.success).toBe(true);
       expect(parsed.members).toHaveLength(2);

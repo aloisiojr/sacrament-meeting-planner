@@ -128,7 +128,8 @@ describe('F027 (CR-83): Explicit Save/Cancel for Members and Topics', () => {
       expect(editorEnd).toBeGreaterThan(editorStart);
       const editorSource = source.substring(editorStart, editorEnd);
       expect(editorSource).not.toContain('onBlur={handleSave}');
-      expect(editorSource).not.toContain('onBlur');
+      // F173/CR-247: onBlur is now allowed for informal_name auto-fill (AC-173-12),
+      // but onBlur={handleSave} pattern is still disallowed
     });
   });
 

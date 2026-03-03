@@ -779,7 +779,8 @@ describe('STEP-14: InviteManagementSection - prayer positions', () => {
     });
 
     it('prayer WhatsApp message resolves template with speaker name and date', () => {
-      expect(inviteManagementSource).toContain('speakerName: speech.speaker_name');
+      // F173/CR-247: Updated to use informal_name with fallback to speaker_name
+      expect(inviteManagementSource).toContain("speakerName: speech.speaker_informal_name || speech.speaker_name || ''");
     });
   });
 

@@ -28,16 +28,16 @@ describe('CR-004 F005: CSV & Members Screen Fixes', () => {
   describe('CR-66: Empty CSV export', () => {
     it('generateCsv([]) should return BOM + header row', () => {
       const csv = generateCsv([]);
-      expect(csv).toBe('\uFEFFNome,Telefone Completo');
+      expect(csv).toBe('\uFEFFNome,Nome Informal,Telefone Completo');
     });
 
     it('generateCsv with members should include BOM + header + data', () => {
       const csv = generateCsv([
-        { full_name: 'Joao Silva', country_code: '+55', phone: '11999999999' },
+        { full_name: 'Joao Silva', informal_name: 'Joao', country_code: '+55', phone: '11999999999' },
       ]);
       expect(csv).toContain('\uFEFF');
-      expect(csv).toContain('Nome,Telefone Completo');
-      expect(csv).toContain('Joao Silva,+5511999999999');
+      expect(csv).toContain('Nome,Nome Informal,Telefone Completo');
+      expect(csv).toContain('Joao Silva,Joao,+5511999999999');
     });
 
     it('handleExport should NOT have empty guard', () => {

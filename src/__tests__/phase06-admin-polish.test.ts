@@ -302,26 +302,26 @@ describe('STEP-06-07: CSV Import/Export', () => {
   describe('generateCsv', () => {
     it('generates header row first with BOM', () => {
       const csv = generateCsv([]);
-      expect(csv).toBe('\uFEFFNome,Telefone Completo');
+      expect(csv).toBe('\uFEFFNome,Nome Informal,Telefone Completo');
     });
 
     it('generates correct data rows', () => {
       const members = [
-        { full_name: 'John', country_code: '+55', phone: '11999999999' },
+        { full_name: 'John', informal_name: 'John', country_code: '+55', phone: '11999999999' },
       ];
       const csv = generateCsv(members);
       const lines = csv.split('\n');
-      expect(lines[0]).toBe('\uFEFFNome,Telefone Completo');
-      expect(lines[1]).toBe('John,+5511999999999');
+      expect(lines[0]).toBe('\uFEFFNome,Nome Informal,Telefone Completo');
+      expect(lines[1]).toBe('John,John,+5511999999999');
     });
 
     it('handles null phone', () => {
       const members = [
-        { full_name: 'John', country_code: '+55', phone: null as unknown as string },
+        { full_name: 'John', informal_name: 'John', country_code: '+55', phone: null as unknown as string },
       ];
       const csv = generateCsv(members);
       const lines = csv.split('\n');
-      expect(lines[1]).toBe('John,');
+      expect(lines[1]).toBe('John,John,');
     });
 
     it('escapes name containing comma', () => {

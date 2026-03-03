@@ -478,14 +478,14 @@ describe('CR-42: CSV export and import', () => {
   // AC-42.3: CSV format verification
   it('AC-42.3: generateCsv produces correct header and format', () => {
     const members = [
-      { full_name: 'Joao Silva', country_code: '+55', phone: '11999999999' },
-      { full_name: 'Maria Santos', country_code: '+1', phone: '2025551234' },
+      { full_name: 'Joao Silva', informal_name: 'Joao', country_code: '+55', phone: '11999999999' },
+      { full_name: 'Maria Santos', informal_name: 'Maria', country_code: '+1', phone: '2025551234' },
     ];
     const csv = generateCsv(members);
     const lines = csv.replace('\uFEFF', '').split('\n');
-    expect(lines[0]).toBe('Nome,Telefone Completo');
-    expect(lines[1]).toBe('Joao Silva,+5511999999999');
-    expect(lines[2]).toBe('Maria Santos,+12025551234');
+    expect(lines[0]).toBe('Nome,Nome Informal,Telefone Completo');
+    expect(lines[1]).toBe('Joao Silva,Joao,+5511999999999');
+    expect(lines[2]).toBe('Maria Santos,Maria,+12025551234');
   });
 
   // AC-42.3: CSV format includes BOM for Excel compatibility
@@ -599,7 +599,7 @@ describe('CR-42: CSV export and import', () => {
     const csv = 'Nome,Telefone Completo\nJoao Silva,';
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
-    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', phone: '' });
+    expect(result.members[0]).toEqual({ full_name: 'Joao Silva', informal_name: 'Joao', phone: '' });
   });
 
   it('parseCsv rejects CSV with insufficient columns in header', () => {
@@ -814,11 +814,11 @@ describe('Cross-feature validation', () => {
   // CSV utilities handle edge cases consistently
   it('generateCsv handles member with null phone gracefully', () => {
     const members = [
-      { full_name: 'No Phone', country_code: '+55', phone: null },
+      { full_name: 'No Phone', informal_name: 'No', country_code: '+55', phone: null },
     ];
     const csv = generateCsv(members);
     const lines = csv.split('\n');
-    expect(lines[1]).toBe('No Phone,');
+    expect(lines[1]).toBe('No Phone,No,');
   });
 
   it('parseCsv accepts phones of any length matching /^[+\\d]*$/', () => {

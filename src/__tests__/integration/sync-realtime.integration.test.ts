@@ -94,7 +94,7 @@ describe('Sync configuration integration', () => {
 
   it('getQueryKeysForTable returns correct keys for each table', () => {
     expect(getQueryKeysForTable('members')).toEqual([['members']]);
-    expect(getQueryKeysForTable('speeches')).toEqual([['speeches']]);
+    expect(getQueryKeysForTable('speeches')).toEqual([['speeches'], ['speechCounts']]);
     expect(getQueryKeysForTable('sunday_agendas')).toEqual([['agendas']]);
     expect(getQueryKeysForTable('meeting_actors')).toEqual([['actors']]);
     expect(getQueryKeysForTable('sunday_exceptions')).toEqual([['sundayTypes']]);

@@ -96,14 +96,14 @@ Deno.serve(async (req) => {
     let defaultClosingPrayerTemplate: string;
 
     switch (wardLanguage) {
-      case 'en':
+      case 'en-US':
         defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
         defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
         defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
         defaultOpeningPrayerTemplate = 'Hi {nome}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}. To help with reverence, we ask that you arrive 15 minutes before the meeting starts and sit with the bishopric on the stand. Can we count on you?';
         defaultClosingPrayerTemplate = 'Hi {nome}, how are you? You have been assigned to give the closing prayer at Sacrament Meeting on {data}. We would like to ask you to join the bishopric on the stand during the intermediate hymn. Can we count on you?';
         break;
-      case 'es':
+      case 'es-LA':
         defaultSpeech1Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
         defaultSpeech2Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
         defaultSpeech3Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';

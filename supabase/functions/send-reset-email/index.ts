@@ -36,7 +36,7 @@ function getEmailTemplate(
         </div>
       `,
     },
-    en: {
+    'en-US': {
       subject: 'Reset password - Sacrament Meeting Planner',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -56,7 +56,7 @@ function getEmailTemplate(
         </div>
       `,
     },
-    es: {
+    'es-LA': {
       subject:
         'Restablecer contrasena - Planificador de la Reunion Sacramental',
       html: `
@@ -79,7 +79,7 @@ function getEmailTemplate(
     },
   };
 
-  return templates[language] ?? templates['en'];
+  return templates[language] ?? templates['en-US'];
 }
 
 Deno.serve(async (req) => {
@@ -149,8 +149,8 @@ Deno.serve(async (req) => {
     }
 
     // Get language for email template
-    // Priority: user_metadata.language > ward.language > 'en'
-    let language = 'en';
+    // Priority: user_metadata.language > ward.language > 'en-US'
+    let language = 'en-US';
     const userMetaLanguage = user.user_metadata?.language;
     if (userMetaLanguage && typeof userMetaLanguage === 'string') {
       language = userMetaLanguage;
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           .select('language')
           .eq('id', wardId)
           .single();
-        language = ward?.language ?? 'en';
+        language = ward?.language ?? 'en-US';
       }
     }
 

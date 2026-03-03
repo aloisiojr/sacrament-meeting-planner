@@ -35,8 +35,8 @@ interface PushToken {
 
 const ORDINALS: Record<string, Record<number, string>> = {
   'pt-BR': { 1: '1\u00BA', 2: '2\u00BA', 3: '3\u00BA' },
-  en: { 1: '1st', 2: '2nd', 3: '3rd' },
-  es: { 1: '1er', 2: '2do', 3: '3er' },
+  'en-US': { 1: '1st', 2: '2nd', 3: '3rd' },
+  'es-LA': { 1: '1er', 2: '2do', 3: '3er' },
 };
 
 function getOrdinal(position: number, language: string): string {
@@ -46,8 +46,8 @@ function getOrdinal(position: number, language: string): string {
 function getPrayerLabel(position: number, language: string): string | null {
   const labels: Record<string, Record<number, string>> = {
     'pt-BR': { 0: 'oração de abertura', 4: 'oração de encerramento' },
-    en: { 0: 'opening prayer', 4: 'closing prayer' },
-    es: { 0: 'oración de apertura', 4: 'oración de clausura' },
+    'en-US': { 0: 'opening prayer', 4: 'closing prayer' },
+    'es-LA': { 0: 'oración de apertura', 4: 'oración de clausura' },
   };
   return labels[language]?.[position] ?? null;
 }
@@ -55,7 +55,7 @@ function getPrayerLabel(position: number, language: string): string | null {
 function formatNameList(names: string[], language: string): string {
   if (names.length === 0) return '';
   if (names.length === 1) return names[0];
-  const conjunction = language === 'en' ? ' and ' : language === 'es' ? ' y ' : ' e ';
+  const conjunction = language === 'en-US' ? ' and ' : language === 'es-LA' ? ' y ' : ' e ';
   if (names.length === 2) return names.join(conjunction);
   const allButLast = names.slice(0, -1).join(', ');
   return `${allButLast}${conjunction}${names[names.length - 1]}`;
@@ -74,11 +74,11 @@ function buildDesignationText(
       title: 'Designação de Discurso',
       body: `${nameList} ${names.length > 1 ? 'foram designados' : 'foi designado(a)'} para discursar em ${date}. Hora de enviar o convite!`,
     },
-    en: {
+    'en-US': {
       title: 'Speech Assignment',
       body: `${nameList} ${names.length > 1 ? 'were assigned' : 'was assigned'} to speak on ${date}. Time to send the invitation!`,
     },
-    es: {
+    'es-LA': {
       title: 'Asignación de Discurso',
       body: `${nameList} ${names.length > 1 ? 'fueron asignados' : 'fue asignado(a)'} para hablar el ${date}. ¡Es hora de enviar la invitación!`,
     },
@@ -92,11 +92,11 @@ function buildWeeklyText(language: string): { title: string; body: string } {
       title: 'Lembrete de Discurso',
       body: 'Ainda há oradores para serem designados para o próximo domingo!',
     },
-    en: {
+    'en-US': {
       title: 'Speech Reminder',
       body: 'There are still speakers to be assigned for next Sunday!',
     },
-    es: {
+    'es-LA': {
       title: 'Recordatorio de Discurso',
       body: '¡Aún hay oradores por asignar para el próximo domingo!',
     },
@@ -117,11 +117,11 @@ function buildConfirmedText(
         title: 'Oração Confirmada',
         body: `${name} foi confirmado(a) para a ${prayerLabel} em ${date}.`,
       },
-      en: {
+      'en-US': {
         title: 'Prayer Confirmed',
         body: `${name} has been confirmed to give the ${prayerLabel} on ${date}.`,
       },
-      es: {
+      'es-LA': {
         title: 'Oración Confirmada',
         body: `${name} fue confirmado(a) para la ${prayerLabel} el ${date}.`,
       },
@@ -134,11 +134,11 @@ function buildConfirmedText(
       title: 'Orador Confirmado',
       body: `${name} foi confirmado(a) para o ${ordinal} discurso em ${date}.`,
     },
-    en: {
+    'en-US': {
       title: 'Speaker Confirmed',
       body: `${name} has been confirmed to give the ${ordinal} speech on ${date}.`,
     },
-    es: {
+    'es-LA': {
       title: 'Orador Confirmado',
       body: `${name} fue confirmado(a) para el ${ordinal} discurso el ${date}.`,
     },
@@ -159,11 +159,11 @@ function buildWithdrewText(
         title: 'ATENÇÃO! Desistência de Oração',
         body: `ATENÇÃO! ${name} NÃO poderá fazer a ${prayerLabel} em ${date}. Designe outra pessoa!`,
       },
-      en: {
+      'en-US': {
         title: 'ATTENTION! Prayer Withdrew',
         body: `ATTENTION! ${name} will NOT be able to give the ${prayerLabel} on ${date}. Assign someone else!`,
       },
-      es: {
+      'es-LA': {
         title: '¡ATENCIÓN! Desistimiento de Oración',
         body: `¡ATENCIÓN! ${name} NO podrá hacer la ${prayerLabel} el ${date}. ¡Asigne a otra persona!`,
       },
@@ -176,11 +176,11 @@ function buildWithdrewText(
       title: 'ATENÇÃO! Desistência',
       body: `ATENÇÃO! ${name} NÃO poderá proferir o ${ordinal} discurso em ${date}. Designe outro orador!`,
     },
-    en: {
+    'en-US': {
       title: 'ATTENTION! Speaker Withdrew',
       body: `ATTENTION! ${name} will NOT be able to give the ${ordinal} speech on ${date}. Assign another speaker!`,
     },
-    es: {
+    'es-LA': {
       title: '¡ATENCIÓN! Desistimiento',
       body: `¡ATENCIÓN! ${name} NO podrá dar el ${ordinal} discurso el ${date}. ¡Asigne otro orador!`,
     },

@@ -154,15 +154,13 @@ export interface Speech {
   updated_at: string;
 }
 
+export type ActorRole = 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor';
+
 export interface MeetingActor {
   id: string;
   ward_id: string;
   name: string;
-  can_preside: boolean;
-  can_conduct: boolean;
-  can_recognize: boolean;
-  can_pianist: boolean;
-  can_conductor: boolean;
+  role: ActorRole;
   created_at: string;
   updated_at: string;
 }
@@ -321,21 +319,13 @@ export interface CreateTopicInput {
 
 export interface CreateActorInput {
   name: string;
-  can_preside?: boolean;
-  can_conduct?: boolean;
-  can_recognize?: boolean;
-  can_pianist?: boolean;
-  can_conductor?: boolean;
+  role: ActorRole;
 }
 
 export interface UpdateActorInput {
   id: string;
   name?: string;
-  can_preside?: boolean;
-  can_conduct?: boolean;
-  can_recognize?: boolean;
-  can_pianist?: boolean;
-  can_conductor?: boolean;
+  role?: ActorRole;
 }
 
 export interface ImportResult {

@@ -97,6 +97,44 @@ describe('parseCsv', () => {
     expect(result.success).toBe(true);
     expect(result.members[0].informal_name).toBe('Joao');
   });
+
+  it('rejects row with only 2 columns (INSUFFICIENT_COLUMNS)', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(false);
+    expect(result.errors[0].code).toBe('INSUFFICIENT_COLUMNS');
+    expect(result.errors[0].line).toBe(2);
+  });
+
+  it('rejects 1-column header CSV', () => {
+    const csv = 'Nome\nJoao Silva';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(false);
+    expect(result.errors[0].code).toBe('INVALID_HEADER');
+  });
+
+  it('sanitizes phone with invalid characters to empty string', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Silva,Joao,(11) 99999-9999';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(true);
+    expect(result.members[0].phone).toBe('');
+  });
+
+  it('preserves informal name when provided', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo\nJoao Carlos Silva,Carlao,+5511999999999';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(true);
+    expect(result.members[0].informal_name).toBe('Carlao');
+    expect(result.members[0].full_name).toBe('Joao Carlos Silva');
+  });
+
+  it('handles CSV with extra columns beyond 3 (ignores extras)', () => {
+    const csv = 'Nome,Nome Informal,Telefone Completo,Extra\nJoao Silva,Joao,+5511999999999,ignored';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(true);
+    expect(result.members).toHaveLength(1);
+    expect(result.members[0].full_name).toBe('Joao Silva');
+  });
 });
 
 describe('generateCsv', () => {

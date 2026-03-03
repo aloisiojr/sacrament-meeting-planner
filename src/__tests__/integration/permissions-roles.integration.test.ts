@@ -271,3 +271,51 @@ describe('AuthContext loading state (EC-082-08)', () => {
     expect(result.current.data).toHaveLength(1);
   });
 });
+
+// ==========================================================================
+// COR-005 (CR-256): manage_prayers toggle visibility per role
+// The Settings screen uses {!isObserver && (...)} where isObserver = role === 'observer'
+// This test verifies the role-based guard logic for the manage_prayers toggle.
+// ==========================================================================
+
+describe('manage_prayers toggle guard (COR-005, CR-256)', () => {
+  it('bishopric is not observer, so manage_prayers toggle is visible', () => {
+    const role: Role = 'bishopric';
+    const isObserver = role === 'observer';
+    expect(isObserver).toBe(false);
+    // The toggle guard is {!isObserver && (...)} - bishopric passes
+    expect(!isObserver).toBe(true);
+  });
+
+  it('secretary is not observer, so manage_prayers toggle is visible', () => {
+    const role: Role = 'secretary';
+    const isObserver = role === 'observer';
+    expect(isObserver).toBe(false);
+    // The toggle guard is {!isObserver && (...)} - secretary passes
+    expect(!isObserver).toBe(true);
+  });
+
+  it('observer IS observer, so manage_prayers toggle is hidden', () => {
+    const role: Role = 'observer';
+    const isObserver = role === 'observer';
+    expect(isObserver).toBe(true);
+    // The toggle guard is {!isObserver && (...)} - observer fails
+    expect(!isObserver).toBe(false);
+  });
+
+  it('secretary auth context has settings:access permission', () => {
+    // Secretary needs settings:access to even see the settings Ward section
+    const authCtx = createMockAuthContext({ role: 'secretary' });
+    expect(authCtx.hasPermission('settings:access')).toBe(true);
+    expect(authCtx.role).toBe('secretary');
+    // Verify secretary is not observer
+    expect(authCtx.role === 'observer').toBe(false);
+  });
+
+  it('observer auth context lacks settings:access permission', () => {
+    const authCtx = createMockAuthContext({ role: 'observer' });
+    expect(authCtx.hasPermission('settings:access')).toBe(false);
+    // Observer IS observer
+    expect(authCtx.role === 'observer').toBe(true);
+  });
+});

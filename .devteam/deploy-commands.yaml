@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 18
-last_updated: "2026-03-03T12:00:00"
+version: 19
+last_updated: "2026-03-03T16:11:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -657,4 +657,95 @@ deploy_history:
       - "Backfill: speeches.speaker_informal_name = first word of speaker_name (verified: Jherry, Laura, Luz, etc.)"
       - "pg_proc: import_members with prosecdef=true, proconfig=[search_path=public]"
       - "import_members includes informal_name in INSERT with COALESCE fallback to SPLIT_PART"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Migration 024_language_code_update.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - language codes padronizados: es-ES->es-LA (hymns, general_collections), en->en-US, es->es-LA (wards)"
+    verified: true
+    cr: "CR-249"
+    verification:
+      - "hymns: en-US(401), es-LA(269), pt-BR(264) - nenhum es-ES restante"
+      - "general_collections: en-US(15), es-LA(15), pt-BR(15) - nenhum es-ES restante"
+      - "wards: Panamby=pt-BR - nenhum en ou es restante"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Backup meeting_actors table (pre-migration 025)"
+    method: "Management API SELECT query"
+    reason: "Migration 025 is destructive (drops 5 boolean columns). Backup before applying."
+    result: "Sucesso - 16 rows backed up to /tmp/meeting_actors_backup_20260303.json"
+    verified: true
+    cr: "CR-255"
+    notes: "Data includes: 7 preside, 3 conduct, 3 recognize, 1 pianist, 2 conductor actors. Lipe Vitor had both can_preside+can_conduct (migrated to preside by priority)."
+
+  - date: "2026-03-03"
+    action: "Migration 025_actor_single_role.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - 5 boolean columns replaced by single TEXT role column with CHECK constraint"
+    verified: true
+    cr: "CR-255"
+    verification:
+      - "Schema: role TEXT NOT NULL DEFAULT 'preside' (no boolean columns remain)"
+      - "Data migration: 16 actors correctly migrated (preside:7, conduct:3, recognize:3, pianist:1, conductor:2)"
+      - "Constraint chk_actor_role: CHECK (role IN ('preside','conduct','recognize','pianist','conductor'))"
+      - "Constraint chk_pianist_conductor_exclusive: DROPPED"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Redeploy Edge Function create-invitation"
+    method: "supabase functions deploy create-invitation"
+    reason: "CR-255: Updated auto-actor creation to use single role column instead of 5 boolean flags. CR-249: language code updates."
+    result: "Sucesso - Function redeployada e ACTIVE (version 11)"
+    verified: true
+    cr: "CR-255, CR-249"
+    verification:
+      - "supabase functions list mostra create-invitation como ACTIVE v11"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Redeploy Edge Function update-user-role"
+    method: "supabase functions deploy update-user-role"
+    reason: "CR-255: Updated auto-actor creation to use single role column instead of 5 boolean flags. CR-249: language code updates."
+    result: "Sucesso - Function redeployada e ACTIVE (version 8)"
+    verified: true
+    cr: "CR-255, CR-249"
+    verification:
+      - "supabase functions list mostra update-user-role como ACTIVE v8"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Redeploy Edge Function register-first-user"
+    method: "supabase functions deploy register-first-user --no-verify-jwt"
+    reason: "CR-255: Updated auto-actor creation to use single role column instead of 5 boolean flags. CR-249: language code updates."
+    result: "Sucesso - Function redeployada e ACTIVE (version 9)"
+    verified: true
+    cr: "CR-255, CR-249"
+    verification:
+      - "supabase functions list mostra register-first-user como ACTIVE v9"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Redeploy Edge Function send-reset-email"
+    method: "supabase functions deploy send-reset-email --no-verify-jwt"
+    reason: "CR-251: fallback en-US. CR-249: language code updates."
+    result: "Sucesso - Function redeployada e ACTIVE (version 7)"
+    verified: true
+    cr: "CR-251, CR-249"
+    verification:
+      - "supabase functions list mostra send-reset-email como ACTIVE v7"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-03"
+    action: "Redeploy Edge Function process-notifications"
+    method: "supabase functions deploy process-notifications"
+    reason: "CR-257: cron comment. CR-249: language code updates."
+    result: "Sucesso - Function redeployada e ACTIVE (version 8)"
+    verified: true
+    cr: "CR-257, CR-249"
+    verification:
+      - "supabase functions list mostra process-notifications como ACTIVE v8"
       - "REST API health check: HTTP 200"

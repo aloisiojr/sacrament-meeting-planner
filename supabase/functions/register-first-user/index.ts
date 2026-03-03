@@ -154,6 +154,9 @@ Deno.serve(async (req) => {
         role: input.role,
         full_name: input.fullName.trim(),
       },
+      user_metadata: {
+        language: wardLanguage,
+      },
     });
 
     if (authError) {

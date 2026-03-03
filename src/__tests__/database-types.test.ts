@@ -7,6 +7,7 @@ import type {
   NotificationType,
   NotificationTargetRole,
   NotificationStatus,
+  ActorRole,
   Ward,
   Member,
   WardTopic,
@@ -50,11 +51,13 @@ describe('Database Types', () => {
   });
 
   describe('Permission type', () => {
-    it('should define exactly 23 permissions', () => {
+    it('should define exactly 26 permissions', () => {
       const permissions: Permission[] = [
         'speech:assign',
         'speech:unassign',
         'speech:change_status',
+        'prayer:assign',
+        'prayer:unassign',
         'member:read',
         'member:write',
         'member:import',
@@ -64,6 +67,7 @@ describe('Database Types', () => {
         'settings:access',
         'settings:language',
         'settings:whatsapp',
+        'settings:timezone',
         'settings:users',
         'invite:manage',
         'home:next_assignments',
@@ -76,7 +80,7 @@ describe('Database Types', () => {
         'invitation:create',
         'history:read',
       ];
-      expect(permissions).toHaveLength(23);
+      expect(permissions).toHaveLength(26);
     });
   });
 

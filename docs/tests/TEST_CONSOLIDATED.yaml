@@ -8,11 +8,11 @@ version: 4
 last_updated: "2026-03-03"
 
 summary:
-  total_test_files: 32
-  total_tests: 703
+  total_test_files: 33
+  total_tests: 776
   framework: vitest
   categories:
-    module_named: 27
+    module_named: 28
     integration: 5
   infrastructure:
     setup: 1
@@ -282,6 +282,24 @@ module_tests:
       - actorKeys without can_ prefix
       - sortActors with role-based actors
       - Cross-feature F041+F042 verification
+
+  - file: src/__tests__/f043-f044-f045-phase4.test.ts
+    tests: 73
+    module: "src/app/(tabs)/agenda.tsx, src/hooks/useAgenda.ts, src/lib/activityLog.ts, src/i18n/locales/*.json, supabase/migrations/026_delete_agenda_activity_log.sql, supabase/functions/register-first-user/index.ts, supabase/functions/register-invited-user/index.ts"
+    covers:
+      - "F043 (CR-259): Play Icon Redesign - theme color contract, source code structure"
+      - "F044 (CR-260): Remove Agenda Change History - logAction removal, i18n cleanup, migration SQL"
+      - "F045 (CR-261): New User Language = Ward Language - edge function source verification"
+      - Play button styles (width 36, height 36, borderRadius 8, primary bg, onPrimary icon)
+      - Play button position (before chevron), navigation to /presentation
+      - useAgenda no longer imports logAction/buildLogDescription/activityLog
+      - 9 i18n keys removed from all 3 locales (agenda_edit, agenda_last_minute_speech, agenda_last_minute_speech_removed)
+      - Activity log module still works for non-agenda types
+      - Migration SQL verification (DELETE, action_type IN, no TRUNCATE/DROP)
+      - register-first-user sets user_metadata.language with pt-BR fallback
+      - register-invited-user fetches ward language and sets user_metadata.language
+      - Ward language null fallback to pt-BR
+      - Language priority chain (user_metadata.language > device locale > pt-BR)
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -939,6 +957,319 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # ===========================================================================
+  # F043 PLAY ICON REDESIGN - TEST COVERAGE (CR-259)
+  # ===========================================================================
+
+  - feature: F043
+    tests:
+      # AC-043-01: Play button has primary background
+      - name: "lightColors.primary is a valid hex color"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button uses colors.primary as backgroundColor"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button has width: 36 and height: 36"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button has borderRadius: 8"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-01"]
+        covers_ecs: []
+        status: passing
+
+      # AC-043-02: PlayIcon uses onPrimary color
+      - name: "PlayIcon uses colors.onPrimary color"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "onPrimary contrasts with primary (not same color)"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-02"]
+        covers_ecs: []
+        status: passing
+
+      # AC-043-03: Play button position unchanged
+      - name: "play button appears before ChevronUpIcon in JSX"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button preserves styles.playButton (marginRight)"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button is only shown when card is expanded"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-043-04: Play button navigates to presentation mode
+      - name: "play button navigates to /presentation with date param"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button has accessibilityRole button"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "play button has hitSlop for touch area"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-043-04"]
+        covers_ecs: []
+        status: passing
+
+      # EC-043-01: Theme change updates colors
+      - name: "both themes provide textSecondary for chevron icons"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-043-01"]
+        status: passing
+
+  # ===========================================================================
+  # F044 REMOVE AGENDA CHANGE HISTORY - TEST COVERAGE (CR-260)
+  # ===========================================================================
+
+  - feature: F044
+    tests:
+      # AC-044-01: Code no longer logs agenda:edit actions
+      - name: "useAgenda source does not import logAction"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "useAgenda source does not import from activityLog"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "useAgenda module exports do not include logAction"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-01"]
+        covers_ecs: []
+        status: passing
+
+      # AC-044-02: Existing entries removed (migration SQL)
+      - name: "migration contains DELETE FROM activity_log"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "migration targets agenda:edit action type"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "migration uses WHERE action_type IN clause"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-02"]
+        covers_ecs: ["EC-044-02"]
+        status: passing
+
+      - name: "migration uses DELETE (not TRUNCATE or DROP), safe on empty table"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-02"]
+        covers_ecs: ["EC-044-01"]
+        status: passing
+
+      - name: "migration does not filter on description column"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-02"]
+        covers_ecs: ["EC-044-02"]
+        status: passing
+
+      # AC-044-03: History screen works for other entry types
+      - name: "logAction function is still exported from activityLog module"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "buildLogDescription still produces pipe-delimited format for non-agenda types"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "parseLogDescription still parses non-agenda types correctly"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-044-04: I18n keys removed
+      - name: "pt-BR does not contain agenda_edit key"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "en-US does not contain agenda_last_minute_speech key"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "es-LA does not contain agenda_last_minute_speech_removed key"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-044-04"]
+        covers_ecs: []
+        status: passing
+
+  # ===========================================================================
+  # F045 NEW USER LANGUAGE = WARD LANGUAGE - TEST COVERAGE (CR-261)
+  # ===========================================================================
+
+  - feature: F045
+    tests:
+      # AC-045-01: register-first-user sets user_metadata.language
+      - name: "createUser call includes user_metadata with language"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "wardLanguage variable uses input.language with pt-BR fallback"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-01", "AC-045-04"]
+        covers_ecs: []
+        status: passing
+
+      # AC-045-02: register-invited-user sets user_metadata.language from ward
+      - name: "fetches ward language from wards table"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-02", "AC-045-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "defines wardLanguage with fallback to pt-BR"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-02"]
+        covers_ecs: ["EC-045-01"]
+        status: passing
+
+      - name: "createUser includes user_metadata with language"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-02"]
+        covers_ecs: []
+        status: passing
+
+      # AC-045-03: App displays in ward language for new user
+      - name: "user_metadata.language is used as app language"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "missing user_metadata.language falls back to pt-BR"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-03"]
+        covers_ecs: []
+        status: passing
+
+      # AC-045-04: register-first-user defaults to pt-BR
+      - name: "default ward language is pt-BR when not specified"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "empty string language falls back to pt-BR"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-04"]
+        covers_ecs: []
+        status: passing
+
+      # AC-045-05: register-invited-user fetches ward language
+      - name: "filters ward query by invitation.ward_id"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-05"]
+        covers_ecs: []
+        status: passing
+
+      - name: "uses .single() for ward query"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: ["AC-045-05"]
+        covers_ecs: []
+        status: passing
+
+      # EC-045-01: Null ward language fallback
+      - name: "null ward.language falls back to pt-BR"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-045-01"]
+        status: passing
+
+      - name: "undefined ward falls back to pt-BR"
+        file: src/__tests__/f043-f044-f045-phase4.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-045-01"]
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -1141,6 +1472,51 @@ coverage:
       covered: false
       reason: "Database migration (SQL). Boolean-to-role data migration cannot be tested in vitest."
 
+    # --- F043 (Phase 4 / CR-259) ---
+    - id: AC-043-01
+      covered: true
+      tests: ["lightColors.primary is a valid hex color", "play button uses colors.primary as backgroundColor", "play button has width: 36 and height: 36", "play button has borderRadius: 8"]
+    - id: AC-043-02
+      covered: true
+      tests: ["PlayIcon uses colors.onPrimary color", "onPrimary contrasts with primary (not same color)"]
+    - id: AC-043-03
+      covered: true
+      tests: ["play button appears before ChevronUpIcon in JSX", "play button preserves styles.playButton (marginRight)", "play button is only shown when card is expanded"]
+    - id: AC-043-04
+      covered: true
+      tests: ["play button navigates to /presentation with date param", "play button has accessibilityRole button", "play button has hitSlop for touch area"]
+
+    # --- F044 (Phase 4 / CR-260) ---
+    - id: AC-044-01
+      covered: true
+      tests: ["useAgenda source does not import logAction", "useAgenda source does not import from activityLog", "useAgenda module exports do not include logAction"]
+    - id: AC-044-02
+      covered: true
+      tests: ["migration contains DELETE FROM activity_log", "migration targets agenda:edit action type", "migration uses WHERE action_type IN clause", "migration uses DELETE (not TRUNCATE or DROP)"]
+    - id: AC-044-03
+      covered: true
+      tests: ["logAction function is still exported from activityLog module", "buildLogDescription still produces pipe-delimited format for non-agenda types", "parseLogDescription still parses non-agenda types correctly"]
+    - id: AC-044-04
+      covered: true
+      tests: ["pt-BR does not contain agenda_edit key", "en-US does not contain agenda_last_minute_speech key", "es-LA does not contain agenda_last_minute_speech_removed key"]
+
+    # --- F045 (Phase 4 / CR-261) ---
+    - id: AC-045-01
+      covered: true
+      tests: ["createUser call includes user_metadata with language", "wardLanguage variable uses input.language with pt-BR fallback"]
+    - id: AC-045-02
+      covered: true
+      tests: ["fetches ward language from wards table", "defines wardLanguage with fallback to pt-BR", "createUser includes user_metadata with language"]
+    - id: AC-045-03
+      covered: true
+      tests: ["user_metadata.language is used as app language", "missing user_metadata.language falls back to pt-BR"]
+    - id: AC-045-04
+      covered: true
+      tests: ["default ward language is pt-BR when not specified", "empty string language falls back to pt-BR"]
+    - id: AC-045-05
+      covered: true
+      tests: ["fetches ward language from wards table", "filters ward query by invitation.ward_id", "uses .single() for ward query"]
+
   edge_cases:
     # F039 edge cases
     - id: EC-2col-rejected
@@ -1155,6 +1531,30 @@ coverage:
     - id: EC-extra-columns
       covered: true
       tests: ["handles CSV with extra columns beyond 3 (ignores extras)"]
+
+    # F043 edge cases (Phase 4 / CR-259)
+    - id: EC-043-01
+      covered: true
+      tests: ["both themes provide textSecondary for chevron icons", "primary color differs between light and dark themes"]
+
+    # F044 edge cases (Phase 4 / CR-260)
+    - id: EC-044-01
+      covered: true
+      tests: ["migration uses DELETE (not TRUNCATE or DROP), safe on empty table"]
+    - id: EC-044-02
+      covered: true
+      tests: ["migration uses WHERE action_type IN clause", "migration does not filter on description column"]
+
+    # F045 edge cases (Phase 4 / CR-261)
+    - id: EC-045-01
+      covered: true
+      tests: ["null ward.language falls back to pt-BR", "undefined ward falls back to pt-BR", "defines wardLanguage with fallback to pt-BR"]
+    - id: EC-045-02
+      covered: false
+      reason: "Existing behavior - user changes app language after registration. No new code needed, verified by existing i18n tests."
+    - id: EC-045-03
+      covered: false
+      reason: "FK constraint behavior. Existing database constraint prevents this scenario. No new code to test."
 
 gaps:
   # F039 gaps (unchanged)
@@ -1238,8 +1638,20 @@ gaps:
     reason: "Database migration 025 (SQL). Boolean-to-role data migration cannot be executed in vitest."
     recommendation: "Verified by SQL review. UPDATE with CASE WHEN priority logic present in migration."
 
+  # F043 gaps - none. All ACs covered.
+  # F044 gaps - none. All ACs covered.
+  # F045 gaps - none. All ACs covered.
+
+  # F045 edge case gaps
+  - id: EC-045-02
+    reason: "Existing behavior - user changes app language in settings. No new code in this CR."
+    recommendation: "No test needed. Existing i18n module tests confirm language switching works."
+  - id: EC-045-03
+    reason: "FK constraint (invitations.ward_id -> wards.id) prevents deleted-ward scenario. Existing error handling."
+    recommendation: "No test needed. Database constraint handles this case."
+
 stats:
-  total_tests: 703
-  passing: 703
+  total_tests: 776
+  passing: 776
   failing: 0
   skipped: 0

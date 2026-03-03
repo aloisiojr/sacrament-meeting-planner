@@ -155,7 +155,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.presiding')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'presiding', roleFilter: 'can_preside' });
+              setSelectorModal({ type: 'actor', field: 'presiding', roleFilter: 'preside' });
             }
           }}
           disabled={isObserver}
@@ -176,7 +176,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.conducting')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'conducting', roleFilter: 'can_conduct' });
+              setSelectorModal({ type: 'actor', field: 'conducting', roleFilter: 'conduct' });
             }
           }}
           disabled={isObserver}
@@ -195,7 +195,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         <Pressable
           style={[styles.selectorField, { borderColor: colors.border }]}
           onPress={isObserver ? undefined : () => {
-            setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'can_recognize' });
+            setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'recognize' });
           }}
           disabled={isObserver}
         >
@@ -256,7 +256,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.pianist')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'can_pianist' });
+              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'pianist' });
             }
           }}
           disabled={isObserver}
@@ -277,7 +277,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.conductor')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'can_conductor' });
+              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'conductor' });
             }
           }}
           disabled={isObserver}

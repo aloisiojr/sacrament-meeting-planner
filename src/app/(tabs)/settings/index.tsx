@@ -54,7 +54,6 @@ export default function SettingsScreen() {
   const [wardLanguageModalVisible, setWardLanguageModalVisible] = useState(false);
 
   const isObserver = role === 'observer';
-  const isBishopric = role === 'bishopric';
   const currentAppLanguage = getCurrentLanguage();
 
   const { managePrayers } = useWardManagePrayers();
@@ -220,7 +219,7 @@ export default function SettingsScreen() {
                   colors={colors}
                 />
               )}
-              {isBishopric && (
+              {!isObserver && (
                 <View style={[styles.item, { borderBottomColor: colors.divider }]}>
                   <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={[styles.itemText, { color: colors.text }]}>

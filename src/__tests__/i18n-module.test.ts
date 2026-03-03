@@ -17,10 +17,10 @@ describe('i18n module', () => {
       expect(SUPPORTED_LANGUAGES).toHaveLength(3);
     });
 
-    it('should include pt-BR, en, and es', () => {
+    it('should include pt-BR, en-US, and es-LA', () => {
       expect(SUPPORTED_LANGUAGES).toContain('pt-BR');
-      expect(SUPPORTED_LANGUAGES).toContain('en');
-      expect(SUPPORTED_LANGUAGES).toContain('es');
+      expect(SUPPORTED_LANGUAGES).toContain('en-US');
+      expect(SUPPORTED_LANGUAGES).toContain('es-LA');
     });
 
     it('should be a readonly tuple (as const enforced at compile time)', () => {
@@ -43,8 +43,8 @@ describe('i18n module', () => {
 
     it('should have correct labels', () => {
       expect(LANGUAGE_LABELS['pt-BR']).toBe('Portugues (Brasil)');
-      expect(LANGUAGE_LABELS['en']).toBe('English');
-      expect(LANGUAGE_LABELS['es']).toBe('Espanol');
+      expect(LANGUAGE_LABELS['en-US']).toBe('English');
+      expect(LANGUAGE_LABELS['es-LA']).toBe('Espanol');
     });
   });
 
@@ -58,8 +58,8 @@ describe('i18n module', () => {
 
     it('should have correct default country codes', () => {
       expect(DEFAULT_COUNTRY_CODES['pt-BR']).toBe('+55');
-      expect(DEFAULT_COUNTRY_CODES['en']).toBe('+1');
-      expect(DEFAULT_COUNTRY_CODES['es']).toBe('+52');
+      expect(DEFAULT_COUNTRY_CODES['en-US']).toBe('+1');
+      expect(DEFAULT_COUNTRY_CODES['es-LA']).toBe('+52');
     });
   });
 
@@ -75,14 +75,14 @@ describe('i18n module', () => {
 
     it('should have correct default timezones in IANA format', () => {
       expect(DEFAULT_TIMEZONES['pt-BR']).toBe('America/Sao_Paulo');
-      expect(DEFAULT_TIMEZONES['en']).toBe('America/New_York');
-      expect(DEFAULT_TIMEZONES['es']).toBe('America/Mexico_City');
+      expect(DEFAULT_TIMEZONES['en-US']).toBe('America/New_York');
+      expect(DEFAULT_TIMEZONES['es-LA']).toBe('America/Mexico_City');
     });
   });
 
   describe('SupportedLanguage type coverage', () => {
     it('should allow using all supported languages as SupportedLanguage type', () => {
-      const langs: SupportedLanguage[] = ['pt-BR', 'en', 'es'];
+      const langs: SupportedLanguage[] = ['pt-BR', 'en-US', 'es-LA'];
       expect(langs).toHaveLength(3);
     });
   });

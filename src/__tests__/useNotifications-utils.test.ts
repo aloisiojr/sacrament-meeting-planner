@@ -18,33 +18,33 @@ describe('getOrdinal', () => {
   });
 
   it('returns English ordinals', () => {
-    expect(getOrdinal(1, 'en')).toBe('1st');
-    expect(getOrdinal(2, 'en')).toBe('2nd');
-    expect(getOrdinal(3, 'en')).toBe('3rd');
+    expect(getOrdinal(1, 'en-US')).toBe('1st');
+    expect(getOrdinal(2, 'en-US')).toBe('2nd');
+    expect(getOrdinal(3, 'en-US')).toBe('3rd');
   });
 
   it('returns Spanish ordinals', () => {
-    expect(getOrdinal(1, 'es')).toBe('1er');
-    expect(getOrdinal(2, 'es')).toBe('2do');
-    expect(getOrdinal(3, 'es')).toBe('3er');
+    expect(getOrdinal(1, 'es-LA')).toBe('1er');
+    expect(getOrdinal(2, 'es-LA')).toBe('2do');
+    expect(getOrdinal(3, 'es-LA')).toBe('3er');
   });
 
   it('falls back to number string for unknown position', () => {
-    expect(getOrdinal(4, 'en')).toBe('4');
+    expect(getOrdinal(4, 'en-US')).toBe('4');
   });
 });
 
 describe('formatNameList', () => {
   it('returns empty string for empty list', () => {
-    expect(formatNameList([], 'en')).toBe('');
+    expect(formatNameList([], 'en-US')).toBe('');
   });
 
   it('returns single name as-is', () => {
-    expect(formatNameList(['John'], 'en')).toBe('John');
+    expect(formatNameList(['John'], 'en-US')).toBe('John');
   });
 
   it('joins two names with "and" in English', () => {
-    expect(formatNameList(['John', 'Mary'], 'en')).toBe('John and Mary');
+    expect(formatNameList(['John', 'Mary'], 'en-US')).toBe('John and Mary');
   });
 
   it('joins two names with "e" in Portuguese', () => {
@@ -52,11 +52,11 @@ describe('formatNameList', () => {
   });
 
   it('joins two names with "y" in Spanish', () => {
-    expect(formatNameList(['Juan', 'María'], 'es')).toBe('Juan y María');
+    expect(formatNameList(['Juan', 'María'], 'es-LA')).toBe('Juan y María');
   });
 
   it('joins three names with commas and conjunction', () => {
-    expect(formatNameList(['John', 'Mary', 'Jane'], 'en')).toBe('John, Mary and Jane');
+    expect(formatNameList(['John', 'Mary', 'Jane'], 'en-US')).toBe('John, Mary and Jane');
   });
 
   it('joins three Portuguese names correctly', () => {
@@ -64,12 +64,12 @@ describe('formatNameList', () => {
   });
 
   it('joins three Spanish names correctly', () => {
-    expect(formatNameList(['Juan', 'María', 'Ana'], 'es')).toBe('Juan, María y Ana');
+    expect(formatNameList(['Juan', 'María', 'Ana'], 'es-LA')).toBe('Juan, María y Ana');
   });
 });
 
 describe('buildNotificationText', () => {
-  const languages: OrdinalLanguage[] = ['pt-BR', 'en', 'es'];
+  const languages: OrdinalLanguage[] = ['pt-BR', 'en-US', 'es-LA'];
 
   describe('designation (Case 1)', () => {
     it.each(languages)('builds text for single assignment in %s', (lang) => {
@@ -135,8 +135,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('2026-03-08');
     });
 
-    it('builds confirmed text for opening prayer (position 0) in en', () => {
-      const result = buildNotificationText('speaker_confirmed', 'en', {
+    it('builds confirmed text for opening prayer (position 0) in en-US', () => {
+      const result = buildNotificationText('speaker_confirmed', 'en-US', {
         name: 'Maria Silva',
         position: 0,
         date: '2026-03-08',
@@ -147,8 +147,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('Maria Silva');
     });
 
-    it('builds confirmed text for opening prayer (position 0) in es', () => {
-      const result = buildNotificationText('speaker_confirmed', 'es', {
+    it('builds confirmed text for opening prayer (position 0) in es-LA', () => {
+      const result = buildNotificationText('speaker_confirmed', 'es-LA', {
         name: 'Maria Silva',
         position: 0,
         date: '2026-03-08',
@@ -171,8 +171,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('João Santos');
     });
 
-    it('builds confirmed text for closing prayer (position 4) in en', () => {
-      const result = buildNotificationText('speaker_confirmed', 'en', {
+    it('builds confirmed text for closing prayer (position 4) in en-US', () => {
+      const result = buildNotificationText('speaker_confirmed', 'en-US', {
         name: 'João Santos',
         position: 4,
         date: '2026-03-15',
@@ -183,8 +183,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('João Santos');
     });
 
-    it('builds confirmed text for closing prayer (position 4) in es', () => {
-      const result = buildNotificationText('speaker_confirmed', 'es', {
+    it('builds confirmed text for closing prayer (position 4) in es-LA', () => {
+      const result = buildNotificationText('speaker_confirmed', 'es-LA', {
         name: 'João Santos',
         position: 4,
         date: '2026-03-15',
@@ -220,8 +220,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('Maria Silva');
     });
 
-    it('builds withdrew text for opening prayer (position 0) in en', () => {
-      const result = buildNotificationText('speaker_withdrew', 'en', {
+    it('builds withdrew text for opening prayer (position 0) in en-US', () => {
+      const result = buildNotificationText('speaker_withdrew', 'en-US', {
         name: 'Maria Silva',
         position: 0,
         date: '2026-03-08',
@@ -232,8 +232,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('Maria Silva');
     });
 
-    it('builds withdrew text for opening prayer (position 0) in es', () => {
-      const result = buildNotificationText('speaker_withdrew', 'es', {
+    it('builds withdrew text for opening prayer (position 0) in es-LA', () => {
+      const result = buildNotificationText('speaker_withdrew', 'es-LA', {
         name: 'Maria Silva',
         position: 0,
         date: '2026-03-08',
@@ -256,8 +256,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('João Santos');
     });
 
-    it('builds withdrew text for closing prayer (position 4) in en', () => {
-      const result = buildNotificationText('speaker_withdrew', 'en', {
+    it('builds withdrew text for closing prayer (position 4) in en-US', () => {
+      const result = buildNotificationText('speaker_withdrew', 'en-US', {
         name: 'João Santos',
         position: 4,
         date: '2026-03-15',
@@ -268,8 +268,8 @@ describe('buildNotificationText', () => {
       expect(result.body).toContain('João Santos');
     });
 
-    it('builds withdrew text for closing prayer (position 4) in es', () => {
-      const result = buildNotificationText('speaker_withdrew', 'es', {
+    it('builds withdrew text for closing prayer (position 4) in es-LA', () => {
+      const result = buildNotificationText('speaker_withdrew', 'es-LA', {
         name: 'João Santos',
         position: 4,
         date: '2026-03-15',
@@ -283,7 +283,7 @@ describe('buildNotificationText', () => {
 
   describe('unknown type', () => {
     it('returns empty strings for unknown notification type', () => {
-      const result = buildNotificationText('unknown', 'en', {});
+      const result = buildNotificationText('unknown', 'en-US', {});
       expect(result.title).toBe('');
       expect(result.body).toBe('');
     });

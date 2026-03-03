@@ -38,7 +38,7 @@ describe('useTopics utilities', () => {
 
     it('should generate unique keys for different languages', () => {
       expect(topicKeys.collections('ward-1', 'pt-BR')).not.toEqual(
-        topicKeys.collections('ward-1', 'en')
+        topicKeys.collections('ward-1', 'en-US')
       );
     });
   });

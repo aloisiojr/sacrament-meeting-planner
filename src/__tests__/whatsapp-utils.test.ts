@@ -116,11 +116,11 @@ describe('getDefaultSpeechTemplate', () => {
   });
 
   it('returns EN template for position 1', () => {
-    expect(getDefaultSpeechTemplate('en', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
+    expect(getDefaultSpeechTemplate('en-US', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
   });
 
   it('returns ES template for position 1', () => {
-    expect(getDefaultSpeechTemplate('es', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
+    expect(getDefaultSpeechTemplate('es-LA', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
   });
 
   it('falls back to pt-BR for unknown language', () => {
@@ -143,13 +143,13 @@ describe('buildWhatsAppUrl language parameter', () => {
     topic: 'Faith',
   };
 
-  it('uses EN template when language=en and no custom template', () => {
-    const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'en');
+  it('uses EN template when language=en-US and no custom template', () => {
+    const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'en-US');
     expect(url).toContain(encodeURIComponent('Bishopric'));
   });
 
-  it('uses ES template when language=es and no custom template', () => {
-    const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'es');
+  it('uses ES template when language=es-LA and no custom template', () => {
+    const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'es-LA');
     expect(url).toContain(encodeURIComponent('Obispado'));
   });
 
@@ -159,7 +159,7 @@ describe('buildWhatsAppUrl language parameter', () => {
   });
 
   it('custom template overrides language default', () => {
-    const url = buildWhatsAppUrl('+5511987654321', '', 'Hello {nome}!', vars, 'es');
+    const url = buildWhatsAppUrl('+5511987654321', '', 'Hello {nome}!', vars, 'es-LA');
     expect(url).toContain(encodeURIComponent('Hello John!'));
     expect(url).not.toContain(encodeURIComponent('Obispado'));
   });

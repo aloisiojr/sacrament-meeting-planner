@@ -96,23 +96,23 @@ describe('dateUtils', () => {
       expect(getMonthAbbr(12, 'pt-BR')).toBe('DEZ');
     });
 
-    it('should return correct abbreviations for en', () => {
-      expect(getMonthAbbr(1, 'en')).toBe('JAN');
-      expect(getMonthAbbr(2, 'en')).toBe('FEB');
-      expect(getMonthAbbr(4, 'en')).toBe('APR');
-      expect(getMonthAbbr(9, 'en')).toBe('SEP');
-      expect(getMonthAbbr(12, 'en')).toBe('DEC');
+    it('should return correct abbreviations for en-US', () => {
+      expect(getMonthAbbr(1, 'en-US')).toBe('JAN');
+      expect(getMonthAbbr(2, 'en-US')).toBe('FEB');
+      expect(getMonthAbbr(4, 'en-US')).toBe('APR');
+      expect(getMonthAbbr(9, 'en-US')).toBe('SEP');
+      expect(getMonthAbbr(12, 'en-US')).toBe('DEC');
     });
 
-    it('should return correct abbreviations for es', () => {
-      expect(getMonthAbbr(1, 'es')).toBe('ENE');
-      expect(getMonthAbbr(2, 'es')).toBe('FEB');
-      expect(getMonthAbbr(12, 'es')).toBe('DIC');
+    it('should return correct abbreviations for es-LA', () => {
+      expect(getMonthAbbr(1, 'es-LA')).toBe('ENE');
+      expect(getMonthAbbr(2, 'es-LA')).toBe('FEB');
+      expect(getMonthAbbr(12, 'es-LA')).toBe('DIC');
     });
 
     it('should throw for invalid month', () => {
       expect(() => getMonthAbbr(0, 'pt-BR')).toThrow('Invalid month');
-      expect(() => getMonthAbbr(13, 'en')).toThrow('Invalid month');
+      expect(() => getMonthAbbr(13, 'en-US')).toThrow('Invalid month');
     });
 
     it('should default to pt-BR', () => {
@@ -125,12 +125,12 @@ describe('dateUtils', () => {
       expect(formatDate('2026-02-08', 'pt-BR')).toBe('08 FEV');
     });
 
-    it('should format as "FEB 08" for en', () => {
-      expect(formatDate('2026-02-08', 'en')).toBe('FEB 08');
+    it('should format as "FEB 08" for en-US', () => {
+      expect(formatDate('2026-02-08', 'en-US')).toBe('FEB 08');
     });
 
-    it('should format as "08 FEB" for es', () => {
-      expect(formatDate('2026-02-08', 'es')).toBe('08 FEB');
+    it('should format as "08 FEB" for es-LA', () => {
+      expect(formatDate('2026-02-08', 'es-LA')).toBe('08 FEB');
     });
 
     it('should work with Date objects', () => {
@@ -142,7 +142,7 @@ describe('dateUtils', () => {
     });
 
     it('should handle day numbers correctly', () => {
-      expect(formatDate('2026-01-01', 'en')).toBe('JAN 01');
+      expect(formatDate('2026-01-01', 'en-US')).toBe('JAN 01');
       expect(formatDate('2026-12-31', 'pt-BR')).toBe('31 DEZ');
     });
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import ptBR from '../i18n/locales/pt-BR.json';
-import en from '../i18n/locales/en.json';
-import es from '../i18n/locales/es.json';
+import enUS from '../i18n/locales/en-US.json';
+import esLA from '../i18n/locales/es-LA.json';
 
 /**
  * Recursively collect all keys from a nested object, using dot notation.
@@ -22,43 +22,43 @@ function collectKeys(obj: Record<string, unknown>, prefix = ''): string[] {
 
 describe('i18n locale files', () => {
   const ptBRKeys = collectKeys(ptBR as Record<string, unknown>);
-  const enKeys = collectKeys(en as Record<string, unknown>);
-  const esKeys = collectKeys(es as Record<string, unknown>);
+  const enUSKeys = collectKeys(enUS as Record<string, unknown>);
+  const esLAKeys = collectKeys(esLA as Record<string, unknown>);
 
   it('should have pt-BR as the reference locale with all required keys', () => {
     expect(ptBRKeys.length).toBeGreaterThan(0);
   });
 
-  it('should have all pt-BR keys present in en locale', () => {
-    const missingInEn = ptBRKeys.filter((key) => !enKeys.includes(key));
-    expect(missingInEn, `Missing keys in en: ${missingInEn.join(', ')}`).toEqual([]);
+  it('should have all pt-BR keys present in en-US locale', () => {
+    const missingInEnUS = ptBRKeys.filter((key) => !enUSKeys.includes(key));
+    expect(missingInEnUS, `Missing keys in en-US: ${missingInEnUS.join(', ')}`).toEqual([]);
   });
 
-  it('should have all pt-BR keys present in es locale', () => {
-    const missingInEs = ptBRKeys.filter((key) => !esKeys.includes(key));
-    expect(missingInEs, `Missing keys in es: ${missingInEs.join(', ')}`).toEqual([]);
+  it('should have all pt-BR keys present in es-LA locale', () => {
+    const missingInEsLA = ptBRKeys.filter((key) => !esLAKeys.includes(key));
+    expect(missingInEsLA, `Missing keys in es-LA: ${missingInEsLA.join(', ')}`).toEqual([]);
   });
 
-  it('should not have extra keys in en that are not in pt-BR', () => {
-    const extraInEn = enKeys.filter((key) => !ptBRKeys.includes(key));
-    expect(extraInEn, `Extra keys in en: ${extraInEn.join(', ')}`).toEqual([]);
+  it('should not have extra keys in en-US that are not in pt-BR', () => {
+    const extraInEnUS = enUSKeys.filter((key) => !ptBRKeys.includes(key));
+    expect(extraInEnUS, `Extra keys in en-US: ${extraInEnUS.join(', ')}`).toEqual([]);
   });
 
-  it('should not have extra keys in es that are not in pt-BR', () => {
-    const extraInEs = esKeys.filter((key) => !ptBRKeys.includes(key));
-    expect(extraInEs, `Extra keys in es: ${extraInEs.join(', ')}`).toEqual([]);
+  it('should not have extra keys in es-LA that are not in pt-BR', () => {
+    const extraInEsLA = esLAKeys.filter((key) => !ptBRKeys.includes(key));
+    expect(extraInEsLA, `Extra keys in es-LA: ${extraInEsLA.join(', ')}`).toEqual([]);
   });
 
   it('should have the correct login title in all languages', () => {
     expect(ptBR.auth.loginTitle).toBe('Gerenciador da Reunião Sacramental');
-    expect(en.auth.loginTitle).toBe('Sacrament Meeting Planner');
-    expect(es.auth.loginTitle).toBe('Planificador de Reunión Sacramental');
+    expect(enUS.auth.loginTitle).toBe('Sacrament Meeting Planner');
+    expect(esLA.auth.loginTitle).toBe('Planificador de Reunión Sacramental');
   });
 
   it('should have the correct login subtitle in all languages', () => {
     expect(ptBR.auth.loginSubtitle).toBe('discursos e agenda');
-    expect(en.auth.loginSubtitle).toBe('speeches and agenda');
-    expect(es.auth.loginSubtitle).toBe('discursos y agenda');
+    expect(enUS.auth.loginSubtitle).toBe('speeches and agenda');
+    expect(esLA.auth.loginSubtitle).toBe('discursos y agenda');
   });
 
   it('should have all 5 speech status translations in all locales', () => {
@@ -75,12 +75,12 @@ describe('i18n locale files', () => {
         `Missing speechStatus.${status} in pt-BR`
       ).toBeDefined();
       expect(
-        en.speechStatus[status as keyof typeof en.speechStatus],
-        `Missing speechStatus.${status} in en`
+        enUS.speechStatus[status as keyof typeof enUS.speechStatus],
+        `Missing speechStatus.${status} in en-US`
       ).toBeDefined();
       expect(
-        es.speechStatus[status as keyof typeof es.speechStatus],
-        `Missing speechStatus.${status} in es`
+        esLA.speechStatus[status as keyof typeof esLA.speechStatus],
+        `Missing speechStatus.${status} in es-LA`
       ).toBeDefined();
     }
   });
@@ -93,12 +93,12 @@ describe('i18n locale files', () => {
         `Missing month ${month} in pt-BR`
       ).toBeDefined();
       expect(
-        en.date.months[month as keyof typeof en.date.months],
-        `Missing month ${month} in en`
+        enUS.date.months[month as keyof typeof enUS.date.months],
+        `Missing month ${month} in en-US`
       ).toBeDefined();
       expect(
-        es.date.months[month as keyof typeof es.date.months],
-        `Missing month ${month} in es`
+        esLA.date.months[month as keyof typeof esLA.date.months],
+        `Missing month ${month} in es-LA`
       ).toBeDefined();
     }
   });
@@ -107,15 +107,15 @@ describe('i18n locale files', () => {
     // pt-BR: "08 FEV" -> "{{day}} {{month}}"
     expect(ptBR.date.format).toBe('{{day}} {{month}}');
     // en: "FEB 08" -> "{{month}} {{day}}"
-    expect(en.date.format).toBe('{{month}} {{day}}');
-    // es: "08 FEB" -> "{{day}} {{month}}"
-    expect(es.date.format).toBe('{{day}} {{month}}');
+    expect(enUS.date.format).toBe('{{month}} {{day}}');
+    // es-LA: "08 FEB" -> "{{day}} {{month}}"
+    expect(esLA.date.format).toBe('{{day}} {{month}}');
   });
 
   it('should have correct month abbreviations per locale', () => {
     expect(ptBR.date.months['02']).toBe('FEV');
-    expect(en.date.months['02']).toBe('FEB');
-    expect(es.date.months['02']).toBe('FEB');
+    expect(enUS.date.months['02']).toBe('FEB');
+    expect(esLA.date.months['02']).toBe('FEB');
   });
 
   it('should have all 3 theme options in all locales', () => {
@@ -126,12 +126,12 @@ describe('i18n locale files', () => {
         `Missing theme.${theme} in pt-BR`
       ).toBeDefined();
       expect(
-        en.theme[theme as keyof typeof en.theme],
-        `Missing theme.${theme} in en`
+        enUS.theme[theme as keyof typeof enUS.theme],
+        `Missing theme.${theme} in en-US`
       ).toBeDefined();
       expect(
-        es.theme[theme as keyof typeof es.theme],
-        `Missing theme.${theme} in es`
+        esLA.theme[theme as keyof typeof esLA.theme],
+        `Missing theme.${theme} in es-LA`
       ).toBeDefined();
     }
   });
@@ -152,12 +152,12 @@ describe('i18n locale files', () => {
         `Missing sundayExceptions.${exc} in pt-BR`
       ).toBeDefined();
       expect(
-        en.sundayExceptions[exc as keyof typeof en.sundayExceptions],
-        `Missing sundayExceptions.${exc} in en`
+        enUS.sundayExceptions[exc as keyof typeof enUS.sundayExceptions],
+        `Missing sundayExceptions.${exc} in en-US`
       ).toBeDefined();
       expect(
-        es.sundayExceptions[exc as keyof typeof es.sundayExceptions],
-        `Missing sundayExceptions.${exc} in es`
+        esLA.sundayExceptions[exc as keyof typeof esLA.sundayExceptions],
+        `Missing sundayExceptions.${exc} in es-LA`
       ).toBeDefined();
     }
   });

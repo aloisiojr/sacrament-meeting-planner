@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 1
+version: 2
 last_updated: "2026-03-03"
 
 summary:
   total_test_files: 30
-  total_tests: 577
+  total_tests: 589
   framework: vitest
   categories:
     module_named: 25
@@ -97,10 +97,13 @@ module_tests:
       - Expo SDK version
 
   - file: src/__tests__/csvUtils.test.ts
-    tests: 19
+    tests: 26
     module: src/lib/csvUtils.ts
     covers:
-      - parseCsv (valid CSV, BOM, empty phone, empty CSV, header-only, quoted fields, Windows line endings)
+      - parseCsv (valid 3-column CSV, BOM, empty phone, empty CSV, header-only, quoted fields, Windows line endings)
+      - parseCsv 3-column enforcement (2-column rejection with INVALID_HEADER, 1-column rejection, row with insufficient columns)
+      - parseCsv defaults (informal name defaults to first word of full name, preserved when provided)
+      - parseCsv edge cases (phone sanitization, extra columns beyond 3 ignored, duplicate phones, skip empty lines)
       - generateCsv (BOM prefix, null phone, comma escaping)
       - splitPhoneNumber (Brazilian, US, 3-digit country codes, empty, no prefix)
 
@@ -268,13 +271,14 @@ integration_tests:
       - Shared QueryClient cache
 
   - file: src/__tests__/integration/permissions-roles.integration.test.ts
-    tests: 14
+    tests: 19
     covers:
       - Permission matrix (bishopric, secretary, observer roles)
       - getPermissions, ALL_PERMISSIONS, ALL_ROLES
       - Auth context permission gating (bishopric, observer, secretary)
       - Unknown role handling
       - AuthContext loading state
+      - manage_prayers toggle guard (!isObserver) per role (COR-005/CR-256)
 
   - file: src/__tests__/integration/speech-lifecycle.integration.test.ts
     tests: 19
@@ -306,3 +310,188 @@ integration_tests:
       - Offline queue (enqueue, dequeue, readQueue, clearQueue, getQueueSize, peek, capacity limit)
       - Sync table-to-query key mapping
       - Queue persistence across cycles
+
+# =============================================================================
+# F039 CORRECTION PACKAGE - TEST COVERAGE
+# =============================================================================
+
+test_suites:
+  - feature: F039
+    tests:
+      # COR-004 (CR-254): CSV 3-column only
+      - name: "rejects 2-column CSV (requires 3 columns)"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "rejects 1-column header CSV"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-2"]
+        covers_ecs: ["EC-2col-rejected"]
+        status: passing
+
+      - name: "rejects row with only 2 columns (INSUFFICIENT_COLUMNS)"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-2"]
+        covers_ecs: ["EC-row-insufficient"]
+        status: passing
+
+      - name: "parses a valid 3-column CSV with header and data"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "defaults informal name to first word of full name when empty"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "preserves informal name when provided"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "sanitizes phone with invalid characters to empty string"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-phone-sanitize"]
+        status: passing
+
+      - name: "handles CSV with extra columns beyond 3 (ignores extras)"
+        file: src/__tests__/csvUtils.test.ts
+        type: unit
+        covers_acs: ["COR-004-AC-1"]
+        covers_ecs: ["EC-extra-columns"]
+        status: passing
+
+      # COR-005 (CR-256): manage_prayers toggle guard
+      - name: "bishopric is not observer, so manage_prayers toggle is visible"
+        file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        covers_acs: ["COR-005-AC-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "secretary is not observer, so manage_prayers toggle is visible"
+        file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        covers_acs: ["COR-005-AC-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "observer IS observer, so manage_prayers toggle is hidden"
+        file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        covers_acs: ["COR-005-AC-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "secretary auth context has settings:access permission"
+        file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        covers_acs: ["COR-005-AC-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "observer auth context lacks settings:access permission"
+        file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        covers_acs: ["COR-005-AC-3"]
+        covers_ecs: []
+        status: passing
+
+coverage:
+  acceptance_criteria:
+    - id: COR-001-AC-1
+      covered: false
+      reason: "Doc-only change (SPEC text correction). No behavioral code to test."
+    - id: COR-001-AC-2
+      covered: false
+      reason: "Doc-only change (SPEC text correction). No behavioral code to test."
+    - id: COR-002-AC-1
+      covered: false
+      reason: "getEmailTemplate is embedded in Deno Edge Function (send-reset-email/index.ts), cannot be imported in vitest Node environment."
+    - id: COR-002-AC-2
+      covered: false
+      reason: "getEmailTemplate is embedded in Deno Edge Function, cannot be imported in vitest."
+    - id: COR-002-AC-3
+      covered: false
+      reason: "getEmailTemplate is embedded in Deno Edge Function, cannot be imported in vitest."
+    - id: COR-003-AC-1
+      covered: false
+      reason: "create-invitation is a Deno Edge Function, cannot be imported in vitest. Diagnostic mode code was fully removed."
+    - id: COR-004-AC-1
+      covered: true
+      tests: ["parses a valid 3-column CSV with header and data", "preserves informal name when provided", "handles CSV with extra columns beyond 3"]
+    - id: COR-004-AC-2
+      covered: true
+      tests: ["rejects 2-column CSV (requires 3 columns)", "rejects 1-column header CSV", "rejects row with only 2 columns (INSUFFICIENT_COLUMNS)"]
+    - id: COR-004-AC-3
+      covered: true
+      tests: ["defaults informal name to first word of full name when empty"]
+    - id: COR-005-AC-1
+      covered: true
+      tests: ["secretary is not observer, so manage_prayers toggle is visible", "secretary auth context has settings:access permission"]
+    - id: COR-005-AC-2
+      covered: true
+      tests: ["bishopric is not observer, so manage_prayers toggle is visible"]
+    - id: COR-005-AC-3
+      covered: true
+      tests: ["observer IS observer, so manage_prayers toggle is hidden", "observer auth context lacks settings:access permission"]
+    - id: COR-006-AC-1
+      covered: false
+      reason: "Comment-only change. No behavioral code to test."
+
+  edge_cases:
+    - id: EC-2col-rejected
+      covered: true
+      tests: ["rejects 1-column header CSV"]
+    - id: EC-row-insufficient
+      covered: true
+      tests: ["rejects row with only 2 columns (INSUFFICIENT_COLUMNS)"]
+    - id: EC-phone-sanitize
+      covered: true
+      tests: ["sanitizes phone with invalid characters to empty string"]
+    - id: EC-extra-columns
+      covered: true
+      tests: ["handles CSV with extra columns beyond 3 (ignores extras)"]
+
+gaps:
+  - id: COR-001-AC-1
+    reason: "Doc-only correction to SPEC_CONSOLIDATED. No runtime code changed."
+    recommendation: "No test needed. Verified by reading corrected SPEC text."
+  - id: COR-001-AC-2
+    reason: "Doc-only correction to SPEC_CONSOLIDATED. No runtime code changed."
+    recommendation: "No test needed. Verified by reading corrected SPEC text."
+  - id: COR-002-AC-1
+    reason: "getEmailTemplate is a private function inside a Deno Edge Function that cannot be imported in the vitest Node.js environment."
+    recommendation: "Extract getEmailTemplate to a shared module (e.g., src/lib/emailTemplates.ts) that can be imported and tested by vitest."
+  - id: COR-002-AC-2
+    reason: "Same as COR-002-AC-1."
+    recommendation: "Same as COR-002-AC-1."
+  - id: COR-002-AC-3
+    reason: "Same as COR-002-AC-1."
+    recommendation: "Same as COR-002-AC-1."
+  - id: COR-003-AC-1
+    reason: "create-invitation is a Deno Edge Function. The diagnostic mode code was entirely removed; there is nothing to test (dead code removal)."
+    recommendation: "If Edge Function testing infrastructure is added in the future, add an integration test verifying diagnose:true is ignored."
+  - id: COR-006-AC-1
+    reason: "Comment-only change (no runtime behavior affected)."
+    recommendation: "No test needed. Verified by grep."
+
+stats:
+  total_tests: 589
+  passing: 589
+  failing: 0
+  skipped: 0

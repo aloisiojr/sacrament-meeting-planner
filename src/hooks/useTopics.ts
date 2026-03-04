@@ -180,9 +180,30 @@ interface CollectionWithConfig extends GeneralCollection {
 }
 
 /**
+ * Fixed sort priority for known collection names (3 per language).
+ * Unknown names (general conference collections) get priority 3
+ * and are sorted by name descending (newest first).
+ */
+export const FIXED_COLLECTION_ORDER: Record<string, number> = {
+  // pt-BR
+  'Temas Especiais': 0,
+  'Para a Forca da Juventude': 1,
+  'Principios do Evangelho': 2,
+  // en-US
+  'Special Topics': 0,
+  'For the Strength of Youth': 1,
+  'Gospel Principles': 2,
+  // es-LA
+  'Temas Especiales': 0,
+  'Para la Fortaleza de la Juventud': 1,
+  'Principios del Evangelio': 2,
+};
+
+/**
  * Fetch general collections for the ward's language with their activation status.
  * Returns: Ward Topics section is handled separately.
- * Collections are sorted: active (newest first), then inactive (newest first).
+ * Collections are sorted in fixed order: known collections by priority (0-2),
+ * then conference collections (priority 3) by name descending (newest first).
  */
 export function useCollections(language: string) {
   const { wardId } = useAuth();
@@ -221,9 +242,12 @@ export function useCollections(language: string) {
     },
     enabled: !!wardId && !!language,
     select: (data: CollectionWithConfig[]) => {
-      const active = data.filter((c) => c.active);
-      const inactive = data.filter((c) => !c.active);
-      return [...active, ...inactive];
+      return [...data].sort((a, b) => {
+        const pa = FIXED_COLLECTION_ORDER[a.name] ?? 3;
+        const pb = FIXED_COLLECTION_ORDER[b.name] ?? 3;
+        if (pa !== pb) return pa - pb;
+        return b.name.localeCompare(a.name);
+      });
     },
   });
 }

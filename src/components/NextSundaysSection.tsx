@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
+import { useOnlineStatus } from '../contexts/OnlineStatusContext';
 import { SundayCard } from './SundayCard';
 import { PencilIcon } from './icons';
 import { QueryErrorView } from './QueryErrorView';
@@ -33,6 +34,7 @@ export function NextSundaysSection() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const isOnline = useOnlineStatus();
   const { managePrayers } = useWardManagePrayers();
 
   // Get next 3 sundays
@@ -101,7 +103,7 @@ export function NextSundaysSection() {
             isNext={entry.date === nextSunday}
             hasSecondSpeech={hasSecondSpeech}
             managePrayers={managePrayers}
-            renderHeaderRight={() => (
+            renderHeaderRight={isOnline ? () => (
               <Pressable
                 style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
                 onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: entry.date } })}
@@ -110,7 +112,7 @@ export function NextSundaysSection() {
               >
                 <PencilIcon size={16} color={colors.text} />
               </Pressable>
-            )}
+            ) : undefined}
           />
         );
       })}

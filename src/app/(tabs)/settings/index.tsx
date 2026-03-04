@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage, setWardLanguage, user, userName } = useAuth();
+  const isOnline = useOnlineStatus();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [appLanguageModalVisible, setAppLanguageModalVisible] = useState(false);
@@ -288,7 +290,7 @@ export default function SettingsScreen() {
           {t('settings.appSettingsGroup')}
         </Text>
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {hasPermission('settings:users') && (
+          {hasPermission('settings:users') && isOnline && (
             <SettingsItem
               label={t('settings.users')}
               onPress={() => router.push('/(tabs)/settings/users')}

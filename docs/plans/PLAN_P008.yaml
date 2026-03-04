@@ -1,0 +1,369 @@
+# =============================================================================
+# PLAN_P008.yaml - Implementation Plan for Phase 1
+# CR-266: Fixed Collection Sort Order (F056)
+# CR-267: Topic Field Visibility Parity (F057)
+# CR-268: Offline Home NextSundaysSection Visibility (F058)
+# Generated: 2026-03-04
+# Artifact ID: 008
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement 3 UX/bugfix improvements:
+  (1) F056 - Replace active/inactive sort in useCollections() with a fixed-order
+      sort using a name-to-priority map (CR-266)
+  (2) F057 - Remove !!speech guard from showTopicRow in SpeechSlot so topic and
+      speaker fields have identical visibility (CR-267)
+  (3) F058 - Show NextSundaysSection when offline on Home tab, with pencil
+      buttons hidden when offline (CR-268)
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # F056: Fixed Collection Sort Order (CR-266)
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-266/F056: Replace the select function in useCollections() hook
+      (src/hooks/useTopics.ts lines 223-227) with a deterministic fixed-order
+      sort.
+
+      Current code:
+        select: (data) => {
+          const active = data.filter((c) => c.active);
+          const inactive = data.filter((c) => !c.active);
+          return [...active, ...inactive];
+        }
+
+      New code:
+        1. Define FIXED_COLLECTION_ORDER constant (Record<string, number>) above
+           the useCollections function with 9 entries (3 per language):
+           - Priority 0: "Temas Especiais" / "Special Topics" / "Temas Especiales"
+           - Priority 1: "Para a Forca da Juventude" / "For the Strength of Youth" / "Para la Fortaleza de la Juventud"
+           - Priority 2: "Principios do Evangelho" / "Gospel Principles" / "Principios del Evangelio"
+        2. Replace the select function with:
+           select: (data) => {
+             return [...data].sort((a, b) => {
+               const pa = FIXED_COLLECTION_ORDER[a.name] ?? 3;
+               const pb = FIXED_COLLECTION_ORDER[b.name] ?? 3;
+               if (pa !== pb) return pa - pb;
+               return b.name.localeCompare(a.name);
+             });
+           }
+        3. Update the JSDoc comment on useCollections to reflect the new sort
+           (remove "active (newest first), then inactive (newest first)").
+    files:
+      - src/hooks/useTopics.ts
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "FIXED_COLLECTION_ORDER constant exists with 9 entries (3 names x 3 languages)"
+      - "select function sorts by priority (0-2 for named, 3 for conferences)"
+      - "Same-priority items (conferences) sorted by name descending (newest first)"
+      - "Active/inactive status does NOT affect sort order"
+      - "JSDoc comment on useCollections is updated"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test the sort logic with mock collection data:
+          1. Mixed active/inactive collections stay in fixed order regardless of toggle
+          2. pt-BR names sort correctly: Temas Especiais, Para a Forca da Juventude,
+             Principios do Evangelho, then conferences newest first
+          3. en-US names sort correctly: Special Topics, For the Strength of Youth,
+             Gospel Principles, then conferences
+          4. es-LA names sort correctly: Temas Especiales, Para la Fortaleza de la
+             Juventud, Principios del Evangelio, then conferences
+          5. Conference collections (unmatched names) sorted by name descending
+          6. Toggling a collection's active status does not change its position
+    covers:
+      acceptance_criteria:
+        - "AC-056-1: Collections appear in fixed order regardless of active/inactive status"
+        - "AC-056-2: Toggling collection does not change its position"
+        - "AC-056-3: General conference collections sorted newest first"
+      edge_cases:
+        - "EC-056-1: Ward language is en-US or es-LA (map covers all 3 languages)"
+        - "EC-056-2: New general conference collection appears at top of conference section (priority 3, name descending)"
+    risks:
+      - risk: "Collection name in DB doesn't match map keys exactly"
+        mitigation: "Map keys come from existing DB seed data; confirmed exact strings"
+
+  # =========================================================================
+  # F057: Topic Field Visibility Parity (CR-267)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-267/F057: One-line fix in src/components/SpeechSlot.tsx line 169.
+      Change:
+        const showTopicRow = !isPrayer && !!speech;
+      To:
+        const showTopicRow = !isPrayer;
+
+      This makes the topic field always visible for speech positions (1, 2, 3),
+      matching the speaker field which already renders without a !!speech guard
+      (lines 229-263). Both fields will now show placeholder text when speech
+      is null.
+
+      The topic Pressable already handles speech === null correctly:
+      disabled={!canAssign || !speech} (line 271), so tapping topic when
+      speech is null is a no-op.
+    files:
+      - src/components/SpeechSlot.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "Line 169 reads: const showTopicRow = !isPrayer;"
+      - "No !!speech guard on showTopicRow"
+      - "Topic Pressable disabled prop still has !speech check (line 271)"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test SpeechSlot rendering:
+          1. Speech position 1 with speech=null: both speaker and topic fields visible
+             with placeholder text
+          2. Speech position 1 with speech assigned: both fields visible with data
+          3. Prayer position 0: topic row hidden regardless of speech value
+          4. Prayer position 4: topic row hidden regardless of speech value
+          5. Position 2 disabled (isSecondSpeechEnabled=false): both placeholder
+             fields visible (handled by isPos2Disabled branch, not showTopicRow)
+    covers:
+      acceptance_criteria:
+        - "AC-057-1: Topic and speaker fields have identical visibility for speech positions"
+        - "AC-057-2: Disabled position 2 shows both placeholder fields"
+      edge_cases:
+        - "EC-057-1: Prayer positions (0, 4) still hide topic row"
+        - "EC-057-2: Speech record is null - both fields show placeholder consistently"
+    risks:
+      - risk: "Topic field interactions with null speech cause errors"
+        mitigation: "Topic Pressable already has disabled={!canAssign || !speech} guard"
+
+  # =========================================================================
+  # F058: Offline Home NextSundaysSection Visibility (CR-268)
+  # =========================================================================
+
+  - id: STEP-03
+    description: |
+      CR-268/F058: In src/app/(tabs)/index.tsx line 245, remove the isOnline
+      guard from NextSundaysSection. Keep the isOnline guard on
+      NextAssignmentsSection and InviteManagementSection.
+
+      Current code (lines 245-247):
+        {isOnline && <NextSundaysSection />}
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
+
+      New code:
+        <NextSundaysSection />
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
+
+      Data availability: NextSundaysSection uses useSpeeches, useSundayExceptions,
+      and useAgendaRange. All are prefetched by useOfflinePrefetch with the same
+      query keys, so TanStack Query's offlineFirst network mode serves cached data.
+    files:
+      - src/app/(tabs)/index.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "NextSundaysSection renders without isOnline guard"
+      - "NextAssignmentsSection still has isOnline guard"
+      - "InviteManagementSection still has isOnline guard"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test Home tab rendering:
+          1. isOnline=false: NextSundaysSection visible, NextAssignmentsSection
+             hidden, InviteManagementSection hidden
+          2. isOnline=true: all three sections visible
+          3. NextSundaysSection receives cached data when offline (via TanStack
+             Query offlineFirst mode)
+    covers:
+      acceptance_criteria:
+        - "AC-058-1: NextSundaysSection visible offline"
+        - "AC-058-2: NextAssignmentsSection remains hidden offline"
+        - "AC-058-3: InviteManagementSection remains hidden offline"
+        - "AC-058-4: NextSundaysSection shows cached data when offline"
+      edge_cases:
+        - "EC-058-1: App opened cold while offline (no cache) - section renders with empty/loading state"
+    risks:
+      - risk: "NextSundaysSection errors when offline with no cache"
+        mitigation: "TanStack Query handles empty cache gracefully; section shows loading state"
+
+  - id: STEP-04
+    description: |
+      CR-268/F058: In src/components/NextSundaysSection.tsx, add offline
+      awareness to hide pencil (edit) buttons when offline.
+
+      Changes:
+      1. Import useOnlineStatus from '../contexts/OnlineStatusContext' (add to
+         existing imports after useTheme).
+      2. Call const isOnline = useOnlineStatus(); inside NextSundaysSection
+         (after the existing useRouter() call).
+      3. Change the renderHeaderRight prop on SundayCard from always rendering
+         the pencil button to conditionally rendering based on isOnline:
+         Current (lines 104-113):
+           renderHeaderRight={() => (
+             <Pressable ...>
+               <PencilIcon ... />
+             </Pressable>
+           )}
+         New:
+           renderHeaderRight={isOnline ? () => (
+             <Pressable ...>
+               <PencilIcon ... />
+             </Pressable>
+           ) : undefined}
+
+      When renderHeaderRight is undefined, SundayCard renders nothing in the
+      right header area. No changes needed to SundayCard itself.
+    files:
+      - src/components/NextSundaysSection.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "useOnlineStatus imported from '../contexts/OnlineStatusContext'"
+      - "const isOnline = useOnlineStatus() called in NextSundaysSection"
+      - "renderHeaderRight is conditional: isOnline ? () => (...pencil...) : undefined"
+      - "Pencil button JSX unchanged (only wrapped in conditional)"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test NextSundaysSection rendering:
+          1. isOnline=true: pencil buttons visible on each SundayCard
+          2. isOnline=false: pencil buttons hidden on each SundayCard
+          3. Transition online->offline: pencil buttons disappear reactively
+          4. Transition offline->online: pencil buttons reappear reactively
+    covers:
+      acceptance_criteria:
+        - "AC-058-5: Pencil buttons hidden when offline"
+      edge_cases:
+        - "EC-058-2: Pencil buttons appear/disappear reactively on connectivity change"
+    risks:
+      - risk: "SundayCard doesn't handle undefined renderHeaderRight"
+        mitigation: "SundayCard already uses optional renderHeaderRight prop with {renderHeaderRight?.()}"
+
+  # =========================================================================
+  # VERIFICATION
+  # =========================================================================
+
+  - id: STEP-05
+    description: |
+      Run full test suite to verify no regressions from all changes.
+      Verify all code changes pass linting, type-checking, and tests.
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Unforeseen interaction between changes"
+        mitigation: "All 3 features are independent; no shared code paths between F056, F057, and F058"
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # F056 (CR-266)
+  - ac_id: AC-056-1
+    description: "Collections appear in fixed order regardless of active/inactive status"
+    how_to_verify: "FIXED_COLLECTION_ORDER map assigns priority 0-2 to named collections; sort by priority, then name descending"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-056-2
+    description: "Toggling collection does not change its position"
+    how_to_verify: "Sort function uses name-to-priority map, not active status. Active/inactive not referenced in sort."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-056-3
+    description: "General conference collections sorted newest first"
+    how_to_verify: "Unmatched names get priority 3; same-priority items sorted by b.name.localeCompare(a.name) (descending)"
+    covered_by_steps: ["STEP-01"]
+
+  # F057 (CR-267)
+  - ac_id: AC-057-1
+    description: "Topic and speaker fields have identical visibility"
+    how_to_verify: "showTopicRow = !isPrayer (no !!speech guard). Speaker row also has no !!speech guard."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-057-2
+    description: "Disabled position 2 shows both placeholder fields"
+    how_to_verify: "isPos2Disabled branch (lines 208-226) renders both speaker and topic placeholder fields"
+    covered_by_steps: ["STEP-02"]
+
+  # F058 (CR-268)
+  - ac_id: AC-058-1
+    description: "NextSundaysSection visible offline"
+    how_to_verify: "isOnline guard removed from NextSundaysSection in index.tsx"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-058-2
+    description: "NextAssignmentsSection remains hidden offline"
+    how_to_verify: "{isOnline && <NextAssignmentsSection />} guard remains"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-058-3
+    description: "InviteManagementSection remains hidden offline"
+    how_to_verify: "{isOnline && <InviteManagementSection />} guard remains"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-058-4
+    description: "NextSundaysSection shows cached data when offline"
+    how_to_verify: "useSpeeches, useSundayExceptions, useAgendaRange use offlineFirst mode; same query keys as useOfflinePrefetch"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: AC-058-5
+    description: "Pencil buttons hidden when offline"
+    how_to_verify: "renderHeaderRight={isOnline ? () => (...) : undefined} in NextSundaysSection"
+    covered_by_steps: ["STEP-04"]
+
+  # Edge cases
+  - ac_id: EC-056-1
+    description: "Ward language is en-US or es-LA"
+    how_to_verify: "FIXED_COLLECTION_ORDER map has entries for all 3 languages (9 total entries)"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-056-2
+    description: "New general conference collection is added"
+    how_to_verify: "Unmatched names get priority 3 and sort descending by name (newest conference names first)"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-057-1
+    description: "Prayer positions (0, 4) still hide topic row"
+    how_to_verify: "showTopicRow = !isPrayer; isPrayer=true for positions 0 and 4"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: EC-057-2
+    description: "Speech record is null (not yet lazy-created)"
+    how_to_verify: "Both speaker and topic fields render with placeholder when speech is null"
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: EC-058-1
+    description: "App opened cold while offline (no cache)"
+    how_to_verify: "TanStack Query handles empty cache; section renders with loading/empty state"
+    covered_by_steps: ["STEP-03"]
+
+  - ac_id: EC-058-2
+    description: "Pencil buttons appear/disappear reactively on connectivity change"
+    how_to_verify: "isOnline from useOnlineStatus is reactive; renderHeaderRight recalculates on change"
+    covered_by_steps: ["STEP-04"]

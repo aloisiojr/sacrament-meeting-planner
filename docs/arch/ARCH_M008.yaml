@@ -1,0 +1,344 @@
+# =============================================================================
+# ARCH_M008.yaml
+# Architecture: Collection sort order (CR-266), Topic field visibility parity
+# (CR-267), Offline Home NextSundaysSection (CR-268)
+# Status: complete
+# Created: 2026-03-04
+# =============================================================================
+
+type: architecture
+status: complete
+artifact_id: "008"
+features: [F056, F057, F058]
+change_requests: [CR-266, CR-267, CR-268]
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # C008-01: Fixed collection sort order in useCollections select
+  # ---------------------------------------------------------------------------
+  - id: C008-01
+    name: Fixed Collection Sort Order
+    feature: F056
+    cr: 266
+    type: modification
+    file: src/hooks/useTopics.ts
+    function: useCollections
+    description: |
+      Replace the current select function in useCollections() that sorts
+      active-first/inactive-last with a deterministic fixed-order sort.
+
+      Current code (lines 223-227):
+        select: (data) => {
+          const active = data.filter((c) => c.active);
+          const inactive = data.filter((c) => !c.active);
+          return [...active, ...inactive];
+        }
+
+      New sort logic:
+        1. Define a FIXED_COLLECTION_NAMES map with the 3 known collection
+           names and their sort priority, keyed by all 3 language variants:
+           - Priority 0: "Temas Especiais" / "Special Topics" / "Temas Especiales"
+           - Priority 1: "Para a Forca da Juventude" / "For the Strength of Youth" / "Para la Fortaleza de la Juventud"
+           - Priority 2: "Principios do Evangelho" / "Gospel Principles" / "Principios del Evangelio"
+        2. Any collection whose name is NOT in the map is a conference
+           collection (priority 3), sorted by name descending (newest first,
+           since conference names contain the year/period).
+        3. Sort all collections by priority, then by name descending for
+           same-priority items (conferences).
+
+      This is a client-side-only change. No database migration needed.
+      The sort is applied in the TanStack Query select function, so it
+      runs on every cache read and always produces the same order regardless
+      of active/inactive toggle state.
+
+    input:
+      - name: data
+        type: "CollectionWithConfig[]"
+        description: "Raw collection data from queryFn (unsorted)"
+
+    output:
+      - name: sorted
+        type: "CollectionWithConfig[]"
+        description: "Collections in fixed deterministic order"
+
+    logic: |
+      const FIXED_ORDER: Record<string, number> = {
+        // pt-BR
+        'Temas Especiais': 0,
+        'Para a Forca da Juventude': 1,
+        'Principios do Evangelho': 2,
+        // en-US
+        'Special Topics': 0,
+        'For the Strength of Youth': 1,
+        'Gospel Principles': 2,
+        // es-LA
+        'Temas Especiales': 0,
+        'Para la Fortaleza de la Juventud': 1,
+        'Principios del Evangelio': 2,
+      };
+
+      select: (data) => {
+        return [...data].sort((a, b) => {
+          const pa = FIXED_ORDER[a.name] ?? 3;
+          const pb = FIXED_ORDER[b.name] ?? 3;
+          if (pa !== pb) return pa - pb;
+          // Same priority (both conferences): sort name descending
+          return b.name.localeCompare(a.name);
+        });
+      }
+
+    acceptance_criteria: [AC-056-1, AC-056-2, AC-056-3]
+    edge_cases: [EC-056-1, EC-056-2]
+
+  # ---------------------------------------------------------------------------
+  # C008-02: Topic field visibility parity in SpeechSlot
+  # ---------------------------------------------------------------------------
+  - id: C008-02
+    name: Topic Field Visibility Parity
+    feature: F057
+    cr: 267
+    type: modification
+    file: src/components/SpeechSlot.tsx
+    function: SpeechSlot
+    description: |
+      One-line fix: change the showTopicRow guard to remove the !!speech
+      condition, making topic and speaker fields always visible together
+      for speech positions (1, 2, 3).
+
+      Current code (line 169):
+        const showTopicRow = !isPrayer && !!speech;
+
+      New code:
+        const showTopicRow = !isPrayer;
+
+      Rationale: The speaker row (lines 229-263) is always rendered inside
+      the non-disabled branch with NO guard on !!speech - it shows a
+      placeholder "Selecionar discursante" when speech is null. The topic
+      row should have the same behavior: show placeholder "Selecionar tema"
+      when speech is null, exactly matching the speaker row.
+
+      The topic Pressable already handles speech === null correctly via
+      disabled={!canAssign || !speech} (line 271), so tapping the topic
+      field when speech is null is a no-op, which is the same behavior as
+      the speaker field.
+
+    input: none
+    output: none
+
+    logic: |
+      // Line 169: remove !!speech guard
+      const showTopicRow = !isPrayer;
+
+    acceptance_criteria: [AC-057-1, AC-057-2]
+    edge_cases: [EC-057-1, EC-057-2]
+
+  # ---------------------------------------------------------------------------
+  # C008-03: Show NextSundaysSection offline on Home tab
+  # ---------------------------------------------------------------------------
+  - id: C008-03
+    name: Offline Home NextSundaysSection Visibility
+    feature: F058
+    cr: 268
+    type: modification
+    file: src/app/(tabs)/index.tsx
+    function: HomeTabContent
+    description: |
+      Remove the isOnline guard from NextSundaysSection rendering so it
+      is visible in both online and offline modes. Keep the isOnline guard
+      on NextAssignmentsSection and InviteManagementSection.
+
+      Current code (lines 245-247):
+        {isOnline && <NextSundaysSection />}
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
+
+      New code:
+        <NextSundaysSection />
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
+
+      Data availability: NextSundaysSection uses useSpeeches({ start, end }),
+      useSundayExceptions(start, end), and useAgendaRange(start, end).
+      All three are prefetched by useOfflinePrefetch (same query keys),
+      so cached data is available offline via TanStack Query's offlineFirst
+      network mode.
+
+    input: none
+    output: none
+
+    acceptance_criteria: [AC-058-1, AC-058-2, AC-058-3, AC-058-4]
+    edge_cases: [EC-058-1]
+
+  # ---------------------------------------------------------------------------
+  # C008-04: Hide pencil buttons when offline in NextSundaysSection
+  # ---------------------------------------------------------------------------
+  - id: C008-04
+    name: Offline Pencil Button Visibility
+    feature: F058
+    cr: 268
+    type: modification
+    file: src/components/NextSundaysSection.tsx
+    function: NextSundaysSection
+    description: |
+      Add isOnline awareness to NextSundaysSection so pencil (edit) buttons
+      are hidden when the device is offline.
+
+      Changes:
+      1. Import useOnlineStatus from contexts/OnlineStatusContext.
+      2. Call useOnlineStatus() to get isOnline.
+      3. Conditionally render the pencil button in renderHeaderRight:
+         only render when isOnline is true.
+
+      Current renderHeaderRight (lines 104-113):
+        renderHeaderRight={() => (
+          <Pressable ...>
+            <PencilIcon ... />
+          </Pressable>
+        )}
+
+      New renderHeaderRight:
+        renderHeaderRight={isOnline ? () => (
+          <Pressable ...>
+            <PencilIcon ... />
+          </Pressable>
+        ) : undefined}
+
+      This approach uses the existing renderHeaderRight prop pattern:
+      when undefined, SundayCard renders nothing in the right header area.
+      No changes needed to SundayCard itself.
+
+    input:
+      - name: isOnline
+        type: boolean
+        source: "useOnlineStatus()"
+        description: "Current online/offline status from OnlineStatusContext"
+
+    output: none
+
+    acceptance_criteria: [AC-058-5]
+    edge_cases: [EC-058-2]
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+integrations:
+
+  - id: INT-008-01
+    name: "useCollections select -> Topics screen"
+    from: C008-01
+    to: "src/app/(tabs)/settings/topics.tsx"
+    description: |
+      The Topics screen calls useCollections(language) and renders the
+      returned array directly. Since the sort is applied in the select
+      function, the Topics screen automatically receives collections in
+      fixed order. No changes needed in the Topics screen.
+
+  - id: INT-008-02
+    name: "NextSundaysSection -> useOnlineStatus"
+    from: C008-04
+    to: "src/contexts/OnlineStatusContext.tsx"
+    description: |
+      NextSundaysSection gains a new dependency on useOnlineStatus() hook.
+      This is the same pattern used by the Home tab (index.tsx) and other
+      components that need online/offline awareness. OnlineStatusContext
+      is provided above the tab navigator in the provider stack.
+
+  - id: INT-008-03
+    name: "NextSundaysSection -> TanStack Query cache (offline data)"
+    from: C008-03
+    to: "src/hooks/useOfflinePrefetch.ts"
+    description: |
+      NextSundaysSection's queries (useSpeeches, useSundayExceptions,
+      useAgendaRange) use the same query keys that useOfflinePrefetch
+      warms. When offline, TanStack Query's offlineFirst network mode
+      serves cached data from AsyncStorage via the persister, ensuring
+      NextSundaysSection has data to display.
+
+# =============================================================================
+# MODULE UPDATES
+# =============================================================================
+
+module_updates:
+
+  - module_id: M003
+    module_name: Topic Management
+    action: update
+    reason: "F056 changes sort order in useCollections select function"
+    features_after: [F008, F056]
+
+  - module_id: M006
+    module_name: Speech Management
+    action: update
+    reason: "F057 changes showTopicRow guard in SpeechSlot"
+    features_after: [F013, F014, F015, F016, F017, F018, F046, F057]
+
+  - module_id: M013
+    module_name: "UI & Navigation"
+    action: update
+    reason: "F058 changes Home tab offline behavior and NextSundaysSection pencil visibility"
+    features_after: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052, F058]
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-024
+    title: "Client-side fixed sort order for collections using name-to-priority map"
+    decision: |
+      Sort collections in the useCollections select function using a
+      static name-to-priority map (Record<string, number>) that maps
+      all 9 known collection names (3 per language) to priorities 0-2.
+      Unknown names (conferences) get priority 3 and are sorted by name
+      descending.
+    context: |
+      The user wants a fixed, deterministic sort order for collections
+      in Settings > Topics. The current sort puts active collections first,
+      which changes order when toggling. A DB migration adding a sort_order
+      column was considered but rejected as over-engineering for 3 fixed
+      items plus conferences.
+    rationale: |
+      - No DB migration needed: pure client-side change in the select function
+      - Handles all 3 languages via the name map (collections are
+        language-filtered by the queryFn, so only one language's names
+        appear at a time, but the map covers all for safety)
+      - Conference collections naturally sort newest-first when sorted
+        by name descending (names contain year/period like "Outubro 2025")
+      - Toggle operations don't affect sort order since the select runs
+        on every cache read
+    alternatives_considered:
+      - "DB sort_order column: Requires migration, over-engineered for a fixed list of 3 + dynamic conferences"
+      - "Sort by created_at or id: Not deterministic across environments, doesn't match desired fixed order"
+    applies_to: [C008-01]
+
+# =============================================================================
+# CONSOLIDATED UPDATES
+# =============================================================================
+
+consolidated_updates:
+  arch_consolidated:
+    modules_to_update: [M003, M006, M013]
+    adrs_to_add: [ADR-024]
+    metadata:
+      total_modules: 13  # unchanged
+      total_adrs: 24     # was 23 (ADR-022,023 from M007 + this ADR-024)
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_spec: true
+  GATE-02_read_consolidated: true
+  GATE-03_components_single_responsibility: true
+  GATE-04_contracts_defined: true
+  GATE-05_integrations_mapped: true
+  GATE-06_adrs_documented: true
+  GATE-07_status_complete: true

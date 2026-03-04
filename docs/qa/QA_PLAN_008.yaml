@@ -1,0 +1,290 @@
+# =============================================================================
+# QA_PLAN_008.yaml
+# PRE validation for CR-266 + CR-267 + CR-268: Collection order, topic/speaker
+# visibility parity, and offline home speeches
+# =============================================================================
+
+metadata:
+  artifact_id: "008"
+  date: "2026-03-04"
+  mode: PRE
+  type: bugfix
+  scope: "CR-266 (fixed collection order) + CR-267 (topic/speaker field visibility parity) + CR-268 (offline home speeches hidden)"
+  requests:
+    - cr: CR-266
+      text: "Vamos deixar fixa a ordem das coleções dentro de Configuracoes -> Temas, independente se estão ativas ou desativadas. Temas Especiais, Para a força da juventude, Principios do evangelho e a lista de conferencias gerais em ordem descrecente de tempo (as mais novas primeiro)"
+    - cr: CR-267
+      text: "Parece que as regras de visibilidade do campo de designacao de temas é diferente do campo de designação de discursantes, e deveria ser o mesmo, quando um aparece, tem que aparecer o outro"
+    - cr: CR-268
+      text: "No modo offline, eu nao consigo ver os próximos discursos na tela home, só estou vendo o botao de apresentar e o card de agenda do proximo domingo"
+
+# =============================================================================
+# PRE VALIDATION
+# =============================================================================
+
+pre_validation:
+  validated: true
+
+  bugs_confirmed: true
+
+  # ---------------------------------------------------------------------------
+  # CR-266: Fixed collection order in Settings -> Topics
+  # ---------------------------------------------------------------------------
+
+  cr266:
+    bug_confirmed: true
+
+    reproduction_steps:
+      - step: 1
+        action: "Open Settings -> Temas (Topics)"
+        expected: "Collections are listed under 'Coleções Gerais' section"
+      - step: 2
+        action: "Observe the collection order"
+        actual: "Collections are sorted by active-first then inactive, with no deterministic order within each group. The order changes when toggling collections on/off."
+        expected: "Collections should always appear in a fixed order: Temas Especiais, Para a Força da Juventude, Princípios do Evangelho, then general conferences in descending chronological order (newest first)"
+
+    root_cause_analysis:
+      summary: >
+        The useCollections hook in src/hooks/useTopics.ts (line 223-228) sorts collections
+        via its `select` function: active first, then inactive. Within each group, order is
+        undefined (depends on database return order from general_collections table).
+        There is no sort_order column in the general_collections table (schema has only
+        id, name, language). The collection names contain temporal info (e.g., conference names
+        with years) but no explicit ordering field.
+      affected_files:
+        - path: "src/hooks/useTopics.ts"
+          lines: "187-229"
+          detail: "useCollections hook: queryFn fetches from general_collections without ORDER BY, select function sorts only by active/inactive"
+        - path: "src/app/(tabs)/settings/topics.tsx"
+          lines: "459-476"
+          detail: "Renders collections in the order returned by useCollections hook"
+        - path: "supabase/migrations/001_initial_schema.sql"
+          lines: "55-58"
+          detail: "general_collections table has no sort_order column"
+        - path: "src/types/database.ts"
+          lines: "112-116"
+          detail: "GeneralCollection interface has only id, name, language"
+
+    fix_approach:
+      summary: >
+        Add a sort_order column to general_collections table (or implement client-side
+        deterministic sorting). The fixed order must be: 1) Temas Especiais, 2) Para a Força
+        da Juventude, 3) Princípios do Evangelho, 4) General conferences sorted by year
+        descending (newest first). The active/inactive grouping should be REMOVED from the
+        select function in useCollections -- order is now always fixed regardless of activation
+        status.
+      options:
+        - option: "A - Database sort_order column"
+          detail: >
+            Add migration with sort_order INTEGER column to general_collections.
+            Populate with values: special=1, youth=2, gospel=3, conferences=10,11,12...
+            Update useCollections queryFn to ORDER BY sort_order.
+            Remove active/inactive grouping from select function.
+          pros: "Clean, server-side, works for all clients"
+          cons: "Requires migration + data update in production"
+        - option: "B - Client-side deterministic sort"
+          detail: >
+            Define a fixed sort map in useCollections by collection name pattern.
+            Parse conference years from name for descending sort.
+            Remove active/inactive grouping from select function.
+          pros: "No migration needed"
+          cons: "Fragile if collection names change"
+
+  # ---------------------------------------------------------------------------
+  # CR-267: Topic/speaker field visibility parity in SpeechSlot
+  # ---------------------------------------------------------------------------
+
+  cr267:
+    bug_confirmed: true
+
+    reproduction_steps:
+      - step: 1
+        action: "Open Speeches tab, expand a Sunday card"
+        expected: "See speech slots with speaker and topic assignment fields"
+      - step: 2
+        action: "Observe that for speech positions (1, 2, 3), the speaker field is always rendered (even when speech is null), but the topic field is only shown when speech object exists (showTopicRow = !isPrayer && !!speech)"
+        actual: "Speaker field shows with placeholder when speech is null; topic field is completely hidden when speech is null"
+        expected: "Both fields should follow the same visibility rules -- when one appears, the other should appear too"
+
+    root_cause_analysis:
+      summary: >
+        In SpeechSlot.tsx, the speaker row (Row 2, line 230-263) is always rendered inside the
+        !isPos2Disabled block, regardless of whether `speech` is null. The topic row (Row 3,
+        line 266-300) is conditionally rendered via `{showTopicRow && (...)}` where
+        showTopicRow = !isPrayer && !!speech (line 169). The `!!speech` condition makes the
+        topic field hidden while the speaker field is visible when speech is null.
+        The speaker field itself uses `disabled={!canAssign || !speech}` to be non-interactive
+        when speech is null, but is still visible. The topic field is completely removed from
+        the DOM when speech is null.
+      affected_files:
+        - path: "src/components/SpeechSlot.tsx"
+          lines: "169"
+          detail: "showTopicRow = !isPrayer && !!speech -- requires speech to exist"
+        - path: "src/components/SpeechSlot.tsx"
+          lines: "230-300"
+          detail: "Speaker row always rendered; topic row conditionally rendered"
+
+    fix_approach:
+      summary: >
+        Make the topic field visibility match the speaker field visibility. Either:
+        (a) Remove the `!!speech` check from showTopicRow so it shows with placeholder
+        like the speaker field does, or (b) add the same `!!speech` check to the speaker
+        field so both are hidden when speech is null. Option (a) is preferred since it
+        provides a better UX (both fields visible with placeholders).
+
+  # ---------------------------------------------------------------------------
+  # CR-268: Offline home tab hides NextSundaysSection completely
+  # ---------------------------------------------------------------------------
+
+  cr268:
+    bug_confirmed: true
+
+    reproduction_steps:
+      - step: 1
+        action: "Open the app while online, navigate around to populate cache"
+        expected: "Data is cached by TanStack Query + useOfflinePrefetch"
+      - step: 2
+        action: "Go offline (airplane mode)"
+        expected: "Home tab should still show upcoming speeches from cache"
+      - step: 3
+        action: "Observe the Home tab"
+        actual: "Only the Start Meeting button and agenda preview card are shown. The NextSundaysSection (upcoming speeches) is completely hidden."
+        expected: "The NextSundaysSection should be visible offline, showing cached speech data for the next 3 Sundays (read-only)"
+
+    root_cause_analysis:
+      summary: >
+        In src/app/(tabs)/index.tsx line 245, the NextSundaysSection is wrapped in
+        `{isOnline && <NextSundaysSection />}` which completely hides it when offline.
+        This was the original design from CR-262 (offline mode), but the user now wants
+        to see upcoming speeches in offline mode too. The data IS already prefetched by
+        useOfflinePrefetch (speeches for next 3 Sundays are cached), so the section
+        could render from cache. Similarly, lines 246-247 hide NextAssignmentsSection
+        and InviteManagementSection when offline, but the user specifically mentions
+        wanting to see speeches.
+      affected_files:
+        - path: "src/app/(tabs)/index.tsx"
+          lines: "245-247"
+          detail: "{isOnline && <NextSundaysSection />} -- completely hidden when offline"
+        - path: "src/hooks/useOfflinePrefetch.ts"
+          lines: "91-106"
+          detail: "Speeches data IS prefetched for next 3 Sundays"
+        - path: "src/components/NextSundaysSection.tsx"
+          lines: "1-143"
+          detail: "NextSundaysSection component uses useSpeeches hook which can read from cache"
+        - path: "src/__tests__/f049-home-offline.test.ts"
+          lines: "60-73"
+          detail: "Current test AC-049-03 explicitly validates NextSundaysSection is hidden offline (must be updated)"
+
+    fix_approach:
+      summary: >
+        Remove the `isOnline &&` guard from NextSundaysSection on line 245 so it always
+        renders. The component will read from TanStack Query cache when offline.
+        The pencil buttons within NextSundaysSection should be hidden when offline
+        (the component already has no write operations, but the pencil navigates to
+        speeches tab which does handle offline correctly).
+        NextAssignmentsSection (line 246) can remain hidden offline since it is bishopric-only
+        and involves mutations. InviteManagementSection (line 247) should remain hidden
+        since it requires network for invitations.
+        Update f049-home-offline.test.ts to reflect new expected behavior.
+
+# =============================================================================
+# VALIDATION CHECKS (for POST mode)
+# =============================================================================
+
+validation_checks:
+
+  # --- CR-266: Fixed collection order ---
+
+  - id: CR266_MP1
+    cr: CR-266
+    type: must_pass
+    description: "useCollections select function no longer groups by active/inactive status -- order is deterministic"
+    check: "In src/hooks/useTopics.ts, the select function of useCollections does NOT sort by active/inactive grouping"
+
+  - id: CR266_MP2
+    cr: CR-266
+    type: must_pass
+    description: "Collections are sorted in the required fixed order: special themes first, then youth, then gospel principles, then conferences descending by date"
+    check: "Verify sorting logic produces: Temas Especiais, Para a Força da Juventude, Princípios do Evangelho, then conferences newest-first"
+
+  - id: CR266_MP3
+    cr: CR-266
+    type: must_pass
+    description: "Collection order does not change when toggling a collection active/inactive"
+    check: "The sort is applied regardless of active status -- toggling does not move items in the list"
+
+  - id: CR266_SP1
+    cr: CR-266
+    type: should_pass
+    description: "TopicSelectorModal also shows topics grouped by collection in the fixed order"
+    check: "Verify useActiveTopics or TopicSelectorModal respects the same collection ordering if applicable"
+
+  # --- CR-267: Topic/speaker field visibility parity ---
+
+  - id: CR267_MP1
+    cr: CR-267
+    type: must_pass
+    description: "Topic field and speaker field have the same visibility rules in SpeechSlot"
+    check: "In SpeechSlot.tsx, the topic field (topicRow) is rendered under the same conditions as the speaker field (speakerRow)"
+
+  - id: CR267_MP2
+    cr: CR-267
+    type: must_pass
+    description: "Topic field is shown with placeholder text when speech exists but has no topic assigned"
+    check: "Verify that the topic field shows 'Selecionar Tema' placeholder when speech.topic_title is null"
+
+  - id: CR267_MP3
+    cr: CR-267
+    type: must_pass
+    description: "Topic field is not shown for prayer slots (positions 0 and 4)"
+    check: "showTopicRow still excludes isPrayer positions"
+
+  - id: CR267_SP1
+    cr: CR-267
+    type: should_pass
+    description: "When speech is null, both speaker and topic fields are either both visible (with placeholder) or both hidden"
+    check: "Verify consistent visibility when speech object is null"
+
+  # --- CR-268: NextSundaysSection visible offline ---
+
+  - id: CR268_MP1
+    cr: CR-268
+    type: must_pass
+    description: "NextSundaysSection is rendered on Home tab when offline"
+    check: "In index.tsx, NextSundaysSection is NOT wrapped in {isOnline && ...}"
+
+  - id: CR268_MP2
+    cr: CR-268
+    type: must_pass
+    description: "NextSundaysSection uses cached data when offline (read-only)"
+    check: "Speech data from TanStack Query cache is displayed in the section when offline"
+
+  - id: CR268_MP3
+    cr: CR-268
+    type: must_pass
+    description: "Pencil edit buttons within NextSundaysSection are hidden when offline"
+    check: "The pencil button for navigating to edit speeches is not shown when isOnline=false"
+
+  - id: CR268_MP4
+    cr: CR-268
+    type: must_pass
+    description: "NextAssignmentsSection remains hidden when offline"
+    check: "In index.tsx, NextAssignmentsSection is still wrapped in {isOnline && ...}"
+
+  - id: CR268_MP5
+    cr: CR-268
+    type: must_pass
+    description: "Test f049-home-offline.test.ts is updated to reflect NextSundaysSection visible offline"
+    check: "AC-049-03 test now expects NextSundaysSection to be rendered when offline"
+
+  - id: CR268_SP1
+    cr: CR-268
+    type: should_pass
+    description: "InviteManagementSection remains hidden when offline"
+    check: "In index.tsx, InviteManagementSection is still wrapped in {isOnline && ...}"
+
+  - id: CR268_SP2
+    cr: CR-268
+    type: should_pass
+    description: "Offline prefetch already covers speeches for next 3 Sundays (no change needed)"
+    check: "useOfflinePrefetch.ts still prefetches speeches for next 3 Sundays"

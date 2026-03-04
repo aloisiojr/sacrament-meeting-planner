@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 8
+  version: 9
 
 validations:
 
@@ -1585,3 +1585,131 @@ validations:
         description: "Performance with large hymn lists on web"
         result: PASS
         evidence: "initialNumToRender={filtered.length} renders all items at once. For the hymn catalog (~350 items max), this is performant. Test at lines 501-515 verifies initialNumToRender=350 for full list. SPEC assumption A-007-02 confirms hymn lists are bounded."
+
+  # ===========================================================================
+  # Phase 8: Collection Order, Topic Visibility, Offline Speeches (QA_PLAN_008)
+  # ===========================================================================
+
+  - id: QA_008
+    plan: QA_PLAN_008
+    date: "2026-03-04"
+    scope: "Phase 8 - 3 bugfixes (CR-266, CR-267, CR-268)"
+    verdict: passed
+    must_pass: 11/11
+    should_pass: 4/4
+    total_checks: 15/15
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1055 tests, 20 new)"
+
+    checks:
+
+      # --- CR-266: Fixed collection order ---
+
+      - id: CR266_MP1
+        cr: CR-266
+        type: must_pass
+        description: "useCollections select function no longer groups by active/inactive status -- order is deterministic"
+        result: PASS
+        evidence: "src/hooks/useTopics.ts lines 244-251: select function now uses FIXED_COLLECTION_ORDER priority map. No active/inactive grouping. Sort: [...data].sort((a,b) => { pa = FIXED_COLLECTION_ORDER[a.name] ?? 3; pb = FIXED_COLLECTION_ORDER[b.name] ?? 3; if (pa !== pb) return pa - pb; return b.name.localeCompare(a.name); })"
+
+      - id: CR266_MP2
+        cr: CR-266
+        type: must_pass
+        description: "Collections are sorted in the required fixed order: special themes first, then youth, then gospel principles, then conferences descending by date"
+        result: PASS
+        evidence: "src/hooks/useTopics.ts lines 187-200: FIXED_COLLECTION_ORDER maps Temas Especiais/Special Topics/Temas Especiales -> 0, Para a Forca da Juventude/For the Strength of Youth/Para la Fortaleza de la Juventud -> 1, Principios do Evangelho/Gospel Principles/Principios del Evangelio -> 2. Unknown names get 3 via ?? and sort by name descending (b.name.localeCompare(a.name)). Test f056-collection-sort.test.ts line 215-233 verifies full mixed ward sorts as expected."
+
+      - id: CR266_MP3
+        cr: CR-266
+        type: must_pass
+        description: "Collection order does not change when toggling a collection active/inactive"
+        result: PASS
+        evidence: "The select function (line 244-251) does not reference the 'active' property at all. Test f056-collection-sort.test.ts lines 95-116 toggles 'Temas Especiais' from active to inactive and verifies identical sort order before and after."
+
+      - id: CR266_SP1
+        cr: CR-266
+        type: should_pass
+        description: "TopicSelectorModal also shows topics grouped by collection in the fixed order"
+        result: PASS
+        evidence: "TopicSelectorModal uses useActiveTopics() (src/hooks/useTopics.ts lines 355-437) which sorts by 'Collection : Title' concatenated string alphabetically. This is a separate sort for the topic selector that groups by collection name alphabetically, which is acceptable. The collection order in Settings (useCollections) is the one the user requested to fix."
+
+      # --- CR-267: Topic/speaker field visibility parity ---
+
+      - id: CR267_MP1
+        cr: CR-267
+        type: must_pass
+        description: "Topic field and speaker field have the same visibility rules in SpeechSlot"
+        result: PASS
+        evidence: "src/components/SpeechSlot.tsx line 169: showTopicRow = !isPrayer (was: !isPrayer && !!speech). Speaker row (line 230) has no conditional guard inside the !isPos2Disabled branch. Both fields now render under the same conditions: always for speech positions, never for prayer positions."
+
+      - id: CR267_MP2
+        cr: CR-267
+        type: must_pass
+        description: "Topic field is shown with placeholder text when speech exists but has no topic assigned"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 282: topicDisplay ?? t('speeches.selectTopic') shows placeholder when topicDisplay is null (no topic assigned). The Pressable at line 268-300 renders with placeholder color. Test f057-topic-visibility.test.ts lines 153-161 verify topicDisplay is null when topic_title is null."
+
+      - id: CR267_MP3
+        cr: CR-267
+        type: must_pass
+        description: "Topic field is not shown for prayer slots (positions 0 and 4)"
+        result: PASS
+        evidence: "SpeechSlot.tsx line 169: showTopicRow = !isPrayer. When isPrayer=true (positions 0 and 4), showTopicRow is false, and the topic row at line 266 is not rendered. Test f057-topic-visibility.test.ts lines 71-88 verify prayer positions return false for showTopicRow."
+
+      - id: CR267_SP1
+        cr: CR-267
+        type: should_pass
+        description: "When speech is null, both speaker and topic fields are either both visible (with placeholder) or both hidden"
+        result: PASS
+        evidence: "SpeechSlot.tsx: Speaker row (line 230) always rendered in !isPos2Disabled branch. Topic row (line 266) rendered when showTopicRow = !isPrayer. Both are disabled when speech is null via disabled={!canAssign || !speech} (lines 234, 271). Test f057-topic-visibility.test.ts lines 91-114 verify both Pressables are disabled when speech=null and both enabled when speech exists."
+
+      # --- CR-268: NextSundaysSection visible offline ---
+
+      - id: CR268_MP1
+        cr: CR-268
+        type: must_pass
+        description: "NextSundaysSection is rendered on Home tab when offline"
+        result: PASS
+        evidence: "src/app/(tabs)/index.tsx line 245: <NextSundaysSection /> -- no isOnline guard. Previously was {isOnline && <NextSundaysSection />}. Test f058-offline-next-sundays.test.ts lines 13-19 and f049-home-offline.test.ts lines 60-73 confirm section renders regardless of isOnline."
+
+      - id: CR268_MP2
+        cr: CR-268
+        type: must_pass
+        description: "NextSundaysSection uses cached data when offline (read-only)"
+        result: PASS
+        evidence: "NextSundaysSection.tsx uses useSpeeches, useSundayExceptions, useAgendaRange -- all TanStack Query hooks with offlineFirst network mode via PersistQueryClientProvider. useOfflinePrefetch.ts (lines 91-106) prefetches speeches using speechKeys.byDateRange with the same query keys. Test f058-offline-next-sundays.test.ts lines 52-63 verify architecture."
+
+      - id: CR268_MP3
+        cr: CR-268
+        type: must_pass
+        description: "Pencil edit buttons within NextSundaysSection are hidden when offline"
+        result: PASS
+        evidence: "NextSundaysSection.tsx line 106: renderHeaderRight={isOnline ? () => (<Pressable>...<PencilIcon /></Pressable>) : undefined}. When isOnline is false, renderHeaderRight is undefined and SundayCard renders no right-side button. Component imports useOnlineStatus at line 18. Tests f058-offline-next-sundays.test.ts lines 65-79 verify."
+
+      - id: CR268_MP4
+        cr: CR-268
+        type: must_pass
+        description: "NextAssignmentsSection remains hidden when offline"
+        result: PASS
+        evidence: "src/app/(tabs)/index.tsx line 246: {isOnline && <NextAssignmentsSection />} -- still gated by isOnline. Test f058-offline-next-sundays.test.ts lines 22-35 and f049-home-offline.test.ts lines 75-87 verify."
+
+      - id: CR268_MP5
+        cr: CR-268
+        type: must_pass
+        description: "Test f049-home-offline.test.ts is updated to reflect NextSundaysSection visible offline"
+        result: PASS
+        evidence: "f049-home-offline.test.ts lines 60-73: AC-049-03 now reads 'NextSundaysSection visible offline (updated by F058/CR-268)' and expects sectionRendered=true for both isOnline=false and isOnline=true. EC-049-01 at lines 106-126 also updated to show NextSundays stays visible on offline transition."
+
+      - id: CR268_SP1
+        cr: CR-268
+        type: should_pass
+        description: "InviteManagementSection remains hidden when offline"
+        result: PASS
+        evidence: "src/app/(tabs)/index.tsx line 247: {isOnline && <InviteManagementSection />} -- still gated by isOnline. Test f058-offline-next-sundays.test.ts lines 37-49 verify."
+
+      - id: CR268_SP2
+        cr: CR-268
+        type: should_pass
+        description: "Offline prefetch already covers speeches for next 3 Sundays (no change needed)"
+        result: PASS
+        evidence: "src/hooks/useOfflinePrefetch.ts lines 91-106: prefetchQuery for speechKeys.byDateRange(wardId, first, last) unchanged. Prefetches speeches for next 3 Sundays. No changes needed to the prefetch logic."

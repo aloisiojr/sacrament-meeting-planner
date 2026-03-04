@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-03 (Phase 3: CR-262)
+# Last updated: 2026-03-04 (Phase 8: CR-266, CR-267, CR-268)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-03"
+  last_updated: "2026-03-04"
   total_modules: 13
-  total_adrs: 21
+  total_adrs: 24
 
 # =============================================================================
 # TECH STACK
@@ -162,7 +162,7 @@ modules:
       Ward-specific topics and general topic collections. Collections are
       language-specific and can be activated/deactivated per ward. Active
       topics combine ward topics + active collection topics.
-    features: [F008]
+    features: [F008, F056]
     components:
       - path: src/hooks/useTopics.ts
         responsibility: TanStack Query hooks for topic CRUD, collection toggle, active topics aggregation
@@ -219,7 +219,7 @@ modules:
       Sunday cards expand. Snapshot pattern stores speaker/topic data as text
       copies. Status lifecycle with full mesh transitions between assigned states.
       Includes optional second speech toggle and managed prayers.
-    features: [F013, F014, F015, F016, F017, F018, F046]
+    features: [F013, F014, F015, F016, F017, F018, F046, F057]
     components:
       - path: src/hooks/useSpeeches.ts
         responsibility: TanStack Query hooks for speech CRUD, lazy creation, status changes, second speech toggle
@@ -402,7 +402,7 @@ modules:
       Application shell, tab navigation, theme system, error handling,
       reusable UI components, and SVG icon system. Four-tab bottom
       navigation. Light/dark theme with system detection.
-    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052]
+    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052, F058]
     components:
       - path: src/app/_layout.tsx
         responsibility: Root layout with provider stack (ErrorBoundary > GestureHandler > PersistQueryClient > I18n > Theme > Auth > Sync > OnlineStatus)
@@ -944,3 +944,40 @@ adrs:
       Reuses existing Supabase queries and query keys. No parallel data paths.
       Respects TanStack Query staleTime and deduplication. Prefetched data is
       seamlessly available to components via the shared query cache.
+
+  - id: ADR-022
+    title: "Web-only onClick stopPropagation for bottom-sheet overlay pattern"
+    decision: |
+      Use Platform.OS === 'web' conditional spread to add onClick with
+      e.stopPropagation() on the inner sheet View of bottom-sheet modals,
+      alongside the existing onStartShouldSetResponder for native.
+    rationale: |
+      The bottom-sheet pattern uses a Pressable overlay with onPress={onClose}
+      and an inner View with onStartShouldSetResponder={() => true} to prevent
+      touch propagation. This works on native but fails on web because DOM
+      click events use bubbling, not RN's responder system. Minimal change:
+      adding one prop via spread, not restructuring the component.
+
+  - id: ADR-023
+    title: "Extract error code from response.data instead of throwing response.error"
+    decision: |
+      For the register-first-user flow, check response.error as a boolean signal
+      for non-2xx, then read response.data.error for the specific error code.
+      Map unknown error codes to a generic i18n message (auth.registrationFailed).
+    rationale: |
+      Uses response.error only as a non-2xx indicator, not as the error message.
+      Reads the actual error code from response.data.error (the structured body).
+      Maps known codes to existing i18n keys, unknown codes to new generic key.
+
+  - id: ADR-024
+    title: "Client-side fixed sort order for collections using name-to-priority map"
+    decision: |
+      Sort collections in the useCollections select function using a static
+      name-to-priority map (Record<string, number>) that maps all 9 known
+      collection names (3 per language) to priorities 0-2. Unknown names
+      (conferences) get priority 3 and are sorted by name descending.
+    rationale: |
+      No DB migration needed: pure client-side change in the select function.
+      Conference collections naturally sort newest-first when sorted by name
+      descending (names contain year/period). Toggle operations don't affect
+      sort order since the select runs on every cache read.

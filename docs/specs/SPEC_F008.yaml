@@ -1,0 +1,321 @@
+# =============================================================================
+# SPEC_F008.yaml
+# UX/Bug fixes: Collection sort order (CR-266), Topic/Speaker field parity
+# (CR-267), Offline Home NextSundaysSection (CR-268)
+# Status: complete
+# Created: 2026-03-04
+# =============================================================================
+
+type: spec
+status: complete
+artifact_id: "008"
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # CR-266: Fixed collection sort order in Topics settings
+  # ---------------------------------------------------------------------------
+
+  - id: F056
+    name: Fixed Collection Sort Order
+    cr: 266
+    type: ux
+    area: ward_data
+    description: |
+      Fix the collection list order in Settings > Topics to be deterministic
+      and independent of active/inactive status. Currently, collections are
+      sorted by active status first (active before inactive), then by
+      database-returned order. The user wants a fixed, predictable order:
+
+      1. Temas Especiais
+      2. Para a Forca da Juventude
+      3. Principios do Evangelho
+      4. General conference collections in descending chronological order
+         (newest first)
+
+      This order must remain constant regardless of which collections are
+      toggled active or inactive.
+
+    current_behavior: |
+      In useCollections() hook (src/hooks/useTopics.ts line 223-228), the
+      select function sorts active collections first, then inactive:
+        const active = data.filter((c) => c.active);
+        const inactive = data.filter((c) => !c.active);
+        return [...active, ...inactive];
+      This means toggling a collection changes its position in the list,
+      which is confusing for the user.
+
+    acceptance_criteria:
+      - id: AC-056-1
+        description: "Collections appear in fixed order regardless of active/inactive status"
+        given: "User opens Settings > Topics"
+        when: "Collections section renders"
+        then: "Collections are shown in fixed order: Temas Especiais, Para a Forca da Juventude, Principios do Evangelho, then general conference collections newest first"
+
+      - id: AC-056-2
+        description: "Toggling collection does not change its position"
+        given: "User toggles a collection's active status"
+        when: "Collection list re-renders"
+        then: "Collection remains in the same position in the list"
+
+      - id: AC-056-3
+        description: "General conference collections sorted newest first"
+        given: "Multiple general conference collections exist"
+        when: "Collections section renders"
+        then: "Conference collections appear in descending chronological order (newest first)"
+
+    edge_cases:
+      - id: EC-056-1
+        case: "Ward language is en-US or es-LA"
+        expected: "Collection names will be in English or Spanish. Sort order must still apply based on equivalent names in those languages."
+
+      - id: EC-056-2
+        case: "New general conference collection is added in the future"
+        expected: "It should appear at the top of the conference section (newest first)"
+
+  # ---------------------------------------------------------------------------
+  # CR-267: Topic field visibility parity with speaker field
+  # ---------------------------------------------------------------------------
+
+  - id: F057
+    name: Topic Field Visibility Parity with Speaker Field
+    cr: 267
+    type: bugfix
+    area: speeches
+    description: |
+      Fix the visibility rules so that the topic assignment field and the
+      speaker assignment field always appear together for speech positions
+      (1, 2, 3). Currently, the topic row visibility has a stricter guard
+      than the speaker row:
+
+        showTopicRow = !isPrayer && !!speech   (line 169)
+
+      The speaker row (lines 229-263) is rendered inside the non-disabled
+      branch with NO guard on !!speech - it always shows a placeholder
+      "Selecionar discursante" even when speech is null.
+
+      The topic row (line 266) is gated by showTopicRow which requires
+      !!speech, so it is completely hidden when speech is null.
+
+      The fix: change showTopicRow to !isPrayer (remove the !!speech
+      condition), making both fields always visible for speech positions,
+      matching exactly how the speaker row already works.
+
+    current_behavior: |
+      In SpeechSlot.tsx line 169:
+        const showTopicRow = !isPrayer && !!speech;
+      The speaker row (lines 229-263) is ALWAYS rendered inside the
+      non-disabled branch (line 227) with NO guard on !!speech. It shows
+      a placeholder text "Selecionar discursante" when speech is null.
+
+      However, the topic row (line 266) is gated by showTopicRow which
+      requires !!speech. When speech is null (record not yet lazy-created
+      for a position), the speaker field renders with placeholder but the
+      topic field is completely hidden.
+
+      Root cause confirmed: the speaker row has no !!speech guard but the
+      topic row does. The fix is to change showTopicRow to remove the
+      !!speech condition: showTopicRow = !isPrayer. This makes the topic
+      row always visible for speech positions (1, 2, 3), matching the
+      speaker row behavior.
+
+    acceptance_criteria:
+      - id: AC-057-1
+        description: "Topic and speaker fields have identical visibility"
+        given: "User views a SpeechSlot at speech position (1, 2, or 3)"
+        when: "The slot renders"
+        then: "Both speaker field and topic field are visible together, or both are hidden together"
+
+      - id: AC-057-2
+        description: "Disabled position 2 shows both placeholder fields"
+        given: "has_second_speech is false (position 2 is disabled)"
+        when: "SpeechSlot for position 2 renders"
+        then: "Both speaker placeholder and topic placeholder are visible (in disabled state)"
+
+    edge_cases:
+      - id: EC-057-1
+        case: "Prayer positions (0, 4)"
+        expected: "Topic row remains hidden for prayers. Speaker row shown. This is intentional and not a parity issue since prayers do not have topics."
+
+      - id: EC-057-2
+        case: "Speech record is null (not yet lazy-created)"
+        expected: "Both speaker and topic fields should have consistent behavior (both show placeholder or both hidden)"
+
+  # ---------------------------------------------------------------------------
+  # CR-268: Show NextSundaysSection offline on Home tab
+  # ---------------------------------------------------------------------------
+
+  - id: F058
+    name: Offline Home NextSundaysSection Visibility
+    cr: 268
+    type: bugfix
+    area: home
+    related_crs: [262]
+    description: |
+      Fix the Home tab so that the NextSundaysSection (next 3 Sundays
+      assignment cards) is visible when the device is offline. Currently,
+      the section is completely hidden behind an `isOnline` guard:
+
+        {isOnline && <NextSundaysSection />}
+
+      The user reports that in offline mode, they can only see the Start
+      Meeting button and the next Sunday agenda preview card. They want to
+      also see the upcoming speeches section.
+
+      The prefetch system (useOfflinePrefetch) already caches the next 3
+      Sundays' speeches, agendas, and exceptions data. However, the Home
+      tab hides the section entirely when offline.
+
+      The fix should show NextSundaysSection when offline (read-only,
+      using cached data), with pencil (edit) buttons hidden since editing
+      is not possible offline. The section already uses TanStack Query with
+      offlineFirst network mode, so it will serve cached data when offline.
+
+      Note: NextAssignmentsSection and InviteManagementSection should
+      remain hidden when offline (they are bishopric/secretary-specific
+      and require online operations).
+
+    current_behavior: |
+      In src/app/(tabs)/index.tsx lines 245-247:
+        {isOnline && <NextSundaysSection />}
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
+      All three sections are hidden when offline.
+
+      The data that NextSundaysSection needs IS already prefetched by
+      useOfflinePrefetch (speeches, exceptions, agenda range for next 3
+      Sundays). However, the NextSundaysSection component fetches data
+      using useSpeeches({ start: startDate, end: endDate }) where
+      startDate/endDate come from getNextSundays(). The prefetch uses
+      the same date range and same query keys, so the cached data should
+      be served.
+
+      The NextSundaysSection uses pencil buttons that navigate to Speeches
+      tab. When offline, the Speeches tab already handles the offline
+      state (cards outside next 3 are non-expandable, etc.). The pencil
+      navigation should work fine offline since it just sets a route param.
+
+    acceptance_criteria:
+      - id: AC-058-1
+        description: "NextSundaysSection visible offline"
+        given: "Device is offline and cached data exists for next 3 Sundays"
+        when: "User views the Home tab"
+        then: "NextSundaysSection is visible showing next 3 Sundays with cached speech data"
+
+      - id: AC-058-2
+        description: "NextAssignmentsSection remains hidden offline"
+        given: "Device is offline"
+        when: "User views the Home tab"
+        then: "NextAssignmentsSection is NOT visible"
+
+      - id: AC-058-3
+        description: "InviteManagementSection remains hidden offline"
+        given: "Device is offline"
+        when: "User views the Home tab"
+        then: "InviteManagementSection is NOT visible"
+
+      - id: AC-058-4
+        description: "NextSundaysSection shows cached data when offline"
+        given: "Device goes offline after data was prefetched"
+        when: "NextSundaysSection renders"
+        then: "Shows cached speech data (speaker names, LEDs) from TanStack Query cache"
+
+      - id: AC-058-5
+        description: "Pencil buttons hidden when offline"
+        given: "Device is offline"
+        when: "NextSundaysSection renders"
+        then: "Pencil (edit) buttons on Sunday cards are NOT visible"
+
+    edge_cases:
+      - id: EC-058-1
+        case: "App opened cold while offline (no cache)"
+        expected: "NextSundaysSection renders but shows empty/loading state since there is no cached data"
+
+      - id: EC-058-2
+        case: "Pencil buttons when device transitions online/offline"
+        expected: "Pencil buttons appear/disappear reactively as connectivity changes"
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    question: "CR-266: How should the sort order work for en-US and es-LA ward languages?"
+    status: resolved
+    resolution: "Sort order is fixed and applies to ALL languages, independent of language. User accepts DB migration (sort_order column) or client-side approach, whichever is better."
+
+  - id: OQ-2
+    question: "CR-266: How to identify general conference collections for date-based sorting?"
+    status: resolved
+    resolution: "By exclusion. Everything NOT matching the 3 fixed collections (Temas Especiais, FSY, Principios do Evangelho and their equivalents) is a general conference collection. Sort by name descending."
+
+  - id: OQ-3
+    question: "CR-267: What is the specific reproduction scenario for the topic/speaker visibility discrepancy?"
+    status: resolved
+    resolution: "Code analysis confirmed. Speaker row (line 229-263) has no !!speech guard, topic row (line 266) is gated by !!speech. When speech is null (not yet lazy-created), speaker shows placeholder but topic is hidden. Fix: showTopicRow = !isPrayer."
+
+  - id: OQ-4
+    question: "CR-268: Should pencil buttons be hidden or disabled when offline in NextSundaysSection?"
+    status: resolved
+    resolution: "Hide pencil buttons when offline. User explicitly requested hiding edit buttons offline."
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: "CR-266: The collection sort order applies to ALL ward languages (pt-BR, en-US, es-LA)"
+    status: confirmed
+    reason: "User confirmed: sort order is fixed, independent of language"
+
+  - id: A-2
+    assumption: "CR-266: Implementation approach (client-side vs DB migration) is flexible"
+    status: confirmed
+    reason: "User does not mind migrations. Best approach to be decided during implementation."
+
+  - id: A-3
+    assumption: "CR-267: The bug is in SpeechSlot.tsx line 169 (showTopicRow = !isPrayer && !!speech)"
+    status: confirmed
+    reason: "Code analysis confirmed: speaker row has no !!speech guard, topic row does"
+
+  - id: A-4
+    assumption: "CR-268: Only NextSundaysSection shown offline. NextAssignmentsSection and InviteManagementSection remain hidden."
+    status: confirmed
+    reason: "User confirmed"
+
+  - id: A-5
+    assumption: "CR-268: NextSundaysSection queries serve cached data via TanStack Query offlineFirst mode"
+    status: confirmed
+    reason: "useOfflinePrefetch uses the same query keys as NextSundaysSection"
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: overlap
+    status: resolved
+    description: "CR-268 modifies the offline behavior specified by CR-262 (F048/F049). The original CR-262 spec says 'Home offline: Start Meeting works, 3 sections hidden, agenda read-only'. CR-268 changes this to show NextSundaysSection offline."
+    resolution: "F058 is a deliberate user-requested modification of F049 behavior. F058 overrides: NextSundaysSection visible offline (with pencil buttons hidden), while NextAssignmentsSection and InviteManagementSection remain hidden."
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_consolidated: true
+  GATE-02_identified_ambiguities: true
+  GATE-03_open_questions_with_ids: true   # OQ-1 through OQ-4 - ALL RESOLVED
+  GATE-04_assumptions_with_ids: true       # A-1 through A-5 - ALL CONFIRMED
+  GATE-05_inconsistencies_reported: true   # INC-1 - RESOLVED
+  GATE-06_status_complete: true

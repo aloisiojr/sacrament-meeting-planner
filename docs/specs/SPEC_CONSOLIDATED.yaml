@@ -7,8 +7,8 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-03"
-  total_features: 48
+  last_updated: "2026-03-04"
+  total_features: 51
   total_business_rules: 40
   total_design_decisions: 35
 
@@ -1054,6 +1054,85 @@ features:
       - given: "A member has 2 speeches and 3 prayers in the last 6 months"
         when: "Speech count is calculated"
         then: "Count is 2 (only positions 1-3 counted, not 0/4)"
+
+  # ---------------------------------------------------------------------------
+  # F056: Fixed Collection Sort Order [CR-266]
+  # ---------------------------------------------------------------------------
+
+  - id: F056
+    name: Fixed Collection Sort Order
+    area: ward_data
+    description: |
+      Fix the collection list order in Settings > Topics to be deterministic
+      and independent of active/inactive status. Fixed order:
+      1. Temas Especiais (Special Topics / Temas Especiales)
+      2. Para a Forca da Juventude (FSY)
+      3. Principios do Evangelho (Gospel Principles / Principios del Evangelio)
+      4. General conference collections in descending chronological order
+         (newest first)
+      Sort order is fixed across ALL languages (pt-BR, en-US, es-LA).
+      Conference collections identified by exclusion: anything not matching
+      the 3 fixed collections is a conference collection.
+      [CR-266]
+    acceptance_criteria:
+      - given: "User opens Settings > Topics"
+        when: "Collections section renders"
+        then: "Collections shown in fixed order: Special Topics, FSY, Gospel Principles, then conference collections newest first"
+      - given: "User toggles a collection's active status"
+        when: "Collection list re-renders"
+        then: "Collection remains in the same position in the list"
+      - given: "Multiple general conference collections exist"
+        when: "Collections section renders"
+        then: "Conference collections appear in descending chronological order (newest first)"
+
+  # ---------------------------------------------------------------------------
+  # F057: Topic Field Visibility Parity [CR-267]
+  # ---------------------------------------------------------------------------
+
+  - id: F057
+    name: Topic Field Visibility Parity with Speaker Field
+    area: speeches
+    description: |
+      Fix topic and speaker field visibility to always match for speech
+      positions (1, 2, 3). Bug: speaker row always renders (no !!speech
+      guard), but topic row is gated by showTopicRow = !isPrayer && !!speech.
+      When speech is null (not yet lazy-created), speaker shows placeholder
+      but topic is hidden. Fix: showTopicRow = !isPrayer (remove !!speech).
+      Prayer positions (0, 4) correctly hide topic row (no change needed).
+      [CR-267]
+    acceptance_criteria:
+      - given: "User views a SpeechSlot at speech position (1, 2, or 3)"
+        when: "The slot renders (whether speech record exists or not)"
+        then: "Both speaker field and topic field are visible together"
+      - given: "has_second_speech is false (position 2 is disabled)"
+        when: "SpeechSlot for position 2 renders"
+        then: "Both speaker placeholder and topic placeholder are visible (in disabled state)"
+
+  # ---------------------------------------------------------------------------
+  # F058: Offline Home NextSundaysSection [CR-268]
+  # ---------------------------------------------------------------------------
+
+  - id: F058
+    name: Offline Home NextSundaysSection Visibility
+    area: home
+    description: |
+      Show NextSundaysSection on Home tab when offline using cached data.
+      Previously all 3 sections were hidden offline (isOnline guard).
+      NextSundaysSection now shown offline with pencil buttons hidden.
+      NextAssignmentsSection and InviteManagementSection remain hidden
+      offline. Data served from TanStack Query cache (prefetched by
+      useOfflinePrefetch). Modifies CR-262 F049 offline behavior.
+      [CR-268]
+    acceptance_criteria:
+      - given: "Device is offline and cached data exists for next 3 Sundays"
+        when: "User views the Home tab"
+        then: "NextSundaysSection is visible showing cached speech data"
+      - given: "Device is offline"
+        when: "NextSundaysSection renders"
+        then: "Pencil (edit) buttons on Sunday cards are NOT visible"
+      - given: "Device is offline"
+        when: "User views the Home tab"
+        then: "NextAssignmentsSection and InviteManagementSection are NOT visible"
 
 # =============================================================================
 # BUSINESS RULES

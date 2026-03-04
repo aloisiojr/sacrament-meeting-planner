@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 9
-  last_updated_by: "phase-007"
+  version: 10
+  last_updated_by: "phase-008"
 
 reviews:
   - id: REV-001
@@ -2268,3 +2268,235 @@ reviews:
       tests_passing: 999
       tests_flaky: 1
       test_files: 48
+
+  # ===========================================================================
+  # REV-010: Phase 8 - CR-266, CR-267, CR-268
+  # ===========================================================================
+
+  - id: REV-010
+    scope: "Phase 8 - Fixed collection sort order (CR-266), Topic field visibility parity (CR-267), Offline NextSundaysSection (CR-268)"
+    date: "2026-03-04"
+    reviewer: reviewer-agent
+    spec: SPEC_F008.yaml
+    arch: ARCH_M008.yaml
+    plan: PLAN_P008.yaml
+    features: [F056, F057, F058]
+    iteration: 1
+    commits:
+      - hash: 0160b00
+        message: "fix(useCollections): replace active/inactive sort with fixed-order priority map (CR-266)"
+      - hash: 6cd57b7
+        message: "fix(SpeechSlot): remove !!speech guard from showTopicRow for visibility parity (CR-267)"
+      - hash: c04ed86
+        message: "fix(home): show NextSundaysSection when offline (CR-268)"
+      - hash: 00e67f0
+        message: "fix(NextSundaysSection): hide pencil buttons when offline (CR-268)"
+      - hash: 6bc08ca
+        message: "test(phase-8): add 20 tests for F056-F057-F058 (CR-266, CR-267, CR-268)"
+      - hash: f2a888b
+        message: "docs(ledger): add phase 8 commits for CR-266, CR-267, CR-268"
+    verdict: approved
+
+    summary: |
+      All 3 CRs implemented correctly. Chain validation fully intact from user
+      request through SPEC, ARCH, PLAN, and CODE. 4 source commits plus 1 test
+      commit. All 1055 tests pass (51 test files). No P0, P1, or P2 issues found.
+      All changes are client-side only; no migrations, no Edge Functions. Clean repo.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        details: |
+          CR-266: User asked to fix collection order in Topics settings with specific
+          sequence (Temas Especiais, FSY, Principios do Evangelho, conferences newest
+          first). SPEC F056 captures this exactly with 3 ACs and 2 edge cases.
+          CR-267: User reported topic and speaker field visibility mismatch. SPEC F057
+          identifies the root cause (showTopicRow has !!speech guard, speaker row does not)
+          and specifies the one-line fix. 2 ACs and 2 edge cases.
+          CR-268: User reported can't see upcoming speeches offline on Home tab. SPEC F058
+          specifies showing NextSundaysSection offline with pencil buttons hidden. 5 ACs
+          and 2 edge cases. Correctly notes this overrides CR-262 F049 behavior.
+
+      arch_vs_spec:
+        status: pass
+        details: |
+          ARCH M008 defines 4 components (C008-01 through C008-04) mapping directly to
+          the 3 features. Each component specifies the exact file, function, and code
+          change. ADR-024 documents the client-side sort approach decision. Integrations
+          mapped for query cache and OnlineStatusContext dependencies.
+
+      plan_vs_arch:
+        status: pass
+        details: |
+          PLAN P008 has 5 steps: STEP-01 (F056 sort), STEP-02 (F057 visibility),
+          STEP-03 (F058 Home tab), STEP-04 (F058 pencil button), STEP-05 (verification).
+          Each step references the correct files and specifies done_when criteria matching
+          the ARCH components. Steps are parallelizable as specified.
+
+      code_vs_plan:
+        status: pass
+        details: |
+          STEP-01: FIXED_COLLECTION_ORDER constant with 9 entries, select function sorts
+          by priority then name descending. Exported for testability. JSDoc updated.
+          STEP-02: Line 169 changed from "!isPrayer && !!speech" to "!isPrayer".
+          STEP-03: NextSundaysSection rendered without isOnline guard. Other 2 sections
+          still guarded.
+          STEP-04: useOnlineStatus imported, renderHeaderRight conditional on isOnline.
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-CR VERIFICATION
+    # =========================================================================
+
+    cr_reviews:
+
+      - cr: CR-266
+        title: "Fixed collection sort order in useCollections"
+        verdict: pass
+        verification:
+          - check: "FIXED_COLLECTION_ORDER constant exported with 9 entries"
+            status: pass
+            file: src/hooks/useTopics.ts
+            detail: "Lines 187-200: 3 pt-BR, 3 en-US, 3 es-LA entries with priorities 0, 1, 2"
+          - check: "select function uses priority map for sorting"
+            status: pass
+            detail: "Lines 244-250: sorts by priority (0-2 named, 3 conferences), then name descending"
+          - check: "Active/inactive status not referenced in sort"
+            status: pass
+            detail: "No reference to .active property in the select function"
+          - check: "JSDoc comment updated"
+            status: pass
+            detail: "Lines 202-207: 'Collections are sorted in fixed order: known collections by priority (0-2), then conference collections (priority 3) by name descending (newest first).'"
+          - check: "Test file created with comprehensive coverage"
+            status: pass
+            detail: "f056-collection-sort.test.ts: 18 tests covering all 3 ACs, 2 edge cases, plus additional edge cases"
+
+      - cr: CR-267
+        title: "Topic field visibility parity with speaker field"
+        verdict: pass
+        verification:
+          - check: "showTopicRow guard changed to !isPrayer only"
+            status: pass
+            file: src/components/SpeechSlot.tsx
+            detail: "Line 169: const showTopicRow = !isPrayer; (removed !!speech)"
+          - check: "Topic Pressable disabled prop still has !speech check"
+            status: pass
+            detail: "Line 271: disabled={!canAssign || !speech} -- ensures tapping topic when speech=null is a no-op"
+          - check: "Test file created"
+            status: pass
+            detail: "f057-topic-visibility.test.ts: 16 tests covering both ACs, both edge cases, plus regression guard"
+
+      - cr: CR-268
+        title: "Show NextSundaysSection offline on Home tab"
+        verdict: pass
+        verification:
+          - check: "NextSundaysSection isOnline guard removed in Home tab"
+            status: pass
+            file: src/app/(tabs)/index.tsx
+            detail: "Line 245: <NextSundaysSection /> (no isOnline guard)"
+          - check: "NextAssignmentsSection still has isOnline guard"
+            status: pass
+            detail: "Line 246: {isOnline && <NextAssignmentsSection />}"
+          - check: "InviteManagementSection still has isOnline guard"
+            status: pass
+            detail: "Line 247: {isOnline && <InviteManagementSection />}"
+          - check: "NextSundaysSection imports useOnlineStatus"
+            status: pass
+            file: src/components/NextSundaysSection.tsx
+            detail: "Line 18: import { useOnlineStatus } from '../contexts/OnlineStatusContext'"
+          - check: "isOnline used in NextSundaysSection"
+            status: pass
+            detail: "Line 37: const isOnline = useOnlineStatus();"
+          - check: "renderHeaderRight conditional on isOnline"
+            status: pass
+            detail: "Line 106: renderHeaderRight={isOnline ? () => (...pencil...) : undefined}"
+          - check: "f049 test updated for CR-268 change"
+            status: pass
+            detail: "f049-home-offline.test.ts updated: AC-049-03 now tests NextSundaysSection always visible"
+          - check: "New test file created"
+            status: pass
+            detail: "f058-offline-next-sundays.test.ts: 15 tests covering all 5 ACs, 2 edge cases"
+
+    # =========================================================================
+    # TEST REVIEW
+    # =========================================================================
+
+    test_review:
+      new_test_files:
+        - file: "src/__tests__/f056-collection-sort.test.ts"
+          test_count: 18
+          coverage: "AC-056-1, AC-056-2, AC-056-3, EC-056-1, EC-056-2, plus additional edge cases"
+        - file: "src/__tests__/f057-topic-visibility.test.ts"
+          test_count: 16
+          coverage: "AC-057-1, AC-057-2, EC-057-1, EC-057-2, plus regression guard and display logic"
+        - file: "src/__tests__/f058-offline-next-sundays.test.ts"
+          test_count: 15
+          coverage: "AC-058-1 through AC-058-5, EC-058-1, EC-058-2"
+      updated_test_files:
+        - file: "src/__tests__/f049-home-offline.test.ts"
+          changes: "AC-049-03 updated to reflect CR-268 (NextSundaysSection always visible)"
+
+      full_suite:
+        total: 1055
+        passing: 1055
+        failing: 0
+        test_files: 51
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Deploy app update (EAS Build)"
+        reason: "CR-266, CR-267, CR-268: All changes are client-side only. No migrations, no Edge Functions."
+        urgency: low
+        notes: |
+          All changes are client-side (React Native / TypeScript). No database
+          migrations. No Edge Function changes. Can be bundled with existing
+          pending EAS Build from CR-262 (which is still pending for offline mode
+          npm packages). No additional deploy steps needed beyond the app binary.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M008.yaml"
+        - "docs/plans/PLAN_P008.yaml"
+        - "docs/qa/QA_PLAN_008.yaml"
+        - "docs/specs/SPEC_F008.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 5
+      total_commits: 6
+      tests_total: 1055
+      tests_passing: 1055
+      tests_flaky: 0
+      test_files: 51

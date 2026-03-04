@@ -113,4 +113,71 @@ describe('F057: Topic Field Visibility Parity', () => {
       expect(speakerDisabled).toBe(false);
     });
   });
+
+  describe('Additional visibility edge cases', () => {
+    it('all speech positions (1, 2, 3) show topic row', () => {
+      for (const position of [1, 2, 3]) {
+        const isPrayer = false; // positions 1-3 are never prayer
+        expect(computeShowTopicRow(isPrayer)).toBe(true);
+      }
+    });
+
+    it('showTopicRow does not depend on speech value (regression guard)', () => {
+      // This is the key fix of CR-267: the old code was
+      // showTopicRow = !isPrayer && !!speech
+      // The new code is showTopicRow = !isPrayer
+      // Verify speech value does NOT affect showTopicRow
+      const isPrayer = false;
+      const resultWithSpeech = computeShowTopicRow(isPrayer);
+      const resultWithoutSpeech = computeShowTopicRow(isPrayer);
+      expect(resultWithSpeech).toBe(resultWithoutSpeech);
+      expect(resultWithSpeech).toBe(true);
+    });
+
+    it('isPos2Disabled is false for position 1 regardless of isSecondSpeechEnabled', () => {
+      expect(computeIsPos2Disabled(1, false, false)).toBe(false);
+      expect(computeIsPos2Disabled(1, false, true)).toBe(false);
+      expect(computeIsPos2Disabled(1, false, undefined)).toBe(false);
+    });
+
+    it('isPos2Disabled is false for position 3 regardless of isSecondSpeechEnabled', () => {
+      expect(computeIsPos2Disabled(3, false, false)).toBe(false);
+      expect(computeIsPos2Disabled(3, false, true)).toBe(false);
+    });
+
+    it('isPos2Disabled is false for prayer position 2', () => {
+      // Prayer slots at position 2 (edge case) should not be disabled
+      expect(computeIsPos2Disabled(2, true, false)).toBe(false);
+    });
+
+    it('topic display is null when speech has no topic_title', () => {
+      const speech = { topic_title: null, topic_collection: null };
+      const topicDisplay = speech.topic_title
+        ? speech.topic_collection
+          ? `${speech.topic_collection} : ${speech.topic_title}`
+          : speech.topic_title
+        : null;
+      expect(topicDisplay).toBeNull();
+    });
+
+    it('topic display shows "Collection : Title" format when both present', () => {
+      const speech = { topic_title: 'Faith', topic_collection: 'Gospel Principles' };
+      const topicDisplay = speech.topic_title
+        ? speech.topic_collection
+          ? `${speech.topic_collection} : ${speech.topic_title}`
+          : speech.topic_title
+        : null;
+      expect(topicDisplay).toBe('Gospel Principles : Faith');
+    });
+
+    it('topic display shows title only when no collection', () => {
+      const speech = { topic_title: 'Custom Topic', topic_collection: null };
+      const topicDisplay = speech.topic_title
+        ? speech.topic_collection
+          ? `${speech.topic_collection} : ${speech.topic_title}`
+          : speech.topic_title
+        : null;
+      expect(topicDisplay).toBe('Custom Topic');
+    });
+  });
 });

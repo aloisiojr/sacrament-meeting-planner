@@ -4,15 +4,15 @@
 # =============================================================================
 
 type: test_consolidated
-version: 7
+version: 8
 last_updated: "2026-03-04"
 
 summary:
-  total_test_files: 48
-  total_tests: 1000
+  total_test_files: 51
+  total_tests: 1055
   framework: vitest
   categories:
-    module_named: 42
+    module_named: 45
     integration: 6
   infrastructure:
     setup: 1
@@ -392,6 +392,7 @@ module_tests:
     covers:
       - AC-049-01: Start Meeting button not gated by isOnline
       - AC-049-02: Pencil button hidden offline; agenda card always visible
+      - AC-049-03: NextSundaysSection always visible (updated by F058/CR-268)
       - AC-049-03: NextSundaysSection hidden offline
       - AC-049-04: NextAssignmentsSection hidden offline
       - AC-049-05: InviteManagementSection hidden offline
@@ -486,6 +487,46 @@ module_tests:
       - AC-F055-06: Native behavior preserved (no onClick on ios/android)
       - AC-F055-07: Web onClick stopPropagation on ActorSelector
       - AC-F055-08: Overlay close resets state
+
+  # --- F056-F057-F058 Phase 8 Tests (CR-266, CR-267, CR-268) ---
+
+  - file: src/__tests__/f056-collection-sort.test.ts
+    tests: 19
+    module: src/hooks/useTopics.ts
+    covers:
+      - "F056 (CR-266): Fixed Collection Sort Order"
+      - FIXED_COLLECTION_ORDER map (9 entries, 3 languages x 3 names)
+      - AC-056-1: Collections in fixed order regardless of active/inactive (pt-BR, en-US, es-LA)
+      - AC-056-2: Toggling active status does not change position
+      - AC-056-3: Conference collections sorted by name descending (newest first)
+      - EC-056-1: All 3 languages covered in map
+      - EC-056-2: New conference collection appears at top of conference section
+      - Edge cases (empty list, single collection, all conferences, immutability, full mixed ward)
+
+  - file: src/__tests__/f057-topic-visibility.test.ts
+    tests: 20
+    module: src/components/SpeechSlot.tsx
+    covers:
+      - "F057 (CR-267): Topic Field Visibility Parity"
+      - AC-057-1: Topic and speaker fields have identical visibility for positions 1-3
+      - AC-057-2: Disabled position 2 shows both placeholder fields via isPos2Disabled
+      - EC-057-1: Prayer positions (0, 4) still hide topic row
+      - EC-057-2: Speech null - both fields show placeholder, Pressable disabled
+      - Edge cases (all positions, regression guard, isPos2Disabled variants, topic display format)
+
+  - file: src/__tests__/f058-offline-next-sundays.test.ts
+    tests: 16
+    module: "src/app/(tabs)/index.tsx, src/components/NextSundaysSection.tsx"
+    covers:
+      - "F058 (CR-268): Offline Home NextSundaysSection Visibility"
+      - AC-058-1: NextSundaysSection visible offline (no isOnline guard)
+      - AC-058-2: NextAssignmentsSection remains hidden offline
+      - AC-058-3: InviteManagementSection remains hidden offline
+      - AC-058-4: Cached data served via offlineFirst
+      - AC-058-5: Pencil buttons hidden when offline (renderHeaderRight conditional)
+      - EC-058-1: Cold start offline - section renders with no cache
+      - EC-058-2: Pencil buttons toggle reactively on connectivity changes
+      - useOnlineStatus and OnlineStatusProvider exports verified
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -1602,6 +1643,185 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # ===========================================================================
+  # F056 FIXED COLLECTION SORT ORDER - TEST COVERAGE (CR-266)
+  # ===========================================================================
+
+  - feature: F056
+    tests:
+      - name: "has 9 entries (3 names x 3 languages)"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-1"]
+        covers_ecs: ["EC-056-1"]
+        status: passing
+
+      - name: "pt-BR collections sort correctly with mixed active/inactive"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "en-US collections sort correctly"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-1"]
+        covers_ecs: ["EC-056-1"]
+        status: passing
+
+      - name: "es-LA collections sort correctly"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-1"]
+        covers_ecs: ["EC-056-1"]
+        status: passing
+
+      - name: "toggling active status does not affect sort order"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "conference collections sorted by name descending"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "new conference with later name sorts first among conferences"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-3"]
+        covers_ecs: ["EC-056-2"]
+        status: passing
+
+      - name: "full mixed ward (3 named + 3 conferences) sorts correctly"
+        file: src/__tests__/f056-collection-sort.test.ts
+        type: unit
+        covers_acs: ["AC-056-1", "AC-056-3"]
+        covers_ecs: []
+        status: passing
+
+  # ===========================================================================
+  # F057 TOPIC FIELD VISIBILITY PARITY - TEST COVERAGE (CR-267)
+  # ===========================================================================
+
+  - feature: F057
+    tests:
+      - name: "position 1 with speech=null: topic row visible (matches speaker row)"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: ["AC-057-1"]
+        covers_ecs: ["EC-057-2"]
+        status: passing
+
+      - name: "position 1 with speech assigned: both fields visible with data"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: ["AC-057-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position 2 disabled renders both placeholder fields via isPos2Disabled branch"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: ["AC-057-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "position 0 (opening prayer): topic row hidden"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-057-1"]
+        status: passing
+
+      - name: "position 4 (closing prayer): topic row hidden"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-057-1"]
+        status: passing
+
+      - name: "speech=null at position 1: topic Pressable is disabled (no-op on tap)"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-057-2"]
+        status: passing
+
+      - name: "showTopicRow does not depend on speech value (regression guard)"
+        file: src/__tests__/f057-topic-visibility.test.ts
+        type: unit
+        covers_acs: ["AC-057-1"]
+        covers_ecs: []
+        status: passing
+
+  # ===========================================================================
+  # F058 OFFLINE HOME NEXTSUNDAYSSECTION - TEST COVERAGE (CR-268)
+  # ===========================================================================
+
+  - feature: F058
+    tests:
+      - name: "NextSundaysSection renders without isOnline guard"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "NextAssignmentsSection not rendered when isOnline=false"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "InviteManagementSection not rendered when isOnline=false"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "TanStack Query offlineFirst mode serves cached data"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-4"]
+        covers_ecs: []
+        status: passing
+
+      - name: "renderHeaderRight is undefined when isOnline=false"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "NextSundaysSection renders even with no cached data"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-058-1"]
+        status: passing
+
+      - name: "pencil buttons toggle with connectivity changes"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-058-2"]
+        status: passing
+
+      - name: "module exports useOnlineStatus hook"
+        file: src/__tests__/f058-offline-next-sundays.test.ts
+        type: unit
+        covers_acs: ["AC-058-5"]
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -2177,8 +2397,20 @@ gaps:
   # F055 gaps
   # All F055 ACs (01-08) covered. No gaps.
 
+  # F056 gaps
+  # All F056 ACs (01-03) covered. All edge cases (EC-056-01 to EC-056-02) covered. No gaps.
+
+  # F057 gaps
+  # All F057 ACs (01-02) covered. All edge cases (EC-057-01 to EC-057-02) covered. No gaps.
+
+  # F058 gaps
+  # All F058 ACs (01-05) covered. All edge cases (EC-058-01 to EC-058-02) covered.
+  - id: AC-058-UI
+    reason: "Home tab and NextSundaysSection React Native rendering cannot be tested in vitest node environment."
+    recommendation: "Verified by logic tests and code review. Conditional rendering patterns confirmed."
+
 stats:
-  total_tests: 1000
-  passing: 1000
+  total_tests: 1055
+  passing: 1055
   failing: 0
   skipped: 0

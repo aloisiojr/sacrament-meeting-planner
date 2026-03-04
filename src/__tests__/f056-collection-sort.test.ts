@@ -160,4 +160,82 @@ describe('F056: Fixed Collection Sort Order', () => {
       ]);
     });
   });
+
+  describe('Additional edge cases', () => {
+    it('empty collection list returns empty array', () => {
+      const sorted = sortCollections([]);
+      expect(sorted).toEqual([]);
+    });
+
+    it('single named collection returns it unchanged', () => {
+      const collections = [{ name: 'Special Topics', active: true }];
+      const sorted = sortCollections(collections);
+      expect(sorted).toHaveLength(1);
+      expect(sorted[0].name).toBe('Special Topics');
+    });
+
+    it('only conference collections (no named) sort by name descending', () => {
+      const collections = [
+        { name: 'Abril 2024', active: true },
+        { name: 'Outubro 2024', active: false },
+        { name: 'Abril 2025', active: true },
+        { name: 'Outubro 2025', active: false },
+      ];
+      const sorted = sortCollections(collections);
+      expect(sorted.map(c => c.name)).toEqual([
+        'Outubro 2025',
+        'Outubro 2024',
+        'Abril 2025',
+        'Abril 2024',
+      ]);
+    });
+
+    it('mixed languages do not conflict (each priority used once per ward)', () => {
+      // In practice, only one language is used per ward, but priorities don't clash
+      const collections = [
+        { name: 'Special Topics', active: true },
+        { name: 'Temas Especiais', active: true },
+      ];
+      const sorted = sortCollections(collections);
+      // Both get priority 0, so they sort by name descending
+      expect(sorted[0].name).toBe('Temas Especiais');
+      expect(sorted[1].name).toBe('Special Topics');
+    });
+
+    it('sort does not mutate original array', () => {
+      const collections = [
+        { name: 'Principios do Evangelho', active: true },
+        { name: 'Temas Especiais', active: false },
+      ];
+      const originalOrder = [...collections.map(c => c.name)];
+      sortCollections(collections);
+      expect(collections.map(c => c.name)).toEqual(originalOrder);
+    });
+
+    it('full mixed ward (3 named + 3 conferences) sorts correctly', () => {
+      const collections = [
+        { name: 'Outubro 2025', active: true },
+        { name: 'Para a Forca da Juventude', active: false },
+        { name: 'Abril 2025', active: true },
+        { name: 'Temas Especiais', active: true },
+        { name: 'Principios do Evangelho', active: false },
+        { name: 'Abril 2024', active: true },
+      ];
+      const sorted = sortCollections(collections);
+      expect(sorted.map(c => c.name)).toEqual([
+        'Temas Especiais',           // priority 0
+        'Para a Forca da Juventude', // priority 1
+        'Principios do Evangelho',   // priority 2
+        'Outubro 2025',              // priority 3, desc
+        'Abril 2025',                // priority 3, desc
+        'Abril 2024',                // priority 3, desc
+      ]);
+    });
+
+    it('priority values are exactly 0, 1, 2 for each language', () => {
+      const values = Object.values(FIXED_COLLECTION_ORDER);
+      const uniqueValues = [...new Set(values)].sort();
+      expect(uniqueValues).toEqual([0, 1, 2]);
+    });
+  });
 });

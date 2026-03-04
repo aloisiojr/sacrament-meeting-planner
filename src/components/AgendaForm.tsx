@@ -16,6 +16,7 @@ import {
   FlatList,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -830,6 +831,7 @@ function HymnSelectorModal({
         <View
           style={[styles.bottomSheet, { backgroundColor: colors.card }]}
           onStartShouldSetResponder={() => true}
+          {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
         >
           {/* Handle bar */}
           <View style={styles.sheetHandleBar}>
@@ -851,6 +853,7 @@ function HymnSelectorModal({
 
           <FlatList
             data={filtered}
+            initialNumToRender={filtered.length}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <Pressable

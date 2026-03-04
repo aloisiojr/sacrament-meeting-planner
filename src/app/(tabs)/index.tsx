@@ -15,6 +15,7 @@ import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { NextSundaysSection } from '../../components/NextSundaysSection';
 import { NextAssignmentsSection } from '../../components/NextAssignmentsSection';
 import { InviteManagementSection } from '../../components/InviteManagementSection';
@@ -32,6 +33,7 @@ function HomeTabContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const locale = getCurrentLanguage();
+  const isOnline = useOnlineStatus();
 
   const sundayDate = useMemo(() => getTodaySundayDate(), []);
   const { managePrayers } = useWardManagePrayers();
@@ -227,20 +229,22 @@ function HomeTabContent() {
                 })()}
               </View>
 
-              <Pressable
-                style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
-                onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
-                accessibilityRole="button"
-                accessibilityLabel="Edit agenda"
-              >
-                <PencilIcon size={16} color={colors.text} />
-              </Pressable>
+              {isOnline && (
+                <Pressable
+                  style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
+                  onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit agenda"
+                >
+                  <PencilIcon size={16} color={colors.text} />
+                </Pressable>
+              )}
             </View>
           </View>
         </View>
-        <NextSundaysSection />
-        <NextAssignmentsSection />
-        <InviteManagementSection />
+        {isOnline && <NextSundaysSection />}
+        {isOnline && <NextAssignmentsSection />}
+        {isOnline && <InviteManagementSection />}
       </ScrollView>
     </SafeAreaView>
   );

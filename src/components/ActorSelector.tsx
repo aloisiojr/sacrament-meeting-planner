@@ -66,18 +66,6 @@ export function ActorSelector({
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  // Scroll to the edited item when keyboard appears or editingId changes
-  useEffect(() => {
-    if (editingId && keyboardHeight > 0) {
-      const index = filtered.findIndex((a) => a.id === editingId);
-      if (index >= 0) {
-        setTimeout(() => {
-          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
-        }, 50);
-      }
-    }
-  }, [keyboardHeight, editingId, filtered]);
-
   const { data: actors } = useActors(roleFilter);
   const createActor = useCreateActor();
   const updateActor = useUpdateActor();
@@ -89,6 +77,18 @@ export function ActorSelector({
     const q = search.toLowerCase();
     return list.filter((a) => a.name.toLowerCase().includes(q));
   }, [actors, search]);
+
+  // Scroll to the edited item when keyboard appears or editingId changes
+  useEffect(() => {
+    if (editingId && keyboardHeight > 0) {
+      const index = filtered.findIndex((a) => a.id === editingId);
+      if (index >= 0) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+        }, 50);
+      }
+    }
+  }, [keyboardHeight, editingId, filtered]);
 
   const handleSelect = useCallback(
     (actor: MeetingActor) => {
@@ -228,6 +228,7 @@ export function ActorSelector({
         <View
           style={[styles.sheet, { backgroundColor: colors.card }]}
           onStartShouldSetResponder={() => true}
+          {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
         >
           {/* Handle bar */}
           <View style={styles.handleBar}>

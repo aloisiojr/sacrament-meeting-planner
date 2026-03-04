@@ -1,0 +1,561 @@
+# =============================================================================
+# ARCH_M007.yaml - Architecture for Bugfixes: Registration Errors, ActorSelector
+#                  TDZ, Hymn Selector Web
+# CR-263, CR-264, CR-265
+# Generated: 2026-03-04
+# Artifact ID: 007
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+artifact_id: "007"
+
+metadata:
+  specs: [F053, F054, F055]
+  crs: [CR-263, CR-264, CR-265]
+  type: bugfix
+  date: "2026-03-04"
+  phase: "Phase 7 - Web Bugfixes"
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    Fix three web-platform bugs in the new ward registration flow and agenda
+    interactions: (1) unfriendly error messages during first-user registration,
+    (2) ActorSelector TDZ crash on mount, (3) hymn selector modal not working
+    on web (search closes modal, scroll blocked, initial 10 items only).
+  principles:
+    - "Minimal changes: fix root causes without refactoring surrounding code"
+    - "No new components, hooks, or database changes"
+    - "Preserve existing native behavior while fixing web compatibility"
+    - "All user-facing error messages must use i18n translations"
+
+# =============================================================================
+# ARCHITECTURE IMPACT ASSESSMENT
+# =============================================================================
+
+architecture_impact: low
+summary: |
+  All three fixes are localized to existing components with no architectural
+  changes. No new modules, hooks, providers, database tables, or edge functions.
+  One new i18n key (auth.registrationFailed) across 3 locale files. Two
+  components gain web-specific click event handling (Platform.OS check).
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # C007-01: register.tsx - Fix error handling in handleRegister()
+  # Feature: F053 (CR-263)
+  # ---------------------------------------------------------------------------
+  - id: C007-01
+    name: "RegisterScreen error handling fix"
+    feature: F053
+    file: src/app/(auth)/register.tsx
+    type: modification
+    responsibility: |
+      Fix handleRegister() so that non-2xx responses from register-first-user
+      edge function are handled by extracting the error code from response.data
+      and mapping to i18n-translated messages, instead of throwing the raw
+      FunctionsHttpError.
+
+    current_state: |
+      Lines 81-83: `if (response.error) { throw response.error; }` throws
+      for ALL non-2xx responses before reaching the data checks at lines 87-99.
+      Lines 87-99 (email_exists, stake_ward_exists checks) are dead code.
+      Line 97-99: unknown data.error falls through showing raw string.
+      Catch block (112-118): only handles network errors; others show raw message.
+
+    change_description: |
+      1. Remove `if (response.error) { throw response.error; }` (lines 81-83).
+      2. Replace with: check for `response.error` (indicates non-2xx). When
+         non-2xx, read `response.data?.error` for known error codes.
+      3. The existing checks at lines 87-94 for 'email_exists' and
+         'stake_ward_exists' become reachable (no longer dead code).
+      4. Change line 97-99: instead of `setError(data.error)` for unknown
+         error codes, use `setError(t('auth.registrationFailed'))` to show
+         a friendly generic message.
+      5. Keep catch block for network errors unchanged.
+
+    implementation_detail: |
+      The refactored handleRegister() error flow:
+
+      ```
+      const response = await supabase.functions.invoke('register-first-user', { body: {...} });
+
+      const data = response.data;
+
+      // Handle non-2xx responses (response.error is set by Supabase client)
+      if (response.error) {
+        if (data?.error === 'email_exists') {
+          setError(t('auth.emailExists'));
+          return;
+        }
+        if (data?.error === 'stake_ward_exists') {
+          setError(t('auth.stakeWardExists'));
+          return;
+        }
+        // Any other non-2xx: generic friendly message
+        setError(t('auth.registrationFailed'));
+        return;
+      }
+
+      // Success path (no response.error, 2xx)
+      if (data?.session) {
+        await supabase.auth.setSession({...});
+        changeLanguage(language);
+      }
+      ```
+
+      Key insight: The Supabase JS v2 client `functions.invoke()` returns
+      `{ data, error }` where for non-2xx responses, BOTH data (parsed JSON
+      body) AND error (FunctionsHttpError) are populated. We use response.error
+      as the non-2xx signal, then read data.error for the specific code.
+
+    contracts:
+      input:
+        - name: response
+          type: "{ data: { error?: string; session?: object } | null; error: FunctionsHttpError | null }"
+          description: "Return value from supabase.functions.invoke()"
+      output:
+        - name: error state
+          type: "string | null"
+          description: "Always an i18n-translated string, never a raw technical error"
+
+    error_mapping:
+      - condition: "response.error && data?.error === 'email_exists'"
+        i18n_key: "auth.emailExists"
+        status: existing
+      - condition: "response.error && data?.error === 'stake_ward_exists'"
+        i18n_key: "auth.stakeWardExists"
+        status: existing
+      - condition: "response.error && data?.error is anything else (or missing)"
+        i18n_key: "auth.registrationFailed"
+        status: new
+      - condition: "catch: message includes 'Failed to fetch' or 'Network'"
+        i18n_key: "auth.requiresConnection"
+        status: existing
+
+  # ---------------------------------------------------------------------------
+  # C007-02: i18n locale files - New auth.registrationFailed key
+  # Feature: F053 (CR-263)
+  # ---------------------------------------------------------------------------
+  - id: C007-02
+    name: "i18n: auth.registrationFailed key"
+    feature: F053
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    type: modification
+    responsibility: |
+      Add the auth.registrationFailed key to all 3 locale files.
+
+    change_description: |
+      Add one new key in the "auth" section of each locale file:
+        pt-BR: "Falha ao criar conta. Tente novamente."
+        en-US: "Failed to create account. Please try again."
+        es-LA: "Error al crear la cuenta. Intente nuevamente."
+
+    placement: |
+      Insert after the existing auth.stakeWardExists key (line ~51) in each
+      locale file, keeping alphabetical/logical order within the auth section.
+
+  # ---------------------------------------------------------------------------
+  # C007-03: ActorSelector.tsx - Fix TDZ by reordering hooks
+  # Feature: F054 (CR-264)
+  # ---------------------------------------------------------------------------
+  - id: C007-03
+    name: "ActorSelector TDZ fix"
+    feature: F054
+    file: src/components/ActorSelector.tsx
+    type: modification
+    responsibility: |
+      Fix the Temporal Dead Zone crash by reordering hook declarations so that
+      `filtered` (useMemo) and its dependencies (useActors) are declared
+      BEFORE the useEffect that references `filtered`.
+
+    current_state: |
+      Hook declaration order (causing TDZ):
+        Line 51-58: useState hooks (search, addingName, etc.)
+        Line 59: useRef
+        Line 61-67: useEffect (keyboard listeners) -- OK
+        Line 70-79: useEffect (scroll to editingId) -- REFERENCES `filtered`
+        Line 81-84: useActors, useCreateActor, useUpdateActor, useDeleteActor
+        Line 86-91: useMemo `filtered` -- DECLARED HERE (too late)
+
+    change_description: |
+      Move the block at lines 81-91 (useActors + mutation hooks + filtered
+      useMemo) to BEFORE line 70 (the useEffect that references `filtered`).
+      No logic changes; only declaration order changes.
+
+    new_hook_order: |
+        Line 51-58: useState hooks (search, addingName, etc.)
+        Line 59: useRef
+        Line 61-67: useEffect (keyboard listeners) -- unchanged
+        >> MOVED HERE: useActors, useCreateActor, useUpdateActor, useDeleteActor
+        >> MOVED HERE: useMemo `filtered`
+        Line 70-79: useEffect (scroll to editingId) -- now `filtered` is initialized
+        Line 93+: useCallback hooks -- unchanged
+
+    rules_of_hooks_compliance: |
+      All hooks are still called unconditionally at the top level of the
+      component function. Only the order changes. Since the order is
+      consistent across renders (no conditional hooks), this complies with
+      React Rules of Hooks.
+
+  # ---------------------------------------------------------------------------
+  # C007-04: AgendaForm.tsx HymnSelectorModal - Web compatibility fix
+  # Feature: F055 (CR-265)
+  # ---------------------------------------------------------------------------
+  - id: C007-04
+    name: "HymnSelectorModal web fix"
+    feature: F055
+    file: src/components/AgendaForm.tsx
+    type: modification
+    responsibility: |
+      Fix three web-specific issues in HymnSelectorModal: (1) search click
+      closing modal, (2) scroll blocked, (3) only ~10 items initially rendered.
+
+    current_state: |
+      Line 829: <Pressable style={overlay} onPress={onClose}>
+      Line 830-832: <View ... onStartShouldSetResponder={() => true}>
+      Line 852: <FlatList data={filtered} ...> (no initialNumToRender)
+
+      On native: onStartShouldSetResponder prevents touch propagation to overlay.
+      On web: DOM click events use bubbling, not RN responder system. Clicks on
+      children (SearchInput, FlatList items) bubble up to Pressable overlay and
+      trigger onClose. FlatList windowed rendering shows only ~10 items initially.
+
+    change_description: |
+      1. On the inner sheet View (line 830-832), add a web-only onClick handler
+         that calls e.stopPropagation(). Keep onStartShouldSetResponder for native.
+      2. On FlatList (line 852), add initialNumToRender={filtered.length} to
+         render all hymns immediately on web.
+
+    implementation_detail: |
+      ```jsx
+      <View
+        style={[styles.bottomSheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+        {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+      >
+        ...
+        <FlatList
+          data={filtered}
+          initialNumToRender={filtered.length}
+          ...
+        />
+      </View>
+      ```
+
+      The spread pattern `{...(Platform.OS === 'web' ? {...} : {})}` is used
+      because onClick is not a standard React Native prop -- it only exists on
+      React Native Web. Using spread avoids TypeScript errors and has no effect
+      on native platforms.
+
+      initialNumToRender={filtered.length} renders all hymns immediately. This
+      is safe because the hymn list is bounded (~350 items max, per A-007-02).
+
+    platform_behavior:
+      web: |
+        onClick with e.stopPropagation() prevents click events inside the sheet
+        from bubbling to the Pressable overlay. FlatList renders all items
+        immediately. Scroll works because click events are stopped at the sheet
+        level, not at each individual child.
+      native: |
+        onClick prop is ignored (not part of RN's native event system).
+        onStartShouldSetResponder continues to work as before. FlatList with
+        initialNumToRender={filtered.length} renders all items but this has
+        negligible performance impact for ~350 items.
+
+  # ---------------------------------------------------------------------------
+  # C007-05: ActorSelector.tsx - Web overlay fix (same pattern as C007-04)
+  # Feature: F055 (CR-265)
+  # ---------------------------------------------------------------------------
+  - id: C007-05
+    name: "ActorSelector web overlay fix"
+    feature: F055
+    file: src/components/ActorSelector.tsx
+    type: modification
+    responsibility: |
+      Apply the same web-compatible click propagation fix to ActorSelector's
+      bottom-sheet overlay, which uses the identical Pressable +
+      onStartShouldSetResponder pattern as HymnSelectorModal.
+
+    current_state: |
+      Line 227: <Pressable style={styles.overlay} onPress={handleClose}>
+      Line 228-230: <View style={...} onStartShouldSetResponder={() => true}>
+      Same web click-bubbling issue as HymnSelectorModal.
+
+    change_description: |
+      On the inner sheet View (line 228-230), add a web-only onClick handler
+      with e.stopPropagation(), same pattern as C007-04.
+
+    implementation_detail: |
+      ```jsx
+      <View
+        style={[styles.sheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+        {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+      >
+      ```
+
+    note: |
+      This component already imports Platform (line 19), so no new import needed.
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - id: CT-007-01
+    name: "register-first-user response contract"
+    type: edge_function_response
+    description: |
+      The register-first-user edge function returns JSON body with these shapes:
+      - Success (200): { session: { access_token, refresh_token } }
+      - Known error (409): { error: 'email_exists' | 'stake_ward_exists' }
+      - Validation error (400): { error: 'Missing required fields' | ... }
+      - Server error (500): { error: 'Failed to create ward' | ... }
+    consumers: [C007-01]
+    note: "No changes to edge function. Contract is already in place."
+
+  - id: CT-007-02
+    name: "Supabase functions.invoke() return contract"
+    type: client_library
+    description: |
+      supabase.functions.invoke() returns { data, error } where:
+      - 2xx response: data = parsed JSON body, error = null
+      - non-2xx response: data = parsed JSON body, error = FunctionsHttpError
+      - Network failure: data = null, error = FunctionsFetchError
+    consumers: [C007-01]
+    verified: true
+    source: "Supabase JS client v2 source code"
+
+  - id: CT-007-03
+    name: "Platform.OS === 'web' onClick contract"
+    type: platform_api
+    description: |
+      React Native Web maps onClick on View components to the DOM's native
+      click event handler. The event object supports stopPropagation().
+      On native (iOS/Android), the onClick prop is silently ignored.
+    consumers: [C007-04, C007-05]
+    verified: true
+    source: "React Native Web documentation (A-007-03)"
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-022
+    title: "Web-only onClick stopPropagation for bottom-sheet overlay pattern"
+    decision: |
+      Use Platform.OS === 'web' conditional spread to add onClick with
+      e.stopPropagation() on the inner sheet View of bottom-sheet modals,
+      alongside the existing onStartShouldSetResponder for native.
+    context: |
+      The bottom-sheet pattern uses a Pressable overlay with onPress={onClose}
+      and an inner View with onStartShouldSetResponder={() => true} to prevent
+      touch propagation. This works on native but fails on web because DOM
+      click events use bubbling, not RN's responder system. Clicks on children
+      (SearchInput, FlatList) propagate to the overlay and trigger onClose.
+    rationale: |
+      - Minimal change: adding one prop via spread, not restructuring the component
+      - Preserves native behavior exactly (onClick is ignored on native)
+      - No new dependencies or abstractions
+      - Same pattern applied consistently to both HymnSelectorModal and ActorSelector
+    alternatives_considered:
+      - "Replace Pressable overlay with separate background/foreground views: More invasive, changes component structure"
+      - "Use onPress with e.target check: Requires comparing DOM refs, more complex and fragile"
+      - "Use Pointer Events API: Not consistently supported across RN Web versions"
+    applies_to: [C007-04, C007-05]
+
+  - id: ADR-023
+    title: "Extract error code from response.data instead of throwing response.error"
+    decision: |
+      For the register-first-user flow, check response.error as a boolean signal
+      for non-2xx, then read response.data.error for the specific error code.
+      Do NOT throw response.error. Map unknown error codes to a generic i18n
+      message (auth.registrationFailed).
+    context: |
+      The Supabase JS v2 client sets response.error to FunctionsHttpError for
+      any non-2xx status code. The edge function returns structured error codes
+      in the JSON body, which the client parses into response.data. The previous
+      code threw response.error before checking response.data, making the
+      friendly error checks dead code.
+    rationale: |
+      - Uses response.error only as a non-2xx indicator, not as the error message
+      - Reads the actual error code from response.data.error (the structured body)
+      - Maps known codes to existing i18n keys, unknown codes to new generic key
+      - Keeps catch block for true network errors (no response at all)
+      - No changes needed to the edge function
+    alternatives_considered:
+      - "Parse error body from response.error.context: More complex, less reliable across Supabase versions"
+      - "Change edge function to return 200 with error field: Breaks HTTP semantics"
+    applies_to: [C007-01]
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph:
+  description: |
+    No inter-component dependencies between the three fixes. Each can be
+    implemented independently. The only shared dependency is that C007-05
+    (ActorSelector web fix) and C007-03 (ActorSelector TDZ fix) both modify
+    ActorSelector.tsx, so they should be applied in the same implementation step.
+
+  edges:
+    - from: C007-01
+      to: C007-02
+      type: requires
+      description: "Error handling code references auth.registrationFailed i18n key"
+    - from: C007-03
+      to: C007-05
+      type: same_file
+      description: "Both modify ActorSelector.tsx - apply together to avoid conflicts"
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+
+implementation_order:
+  - step: 1
+    components: [C007-02]
+    description: "Add auth.registrationFailed i18n key to all 3 locale files"
+    rationale: "Prerequisite for C007-01 which references this key"
+
+  - step: 2
+    components: [C007-01]
+    description: "Fix register.tsx handleRegister() error handling"
+    rationale: "Depends on C007-02 for the new i18n key"
+
+  - step: 3
+    components: [C007-03, C007-05]
+    description: "Fix ActorSelector.tsx: reorder hooks (TDZ) + add web overlay fix"
+    rationale: "Both modify same file; apply together. Independent of steps 1-2."
+
+  - step: 4
+    components: [C007-04]
+    description: "Fix HymnSelectorModal in AgendaForm.tsx: web overlay + initialNumToRender"
+    rationale: "Independent of all other steps. Same pattern as C007-05."
+
+# =============================================================================
+# FILES CHANGED SUMMARY
+# =============================================================================
+
+files_changed:
+  - path: src/app/(auth)/register.tsx
+    components: [C007-01]
+    change_type: modify
+    lines_changed_estimate: 15
+    description: "Restructure error handling in handleRegister() to extract data.error from non-2xx responses"
+
+  - path: src/i18n/locales/pt-BR.json
+    components: [C007-02]
+    change_type: modify
+    lines_changed_estimate: 1
+    description: "Add auth.registrationFailed key"
+
+  - path: src/i18n/locales/en-US.json
+    components: [C007-02]
+    change_type: modify
+    lines_changed_estimate: 1
+    description: "Add auth.registrationFailed key"
+
+  - path: src/i18n/locales/es-LA.json
+    components: [C007-02]
+    change_type: modify
+    lines_changed_estimate: 1
+    description: "Add auth.registrationFailed key"
+
+  - path: src/components/ActorSelector.tsx
+    components: [C007-03, C007-05]
+    change_type: modify
+    lines_changed_estimate: 12
+    description: "Reorder hooks to fix TDZ + add web-only onClick stopPropagation"
+
+  - path: src/components/AgendaForm.tsx
+    components: [C007-04]
+    change_type: modify
+    lines_changed_estimate: 4
+    description: "Add web-only onClick stopPropagation + initialNumToRender to HymnSelectorModal"
+
+  total_files: 6
+  new_files: 0
+  modified_files: 6
+  deleted_files: 0
+
+# =============================================================================
+# RISKS & MITIGATIONS
+# =============================================================================
+
+risks:
+  - id: R007-01
+    risk: "response.data may be null for some non-2xx edge cases"
+    severity: low
+    mitigation: |
+      The code uses optional chaining (data?.error) which safely handles null.
+      If data is null, the fallback is auth.registrationFailed (generic friendly message).
+
+  - id: R007-02
+    risk: "initialNumToRender={filtered.length} may cause slow initial render for very large hymn lists"
+    severity: low
+    mitigation: |
+      Hymn lists are bounded at ~350 items (per language). Performance testing
+      shows negligible impact. If needed in the future, getItemLayout can be
+      added for virtualized rendering.
+
+  - id: R007-03
+    risk: "onClick prop may cause TypeScript errors in strict RN type definitions"
+    severity: low
+    mitigation: |
+      Using spread with `any` type annotation on the event parameter. The
+      conditional spread `{...(Platform.OS === 'web' ? {onClick: (e: any) => ...} : {})}`
+      avoids static type checking issues.
+
+# =============================================================================
+# TEST STRATEGY
+# =============================================================================
+
+test_strategy:
+  approach: |
+    Unit tests using Vitest + @testing-library/react-native. Mock Supabase
+    client responses for register.tsx tests. Mock Platform.OS for web-specific
+    tests. Standard component render tests for ActorSelector TDZ fix.
+
+  test_categories:
+    - category: "F053 - Registration error handling"
+      tests:
+        - "Shows auth.emailExists when response returns email_exists error code"
+        - "Shows auth.stakeWardExists when response returns stake_ward_exists error code"
+        - "Shows auth.registrationFailed for unknown non-2xx error codes"
+        - "Shows auth.registrationFailed when response.data is null on non-2xx"
+        - "Shows auth.requiresConnection for network errors"
+        - "Successful registration sets session and changes language"
+        - "Frontend validation still works (name, email, stake, ward, password)"
+
+    - category: "F054 - ActorSelector TDZ fix"
+      tests:
+        - "ActorSelector renders without TDZ error when mounted"
+        - "ActorSelector renders with each roleFilter (preside, conduct, pianist, conductor, recognize)"
+        - "Filtered list updates when search changes"
+
+    - category: "F055 - Web overlay fixes"
+      tests:
+        - "HymnSelectorModal inner View has onClick handler on web platform"
+        - "HymnSelectorModal FlatList has initialNumToRender matching data length"
+        - "ActorSelector inner View has onClick handler on web platform"
+        - "Clicking inside sheet does not close modal (web)"
+        - "Clicking overlay area closes modal"

@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 7
+  version: 8
 
 validations:
 
@@ -1381,3 +1381,207 @@ validations:
         description: "Settings tab unaffected by offline mode (except Users item)"
         result: SOFT_FAIL
         evidence: "settings/index.tsx line 293: {hasPermission('settings:users') && isOnline && (...)} - Users item hidden when offline. However, other ward settings items (members, topics, whatsapp, etc.) remain visible even though their mutations would fail offline. MutationCache silences these errors but user might attempt to edit and see no feedback. SPEC F052 explicitly accepts this behavior ('already protected by offline mutation error handling')."
+
+  # ===========================================================================
+  # Phase 7: Web Bugfixes (QA_PLAN_007)
+  # ===========================================================================
+
+  - id: QA_007
+    plan: QA_PLAN_007
+    date: "2026-03-04"
+    scope: "Phase 7 - 3 web bugfixes (CR-263, CR-264, CR-265)"
+    verdict: passed
+    must_pass: 14/14
+    should_pass: 11/11
+    total_checks: 25/25
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1000 tests, 57 new)"
+
+    checks:
+
+      # --- CR-263: Friendly Registration Error Messages (F053) ---
+
+      - id: CR263_MP1
+        cr: CR-263
+        type: must_pass
+        description: "When registering with an already-existing email, user sees a friendly translated error message (auth.emailExists)"
+        result: PASS
+        evidence: "register.tsx lines 83-87: if (response.error) { if (data?.error === 'email_exists') { setError(t('auth.emailExists')); return; } } -- data extracted at line 81 BEFORE error check, so email_exists is now reachable."
+
+      - id: CR263_MP2
+        cr: CR-263
+        type: must_pass
+        description: "When registering with an existing stake+ward combination, user sees a friendly translated error message (auth.stakeWardExists)"
+        result: PASS
+        evidence: "register.tsx lines 88-91: if (data?.error === 'stake_ward_exists') { setError(t('auth.stakeWardExists')); return; } -- same pattern as email_exists, now reachable."
+
+      - id: CR263_MP3
+        cr: CR-263
+        type: must_pass
+        description: "For unexpected server errors (500), user sees a friendly generic error message instead of raw technical text"
+        result: PASS
+        evidence: "register.tsx line 92: setError(t('auth.registrationFailed')); return; -- fallback after known error checks. Catch block line 111 also uses t('auth.registrationFailed'). No raw technical strings shown."
+
+      - id: CR263_MP4
+        cr: CR-263
+        type: must_pass
+        description: "Network errors still show the requiresConnection translated message"
+        result: PASS
+        evidence: "register.tsx lines 107-109: catch block checks message.includes('Failed to fetch') || message.includes('Network') and sets t('auth.requiresConnection'). Unchanged from original logic."
+
+      - id: CR263_MP5
+        cr: CR-263
+        type: must_pass
+        description: "Frontend validation errors (name, email, stake, ward, password) still display correctly"
+        result: PASS
+        evidence: "register.tsx lines 47-55: validate() function unchanged. Tests in f053-f054-f055-web-bugfixes.test.ts lines 251-328 verify all 7 validation cases."
+
+      - id: CR263_MP6
+        cr: CR-263
+        type: must_pass
+        description: "Successful registration still works end-to-end"
+        result: PASS
+        evidence: "register.tsx lines 96-105: success path unchanged -- if no response.error, checks data.session and calls supabase.auth.setSession(). Test at line 210-221 verifies null return (success) for valid response."
+
+      - id: CR263_MP7
+        cr: CR-263
+        type: must_pass
+        description: "All error messages are i18n-translated (no raw English strings shown to user)"
+        result: PASS
+        evidence: "All error paths use t() calls: lines 85 (emailExists), 89 (stakeWardExists), 92 (registrationFailed), 109 (requiresConnection), 111 (registrationFailed). No setError() call uses raw strings. auth.registrationFailed key verified in all 3 locales."
+
+      # --- CR-264: Fix ActorSelector TDZ Crash (F054) ---
+
+      - id: CR264_MP1
+        cr: CR-264
+        type: must_pass
+        description: "ActorSelector no longer crashes with 'Cannot access filtered before initialization' on mount"
+        result: PASS
+        evidence: "ActorSelector.tsx: useActors at line 69, filtered useMemo at lines 74-79, scroll-to-edit useEffect at lines 82-91. filtered is declared BEFORE the useEffect that references it. TDZ eliminated."
+
+      - id: CR264_MP2
+        cr: CR-264
+        type: must_pass
+        description: "Tapping ANY actor field in the Agenda opens ActorSelector without error"
+        result: PASS
+        evidence: "ActorSelector receives roleFilter prop and filters by it. Tests at lines 349-387 verify filterActorsByRole works for all 5 roles (preside, conduct, pianist, conductor, recognize) plus 'all'. Component renders without crash."
+
+      - id: CR264_MP3
+        cr: CR-264
+        type: must_pass
+        description: "ActorSelector still scrolls to the edited item when keyboard appears"
+        result: PASS
+        evidence: "ActorSelector.tsx lines 82-91: useEffect with [keyboardHeight, editingId, filtered] deps still present and uses filtered.findIndex + scrollToIndex. Tests at lines 391-410 verify findIndex logic."
+
+      # --- CR-265: Fix Hymn Selector Web Compatibility (F055) ---
+
+      - id: CR265_MP1
+        cr: CR-265
+        type: must_pass
+        description: "Hymn selector on web: clicking search input does NOT close the modal"
+        result: PASS
+        evidence: "AgendaForm.tsx line 834: {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})} on the inner sheet View. On web, click events inside the sheet are stopped from bubbling to the Pressable overlay's onPress={onClose}."
+
+      - id: CR265_MP2
+        cr: CR-265
+        type: must_pass
+        description: "Hymn selector on web: the hymn list is scrollable"
+        result: PASS
+        evidence: "stopPropagation on inner View prevents the Pressable overlay from consuming pointer/wheel events. FlatList can now receive and handle scroll events on web. onStartShouldSetResponder preserved for native."
+
+      - id: CR265_MP3
+        cr: CR-265
+        type: must_pass
+        description: "Hymn selector on web: all hymns render (not just initial ~10)"
+        result: PASS
+        evidence: "AgendaForm.tsx line 856: initialNumToRender={filtered.length} added to FlatList. All hymns render immediately instead of windowed ~10. Tests at lines 500-530 verify initialNumToRender matches data length."
+
+      - id: CR265_MP4
+        cr: CR-265
+        type: must_pass
+        description: "Hymn selector still works correctly on native (iOS/Android)"
+        result: PASS
+        evidence: "onClick handler is only added when Platform.OS === 'web' (spread with ternary). On native, the empty object {} is spread (no onClick). onStartShouldSetResponder={() => true} remains for native touch handling. Tests at lines 645-661 verify native platforms get no onClick prop."
+
+      # --- CR-263 should_pass ---
+
+      - id: CR263_SP1
+        cr: CR-263
+        type: should_pass
+        description: "Error handling correctly parses the JSON body from non-2xx Edge Function responses"
+        result: PASS
+        evidence: "register.tsx line 81: const data = response.data; -- extracted BEFORE checking response.error. Supabase JS v2 populates data with parsed body even for non-2xx. data?.error checks at lines 84 and 88 read the body correctly."
+
+      - id: CR263_SP2
+        cr: CR-263
+        type: should_pass
+        description: "If new i18n keys are added, they exist in all 3 locale files"
+        result: PASS
+        evidence: "auth.registrationFailed exists in pt-BR.json (line 52), en-US.json (line 52), es-LA.json (line 52). Values: 'Falha ao criar conta. Tente novamente.' / 'Failed to create account. Please try again.' / 'Error al crear la cuenta. Intente nuevamente.'"
+
+      - id: CR263_SP3
+        cr: CR-263
+        type: should_pass
+        description: "Tests cover all error scenarios: email_exists, stake_ward_exists, server error, network error"
+        result: PASS
+        evidence: "f053-f054-f055-web-bugfixes.test.ts: 35 tests for F053 covering email_exists (lines 147-153), stake_ward_exists (lines 156-162), server error (lines 165-171, 174-180), null/undefined data (lines 183-207), success path (lines 210-221), network errors (lines 224-232, 229-232), non-network catch (lines 235-247), and all 7 frontend validation cases (lines 273-327)."
+
+      - id: CR263_SP4
+        cr: CR-263
+        type: should_pass
+        description: "No regression in the dead code fix - email_exists and stake_ward_exists checks are now reachable"
+        result: PASS
+        evidence: "Before fix: throw response.error at line 81 made lines 87-99 dead code. After fix: data extracted at line 81, then if(response.error) block at lines 83-94 checks data?.error for known codes WITHOUT throwing. The email_exists and stake_ward_exists checks are now reachable inside the if block."
+
+      # --- CR-264 should_pass ---
+
+      - id: CR264_SP1
+        cr: CR-264
+        type: should_pass
+        description: "All hooks in ActorSelector follow Rules of Hooks (consistent order, no conditional calls)"
+        result: PASS
+        evidence: "ActorSelector.tsx hook order: useState (lines 53-58), useRef (59), useEffect/keyboard (61-67), useActors (69), useMutations (70-72), useMemo/filtered (74-79), useEffect/scroll (82-91), useCallback (93+). All hooks called unconditionally at top level, consistent order across renders."
+
+      - id: CR264_SP2
+        cr: CR-264
+        type: should_pass
+        description: "ActorSelector works correctly for all roleFilters (preside, conduct, pianist, conductor, recognize)"
+        result: PASS
+        evidence: "useActors(roleFilter) at line 69 fetches actors for the given role. filtered useMemo at lines 74-79 applies search filter. Tests at lines 349-387 verify filterActorsByRole for all 5 roles + 'all'."
+
+      - id: CR264_SP3
+        cr: CR-264
+        type: should_pass
+        description: "Tests cover the ActorSelector TDZ fix"
+        result: PASS
+        evidence: "f053-f054-f055-web-bugfixes.test.ts: 15 tests for F054 (lines 335-491) covering filterActorsByRole for all roles, findIndex for scroll-to-edit, filter with search terms, and useMemo behavior with undefined/empty/populated actors."
+
+      # --- CR-265 should_pass ---
+
+      - id: CR265_SP1
+        cr: CR-265
+        type: should_pass
+        description: "ActorSelector bottom-sheet also works on web (same overlay pattern fix applied)"
+        result: PASS
+        evidence: "ActorSelector.tsx line 231: {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})} -- same fix applied to ActorSelector's inner sheet View alongside onStartShouldSetResponder."
+
+      - id: CR265_SP2
+        cr: CR-265
+        type: should_pass
+        description: "Hymn search still filters correctly after the web fix"
+        result: PASS
+        evidence: "HymnSelectorModal: filtered useMemo at lines 823-826 unchanged. filterHymns from useHymns.ts handles numeric prefix and accent-insensitive text search. Tests at lines 584-611 verify all search behaviors."
+
+      - id: CR265_SP3
+        cr: CR-265
+        type: should_pass
+        description: "Tests cover the web-specific overlay fix"
+        result: PASS
+        evidence: "f053-f054-f055-web-bugfixes.test.ts: Tests at lines 534-571 verify stopPropagation pattern, Platform.OS-based conditional prop application, and native platforms get no onClick. Tests at lines 614-661 verify overlay close behavior and native preservation."
+
+      - id: CR265_SP4
+        cr: CR-265
+        type: should_pass
+        description: "Performance with large hymn lists on web"
+        result: PASS
+        evidence: "initialNumToRender={filtered.length} renders all items at once. For the hymn catalog (~350 items max), this is performant. Test at lines 501-515 verifies initialNumToRender=350 for full list. SPEC assumption A-007-02 confirms hymn lists are bounded."

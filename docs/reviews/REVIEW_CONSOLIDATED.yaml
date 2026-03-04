@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 8
-  last_updated_by: "phase-006"
+  version: 9
+  last_updated_by: "phase-007"
 
 reviews:
   - id: REV-001
@@ -1995,3 +1995,276 @@ reviews:
       tests_total: 943
       tests_passing: 943
       test_files: 47
+
+  # ===========================================================================
+  # REV-008: Phase 7 - Web Bugfixes (CR-263, CR-264, CR-265)
+  # ===========================================================================
+
+  - id: REV-008
+    scope: "CR-263, CR-264, CR-265 - Web Bugfixes (Registration Errors, ActorSelector TDZ, Hymn Selector Web)"
+    date: "2026-03-04"
+    reviewer: reviewer-agent
+    phase: 7
+    iteration: 1
+
+    commits:
+      - hash: 648bb3c
+        message: "feat(i18n): add auth.registrationFailed key to all 3 locales (CR-263)"
+      - hash: a697ff9
+        message: "fix(register): show friendly i18n errors instead of raw technical messages (CR-263)"
+      - hash: 57eea91
+        message: "fix(ActorSelector): reorder hooks to fix TDZ crash + add web overlay fix (CR-264, CR-265)"
+      - hash: 4e0a1c1
+        message: "fix(AgendaForm): add web overlay fix + initialNumToRender to HymnSelectorModal (CR-265)"
+      - hash: 4ac585a
+        message: "test(phase-7): add 57 tests for F053-F054-F055 web bugfixes (CR-263, CR-264, CR-265)"
+      - hash: 7be6a15
+        message: "docs(tests): update TEST_CONSOLIDATED for F053-F055 (57 new tests, 1000 total)"
+
+    verdict: approved
+
+    summary: |
+      All three bugfixes (CR-263, CR-264, CR-265) are correctly implemented with
+      minimal, focused changes. Chain validation passes completely: SPEC_F007 accurately
+      captures the bugs and fixes, ARCH_M007 provides correct architectural guidance,
+      PLAN_P007 orders steps properly, and the code faithfully implements each step.
+      No P0 or P1 issues found. 57 new tests all pass. 1000 total tests, 999 pass
+      (1 pre-existing flaky test from Phase 5 unrelated to these changes). No database
+      migrations, no Edge Function changes -- pure client-side fixes. No deploy needed
+      beyond the existing pending EAS Build from CR-262.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request: pass
+      arch_vs_spec: pass
+      plan_vs_arch: pass
+      code_vs_plan: pass
+      chain_intact: true
+
+      details:
+        spec_vs_request:
+          status: pass
+          notes: |
+            SPEC_F007 accurately captures all three bugs:
+            - F053 (CR-263): Root cause (FunctionsHttpError thrown before data checks),
+              fix strategy (read data.error for known codes), error mapping (4 scenarios),
+              new i18n key (auth.registrationFailed). 7 ACs cover all error scenarios.
+            - F054 (CR-264): Root cause (TDZ due to hook declaration order), fix (reorder
+              hooks). 6 ACs cover all actor roles and scroll behavior.
+            - F055 (CR-265): Root cause (web click bubbling, FlatList windowed rendering),
+              fix (onClick stopPropagation, initialNumToRender). 8 ACs cover web and native.
+
+        arch_vs_spec:
+          status: pass
+          notes: |
+            ARCH_M007 correctly identifies 5 components (C007-01 through C007-05) mapping
+            to the 3 features. Architecture impact is correctly assessed as "low" (no new
+            modules, hooks, providers, database tables). Two ADRs (ADR-022 for web overlay
+            pattern, ADR-023 for error extraction) document the key decisions. Contracts
+            are well-defined (Supabase functions.invoke return, Platform.OS onClick).
+
+        plan_vs_arch:
+          status: pass
+          notes: |
+            PLAN_P007 has 5 steps matching the architecture. Step ordering respects
+            dependencies (STEP-01 i18n before STEP-02 register.tsx). STEP-03 correctly
+            combines C007-03 and C007-05 (both modify ActorSelector.tsx). Coverage matrix
+            shows all 21 ACs covered across steps.
+
+        code_vs_plan:
+          status: pass
+          notes: |
+            Each commit maps precisely to a PLAN step:
+            - 648bb3c -> STEP-01: auth.registrationFailed in 3 locale files
+            - a697ff9 -> STEP-02: register.tsx error handling refactored
+            - 57eea91 -> STEP-03: ActorSelector hook reorder + web overlay
+            - 4e0a1c1 -> STEP-04: HymnSelectorModal web overlay + initialNumToRender
+
+    # =========================================================================
+    # CODE REVIEW
+    # =========================================================================
+
+    code_review:
+
+      - file: "src/i18n/locales/pt-BR.json"
+        verdict: pass
+        changes: "Added auth.registrationFailed key"
+        checks:
+          - "Key present at line 52 with correct value"
+          - "Placement is after auth.stakeWardExists (logical order)"
+          - "JSON remains valid"
+
+      - file: "src/i18n/locales/en-US.json"
+        verdict: pass
+        changes: "Added auth.registrationFailed key"
+        checks:
+          - "Key present at line 52 with correct value"
+          - "English text is natural and user-friendly"
+
+      - file: "src/i18n/locales/es-LA.json"
+        verdict: pass
+        changes: "Added auth.registrationFailed key"
+        checks:
+          - "Key present at line 52 with correct value"
+          - "Spanish text is natural and user-friendly"
+
+      - file: "src/app/(auth)/register.tsx"
+        verdict: pass
+        changes: "Refactored handleRegister() error handling"
+        checks:
+          - check: "No 'throw response.error' -- removed as planned"
+            status: pass
+            detail: "Lines 81-94: response.error is checked as boolean, then data?.error is inspected for known codes"
+          - check: "email_exists mapped to t('auth.emailExists')"
+            status: pass
+            detail: "Line 84-87"
+          - check: "stake_ward_exists mapped to t('auth.stakeWardExists')"
+            status: pass
+            detail: "Line 88-91"
+          - check: "Fallback for unknown non-2xx errors: t('auth.registrationFailed')"
+            status: pass
+            detail: "Line 92-93"
+          - check: "Success path unchanged (data?.session)"
+            status: pass
+            detail: "Lines 97-105"
+          - check: "Catch block: network errors -> t('auth.requiresConnection')"
+            status: pass
+            detail: "Line 108-109"
+          - check: "Catch block: non-network errors -> t('auth.registrationFailed')"
+            status: pass
+            detail: "Line 110-111"
+          - check: "Optional chaining on data?.error for null safety"
+            status: pass
+            detail: "Lines 84, 88 use data?.error"
+          - check: "No raw error.message ever shown to user"
+            status: pass
+            detail: "All error paths use i18n-translated strings"
+
+      - file: "src/components/ActorSelector.tsx"
+        verdict: pass
+        changes: "Hook reorder (TDZ fix) + web overlay fix"
+        checks:
+          - check: "useActors and mutation hooks declared before useEffect that uses filtered"
+            status: pass
+            detail: "Lines 69-72: useActors, useCreateActor, useUpdateActor, useDeleteActor"
+          - check: "useMemo filtered declared before useEffect that references it"
+            status: pass
+            detail: "Lines 74-79: useMemo. Lines 82-91: useEffect uses filtered"
+          - check: "No hooks removed or added, only reordered"
+            status: pass
+            detail: "Same hooks as before, in different order"
+          - check: "Web onClick stopPropagation on inner sheet View"
+            status: pass
+            detail: "Line 231: {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}"
+          - check: "onStartShouldSetResponder preserved for native"
+            status: pass
+            detail: "Line 230: onStartShouldSetResponder={() => true}"
+          - check: "Platform already imported (no new import needed)"
+            status: pass
+            detail: "Line 19: Platform in import list"
+
+      - file: "src/components/AgendaForm.tsx"
+        verdict: pass
+        changes: "HymnSelectorModal web overlay fix + initialNumToRender"
+        checks:
+          - check: "Platform imported from react-native"
+            status: pass
+            detail: "Line 19: Platform in import list"
+          - check: "Web onClick stopPropagation on HymnSelectorModal inner View"
+            status: pass
+            detail: "Line 834: {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}"
+          - check: "onStartShouldSetResponder preserved for native"
+            status: pass
+            detail: "Line 833: onStartShouldSetResponder={() => true}"
+          - check: "FlatList has initialNumToRender={filtered.length}"
+            status: pass
+            detail: "Line 856: initialNumToRender={filtered.length}"
+
+    # =========================================================================
+    # TEST REVIEW
+    # =========================================================================
+
+    test_review:
+      test_file: "src/__tests__/f053-f054-f055-web-bugfixes.test.ts"
+      test_count: 57
+      test_result: "57/57 pass"
+      coverage_assessment: |
+        Tests cover all 21 acceptance criteria across 3 features:
+        - F053 (CR-263): 30 tests covering i18n keys (3 locales x 4 keys),
+          error-handling decision logic (13 scenarios including edge cases),
+          frontend validation (8 field validation tests)
+        - F054 (CR-264): 15 tests covering filterActorsByRole for all 5 roles
+          plus 'all', scroll-to-editingId findIndex behavior, TDZ-safe
+          useMemo with undefined/empty/populated actors
+        - F055 (CR-265): 12 tests covering initialNumToRender matching data
+          length, web onClick stopPropagation pattern, onStartShouldSetResponder
+          preservation, search filtering behavior, overlay close pattern,
+          native no-regression
+
+      full_suite:
+        total: 1000
+        passing: 999
+        failing: 1
+        flaky_test: |
+          useSpeechCounts.integration.test.ts > "makes a single Supabase call
+          per fetch (AC-046-06 bulk query)" -- pre-existing flaky test from
+          Phase 5 (CR-258). Passes when run in isolation, fails in full suite
+          due to shared mock state. Also fails on pre-Phase 7 code. NOT caused
+          by Phase 7 changes.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Deploy app update (EAS Build)"
+        reason: "CR-263, CR-264, CR-265: All changes are client-side. No migrations, no Edge Functions."
+        urgency: low
+        notes: |
+          All changes are client-side (React Native). No database migrations.
+          No Edge Function changes. Can be bundled with the existing pending
+          EAS Build from CR-262. No additional deploy steps needed.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/deploy-commands.yaml"
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M007.yaml"
+        - "docs/plans/PLAN_P007.yaml"
+        - "docs/qa/QA_PLAN_007.yaml"
+        - "docs/specs/SPEC_F007.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 6
+      total_commits: 6
+      tests_total: 1000
+      tests_passing: 999
+      tests_flaky: 1
+      test_files: 48

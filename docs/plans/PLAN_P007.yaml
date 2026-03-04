@@ -1,0 +1,457 @@
+# =============================================================================
+# PLAN_P007.yaml - Implementation Plan for Phase 7 (Web Bugfixes)
+# CR-263: Friendly Registration Errors (F053)
+# CR-264: Fix ActorSelector TDZ (F054)
+# CR-265: Fix Hymn Selector Web (F055)
+# Generated: 2026-03-04
+# Artifact ID: 007
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement F053-F055 - Web Bugfixes (CR-263, CR-264, CR-265): fix register.tsx
+  so non-2xx responses show i18n-translated error messages instead of raw
+  technical errors; fix ActorSelector TDZ crash by reordering hook declarations;
+  fix HymnSelectorModal and ActorSelector web-specific issues (search click
+  closing modal, scroll blocked, only ~10 items rendered). No new components,
+  hooks, database changes, or edge function changes.
+
+strategy:
+  order: "i18n key -> register.tsx error handling -> ActorSelector (TDZ + web overlay) -> AgendaForm HymnSelectorModal (web overlay + initialNumToRender)"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # STEP-01: i18n - Add auth.registrationFailed key (C007-02)
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-263/F053: Add the new i18n key `auth.registrationFailed` to all 3
+      locale files. This key provides a generic, user-friendly error message
+      for non-2xx responses from the register-first-user edge function that
+      have unknown or unexpected error codes.
+
+      Changes:
+      1. In src/i18n/locales/pt-BR.json, add after line 51 (auth.stakeWardExists):
+         "registrationFailed": "Falha ao criar conta. Tente novamente."
+      2. In src/i18n/locales/en-US.json, add after line 51 (auth.stakeWardExists):
+         "registrationFailed": "Failed to create account. Please try again."
+      3. In src/i18n/locales/es-LA.json, add after line 51 (auth.stakeWardExists):
+         "registrationFailed": "Error al crear la cuenta. Intente nuevamente."
+
+      Component: C007-02 from ARCH_M007.
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "pt-BR.json contains key auth.registrationFailed = 'Falha ao criar conta. Tente novamente.'"
+      - "en-US.json contains key auth.registrationFailed = 'Failed to create account. Please try again.'"
+      - "es-LA.json contains key auth.registrationFailed = 'Error al crear la cuenta. Intente nuevamente.'"
+      - "All 3 locale files parse as valid JSON"
+    acceptance_criteria:
+      - AC-F053-03  # Generic friendly message for 500 errors
+      - AC-F053-07  # Generic friendly message for unknown error codes
+    tests:
+      - test: "auth.registrationFailed key exists in all 3 locales"
+        type: unit
+        description: "Verify the new i18n key is present and non-empty in pt-BR, en-US, and es-LA"
+    commit_message: "feat(i18n): add auth.registrationFailed key to all 3 locales (CR-263)"
+
+  # =========================================================================
+  # STEP-02: register.tsx - Fix error handling in handleRegister() (C007-01)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-263/F053: Fix the handleRegister() function in register.tsx so that
+      ALL error scenarios display user-friendly, i18n-translated messages
+      instead of raw technical errors.
+
+      Changes to src/app/(auth)/register.tsx:
+      1. Remove lines 81-83: `if (response.error) { throw response.error; }`
+      2. Move `const data = response.data;` (line 85) up to immediately after
+         the invoke call (after line 79).
+      3. Add a new non-2xx check block: `if (response.error) { ... }` that:
+         a. Checks `data?.error === 'email_exists'` -> setError(t('auth.emailExists')), return
+         b. Checks `data?.error === 'stake_ward_exists'` -> setError(t('auth.stakeWardExists')), return
+         c. Fallback: setError(t('auth.registrationFailed')), return
+      4. Remove the old dead-code checks at lines 87-99 (they are now
+         incorporated into the new block above).
+      5. Keep the success path (data?.session) unchanged.
+      6. Keep the catch block for network errors, but change line 117 from
+         `setError(message)` to `setError(t('auth.registrationFailed'))` so
+         that unexpected non-network errors also show a friendly message.
+
+      The refactored flow:
+      ```
+      const response = await supabase.functions.invoke(...);
+      const data = response.data;
+
+      if (response.error) {
+        if (data?.error === 'email_exists') {
+          setError(t('auth.emailExists'));
+          return;
+        }
+        if (data?.error === 'stake_ward_exists') {
+          setError(t('auth.stakeWardExists'));
+          return;
+        }
+        setError(t('auth.registrationFailed'));
+        return;
+      }
+
+      if (data?.session) { ... } // success path unchanged
+
+      catch (err) {
+        // Network errors -> auth.requiresConnection
+        // Other errors -> auth.registrationFailed
+      }
+      ```
+
+      Component: C007-01 from ARCH_M007.
+      ADR: ADR-023 (Extract error code from response.data instead of throwing).
+    files:
+      - src/app/(auth)/register.tsx
+    dependencies:
+      - STEP-01  # Needs auth.registrationFailed i18n key
+    parallelizable_with: []
+    done_when:
+      - "No 'throw response.error' in handleRegister()"
+      - "response.error is checked as boolean (non-2xx indicator)"
+      - "data?.error === 'email_exists' sets auth.emailExists translated message"
+      - "data?.error === 'stake_ward_exists' sets auth.stakeWardExists translated message"
+      - "Any other response.error sets auth.registrationFailed translated message"
+      - "Network errors in catch block still set auth.requiresConnection"
+      - "Non-network errors in catch block set auth.registrationFailed (not raw message)"
+      - "Success path (data?.session) is unchanged"
+      - "All existing tests pass"
+    acceptance_criteria:
+      - AC-F053-01  # email_exists -> auth.emailExists
+      - AC-F053-02  # stake_ward_exists -> auth.stakeWardExists
+      - AC-F053-03  # 500 error -> auth.registrationFailed
+      - AC-F053-04  # No internet -> auth.requiresConnection
+      - AC-F053-05  # Success path unchanged
+      - AC-F053-06  # Frontend validation still works (no change needed)
+      - AC-F053-07  # Unknown error code -> auth.registrationFailed
+    tests:
+      - test: "Shows auth.emailExists when response returns email_exists error"
+        type: unit
+        description: "Mock supabase.functions.invoke to return { data: { error: 'email_exists' }, error: new Error() }. Verify error state = t('auth.emailExists')."
+      - test: "Shows auth.stakeWardExists when response returns stake_ward_exists error"
+        type: unit
+        description: "Mock to return { data: { error: 'stake_ward_exists' }, error: new Error() }. Verify error state = t('auth.stakeWardExists')."
+      - test: "Shows auth.registrationFailed for unknown non-2xx error code"
+        type: unit
+        description: "Mock to return { data: { error: 'some_unknown_error' }, error: new Error() }. Verify error state = t('auth.registrationFailed')."
+      - test: "Shows auth.registrationFailed when response.data is null on non-2xx"
+        type: unit
+        description: "Mock to return { data: null, error: new Error() }. Verify error state = t('auth.registrationFailed')."
+      - test: "Shows auth.requiresConnection for network errors"
+        type: unit
+        description: "Mock invoke to throw Error('Failed to fetch'). Verify error state = t('auth.requiresConnection')."
+      - test: "Successful registration sets session and changes language"
+        type: unit
+        description: "Mock to return { data: { session: { access_token, refresh_token } }, error: null }. Verify setSession called and changeLanguage called."
+      - test: "Frontend validation prevents request for empty fields"
+        type: unit
+        description: "Leave name empty, tap submit. Verify error = t('auth.nameRequired') and invoke NOT called."
+    commit_message: "fix(register): show friendly i18n errors instead of raw technical messages (CR-263)"
+
+  # =========================================================================
+  # STEP-03: ActorSelector.tsx - Fix TDZ + web overlay (C007-03 + C007-05)
+  # =========================================================================
+
+  - id: STEP-03
+    description: |
+      CR-264/F054 + CR-265/F055: Fix two separate issues in ActorSelector.tsx:
+
+      FIX 1 - TDZ (C007-03): Reorder hook declarations so that `filtered`
+      (useMemo at line 86-91) and its dependencies (useActors at line 81,
+      mutation hooks at lines 82-84) are declared BEFORE the useEffect at
+      line 70-79 that references `filtered`.
+
+      Current order (broken):
+        Lines 51-58: useState hooks
+        Line 59: useRef
+        Lines 61-67: useEffect (keyboard)
+        Lines 70-79: useEffect (scroll to editingId) -- REFERENCES `filtered`
+        Lines 81-84: useActors + mutation hooks
+        Lines 86-91: useMemo `filtered` -- DECLARED TOO LATE
+
+      New order (fixed):
+        Lines 51-58: useState hooks
+        Line 59: useRef
+        Lines 61-67: useEffect (keyboard) -- unchanged
+        >> MOVED: useActors + mutation hooks (was lines 81-84)
+        >> MOVED: useMemo `filtered` (was lines 86-91)
+        Lines 70-79: useEffect (scroll to editingId) -- now `filtered` is initialized
+
+      FIX 2 - Web overlay (C007-05): On the inner sheet View (line 228-230),
+      add a web-only onClick handler with e.stopPropagation(). This prevents
+      click events inside the sheet from bubbling to the Pressable overlay on
+      web, which would trigger handleClose.
+
+      Change line 228-230 from:
+      ```jsx
+      <View
+        style={[styles.sheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+      >
+      ```
+      To:
+      ```jsx
+      <View
+        style={[styles.sheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+        {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+      >
+      ```
+
+      Platform is already imported at line 19, so no new import needed.
+
+      Components: C007-03 + C007-05 from ARCH_M007.
+      ADR: ADR-022 (Web-only onClick stopPropagation for bottom-sheet overlay).
+    files:
+      - src/components/ActorSelector.tsx
+    dependencies: []
+    parallelizable_with:
+      - STEP-01
+      - STEP-02
+    done_when:
+      - "useActors, useCreateActor, useUpdateActor, useDeleteActor hooks are declared BEFORE the useEffect that references `filtered`"
+      - "useMemo `filtered` is declared BEFORE the useEffect that references `filtered`"
+      - "No TDZ error when mounting ActorSelector with any roleFilter"
+      - "Inner sheet View has web-only onClick with e.stopPropagation()"
+      - "onStartShouldSetResponder={() => true} is preserved for native"
+      - "Platform import already exists (no new import)"
+      - "All existing tests pass"
+    acceptance_criteria:
+      - AC-F054-01  # Presiding ActorSelector opens without error
+      - AC-F054-02  # Conducting ActorSelector opens without error
+      - AC-F054-03  # Pianist ActorSelector opens without error
+      - AC-F054-04  # Conductor ActorSelector opens without error
+      - AC-F054-05  # Recognizing ActorSelector opens in multi-select
+      - AC-F054-06  # Scroll-to-editingId preserved
+      - AC-F055-07  # Web: clicking search/add inside ActorSelector doesn't close it
+      - AC-F055-08  # Web: clicking overlay area closes ActorSelector
+    tests:
+      - test: "ActorSelector renders without TDZ error for preside role"
+        type: unit
+        description: "Render ActorSelector with roleFilter='preside'. Verify no ReferenceError, component renders."
+      - test: "ActorSelector renders without TDZ error for conduct role"
+        type: unit
+        description: "Render ActorSelector with roleFilter='conduct'. Verify no error."
+      - test: "ActorSelector renders without TDZ error for pianist role"
+        type: unit
+        description: "Render ActorSelector with roleFilter='pianist'. Verify no error."
+      - test: "ActorSelector renders without TDZ error for conductor role"
+        type: unit
+        description: "Render ActorSelector with roleFilter='conductor'. Verify no error."
+      - test: "ActorSelector renders without TDZ error for recognize role"
+        type: unit
+        description: "Render ActorSelector with roleFilter='recognize', multiSelect=true. Verify no error."
+      - test: "Filtered list updates when search changes"
+        type: unit
+        description: "Render with actors, type in search. Verify list filters correctly."
+      - test: "ActorSelector inner View has onClick on web platform"
+        type: unit
+        description: "Mock Platform.OS = 'web'. Render ActorSelector. Verify inner View has onClick prop."
+      - test: "Clicking overlay closes modal"
+        type: unit
+        description: "Render ActorSelector, press the overlay Pressable. Verify onClose called."
+    commit_message: "fix(ActorSelector): reorder hooks to fix TDZ crash + add web overlay fix (CR-264, CR-265)"
+
+  # =========================================================================
+  # STEP-04: AgendaForm.tsx - HymnSelectorModal web fix (C007-04)
+  # =========================================================================
+
+  - id: STEP-04
+    description: |
+      CR-265/F055: Fix three web-specific issues in HymnSelectorModal
+      (defined inside AgendaForm.tsx):
+
+      FIX 1 - Search click closing modal / Scroll blocked: On the inner sheet
+      View (line 830-832), add a web-only onClick handler with
+      e.stopPropagation(). This prevents click events inside the sheet from
+      bubbling to the Pressable overlay on web.
+
+      Change line 830-832 from:
+      ```jsx
+      <View
+        style={[styles.bottomSheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+      >
+      ```
+      To:
+      ```jsx
+      <View
+        style={[styles.bottomSheet, { backgroundColor: colors.card }]}
+        onStartShouldSetResponder={() => true}
+        {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+      >
+      ```
+
+      NOTE: Platform is NOT currently imported in AgendaForm.tsx. Add Platform
+      to the import from 'react-native' at line 9-19.
+
+      FIX 2 - Initial 10 items: On FlatList (line 852), add
+      initialNumToRender={filtered.length} so all hymns render immediately.
+
+      Change line 852 from:
+      ```jsx
+      <FlatList
+        data={filtered}
+      ```
+      To:
+      ```jsx
+      <FlatList
+        data={filtered}
+        initialNumToRender={filtered.length}
+      ```
+
+      Component: C007-04 from ARCH_M007.
+      ADR: ADR-022 (Web-only onClick stopPropagation for bottom-sheet overlay).
+    files:
+      - src/components/AgendaForm.tsx
+    dependencies: []
+    parallelizable_with:
+      - STEP-01
+      - STEP-02
+      - STEP-03
+    done_when:
+      - "Platform is imported from react-native in AgendaForm.tsx"
+      - "HymnSelectorModal inner sheet View has web-only onClick with e.stopPropagation()"
+      - "onStartShouldSetResponder={() => true} is preserved for native"
+      - "FlatList has initialNumToRender={filtered.length}"
+      - "All existing tests pass"
+    acceptance_criteria:
+      - AC-F055-01  # Web: hymn selector opens showing all hymns
+      - AC-F055-02  # Web: clicking search input keeps modal open
+      - AC-F055-03  # Web: hymn list scrolls normally
+      - AC-F055-04  # Web: search filters correctly (unchanged behavior)
+      - AC-F055-05  # Web: clicking overlay closes modal
+      - AC-F055-06  # Native: no regression
+    tests:
+      - test: "HymnSelectorModal inner View has onClick on web platform"
+        type: unit
+        description: "Mock Platform.OS = 'web'. Render HymnSelectorModal. Verify inner View has onClick prop."
+      - test: "HymnSelectorModal FlatList has initialNumToRender matching data length"
+        type: unit
+        description: "Render HymnSelectorModal with 350 hymns. Verify FlatList initialNumToRender = 350."
+      - test: "Clicking overlay closes HymnSelectorModal"
+        type: unit
+        description: "Render HymnSelectorModal, press the overlay Pressable. Verify onClose called."
+      - test: "Clicking inside sheet does not close HymnSelectorModal (web)"
+        type: unit
+        description: "Mock Platform.OS = 'web'. Render, click inside sheet. Verify onClose NOT called."
+      - test: "HymnSelectorModal search filters hymns correctly"
+        type: unit
+        description: "Render with hymns, type '100'. Verify list shows only matching hymns."
+    commit_message: "fix(AgendaForm): add web overlay fix + initialNumToRender to HymnSelectorModal (CR-265)"
+
+  # =========================================================================
+  # STEP-05: Final Verification
+  # =========================================================================
+
+  - id: STEP-05
+    description: |
+      Final verification step: run the full test suite to ensure all changes
+      work together and no regressions were introduced. Verify:
+
+      1. All new tests for F053, F054, F055 pass.
+      2. All existing tests still pass (no regressions).
+      3. TypeScript compilation succeeds with no errors.
+      4. Total test count is baseline + new tests.
+    files: []
+    dependencies:
+      - STEP-01
+      - STEP-02
+      - STEP-03
+      - STEP-04
+    parallelizable_with: []
+    done_when:
+      - "npx tsc --noEmit passes with 0 errors"
+      - "npx vitest run passes with 0 failures"
+      - "All 21 acceptance criteria covered by tests"
+      - "No regressions in existing test suite"
+    acceptance_criteria: []
+    tests: []
+    commit_message: null
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage:
+  features:
+    F053:
+      total_acs: 7
+      covered:
+        - { ac: AC-F053-01, steps: [STEP-02] }
+        - { ac: AC-F053-02, steps: [STEP-02] }
+        - { ac: AC-F053-03, steps: [STEP-01, STEP-02] }
+        - { ac: AC-F053-04, steps: [STEP-02] }
+        - { ac: AC-F053-05, steps: [STEP-02] }
+        - { ac: AC-F053-06, steps: [STEP-02] }
+        - { ac: AC-F053-07, steps: [STEP-01, STEP-02] }
+    F054:
+      total_acs: 6
+      covered:
+        - { ac: AC-F054-01, steps: [STEP-03] }
+        - { ac: AC-F054-02, steps: [STEP-03] }
+        - { ac: AC-F054-03, steps: [STEP-03] }
+        - { ac: AC-F054-04, steps: [STEP-03] }
+        - { ac: AC-F054-05, steps: [STEP-03] }
+        - { ac: AC-F054-06, steps: [STEP-03] }
+    F055:
+      total_acs: 8
+      covered:
+        - { ac: AC-F055-01, steps: [STEP-04] }
+        - { ac: AC-F055-02, steps: [STEP-04] }
+        - { ac: AC-F055-03, steps: [STEP-04] }
+        - { ac: AC-F055-04, steps: [STEP-04] }
+        - { ac: AC-F055-05, steps: [STEP-04] }
+        - { ac: AC-F055-06, steps: [STEP-04] }
+        - { ac: AC-F055-07, steps: [STEP-03] }
+        - { ac: AC-F055-08, steps: [STEP-03] }
+
+  summary:
+    total_acs: 21
+    acs_covered: 21
+    total_steps: 5
+    total_tests: 20
+    edge_cases_covered: 2  # null data on non-2xx, non-network catch error
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph:
+  # STEP-01 (i18n) <- STEP-02 (register.tsx) needs the new key
+  # STEP-03 (ActorSelector) independent
+  # STEP-04 (AgendaForm) independent
+  # STEP-05 (verification) depends on all
+  edges:
+    - { from: STEP-01, to: STEP-02, type: requires }
+    - { from: STEP-01, to: STEP-05, type: requires }
+    - { from: STEP-02, to: STEP-05, type: requires }
+    - { from: STEP-03, to: STEP-05, type: requires }
+    - { from: STEP-04, to: STEP-05, type: requires }
+
+  parallel_groups:
+    - group: 1
+      steps: [STEP-01, STEP-03, STEP-04]
+      description: "Independent changes: i18n keys, ActorSelector fixes, HymnSelectorModal fixes"
+    - group: 2
+      steps: [STEP-02]
+      description: "Depends on STEP-01 for auth.registrationFailed key"
+    - group: 3
+      steps: [STEP-05]
+      description: "Final verification after all code changes"

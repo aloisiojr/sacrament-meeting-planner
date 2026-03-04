@@ -5,6 +5,7 @@ import { useOfflineQueueProcessor } from '../hooks/useOfflineQueueProcessor';
 import { useRegisterPushToken, useNotificationHandler } from '../hooks/useNotifications';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { OnlineStatusProvider } from '../contexts/OnlineStatusContext';
+import { useOfflinePrefetch } from '../hooks/useOfflinePrefetch';
 
 interface SyncProviderProps {
   children: React.ReactNode;
@@ -28,10 +29,13 @@ export function SyncProvider({ children }: SyncProviderProps) {
   // 3. Offline queue processing (depends on isOnline)
   useOfflineQueueProcessor(isOnline);
 
-  // 4. Push token registration (depends on isOnline)
+  // 4. Proactive prefetch for offline cache (depends on isOnline)
+  useOfflinePrefetch(isOnline);
+
+  // 5. Push token registration (depends on isOnline)
   useRegisterPushToken(isOnline);
 
-  // 5. Notification tap handler (independent)
+  // 6. Notification tap handler (independent)
   useNotificationHandler();
 
   return (

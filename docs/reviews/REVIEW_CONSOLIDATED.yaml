@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 10
-  last_updated_by: "phase-008"
+  version: 11
+  last_updated_by: "phase-009"
 
 reviews:
   - id: REV-001
@@ -2500,3 +2500,211 @@ reviews:
       tests_passing: 1055
       tests_flaky: 0
       test_files: 51
+
+  # ===========================================================================
+  # REV-009: Phase 9 - CR-269 (F059)
+  # ===========================================================================
+
+  - id: REV-009
+    scope: "CR-269 - Designation Notification Initial Assignment Guard (F059)"
+    date: "2026-03-04"
+    phase: 9
+    reviewer: reviewer-agent
+    iteration: 1
+    commits:
+      - hash: 9bffbf3
+        message: "fix(notification): add OLD.status guard to designation trigger Case 1 (CR-269)"
+      - hash: 9bdaa4d
+        message: "docs(ledger): add phase 9 commit for CR-269"
+      - hash: 77971de
+        message: "test(F059): replace fs.readFileSync tests with behavioral trigger logic tests (CR-269)"
+    verdict: approved
+
+    summary: |
+      Clean, minimal DB trigger fix. Migration 028 redefines enqueue_speech_notification()
+      with a strict OLD.status = 'not_assigned' guard on Case 1 (designation), ensuring
+      notifications only fire on initial speaker assignment. 35 behavioral tests cover
+      all 7 ACs, 3 edge cases, early-exit guard, and exhaustive status transitions.
+      No client-side code changes. Full test suite passes (1090 tests, 52 files).
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        details: |
+          User request: designation push notification should only fire when bishopric
+          selects a speaker name in the expanded speech card (initial assignment).
+          SPEC_F009 captures this correctly as F059 with 7 ACs and 3 edge cases.
+          The fix scope (DB trigger only, no client changes) matches the root cause.
+      arch_vs_spec:
+        status: pass
+        details: |
+          ARCH_M009 correctly maps the fix to a single component C009-01 (migration 028).
+          The strict positive equality guard (OLD.status = 'not_assigned') is justified
+          by ADR-025 and is more restrictive than the negative guard used by Cases 4/5,
+          which matches the different business requirement (only initial assignment vs
+          prevent duplicate fires).
+      plan_vs_arch:
+        status: pass
+        details: |
+          PLAN_P009 has 2 steps: STEP-01 (create migration + tests) and STEP-02
+          (verify full suite). The plan includes the complete function body copied
+          from migration 013 with only Case 1 guard added. done_when criteria are
+          comprehensive (9 checks).
+      code_vs_plan:
+        status: pass
+        details: |
+          Migration 028 exactly matches the planned function body. The diff between
+          migrations 013 and 028 shows only: (1) header comments updated, (2) Case 1
+          comment updated, (3) Case 1 guard line changed from
+          "IF NEW.status = 'assigned_not_invited' THEN" to
+          "IF NEW.status = 'assigned_not_invited' AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN".
+          All other cases (4, 5, cancellation, early-exit) are byte-identical.
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW
+    # =========================================================================
+
+    code_review:
+
+      migration_028:
+        file: supabase/migrations/028_fix_designation_notification_guard.sql
+        status: pass
+        checks:
+          - check: "CREATE OR REPLACE FUNCTION enqueue_speech_notification()"
+            status: pass
+            detail: "Line 20: correct function signature"
+          - check: "SECURITY DEFINER preserved"
+            status: pass
+            detail: "Line 96: $$ LANGUAGE plpgsql SECURITY DEFINER;"
+          - check: "Early-exit guard unchanged"
+            status: pass
+            detail: "Lines 24-26: IF TG_OP = 'UPDATE' AND OLD.status = NEW.status THEN RETURN NEW;"
+          - check: "Case 1 guard added correctly"
+            status: pass
+            detail: "Lines 32-33: IF NEW.status = 'assigned_not_invited' AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN"
+          - check: "Case 4 guard unchanged"
+            status: pass
+            detail: "Line 50: IF NEW.status = 'assigned_confirmed' AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed') THEN"
+          - check: "Case 5 guard unchanged"
+            status: pass
+            detail: "Line 67: IF NEW.status = 'gave_up' AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up') THEN"
+          - check: "Cancellation case unchanged"
+            status: pass
+            detail: "Lines 84-91: IF NEW.status = 'not_assigned' AND TG_OP = 'UPDATE' AND OLD.status != 'not_assigned' THEN ..."
+          - check: "INSERT INTO notification_queue columns match original"
+            status: pass
+            detail: "All 3 INSERT statements (Cases 1, 4, 5) have identical column lists and value expressions as migration 013"
+          - check: "ADR-025 referenced in comments"
+            status: pass
+            detail: "Lines 13-15 and 31"
+          - check: "No trigger re-creation (CREATE OR REPLACE FUNCTION only)"
+            status: pass
+            detail: "File contains only function definition, no CREATE TRIGGER or DROP TRIGGER"
+
+      test_file:
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        status: pass
+        checks:
+          - check: "Behavioral simulation approach (not fs.readFileSync)"
+            status: pass
+            detail: "simulateTrigger() function mirrors SQL logic, tests behavior not string content"
+          - check: "All 7 ACs covered"
+            status: pass
+            detail: "AC-059-1 through AC-059-7 each have dedicated describe blocks"
+          - check: "All 3 edge cases covered"
+            status: pass
+            detail: "EC-059-1 (reassign cycle), EC-059-2 (unmanaged prayer), EC-059-3 (INSERT safety)"
+          - check: "Early-exit guard exhaustive test"
+            status: pass
+            detail: "it.each(ALL_STATUSES) tests all 5 same-status transitions"
+          - check: "Exhaustive guard test"
+            status: pass
+            detail: "Tests all 3 non-not_assigned statuses blocked from designation + positive confirmation"
+          - check: "35 tests, all passing"
+            status: pass
+
+    # =========================================================================
+    # TEST REVIEW
+    # =========================================================================
+
+    test_review:
+      new_test_files:
+        - file: "src/__tests__/f059-designation-notification-guard.test.ts"
+          test_count: 35
+          coverage: "AC-059-1, AC-059-2, AC-059-3, AC-059-4, AC-059-5, AC-059-6, AC-059-7, EC-059-1, EC-059-2, EC-059-3, early-exit guard, exhaustive guard, Case 4/5 self-transitions, INSERT cancellation guard"
+      updated_test_files: []
+
+      full_suite:
+        total: 1090
+        passing: 1090
+        failing: 0
+        test_files: 52
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Apply migration 028 to Supabase (supabase db push or apply via dashboard)"
+        reason: "CR-269: New SQL migration redefines enqueue_speech_notification() trigger function"
+        urgency: medium
+        instructions: |
+          Run the migration against the production Supabase database:
+            supabase db push
+          or apply 028_fix_designation_notification_guard.sql manually via
+          the Supabase SQL Editor in the dashboard.
+          No downtime needed - CREATE OR REPLACE FUNCTION is atomic.
+          No client-side changes are needed; the fix is entirely server-side.
+        notes: |
+          This migration does NOT require an app binary update (EAS Build).
+          It can be deployed independently of the pending EAS Build from CR-262.
+          After applying, verify in Supabase SQL Editor:
+            SELECT prosrc FROM pg_proc WHERE proname = 'enqueue_speech_notification';
+          Should contain "OLD.status = 'not_assigned'" in the Case 1 guard.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/tests/TEST_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M009.yaml"
+        - "docs/plans/PLAN_P009.yaml"
+        - "docs/qa/QA_PLAN_009.yaml"
+        - "docs/specs/SPEC_F009.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 3
+      total_commits: 3
+      tests_total: 1090
+      tests_passing: 1090
+      tests_flaky: 0
+      test_files: 52

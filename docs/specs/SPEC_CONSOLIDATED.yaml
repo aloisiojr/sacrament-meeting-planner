@@ -8,9 +8,9 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  total_features: 51
-  total_business_rules: 40
-  total_design_decisions: 35
+  total_features: 52
+  total_business_rules: 41
+  total_design_decisions: 36
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -869,7 +869,7 @@ features:
       don't receive push. Prayer-specific notification titles and bodies
       for positions 0 and 4. Notification tap navigates to Home tab.
     acceptance_criteria:
-      - given: "Speaker is assigned to a speech"
+      - given: "Speaker is initially assigned to a speech (status transitions from not_assigned to assigned_not_invited)"
         when: "Assignment is saved"
         then: "Designation notification is enqueued with 5-minute delay"
       - given: "Speaker confirms their speech"
@@ -1134,6 +1134,29 @@ features:
         when: "User views the Home tab"
         then: "NextAssignmentsSection and InviteManagementSection are NOT visible"
 
+  # ---------------------------------------------------------------------------
+  # F059: Designation Notification Initial Assignment Guard [CR-269]
+  # ---------------------------------------------------------------------------
+
+  - id: F059
+    name: Designation Notification Initial Assignment Guard
+    area: notifications
+    description: |
+      Guard on the enqueue_speech_notification() DB trigger so that
+      designation (type='designation') notifications only fire on initial
+      speaker assignment (not_assigned -> assigned_not_invited). Manual
+      status reverts to assigned_not_invited from other statuses
+      (assigned_invited, assigned_confirmed, gave_up) do not enqueue
+      a notification. Fixes spurious push notifications on manual
+      status changes. [CR-269]
+    acceptance_criteria:
+      - given: "Speech status is not_assigned"
+        when: "Bishopric assigns a speaker (status changes to assigned_not_invited)"
+        then: "Designation notification is enqueued with 5-minute delay"
+      - given: "Speech status is any assigned status (assigned_invited, assigned_confirmed, gave_up)"
+        when: "User manually changes status to assigned_not_invited"
+        then: "No designation notification is enqueued"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1278,6 +1301,10 @@ business_rules:
     rule: "Speech count singular/plural"
     description: "Speech count text uses singular/plural forms per language: pt-BR (discurso/discursos), en-US (speech/speeches), es-LA (discurso/discursos)."
 
+  - id: BR034
+    rule: "Designation notification guard"
+    description: "Designation notifications only fire on initial assignment (OLD.status = not_assigned AND NEW.status = assigned_not_invited). Manual status reverts to assigned_not_invited do not trigger notifications."
+
 # =============================================================================
 # DESIGN DECISIONS
 # =============================================================================
@@ -1383,6 +1410,10 @@ design_decisions:
   - id: DD025
     decision: "6-month window as calendar months"
     rationale: "JavaScript Date.setMonth(m - 6) handles calendar month arithmetic including leap year and month boundary edge cases."
+
+  - id: DD026
+    decision: "Guard pattern for notification trigger Case 1"
+    rationale: "Uses (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') guard for designation notifications, consistent with existing guard pattern in Cases 4 and 5 of the same trigger function."
 
 # =============================================================================
 # EDGE CASES

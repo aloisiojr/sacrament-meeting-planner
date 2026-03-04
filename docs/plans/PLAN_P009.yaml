@@ -1,0 +1,262 @@
+# =============================================================================
+# PLAN_P009.yaml - Implementation Plan for Phase 1
+# CR-269: Designation Notification Initial Assignment Guard (F059)
+# Generated: 2026-03-04
+# Artifact ID: 009
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Fix the enqueue_speech_notification() DB trigger function so that
+  designation ('designation' type) push notifications only fire on initial
+  speaker assignment (not_assigned -> assigned_not_invited), not on manual
+  status reverts. Single SQL migration (028), no client-side changes.
+
+strategy:
+  order: "Migration -> Verification"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # F059: Designation Notification Initial Assignment Guard (CR-269)
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-269/F059: Create new migration file
+      supabase/migrations/028_fix_designation_notification_guard.sql
+
+      This migration uses CREATE OR REPLACE FUNCTION to redefine
+      enqueue_speech_notification() with the added OLD.status guard on
+      Case 1 (designation). No trigger re-creation needed since the
+      function name and trigger binding remain the same.
+
+      Full function body (copy from migration 013 with the fix applied):
+
+      CREATE OR REPLACE FUNCTION enqueue_speech_notification()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Only fire on status changes
+        IF TG_OP = 'UPDATE' AND OLD.status = NEW.status THEN
+          RETURN NEW;
+        END IF;
+
+        -- Case 1: Assignment notification (delayed, grouped)
+        -- Only fires on initial assignment: not_assigned -> assigned_not_invited
+        -- Manual status reverts to assigned_not_invited do NOT trigger notification
+        -- (ADR-025: strict positive equality guard)
+        IF NEW.status = 'assigned_not_invited'
+          AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id,
+            'designation',
+            NEW.sunday_date,
+            NEW.position,
+            NEW.speaker_name,
+            'secretary',
+            'pending',
+            now() + INTERVAL '5 minutes'
+          );
+        END IF;
+
+        -- Case 4: Speaker confirmed (immediate)
+        IF NEW.status = 'assigned_confirmed' AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id,
+            'speaker_confirmed',
+            NEW.sunday_date,
+            NEW.position,
+            NEW.speaker_name,
+            'secretary_and_bishopric',
+            'pending',
+            now()
+          );
+        END IF;
+
+        -- Case 5: Speaker gave up (immediate)
+        IF NEW.status = 'gave_up' AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id,
+            'speaker_withdrew',
+            NEW.sunday_date,
+            NEW.position,
+            NEW.speaker_name,
+            'bishopric',
+            'pending',
+            now()
+          );
+        END IF;
+
+        -- Cancellation: if speech returns to not_assigned, cancel pending designation notifications
+        IF NEW.status = 'not_assigned' AND TG_OP = 'UPDATE' AND OLD.status != 'not_assigned' THEN
+          UPDATE notification_queue
+          SET status = 'cancelled'
+          WHERE ward_id = NEW.ward_id
+            AND sunday_date = NEW.sunday_date
+            AND speech_position = NEW.position
+            AND type = 'designation'
+            AND status = 'pending';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+      Key changes from migration 013:
+      1. Case 1 guard added: AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned')
+      2. Comment updated to explain the guard and reference ADR-025
+      3. All other cases (4, 5, cancellation) and the early-exit guard are
+         copied verbatim from migration 013
+    files:
+      - supabase/migrations/028_fix_designation_notification_guard.sql
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "File supabase/migrations/028_fix_designation_notification_guard.sql exists"
+      - "Function signature is CREATE OR REPLACE FUNCTION enqueue_speech_notification()"
+      - "Case 1 has guard: AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned')"
+      - "Case 4 guard unchanged: AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed')"
+      - "Case 5 guard unchanged: AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up')"
+      - "Cancellation case unchanged"
+      - "Early-exit guard unchanged"
+      - "SECURITY DEFINER preserved"
+      - "LANGUAGE plpgsql preserved"
+      - "Comment references ADR-025"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test the enqueue_speech_notification() trigger logic via migration
+          SQL assertions. Since this is a pure DB trigger change, tests validate
+          the SQL content of the migration file:
+          1. Migration file contains 'CREATE OR REPLACE FUNCTION enqueue_speech_notification()'
+          2. Case 1 line contains "AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned')"
+          3. Case 4 line contains "AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed')"
+          4. Case 5 line contains "AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up')"
+          5. Function includes SECURITY DEFINER
+          6. Cancellation case includes "SET status = 'cancelled'"
+
+          Additionally, scenario-based tests for the trigger logic:
+          7. AC-059-1: not_assigned -> assigned_not_invited: guard passes (OLD.status = 'not_assigned')
+          8. AC-059-2: assigned_invited -> assigned_not_invited: guard fails (OLD.status != 'not_assigned')
+          9. AC-059-3: assigned_confirmed -> assigned_not_invited: guard fails
+          10. AC-059-4: gave_up -> assigned_not_invited: guard fails
+          11. AC-059-5: any -> assigned_confirmed: Case 4 fires (unchanged)
+          12. AC-059-6: any -> gave_up: Case 5 fires (unchanged)
+          13. AC-059-7: any -> not_assigned: cancellation fires (unchanged)
+          14. EC-059-1: not_assigned -> assigned_not_invited -> not_assigned -> assigned_not_invited:
+              first notification enqueued, then cancelled, then second notification enqueued
+          15. EC-059-3: INSERT with status = assigned_not_invited: guard passes (TG_OP = 'INSERT')
+    covers:
+      acceptance_criteria:
+        - "AC-059-1: Designation notification fires on initial assignment (not_assigned -> assigned_not_invited)"
+        - "AC-059-2: No notification on manual revert from assigned_invited"
+        - "AC-059-3: No notification on manual revert from assigned_confirmed"
+        - "AC-059-4: No notification on manual revert from gave_up"
+        - "AC-059-5: Speaker confirmed notification still works (Case 4 unchanged)"
+        - "AC-059-6: Speaker withdrew notification still works (Case 5 unchanged)"
+        - "AC-059-7: Cancellation on unassign still works (cancellation case unchanged)"
+      edge_cases:
+        - "EC-059-1: Reassign after unassign fires new notification (both transitions pass guard)"
+        - "EC-059-2: Unmanaged prayer auto-confirm skips designation (status goes directly to assigned_confirmed)"
+        - "EC-059-3: INSERT with status = assigned_not_invited fires notification (TG_OP = 'INSERT' branch)"
+    risks:
+      - risk: "Migration 028 function body diverges from migration 013"
+        mitigation: "Full function body copied from 013 with only Case 1 guard added. Diff is 2 lines (guard condition + comment)."
+      - risk: "Existing pending spurious notifications are not cleaned up"
+        mitigation: "Per A-4, pending spurious notifications cannot be distinguished from legitimate ones. Fix prevents future spurious enqueues."
+
+  # =========================================================================
+  # VERIFICATION
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      Run full test suite to verify no regressions from the migration change.
+      Verify all code changes pass linting, type-checking, and tests.
+    files: []
+    dependencies: ["STEP-01"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Unforeseen interaction with other tests"
+        mitigation: "F059 is a pure DB migration, no client-side code changes. Zero interaction with existing client-side tests."
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # F059 Acceptance Criteria (CR-269)
+  - ac_id: AC-059-1
+    description: "Designation notification fires on initial assignment"
+    how_to_verify: "Case 1 guard: AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned'). When OLD.status = 'not_assigned', guard passes -> notification enqueued."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-2
+    description: "No notification on manual revert from assigned_invited"
+    how_to_verify: "OLD.status = 'assigned_invited' != 'not_assigned' -> guard fails -> no INSERT into notification_queue."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-3
+    description: "No notification on manual revert from assigned_confirmed"
+    how_to_verify: "OLD.status = 'assigned_confirmed' != 'not_assigned' -> guard fails -> no INSERT."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-4
+    description: "No notification on manual revert from gave_up"
+    how_to_verify: "OLD.status = 'gave_up' != 'not_assigned' -> guard fails -> no INSERT."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-5
+    description: "Speaker confirmed notification still works"
+    how_to_verify: "Case 4 unchanged: IF NEW.status = 'assigned_confirmed' AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed')"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-6
+    description: "Speaker withdrew notification still works"
+    how_to_verify: "Case 5 unchanged: IF NEW.status = 'gave_up' AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up')"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-059-7
+    description: "Cancellation on unassign still works"
+    how_to_verify: "Cancellation case unchanged: IF NEW.status = 'not_assigned' AND TG_OP = 'UPDATE' AND OLD.status != 'not_assigned'"
+    covered_by_steps: ["STEP-01"]
+
+  # Edge Cases
+  - ac_id: EC-059-1
+    description: "Reassign after unassign (not_assigned -> assigned_not_invited -> not_assigned -> assigned_not_invited)"
+    how_to_verify: "First transition: OLD.status='not_assigned' -> guard passes -> notification 1. Cancellation: status='not_assigned' -> notification 1 cancelled. Second transition: OLD.status='not_assigned' -> guard passes -> notification 2."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-059-2
+    description: "Unmanaged prayer auto-confirm (manage_prayers=false)"
+    how_to_verify: "When manage_prayers=false, prayer assignment sets status directly to assigned_confirmed (skipping assigned_not_invited). Case 1 never fires for this flow. This is existing behavior, unchanged by the fix."
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-059-3
+    description: "INSERT with status = assigned_not_invited (safety net)"
+    how_to_verify: "Guard: TG_OP = 'INSERT' OR OLD.status = 'not_assigned'. When TG_OP = 'INSERT', guard passes -> notification enqueued. In practice, lazy-create always inserts with not_assigned."
+    covered_by_steps: ["STEP-01"]

@@ -4,15 +4,16 @@
 # =============================================================================
 
 type: test_consolidated
-version: 8
+version: 10
 last_updated: "2026-03-04"
 
 summary:
-  total_test_files: 51
-  total_tests: 1055
+  total_test_files: 52
+  total_tests: 1090
+  # Note: F059 added 35 tests (coder), already counted in total above
   framework: vitest
   categories:
-    module_named: 45
+    module_named: 46
     integration: 6
   infrastructure:
     setup: 1
@@ -527,6 +528,28 @@ module_tests:
       - EC-058-1: Cold start offline - section renders with no cache
       - EC-058-2: Pencil buttons toggle reactively on connectivity changes
       - useOnlineStatus and OnlineStatusProvider exports verified
+
+  # --- F059 Designation Notification Guard Tests (CR-269) ---
+
+  - file: src/__tests__/f059-designation-notification-guard.test.ts
+    tests: 35
+    module: supabase/migrations/028_fix_designation_notification_guard.sql
+    covers:
+      - "F059 (CR-269): Designation Notification Initial Assignment Guard"
+      - AC-059-1: not_assigned -> assigned_not_invited fires designation notification
+      - AC-059-2: assigned_invited -> assigned_not_invited does NOT fire designation
+      - AC-059-3: assigned_confirmed -> assigned_not_invited does NOT fire designation
+      - AC-059-4: gave_up -> assigned_not_invited does NOT fire designation
+      - AC-059-5: Speaker confirmed notification (Case 4) unchanged from all source statuses
+      - AC-059-6: Speaker withdrew notification (Case 5) unchanged from all source statuses
+      - AC-059-7: Cancellation on unassign unchanged from all assigned statuses
+      - EC-059-1: Reassign after unassign fires new notification (full cycle)
+      - EC-059-2: Unmanaged prayer auto-confirm skips designation (INSERT assigned_confirmed)
+      - EC-059-3: INSERT with assigned_not_invited fires notification via TG_OP branch
+      - Early exit guard: same-status UPDATE is no-op for all 5 statuses
+      - Exhaustive guard: only not_assigned source triggers designation
+      - Case 4 & 5 self-transition guards
+      - Cancellation only fires on UPDATE, not INSERT
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -1822,6 +1845,200 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # F059 DESIGNATION NOTIFICATION GUARD - TEST COVERAGE (CR-269)
+  # Tests validate trigger behavior via behavioral simulation of SQL logic
+
+  - feature: F059
+    tests:
+      - name: "not_assigned -> assigned_not_invited enqueues designation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation notification has correct type"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_invited -> assigned_not_invited produces no notifications"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_confirmed -> assigned_not_invited produces no notifications"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "gave_up -> assigned_not_invited produces no notifications"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-4"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_not_invited -> assigned_confirmed fires speaker_confirmed"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_invited -> assigned_confirmed fires speaker_confirmed"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "gave_up -> assigned_confirmed fires speaker_confirmed"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "not_assigned -> assigned_confirmed fires speaker_confirmed"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: ["EC-059-2"]
+        status: passing
+
+      - name: "assigned_confirmed -> gave_up fires speaker_withdrew"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_not_invited -> gave_up fires speaker_withdrew"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_invited -> gave_up fires speaker_withdrew"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "not_assigned -> gave_up fires speaker_withdrew"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_not_invited -> not_assigned fires cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-7"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_invited -> not_assigned fires cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-7"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assigned_confirmed -> not_assigned fires cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-7"]
+        covers_ecs: []
+        status: passing
+
+      - name: "gave_up -> not_assigned fires cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-7"]
+        covers_ecs: []
+        status: passing
+
+      - name: "assign -> unassign -> reassign: two designation notifications and one cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-1", "AC-059-7"]
+        covers_ecs: ["EC-059-1"]
+        status: passing
+
+      - name: "INSERT with assigned_confirmed fires speaker_confirmed but NOT designation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: ["EC-059-2"]
+        status: passing
+
+      - name: "not_assigned -> assigned_confirmed fires speaker_confirmed, not designation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5"]
+        covers_ecs: ["EC-059-2"]
+        status: passing
+
+      - name: "INSERT with assigned_not_invited fires designation via TG_OP branch"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-1"]
+        covers_ecs: ["EC-059-3"]
+        status: passing
+
+      - name: "INSERT with not_assigned fires no notifications"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-059-3"]
+        status: passing
+
+      - name: "INSERT with gave_up fires speaker_withdrew"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-6"]
+        covers_ecs: ["EC-059-3"]
+        status: passing
+
+      - name: "UPDATE same-status produces no notifications (parameterized x5)"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: "exhaustive guard: only not_assigned triggers designation (parameterized x3 + positive)"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-2", "AC-059-3", "AC-059-4"]
+        covers_ecs: []
+        status: passing
+
+      - name: "Case 4 & 5 self-transition guards (x2)"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-5", "AC-059-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "INSERT with not_assigned does NOT fire cancellation"
+        file: src/__tests__/f059-designation-notification-guard.test.ts
+        type: unit
+        covers_acs: ["AC-059-7"]
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -2409,8 +2626,12 @@ gaps:
     reason: "Home tab and NextSundaysSection React Native rendering cannot be tested in vitest node environment."
     recommendation: "Verified by logic tests and code review. Conditional rendering patterns confirmed."
 
+  # F059 gaps
+  # All F059 ACs (01-07) covered. All edge cases (EC-059-01 to EC-059-03) covered. No gaps.
+  # Behavioral simulation tests mirror SQL trigger logic 1:1.
+
 stats:
-  total_tests: 1055
-  passing: 1055
+  total_tests: 1090
+  passing: 1090
   failing: 0
   skipped: 0

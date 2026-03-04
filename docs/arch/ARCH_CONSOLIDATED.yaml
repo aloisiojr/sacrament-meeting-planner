@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-04 (Phase 8: CR-266, CR-267, CR-268)
+# Last updated: 2026-03-04 (CR-269: Designation notification guard)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
   total_modules: 13
-  total_adrs: 24
+  total_adrs: 25
 
 # =============================================================================
 # TECH STACK
@@ -381,7 +381,7 @@ modules:
       notifications on speech status changes. Edge Function processes queue
       on cron. Token registered on login (non-observers). Notification tap
       navigates to Home.
-    features: [F034]
+    features: [F034, F059]
     components:
       - path: src/hooks/useNotifications.ts
         responsibility: Push token registration, notification tap handler
@@ -655,7 +655,7 @@ database_schema:
       description: Auto-updates updated_at timestamp on row update (applied to 7 tables)
     - name: enqueue_speech_notification()
       type: trigger function (SECURITY DEFINER)
-      description: Enqueues push notifications on speech status changes
+      description: Enqueues push notifications on speech status changes (designation only on initial assignment)
     - name: import_members(ward_uuid, members_json)
       type: RPC
       description: Bulk import members from CSV data
@@ -981,3 +981,15 @@ adrs:
       Conference collections naturally sort newest-first when sorted by name
       descending (names contain year/period). Toggle operations don't affect
       sort order since the select runs on every cache read.
+
+  - id: ADR-025
+    title: "Strict OLD.status guard for designation notification trigger"
+    decision: |
+      Use OLD.status = 'not_assigned' (strict equality) for the Case 1
+      designation notification guard, rather than OLD.status != 'assigned_not_invited'
+      (negative guard) used by Cases 4 and 5.
+    rationale: |
+      Positive equality matches the exact business intent: only fire on initial
+      assignment (not_assigned -> assigned_not_invited). A negative guard would
+      still allow spurious notifications from manual status reverts. The
+      TG_OP = 'INSERT' OR clause is preserved for consistency and defense-in-depth.

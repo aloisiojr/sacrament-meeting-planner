@@ -1,0 +1,245 @@
+# =============================================================================
+# ARCH_M009.yaml
+# Architecture: Designation Notification Initial Assignment Guard (CR-269)
+# Status: complete
+# Created: 2026-03-04
+# =============================================================================
+
+type: architecture
+status: complete
+artifact_id: "009"
+features: [F059]
+change_requests: [CR-269]
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # C009-01: Fix designation notification trigger guard
+  # ---------------------------------------------------------------------------
+  - id: C009-01
+    name: Designation Notification Trigger Guard
+    feature: F059
+    cr: 269
+    type: migration
+    file: supabase/migrations/028_fix_designation_notification_guard.sql
+    function: enqueue_speech_notification
+    description: |
+      New SQL migration that redefines the enqueue_speech_notification()
+      trigger function with an OLD.status guard on Case 1 (designation).
+
+      Current code in migration 013 (line 23):
+        IF NEW.status = 'assigned_not_invited' THEN
+
+      Fixed code:
+        IF NEW.status = 'assigned_not_invited'
+          AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN
+
+      This ensures designation notifications only fire on:
+        1. INSERT with status = assigned_not_invited (safety net, unlikely in practice)
+        2. UPDATE from not_assigned to assigned_not_invited (initial speaker assignment)
+
+      Manual status reverts (assigned_invited -> assigned_not_invited,
+      assigned_confirmed -> assigned_not_invited, gave_up -> assigned_not_invited)
+      will NOT enqueue a designation notification.
+
+      The guard pattern is consistent with Cases 4 and 5 which already use:
+        IF NEW.status = 'X' AND (TG_OP = 'INSERT' OR OLD.status != 'X') THEN
+
+      Case 1 uses a stricter variant (OLD.status = 'not_assigned' instead of
+      OLD.status != 'assigned_not_invited') because the intent is to fire ONLY
+      on the initial assignment transition, not just to prevent duplicate fires
+      on the same status.
+
+      Cases 2-5, the early-exit guard, and the cancellation case remain unchanged.
+      Uses CREATE OR REPLACE FUNCTION (no trigger re-creation needed).
+      SECURITY DEFINER is preserved.
+
+    input:
+      - name: NEW
+        type: "speeches row (new values)"
+        description: "New row values from the triggering INSERT/UPDATE"
+      - name: OLD
+        type: "speeches row (old values)"
+        description: "Previous row values (NULL for INSERT, populated for UPDATE)"
+      - name: TG_OP
+        type: "text"
+        description: "Trigger operation: 'INSERT' or 'UPDATE'"
+
+    output:
+      - name: RETURN NEW
+        type: "speeches row"
+        description: "Returns NEW to allow the triggering operation to proceed"
+      - name: side_effect
+        type: "INSERT into notification_queue"
+        description: "Enqueues a designation notification only when transitioning from not_assigned to assigned_not_invited"
+
+    logic: |
+      CREATE OR REPLACE FUNCTION enqueue_speech_notification()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Early exit: no status change on UPDATE
+        IF TG_OP = 'UPDATE' AND OLD.status = NEW.status THEN
+          RETURN NEW;
+        END IF;
+
+        -- Case 1: Designation (delayed, grouped) - FIXED with OLD.status guard
+        IF NEW.status = 'assigned_not_invited'
+          AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN
+          INSERT INTO notification_queue (
+            ward_id, type, sunday_date, speech_position, speaker_name,
+            target_role, status, send_after
+          ) VALUES (
+            NEW.ward_id, 'designation', NEW.sunday_date, NEW.position,
+            NEW.speaker_name, 'secretary', 'pending',
+            now() + INTERVAL '5 minutes'
+          );
+        END IF;
+
+        -- Case 4: Speaker confirmed (immediate) - unchanged
+        IF NEW.status = 'assigned_confirmed'
+          AND (TG_OP = 'INSERT' OR OLD.status != 'assigned_confirmed') THEN
+          INSERT INTO notification_queue (...) VALUES (...);
+        END IF;
+
+        -- Case 5: Speaker gave up (immediate) - unchanged
+        IF NEW.status = 'gave_up'
+          AND (TG_OP = 'INSERT' OR OLD.status != 'gave_up') THEN
+          INSERT INTO notification_queue (...) VALUES (...);
+        END IF;
+
+        -- Cancellation: cancel pending designation on unassign - unchanged
+        IF NEW.status = 'not_assigned' AND TG_OP = 'UPDATE'
+          AND OLD.status != 'not_assigned' THEN
+          UPDATE notification_queue SET status = 'cancelled' WHERE ...;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+    acceptance_criteria: [AC-059-1, AC-059-2, AC-059-3, AC-059-4, AC-059-5, AC-059-6, AC-059-7]
+    edge_cases: [EC-059-1, EC-059-2, EC-059-3]
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+integrations:
+
+  - id: INT-009-01
+    name: "enqueue_speech_notification() -> speech_notification_trigger"
+    from: C009-01
+    to: "speeches table trigger (speech_notification_trigger)"
+    description: |
+      The trigger speech_notification_trigger was created in migration
+      003_notification_triggers.sql and fires AFTER INSERT OR UPDATE on
+      the speeches table, calling enqueue_speech_notification(). Migration
+      028 uses CREATE OR REPLACE FUNCTION to redefine the function body
+      without touching the trigger definition. The trigger continues to
+      fire on all INSERT/UPDATE operations; the guard logic inside the
+      function decides whether to enqueue a notification.
+
+  - id: INT-009-02
+    name: "enqueue_speech_notification() -> notification_queue table"
+    from: C009-01
+    to: "notification_queue table"
+    description: |
+      The trigger function inserts rows into notification_queue when
+      conditions are met. SECURITY DEFINER (preserved from migration 013)
+      allows the function to bypass RLS on notification_queue, which has
+      no user-facing policies (service-only access). The guard change only
+      affects WHEN a designation row is inserted, not the row structure
+      or the table schema.
+
+  - id: INT-009-03
+    name: "notification_queue -> process-notifications Edge Function"
+    from: "notification_queue table"
+    to: "supabase/functions/process-notifications/"
+    description: |
+      The process-notifications Edge Function runs on cron (every 5 minutes)
+      and processes pending rows in notification_queue. No changes to this
+      function are needed. It will simply see fewer designation rows because
+      the trigger guard prevents spurious enqueues. The function's logic for
+      grouping designation notifications by ward+sunday_date and building
+      push notification text is unaffected.
+
+# =============================================================================
+# MODULE UPDATES
+# =============================================================================
+
+module_updates:
+
+  - module_id: M012
+    module_name: Push Notifications
+    action: update
+    reason: "F059 fixes the enqueue_speech_notification trigger guard for designation notifications"
+    features_after: [F034, F059]
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-025
+    title: "Strict OLD.status guard for designation notification trigger"
+    decision: |
+      Use OLD.status = 'not_assigned' (strict equality) for the Case 1
+      designation notification guard, rather than OLD.status != 'assigned_not_invited'
+      (negative guard) used by Cases 4 and 5.
+    context: |
+      Cases 4 (speaker_confirmed) and 5 (gave_up) use negative guards
+      (OLD.status != 'X') to prevent duplicate notifications when the
+      trigger fires on an update that doesn't change the status (which is
+      already handled by the early-exit guard, but provides defense-in-depth).
+      Case 1 (designation) has a different requirement: the notification
+      should ONLY fire on initial assignment (not_assigned -> assigned_not_invited),
+      not on any other transition to assigned_not_invited.
+    rationale: |
+      - Positive equality (OLD.status = 'not_assigned') is more restrictive
+        and matches the exact business intent: only fire on initial assignment.
+      - A negative guard (OLD.status != 'assigned_not_invited') would still
+        allow spurious notifications from assigned_invited, assigned_confirmed,
+        and gave_up transitions, which is the bug being fixed.
+      - The TG_OP = 'INSERT' OR clause is preserved for consistency with
+        Cases 4/5 and provides defense-in-depth for hypothetical INSERT paths
+        that set status = assigned_not_invited directly.
+    alternatives_considered:
+      - "Negative guard (OLD.status != 'assigned_not_invited'): Would prevent self-transition but still fire on reverts from other statuses - does not fix the bug."
+      - "Check only TG_OP = 'INSERT': Would miss the primary use case (UPDATE from not_assigned to assigned_not_invited via useAssignSpeaker)."
+      - "Client-side fix (skip status update in StatusChangeModal): Would only fix the UI path, not protect against direct DB updates or future code paths."
+    applies_to: [C009-01]
+
+# =============================================================================
+# CONSOLIDATED UPDATES
+# =============================================================================
+
+consolidated_updates:
+  arch_consolidated:
+    modules_to_update: [M012]
+    adrs_to_add: [ADR-025]
+    server_functions_to_update:
+      - name: enqueue_speech_notification()
+        field: description
+        old_value: "Enqueues push notifications on speech status changes"
+        new_value: "Enqueues push notifications on speech status changes (designation only on initial assignment)"
+    metadata:
+      total_modules: 13  # unchanged
+      total_adrs: 25     # was 24 + ADR-025
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_spec: true
+  GATE-02_read_consolidated: true
+  GATE-03_components_single_responsibility: true
+  GATE-04_contracts_defined: true
+  GATE-05_integrations_mapped: true
+  GATE-06_adrs_documented: true
+  GATE-07_status_complete: true

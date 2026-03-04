@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-04"
-  version: 9
+  version: 10
 
 validations:
 
@@ -1713,3 +1713,127 @@ validations:
         description: "Offline prefetch already covers speeches for next 3 Sundays (no change needed)"
         result: PASS
         evidence: "src/hooks/useOfflinePrefetch.ts lines 91-106: prefetchQuery for speechKeys.byDateRange(wardId, first, last) unchanged. Prefetches speeches for next 3 Sundays. No changes needed to the prefetch logic."
+
+  # ===========================================================================
+  # Phase 9: Designation Notification Guard (QA_PLAN_009)
+  # ===========================================================================
+
+  - id: QA_009
+    plan: QA_PLAN_009
+    date: "2026-03-04"
+    scope: "Phase 9 - CR-269 bugfix: Suppress spurious designation notification on manual status revert to assigned_not_invited"
+    verdict: passed
+    must_pass: 10/10
+    should_pass: 4/5
+    total_checks: 14/15
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1090 tests, 35 new F059)"
+
+    checks:
+
+      # --- CR-269: Designation notification guard ---
+
+      - id: CR269_MP1
+        cr: CR-269
+        type: must_pass
+        description: "DB trigger only enqueues 'designation' notification when OLD.status = 'not_assigned' (or INSERT)"
+        result: PASS
+        evidence: "supabase/migrations/028_fix_designation_notification_guard.sql lines 32-33: IF NEW.status = 'assigned_not_invited' AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') THEN"
+
+      - id: CR269_MP2
+        cr: CR-269
+        type: must_pass
+        description: "Status change from assigned_invited to assigned_not_invited does NOT enqueue notification"
+        result: PASS
+        evidence: "Guard OLD.status = 'not_assigned' excludes assigned_invited. Test f059 AC-059-2: 'assigned_invited -> assigned_not_invited produces no notifications' passes."
+
+      - id: CR269_MP3
+        cr: CR-269
+        type: must_pass
+        description: "Status change from assigned_confirmed to assigned_not_invited does NOT enqueue notification"
+        result: PASS
+        evidence: "Guard OLD.status = 'not_assigned' excludes assigned_confirmed. Test f059 AC-059-3: 'assigned_confirmed -> assigned_not_invited produces no notifications' passes."
+
+      - id: CR269_MP4
+        cr: CR-269
+        type: must_pass
+        description: "Status change from gave_up to assigned_not_invited does NOT enqueue notification"
+        result: PASS
+        evidence: "Guard OLD.status = 'not_assigned' excludes gave_up. Test f059 AC-059-4: 'gave_up -> assigned_not_invited produces no notifications' passes."
+
+      - id: CR269_MP5
+        cr: CR-269
+        type: must_pass
+        description: "Initial speaker assignment (not_assigned -> assigned_not_invited) STILL enqueues notification"
+        result: PASS
+        evidence: "Guard allows OLD.status = 'not_assigned'. Test f059 AC-059-1: 'not_assigned -> assigned_not_invited enqueues designation' passes."
+
+      - id: CR269_MP6
+        cr: CR-269
+        type: must_pass
+        description: "INSERT on speeches table with status assigned_not_invited STILL enqueues notification"
+        result: PASS
+        evidence: "Guard allows TG_OP = 'INSERT'. Test f059 EC-059-3: 'INSERT with assigned_not_invited fires designation via TG_OP branch' passes."
+
+      - id: CR269_MP7
+        cr: CR-269
+        type: must_pass
+        description: "No changes to Case 4 (speaker_confirmed) notification logic"
+        result: PASS
+        evidence: "diff of Case 4 block between migration 013 and 028 is empty (identical). Lines 49-64 in 028 match lines 38-53 in 013. Tests AC-059-5 verify all transitions to assigned_confirmed still fire."
+
+      - id: CR269_MP8
+        cr: CR-269
+        type: must_pass
+        description: "No changes to Case 5 (speaker_withdrew/gave_up) notification logic"
+        result: PASS
+        evidence: "diff of Case 5 block between migration 013 and 028 is empty (identical). Lines 66-81 in 028 match lines 55-70 in 013. Tests AC-059-6 verify all transitions to gave_up still fire."
+
+      - id: CR269_MP9
+        cr: CR-269
+        type: must_pass
+        description: "No changes to cancellation logic (not_assigned cancels pending designations)"
+        result: PASS
+        evidence: "diff of Cancellation block between migration 013 and 028 is empty (identical). Lines 83-92 in 028 match lines 72-81 in 013. Tests AC-059-7 verify all transitions to not_assigned fire cancellation."
+
+      - id: CR269_MP10
+        cr: CR-269
+        type: must_pass
+        description: "No client-side code changes required (fix is purely in DB trigger)"
+        result: PASS
+        evidence: "git diff 034399c..HEAD shows no changes to useSpeeches.ts, StatusChangeModal.tsx, InviteActionDropdown.tsx, SpeechSlot.tsx, or process-notifications/index.ts. Only 3 files changed: migration 028, test f059, CODE_LEDGER.yaml."
+
+      - id: CR269_SP1
+        cr: CR-269
+        type: should_pass
+        description: "New migration file follows naming convention (incremental number)"
+        result: PASS
+        evidence: "File is supabase/migrations/028_fix_designation_notification_guard.sql. Previous was 027_speech_count_index.sql. Sequential numbering correct."
+
+      - id: CR269_SP2
+        cr: CR-269
+        type: should_pass
+        description: "Migration uses CREATE OR REPLACE FUNCTION with SECURITY DEFINER"
+        result: PASS
+        evidence: "Migration 028 line 20: 'CREATE OR REPLACE FUNCTION enqueue_speech_notification()' and line 96: '$$ LANGUAGE plpgsql SECURITY DEFINER;' -- matches migration 013 pattern."
+
+      - id: CR269_SP3
+        cr: CR-269
+        type: should_pass
+        description: "Existing tests still pass (no regressions)"
+        result: PASS
+        evidence: "npx vitest run: 52 test files, 1090 tests passed, 0 failed. Includes 35 new F059 tests."
+
+      - id: CR269_SP4
+        cr: CR-269
+        type: should_pass
+        description: "process-notifications edge function does NOT need changes"
+        result: PASS
+        evidence: "git diff 034399c..HEAD -- supabase/functions/process-notifications/index.ts shows no changes. File is unchanged."
+
+      - id: CR269_SP5
+        cr: CR-269
+        type: should_pass
+        description: "CHANGE_REQUESTS.yaml updated with CR-269 entry"
+        result: FAIL
+        evidence: "grep 'CR-269' docs/CHANGE_REQUESTS.yaml returns no matches. CR-269 is NOT listed in CHANGE_REQUESTS.yaml."

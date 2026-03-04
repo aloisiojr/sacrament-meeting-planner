@@ -78,24 +78,18 @@ export default function RegisterScreen() {
         },
       });
 
-      if (response.error) {
-        throw response.error;
-      }
-
       const data = response.data;
 
-      if (data?.error === 'email_exists') {
-        setError(t('auth.emailExists'));
-        return;
-      }
-
-      if (data?.error === 'stake_ward_exists') {
-        setError(t('auth.stakeWardExists'));
-        return;
-      }
-
-      if (data?.error) {
-        setError(data.error);
+      if (response.error) {
+        if (data?.error === 'email_exists') {
+          setError(t('auth.emailExists'));
+          return;
+        }
+        if (data?.error === 'stake_ward_exists') {
+          setError(t('auth.stakeWardExists'));
+          return;
+        }
+        setError(t('auth.registrationFailed'));
         return;
       }
 
@@ -114,7 +108,7 @@ export default function RegisterScreen() {
       if (message.includes('Failed to fetch') || message.includes('Network')) {
         setError(t('auth.requiresConnection'));
       } else {
-        setError(message);
+        setError(t('auth.registrationFailed'));
       }
     } finally {
       setLoading(false);

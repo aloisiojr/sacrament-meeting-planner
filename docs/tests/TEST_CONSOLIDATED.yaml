@@ -4,15 +4,15 @@
 # =============================================================================
 
 type: test_consolidated
-version: 5
-last_updated: "2026-03-03"
+version: 6
+last_updated: "2026-03-04"
 
 summary:
-  total_test_files: 35
-  total_tests: 794
+  total_test_files: 47
+  total_tests: 943
   framework: vitest
   categories:
-    module_named: 29
+    module_named: 41
     integration: 6
   infrastructure:
     setup: 1
@@ -309,6 +309,153 @@ module_tests:
       - speechCountKeys.byWard(wardId) = ['speechCounts', wardId]
       - Different wardIds produce different keys
       - Keys are readonly tuples with correct lengths
+
+  # --- F047-F052 Offline Mode Tests (Coder + Tester) ---
+
+  - file: src/__tests__/f047-cache-persistence.test.ts
+    tests: 9
+    module: src/app/_layout.tsx
+    covers:
+      - SEVEN_DAYS_MS constant value (604800000ms)
+      - AsyncStoragePersister key is @query_cache
+      - PersistQueryClientProvider exported from package
+      - QueryClient gcTime is 7 days
+      - Version buster fallback to 1.0.0
+      - offlineFirst networkMode configuration
+      - Retry disabled when offline
+
+  - file: src/__tests__/f047-cache-persistence-behavior.test.ts
+    tests: 17
+    module: src/app/_layout.tsx
+    covers:
+      - AC-047-01: Persister creates with correct key and methods
+      - AC-047-02: Persister restores cached data / returns undefined on first launch
+      - AC-047-03: 7-day expiration math; expired cache discarded
+      - AC-047-04: Version buster mismatch invalidates cache
+      - AC-047-05: PersistQueryClientProvider exported
+      - EC-047-01: Storage getItem errors handled gracefully; corrupted JSON handled
+      - EC-047-02: AsyncStorage write atomicity
+      - EC-047-03: Empty storage returns no cache
+      - gcTime >= maxAge to prevent premature GC
+
+  - file: src/__tests__/f048-online-status-context.test.ts
+    tests: 3
+    module: src/contexts/OnlineStatusContext.tsx
+    covers:
+      - Exports OnlineStatusProvider as function
+      - Exports useOnlineStatus as function
+      - Provider accepts isOnline and children props
+
+  - file: src/__tests__/f048-online-status-behavior.test.ts
+    tests: 7
+    module: src/contexts/OnlineStatusContext.tsx
+    covers:
+      - useOnlineStatus returns true when no provider (default)
+      - Returns true/false matching provider isOnline prop
+      - Re-renders on isOnline true->false and false->true transitions
+      - Same value update does not change result
+      - Return type is boolean
+
+  - file: src/__tests__/f048-offline-prefetch.test.ts
+    tests: 9
+    module: src/hooks/useOfflinePrefetch.ts
+    covers:
+      - getNext3Sundays returns 3 dates, valid ISO, consecutive Sundays
+      - First date matches getTodaySundayDate
+      - Query key compatibility (agendaKeys, speechKeys, sundayTypeKeys)
+      - useOfflinePrefetch exported
+
+  - file: src/__tests__/f048-prefetch-integration.test.ts
+    tests: 12
+    module: src/hooks/useOfflinePrefetch.ts
+    covers:
+      - AC-048-01: prefetchQuery called for agenda on mount
+      - AC-048-02: prefetchQuery called for speeches, exceptions, agenda range
+      - AC-048-03: Exactly 4 prefetch queries on mount
+      - AC-048-04: TanStack handles staleTime for no-redundant fetches
+      - EC-048-01: Each prefetch call independent (4 unique query keys)
+      - EC-048-02: No prefetch when wardId is null
+      - Offline-to-online transition triggers prefetch
+      - No prefetch when offline
+
+  - file: src/__tests__/offline-utils.test.ts
+    tests: 17
+    module: src/lib/offlineUtils.ts
+    covers:
+      - offlineQueue (enqueue/dequeue/readQueue/clearQueue/getQueueSize/peek/capacity)
+      - offlineGuard (suppresses mutation when offline, allows when online)
+      - Queue ordering (FIFO)
+
+  - file: src/__tests__/f049-home-offline.test.ts
+    tests: 13
+    module: src/app/(tabs)/index.tsx
+    covers:
+      - AC-049-01: Start Meeting button not gated by isOnline
+      - AC-049-02: Pencil button hidden offline; agenda card always visible
+      - AC-049-03: NextSundaysSection hidden offline
+      - AC-049-04: NextAssignmentsSection hidden offline
+      - AC-049-05: InviteManagementSection hidden offline
+      - EC-049-01: Sections hide on online->offline transition
+      - EC-049-02: Start Meeting visible with no cached data offline
+
+  - file: src/__tests__/f050-sunday-card-chevron.test.ts
+    tests: 4
+    module: src/components/SundayCard.tsx
+    covers:
+      - showChevron optional boolean prop accepted
+      - Defaults to true when not provided
+      - showChevron=false disables header tap
+      - Existing behavior unchanged without prop
+
+  - file: src/__tests__/f050-agenda-offline.test.ts
+    tests: 20
+    module: src/app/(tabs)/agenda.tsx
+    covers:
+      - AC-050-01: Non-next-Sunday not expandable offline
+      - AC-050-02: Next Sunday expandable offline
+      - AC-050-03: AgendaForm disabled offline; SundayTypeDropdown disabled
+      - AC-050-04: Play button works offline
+      - AC-050-05: Non-expandable cards hide chevron offline
+      - EC-050-01: Next Sunday stays expanded when going offline
+      - EC-050-02: Non-next card auto-collapses when going offline
+      - Excluded dates not expandable even online
+      - handleToggle guards lazyCreate.mutate with isOnline
+
+  - file: src/__tests__/f050-f051-disabled-props.test.ts
+    tests: 11
+    module: src/components/AgendaForm.tsx, src/components/SpeechSlot.tsx
+    covers:
+      - AgendaForm disabled prop accepted, defaults false, makes fields read-only
+      - SpeechSlot disabled suppresses canAssign/canUnassign/canChangeStatus
+      - SpeechSlot disabled makes isObserver true, suppresses isBispado
+      - disabled=false preserves normal behavior
+
+  - file: src/__tests__/f051-speeches-offline.test.ts
+    tests: 21
+    module: src/app/(tabs)/speeches.tsx
+    covers:
+      - AC-051-01: Cards outside next 3 not expandable offline
+      - AC-051-02: All 3 next Sundays expandable offline
+      - AC-051-03: SpeechSlot disabled when offline
+      - AC-051-04: Collapsed card data visible from cache
+      - AC-051-05: Cards outside next 3 hide chevron offline
+      - EC-051-01: Auto-collapse card outside next 3 when going offline
+      - EC-051-02: Stale cached data displayed
+      - SundayTypeDropdown disabled offline
+      - onToggle undefined for non-expandable cards
+      - handleToggle guards lazyCreate.mutate with isOnline
+      - offlineExpandableDates is Set of 3 Sundays
+
+  - file: src/__tests__/f052-settings-offline.test.ts
+    tests: 16
+    module: src/app/(tabs)/settings/index.tsx
+    covers:
+      - AC-052-01: Users item hidden offline (even with permission)
+      - AC-052-02: App language, theme, about, history not gated by isOnline
+      - AC-052-03: Users reappears when online; transitions both directions
+      - EC-052-01: Deep link prevented - item not rendered offline
+      - Permission-only behavior preserved for observers
+      - Ward settings items not gated by isOnline
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -1901,8 +2048,29 @@ gaps:
     reason: "FK constraint (invitations.ward_id -> wards.id) prevents deleted-ward scenario. Existing error handling."
     recommendation: "No test needed. Database constraint handles this case."
 
+  # F047 gaps
+  # All F047 ACs (01-05) covered. All edge cases (EC-047-01 to EC-047-03) covered.
+
+  # F048 gaps
+  # All F048 ACs (01-04) covered. All edge cases (EC-048-01 to EC-048-02) covered.
+
+  # F049 gaps
+  # All F049 ACs (01-05) covered. All edge cases (EC-049-01 to EC-049-02) covered.
+  - id: AC-049-UI
+    reason: "Home tab React Native rendering cannot be tested in vitest node environment."
+    recommendation: "Verified by logic tests and code review. Conditional rendering patterns {isOnline && <Section />} confirmed."
+
+  # F050 gaps
+  # All F050 ACs (01-05) covered. All edge cases (EC-050-01 to EC-050-02) covered.
+
+  # F051 gaps
+  # All F051 ACs (01-05) covered. All edge cases (EC-051-01 to EC-051-02) covered.
+
+  # F052 gaps
+  # All F052 ACs (01-03) covered. Edge case EC-052-01 covered.
+
 stats:
-  total_tests: 794
-  passing: 794
+  total_tests: 943
+  passing: 943
   failing: 0
   skipped: 0

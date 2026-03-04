@@ -242,7 +242,7 @@ function HomeTabContent() {
             </View>
           </View>
         </View>
-        {isOnline && <NextSundaysSection />}
+        <NextSundaysSection />
         {isOnline && <NextAssignmentsSection />}
         {isOnline && <InviteManagementSection />}
       </ScrollView>

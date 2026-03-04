@@ -57,17 +57,17 @@ describe('F049: Home Tab Offline UI Logic', () => {
     });
   });
 
-  describe('AC-049-03: NextSundaysSection hidden offline', () => {
-    it('NextSundaysSection not rendered when isOnline=false', () => {
+  describe('AC-049-03: NextSundaysSection visible offline (updated by F058/CR-268)', () => {
+    it('NextSundaysSection rendered when isOnline=false (always visible)', () => {
       const isOnline = false;
-      // Pattern: {isOnline && <NextSundaysSection />}
-      const sectionRendered = isOnline;
-      expect(sectionRendered).toBe(false);
+      // Pattern updated by CR-268: <NextSundaysSection /> (no isOnline guard)
+      const sectionRendered = true; // always rendered
+      expect(sectionRendered).toBe(true);
     });
 
     it('NextSundaysSection rendered when isOnline=true', () => {
       const isOnline = true;
-      const sectionRendered = isOnline;
+      const sectionRendered = true; // always rendered
       expect(sectionRendered).toBe(true);
     });
   });
@@ -103,12 +103,12 @@ describe('F049: Home Tab Offline UI Logic', () => {
   });
 
   describe('EC-049-01: Device goes offline while on Home tab', () => {
-    it('sections hide immediately when isOnline transitions true->false', () => {
+    it('NextAssignments and InviteManagement hide when isOnline transitions true->false; NextSundays stays visible', () => {
       let isOnline = true;
 
       // Online: all sections visible
       expect(isOnline).toBe(true);
-      let nextSundaysRendered = isOnline;
+      let nextSundaysRendered = true; // always visible (CR-268)
       let nextAssignmentsRendered = isOnline;
       let inviteRendered = isOnline;
       expect(nextSundaysRendered).toBe(true);
@@ -117,10 +117,10 @@ describe('F049: Home Tab Offline UI Logic', () => {
 
       // Goes offline: re-render with isOnline=false
       isOnline = false;
-      nextSundaysRendered = isOnline;
+      nextSundaysRendered = true; // still visible (CR-268)
       nextAssignmentsRendered = isOnline;
       inviteRendered = isOnline;
-      expect(nextSundaysRendered).toBe(false);
+      expect(nextSundaysRendered).toBe(true);
       expect(nextAssignmentsRendered).toBe(false);
       expect(inviteRendered).toBe(false);
     });

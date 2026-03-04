@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-03"
-  version: 7
-  last_updated_by: "phase-005"
+  last_updated: "2026-03-04"
+  version: 8
+  last_updated_by: "phase-006"
 
 reviews:
   - id: REV-001
@@ -1678,3 +1678,320 @@ reviews:
       tests_total: 794
       tests_passing: 794
       test_files: 35
+
+  # ===========================================================================
+  # REV-006: Phase 6 - CR-262 Optimized Offline Mode (F047-F052)
+  # ===========================================================================
+
+  - id: REV-006
+    scope: "CR-262 - Optimized Offline Mode (F047-F052)"
+    date: "2026-03-04"
+    reviewer: reviewer-agent
+    iteration: 1
+    commits:
+      - hash: b13281a
+        message: "feat(offline): add PersistQueryClientProvider for cache persistence (CR-262)"
+      - hash: 12630b9
+        message: "feat(offline): add OnlineStatusContext and wire into SyncProvider (CR-262)"
+      - hash: 46c46d4
+        message: "feat(offline): add showChevron prop to SundayCard (CR-262)"
+      - hash: cfd1534
+        message: "feat(offline): add disabled prop to AgendaForm and SpeechSlot (CR-262)"
+      - hash: 3d5f302
+        message: "feat(offline): add useOfflinePrefetch hook for proactive cache warming (CR-262)"
+      - hash: 2703f51
+        message: "feat(offline): wire useOfflinePrefetch into SyncProvider (CR-262)"
+      - hash: 1fb7f2e
+        message: "feat(offline): adapt Home tab UI for offline mode (CR-262)"
+      - hash: f93a8de
+        message: "feat(offline): adapt Agenda tab UI for offline mode (CR-262)"
+      - hash: 13589d8
+        message: "feat(offline): adapt Speeches tab UI for offline mode (CR-262)"
+      - hash: 344a195
+        message: "feat(offline): hide Users item in Settings when offline (CR-262)"
+    verdict: approved
+
+    summary: |
+      CR-262 Optimized Offline Mode is fully implemented across 10 commits following
+      the PLAN_P006 step sequence. All 6 features (F047-F052) correctly implemented:
+      cache persistence via PersistQueryClientProvider, OnlineStatusContext for offline
+      state distribution, proactive prefetch hook, and per-tab UI adaptation (Home,
+      Agenda, Speeches, Settings). No database changes, no Edge Functions, purely
+      client-side. 943 tests pass (47 test files), 12 new test files cover all ACs
+      and edge cases. No P0 or P1 issues found.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          SPEC_F006 covers all 6 features requested for offline mode: cache persistence
+          (F047), proactive prefetch (F048), Home tab offline (F049), Agenda tab offline
+          (F050), Speeches tab offline (F051), Settings tab offline (F052). All ACs are
+          faithful to the user's request for read-only offline mode with cached data.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M006 maps 11 components (C1-C11) to the 6 features. Architecture correctly
+          identifies: no new DB tables, no new migrations, no Edge Functions. Impact
+          assessment is "medium" (correct - modifies layout, sync, all 4 tabs, 2 components).
+          Design decisions (PersistQueryClientProvider, OnlineStatusContext, prefetchQuery)
+          are sound and consistent with existing patterns.
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P006 has 11 steps covering all 11 ARCH components. Dependency graph is
+          correct: infrastructure steps (STEP-01 to STEP-04) are parallelizable, STEP-06
+          depends on STEP-02 and STEP-05, tab UI steps (STEP-07 to STEP-10) depend on
+          STEP-06. STEP-11 is final verification. Validation matrix maps all 27 ACs and
+          12 edge cases to steps.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 11 plan steps implemented in 10 commits. STEP-02 and STEP-06 were partially
+          combined (OnlineStatusContext creation and SyncProvider wiring happened in 2
+          commits instead of exactly matching step boundaries). This is a minor deviation
+          that does not affect correctness. All files modified match PLAN expectations.
+          All done_when criteria are satisfied. All tests pass.
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-STEP VERIFICATION
+    # =========================================================================
+
+    step_reviews:
+
+      - step: STEP-01
+        title: "PersistQueryClientProvider + gcTime"
+        verdict: pass
+        verification:
+          - check: "npm packages installed"
+            status: pass
+            detail: "@tanstack/query-async-storage-persister and @tanstack/react-query-persist-client in package.json"
+          - check: "PersistQueryClientProvider replaces QueryClientProvider"
+            status: pass
+            detail: "Import from @tanstack/react-query-persist-client. QueryClientProvider removed from imports."
+          - check: "asyncStoragePersister created with correct config"
+            status: pass
+            detail: "key: '@query_cache', throttleTime: 1000"
+          - check: "gcTime set to 7 days"
+            status: pass
+            detail: "SEVEN_DAYS_MS = 1000 * 60 * 60 * 24 * 7 (604800000)"
+          - check: "persistOptions correct"
+            status: pass
+            detail: "persister, maxAge: SEVEN_DAYS_MS, buster: Constants.expoConfig?.version ?? '1.0.0'"
+
+      - step: STEP-02
+        title: "OnlineStatusContext"
+        verdict: pass
+        verification:
+          - check: "File exists at src/contexts/OnlineStatusContext.tsx"
+            status: pass
+          - check: "Exports OnlineStatusProvider and useOnlineStatus"
+            status: pass
+            detail: "OnlineStatusProvider accepts isOnline + children. useOnlineStatus returns boolean."
+          - check: "Default context value is { isOnline: true }"
+            status: pass
+
+      - step: STEP-03
+        title: "SundayCard showChevron prop"
+        verdict: pass
+        verification:
+          - check: "showChevron added to SundayCardProps"
+            status: pass
+            detail: "showChevron?: boolean with default true"
+          - check: "Chevron conditionally rendered"
+            status: pass
+            detail: "onPress={showChevron ? onToggle : undefined} on header Pressable"
+
+      - step: STEP-04
+        title: "AgendaForm + SpeechSlot disabled prop"
+        verdict: pass
+        verification:
+          - check: "AgendaForm disabled prop"
+            status: pass
+            detail: "disabled?: boolean defaults to false. isObserver = !hasPermission('agenda:write') || disabled"
+          - check: "AgendaForm propagates disabled to sub-components"
+            status: pass
+            detail: "DebouncedTextInput editable={!isObserver}, SelectorField disabled={isObserver}, Switch disabled={isObserver}"
+          - check: "SpeechSlot disabled prop"
+            status: pass
+            detail: "disabled?: boolean defaults to false. canAssign, canUnassign, canChangeStatus all AND with !disabled"
+
+      - step: STEP-05
+        title: "useOfflinePrefetch hook"
+        verdict: pass
+        verification:
+          - check: "getNext3Sundays utility"
+            status: pass
+            detail: "Returns 3 consecutive Sunday ISO dates starting from getTodaySundayDate()"
+          - check: "Prefetches 4 queries"
+            status: pass
+            detail: "agenda bySunday, agenda byDateRange, speeches byDateRange, exceptions"
+          - check: "Uses same query keys as tab hooks"
+            status: pass
+            detail: "Imports agendaKeys, speechKeys, sundayTypeKeys from respective hooks"
+          - check: "Offline->online transition tracking"
+            status: pass
+            detail: "useRef(prevOnlineRef) tracks previous state. Only prefetches on transition."
+          - check: "Each prefetchQuery independent"
+            status: pass
+            detail: "4 separate prefetchQuery calls, no chaining"
+
+      - step: STEP-06
+        title: "SyncProvider integration"
+        verdict: pass
+        verification:
+          - check: "OnlineStatusProvider wraps children"
+            status: pass
+            detail: "<OnlineStatusProvider isOnline={isOnline}> wraps OfflineBanner + children"
+          - check: "useOfflinePrefetch called"
+            status: pass
+            detail: "useOfflinePrefetch(isOnline) after useOfflineQueueProcessor"
+          - check: "Existing hooks unchanged"
+            status: pass
+            detail: "useConnection, useRealtimeSync, useOfflineQueueProcessor, useRegisterPushToken, useNotificationHandler all intact"
+
+      - step: STEP-07
+        title: "Home tab offline UI"
+        verdict: pass
+        verification:
+          - check: "useOnlineStatus imported and called"
+            status: pass
+          - check: "NextSundaysSection conditional"
+            status: pass
+            detail: "{isOnline && <NextSundaysSection />}"
+          - check: "NextAssignmentsSection conditional"
+            status: pass
+            detail: "{isOnline && <NextAssignmentsSection />}"
+          - check: "InviteManagementSection conditional"
+            status: pass
+            detail: "{isOnline && <InviteManagementSection />}"
+          - check: "Pencil button conditional"
+            status: pass
+            detail: "{isOnline && (<Pressable ... pencil ... />)}"
+          - check: "Start Meeting always visible"
+            status: pass
+            detail: "Not wrapped in isOnline conditional"
+
+      - step: STEP-08
+        title: "Agenda tab offline UI"
+        verdict: pass
+        verification:
+          - check: "Expandable logic includes online check"
+            status: pass
+            detail: "isExpandable = baseExpandable && (isOnline || date === nextSunday)"
+          - check: "Auto-collapse on offline"
+            status: pass
+            detail: "useEffect collapses if !isOnline && expandedDate !== nextSunday"
+          - check: "AgendaForm disabled when offline"
+            status: pass
+            detail: "disabled={isOffline} passed to AgendaForm"
+          - check: "SundayTypeDropdown disabled when offline"
+            status: pass
+            detail: "disabled={typeDisabled || isOffline}"
+          - check: "lazyCreate guarded by isOnline"
+            status: pass
+            detail: "if (isOnline) { lazyCreate.mutate(date) }"
+          - check: "Chevron uses expandable"
+            status: pass
+            detail: "{expandable && (isExpanded ? ChevronUp : ChevronDown)}"
+
+      - step: STEP-09
+        title: "Speeches tab offline UI"
+        verdict: pass
+        verification:
+          - check: "offlineExpandableDates computed"
+            status: pass
+            detail: "useMemo(() => new Set(getNext3Sundays()), [])"
+          - check: "isExpandable per card"
+            status: pass
+            detail: "isOnline || offlineExpandableDates.has(item.date)"
+          - check: "onToggle guarded"
+            status: pass
+            detail: "onToggle={isExpandable ? () => handleToggle(item.date) : undefined}"
+          - check: "showChevron guarded"
+            status: pass
+            detail: "showChevron={isExpandable}"
+          - check: "SpeechSlot disabled when offline"
+            status: pass
+            detail: "disabled={!isOnline} on all SpeechSlot instances"
+          - check: "typeDisabled includes isOnline"
+            status: pass
+            detail: "typeDisabled={!canWriteSundayType || !isOnline}"
+          - check: "Auto-collapse on offline"
+            status: pass
+            detail: "useEffect: !isOnline && !offlineExpandableDates.has(expandedDate) -> collapse"
+          - check: "lazyCreate guarded by isOnline"
+            status: pass
+            detail: "if (isOnline) { lazyCreate.mutate(...) }"
+
+      - step: STEP-10
+        title: "Settings tab offline UI"
+        verdict: pass
+        verification:
+          - check: "Users item conditional on isOnline"
+            status: pass
+            detail: "{hasPermission('settings:users') && isOnline && (<SettingsItem />)}"
+          - check: "Other settings not conditional on isOnline"
+            status: pass
+            detail: "Members, topics, whatsapp, language, timezone, manage_prayers, history, app language, theme, about - none gated by isOnline"
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Deploy app update (EAS Build)"
+        reason: "CR-262: Offline mode is purely client-side. No migrations, no Edge Functions."
+        urgency: low
+        notes: |
+          All changes are client-side (React Native). No database migrations.
+          No Edge Function changes. Ship whenever ready. New npm packages
+          (@tanstack/query-async-storage-persister, @tanstack/react-query-persist-client)
+          are bundled in the app binary.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M006.yaml"
+        - "docs/plans/PLAN_P006.yaml"
+        - "docs/qa/QA_PLAN_006.yaml"
+        - "docs/specs/SPEC_F006.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 12
+      total_commits: 10
+      tests_total: 943
+      tests_passing: 943
+      test_files: 47

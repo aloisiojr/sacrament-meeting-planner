@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-03"
-  version: 6
+  last_updated: "2026-03-04"
+  version: 7
 
 validations:
 
@@ -1180,3 +1180,204 @@ validations:
         description: "Speech count query invalidated when a speech assignment changes"
         result: PASS
         evidence: "src/lib/sync.ts line 49: speeches table maps to [speechKeys.all, speechCountKeys.all]. When realtime sync detects a speech change, both speech and speechCount queries are invalidated. Integration test at useSpeechCounts.integration.test.ts lines 243-271 confirms speechCountKeys.all is in TABLE_TO_QUERY_KEYS.speeches."
+
+  # ===========================================================================
+  # Phase 6: Optimized Offline Mode (QA_PLAN_006)
+  # ===========================================================================
+
+  - id: QA_006
+    plan: QA_PLAN_006
+    date: "2026-03-04"
+    scope: "Phase 6 - CR-262: Optimized Offline Mode (F047-F052)"
+    verdict: passed
+    must_pass: 15/15
+    should_pass: 5/7
+    total_checks: 20/22
+    reviewer_verdict: "APPROVED (0 issues P0/P1/P2)"
+    tester_verdict: "PASSED (943 tests, 111 new, 0 failures)"
+
+    checks:
+
+      # =========================================================================
+      # must_pass checks
+      # =========================================================================
+
+      # --- MP-001: Cache persistence ---
+      - id: MP-001
+        cr: CR-262
+        type: must_pass
+        description: "QueryClient has persistence configured with AsyncStorage"
+        result: PASS
+        evidence: "_layout.tsx lines 20-24: createAsyncStoragePersister({ storage: AsyncStorage, key: '@query_cache', throttleTime: 1000 }). Lines 129-136: PersistQueryClientProvider wraps the app with persistOptions: { persister: asyncStoragePersister, maxAge: SEVEN_DAYS_MS, buster: Constants.expoConfig?.version ?? '1.0.0' }."
+
+      # --- MP-002: Agenda data cached ---
+      - id: MP-002
+        cr: CR-262
+        type: must_pass
+        description: "Agenda data for next sunday is cached locally"
+        result: PASS
+        evidence: "useOfflinePrefetch.ts lines 61-73: queryClient.prefetchQuery with queryKey: agendaKeys.bySunday(wardId, first) where first is the next Sunday date. Combined with PersistQueryClientProvider, this data persists to AsyncStorage."
+
+      # --- MP-003: Speech data cached ---
+      - id: MP-003
+        cr: CR-262
+        type: must_pass
+        description: "Speech assignment data for next 3 sundays is cached locally"
+        result: PASS
+        evidence: "useOfflinePrefetch.ts lines 91-106: queryClient.prefetchQuery with queryKey: speechKeys.byDateRange(wardId, first, last) fetches all speeches for next 3 Sundays. Lines 76-89: agenda range also prefetched. Lines 108-122: exceptions also prefetched."
+
+      # --- MP-004: Home Start Meeting button ---
+      - id: MP-004
+        cr: CR-262
+        type: must_pass
+        description: "Home tab shows Start Meeting button when offline"
+        result: PASS
+        evidence: "index.tsx lines 133-146: Start Meeting button is rendered unconditionally - no isOnline check. Always visible regardless of online/offline status."
+
+      # --- MP-005: Presentation mode works offline ---
+      - id: MP-005
+        cr: CR-262
+        type: must_pass
+        description: "Presentation mode works with cached data when offline"
+        result: PASS
+        evidence: "presentation.tsx uses usePresentationData which calls useAgenda/useSpeeches/useSundayExceptions. TanStack Query networkMode: 'offlineFirst' (_layout.tsx line 53) serves cached data offline. Prefetch ensures data is warm."
+
+      # --- MP-006: Home agenda card read-only offline ---
+      - id: MP-006
+        cr: CR-262
+        type: must_pass
+        description: "Home agenda preview card is read-only when offline"
+        result: PASS
+        evidence: "index.tsx lines 232-241: Pencil button wrapped in {isOnline && (...)} guard. When offline, pencil is not rendered. Agenda preview card content (status lines) still shows from cached data."
+
+      # --- MP-007: NextSundaysSection hidden offline ---
+      - id: MP-007
+        cr: CR-262
+        type: must_pass
+        description: "NextSundaysSection, NextAssignmentsSection, InviteManagementSection hidden when offline"
+        result: PASS
+        evidence: "index.tsx line 245: {isOnline && <NextSundaysSection />}. Line 246: {isOnline && <NextAssignmentsSection />}. Line 247: {isOnline && <InviteManagementSection />}. All 3 sections hidden when offline."
+
+      # --- MP-008: InviteManagementSection hidden offline ---
+      - id: MP-008
+        cr: CR-262
+        type: must_pass
+        description: "InviteManagementSection hidden when offline"
+        result: PASS
+        evidence: "Hidden at Home tab level (index.tsx line 247). InviteManagementSection.tsx itself unchanged - gating done at parent level."
+
+      # --- MP-009: Agenda only next sunday expandable offline ---
+      - id: MP-009
+        cr: CR-262
+        type: must_pass
+        description: "Agenda tab: only next sunday expandable when offline"
+        result: PASS
+        evidence: "agenda.tsx line 242: const isExpandable = baseExpandable && (isOnline || date === nextSunday). When offline, only nextSunday is expandable. Lines 184-188: useEffect auto-collapses expanded non-next-Sunday card when going offline."
+
+      # --- MP-010: Agenda form fields disabled offline ---
+      - id: MP-010
+        cr: CR-262
+        type: must_pass
+        description: "Agenda tab: expanded form fields disabled when offline"
+        result: PASS
+        evidence: "agenda.tsx line 581: <AgendaForm sundayDate={date} ... disabled={isOffline} />. AgendaForm.tsx line 61: disabled prop received, line 68: isObserver = !hasPermission('agenda:write') || disabled. All form fields check isObserver (lines 163, 184, 202, 264, 285). SundayTypeDropdown also disabled: line 571: disabled={typeDisabled || isOffline}."
+
+      # --- MP-011: Speeches only next 3 expandable offline ---
+      - id: MP-011
+        cr: CR-262
+        type: must_pass
+        description: "Speeches tab: only next 3 sundays expandable when offline"
+        result: PASS
+        evidence: "speeches.tsx line 117: offlineExpandableDates = useMemo(() => new Set(getNext3Sundays()), []). Line 433: const isExpandable = isOnline || offlineExpandableDates.has(item.date). Lines 218-222: useEffect auto-collapses expanded card outside next 3 when going offline."
+
+      # --- MP-012: Speeches interactive elements disabled offline ---
+      - id: MP-012
+        cr: CR-262
+        type: must_pass
+        description: "Speeches tab: all interactive elements disabled when offline"
+        result: PASS
+        evidence: "speeches.tsx: All SpeechSlot instances pass disabled={!isOnline} (lines 467, 482, 503, 522, 537). SpeechSlot.tsx lines 99-103: disabled affects canAssign, canUnassign, canChangeStatus, isObserver. SundayTypeDropdown disabled: line 453: typeDisabled={!canWriteSundayType || !isOnline}."
+
+      # --- MP-013: isOnline propagation ---
+      - id: MP-013
+        cr: CR-262
+        type: must_pass
+        description: "isOnline state accessible to all affected components"
+        result: PASS
+        evidence: "OnlineStatusContext.tsx: Context created with useOnlineStatus() hook. SyncProvider.tsx lines 42-44: OnlineStatusProvider wraps children. Consumers: index.tsx line 36, agenda.tsx line 76, speeches.tsx line 100, settings/index.tsx line 52 - all use useOnlineStatus()."
+
+      # --- MP-014: All tests pass ---
+      - id: MP-014
+        cr: CR-262
+        type: must_pass
+        description: "All existing tests still pass"
+        result: PASS
+        evidence: "npx vitest run: 47 test files, 943 tests passed, 0 failures. Up from 794 tests (149 new tests total, 111 new for CR-262 per tester report)."
+
+      # --- MP-015: New tests for offline ---
+      - id: MP-015
+        cr: CR-262
+        type: must_pass
+        description: "New tests cover offline behavior"
+        result: PASS
+        evidence: "6 new test files: f047-cache-persistence.test.ts, f047-cache-persistence-behavior.test.ts, f048-offline-prefetch.test.ts, f049-home-offline.test.ts, f050-agenda-offline.test.ts, f051-speeches-offline.test.ts, f052-settings-offline.test.ts. 111 new tests covering: cache persistence config, offline prefetch logic, Home/Agenda/Speeches/Settings offline UI behavior."
+
+      # =========================================================================
+      # should_pass checks
+      # =========================================================================
+
+      # --- SP-001: Cache size bounded ---
+      - id: SP-001
+        cr: CR-262
+        type: should_pass
+        description: "Cache size is bounded to prevent excessive storage use"
+        result: PASS
+        evidence: "_layout.tsx line 18: SEVEN_DAYS_MS constant. Line 133: maxAge: SEVEN_DAYS_MS (7 days). Line 134: buster: Constants.expoConfig?.version invalidates on version change. Line 23: throttleTime: 1000ms. Cache entries older than 7 days discarded on restore."
+
+      # --- SP-002: NextAssignmentsSection offline ---
+      - id: SP-002
+        cr: CR-262
+        type: should_pass
+        description: "NextAssignmentsSection behaves correctly when offline"
+        result: PASS
+        evidence: "index.tsx line 246: {isOnline && <NextAssignmentsSection />} - hidden entirely when offline. Clean approach consistent with NextSundaysSection."
+
+      # --- SP-003: Hymn data cached ---
+      - id: SP-003
+        cr: CR-262
+        type: should_pass
+        description: "Hymn data is also cached for presentation mode offline"
+        result: SOFT_FAIL
+        evidence: "useOfflinePrefetch.ts does not explicitly prefetch hymn data. Hymn queries use default gcTime (7 days via QueryClient) so they persist IF the user has navigated to a view that loads hymns. Not proactively prefetched. Hymn data may be absent on cold offline start if user never visited an agenda form. Low impact: presentation mode shows hymn IDs even without the lookup data."
+
+      # --- SP-004: SundayTypeDropdown disabled offline ---
+      - id: SP-004
+        cr: CR-262
+        type: should_pass
+        description: "SundayTypeDropdown disabled when offline"
+        result: PASS
+        evidence: "agenda.tsx line 571: disabled={typeDisabled || isOffline}. speeches.tsx line 453: typeDisabled={!canWriteSundayType || !isOnline}. Both tabs disable the dropdown when offline."
+
+      # --- SP-005: No spurious errors offline ---
+      - id: SP-005
+        cr: CR-262
+        type: should_pass
+        description: "No mutation error alerts shown for offline cache reads"
+        result: PASS
+        evidence: "_layout.tsx lines 35-39: MutationCache onError checks isOffline and isNetworkError - both cases return early (silenced). Offline reads don't trigger mutations at all."
+
+      # --- SP-006: Cache refreshed on reconnect ---
+      - id: SP-006
+        cr: CR-262
+        type: should_pass
+        description: "Cache is refreshed on reconnect"
+        result: PASS
+        evidence: "useOfflineQueueProcessor.ts already calls queryClient.invalidateQueries() on reconnect. useOfflinePrefetch.ts lines 50-54: runs again on offline->online transition (prevOnlineRef tracks state). Stale cached data replaced with fresh data."
+
+      # --- SP-007: Settings tab unaffected ---
+      - id: SP-007
+        cr: CR-262
+        type: should_pass
+        description: "Settings tab unaffected by offline mode (except Users item)"
+        result: SOFT_FAIL
+        evidence: "settings/index.tsx line 293: {hasPermission('settings:users') && isOnline && (...)} - Users item hidden when offline. However, other ward settings items (members, topics, whatsapp, etc.) remain visible even though their mutations would fail offline. MutationCache silences these errors but user might attempt to edit and see no feedback. SPEC F052 explicitly accepts this behavior ('already protected by offline mutation error handling')."

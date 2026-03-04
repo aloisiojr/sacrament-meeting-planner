@@ -1,0 +1,839 @@
+# =============================================================================
+# PLAN_P006.yaml - Implementation Plan for Phase 3 (Offline Mode)
+# CR-262: Optimized Offline Mode
+# Generated: 2026-03-03
+# Artifact ID: 006
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Implement F047-F052 - Optimized Offline Mode (CR-262): persist TanStack Query
+  cache to AsyncStorage via PersistQueryClientProvider, proactively prefetch
+  next Sunday agenda + next 3 Sundays speeches/exceptions, expose isOnline via
+  OnlineStatusContext, and adapt each tab's UI to read-only mode when offline.
+  No new migrations or Edge Functions -- purely client-side changes.
+
+strategy:
+  order: "Infrastructure (persistence + context + props) -> Integration (SyncProvider) -> Tab UI (Home, Agenda, Speeches, Settings) -> Verification"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # STEP-01: _layout.tsx - PersistQueryClientProvider + gcTime (C1)
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-262/F047: Update src/app/_layout.tsx to replace QueryClientProvider
+      with PersistQueryClientProvider from @tanstack/react-query-persist-client.
+      Create an AsyncStorage persister using createAsyncStoragePersister from
+      @tanstack/query-async-storage-persister. Set gcTime to 7 days to match
+      maxAge. Use app version from expo-constants as cache buster.
+
+      Changes:
+      1. Install npm packages: @tanstack/query-async-storage-persister and
+         @tanstack/react-query-persist-client
+      2. Import PersistQueryClientProvider, createAsyncStoragePersister,
+         AsyncStorage, Constants
+      3. Remove QueryClientProvider from @tanstack/react-query import
+      4. Create module-level asyncStoragePersister constant with key
+         '@query_cache' and throttleTime 1000ms
+      5. Add gcTime: 1000 * 60 * 60 * 24 * 7 (7 days) to defaultOptions.queries
+      6. Replace <QueryClientProvider> with <PersistQueryClientProvider> in
+         RootLayout, passing persistOptions with persister, maxAge (7 days),
+         and buster (app version)
+
+      Component: C1 from ARCH_M006.
+    files:
+      - src/app/_layout.tsx
+      - package.json
+    dependencies: []
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "npm packages @tanstack/query-async-storage-persister and @tanstack/react-query-persist-client installed"
+      - "PersistQueryClientProvider imported from @tanstack/react-query-persist-client"
+      - "createAsyncStoragePersister imported from @tanstack/query-async-storage-persister"
+      - "AsyncStorage imported from @react-native-async-storage/async-storage"
+      - "Constants imported from expo-constants"
+      - "QueryClientProvider removed from @tanstack/react-query import"
+      - "asyncStoragePersister created at module level with key '@query_cache', throttleTime 1000"
+      - "gcTime: 1000 * 60 * 60 * 24 * 7 added to defaultOptions.queries"
+      - "<PersistQueryClientProvider> replaces <QueryClientProvider> in RootLayout"
+      - "persistOptions has persister, maxAge (7 days), buster (Constants.expoConfig?.version ?? '1.0.0')"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          Test _layout.tsx rendering:
+          1. Verify PersistQueryClientProvider renders (mock the package)
+          2. Verify asyncStoragePersister configuration (key, throttleTime)
+          3. Verify gcTime is set to 7 days in defaultOptions
+          4. Verify maxAge is 7 days and buster uses app version
+          5. Verify QueryClientProvider is NOT used (replaced)
+    covers:
+      acceptance_criteria:
+        - "AC-047-01: Cache persisted to AsyncStorage (PersistQueryClientProvider writes to '@query_cache')"
+        - "AC-047-02: Offline app launch shows cached data (cache restored from AsyncStorage on mount)"
+        - "AC-047-03: Cache expiration after 7 days (maxAge: 7 days)"
+        - "AC-047-04: Cache invalidated on app version change (buster param)"
+        - "AC-047-05: Loading state while restoring cache (PersistQueryClientProvider handles internally)"
+      edge_cases:
+        - "EC-047-01: AsyncStorage full/corrupted - fails silently, in-memory cache only"
+        - "EC-047-02: App crashes during cache write - AsyncStorage write is atomic per key"
+        - "EC-047-03: User clears app storage - cache lost, fresh fetch from server"
+    risks:
+      - risk: "PersistQueryClientProvider blocks render during restore"
+        mitigation: "Restore is async and fast (<200ms). NavigationGuard already handles auth loading."
+
+  # =========================================================================
+  # STEP-02: OnlineStatusContext - new context + hook (C2)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-262/F049-F052: Create src/contexts/OnlineStatusContext.tsx with a React
+      Context that distributes the isOnline boolean from SyncProvider to all
+      descendant components.
+
+      Exports:
+      - OnlineStatusProvider: component that accepts isOnline prop and children
+      - useOnlineStatus(): hook returning { isOnline: boolean }
+
+      Default context value is { isOnline: true } so components outside the
+      provider (e.g., in tests) behave as if online.
+
+      Component: C2 from ARCH_M006.
+    files:
+      - src/contexts/OnlineStatusContext.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-03", "STEP-04"]
+    done_when:
+      - "File src/contexts/OnlineStatusContext.tsx exists"
+      - "Exports OnlineStatusProvider component accepting isOnline and children props"
+      - "Exports useOnlineStatus() hook returning { isOnline: boolean }"
+      - "Default context value is { isOnline: true }"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. useOnlineStatus returns { isOnline: true } when no provider
+          2. useOnlineStatus returns { isOnline: true } when provider has isOnline=true
+          3. useOnlineStatus returns { isOnline: false } when provider has isOnline=false
+          4. Re-render updates when isOnline changes
+    covers:
+      acceptance_criteria:
+        - "AC-049-01 through AC-052-03: All offline UI behaviors depend on OnlineStatusContext"
+      edge_cases: []
+    risks:
+      - risk: "Component re-renders when isOnline toggles"
+        mitigation: "isOnline is a boolean, changes infrequently. React optimizes context with reference equality."
+
+  # =========================================================================
+  # STEP-03: SundayCard showChevron prop (C9)
+  # =========================================================================
+
+  - id: STEP-03
+    description: |
+      CR-262/F050+F051: Update src/components/SundayCard.tsx to accept an
+      optional showChevron prop (default true). When false, the expand/collapse
+      chevron icon is hidden. This is used by Agenda and Speeches tabs to hide
+      the chevron on non-expandable cards when offline.
+
+      Changes:
+      1. Add showChevron?: boolean to SundayCardProps interface
+      2. Destructure showChevron from props (default true)
+      3. Wrap chevron rendering: {(showChevron ?? true) && <ChevronIcon />}
+
+      Component: C9 from ARCH_M006.
+    files:
+      - src/components/SundayCard.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-04"]
+    done_when:
+      - "SundayCardProps interface includes showChevron?: boolean"
+      - "Chevron icon conditionally rendered based on showChevron (default true)"
+      - "Existing behavior unchanged when showChevron is not passed"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. SundayCard renders chevron by default (showChevron not passed)
+          2. SundayCard renders chevron when showChevron=true
+          3. SundayCard hides chevron when showChevron=false
+          4. Card header tap still works when showChevron=true
+    covers:
+      acceptance_criteria:
+        - "AC-050-05: Non-next-Sunday cards hide chevron offline (Agenda)"
+        - "AC-051-05: Cards outside next 3 Sundays hide chevron offline (Speeches)"
+      edge_cases: []
+    risks:
+      - risk: "Existing SundayCard users break"
+        mitigation: "Prop is optional with default true. No existing caller is affected."
+
+  # =========================================================================
+  # STEP-04: AgendaForm disabled prop + SpeechSlot disabled prop (C10 + C11)
+  # =========================================================================
+
+  - id: STEP-04
+    description: |
+      CR-262/F050+F051: Add disabled prop to AgendaForm and SpeechSlot components
+      for read-only offline mode.
+
+      AgendaForm (C10 from ARCH_M006):
+      1. Add disabled?: boolean to AgendaFormProps
+      2. When disabled=true, propagate to all interactive sub-components:
+         - DebouncedTextInput: editable={!disabled}
+         - ActorSelector: disabled={disabled} (onPress = undefined when disabled)
+         - HymnSelector: disabled={disabled}
+         - PrayerSelector: disabled={disabled}
+         - Switch components: disabled={disabled}
+         - Pressable wrappers: onPress={disabled ? undefined : handler}
+
+      SpeechSlot (C11 from ARCH_M006):
+      1. Add disabled?: boolean to SpeechSlotProps
+      2. When disabled=true, all interactions suppressed:
+         - Speaker selector Pressable: onPress guarded
+         - Topic selector Pressable: onPress guarded
+         - StatusLED: onPress guarded
+         - Remove (X) button: hidden or onPress guarded
+         - Second speech toggle: guarded
+
+      Components: C10 + C11 from ARCH_M006.
+    files:
+      - src/components/AgendaForm.tsx
+      - src/components/SpeechSlot.tsx
+    dependencies: []
+    parallelizable_with: ["STEP-01", "STEP-02", "STEP-03"]
+    done_when:
+      - "AgendaFormProps includes disabled?: boolean"
+      - "AgendaForm propagates disabled to all interactive sub-components"
+      - "DebouncedTextInput receives editable={!disabled}"
+      - "ActorSelector, HymnSelector, PrayerSelector receive disabled prop"
+      - "Switch components receive disabled prop"
+      - "Pressable wrappers suppress onPress when disabled"
+      - "SpeechSlotProps includes disabled?: boolean"
+      - "SpeechSlot guards speaker selector, topic selector, StatusLED, remove button, toggle"
+      - "Existing behavior unchanged when disabled is not passed or is false"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          AgendaForm tests:
+          1. All interactive elements enabled when disabled=false (default)
+          2. All interactive elements disabled when disabled=true
+          3. DebouncedTextInput not editable when disabled
+          4. Pressables do not fire onPress when disabled
+
+          SpeechSlot tests:
+          5. All interactions work when disabled=false (default)
+          6. Speaker selector tap does nothing when disabled=true
+          7. Topic selector tap does nothing when disabled=true
+          8. StatusLED tap does nothing when disabled=true
+          9. Remove button hidden or no-op when disabled=true
+          10. Second speech toggle no-op when disabled=true
+    covers:
+      acceptance_criteria:
+        - "AC-050-03: All form fields disabled offline (AgendaForm disabled=true)"
+        - "AC-051-03: All SpeechSlot interactions disabled offline"
+      edge_cases: []
+    risks:
+      - risk: "Sub-components don't support disabled prop"
+        mitigation: "TextInput editable and Switch disabled are native props. Pressable onPress can be undefined."
+
+  # =========================================================================
+  # STEP-05: useOfflinePrefetch hook (C4)
+  # =========================================================================
+
+  - id: STEP-05
+    description: |
+      CR-262/F048: Create src/hooks/useOfflinePrefetch.ts - a hook that
+      proactively prefetches key data into TanStack Query cache when online.
+
+      Exports:
+      - useOfflinePrefetch(isOnline: boolean): void
+
+      Internal helper:
+      - getNext3Sundays(): string[] (uses getTodaySundayDate + date arithmetic)
+
+      Prefetches (using queryClient.prefetchQuery with same keys as tab hooks):
+      1. Next Sunday agenda: agendaKeys.bySunday(wardId, nextSunday)
+      2. Next 3 Sundays agenda range: agendaKeys.byDateRange(wardId, first, last)
+      3. Next 3 Sundays speeches: speechKeys.byDateRange(wardId, first, last)
+      4. Next 3 Sundays exceptions: sundayTypeKeys.exceptions(wardId, first, last)
+
+      Prefetch runs:
+      - On mount when online (isOnline starts true)
+      - On offline->online transition (isOnline changes false->true)
+      - NOT on subsequent re-renders where isOnline stays true (useEffect deps)
+
+      Component: C4 from ARCH_M006.
+    files:
+      - src/hooks/useOfflinePrefetch.ts
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "File src/hooks/useOfflinePrefetch.ts exists"
+      - "Exports useOfflinePrefetch(isOnline: boolean): void"
+      - "getNext3Sundays() returns array of 3 ISO date strings"
+      - "Prefetches agenda, speeches, exceptions, agenda range for next 3 Sundays"
+      - "Uses same query keys as existing hooks (agendaKeys, speechKeys, sundayTypeKeys)"
+      - "Uses same Supabase queries as existing hooks"
+      - "Runs on mount when online and on offline->online transition"
+      - "Does NOT run when isOnline stays true (useEffect deps handle this)"
+      - "Each prefetchQuery is independent (one failure doesn't block others)"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. Prefetch called when isOnline=true on mount (4 prefetchQuery calls)
+          2. Prefetch called when isOnline transitions false->true
+          3. Prefetch NOT called when isOnline=false
+          4. Prefetch NOT called when wardId is null
+          5. getNext3Sundays returns 3 consecutive Sunday dates
+          6. Query keys match existing hook key factories
+          7. Each prefetchQuery uses correct Supabase query
+          8. One prefetch failure doesn't block others
+    covers:
+      acceptance_criteria:
+        - "AC-048-01: Next Sunday agenda prefetched"
+        - "AC-048-02: Next 3 Sundays speeches prefetched"
+        - "AC-048-03: Prefetched data available offline (enters TanStack cache)"
+        - "AC-048-04: No redundant fetches when data is fresh (staleTime respected)"
+      edge_cases:
+        - "EC-048-01: Prefetch fails for some queries - independent, others still succeed"
+        - "EC-048-02: No next Sunday - practically impossible, hook does nothing"
+    risks:
+      - risk: "Query key mismatch between prefetch and tab hooks"
+        mitigation: "Import same key factories (agendaKeys, speechKeys, sundayTypeKeys) used by tab hooks."
+
+  # =========================================================================
+  # STEP-06: SyncProvider integration (C3)
+  # =========================================================================
+
+  - id: STEP-06
+    description: |
+      CR-262/F047+F048: Update src/providers/SyncProvider.tsx to:
+      1. Import OnlineStatusProvider from contexts/OnlineStatusContext
+      2. Import useOfflinePrefetch from hooks/useOfflinePrefetch
+      3. Call useOfflinePrefetch(isOnline) after useOfflineQueueProcessor
+      4. Wrap children with <OnlineStatusProvider isOnline={isOnline}>
+
+      This connects the cache persistence context (so all tabs can read
+      isOnline) and the prefetch hook (so data is warmed when online).
+
+      Component: C3 from ARCH_M006.
+    files:
+      - src/providers/SyncProvider.tsx
+    dependencies: ["STEP-02", "STEP-05"]
+    parallelizable_with: []
+    done_when:
+      - "SyncProvider imports OnlineStatusProvider from '../contexts/OnlineStatusContext'"
+      - "SyncProvider imports useOfflinePrefetch from '../hooks/useOfflinePrefetch'"
+      - "useOfflinePrefetch(isOnline) called after useOfflineQueueProcessor"
+      - "Return JSX wraps children with <OnlineStatusProvider isOnline={isOnline}>"
+      - "OfflineBanner rendered inside OnlineStatusProvider"
+      - "Existing hooks unchanged (useConnection, useRealtimeSync, useOfflineQueueProcessor, useRegisterPushToken, useNotificationHandler)"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. SyncProvider renders OnlineStatusProvider around children
+          2. OnlineStatusProvider receives isOnline from useConnection
+          3. useOfflinePrefetch is called with isOnline value
+          4. Existing SyncProvider behavior unchanged (OfflineBanner, etc.)
+    covers:
+      acceptance_criteria:
+        - "AC-048-01: Prefetch triggered via SyncProvider when online"
+        - "AC-048-02: Prefetch re-triggered on offline->online transition"
+      edge_cases: []
+    risks:
+      - risk: "SyncProvider re-renders children when isOnline changes"
+        mitigation: "OnlineStatusContext uses context which re-renders only consumers that call useOnlineStatus."
+
+  # =========================================================================
+  # STEP-07: Home tab offline UI (C5)
+  # =========================================================================
+
+  - id: STEP-07
+    description: |
+      CR-262/F049: Update src/app/(tabs)/index.tsx (Home tab) to adapt UI
+      when offline.
+
+      Changes:
+      1. Import useOnlineStatus from contexts/OnlineStatusContext
+      2. Call useOnlineStatus() in HomeTabContent
+      3. Conditionally render sections:
+         {isOnline && <NextSundaysSection />}
+         {isOnline && <NextAssignmentsSection />}
+         {isOnline && <InviteManagementSection />}
+      4. Hide pencil button on agenda preview card when offline:
+         {isOnline && (<Pressable ... pencil button ... />)}
+      5. Keep Start Meeting button always visible and functional
+
+      Component: C5 from ARCH_M006.
+    files:
+      - src/app/(tabs)/index.tsx
+    dependencies: ["STEP-06"]
+    parallelizable_with: ["STEP-08", "STEP-09", "STEP-10"]
+    done_when:
+      - "Home tab imports useOnlineStatus"
+      - "HomeTabContent calls useOnlineStatus()"
+      - "NextSundaysSection wrapped in {isOnline && ...}"
+      - "NextAssignmentsSection wrapped in {isOnline && ...}"
+      - "InviteManagementSection wrapped in {isOnline && ...}"
+      - "Pencil button on preview card wrapped in {isOnline && ...}"
+      - "Start Meeting button is NOT conditionally rendered (always visible)"
+      - "Agenda preview card remains visible (collapsed, read-only) when offline"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. Online: all sections rendered (NextSundays, NextAssignments, InviteManagement)
+          2. Online: pencil button visible on agenda preview card
+          3. Offline: NextSundaysSection not rendered
+          4. Offline: NextAssignmentsSection not rendered
+          5. Offline: InviteManagementSection not rendered
+          6. Offline: pencil button hidden
+          7. Offline: Start Meeting button still rendered and pressable
+          8. Offline: agenda preview card visible with status lines from cache
+          9. Transition online->offline: sections disappear on re-render
+          10. Transition offline->online: sections reappear
+    covers:
+      acceptance_criteria:
+        - "AC-049-01: Start Meeting button works offline"
+        - "AC-049-02: Agenda preview card is read-only offline (no pencil)"
+        - "AC-049-03: NextSundaysSection hidden offline"
+        - "AC-049-04: NextAssignmentsSection hidden offline"
+        - "AC-049-05: InviteManagementSection hidden offline"
+      edge_cases:
+        - "EC-049-01: Device goes offline while on Home tab - sections hide immediately"
+        - "EC-049-02: No cached data and offline - Start Meeting still visible"
+    risks:
+      - risk: "Sections flash on offline->online transition"
+        mitigation: "Conditional rendering is synchronous with isOnline state. No flash."
+
+  # =========================================================================
+  # STEP-08: Agenda tab offline UI (C6)
+  # =========================================================================
+
+  - id: STEP-08
+    description: |
+      CR-262/F050: Update src/app/(tabs)/agenda.tsx (Agenda tab) to restrict
+      UI when offline.
+
+      Changes:
+      1. Import useOnlineStatus from contexts/OnlineStatusContext
+      2. Call useOnlineStatus() in AgendaTabContent
+      3. Add useEffect to auto-collapse non-next-Sunday card when going offline
+      4. Update expandable logic: expandable = (existing logic) && (isOnline || date === nextSunday)
+      5. Pass isOffline={!isOnline} to AgendaSundayCard
+      6. Pass showChevron={isExpandable} to card header
+      7. In AgendaSundayCard: disable SundayTypeDropdown when isOffline
+      8. In AgendaSundayCard: pass disabled={isOffline} to AgendaForm
+      9. Guard handleToggle lazyCreate.mutate with isOnline check
+
+      Component: C6 from ARCH_M006.
+    files:
+      - src/app/(tabs)/agenda.tsx
+    dependencies: ["STEP-06"]
+    parallelizable_with: ["STEP-07", "STEP-09", "STEP-10"]
+    done_when:
+      - "Agenda tab imports useOnlineStatus"
+      - "AgendaTabContent calls useOnlineStatus()"
+      - "useEffect auto-collapses card when !isOnline && expandedDate !== nextSunday"
+      - "expandable computed with (isOnline || date === nextSunday) condition"
+      - "AgendaSundayCard receives isOffline prop"
+      - "SundayTypeDropdown disabled when isOffline"
+      - "AgendaForm receives disabled={isOffline} when card is expanded offline"
+      - "showChevron passed to card based on expandability"
+      - "handleToggle guards lazyCreate.mutate with isOnline"
+      - "Play button remains functional when offline"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. Online: all cards expandable (existing behavior)
+          2. Online: AgendaForm enabled (disabled=false)
+          3. Online: SundayTypeDropdown enabled
+          4. Offline: only next Sunday card expandable
+          5. Offline: AgendaForm disabled (disabled=true) when expanded
+          6. Offline: SundayTypeDropdown disabled for all cards
+          7. Offline: non-next-Sunday cards hide chevron
+          8. Offline: play button still functional on next Sunday card
+          9. Transition to offline: non-next-Sunday expanded card auto-collapses
+          10. Offline: lazyCreate.mutate NOT called on handleToggle
+    covers:
+      acceptance_criteria:
+        - "AC-050-01: Only next Sunday expandable offline"
+        - "AC-050-02: Next Sunday card expandable offline (read-only AgendaForm)"
+        - "AC-050-03: All form fields disabled offline"
+        - "AC-050-04: Play button works offline"
+        - "AC-050-05: Non-next-Sunday cards hide chevron offline"
+      edge_cases:
+        - "EC-050-01: Card expanded, then goes offline - fields become disabled"
+        - "EC-050-02: Non-next-Sunday card expanded, then goes offline - auto-collapses"
+    risks:
+      - risk: "Auto-collapse breaks scrollPosition"
+        mitigation: "FlatList maintains scroll position; only card height changes."
+
+  # =========================================================================
+  # STEP-09: Speeches tab offline UI (C7)
+  # =========================================================================
+
+  - id: STEP-09
+    description: |
+      CR-262/F051: Update src/app/(tabs)/speeches.tsx (Speeches tab) to
+      restrict UI when offline.
+
+      Changes:
+      1. Import useOnlineStatus from contexts/OnlineStatusContext
+      2. Import toISODateString from lib/dateUtils
+      3. Call useOnlineStatus() in SpeechesTabContent
+      4. Compute offlineExpandableDates as Set of next 3 Sundays (useMemo)
+      5. Add useEffect to auto-collapse card outside next 3 Sundays when going offline
+      6. In renderItem, compute isExpandable = isOnline || offlineExpandableDates.has(date)
+      7. Pass onToggle={isExpandable ? handler : undefined} to SundayCard
+      8. Pass showChevron={isExpandable} to SundayCard
+      9. Pass typeDisabled={!canWriteSundayType || !isOnline} to SundayCard
+      10. Pass disabled={!isOnline} to SpeechSlot components
+      11. Guard handleToggle lazyCreate.mutate with isOnline check
+
+      Component: C7 from ARCH_M006.
+    files:
+      - src/app/(tabs)/speeches.tsx
+    dependencies: ["STEP-06"]
+    parallelizable_with: ["STEP-07", "STEP-08", "STEP-10"]
+    done_when:
+      - "Speeches tab imports useOnlineStatus"
+      - "SpeechesTabContent calls useOnlineStatus()"
+      - "offlineExpandableDates computed as Set<string> of next 3 Sundays"
+      - "useEffect auto-collapses card when !isOnline && expandedDate not in offlineExpandableDates"
+      - "isExpandable computed per card in renderItem"
+      - "onToggle set to undefined for non-expandable cards"
+      - "showChevron={isExpandable} passed to SundayCard"
+      - "typeDisabled includes !isOnline condition"
+      - "SpeechSlot receives disabled={!isOnline}"
+      - "handleToggle guards lazyCreate.mutate with isOnline"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. Online: all cards expandable (existing behavior)
+          2. Online: SpeechSlot interactions enabled
+          3. Offline: only next 3 Sunday cards expandable
+          4. Offline: SpeechSlot disabled (read-only) when expanded
+          5. Offline: SundayTypeDropdown disabled for all cards
+          6. Offline: cards outside next 3 Sundays hide chevron
+          7. Offline: collapsed cards show speaker names and LEDs from cache
+          8. Transition to offline: card outside next 3 auto-collapses
+          9. Offline: lazyCreate.mutate NOT called on handleToggle
+          10. Offline: onToggle is undefined for non-expandable cards
+    covers:
+      acceptance_criteria:
+        - "AC-051-01: Only next 3 Sundays expandable offline"
+        - "AC-051-02: Next 3 Sunday cards expandable offline (read-only SpeechSlots)"
+        - "AC-051-03: All SpeechSlot interactions disabled offline"
+        - "AC-051-04: Collapsed card data visible offline (cached data)"
+        - "AC-051-05: Cards outside next 3 Sundays hide chevron offline"
+      edge_cases:
+        - "EC-051-01: Card outside next 3 expanded, then goes offline - auto-collapses"
+        - "EC-051-02: Cached speech data is stale - shown with OfflineBanner, refreshed on reconnect"
+    risks:
+      - risk: "offlineExpandableDates computation expensive"
+        mitigation: "useMemo ensures computation only when isOnline or nextSunday changes. Set creation is O(1)."
+
+  # =========================================================================
+  # STEP-10: Settings tab offline UI (C8)
+  # =========================================================================
+
+  - id: STEP-10
+    description: |
+      CR-262/F052: Update src/app/(tabs)/settings/index.tsx to hide the
+      Users (Invitation Manager) item when offline.
+
+      Changes:
+      1. Import useOnlineStatus from contexts/OnlineStatusContext
+      2. Call useOnlineStatus() in SettingsScreen
+      3. Add isOnline to the existing permission check for Users item:
+         {hasPermission('settings:users') && isOnline && (<SettingsItem ... />)}
+
+      Component: C8 from ARCH_M006.
+    files:
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: ["STEP-06"]
+    parallelizable_with: ["STEP-07", "STEP-08", "STEP-09"]
+    done_when:
+      - "Settings tab imports useOnlineStatus"
+      - "SettingsScreen calls useOnlineStatus()"
+      - "Users item conditionally rendered with hasPermission('settings:users') && isOnline"
+      - "Other settings items (language, theme, about, members, topics, etc.) remain visible"
+      - "TypeScript compiles without errors"
+    tests:
+      - type: unit
+        description: |
+          1. Online + settings:users permission: Users item visible
+          2. Online + no permission: Users item hidden (existing behavior)
+          3. Offline + settings:users permission: Users item hidden
+          4. Offline + no permission: Users item hidden
+          5. Other settings items visible in all cases (language, theme, about)
+          6. Transition offline->online: Users item reappears
+          7. Transition online->offline: Users item disappears
+    covers:
+      acceptance_criteria:
+        - "AC-052-01: Users/Invitation Manager hidden offline"
+        - "AC-052-02: Local settings remain accessible offline"
+        - "AC-052-03: Users item reappears when online"
+      edge_cases:
+        - "EC-052-01: Deep link to Users screen while offline - unlikely since item is hidden"
+    risks:
+      - risk: "Other ward settings items accessible offline but mutations fail"
+        mitigation: "MutationCache already silences network errors. Users is hidden because it calls Edge Functions."
+
+  # =========================================================================
+  # STEP-11: Final verification
+  # =========================================================================
+
+  - id: STEP-11
+    description: |
+      Run full test suite to verify no regressions from all changes.
+      Verify all code changes pass linting, type-checking, and tests.
+      Confirm the complete offline mode feature works end-to-end:
+      - Cache persistence via PersistQueryClientProvider
+      - OnlineStatusContext distributes isOnline to all tabs
+      - useOfflinePrefetch warms cache when online
+      - Home tab: sections hidden offline, Start Meeting works
+      - Agenda tab: only next Sunday expandable, form disabled
+      - Speeches tab: only next 3 Sundays expandable, SpeechSlots disabled
+      - Settings tab: Users item hidden offline
+      - SundayCard chevron hidden for non-expandable cards
+      - AgendaForm and SpeechSlot disabled when offline
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07", "STEP-08", "STEP-09", "STEP-10"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+      - "All new tests pass"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria:
+        - "All AC-047 through AC-052 verified via individual step tests"
+      edge_cases:
+        - "All EC-047 through EC-052 covered by step tests"
+    risks:
+      - risk: "Unforeseen interaction between offline persistence and existing cache behavior"
+        mitigation: "gcTime increased to 7 days but staleTime unchanged (5 min). Online queries still refetch normally."
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # F047: TanStack Query Cache Persistence
+  - ac_id: AC-047-01
+    description: "Cache persisted to AsyncStorage"
+    how_to_verify: "PersistQueryClientProvider with asyncStoragePersister writes to '@query_cache' key"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-047-02
+    description: "Offline app launch shows cached data"
+    how_to_verify: "PersistQueryClientProvider restores cache from AsyncStorage on mount"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-047-03
+    description: "Cache expiration after 7 days"
+    how_to_verify: "maxAge: 1000 * 60 * 60 * 24 * 7 in persistOptions"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-047-04
+    description: "Cache invalidated on app version change"
+    how_to_verify: "buster: Constants.expoConfig?.version ?? '1.0.0'"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: AC-047-05
+    description: "Loading state while restoring cache"
+    how_to_verify: "PersistQueryClientProvider handles restoration loading internally"
+    covered_by_steps: ["STEP-01"]
+
+  # F048: Proactive Offline Cache
+  - ac_id: AC-048-01
+    description: "Next Sunday agenda prefetched"
+    how_to_verify: "useOfflinePrefetch calls prefetchQuery with agendaKeys.bySunday"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-048-02
+    description: "Next 3 Sundays speeches prefetched"
+    how_to_verify: "useOfflinePrefetch calls prefetchQuery with speechKeys.byDateRange"
+    covered_by_steps: ["STEP-05", "STEP-06"]
+
+  - ac_id: AC-048-03
+    description: "Prefetched data available offline"
+    how_to_verify: "Prefetched data enters TanStack cache -> persisted to AsyncStorage by F047"
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-048-04
+    description: "No redundant fetches when data is fresh"
+    how_to_verify: "prefetchQuery respects staleTime (5 min); fresh data is not re-fetched"
+    covered_by_steps: ["STEP-05"]
+
+  # F049: Offline UI - Home
+  - ac_id: AC-049-01
+    description: "Start Meeting button works offline"
+    how_to_verify: "Start Meeting button NOT wrapped in isOnline conditional"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-049-02
+    description: "Agenda preview card is read-only offline"
+    how_to_verify: "Pencil button wrapped in {isOnline && ...}; card visible but no edit action"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-049-03
+    description: "NextSundaysSection hidden offline"
+    how_to_verify: "{isOnline && <NextSundaysSection />}"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-049-04
+    description: "NextAssignmentsSection hidden offline"
+    how_to_verify: "{isOnline && <NextAssignmentsSection />}"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-049-05
+    description: "InviteManagementSection hidden offline"
+    how_to_verify: "{isOnline && <InviteManagementSection />}"
+    covered_by_steps: ["STEP-07"]
+
+  # F050: Offline UI - Agenda
+  - ac_id: AC-050-01
+    description: "Only next Sunday expandable offline"
+    how_to_verify: "expandable includes (isOnline || date === nextSunday) check"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-050-02
+    description: "Next Sunday card expandable offline"
+    how_to_verify: "date === nextSunday passes expandable check; card opens with disabled AgendaForm"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-050-03
+    description: "All form fields disabled offline"
+    how_to_verify: "AgendaForm receives disabled={isOffline}"
+    covered_by_steps: ["STEP-04", "STEP-08"]
+
+  - ac_id: AC-050-04
+    description: "Play button works offline"
+    how_to_verify: "Play button not conditionally hidden by isOffline"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: AC-050-05
+    description: "Non-next-Sunday cards hide chevron offline"
+    how_to_verify: "showChevron={isExpandable} and isExpandable=false for non-next-Sunday offline"
+    covered_by_steps: ["STEP-03", "STEP-08"]
+
+  # F051: Offline UI - Speeches
+  - ac_id: AC-051-01
+    description: "Only next 3 Sundays expandable offline"
+    how_to_verify: "isExpandable = offlineExpandableDates.has(date) when offline"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: AC-051-02
+    description: "Next 3 Sunday cards expandable offline"
+    how_to_verify: "offlineExpandableDates contains next 3 Sundays; cards open with disabled SpeechSlots"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: AC-051-03
+    description: "All SpeechSlot interactions disabled offline"
+    how_to_verify: "SpeechSlot receives disabled={!isOnline}"
+    covered_by_steps: ["STEP-04", "STEP-09"]
+
+  - ac_id: AC-051-04
+    description: "Collapsed card data visible offline"
+    how_to_verify: "SundayCard renders speaker names and LEDs from cached TanStack Query data"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: AC-051-05
+    description: "Cards outside next 3 Sundays hide chevron offline"
+    how_to_verify: "showChevron={isExpandable} and isExpandable=false for cards outside next 3"
+    covered_by_steps: ["STEP-03", "STEP-09"]
+
+  # F052: Offline UI - Settings
+  - ac_id: AC-052-01
+    description: "Users/Invitation Manager hidden offline"
+    how_to_verify: "hasPermission('settings:users') && isOnline condition"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-052-02
+    description: "Local settings remain accessible offline"
+    how_to_verify: "Language, theme, about items NOT wrapped in isOnline check"
+    covered_by_steps: ["STEP-10"]
+
+  - ac_id: AC-052-03
+    description: "Users item reappears when online"
+    how_to_verify: "isOnline=true re-renders Settings, Users item visible again"
+    covered_by_steps: ["STEP-10"]
+
+  # Edge cases
+  - ac_id: EC-047-01
+    description: "AsyncStorage full/corrupted"
+    how_to_verify: "Persister fails silently; app works with in-memory cache"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-047-02
+    description: "App crashes during cache write"
+    how_to_verify: "AsyncStorage write is atomic per key; next launch restores old or no cache"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-047-03
+    description: "User clears app storage"
+    how_to_verify: "Cache lost; app fetches fresh data from server"
+    covered_by_steps: ["STEP-01"]
+
+  - ac_id: EC-048-01
+    description: "Prefetch fails for some queries"
+    how_to_verify: "Each prefetchQuery is independent; partial failure OK"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: EC-048-02
+    description: "No next Sunday exists"
+    how_to_verify: "Hook does nothing; practically impossible"
+    covered_by_steps: ["STEP-05"]
+
+  - ac_id: EC-049-01
+    description: "Device goes offline while on Home tab"
+    how_to_verify: "isOnline changes trigger re-render; sections hide immediately"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: EC-049-02
+    description: "No cached data and offline"
+    how_to_verify: "Start Meeting visible; agenda preview shows empty/loading state"
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: EC-050-01
+    description: "Next Sunday card expanded, then goes offline"
+    how_to_verify: "Card stays expanded; fields become disabled (isOffline re-render)"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: EC-050-02
+    description: "Non-next-Sunday card expanded, then goes offline"
+    how_to_verify: "useEffect auto-collapses card; chevron hidden"
+    covered_by_steps: ["STEP-08"]
+
+  - ac_id: EC-051-01
+    description: "Card outside next 3 expanded, then goes offline"
+    how_to_verify: "useEffect auto-collapses card; chevron hidden"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: EC-051-02
+    description: "Cached speech data is stale"
+    how_to_verify: "Stale data shown; OfflineBanner visible; refreshed on reconnect"
+    covered_by_steps: ["STEP-09"]
+
+  - ac_id: EC-052-01
+    description: "Deep link to Users screen while offline"
+    how_to_verify: "Settings item hidden; deep link unlikely; screen shows error if reached"
+    covered_by_steps: ["STEP-10"]

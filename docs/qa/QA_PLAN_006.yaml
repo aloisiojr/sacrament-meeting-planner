@@ -1,0 +1,442 @@
+# =============================================================================
+# QA_PLAN_006.yaml
+# PRE validation plan for CR-262: Optimized Offline Mode
+# =============================================================================
+
+metadata:
+  artifact_id: "006"
+  cr: CR-262
+  feature_id: F_OFFLINE_MODE
+  type: feature_request
+  created_at: "2026-03-03"
+  mode: PRE
+
+# =============================================================================
+# PRE VALIDATION REPORT
+# =============================================================================
+
+pre_report:
+  validated: true
+  reason: "Request is implementable. Existing codebase already has solid offline infrastructure (offlineQueue, offlineGuard, useConnection, OfflineBanner, useOfflineQueueProcessor, SyncProvider). The request adds a local cache layer using TanStack Query persistence + AsyncStorage, and UI-level offline behavior (read-only mode, collapsed cards, hidden sections). No DB migration needed. No new Edge Functions."
+
+  # ---------------------------------------------------------------------------
+  # Evidence gathered during analysis
+  # ---------------------------------------------------------------------------
+  evidence:
+
+    - id: EVD-001
+      description: "Existing offline infrastructure files"
+      paths_searched:
+        - "src/lib/offlineQueue.ts"
+        - "src/lib/offlineGuard.ts"
+        - "src/lib/connectionUtils.ts"
+        - "src/hooks/useConnection.ts"
+        - "src/hooks/useOfflineQueueProcessor.ts"
+        - "src/components/OfflineBanner.tsx"
+        - "src/providers/SyncProvider.tsx"
+      finding: |
+        Full offline stack already exists:
+        - offlineQueue.ts: AsyncStorage-backed FIFO mutation queue (100 entries, 3 retries)
+        - offlineGuard.ts: Blocks Edge Function calls when offline (6 online-only operations)
+        - connectionUtils.ts: Pure utility for NetInfo state interpretation
+        - useConnection.ts: Hook providing isOnline, showOfflineBanner, isWebSocketConnected
+        - useOfflineQueueProcessor.ts: Drains mutation queue on reconnect
+        - OfflineBanner.tsx: Red banner shown when offline
+        - SyncProvider.tsx: Orchestrates all sync/offline components
+
+    - id: EVD-002
+      description: "TanStack Query already configured with offlineFirst"
+      paths_searched:
+        - "src/app/_layout.tsx"
+      finding: |
+        QueryClient configured at _layout.tsx:14 with:
+        - staleTime: 5 minutes (line 39)
+        - networkMode: 'offlineFirst' (line 40)
+        - Mutation errors suppressed when offline (lines 23-27)
+        This means TanStack Query already serves cached data when offline.
+        Missing: no persistence layer (data lost on app restart while offline).
+
+    - id: EVD-003
+      description: "Home tab structure analysis"
+      paths_searched:
+        - "src/app/(tabs)/index.tsx"
+      finding: |
+        Home tab (index.tsx) shows:
+        1. "Start Meeting" button (line 131-144) - navigates to /presentation
+        2. Agenda preview card (line 147-239) - read-only, non-expandable
+        3. NextSundaysSection component (line 241)
+        4. NextAssignmentsSection component (line 242) - bishopric only
+        5. InviteManagementSection component (line 243) - secretary only
+        CR-262 requires: Button + presentation working, agenda card collapsed (read-only),
+        3 assignment cards collapsed (read-only), invite manager hidden.
+
+    - id: EVD-004
+      description: "Agenda tab structure analysis"
+      paths_searched:
+        - "src/app/(tabs)/agenda.tsx"
+      finding: |
+        Agenda tab has infinite scroll of sunday cards (12 months past + future).
+        Cards can be expanded/collapsed via handleToggle (line 181).
+        expandable prop determined by exception type (line 238).
+        CR-262 requires: only next sunday expandable (fields disabled), rest collapsed.
+
+    - id: EVD-005
+      description: "Speeches tab structure analysis"
+      paths_searched:
+        - "src/app/(tabs)/speeches.tsx"
+      finding: |
+        Speeches tab has infinite scroll of SundayCards with speech management.
+        Cards expand/collapse via handleToggle (line 211).
+        All mutations (assign, status change, etc.) are online operations.
+        CR-262 requires: only next 3 sundays expandable (fields disabled), rest collapsed.
+
+    - id: EVD-006
+      description: "InviteManagementSection analysis"
+      paths_searched:
+        - "src/components/InviteManagementSection.tsx"
+      finding: |
+        InviteManagementSection is already gated by permission 'home:invite_mgmt' (line 204).
+        Visible only for Secretary and Bishopric.
+        CR-262 requires: hidden entirely when offline.
+
+    - id: EVD-007
+      description: "Presentation mode analysis"
+      paths_searched:
+        - "src/app/presentation.tsx"
+        - "src/hooks/usePresentationMode.ts"
+      finding: |
+        PresentationScreen is already read-only (no mutations in the component).
+        Data loaded via usePresentationData hook which uses useAgenda + useSpeeches + useSundayExceptions.
+        With TanStack Query's offlineFirst mode, cached data will be served when offline.
+        CR-262 requires: presentation mode working offline (already works if data is cached).
+
+    - id: EVD-008
+      description: "Package dependencies for persistence"
+      paths_searched:
+        - "package.json"
+      finding: |
+        @tanstack/react-query ^5.90.21 - supports persist plugins.
+        @react-native-async-storage/async-storage already in project (used by offlineQueue.ts).
+        Need to add: @tanstack/query-async-storage-persister and @tanstack/react-query-persist-client.
+
+    - id: EVD-009
+      description: "NextSundaysSection and NextAssignmentsSection analysis"
+      paths_searched:
+        - "src/components/NextSundaysSection.tsx"
+        - "src/components/NextAssignmentsSection.tsx"
+      finding: |
+        NextSundaysSection: Shows next 3 sundays with read-only cards + pencil buttons.
+        NextAssignmentsSection: Bishopric-only, expandable with mutation capabilities.
+        CR-262 requires: Both visible as collapsed/read-only cards when offline.
+
+    - id: EVD-010
+      description: "Current test count"
+      finding: "794 tests passing across 35 test files"
+
+  # ---------------------------------------------------------------------------
+  # Requirement extraction from user request
+  # ---------------------------------------------------------------------------
+  requirements:
+
+    - id: REQ-001
+      description: "Local cache: next sunday agenda"
+      source: "Cache local: agenda do próximo domingo"
+      category: cache
+      details: |
+        Persist the agenda data for the upcoming Sunday to local storage so it
+        survives app restart. Use TanStack Query persistence with AsyncStorage.
+
+    - id: REQ-002
+      description: "Local cache: next 3 sundays speech assignments"
+      source: "designações dos próximos 3 domingos"
+      category: cache
+      details: |
+        Persist speech assignment data for the next 3 Sundays to local storage.
+        This covers speeches, sunday_exceptions, and agenda data for these dates.
+
+    - id: REQ-003
+      description: "Offline Home: Start Meeting button + presentation mode working"
+      source: "Home com botão iniciar reunião + modo apresentação funcionando"
+      category: ui_offline
+      details: |
+        When offline, the Home tab must show the Start Meeting button and the
+        presentation mode must work using cached data. Button already exists.
+        Presentation already read-only. Key: ensure cached data is available.
+
+    - id: REQ-004
+      description: "Offline Home: agenda card collapsed, read-only"
+      source: "card da agenda contraído (read-only)"
+      category: ui_offline
+      details: |
+        When offline, the agenda preview card on Home should remain visible but
+        in its current collapsed/non-expandable state. Already non-expandable.
+        Pencil button should be disabled or hidden when offline.
+
+    - id: REQ-005
+      description: "Offline Home: 3 assignment cards collapsed, read-only"
+      source: "3 cards designações contraídos (read-only)"
+      category: ui_offline
+      details: |
+        When offline, the NextSundaysSection (3 cards) should remain visible
+        but collapsed and read-only. Pencil buttons disabled/hidden.
+
+    - id: REQ-006
+      description: "Offline Agenda tab: only next sunday expandable, fields disabled"
+      source: "Agendas: só próximo domingo expansível, campos disabled"
+      category: ui_offline
+      details: |
+        When offline, the Agenda tab should restrict expansion to only the next
+        Sunday. All form fields inside the expanded agenda should be disabled
+        (non-editable). Other sundays should not be expandable.
+
+    - id: REQ-007
+      description: "Offline Speeches tab: only next 3 sundays expandable, fields disabled"
+      source: "Discursos: só próximos 3 domingos expansíveis, campos disabled"
+      category: ui_offline
+      details: |
+        When offline, the Speeches tab should restrict expansion to only the
+        next 3 Sundays. All interactive elements (assign speaker, change status,
+        etc.) should be disabled. Other sundays should not be expandable.
+
+    - id: REQ-008
+      description: "Offline Home: invite manager hidden"
+      source: "Gerenciador de convites escondido"
+      category: ui_offline
+      details: |
+        When offline, the InviteManagementSection should be completely hidden.
+        This is a natural fit since invite management requires WhatsApp/network.
+
+  # ---------------------------------------------------------------------------
+  # Related existing features
+  # ---------------------------------------------------------------------------
+  related_features:
+
+    - id: F_OFFLINE_QUEUE
+      description: "Existing offline mutation queue (offlineQueue.ts)"
+      relationship: "Foundation - provides queuing for mutations that happen offline"
+
+    - id: F_OFFLINE_GUARD
+      description: "Existing offline guard (offlineGuard.ts)"
+      relationship: "Foundation - blocks Edge Function operations when offline"
+
+    - id: F_CONNECTION_MONITOR
+      description: "Connection monitoring (useConnection.ts)"
+      relationship: "Foundation - provides isOnline state used throughout the app"
+
+    - id: F_OFFLINE_BANNER
+      description: "Offline banner (OfflineBanner.tsx)"
+      relationship: "Foundation - visual indicator of offline status"
+
+    - id: F_SYNC_PROVIDER
+      description: "SyncProvider orchestration"
+      relationship: "Foundation - orchestrates all offline/sync components"
+
+    - id: F_TANSTACK_OFFLINE_FIRST
+      description: "TanStack Query offlineFirst mode"
+      relationship: "Foundation - queries serve cached data when offline"
+
+    - id: F_PRESENTATION_MODE
+      description: "Presentation mode (presentation.tsx)"
+      relationship: "Must work offline with cached data"
+
+    - id: F_NEXT_SUNDAYS
+      description: "NextSundaysSection component"
+      relationship: "Shows the 3 cards that must be visible offline (read-only)"
+
+    - id: F_INVITE_MGMT
+      description: "InviteManagementSection component"
+      relationship: "Must be hidden when offline"
+
+  # ---------------------------------------------------------------------------
+  # Implementation scope analysis
+  # ---------------------------------------------------------------------------
+  scope_analysis:
+    new_files:
+      - path: "src/lib/offlineCache.ts"
+        purpose: "TanStack Query persistence layer using AsyncStorage. Selectively persists agenda + speeches queries for next 1-3 sundays."
+
+    modified_files:
+      - path: "src/app/_layout.tsx"
+        changes: "Wrap QueryClient with PersistQueryClientProvider or add persistence setup"
+
+      - path: "src/app/(tabs)/index.tsx"
+        changes: "Pass isOnline to child components; disable pencil button when offline"
+
+      - path: "src/app/(tabs)/agenda.tsx"
+        changes: "When offline, restrict expandable to only next sunday; pass disabled prop to AgendaForm"
+
+      - path: "src/app/(tabs)/speeches.tsx"
+        changes: "When offline, restrict expandable to only next 3 sundays; disable all mutation interactions"
+
+      - path: "src/components/InviteManagementSection.tsx"
+        changes: "Return null when offline"
+
+      - path: "src/components/NextSundaysSection.tsx"
+        changes: "Hide pencil buttons when offline"
+
+      - path: "src/components/NextAssignmentsSection.tsx"
+        changes: "Collapse and disable when offline; or hide entirely"
+
+      - path: "src/components/AgendaForm.tsx"
+        changes: "Accept disabled prop to make all fields read-only"
+
+      - path: "src/components/SpeechSlot.tsx"
+        changes: "Accept disabled prop to prevent interactions when offline"
+
+      - path: "src/providers/SyncProvider.tsx"
+        changes: "Expose isOnline via React context so all components can access it"
+
+    no_changes_needed:
+      - "Database migrations (no schema changes)"
+      - "Edge Functions (no new server-side logic)"
+      - "supabase/config.toml (no configuration changes)"
+
+  # ---------------------------------------------------------------------------
+  # Risk assessment
+  # ---------------------------------------------------------------------------
+  risks:
+    - id: RISK-001
+      level: low
+      description: "TanStack Query persistence may need new npm packages"
+      mitigation: "Use @tanstack/query-async-storage-persister which is the official React Native solution"
+
+    - id: RISK-002
+      level: low
+      description: "Cache invalidation on reconnect"
+      mitigation: "Existing useOfflineQueueProcessor already calls queryClient.invalidateQueries() on reconnect"
+
+    - id: RISK-003
+      level: medium
+      description: "isOnline state needs to be accessible in components that don't currently have it"
+      mitigation: "Create an OfflineContext or pass isOnline through SyncProvider context. Alternatively, use onlineManager from TanStack Query."
+
+    - id: RISK-004
+      level: low
+      description: "Presentation mode data availability when offline on app cold start"
+      mitigation: "Persistence layer ensures data survives app restart. Hymns data also needs to be cached."
+
+# =============================================================================
+# VALIDATION CHECKS (for POST phase)
+# =============================================================================
+
+validation_checks:
+
+  must_pass:
+
+    # --- Cache persistence ---
+    - id: MP-001
+      description: "QueryClient has persistence configured with AsyncStorage"
+      how_to_verify: "Check _layout.tsx for PersistQueryClientProvider or equivalent persistence setup"
+      expected: "QueryClient data persisted to AsyncStorage with appropriate key prefix"
+
+    - id: MP-002
+      description: "Agenda data for next sunday is cached locally"
+      how_to_verify: "Check that agenda queries for the target sunday use queryKey patterns that are included in the persistence filter"
+      expected: "Agenda data survives app restart"
+
+    - id: MP-003
+      description: "Speech assignment data for next 3 sundays is cached locally"
+      how_to_verify: "Check that speech queries for the next 3 sundays are included in persistence filter"
+      expected: "Speech data survives app restart"
+
+    # --- Home tab offline behavior ---
+    - id: MP-004
+      description: "Home tab shows Start Meeting button when offline"
+      how_to_verify: "Check index.tsx - button must render regardless of isOnline state"
+      expected: "Start Meeting button always visible on Home tab"
+
+    - id: MP-005
+      description: "Presentation mode works with cached data when offline"
+      how_to_verify: "Check presentation.tsx and usePresentationMode.ts - must work with TanStack Query cached data"
+      expected: "Presentation screen renders with cached agenda/speeches/hymns data"
+
+    - id: MP-006
+      description: "Home agenda preview card is read-only when offline"
+      how_to_verify: "Check index.tsx - pencil button disabled or hidden when offline"
+      expected: "Pencil button non-interactive when offline"
+
+    - id: MP-007
+      description: "NextSundaysSection cards visible but read-only when offline"
+      how_to_verify: "Check NextSundaysSection.tsx - cards rendered, pencil buttons disabled/hidden"
+      expected: "3 assignment cards visible in collapsed state, pencils disabled"
+
+    - id: MP-008
+      description: "InviteManagementSection hidden when offline"
+      how_to_verify: "Check InviteManagementSection.tsx for isOnline check returning null"
+      expected: "Section returns null when offline"
+
+    # --- Agenda tab offline behavior ---
+    - id: MP-009
+      description: "Agenda tab: only next sunday expandable when offline"
+      how_to_verify: "Check agenda.tsx handleToggle and expandable logic for offline restriction"
+      expected: "Only next sunday card can be expanded; other sundays' expandable prop is false when offline"
+
+    - id: MP-010
+      description: "Agenda tab: expanded form fields disabled when offline"
+      how_to_verify: "Check AgendaForm.tsx for disabled prop propagation"
+      expected: "All form inputs (TextInput, selectors, toggles) have disabled/editable=false when offline"
+
+    # --- Speeches tab offline behavior ---
+    - id: MP-011
+      description: "Speeches tab: only next 3 sundays expandable when offline"
+      how_to_verify: "Check speeches.tsx handleToggle and SundayCard expansion logic for offline restriction"
+      expected: "Only next 3 sunday cards can be expanded; others are non-expandable when offline"
+
+    - id: MP-012
+      description: "Speeches tab: all interactive elements disabled when offline"
+      how_to_verify: "Check SpeechSlot.tsx for disabled prop; assign/status/remove buttons disabled"
+      expected: "No mutations can be triggered from speech slots when offline"
+
+    # --- isOnline propagation ---
+    - id: MP-013
+      description: "isOnline state accessible to all affected components"
+      how_to_verify: "Check for OfflineContext or onlineManager usage in affected components"
+      expected: "Components can determine online/offline state without prop drilling through every level"
+
+    # --- Tests ---
+    - id: MP-014
+      description: "All existing tests still pass"
+      how_to_verify: "Run npx vitest run and verify 794+ tests pass"
+      expected: "Zero test regressions"
+
+    - id: MP-015
+      description: "New tests cover offline behavior"
+      how_to_verify: "Check for new test file(s) covering offline cache and UI behavior"
+      expected: "Tests verify: cache persistence config, offline UI restrictions, InviteManagement hidden"
+
+  should_pass:
+
+    - id: SP-001
+      description: "Cache size is bounded to prevent excessive storage use"
+      how_to_verify: "Check persistence config for maxAge, buster, or selective caching"
+      expected: "Cache expires or is bounded (e.g., 24h maxAge or selective query persistence)"
+
+    - id: SP-002
+      description: "NextAssignmentsSection behaves correctly when offline"
+      how_to_verify: "Check NextAssignmentsSection.tsx for offline handling"
+      expected: "Section either hidden or shown collapsed/read-only when offline"
+
+    - id: SP-003
+      description: "Hymn data is also cached for presentation mode offline"
+      how_to_verify: "Check if hymn query keys are included in persistence filter"
+      expected: "Hymn data available offline for presentation mode hymn display"
+
+    - id: SP-004
+      description: "SundayTypeDropdown disabled when offline"
+      how_to_verify: "Check SundayCard/SundayTypeDropdown for offline-aware disabled prop"
+      expected: "Sunday type cannot be changed when offline"
+
+    - id: SP-005
+      description: "No mutation error alerts shown for offline cache reads"
+      how_to_verify: "Verify that reading cached data offline doesn't trigger mutation error alerts"
+      expected: "Clean UX - no spurious error modals when browsing cached data offline"
+
+    - id: SP-006
+      description: "Cache is refreshed on reconnect"
+      how_to_verify: "Check that reconnect triggers query invalidation (already in useOfflineQueueProcessor)"
+      expected: "Stale cached data replaced with fresh data when going back online"
+
+    - id: SP-007
+      description: "Settings tab unaffected by offline mode"
+      how_to_verify: "Check that settings tab has no new restrictions"
+      expected: "Settings tab behavior unchanged (may have natural network errors for user management)"

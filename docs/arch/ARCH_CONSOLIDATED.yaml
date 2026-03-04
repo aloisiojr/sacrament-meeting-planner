@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-03 (Phase 2: CR-258)
+# Last updated: 2026-03-03 (Phase 3: CR-262)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-03"
   total_modules: 13
-  total_adrs: 18
+  total_adrs: 21
 
 # =============================================================================
 # TECH STACK
@@ -37,7 +37,7 @@ tech_stack:
   state_management:
     server_state: TanStack React Query 5
     local_state: React Context (AuthContext, ThemeContext)
-    persistence: AsyncStorage (theme preference, Supabase auth session)
+    persistence: AsyncStorage (theme preference, Supabase auth session, TanStack Query cache)
 
   ui:
     gesture_handler: react-native-gesture-handler 2.28
@@ -338,10 +338,14 @@ modules:
       to 7 tables filtered by ward_id. Falls back to polling (2.5s) when
       WebSocket disconnects. Offline-first architecture with TanStack Query
       offlineFirst mode. OfflineBanner shown when disconnected.
-    features: [F032, F033]
+      Cache persistence via @tanstack/react-query-persist-client with
+      AsyncStorage persister (7-day maxAge, version-busted). Proactive
+      prefetch of next Sunday agenda and next 3 Sundays speeches for
+      offline use. OnlineStatusContext distributes isOnline to all tabs.
+    features: [F032, F033, F047, F048]
     components:
       - path: src/providers/SyncProvider.tsx
-        responsibility: Orchestrates connection, realtime sync, offline queue, push token, notifications
+        responsibility: Orchestrates connection, realtime sync, offline queue, push token, notifications, online status context, offline prefetch
       - path: src/hooks/useRealtimeSync.ts
         responsibility: Supabase Realtime channel subscription with polling fallback
       - path: src/hooks/useConnection.ts
@@ -358,6 +362,10 @@ modules:
         responsibility: Guard for blocking Edge Function operations when offline
       - path: src/components/OfflineBanner.tsx
         responsibility: Offline indicator banner with safe area insets
+      - path: src/contexts/OnlineStatusContext.tsx
+        responsibility: React Context distributing isOnline from SyncProvider to all descendants
+      - path: src/hooks/useOfflinePrefetch.ts
+        responsibility: Proactive TanStack Query cache warming for offline use (next Sunday agenda, next 3 Sundays speeches)
     dependencies:
       - "@react-native-community/netinfo"
       - "Supabase Realtime (WebSocket channels)"
@@ -394,10 +402,10 @@ modules:
       Application shell, tab navigation, theme system, error handling,
       reusable UI components, and SVG icon system. Four-tab bottom
       navigation. Light/dark theme with system detection.
-    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038]
+    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052]
     components:
       - path: src/app/_layout.tsx
-        responsibility: Root layout with provider stack (ErrorBoundary > GestureHandler > QueryClient > I18n > Theme > Auth > Sync)
+        responsibility: Root layout with provider stack (ErrorBoundary > GestureHandler > PersistQueryClient > I18n > Theme > Auth > Sync > OnlineStatus)
       - path: src/app/(tabs)/_layout.tsx
         responsibility: Tab navigation layout (Home, Agenda, Speeches, Settings)
       - path: src/app/(tabs)/index.tsx
@@ -718,11 +726,12 @@ provider_hierarchy:
   order:
     - ErrorBoundary
     - GestureHandlerRootView
-    - QueryClientProvider (TanStack Query)
+    - PersistQueryClientProvider (TanStack Query + AsyncStorage cache persistence)
     - I18nextProvider (i18n)
     - ThemeProvider (theme context + AsyncStorage)
     - AuthProvider (Supabase auth, role, wardId)
     - SyncProvider (connection, realtime, offline queue, push, notifications)
+    - OnlineStatusProvider (isOnline context for all descendants)
     - NavigationGuard (auth-based routing)
     - Slot (Expo Router)
 
@@ -902,3 +911,36 @@ adrs:
       Speech counts change on speech mutations while member data changes on
       member CRUD. A dedicated key allows independent caching and invalidation.
       The sync.ts mapping invalidates speechCountKeys.all on speech table changes.
+
+  - id: ADR-019
+    title: PersistQueryClientProvider for cache persistence
+    decision: |
+      Replace QueryClientProvider with PersistQueryClientProvider from
+      @tanstack/react-query-persist-client. Use createAsyncStoragePersister
+      from @tanstack/query-async-storage-persister for the storage backend.
+    rationale: |
+      Official TanStack Query packages for React Native cache persistence.
+      Handles serialization, maxAge expiry, version busting, and throttled
+      writes automatically. Avoids custom persistence logic.
+
+  - id: ADR-020
+    title: OnlineStatusContext for isOnline distribution
+    decision: |
+      Create a React Context (OnlineStatusContext) inside SyncProvider that
+      exposes the isOnline boolean to all descendant components via a
+      useOnlineStatus() hook.
+    rationale: |
+      Avoids multiple NetInfo listeners (one per tab). Consistent with
+      existing AuthContext and ThemeContext patterns. SyncProvider already
+      has isOnline from useConnection; the context simply distributes it.
+
+  - id: ADR-021
+    title: Proactive prefetch via queryClient.prefetchQuery
+    decision: |
+      Use queryClient.prefetchQuery() with existing query keys and functions
+      to warm the cache for offline use (next Sunday agenda, next 3 Sundays
+      speeches/exceptions/agendas).
+    rationale: |
+      Reuses existing Supabase queries and query keys. No parallel data paths.
+      Respects TanStack Query staleTime and deduplication. Prefetched data is
+      seamlessly available to components via the shared query cache.

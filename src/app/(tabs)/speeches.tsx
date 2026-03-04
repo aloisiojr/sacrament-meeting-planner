@@ -18,6 +18,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,6 +42,8 @@ import {
 } from '../../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
 import { supabase } from '../../lib/supabase';
+import { getTodaySundayDate } from '../../hooks/usePresentationMode';
+import { getNext3Sundays } from '../../hooks/useOfflinePrefetch';
 import { toISODateString } from '../../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../../types/database';
 
@@ -94,6 +97,7 @@ function SpeechesTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission, role } = useAuth();
+  const isOnline = useOnlineStatus();
   const flatListRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{ expandDate?: string }>();
   const router = useRouter();
@@ -108,6 +112,9 @@ function SpeechesTabContent() {
 
   const isObserver = role === 'observer';
   const canWriteSundayType = hasPermission('sunday_type:write');
+
+  // Offline: compute the set of next 3 Sundays that are expandable offline
+  const offlineExpandableDates = useMemo(() => new Set(getNext3Sundays()), []);
 
   const { managePrayers } = useWardManagePrayers();
 
@@ -207,6 +214,13 @@ function SpeechesTabContent() {
     router.setParams({ expandDate: undefined });
   }, [params.expandDate, listItems.length]);
 
+  // Auto-collapse card outside next 3 Sundays when going offline
+  useEffect(() => {
+    if (!isOnline && expandedDate && !offlineExpandableDates.has(expandedDate)) {
+      setExpandedDate(null);
+    }
+  }, [isOnline, expandedDate, offlineExpandableDates]);
+
   // Toggle expand/collapse
   const handleToggle = useCallback(
     (date: string) => {
@@ -214,10 +228,12 @@ function SpeechesTabContent() {
         setExpandedDate(null);
       } else {
         setExpandedDate(date);
-        // Lazy-create speeches on first expand, passing sundayType
-        const entry = speechMap.get(date);
-        const sundayType = entry?.exception?.reason as SundayExceptionReason | undefined;
-        lazyCreate.mutate({ sundayDate: date, sundayType });
+        // Lazy-create speeches on first expand, passing sundayType (only when online)
+        if (isOnline) {
+          const entry = speechMap.get(date);
+          const sundayType = entry?.exception?.reason as SundayExceptionReason | undefined;
+          lazyCreate.mutate({ sundayDate: date, sundayType });
+        }
         // Auto-scroll to expanded card (ADR-047)
         const index = listItems.findIndex(
           (i) => i.type === 'sunday' && i.key === date
@@ -233,7 +249,7 @@ function SpeechesTabContent() {
         }
       }
     },
-    [expandedDate, lazyCreate, speechMap, listItems]
+    [expandedDate, isOnline, lazyCreate, speechMap, listItems]
   );
 
   // Speaker assignment
@@ -414,6 +430,8 @@ function SpeechesTabContent() {
       const isSpeechesType = !exception || exception.reason === 'speeches';
       const isTestimonyOrPrimary = exception && (exception.reason === 'testimony_meeting' || exception.reason === 'primary_presentation');
 
+      const isExpandable = isOnline || offlineExpandableDates.has(item.date);
+
       return (
         <SundayCard
           date={item.date}
@@ -424,14 +442,15 @@ function SpeechesTabContent() {
           expanded={isExpanded}
           hasSecondSpeech={hasSecondSpeech}
           managePrayers={managePrayers}
-          onToggle={() => handleToggle(item.date)}
+          onToggle={isExpandable ? () => handleToggle(item.date) : undefined}
+          showChevron={isExpandable}
           onStatusPress={(speech) => {
             // Status press handled within SpeechSlot
           }}
           onTypeChange={handleTypeChange}
           onRemoveException={handleRemoveException}
           onDeleteSpeeches={handleDeleteSpeeches}
-          typeDisabled={!canWriteSundayType}
+          typeDisabled={!canWriteSundayType || !isOnline}
         >
           {/* Prayer + Speech slots when expanded */}
           {isExpanded && isSpeechesType && (
@@ -445,6 +464,7 @@ function SpeechesTabContent() {
                     speech={prayerSpeech}
                     position={0}
                     isPrayer
+                    disabled={!isOnline}
                     onChangeStatus={handleChangeStatus}
                     onRemoveAssignment={handleRemoveAssignment}
                     onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
@@ -459,6 +479,7 @@ function SpeechesTabContent() {
                     key={pos}
                     speech={speech}
                     position={pos}
+                    disabled={!isOnline}
                     onChangeStatus={handleChangeStatus}
                     onRemoveAssignment={handleRemoveAssignment}
                     onClearTopic={handleClearTopic}
@@ -478,6 +499,7 @@ function SpeechesTabContent() {
                     speech={prayerSpeech}
                     position={4}
                     isPrayer
+                    disabled={!isOnline}
                     onChangeStatus={handleChangeStatus}
                     onRemoveAssignment={handleRemoveAssignment}
                     onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
@@ -497,6 +519,7 @@ function SpeechesTabContent() {
                     speech={openingPrayer}
                     position={0}
                     isPrayer
+                    disabled={!isOnline}
                     onChangeStatus={handleChangeStatus}
                     onRemoveAssignment={handleRemoveAssignment}
                     onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
@@ -511,6 +534,7 @@ function SpeechesTabContent() {
                     speech={closingPrayer}
                     position={4}
                     isPrayer
+                    disabled={!isOnline}
                     onChangeStatus={handleChangeStatus}
                     onRemoveAssignment={handleRemoveAssignment}
                     onOpenSpeakerSelector={(id) => setSpeakerModalSpeechId(id)}
@@ -529,6 +553,8 @@ function SpeechesTabContent() {
       expandedDate,
       agendaMap,
       managePrayers,
+      isOnline,
+      offlineExpandableDates,
       handleToggle,
       handleTypeChange,
       handleRemoveException,

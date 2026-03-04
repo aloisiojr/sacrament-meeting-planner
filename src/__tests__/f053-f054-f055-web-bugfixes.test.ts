@@ -109,26 +109,54 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
      * in register.tsx to test it in isolation. The logic flow is:
      *
      * 1. If response.error:
-     *    a. data?.error === 'email_exists' -> 'auth.emailExists'
-     *    b. data?.error === 'stake_ward_exists' -> 'auth.stakeWardExists'
-     *    c. fallback -> 'auth.registrationFailed'
+     *    a. Extract error code from error.context (Response body)
+     *    b. 'email_exists' -> 'auth.emailExists'
+     *    c. 'stake_ward_exists' -> 'auth.stakeWardExists'
+     *    d. fallback -> 'auth.registrationFailed'
      * 2. If no response.error: success path
      * 3. Catch: network error -> 'auth.requiresConnection', else -> 'auth.registrationFailed'
+     *
+     * Note: Supabase JS v2 returns data=null for non-2xx. The error body
+     * must be extracted from error.context (the raw Response object).
      */
-    function classifyError(response: { data: any; error: any }): string | null {
-      const data = response.data;
 
+    /** Helper to create a mock Response with JSON body */
+    function mockResponse(body: Record<string, any>): Response {
+      return new Response(JSON.stringify(body), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    /** Helper to create a FunctionsHttpError-like object with context */
+    function mockFunctionsError(body: Record<string, any>) {
+      const err = new Error('Edge Function returned a non-2xx status code');
+      (err as any).context = mockResponse(body);
+      return err;
+    }
+
+    async function classifyError(response: { data: any; error: any }): Promise<string | null> {
       if (response.error) {
-        if (data?.error === 'email_exists') {
+        let errorCode: string | undefined;
+        try {
+          const ctx = response.error?.context;
+          if (ctx instanceof Response) {
+            const errorBody = await ctx.json();
+            errorCode = errorBody?.error;
+          }
+        } catch {
+          // Couldn't parse error body
+        }
+        if (errorCode === 'email_exists') {
           return 'auth.emailExists';
         }
-        if (data?.error === 'stake_ward_exists') {
+        if (errorCode === 'stake_ward_exists') {
           return 'auth.stakeWardExists';
         }
         return 'auth.registrationFailed';
       }
 
-      if (data?.session) {
+      if (response.data?.session) {
         return null; // success
       }
 
@@ -144,70 +172,69 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
     }
 
     // AC-F053-01: email_exists -> auth.emailExists
-    it('returns auth.emailExists when data.error is email_exists', () => {
+    it('returns auth.emailExists when error.context body has email_exists', async () => {
       const response = {
-        data: { error: 'email_exists' },
-        error: new Error('Non-2xx status code'),
+        data: null,
+        error: mockFunctionsError({ error: 'email_exists' }),
       };
-      expect(classifyError(response)).toBe('auth.emailExists');
+      expect(await classifyError(response)).toBe('auth.emailExists');
     });
 
     // AC-F053-02: stake_ward_exists -> auth.stakeWardExists
-    it('returns auth.stakeWardExists when data.error is stake_ward_exists', () => {
+    it('returns auth.stakeWardExists when error.context body has stake_ward_exists', async () => {
       const response = {
-        data: { error: 'stake_ward_exists' },
-        error: new Error('Non-2xx status code'),
+        data: null,
+        error: mockFunctionsError({ error: 'stake_ward_exists' }),
       };
-      expect(classifyError(response)).toBe('auth.stakeWardExists');
+      expect(await classifyError(response)).toBe('auth.stakeWardExists');
     });
 
     // AC-F053-03: 500 error with unknown data -> auth.registrationFailed
-    it('returns auth.registrationFailed for 500 error with unknown error code', () => {
+    it('returns auth.registrationFailed for unknown error code in context body', async () => {
       const response = {
-        data: { error: 'internal_server_error' },
-        error: new Error('Non-2xx status code'),
+        data: null,
+        error: mockFunctionsError({ error: 'internal_server_error' }),
       };
-      expect(classifyError(response)).toBe('auth.registrationFailed');
+      expect(await classifyError(response)).toBe('auth.registrationFailed');
     });
 
     // AC-F053-07: Unknown error code -> auth.registrationFailed (fallback)
-    it('returns auth.registrationFailed for completely unknown error code', () => {
+    it('returns auth.registrationFailed for completely unknown error code', async () => {
       const response = {
-        data: { error: 'some_random_error_nobody_expects' },
-        error: new Error('Non-2xx status code'),
+        data: null,
+        error: mockFunctionsError({ error: 'some_random_error_nobody_expects' }),
       };
-      expect(classifyError(response)).toBe('auth.registrationFailed');
+      expect(await classifyError(response)).toBe('auth.registrationFailed');
     });
 
-    // Edge case: null data on non-2xx
-    it('returns auth.registrationFailed when response.data is null on non-2xx', () => {
+    // Edge case: error without context (e.g. plain Error)
+    it('returns auth.registrationFailed when error has no context', async () => {
       const response = {
         data: null,
         error: new Error('Non-2xx status code'),
       };
-      expect(classifyError(response)).toBe('auth.registrationFailed');
+      expect(await classifyError(response)).toBe('auth.registrationFailed');
     });
 
-    // Edge case: undefined data on non-2xx
-    it('returns auth.registrationFailed when response.data is undefined on non-2xx', () => {
-      const response = {
-        data: undefined,
-        error: new Error('Non-2xx status code'),
-      };
-      expect(classifyError(response)).toBe('auth.registrationFailed');
+    // Edge case: error.context is not a Response
+    it('returns auth.registrationFailed when error.context is not a Response', async () => {
+      const err = new Error('Non-2xx status code');
+      (err as any).context = 'not-a-response';
+      const response = { data: null, error: err };
+      expect(await classifyError(response)).toBe('auth.registrationFailed');
     });
 
-    // Edge case: data without error field on non-2xx
-    it('returns auth.registrationFailed when data has no error field on non-2xx', () => {
+    // Edge case: error.context body has no error field
+    it('returns auth.registrationFailed when context body has no error field', async () => {
       const response = {
-        data: { message: 'Something went wrong' },
-        error: new Error('Non-2xx status code'),
+        data: null,
+        error: mockFunctionsError({ message: 'Something went wrong' }),
       };
-      expect(classifyError(response)).toBe('auth.registrationFailed');
+      expect(await classifyError(response)).toBe('auth.registrationFailed');
     });
 
     // AC-F053-05: Successful registration (no error)
-    it('returns null (success) when response has session and no error', () => {
+    it('returns null (success) when response has session and no error', async () => {
       const response = {
         data: {
           session: {
@@ -217,7 +244,7 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
         },
         error: null,
       };
-      expect(classifyError(response)).toBeNull();
+      expect(await classifyError(response)).toBeNull();
     });
 
     // AC-F053-04: Network error -> auth.requiresConnection

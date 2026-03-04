@@ -81,11 +81,22 @@ export default function RegisterScreen() {
       const data = response.data;
 
       if (response.error) {
-        if (data?.error === 'email_exists') {
+        // Supabase JS v2: for non-2xx, data is null. Extract error body from Response.
+        let errorCode: string | undefined;
+        try {
+          const ctx = response.error?.context;
+          if (ctx instanceof Response) {
+            const errorBody = await ctx.json();
+            errorCode = errorBody?.error;
+          }
+        } catch {
+          // Couldn't parse error body, fall through to generic message
+        }
+        if (errorCode === 'email_exists') {
           setError(t('auth.emailExists'));
           return;
         }
-        if (data?.error === 'stake_ward_exists') {
+        if (errorCode === 'stake_ward_exists') {
           setError(t('auth.stakeWardExists'));
           return;
         }

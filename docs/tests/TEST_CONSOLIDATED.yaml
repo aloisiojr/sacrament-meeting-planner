@@ -4,15 +4,15 @@
 # =============================================================================
 
 type: test_consolidated
-version: 6
+version: 7
 last_updated: "2026-03-04"
 
 summary:
-  total_test_files: 47
-  total_tests: 943
+  total_test_files: 48
+  total_tests: 1000
   framework: vitest
   categories:
-    module_named: 41
+    module_named: 42
     integration: 6
   infrastructure:
     setup: 1
@@ -456,6 +456,36 @@ module_tests:
       - EC-052-01: Deep link prevented - item not rendered offline
       - Permission-only behavior preserved for observers
       - Ward settings items not gated by isOnline
+
+  # --- F053-F054-F055 Web Bugfixes Tests ---
+
+  - file: src/__tests__/f053-f054-f055-web-bugfixes.test.ts
+    tests: 57
+    module: "src/app/(auth)/register.tsx, src/components/ActorSelector.tsx, src/components/AgendaForm.tsx"
+    covers:
+      - AC-F053-01: email_exists maps to auth.emailExists (i18n key + error logic)
+      - AC-F053-02: stake_ward_exists maps to auth.stakeWardExists (i18n key + error logic)
+      - AC-F053-03: 500 error shows auth.registrationFailed (i18n key + fallback logic)
+      - AC-F053-04: Network error shows auth.requiresConnection (catch branch logic)
+      - AC-F053-05: Successful registration (null error, session present)
+      - AC-F053-06: Frontend validation pattern (8 tests)
+      - AC-F053-07: Unknown error code falls back to auth.registrationFailed
+      - EC: null/undefined data on non-2xx, non-Error exceptions in catch
+      - AC-F054-01: filterActorsByRole preside
+      - AC-F054-02: filterActorsByRole conduct
+      - AC-F054-03: filterActorsByRole pianist
+      - AC-F054-04: filterActorsByRole conductor
+      - AC-F054-05: filterActorsByRole recognize
+      - AC-F054-06: Scroll-to-editingId findIndex on filtered list
+      - TDZ fix: useMemo filter with undefined/empty/populated actors
+      - AC-F055-01: initialNumToRender matches filtered.length
+      - AC-F055-02: Web onClick stopPropagation pattern
+      - AC-F055-03: onStartShouldSetResponder preserved for native
+      - AC-F055-04: filterHymns search behavior unchanged
+      - AC-F055-05: Overlay press triggers onClose
+      - AC-F055-06: Native behavior preserved (no onClick on ios/android)
+      - AC-F055-07: Web onClick stopPropagation on ActorSelector
+      - AC-F055-08: Overlay close resets state
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -1928,6 +1958,75 @@ coverage:
       covered: true
       tests: ["counts speeches per member correctly (AC-046-06)"]
 
+    # --- F053 (CR-263): Friendly Registration Error Messages ---
+    - id: AC-F053-01
+      covered: true
+      tests: ["auth.emailExists key exists in pt-BR/en-US/es-LA", "returns auth.emailExists when data.error is email_exists"]
+    - id: AC-F053-02
+      covered: true
+      tests: ["auth.stakeWardExists key exists in pt-BR/en-US/es-LA", "returns auth.stakeWardExists when data.error is stake_ward_exists"]
+    - id: AC-F053-03
+      covered: true
+      tests: ["auth.registrationFailed i18n key in all 3 locales", "returns auth.registrationFailed for 500 error"]
+    - id: AC-F053-04
+      covered: true
+      tests: ["auth.requiresConnection exists in all 3 locales", "returns auth.requiresConnection for Failed to fetch/Network errors"]
+    - id: AC-F053-05
+      covered: true
+      tests: ["returns null (success) when response has session and no error"]
+    - id: AC-F053-06
+      covered: true
+      tests: ["Frontend validation pattern - 8 tests covering empty/whitespace/short/mismatch"]
+    - id: AC-F053-07
+      covered: true
+      tests: ["returns auth.registrationFailed for completely unknown error code"]
+
+    # --- F054 (CR-264): Fix ActorSelector TDZ Crash ---
+    - id: AC-F054-01
+      covered: true
+      tests: ["filters actors by preside role"]
+    - id: AC-F054-02
+      covered: true
+      tests: ["filters actors by conduct role"]
+    - id: AC-F054-03
+      covered: true
+      tests: ["filters actors by pianist role"]
+    - id: AC-F054-04
+      covered: true
+      tests: ["filters actors by conductor role"]
+    - id: AC-F054-05
+      covered: true
+      tests: ["filters actors by recognize role"]
+    - id: AC-F054-06
+      covered: true
+      tests: ["findIndex locates correct actor in filtered list", "filtered list updates when search term changes"]
+
+    # --- F055 (CR-265): Fix Hymn Selector Web Compatibility ---
+    - id: AC-F055-01
+      covered: true
+      tests: ["initialNumToRender should equal filtered.length", "initialNumToRender updates when search filters"]
+    - id: AC-F055-02
+      covered: true
+      tests: ["stopPropagation prevents event bubbling", "web props conditionally applied"]
+    - id: AC-F055-03
+      covered: true
+      tests: ["onStartShouldSetResponder returns true"]
+    - id: AC-F055-04
+      covered: true
+      tests: ["empty search returns all hymns", "numeric search matches hymn number prefix", "text search matches title"]
+    - id: AC-F055-05
+      covered: true
+      tests: ["onClose callback is callable", "onClose resets search state"]
+    - id: AC-F055-06
+      covered: true
+      tests: ["native platform does not add onClick prop", "ios platform does not add onClick prop"]
+    - id: AC-F055-07
+      covered: true
+      tests: ["web props conditionally applied based on Platform.OS"]
+    - id: AC-F055-08
+      covered: true
+      tests: ["onClose resets search state (pattern from ActorSelector handleClose)"]
+
 gaps:
   # F039 gaps (unchanged)
   - id: COR-001-AC-1
@@ -2069,8 +2168,17 @@ gaps:
   # F052 gaps
   # All F052 ACs (01-03) covered. Edge case EC-052-01 covered.
 
+  # F053 gaps
+  # All F053 ACs (01-07) covered. Edge cases covered (null data, undefined data, non-Error).
+
+  # F054 gaps
+  # All F054 ACs (01-06) covered. TDZ fix verified via useMemo filter logic tests.
+
+  # F055 gaps
+  # All F055 ACs (01-08) covered. No gaps.
+
 stats:
-  total_tests: 943
-  passing: 943
+  total_tests: 1000
+  passing: 1000
   failing: 0
   skipped: 0

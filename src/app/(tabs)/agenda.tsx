@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SundayTypeDropdown } from '../../components/SundayCard';
@@ -72,6 +73,7 @@ function AgendaTabContent() {
   const removeSundayException = useRemoveSundayException();
   const deleteSpeechesByDate = useDeleteSpeechesByDate();
   const { hasPermission } = useAuth();
+  const isOnline = useOnlineStatus();
   const canEditType = hasPermission('sunday_type:write');
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -178,12 +180,21 @@ function AgendaTabContent() {
     router.setParams({ expandDate: undefined });
   }, [params.expandDate, listItems.length]);
 
+  // Auto-collapse non-next-Sunday card when going offline
+  useEffect(() => {
+    if (!isOnline && expandedDate && expandedDate !== nextSunday) {
+      setExpandedDate(null);
+    }
+  }, [isOnline, expandedDate, nextSunday]);
+
   const handleToggle = useCallback(
     (date: string) => {
       if (expandedDate === date) {
         setExpandedDate(null);
       } else {
-        lazyCreate.mutate(date);
+        if (isOnline) {
+          lazyCreate.mutate(date);
+        }
         setExpandedDate(date);
         // Auto-scroll to expanded card (ADR-047)
         const index = listItems.findIndex(
@@ -200,7 +211,7 @@ function AgendaTabContent() {
         }
       }
     },
-    [expandedDate, lazyCreate, listItems]
+    [expandedDate, isOnline, lazyCreate, listItems]
   );
 
   const getItemKey = useCallback((item: ListItem, index: number): string => {
@@ -227,6 +238,9 @@ function AgendaTabContent() {
       const sundayDate = new Date(date + 'T12:00:00');
       const isPast = sundayDate < today;
 
+      const baseExpandable = !exception || !isExcludedFromAgenda(exception.reason);
+      const isExpandable = baseExpandable && (isOnline || date === nextSunday);
+
       return (
         <AgendaSundayCard
           date={date}
@@ -235,7 +249,8 @@ function AgendaTabContent() {
           isNext={isNext}
           isPast={isPast}
           locale={locale}
-          expandable={!exception || !isExcludedFromAgenda(exception.reason)}
+          expandable={isExpandable}
+          isOffline={!isOnline}
           onToggle={() => handleToggle(date)}
           speeches={speechMap.get(date) ?? []}
           agenda={agendaMap.get(date) ?? null}
@@ -246,7 +261,7 @@ function AgendaTabContent() {
         />
       );
     },
-    [expandedDate, nextSunday, locale, handleToggle, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
+    [expandedDate, nextSunday, locale, handleToggle, isOnline, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -313,6 +328,7 @@ interface AgendaSundayCardProps {
   isPast: boolean;
   locale: SupportedLanguage;
   expandable: boolean;
+  isOffline: boolean;
   onToggle: () => void;
   speeches: Speech[];
   agenda: SundayAgenda | null;
@@ -330,6 +346,7 @@ function AgendaSundayCard({
   isPast,
   locale,
   expandable,
+  isOffline,
   onToggle,
   speeches,
   agenda,
@@ -551,7 +568,7 @@ function AgendaSundayCard({
             currentType={currentType}
             onSelect={handleTypeSelect}
             onRevertToSpeeches={handleRevertToSpeeches}
-            disabled={typeDisabled}
+            disabled={typeDisabled || isOffline}
             speeches={speeches}
             date={date}
             onDeleteSpeeches={onDeleteSpeeches}
@@ -561,6 +578,7 @@ function AgendaSundayCard({
               sundayDate={date}
               exceptionReason={exception?.reason ?? null}
               customReason={exception?.custom_reason ?? null}
+              disabled={isOffline}
             />
           </ThemedErrorBoundary>
         </View>

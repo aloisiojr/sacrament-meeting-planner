@@ -546,7 +546,7 @@ export default function MembersScreen() {
         onCancel={() => setEditingId(null)}
         disabled={!canWrite}
         colors={colors}
-        speechCount={speechCounts.get(item.id) ?? 0}
+        speechCount={speechCounts[item.id] ?? 0}
       />
     ),
     [editingId, activeSwipeId, handleEdit, handleDelete, handleSaveEdit, canWrite, colors, speechCounts]

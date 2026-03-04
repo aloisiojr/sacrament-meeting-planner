@@ -99,9 +99,9 @@ export function MemberSelectorModal({
               >
                 {item.full_name}
               </Text>
-              {(speechCounts.get(item.id) ?? 0) > 0 && (
+              {(speechCounts[item.id] ?? 0) > 0 && (
                 <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
-                  {t('members.speechCount', { count: speechCounts.get(item.id) ?? 0 })}
+                  {t('members.speechCount', { count: speechCounts[item.id] ?? 0 })}
                 </Text>
               )}
             </Pressable>

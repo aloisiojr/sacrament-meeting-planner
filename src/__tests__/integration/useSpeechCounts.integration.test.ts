@@ -2,17 +2,17 @@
  * Integration tests: useSpeechCounts hook with mocked Supabase.
  *
  * Covers:
- *   AC-046-03: Zero count hidden (Map has no entry)
+ *   AC-046-03: Zero count hidden (Record has no entry)
  *   AC-046-06: Bulk query fetches all counts in one request
  *   AC-046-07: Prayers excluded (position IN (1,2,3) only)
  *   AC-046-08: Only last 6 months counted
  *   AC-046-09: Count updates when speeches change (sync invalidation)
- *   EC-046-01: Ward has no members -> empty Map
- *   EC-046-02: Ward has members but no speech records -> empty Map
+ *   EC-046-01: Ward has no members -> empty Record
+ *   EC-046-02: Ward has members but no speech records -> empty Record
  *   EC-046-03: Deleted member speeches have NULL member_id -> excluded
- *   EC-046-04: All speeches are prayers (pos 0,4) -> empty Map
+ *   EC-046-04: All speeches are prayers (pos 0,4) -> empty Record
  *   EC-046-05: Speech exactly on cutoff date (boundary) -> included
- *   EC-046-09: Query fails -> data is empty Map
+ *   EC-046-09: Query fails -> data is empty Record
  *   EC-046-10: Leap year/month boundary -> Date.setMonth handles correctly
  */
 
@@ -82,15 +82,15 @@ afterEach(() => {
 // ==========================================================================
 
 describe('useSpeechCounts integration', () => {
-  it('returns empty Map when no speech records exist (EC-046-02)', async () => {
+  it('returns empty Record when no speech records exist (EC-046-02)', async () => {
     mockSupabaseFrom(mockedSupabase, 'speeches', { data: [], error: null });
 
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.data).toBeInstanceOf(Map);
-    expect(result.current.data.size).toBe(0);
+    expect(result.current.data).toEqual({});
+    expect(Object.keys(result.current.data).length).toBe(0);
   });
 
   it('counts speeches per member correctly (AC-046-06)', async () => {
@@ -107,13 +107,13 @@ describe('useSpeechCounts integration', () => {
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
-    await waitFor(() => expect(result.current.data.size).toBeGreaterThan(0));
-    expect(result.current.data.get('member-a')).toBe(3);
-    expect(result.current.data.get('member-b')).toBe(2);
-    expect(result.current.data.get('member-c')).toBe(1);
+    await waitFor(() => expect(Object.keys(result.current.data).length).toBeGreaterThan(0));
+    expect(result.current.data['member-a']).toBe(3);
+    expect(result.current.data['member-b']).toBe(2);
+    expect(result.current.data['member-c']).toBe(1);
   });
 
-  it('returns 0 for member not in Map (AC-046-03)', async () => {
+  it('returns 0 for member not in Record (AC-046-03)', async () => {
     const mockRows = [
       { member_id: 'member-a' },
     ];
@@ -122,24 +122,24 @@ describe('useSpeechCounts integration', () => {
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
-    await waitFor(() => expect(result.current.data.size).toBeGreaterThan(0));
-    // member-b has no entry in Map -> undefined -> consumers use ?? 0
-    expect(result.current.data.get('member-b')).toBeUndefined();
-    expect(result.current.data.get('member-b') ?? 0).toBe(0);
+    await waitFor(() => expect(Object.keys(result.current.data).length).toBeGreaterThan(0));
+    // member-b has no entry in Record -> undefined -> consumers use ?? 0
+    expect(result.current.data['member-b']).toBeUndefined();
+    expect(result.current.data['member-b'] ?? 0).toBe(0);
   });
 
-  it('returns empty Map when query returns null data (EC-046-01)', async () => {
+  it('returns empty Record when query returns null data (EC-046-01)', async () => {
     mockSupabaseFrom(mockedSupabase, 'speeches', { data: null, error: null });
 
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.data).toBeInstanceOf(Map);
-    expect(result.current.data.size).toBe(0);
+    expect(result.current.data).toEqual({});
+    expect(Object.keys(result.current.data).length).toBe(0);
   });
 
-  it('returns empty Map when query fails (EC-046-09)', async () => {
+  it('returns empty Record when query fails (EC-046-09)', async () => {
     mockSupabaseFrom(mockedSupabase, 'speeches', {
       data: null,
       error: { message: 'Network error', code: '500' },
@@ -150,9 +150,9 @@ describe('useSpeechCounts integration', () => {
 
     // Wait for the error state to settle - retry is false, so one failure is final
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    // data defaults to empty Map via data ?? new Map()
-    expect(result.current.data).toBeInstanceOf(Map);
-    expect(result.current.data.size).toBe(0);
+    // data defaults to empty Record via data ?? {}
+    expect(result.current.data).toEqual({});
+    expect(Object.keys(result.current.data).length).toBe(0);
   });
 
   it('does not fetch when wardId is empty', async () => {
@@ -163,9 +163,9 @@ describe('useSpeechCounts integration', () => {
 
     // Wait a tick to ensure no query fires
     await new Promise((r) => setTimeout(r, 50));
-    // enabled: !!wardId is false, so data stays as default empty Map
-    expect(result.current.data).toBeInstanceOf(Map);
-    expect(result.current.data.size).toBe(0);
+    // enabled: !!wardId is false, so data stays as default empty Record
+    expect(result.current.data).toEqual({});
+    expect(Object.keys(result.current.data).length).toBe(0);
   });
 
   it('uses query key ["speechCounts", wardId]', async () => {
@@ -217,10 +217,10 @@ describe('useSpeechCounts integration', () => {
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
-    await waitFor(() => expect(result.current.data.size).toBe(3));
-    expect(result.current.data.get('member-x')).toBe(1);
-    expect(result.current.data.get('member-y')).toBe(1);
-    expect(result.current.data.get('member-z')).toBe(1);
+    await waitFor(() => expect(Object.keys(result.current.data).length).toBe(3));
+    expect(result.current.data['member-x']).toBe(1);
+    expect(result.current.data['member-y']).toBe(1);
+    expect(result.current.data['member-z']).toBe(1);
   });
 
   it('handles member with many speeches (AC-046-05 plural)', async () => {
@@ -231,8 +231,8 @@ describe('useSpeechCounts integration', () => {
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSpeechCounts(), { wrapper });
 
-    await waitFor(() => expect(result.current.data.size).toBe(1));
-    expect(result.current.data.get('prolific-speaker')).toBe(7);
+    await waitFor(() => expect(Object.keys(result.current.data).length).toBe(1));
+    expect(result.current.data['prolific-speaker']).toBe(7);
   });
 });
 

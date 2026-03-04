@@ -1,7 +1,8 @@
 /**
  * TanStack Query hook for bulk speech count per member (last 6 months).
  * Fetches all speech records for the ward (positions 1-3, member_id IS NOT NULL),
- * counts occurrences per member_id client-side, and returns Map<string, number>.
+ * counts occurrences per member_id client-side, and returns Record<string, number>.
+ * Uses plain object (not Map) for JSON-safe cache persistence (PersistQueryClientProvider).
  * Used by MemberRow (Settings) and MemberSelectorModal.
  */
 
@@ -19,7 +20,7 @@ export const speechCountKeys = {
 
 // --- Hook ---
 
-export function useSpeechCounts(): { data: Map<string, number>; isLoading: boolean } {
+export function useSpeechCounts(): { data: Record<string, number>; isLoading: boolean } {
   const { wardId } = useAuth();
 
   const cutoffDate = useMemo(() => {
@@ -44,15 +45,15 @@ export function useSpeechCounts(): { data: Map<string, number>; isLoading: boole
 
       if (error) throw error;
 
-      const counts = new Map<string, number>();
+      const counts: Record<string, number> = {};
       for (const row of rows ?? []) {
         const id = row.member_id as string;
-        counts.set(id, (counts.get(id) ?? 0) + 1);
+        counts[id] = (counts[id] ?? 0) + 1;
       }
       return counts;
     },
     enabled: !!wardId,
   });
 
-  return { data: data ?? new Map(), isLoading };
+  return { data: data ?? {}, isLoading };
 }

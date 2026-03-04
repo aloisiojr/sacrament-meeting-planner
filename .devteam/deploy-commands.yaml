@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 19
-last_updated: "2026-03-03T16:11:00"
+version: 20
+last_updated: "2026-03-04T12:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -749,3 +749,18 @@ deploy_history:
     verification:
       - "supabase functions list mostra process-notifications como ACTIVE v8"
       - "REST API health check: HTTP 200"
+
+  - date: "2026-03-04"
+    action: "Migration 028_fix_designation_notification_guard.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding + ALTER FUNCTION for search_path"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - enqueue_speech_notification() atualizada com guard OLD.status = 'not_assigned' no Case 1 (designation)"
+    verified: true
+    cr: "CR-269"
+    verification:
+      - "pg_proc.prosrc: Case 1 guard 'OLD.status = not_assigned' presente"
+      - "pg_proc.prosecdef = true (SECURITY DEFINER mantido)"
+      - "pg_proc.proconfig = [search_path=\"\"] (restaurado via ALTER FUNCTION)"
+      - "speech_notification_trigger: ativo em INSERT e UPDATE"
+      - "REST API health check: HTTP 200"
+    notes: "Migration file nao incluia SET search_path = ''. Corrigido via ALTER FUNCTION separado e arquivo local atualizado."

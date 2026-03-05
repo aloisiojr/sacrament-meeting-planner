@@ -8,7 +8,7 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  total_features: 56
+  total_features: 57
   total_business_rules: 44
   total_design_decisions: 39
 
@@ -1245,6 +1245,42 @@ features:
         when: "Invite row renders"
         then: "No missing topic indicator shown regardless of topic_title"
 
+  - id: F064
+    name: Supabase Resource Optimization
+    area: performance
+    description: |
+      Optimization bundle addressing 7 Supabase resource usage issues across
+      Edge Functions, database, client hooks, and real-time sync. Changes:
+      (S1-CRITICAL) send-reset-email listUsers() paginated loop to handle >50 users;
+      (S2-HIGH) device_push_tokens stores role, eliminating N+1 getUserById in
+      process-notifications; (S3-HIGH) ward query cache Map in process-notifications;
+      (S4-MEDIUM) notification_queue 7-day retention cleanup; (S5-MEDIUM) useActiveTopics
+      Promise.all parallelization (4 sequential -> 2 rounds); (S6-MEDIUM) polling
+      fallback interval 2500ms -> 10000ms; (S7-MEDIUM) useToggleCollection UPSERT
+      replaces check-then-act. All backward-compatible. [CR-273]
+    acceptance_criteria:
+      - given: "Project has >50 users and user #51+ requests password reset"
+        when: "send-reset-email processes the request"
+        then: "Paginated listUsers loop finds the user and sends reset email"
+      - given: "Notification batch is being processed"
+        when: "getTargetTokens is called for a ward and target_role"
+        then: "Single SQL query filtering by ward_id AND role; no auth.admin API calls"
+      - given: "Notification batch has entries for the same ward_id"
+        when: "Batch is processed"
+        then: "Only one query to wards table per unique ward_id (cached)"
+      - given: "process-notifications completes processing"
+        when: "Cleanup step runs"
+        then: "Entries with status sent/cancelled older than 7 days are deleted"
+      - given: "useActiveTopics queryFn executes"
+        when: "ward_topics and ward_collection_config queries are issued"
+        then: "Both run in parallel via Promise.all"
+      - given: "WebSocket is disconnected and polling fallback is active"
+        when: "Polling timer fires"
+        then: "Interval is 10000ms (10s), not 2500ms"
+      - given: "User toggles a collection on/off"
+        when: "Mutation executes"
+        then: "Single upsert with onConflict replaces select+update/insert"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1586,3 +1622,24 @@ edge_cases:
 
   - id: EC018
     description: "CSV import replaces all members -> counts reset since old member_ids become NULL in speeches table"
+
+  - id: EC019
+    description: "Project has exactly 50 users -> all returned in first page of listUsers, no pagination needed"
+
+  - id: EC020
+    description: "User's role changes after token registration -> device_push_tokens role stale until next app open; acceptable since role changes are rare"
+
+  - id: EC021
+    description: "device_push_tokens row has NULL role (pre-migration) -> excluded from getTargetTokens filter; populated on next app open"
+
+  - id: EC022
+    description: "Ward deleted between cache fetch and processing -> cache returns null, notification falls back to pt-BR"
+
+  - id: EC023
+    description: "notification_queue cleanup runs while new entries inserted -> new entries have status=pending, only old sent/cancelled deleted"
+
+  - id: EC024
+    description: "useActiveTopics with no active collections -> only 2 queries (ward_topics + ward_collection_config), general queries skipped"
+
+  - id: EC025
+    description: "Concurrent collection toggle from two devices -> UPSERT with onConflict handles atomically, last write wins"

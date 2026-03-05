@@ -1,0 +1,372 @@
+# =============================================================================
+# QA_PLAN_012.yaml
+# PRE-validation plan for CR-273: Otimização de recursos Supabase
+# =============================================================================
+
+metadata:
+  plan_id: QA_PLAN_012
+  cr: CR-273
+  type: feature_request
+  mode: PRE
+  date: "2026-03-05"
+  scope: "7-item Supabase resource optimization (1 critical, 2 high, 4 medium)"
+  validated: true
+
+# =============================================================================
+# PRE-VALIDATION EVIDENCE
+# =============================================================================
+pre_validation:
+  status: validated
+  summary: "All 7 items confirmed present in codebase. Each issue is reproducible via code inspection."
+
+  items:
+
+    # -------------------------------------------------------------------------
+    # Item 1: CRITICAL - send-reset-email listUsers() sem paginação
+    # -------------------------------------------------------------------------
+    - id: ITEM_1
+      severity: CRITICAL
+      title: "send-reset-email listUsers() sem paginação"
+      confirmed: true
+      evidence:
+        - path: "supabase/functions/send-reset-email/index.ts"
+          line: 125
+          code: "await supabaseAdmin.auth.admin.listUsers()"
+          observation: |
+            listUsers() chamado SEM parâmetros de paginação. A API do Supabase Auth
+            retorna no máximo 50 users por página por padrão. Com >50 users, o user
+            buscado pode não estar na primeira página, causando falha silenciosa
+            (retorna success:true sem enviar email, por causa do anti-enumeration
+            guard na linha 144).
+        - path: "supabase/functions/send-reset-email/index.ts"
+          lines: "138-141"
+          code: "const user = users.find((u) => u.email?.toLowerCase() === trimmedEmail)"
+          observation: |
+            O find() busca linearmente no array retornado, que contém no máximo 50 users.
+            Se o user está na página 2+, nunca será encontrado.
+      fix_approach: |
+        Substituir listUsers() por getUserByEmail() da admin API do Supabase, que busca
+        diretamente pelo email sem paginação. Alternativa: paginar com listUsers({ page, perPage }).
+
+    # -------------------------------------------------------------------------
+    # Item 2: HIGH - process-notifications N+1 getUserById
+    # -------------------------------------------------------------------------
+    - id: ITEM_2
+      severity: HIGH
+      title: "process-notifications N+1 getUserById"
+      confirmed: true
+      evidence:
+        - path: "supabase/functions/process-notifications/index.ts"
+          lines: "419-426"
+          code: |
+            for (const userId of userIds) {
+              const { data: userData } = await supabase.auth.admin.getUserById(userId);
+              const userRole = userData?.user?.app_metadata?.role;
+              ...
+            }
+          observation: |
+            Loop N+1: para CADA user_id único nos tokens do ward, faz uma chamada
+            individual à Auth Admin API (getUserById). Se um ward tem 5 users com
+            tokens, são 5 chamadas sequenciais ao Auth. Isto ocorre para CADA grupo
+            de notificação e cada entry imediata, multiplicando o problema.
+        - path: "supabase/migrations/001_initial_schema.sql"
+          lines: "248-256"
+          code: "CREATE TABLE device_push_tokens (id, user_id, ward_id, expo_push_token, ...)"
+          observation: |
+            Tabela device_push_tokens NÃO tem coluna 'role'. O role só existe em
+            auth.users.app_metadata, forçando a chamada à Auth Admin API.
+      fix_approach: |
+        Adicionar coluna 'role' na tabela device_push_tokens. O client já faz upsert
+        do token (useNotifications.ts:84-95) e tem acesso ao role via useAuth().
+        Basta incluir o role no upsert. No process-notifications, filtrar diretamente
+        no SELECT da tabela, eliminando o loop N+1.
+
+    # -------------------------------------------------------------------------
+    # Item 3: HIGH - process-notifications queries repetidas de wards
+    # -------------------------------------------------------------------------
+    - id: ITEM_3
+      severity: HIGH
+      title: "process-notifications queries repetidas de wards"
+      confirmed: true
+      evidence:
+        - path: "supabase/functions/process-notifications/index.ts"
+          lines: "274-278"
+          code: |
+            const { data: ward } = await supabase
+              .from('wards')
+              .select('language, timezone')
+              .eq('id', wardId)
+              .single();
+          observation: |
+            Dentro do loop de designationGroups (linha 265), cada grupo faz um SELECT
+            na tabela wards. Se há 3 grupos do mesmo ward, são 3 queries idênticas.
+        - path: "supabase/functions/process-notifications/index.ts"
+          lines: "297-301"
+          code: |
+            const { data: ward } = await supabase
+              .from('wards')
+              .select('language, timezone')
+              .eq('id', entry.ward_id)
+              .single();
+          observation: |
+            Dentro do loop de immediateEntries (linha 296), CADA entry faz outro SELECT
+            na tabela wards. Se há 10 entries do mesmo ward, são 10 queries idênticas.
+            Total: O(designationGroups + immediateEntries) queries à tabela wards.
+      fix_approach: |
+        Criar um cache local (Map<string, WardInfo>) no início do handler. Antes de
+        cada query, verificar se o ward_id já está no cache. Se não, buscar e armazenar.
+        Reduz para O(distinct_ward_ids) queries.
+
+    # -------------------------------------------------------------------------
+    # Item 4: MEDIUM - notification_queue sem retenção
+    # -------------------------------------------------------------------------
+    - id: ITEM_4
+      severity: MEDIUM
+      title: "notification_queue sem retenção"
+      confirmed: true
+      evidence:
+        - path: "supabase/migrations/001_initial_schema.sql"
+          lines: "264-293"
+          code: "CREATE TABLE notification_queue (...)"
+          observation: |
+            Tabela notification_queue não tem nenhuma política de retenção ou cleanup.
+            Registros com status 'sent' e 'cancelled' acumulam indefinidamente.
+            O índice parcial (idx_notification_queue_pending) ajuda nas queries de
+            processing, mas a tabela cresce sem limite.
+        - path: "supabase/functions/process-notifications/index.ts"
+          lines: "359-363"
+          code: |
+            await supabase
+              .from('notification_queue')
+              .update({ status: 'sent' })
+              .in('id', processedIds);
+          observation: |
+            Entries são marcadas como 'sent' mas nunca deletadas. Sem TTL ou cron de cleanup.
+      fix_approach: |
+        Adicionar cleanup no final do process-notifications: DELETE FROM notification_queue
+        WHERE status IN ('sent', 'cancelled') AND created_at < now() - interval '7 days'.
+        Ou criar um pg_cron job separado para limpeza periódica.
+
+    # -------------------------------------------------------------------------
+    # Item 5: MEDIUM - useActiveTopics 4 queries cascata
+    # -------------------------------------------------------------------------
+    - id: ITEM_5
+      severity: MEDIUM
+      title: "useActiveTopics 4 queries cascata"
+      confirmed: true
+      evidence:
+        - path: "src/hooks/useTopics.ts"
+          lines: "355-436"
+          code: "useActiveTopics() queryFn"
+          observation: |
+            Dentro de um único queryFn, executa 4 queries sequenciais:
+            1. ward_topics: SELECT * FROM ward_topics WHERE ward_id = X (linha 365-368)
+            2. ward_collection_config: SELECT collection_id FROM ward_collection_config WHERE ward_id = X AND active = true (linhas 384-388)
+            3. general_collections: SELECT * FROM general_collections WHERE id IN (...) (linhas 396-399)
+            4. general_topics: SELECT * FROM general_topics WHERE collection_id IN (...) (linhas 407-410)
+            Queries 1-2 são independentes (podem ser paralelas). Queries 3-4 dependem
+            de 2 mas são independentes entre si (podem ser paralelas).
+      fix_approach: |
+        Paralelizar com Promise.all:
+        - Fase 1: Promise.all([wardTopicsQuery, activeConfigsQuery])
+        - Fase 2: Promise.all([collectionsQuery, generalTopicsQuery])
+        Reduz de 4 sequential roundtrips para 2.
+
+    # -------------------------------------------------------------------------
+    # Item 6: MEDIUM - polling fallback 2.5s muito agressivo
+    # -------------------------------------------------------------------------
+    - id: ITEM_6
+      severity: MEDIUM
+      title: "polling fallback 2.5s muito agressivo"
+      confirmed: true
+      evidence:
+        - path: "src/lib/sync.ts"
+          line: 67
+          code: "export const POLLING_INTERVAL_MS = 2500;"
+          observation: |
+            Polling de 2.5 segundos quando WebSocket cai. Cada poll invalida TODAS as
+            query keys de TODAS as 7 tabelas sincronizadas (sync.ts linhas 44-52).
+            Com TanStack Query, invalidar = refetch, gerando potencialmente 7+ requests
+            a cada 2.5s. Em mobile com conexão instável, gera tráfego excessivo.
+        - path: "src/hooks/useRealtimeSync.ts"
+          lines: "59-61"
+          code: |
+            pollingRef.current = setInterval(() => {
+              invalidateAll();
+            }, POLLING_INTERVAL_MS);
+          observation: |
+            invalidateAll() percorre SYNCED_TABLES (7 tabelas) e invalida cada uma.
+            Cada invalidação pode gerar um refetch se a query está ativa.
+      fix_approach: |
+        Aumentar o intervalo para 10-15 segundos. Os dados do app não são tão
+        time-sensitive para justificar 2.5s. O realtime WebSocket já cobre o caso
+        normal. O polling é apenas fallback temporário.
+
+    # -------------------------------------------------------------------------
+    # Item 7: MEDIUM - check-then-act substituir por UPSERT
+    # -------------------------------------------------------------------------
+    - id: ITEM_7
+      severity: MEDIUM
+      title: "check-then-act substituir por UPSERT"
+      confirmed: true
+      evidence:
+        - path: "src/hooks/useTopics.ts"
+          lines: "294-316"
+          code: |
+            // Check if config exists
+            const { data: existing } = await supabase
+              .from('ward_collection_config')
+              .select('id')
+              .eq('ward_id', wardId)
+              .eq('collection_id', collectionId)
+              .single();
+            if (existing) {
+              await supabase.from('ward_collection_config').update({ active }).eq('id', existing.id);
+            } else {
+              await supabase.from('ward_collection_config').insert({ ward_id: wardId, collection_id: collectionId, active });
+            }
+          observation: |
+            Padrão check-then-act: primeiro SELECT para verificar se existe, depois
+            INSERT ou UPDATE conforme resultado. Race condition possível (dois users
+            toggleando ao mesmo tempo). A tabela ward_collection_config já tem UNIQUE
+            (ward_id, collection_id) na linha 81 do schema, perfeito para upsert.
+        - path: "supabase/migrations/001_initial_schema.sql"
+          line: 81
+          code: "UNIQUE (ward_id, collection_id)"
+          observation: "Constraint UNIQUE já existe, habilitando upsert com onConflict."
+      fix_approach: |
+        Substituir check-then-act por um único upsert:
+        supabase.from('ward_collection_config').upsert(
+          { ward_id: wardId, collection_id: collectionId, active },
+          { onConflict: 'ward_id,collection_id' }
+        )
+        Reduz de 2 queries para 1, elimina race condition.
+
+# =============================================================================
+# VALIDATION CHECKS (para fase POST)
+# =============================================================================
+
+validation_checks:
+
+  must_pass:
+
+    # --- Item 1: listUsers() pagination fix ---
+    - id: CR273_MP1
+      item: ITEM_1
+      description: "send-reset-email não usa listUsers() sem paginação"
+      verify: |
+        grep -c 'listUsers()' em send-reset-email/index.ts deve ser 0.
+        Deve usar getUserByEmail, listUsers com paginação, ou equivalente.
+
+    - id: CR273_MP2
+      item: ITEM_1
+      description: "send-reset-email encontra user por email mesmo com >50 users no sistema"
+      verify: |
+        A busca por email não depende de paginação. Se usar getUserByEmail ou
+        listUsers({filter: email}), o resultado é direto.
+
+    # --- Item 2: N+1 getUserById fix ---
+    - id: CR273_MP3
+      item: ITEM_2
+      description: "device_push_tokens tem coluna role"
+      verify: |
+        Nova migration adiciona coluna role à tabela device_push_tokens.
+
+    - id: CR273_MP4
+      item: ITEM_2
+      description: "useRegisterPushToken inclui role no upsert"
+      verify: |
+        useNotifications.ts upsert inclui role no payload.
+
+    - id: CR273_MP5
+      item: ITEM_2
+      description: "process-notifications não usa getUserById em loop"
+      verify: |
+        grep -c 'getUserById' em process-notifications/index.ts deve ser 0.
+        getTargetTokens filtra por role diretamente no SELECT da tabela.
+
+    # --- Item 3: ward queries cache ---
+    - id: CR273_MP6
+      item: ITEM_3
+      description: "process-notifications não repete queries de wards"
+      verify: |
+        Deve haver cache local (Map) ou batch query para wards.
+        Contar chamadas .from('wards') no handler: deve ser <= distinct_ward_ids.
+
+    # --- Item 4: notification_queue retention ---
+    - id: CR273_MP7
+      item: ITEM_4
+      description: "notification_queue tem mecanismo de cleanup"
+      verify: |
+        DELETE de registros antigos com status 'sent'/'cancelled' existe,
+        seja no process-notifications ou em migration separada (pg_cron).
+
+    # --- Item 5: useActiveTopics parallelization ---
+    - id: CR273_MP8
+      item: ITEM_5
+      description: "useActiveTopics executa queries em paralelo onde possível"
+      verify: |
+        Promise.all ou equivalente agrupa queries independentes.
+        Máximo 2 roundtrips sequenciais (em vez de 4).
+
+    # --- Item 6: polling interval ---
+    - id: CR273_MP9
+      item: ITEM_6
+      description: "POLLING_INTERVAL_MS aumentado para >= 10000ms"
+      verify: |
+        src/lib/sync.ts POLLING_INTERVAL_MS >= 10000.
+
+    # --- Item 7: upsert pattern ---
+    - id: CR273_MP10
+      item: ITEM_7
+      description: "useToggleCollection usa upsert em vez de check-then-act"
+      verify: |
+        grep 'upsert' em useTopics.ts na mutationFn de useToggleCollection.
+        Apenas 1 chamada Supabase (não 2).
+
+    # --- Regression checks ---
+    - id: CR273_MP11
+      item: ALL
+      description: "Todos os testes existentes continuam passando"
+      verify: |
+        npx vitest run: 0 failures. Total >= 1181 (tests atuais).
+
+    - id: CR273_MP12
+      item: ALL
+      description: "Novos testes cobrem as mudanças"
+      verify: |
+        Novos testes para: listUsers fix, role em device_push_tokens,
+        ward cache, cleanup, parallelização, polling interval, upsert.
+
+  should_pass:
+
+    - id: CR273_SP1
+      item: ITEM_2
+      description: "Migration popula role para tokens existentes (backfill)"
+      verify: |
+        Migration inclui UPDATE para tokens existentes ou documenta que
+        o role será preenchido na próxima abertura do app.
+
+    - id: CR273_SP2
+      item: ITEM_4
+      description: "Cleanup retention é configurável ou documentado (ex: 7 dias)"
+      verify: |
+        Período de retenção está claro no código (comentário ou constante).
+
+    - id: CR273_SP3
+      item: ITEM_6
+      description: "Teste existente de POLLING_INTERVAL_MS atualizado"
+      verify: |
+        sync-utils.test.ts e sync-realtime.integration.test.ts refletem novo valor.
+
+    - id: CR273_SP4
+      item: ITEM_3
+      description: "Ward cache não introduz memory leak (limpo no final da execução)"
+      verify: |
+        Map é variável local do handler, garbage collected automaticamente.
+
+    - id: CR273_SP5
+      item: ITEM_1
+      description: "Anti-enumeration behavior preservado (success:true mesmo sem user)"
+      verify: |
+        Retorno 200 success:true quando user não encontrado permanece.

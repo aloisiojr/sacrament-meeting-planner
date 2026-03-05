@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  version: 12
+  version: 13
 
 validations:
 
@@ -2131,3 +2131,175 @@ validations:
         description: "Tests confirm prayers are unaffected by missing topic check"
         result: PASS
         evidence: "f063-topic-missing-indicator.test.ts: Lines 70-76 confirm computeTopicMissing(0, null)=false and computeTopicMissing(4, null)=false. Lines 98-106 confirm isWhatsAppDisabled(0/4, null, 'assigned_not_invited')=false. Supplementary test lines 249-264 with getInviteItems integration confirms prayers never flagged."
+
+  # ===========================================================================
+  # Phase 12: Supabase Resource Optimization (QA_PLAN_012)
+  # ===========================================================================
+
+  - id: QA_012
+    plan: QA_PLAN_012
+    date: "2026-03-05"
+    scope: "Phase 12 - CR-273: Supabase Resource Optimization (7 items: 1 critical, 2 high, 4 medium)"
+    verdict: passed
+    must_pass: 12/12
+    should_pass: 5/5
+    total_checks: 17/17
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1222 tests, 41 new, 0 failures)"
+
+    checks:
+
+      # =========================================================================
+      # CR-273 ITEM 1: send-reset-email listUsers() pagination fix (CRITICAL)
+      # =========================================================================
+
+      - id: CR273_MP1
+        cr: CR-273
+        type: must_pass
+        description: "send-reset-email does not use listUsers() without pagination"
+        result: PASS
+        evidence: "grep 'listUsers()' in send-reset-email/index.ts returns 0 matches. Line 126: listUsers({ page, perPage: 50 }) with paginated while loop (lines 124-146). Commits: f257893."
+
+      - id: CR273_MP2
+        cr: CR-273
+        type: must_pass
+        description: "send-reset-email finds user by email even with >50 users in system"
+        result: PASS
+        evidence: "Lines 122-146: while loop iterates pages. Line 139: find() searches each page. Line 144: 'if (user || data.users.length < 50) break;' terminates on found or last page. Anti-enumeration preserved at lines 148-154."
+
+      # =========================================================================
+      # CR-273 ITEM 2: process-notifications N+1 getUserById fix (HIGH)
+      # =========================================================================
+
+      - id: CR273_MP3
+        cr: CR-273
+        type: must_pass
+        description: "device_push_tokens has role column"
+        result: PASS
+        evidence: "supabase/migrations/029_add_device_push_tokens_role.sql: 'ALTER TABLE device_push_tokens ADD COLUMN role TEXT;'. Nullable column, existing rows get NULL until next app open. Commit: e09ae26."
+
+      - id: CR273_MP4
+        cr: CR-273
+        type: must_pass
+        description: "useRegisterPushToken includes role in upsert"
+        result: PASS
+        evidence: "useNotifications.ts lines 86-96: upsert payload includes { user_id, ward_id, expo_push_token, role } with onConflict 'user_id,expo_push_token'. Role comes from useAuth() destructured at line 38. Commit: 536289b."
+
+      - id: CR273_MP5
+        cr: CR-273
+        type: must_pass
+        description: "process-notifications does not use getUserById in loop"
+        result: PASS
+        evidence: "grep 'getUserById' in process-notifications/index.ts returns 0 matches. getTargetTokens() at lines 405-428: builds roles array from targetRole, then single query with .eq('ward_id', wardId).in('role', roles). No auth.admin calls. Commit: 734ee91."
+
+      # =========================================================================
+      # CR-273 ITEM 3: process-notifications ward queries cache (HIGH)
+      # =========================================================================
+
+      - id: CR273_MP6
+        cr: CR-273
+        type: must_pass
+        description: "process-notifications does not repeat queries for wards"
+        result: PASS
+        evidence: "Lines 240-249: wardIds collected via Set, batch query with .in('id', wardIds), results stored in wardCache Map<string, WardInfo>. Lines 286, 304: wardCache.get() used instead of individual queries. Zero individual ward queries in processing loops. Commit: 64eed72."
+
+      # =========================================================================
+      # CR-273 ITEM 4: notification_queue retention cleanup (MEDIUM)
+      # =========================================================================
+
+      - id: CR273_MP7
+        cr: CR-273
+        type: must_pass
+        description: "notification_queue has cleanup mechanism"
+        result: PASS
+        evidence: "process-notifications/index.ts lines 376-386: Step 6 cleanup deletes entries with status IN ['sent','cancelled'] AND created_at < 7 days ago. Wrapped in try/catch so cleanup failures don't affect response. Commit: f87321f."
+
+      # =========================================================================
+      # CR-273 ITEM 5: useActiveTopics parallelization (MEDIUM)
+      # =========================================================================
+
+      - id: CR273_MP8
+        cr: CR-273
+        type: must_pass
+        description: "useActiveTopics executes queries in parallel where possible"
+        result: PASS
+        evidence: "useTopics.ts lines 349-359: Round 1 Promise.all([ward_topics, ward_collection_config]). Lines 379-388: Round 2 Promise.all([general_collections, general_topics]). Maximum 2 sequential rounds instead of 4. ADR-033 referenced. Commit: 4886c58."
+
+      # =========================================================================
+      # CR-273 ITEM 6: polling interval increase (MEDIUM)
+      # =========================================================================
+
+      - id: CR273_MP9
+        cr: CR-273
+        type: must_pass
+        description: "POLLING_INTERVAL_MS increased to >= 10000ms"
+        result: PASS
+        evidence: "src/lib/sync.ts line 67: 'export const POLLING_INTERVAL_MS = 10000;'. Changed from 2500 to 10000. Commit: 1896b67."
+
+      # =========================================================================
+      # CR-273 ITEM 7: useToggleCollection UPSERT (MEDIUM)
+      # =========================================================================
+
+      - id: CR273_MP10
+        cr: CR-273
+        type: must_pass
+        description: "useToggleCollection uses upsert instead of check-then-act"
+        result: PASS
+        evidence: "useTopics.ts lines 294-299: Single .upsert({ ward_id, collection_id, active }, { onConflict: 'ward_id,collection_id' }). No SELECT+UPDATE/INSERT pattern. Only 1 Supabase call per toggle. Commit: 1896b67."
+
+      # =========================================================================
+      # CR-273 REGRESSION CHECKS
+      # =========================================================================
+
+      - id: CR273_MP11
+        cr: CR-273
+        type: must_pass
+        description: "All existing tests continue passing"
+        result: PASS
+        evidence: "TEST_CONSOLIDATED.yaml version 13: total_tests=1222, passing=1222, 0 failures. Tester phase confirmed all tests pass."
+
+      - id: CR273_MP12
+        cr: CR-273
+        type: must_pass
+        description: "New tests cover the changes"
+        result: PASS
+        evidence: "f064-supabase-resource-optimization.test.ts: 41 new tests covering all 7 items. S1: 8 tests (pagination loop, edge cases). S2: 6 tests (role parsing, upsert, NULL filtering). S3: 5 tests (cache build, unique ids, fallback). S4: 5 tests (cleanup statuses, 7-day calc, pending safety). S5: 4 tests (Promise.all rounds, result set). S6: 3 tests (value check, table keys). S7: 4 tests (upsert call, toggle on/off, conflict). Plus 6 cross-feature tests."
+
+      # =========================================================================
+      # CR-273 SHOULD_PASS CHECKS
+      # =========================================================================
+
+      - id: CR273_SP1
+        cr: CR-273
+        type: should_pass
+        description: "Migration documents that role will be populated on next app open (no backfill)"
+        result: PASS
+        evidence: "029_add_device_push_tokens_role.sql comment: 'Nullable: existing rows will have NULL until user next opens the app.' No explicit backfill UPDATE needed; useRegisterPushToken runs on every app mount and populates role via upsert."
+
+      - id: CR273_SP2
+        cr: CR-273
+        type: should_pass
+        description: "Cleanup retention period is documented (7 days)"
+        result: PASS
+        evidence: "process-notifications/index.ts line 376: comment 'Cleanup: delete processed entries older than 7 days'. Line 378: '7 * 24 * 60 * 60 * 1000' calculation is explicit."
+
+      - id: CR273_SP3
+        cr: CR-273
+        type: should_pass
+        description: "Existing polling interval tests updated to reflect new value"
+        result: PASS
+        evidence: "sync-utils.test.ts line 70: expect(POLLING_INTERVAL_MS).toBe(10000). sync-realtime.integration.test.ts lines 109-110: expect(POLLING_INTERVAL_MS).toBe(10000). Both updated from 2500 to 10000. Commit: ea1352a."
+
+      - id: CR273_SP4
+        cr: CR-273
+        type: should_pass
+        description: "Ward cache does not introduce memory leak (cleaned after execution)"
+        result: PASS
+        evidence: "process-notifications/index.ts line 246: 'const wardCache = new Map<>()' declared inside Deno.serve handler function (local variable). Garbage collected after each request completes. Not a module-level variable."
+
+      - id: CR273_SP5
+        cr: CR-273
+        type: should_pass
+        description: "Anti-enumeration behavior preserved in send-reset-email"
+        result: PASS
+        evidence: "send-reset-email/index.ts lines 148-154: 'if (!user) { return new Response(JSON.stringify({ success: true }), { status: 200, ... }); }'. Success returned even when user not found. Same anti-enumeration pattern as before."

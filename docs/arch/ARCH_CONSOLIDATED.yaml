@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-05 (CR-274: Missing topic indicator in invite management)
+# Last updated: 2026-03-05 (CR-273: Supabase resource optimization)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-05"
   total_modules: 13
-  total_adrs: 29
+  total_adrs: 34
 
 # =============================================================================
 # TECH STACK
@@ -482,7 +482,7 @@ shared_libraries:
 database_schema:
   provider: Supabase (PostgreSQL)
   migrations_dir: supabase/migrations/
-  total_migrations: 27
+  total_migrations: 28
 
   tables:
     # --- Ward-scoped tables ---
@@ -608,17 +608,18 @@ database_schema:
 
     - name: device_push_tokens
       scope: user-scoped (RLS by user_id = auth.uid())
-      description: Expo push tokens per user/device
+      description: Expo push tokens per user/device with cached role for notification targeting
       key_columns:
         - "id (UUID PK)"
         - "user_id, ward_id"
         - "expo_push_token"
+        - "role (TEXT, nullable, cached from app_metadata on upsert)"
       constraints:
         - "UNIQUE (user_id, expo_push_token)"
 
     - name: notification_queue
       scope: service-only (no RLS policies, only service_role access)
-      description: Push notification queue processed by Edge Function on cron
+      description: Push notification queue processed by Edge Function on cron. 7-day retention for processed entries.
       key_columns:
         - "id (UUID PK)"
         - "ward_id, type, sunday_date, speech_position, speaker_name"
@@ -712,7 +713,7 @@ edge_functions:
 
     # --- Notifications ---
     - name: process-notifications
-      description: Processes pending notification queue entries and sends via Expo Push API
+      description: Processes pending notification queue entries and sends via Expo Push API. Caches ward data per batch, filters tokens by role in SQL, cleans up entries older than 7 days.
       trigger: Cron (every 5 minutes)
 
 # =============================================================================
@@ -786,11 +787,13 @@ adrs:
 
   - id: ADR-006
     title: Polling fallback for sync
-    decision: Fall back to 2.5s polling when WebSocket is disconnected
+    decision: Fall back to 10s polling when WebSocket is disconnected
     rationale: |
       Ensures data freshness even when Realtime WebSocket connection is
       unavailable. Polling automatically stops when WebSocket reconnects.
       Immediate full refetch on reconnect ensures no missed events.
+      Interval changed from 2.5s to 10s (CR-273) to reduce API usage;
+      meeting planning data changes infrequently enough for 10s staleness.
 
   - id: ADR-007
     title: Separate app language vs ward language
@@ -1045,3 +1048,63 @@ adrs:
       same map callback: indicator display and button disabling. Local variables
       keep all logic visible in one render function without new modules or exports.
       YAGNI: if more components need the same check later, extraction can happen then.
+
+  - id: ADR-030
+    title: "Store user role in device_push_tokens to eliminate N+1 admin API calls"
+    decision: |
+      Add a nullable `role` TEXT column to device_push_tokens. Populate it
+      during the existing upsert in useRegisterPushToken. Rewrite getTargetTokens
+      to filter by role in SQL instead of calling getUserById per user.
+    rationale: |
+      Reduces N+1 admin API calls (getUserById in a loop) to 1 SQL query
+      with .in('role', roles). Role updates naturally on every app open via
+      the existing upsert. Stale role for users who change roles between app
+      opens is acceptable (rare event, corrected on next mount). Pre-migration
+      NULL role tokens are excluded from targeting (acceptable: stale tokens).
+
+  - id: ADR-031
+    title: "Runtime ward cache with Map instead of database-level caching"
+    decision: |
+      Build a Map<ward_id, WardInfo> at the start of each process-notifications
+      batch. Collect unique ward_ids and issue a single .in('id', wardIds)
+      query. Replace all inline ward queries with cache.get(wardId).
+    rationale: |
+      Reduces N ward queries to 1 per batch with no database schema changes.
+      Cache lifetime is a single function invocation, eliminating staleness
+      concerns across invocations. Deleted ward fallback returns undefined,
+      handled by existing 'pt-BR' default language fallback.
+
+  - id: ADR-032
+    title: "Paginated listUsers loop for send-reset-email"
+    decision: |
+      Replace single listUsers() call with a paginated loop:
+      listUsers({ page: N, perPage: 50 }) iterating until the target user
+      is found or data.users.length < 50 (last page).
+    rationale: |
+      Supabase Admin API defaults to perPage=50. With >50 users, the target
+      user may be on a later page, causing silent failure. Paginated loop
+      exits early when user found. Backward-compatible for <50 users.
+      Worst case O(ceil(N/50)) API calls (acceptable: password reset is rare).
+
+  - id: ADR-033
+    title: "Promise.all for independent Supabase queries in useActiveTopics"
+    decision: |
+      Use Promise.all to parallelize: Round 1 runs ward_topics + collection_config
+      in parallel, Round 2 runs general_collections + general_topics in parallel
+      (if active collections exist). Reduces critical path from 4 sequential to
+      2 rounds.
+    rationale: |
+      Queries 1 (ward_topics) and 2 (collection_config) are independent.
+      Queries 3 (collections) and 4 (topics) both depend only on query 2
+      results (active IDs), not on each other. Result set and sort order
+      remain identical. ~50% latency reduction for the active topics query.
+
+  - id: ADR-034
+    title: "Polling interval 10s for degraded-mode sync"
+    decision: |
+      Increase POLLING_INTERVAL_MS from 2500 to 10000 (10 seconds).
+    rationale: |
+      75% reduction in polling queries (24/min to 6/min). Polling fallback
+      only activates when WebSocket is disconnected. For a meeting planning
+      app where data changes infrequently, 10s staleness during degraded
+      connectivity is acceptable.

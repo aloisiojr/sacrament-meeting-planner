@@ -1,0 +1,451 @@
+# =============================================================================
+# SPEC_F012.yaml - CR-273: Supabase Resource Optimization
+# Artifact ID: 012
+# Feature ID: F064
+# Status: complete
+# =============================================================================
+
+metadata:
+  artifact_id: "012"
+  feature_id: F064
+  cr: 273
+  status: complete
+  created: "2026-03-05"
+  finalized: "2026-03-05"
+  author: requirements-extractor
+
+# =============================================================================
+# USER REQUEST (verbatim)
+# =============================================================================
+user_request: |
+  Otimização de recursos Supabase: (1) CRÍTICO send-reset-email listUsers() sem
+  paginação - falha silenciosamente com >50 users; (2) ALTO process-notifications
+  N+1 getUserById - guardar role em device_push_tokens; (3) ALTO
+  process-notifications queries repetidas de wards; (4) MÉDIO notification_queue
+  sem retenção; (5) MÉDIO useActiveTopics 4 queries cascata; (6) MÉDIO polling
+  fallback 2.5s muito agressivo; (7) MÉDIO check-then-act substituir por UPSERT.
+
+# =============================================================================
+# FEATURE SPECIFICATION
+# =============================================================================
+feature:
+  id: F064
+  name: Supabase Resource Optimization
+  area: performance
+  description: |
+    Optimization bundle addressing 7 Supabase resource usage issues across
+    Edge Functions, database, client hooks, and real-time sync. Organized by
+    priority: CRITICAL (1 item), HIGH (2 items), MEDIUM (4 items). All changes
+    are backward-compatible and focus on reducing API calls, query count,
+    database storage, and polling frequency.
+
+# =============================================================================
+# SUB-FEATURES
+# =============================================================================
+sub_features:
+
+  # ---------------------------------------------------------------------------
+  # SUB-1: CRITICAL - send-reset-email listUsers() pagination
+  # ---------------------------------------------------------------------------
+  - id: F064-S1
+    priority: CRITICAL
+    name: "send-reset-email: Fix listUsers() pagination"
+    description: |
+      The send-reset-email Edge Function calls
+      supabase.auth.admin.listUsers() without pagination parameters.
+      The Supabase Admin API defaults to returning a maximum of 50 users
+      per page. If the project has >50 users, the user being looked up
+      may not be in the first page, causing the reset email to silently
+      NOT be sent (the function returns success due to anti-enumeration
+      pattern even when the user is not found).
+
+      Fix: Replace listUsers() with a paginated loop using
+      listUsers({page: N, perPage: 50}) that iterates until the target
+      user is found or all pages are exhausted.
+    affected_files:
+      - supabase/functions/send-reset-email/index.ts
+    current_behavior: |
+      Line 125: `await supabaseAdmin.auth.admin.listUsers()` fetches at most
+      50 users. If the target user is beyond position 50, they are not found,
+      and the function returns `{ success: true }` (anti-enumeration), silently
+      failing to send the reset email.
+    acceptance_criteria:
+      - id: AC-064-01
+        description: "listUsers handles >50 users correctly"
+        given: "Project has more than 50 registered users"
+        when: "User #51+ requests a password reset"
+        then: "Reset email is correctly sent to that user"
+      - id: AC-064-02
+        description: "Existing behavior for <50 users unchanged"
+        given: "Project has fewer than 50 users"
+        when: "Any user requests a password reset"
+        then: "Reset email is sent as before"
+      - id: AC-064-03
+        description: "Anti-enumeration preserved"
+        given: "Email does not exist in the system"
+        when: "Someone requests a password reset for that email"
+        then: "Response is still { success: true } (no information leak)"
+
+  # ---------------------------------------------------------------------------
+  # SUB-2: HIGH - process-notifications N+1 getUserById
+  # ---------------------------------------------------------------------------
+  - id: F064-S2
+    priority: HIGH
+    name: "process-notifications: Eliminate N+1 getUserById calls"
+    description: |
+      The getTargetTokens() helper in process-notifications calls
+      supabase.auth.admin.getUserById(userId) in a for-loop for each unique
+      user_id found in device_push_tokens. This creates N+1 queries (1 to
+      fetch tokens + N to fetch each user's role). With multiple wards and
+      multiple users per ward, this scales poorly.
+
+      Fix: Store the user's role in the device_push_tokens table so that
+      getTargetTokens() can filter by role directly in SQL without calling
+      getUserById at all. Requires:
+      (a) DB migration: add `role` TEXT column to device_push_tokens
+      (b) Update useRegisterPushToken to include role in the upsert
+      (c) Update getTargetTokens to filter by role in the query
+    affected_files:
+      - supabase/functions/process-notifications/index.ts
+      - supabase/migrations/ (new migration)
+      - src/hooks/useNotifications.ts
+    current_behavior: |
+      Lines 419-426 in process-notifications: for each userId in tokens,
+      calls getUserById to get app_metadata.role, then filters. This is
+      O(N) admin API calls per notification batch.
+    acceptance_criteria:
+      - id: AC-064-04
+        description: "getTargetTokens no longer calls getUserById"
+        given: "Notification batch is being processed"
+        when: "getTargetTokens is called for a ward and target_role"
+        then: "Only a single Supabase query is made (filtering by ward_id AND role), no auth.admin API calls"
+      - id: AC-064-05
+        description: "device_push_tokens stores user role"
+        given: "User opens the app and token registration occurs"
+        when: "Token is upserted"
+        then: "Role from app_metadata is included in the upsert"
+      - id: AC-064-06
+        description: "Existing tokens get role populated"
+        given: "Existing device_push_tokens rows have NULL role"
+        when: "User opens the app after the migration"
+        then: "The next upsert populates the role column"
+
+  # ---------------------------------------------------------------------------
+  # SUB-3: HIGH - process-notifications repeated ward queries
+  # ---------------------------------------------------------------------------
+  - id: F064-S3
+    priority: HIGH
+    name: "process-notifications: Cache ward queries"
+    description: |
+      The process-notifications function queries the wards table for
+      (language, timezone) separately for each notification group AND
+      each immediate entry. If multiple notifications target the same ward
+      in the same batch, the ward is queried multiple times.
+
+      Fix: Build a ward cache Map<ward_id, WardInfo> before processing.
+      Fetch all unique ward_ids from the pending entries in a single
+      query, then look up from the cache during processing.
+    affected_files:
+      - supabase/functions/process-notifications/index.ts
+    current_behavior: |
+      Lines 274-278 (grouped designations) and lines 297-301 (immediate
+      entries) each issue: `supabase.from('wards').select(...).eq('id', wardId).single()`.
+      For a batch with 10 entries across 2 wards, that's 10 ward queries
+      instead of 1.
+    acceptance_criteria:
+      - id: AC-064-07
+        description: "Ward data is fetched once per unique ward_id"
+        given: "Notification batch has entries for the same ward_id"
+        when: "Batch is processed"
+        then: "Only one query to wards table per unique ward_id in the batch"
+      - id: AC-064-08
+        description: "Ward cache is built before processing loop"
+        given: "Pending notifications are fetched"
+        when: "Processing begins"
+        then: "All unique ward_ids are fetched in a single batch query"
+
+  # ---------------------------------------------------------------------------
+  # SUB-4: MEDIUM - notification_queue retention
+  # ---------------------------------------------------------------------------
+  - id: F064-S4
+    priority: MEDIUM
+    name: "notification_queue: Add data retention"
+    description: |
+      The notification_queue table accumulates rows indefinitely. Processed
+      entries (status = 'sent' or 'cancelled') are never cleaned up, leading
+      to unbounded growth over time.
+
+      Fix: Add a cleanup step at the end of the process-notifications
+      function that deletes entries older than 7 days with status
+      'sent' or 'cancelled'.
+    affected_files:
+      - supabase/functions/process-notifications/index.ts
+    current_behavior: |
+      Processed entries are updated to status='sent' or 'cancelled' but
+      never deleted. Over months, the table accumulates thousands of
+      stale rows.
+    acceptance_criteria:
+      - id: AC-064-09
+        description: "Old processed entries are cleaned up"
+        given: "process-notifications runs"
+        when: "Processing completes"
+        then: "Entries with status 'sent' or 'cancelled' older than 7 days are deleted"
+      - id: AC-064-10
+        description: "Pending entries are never deleted"
+        given: "process-notifications cleanup runs"
+        when: "Cleanup query executes"
+        then: "Only entries with status 'sent' or 'cancelled' are deleted; pending entries are preserved"
+
+  # ---------------------------------------------------------------------------
+  # SUB-5: MEDIUM - useActiveTopics 4 cascading queries
+  # ---------------------------------------------------------------------------
+  - id: F064-S5
+    priority: MEDIUM
+    name: "useActiveTopics: Reduce cascading queries"
+    description: |
+      The useActiveTopics() hook currently makes 4 sequential Supabase
+      queries in a single queryFn:
+        1. ward_topics (all ward topics)
+        2. ward_collection_config (active collections for ward)
+        3. general_collections (collection names for active IDs)
+        4. general_topics (topics for active collections)
+
+      Queries 3 and 4 depend on the result of query 2 (active collection
+      IDs), so they must be sequential. However, queries 3 and 4 can be
+      parallelized. Additionally, query 1 (ward_topics) is independent
+      and can be parallelized with query 2.
+
+      Fix: Use Promise.all to parallelize independent queries, reducing
+      the critical path from 4 sequential queries to 2 rounds.
+    affected_files:
+      - src/hooks/useTopics.ts
+    current_behavior: |
+      Lines 362-433: Four sequential awaits in useActiveTopics queryFn.
+      Round 1: ward_topics. Round 2: ward_collection_config. Round 3:
+      general_collections. Round 4: general_topics.
+    acceptance_criteria:
+      - id: AC-064-11
+        description: "Independent queries run in parallel"
+        given: "useActiveTopics queryFn executes"
+        when: "Queries to ward_topics and ward_collection_config are issued"
+        then: "Both run in parallel (Promise.all), not sequentially"
+      - id: AC-064-12
+        description: "Dependent queries also parallelize where possible"
+        given: "Active collection IDs are known"
+        when: "Collection names and topics need fetching"
+        then: "general_collections and general_topics queries run in parallel (Promise.all)"
+      - id: AC-064-13
+        description: "Result set is unchanged"
+        given: "useActiveTopics returns data"
+        when: "Data is compared to previous behavior"
+        then: "Same set of TopicWithCollection[] sorted identically"
+
+  # ---------------------------------------------------------------------------
+  # SUB-6: MEDIUM - polling fallback too aggressive
+  # ---------------------------------------------------------------------------
+  - id: F064-S6
+    priority: MEDIUM
+    name: "Polling fallback: Increase interval"
+    description: |
+      The polling fallback (used when WebSocket is disconnected) runs at
+      2.5 seconds (POLLING_INTERVAL_MS = 2500). This causes 24 query
+      invalidation cycles per minute, each touching all 7 synced tables.
+      This is unnecessarily aggressive for a meeting planning app where
+      data changes are infrequent.
+
+      Fix: Increase the polling interval from 2500ms to 10000ms (10 seconds).
+    affected_files:
+      - src/lib/sync.ts
+    current_behavior: |
+      Line 67: `export const POLLING_INTERVAL_MS = 2500;`
+      Results in ~24 full cache invalidation cycles per minute across
+      7 tables.
+    acceptance_criteria:
+      - id: AC-064-14
+        description: "Polling interval is increased"
+        given: "WebSocket is disconnected and polling fallback is active"
+        when: "Polling timer fires"
+        then: "Interval is 10000ms (10 seconds), reduced from 2500ms"
+      - id: AC-064-15
+        description: "Polling still works correctly"
+        given: "WebSocket is disconnected"
+        when: "Polling is active for several minutes"
+        then: "Queries are still invalidated periodically, just less frequently"
+
+  # ---------------------------------------------------------------------------
+  # SUB-7: MEDIUM - check-then-act replace with UPSERT
+  # ---------------------------------------------------------------------------
+  - id: F064-S7
+    priority: MEDIUM
+    name: "useToggleCollection: Replace check-then-act with UPSERT"
+    description: |
+      The useToggleCollection mutation in useTopics.ts uses a check-then-act
+      pattern: first queries for an existing ward_collection_config row,
+      then either updates or inserts. This is 2 queries instead of 1 and
+      has a theoretical race condition (though unlikely in practice since
+      it's user-triggered).
+
+      Fix: Replace with a single upsert call using onConflict, matching
+      the pattern already used in useNotifications.ts (line 86) and
+      settings/index.tsx (line 130).
+    affected_files:
+      - src/hooks/useTopics.ts
+    current_behavior: |
+      Lines 293-316 in useToggleCollection mutationFn: first SELECT to
+      check if config exists, then conditional UPDATE or INSERT. Total:
+      2 queries per toggle.
+    acceptance_criteria:
+      - id: AC-064-16
+        description: "Single upsert replaces check-then-act"
+        given: "User toggles a collection on/off"
+        when: "Mutation executes"
+        then: "A single upsert query is made (not select + update/insert)"
+      - id: AC-064-17
+        description: "Behavior is unchanged"
+        given: "User toggles a collection"
+        when: "Toggle completes"
+        then: "Collection active status is correctly updated regardless of prior existence"
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+open_questions:
+  - id: OQ-1
+    status: RESOLVED
+    question: "For SUB-1 (send-reset-email), should we use paginated listUsers() loop or switch to a different API?"
+    resolution: "User chose paginated loop: listUsers({page: N, perPage: 50}) iterating until user found or pages exhausted."
+
+  - id: OQ-2
+    status: RESOLVED
+    question: "For SUB-4 (notification_queue retention), what should the retention period be?"
+    resolution: "User chose 7 days. Delete entries with status 'sent' or 'cancelled' older than 7 days."
+
+  - id: OQ-3
+    status: RESOLVED
+    question: "For SUB-6 (polling interval), what should the new polling interval be?"
+    resolution: "User chose 10 seconds (10000ms). Change POLLING_INTERVAL_MS from 2500 to 10000."
+
+  - id: OQ-4
+    status: RESOLVED
+    question: "For SUB-7 (useToggleCollection UPSERT), does the ward_collection_config table have a UNIQUE constraint on (ward_id, collection_id)?"
+    resolution: |
+      CONFIRMED: UNIQUE(ward_id, collection_id) constraint exists at
+      supabase/migrations/001_initial_schema.sql:81. No migration needed.
+      The upsert onConflict: 'ward_id,collection_id' will work directly.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+assumptions:
+  - id: A-1
+    assumption: "Supabase Auth Admin listUsers() in supabase-js@2 defaults to page 1 with 50 users max"
+    reason: "This is the documented behavior in Supabase docs. The current code passes no pagination parameters."
+    impact_if_wrong: "If the default limit is higher (e.g., 1000), SUB-1 may be less critical but the fix is still correct."
+    needs_confirmation: true
+
+  - id: A-2
+    assumption: "Adding a 'role' column to device_push_tokens is safe because existing rows will have NULL and get populated on next app open"
+    reason: "useRegisterPushToken runs on every app mount with isOnline. The upsert will populate role for existing tokens on the user's next session."
+    impact_if_wrong: "If some tokens never get updated (e.g., user uninstalls app), those tokens will have NULL role and won't match any filter, effectively excluding them. This is acceptable since the tokens would be stale anyway."
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: "The useToggleCollection check-then-act race condition is theoretical, not observed in production"
+    reason: "Collection toggling is a manual user action from a single device, making concurrent toggles extremely unlikely."
+    impact_if_wrong: "Even if it occurred, the worst case is a duplicate insert which would be caught by the unique constraint (if exists) or result in two rows (if no constraint)."
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: "Changing polling interval from 2.5s to a higher value won't cause noticeable UX degradation"
+    reason: "The polling fallback only activates when WebSocket is disconnected. In the normal case, Realtime WebSocket provides near-instant updates. When WebSocket is down, a 10s delay is acceptable for a meeting planner."
+    impact_if_wrong: "Users might notice slightly slower sync when on a degraded network, but this is already a degraded experience. The tradeoff is worthwhile for reducing resource usage."
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: "No other Edge Functions call listUsers() without pagination"
+    reason: "Verified via grep: only send-reset-email/index.ts:125 uses listUsers(). Other functions use getUserById()."
+    impact_if_wrong: "N/A - confirmed."
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+inconsistencies:
+  - id: INC-1
+    type: overlap
+    status: RESOLVED
+    description: |
+      SUB-7 (check-then-act -> UPSERT) for useToggleCollection: The same
+      pattern is already used correctly in two other places (useNotifications.ts
+      line 86 and settings/index.tsx line 130). The fix is to align
+      useToggleCollection with the already-established UPSERT pattern.
+    existing_spec: "No existing spec documents the check-then-act pattern in useToggleCollection."
+    new_request: "Replace with UPSERT to be consistent with existing code patterns."
+    resolution: "UNIQUE(ward_id, collection_id) confirmed at 001_initial_schema.sql:81. UPSERT will work."
+
+  - id: INC-2
+    type: missing_context
+    description: |
+      The CR mentions useActiveTopics has "4 queries cascata" but the actual
+      query count depends on whether there are active collections. If no
+      collections are active, only 2 queries are made (ward_topics +
+      ward_collection_config). The 4 queries only happen when active
+      collections exist.
+    existing_spec: "SPEC_CONSOLIDATED F008 describes topic management but not query optimization."
+    new_request: "Optimize useActiveTopics from 4 sequential to 2 parallel rounds."
+    question: "Should we also consider caching collection names since they rarely change?"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+edge_cases:
+  - id: EC-064-01
+    sub_feature: F064-S1
+    case: "Project has exactly 50 users"
+    expected: "All 50 users are returned in the first page; no pagination needed"
+
+  - id: EC-064-02
+    sub_feature: F064-S1
+    case: "Project has 0 users (fresh instance)"
+    expected: "Empty list returned; anti-enumeration response sent"
+
+  - id: EC-064-03
+    sub_feature: F064-S2
+    case: "User's role changes after token registration"
+    expected: "Role in device_push_tokens becomes stale until next app open. Notifications may target wrong role temporarily. Acceptable because role changes are rare and the token is updated on next mount."
+
+  - id: EC-064-04
+    sub_feature: F064-S2
+    case: "device_push_tokens row has NULL role (pre-migration token)"
+    expected: "getTargetTokens query filters by role, so NULL role tokens are excluded. They get populated on next app open."
+
+  - id: EC-064-05
+    sub_feature: F064-S3
+    case: "Ward is deleted between fetch and processing"
+    expected: "Ward cache returns null; notification falls back to default language (pt-BR)"
+
+  - id: EC-064-06
+    sub_feature: F064-S4
+    case: "Cleanup runs while new entries are being inserted"
+    expected: "New entries have status='pending' and recent created_at; cleanup only deletes old sent/cancelled entries"
+
+  - id: EC-064-07
+    sub_feature: F064-S5
+    case: "No active collections"
+    expected: "Only ward_topics + ward_collection_config queries are made (2 queries). general_collections and general_topics queries are skipped."
+
+  - id: EC-064-08
+    sub_feature: F064-S7
+    case: "Concurrent toggle from two devices"
+    expected: "UPSERT with onConflict handles this atomically; last write wins"
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+validation_gate:
+  GATE-01: true   # Read SPEC_CONSOLIDATED before starting
+  GATE-02: true   # Identified all ambiguities
+  GATE-03: true   # Listed ALL open questions with IDs
+  GATE-04: true   # Listed ALL assumptions with IDs
+  GATE-05: true   # Reported inconsistencies with SPEC_CONSOLIDATED
+  GATE-06: true   # Status is complete (all OQs resolved)

@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  version: 13
-  last_updated_by: "phase-011"
+  version: 14
+  last_updated_by: "phase-012"
 
 reviews:
   - id: REV-001
@@ -3348,3 +3348,394 @@ reviews:
       tests_passing: 1181
       tests_flaky: 0
       test_files: 54
+
+  # ===========================================================================
+  # REV-014: Phase 12 - Supabase Resource Optimization (CR-273)
+  # ===========================================================================
+
+  - id: REV-014
+    scope: "F064 Phase 12 - Supabase Resource Optimization (CR-273)"
+    date: "2026-03-05"
+    reviewer: reviewer-agent
+    spec: F064
+    arch: M012
+    plan: P012
+    iteration: 1
+    commits:
+      - hash: f257893
+        step: STEP-01
+        message: "fix(send-reset-email): paginate listUsers to handle >50 users (CR-273)"
+      - hash: e09ae26
+        step: STEP-02
+        message: "feat(migration): add role column to device_push_tokens (CR-273)"
+      - hash: 536289b
+        step: STEP-03
+        message: "feat(useNotifications): include role in push token upsert (CR-273)"
+      - hash: 734ee91
+        step: STEP-04
+        message: "perf(process-notifications): filter tokens by role in SQL (CR-273)"
+      - hash: 64eed72
+        step: STEP-05
+        message: "perf(process-notifications): add ward cache Map for batch query (CR-273)"
+      - hash: f87321f
+        step: STEP-06
+        message: "feat(process-notifications): add 7-day retention cleanup (CR-273)"
+      - hash: 4886c58
+        step: STEP-07
+        message: "perf(useTopics): parallelize useActiveTopics queries (CR-273)"
+      - hash: 1896b67
+        step: STEP-08
+        message: "perf(useTopics,sync): upsert for collection toggle + 10s polling (CR-273)"
+      - hash: ea1352a
+        step: STEP-09
+        message: "test(sync): update polling interval tests from 2500 to 10000 (CR-273)"
+      - hash: d0b80db
+        step: STEP-docs
+        message: "docs(ledger): add phase 12 commits for CR-273"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          User request specified 7 optimization items at 3 priority levels:
+          CRITICAL(1), HIGH(2), MEDIUM(4). SPEC_F012 maps each item to a
+          sub-feature (F064-S1 through F064-S7) with acceptance criteria
+          (AC-064-01 through AC-064-17). All 7 items are fully specified.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M012 defines components for all 7 sub-features. ADR-030
+          (role in device_push_tokens), ADR-031 (ward cache Map), ADR-032
+          (paginated listUsers), ADR-033 (Promise.all for useActiveTopics),
+          ADR-034 (10s polling) are well-documented. Migration 029 adds
+          role column. Contracts defined for all integration points.
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P012 has 9 steps (STEP-01 through STEP-09) mapping to all
+          ARCH components. Dependency graph is correct: STEP-03/04 depend
+          on STEP-02 (migration before client/function changes). Steps
+          01, 05, 06, 07, 08 are parallelizable. Validation matrix maps
+          all 17 ACs to steps.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 9 plan steps implemented in 10 commits (9 code + 1 docs).
+          STEP-08 combined useToggleCollection upsert + polling interval
+          change in a single commit as planned. STEP-09 updated the 2 test
+          files that referenced the old 2500ms polling value. Files match
+          PLAN expectations exactly.
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-STEP VERIFICATION
+    # =========================================================================
+
+    step_reviews:
+
+      # --- STEP-01: send-reset-email pagination (F064-S1) ---
+      - step: STEP-01
+        title: "Paginate listUsers to handle >50 users"
+        verdict: pass
+        verification:
+          - check: "listUsers called with pagination params"
+            status: pass
+            file: supabase/functions/send-reset-email/index.ts
+            detail: "Line 126: listUsers({ page, perPage: 50 }) with page starting at 1."
+          - check: "Pagination loop iterates until user found or last page"
+            status: pass
+            detail: "Line 124: while(!user) loop. Line 144: break when user found OR data.users.length < 50 (last page)."
+          - check: "Anti-enumeration preserved"
+            status: pass
+            detail: "Lines 148-154: if (!user) returns { success: true } status 200, same as before."
+          - check: "Error handling preserved inside loop"
+            status: pass
+            detail: "Lines 128-137: listError check returns 500 inside the loop."
+          - check: "No standalone listUsers() without params"
+            status: pass
+            detail: "grep for 'listUsers()' returns 0 matches. Only 'listUsers({ page, perPage: 50 })' exists."
+        covers_ac: ["AC-064-01", "AC-064-02", "AC-064-03"]
+
+      # --- STEP-02: Migration 029 (F064-S2) ---
+      - step: STEP-02
+        title: "Add role column to device_push_tokens"
+        verdict: pass
+        verification:
+          - check: "Migration file exists with correct name"
+            status: pass
+            file: supabase/migrations/029_add_device_push_tokens_role.sql
+            detail: "File exists, 6 lines."
+          - check: "ALTER TABLE adds role TEXT (nullable)"
+            status: pass
+            detail: "Line 6: ALTER TABLE device_push_tokens ADD COLUMN role TEXT; No NOT NULL constraint."
+          - check: "Migration comment references ADR-030"
+            status: pass
+            detail: "Line 1: -- Migration 029: Add role column to device_push_tokens (CR-273, ADR-030)"
+        covers_ac: ["AC-064-05"]
+
+      # --- STEP-03: useNotifications role in upsert (F064-S2) ---
+      - step: STEP-03
+        title: "Include role in push token upsert"
+        verdict: pass
+        verification:
+          - check: "role destructured from useAuth"
+            status: pass
+            file: src/hooks/useNotifications.ts
+            detail: "Line 38: const { user, role, wardId } = useAuth();"
+          - check: "role included in upsert payload"
+            status: pass
+            detail: "Line 91: role is included in the upsert object { user_id, ward_id, expo_push_token, role }."
+          - check: "onConflict unchanged"
+            status: pass
+            detail: "Line 94: onConflict: 'user_id,expo_push_token' - same as before."
+          - check: "Comment explains purpose"
+            status: pass
+            detail: "Line 83: // Upsert token in device_push_tokens (includes role for SQL-based filtering)"
+        covers_ac: ["AC-064-05", "AC-064-06"]
+
+      # --- STEP-04: getTargetTokens filter by role (F064-S2) ---
+      - step: STEP-04
+        title: "Filter tokens by role in SQL"
+        verdict: pass
+        verification:
+          - check: "No getUserById calls remain"
+            status: pass
+            file: supabase/functions/process-notifications/index.ts
+            detail: "grep for 'getUserById' returns only the ADR-030 comment on line 420, not a function call."
+          - check: "Roles array built correctly from targetRole"
+            status: pass
+            detail: "Lines 412-418: handles 'secretary', 'bishopric', and 'secretary_and_bishopric' with push logic."
+          - check: "Single query with .in('role', roles)"
+            status: pass
+            detail: "Lines 421-425: .from('device_push_tokens').select('expo_push_token, user_id').eq('ward_id', wardId).in('role', roles)"
+          - check: "Return type unchanged"
+            status: pass
+            detail: "Line 427: return (tokens as PushToken[] | null) ?? []; Same PushToken interface (expo_push_token, user_id)."
+        covers_ac: ["AC-064-04"]
+
+      # --- STEP-05: Ward cache Map (F064-S3) ---
+      - step: STEP-05
+        title: "Ward cache Map for batch query"
+        verdict: pass
+        verification:
+          - check: "Unique ward_ids collected from entries"
+            status: pass
+            file: supabase/functions/process-notifications/index.ts
+            detail: "Line 240: const wardIds = [...new Set(entries.map((e) => e.ward_id))];"
+          - check: "Single batch query with .in('id', wardIds)"
+            status: pass
+            detail: "Lines 241-244: .from('wards').select('id, language, timezone').in('id', wardIds)"
+          - check: "Map built from query results"
+            status: pass
+            detail: "Lines 246-249: Map<string, WardInfo> built with forEach. WardInfo has language and timezone."
+          - check: "Cache used in grouped designations loop"
+            status: pass
+            detail: "Line 286: const ward = wardCache.get(wardId); Line 287: const language = ward?.language ?? 'pt-BR';"
+          - check: "Cache used in immediate entries loop"
+            status: pass
+            detail: "Line 304: const ward = wardCache.get(entry.ward_id); Line 305: const language = ward?.language ?? 'pt-BR';"
+          - check: "No inline ward queries remain"
+            status: pass
+            detail: "grep for '.from(\"wards\")' or '.from(''wards'')' inside processing loops returns 0. Only the batch query at lines 241-244."
+          - check: "Fallback to pt-BR on cache miss"
+            status: pass
+            detail: "Both lines 287 and 305 use ward?.language ?? 'pt-BR'."
+        covers_ac: ["AC-064-07", "AC-064-08"]
+
+      # --- STEP-06: notification_queue retention cleanup (F064-S4) ---
+      - step: STEP-06
+        title: "7-day retention cleanup"
+        verdict: pass
+        verification:
+          - check: "Cleanup code exists after invalid token removal"
+            status: pass
+            file: supabase/functions/process-notifications/index.ts
+            detail: "Lines 376-386: Section 6 comment, try/catch block."
+          - check: "7-day calculation correct"
+            status: pass
+            detail: "Line 378: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()"
+          - check: "Filters only sent/cancelled status"
+            status: pass
+            detail: "Line 382: .in('status', ['sent', 'cancelled'])"
+          - check: "Uses lt for created_at comparison"
+            status: pass
+            detail: "Line 383: .lt('created_at', sevenDaysAgo)"
+          - check: "Cleanup errors are caught and logged, not thrown"
+            status: pass
+            detail: "Lines 384-386: catch (cleanupErr) { console.error(...) } - does not rethrow, does not fail the response."
+        covers_ac: ["AC-064-09", "AC-064-10"]
+
+      # --- STEP-07: useActiveTopics parallelization (F064-S5) ---
+      - step: STEP-07
+        title: "Parallelize useActiveTopics queries"
+        verdict: pass
+        verification:
+          - check: "Round 1: ward_topics + ward_collection_config in Promise.all"
+            status: pass
+            file: src/hooks/useTopics.ts
+            detail: "Lines 349-359: const [wardTopicsResult, activeConfigsResult] = await Promise.all([...]);"
+          - check: "Error handling for both Round 1 results"
+            status: pass
+            detail: "Lines 361-362: if (wardTopicsResult.error) throw; if (activeConfigsResult.error) throw;"
+          - check: "Round 2: general_collections + general_topics in Promise.all"
+            status: pass
+            detail: "Lines 379-388: const [collectionsResult, generalTopicsResult] = await Promise.all([...]);"
+          - check: "Round 2 guarded by activeCollectionIds.length > 0"
+            status: pass
+            detail: "Line 377: if (activeCollectionIds.length > 0) {"
+          - check: "Sort order unchanged"
+            status: pass
+            detail: "Lines 409-412: results.sort with localeCompare on 'Collection : Title' string. Identical to previous."
+          - check: "Result set unchanged (same data, same TopicWithCollection[])"
+            status: pass
+            detail: "Structure is identical: ward topics get type 'ward', general topics get type 'general', same collectionMap logic."
+        covers_ac: ["AC-064-11", "AC-064-12", "AC-064-13"]
+
+      # --- STEP-08: useToggleCollection UPSERT + polling interval (F064-S6, S7) ---
+      - step: STEP-08
+        title: "Upsert for collection toggle + 10s polling"
+        verdict: pass
+        verification:
+          - check: "useToggleCollection uses single .upsert()"
+            status: pass
+            file: src/hooks/useTopics.ts
+            detail: "Lines 294-299: .upsert({ ward_id, collection_id, active }, { onConflict: 'ward_id,collection_id' })"
+          - check: "No SELECT + conditional INSERT/UPDATE pattern"
+            status: pass
+            detail: "grep for '.select(' in useToggleCollection mutationFn returns 0. Single upsert only."
+          - check: "Comment references UNIQUE constraint"
+            status: pass
+            detail: "Line 293: // Single upsert with onConflict (UNIQUE(ward_id, collection_id) at 001_initial_schema.sql:81)"
+          - check: "POLLING_INTERVAL_MS = 10000"
+            status: pass
+            file: src/lib/sync.ts
+            detail: "Line 67: export const POLLING_INTERVAL_MS = 10000;"
+        covers_ac: ["AC-064-14", "AC-064-15", "AC-064-16", "AC-064-17"]
+
+      # --- STEP-09: Test updates ---
+      - step: STEP-09
+        title: "Update polling interval tests"
+        verdict: pass
+        verification:
+          - check: "sync-utils.test.ts updated to 10000"
+            status: pass
+            file: src/__tests__/sync-utils.test.ts
+            detail: "Line 70: expect(POLLING_INTERVAL_MS).toBe(10000);"
+          - check: "sync-realtime.integration.test.ts updated to 10000"
+            status: pass
+            file: src/__tests__/integration/sync-realtime.integration.test.ts
+            detail: "Line 110: expect(POLLING_INTERVAL_MS).toBe(10000);"
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # TEST VERIFICATION
+    # =========================================================================
+
+    test_verification:
+      total_tests: 1222
+      total_files: 55
+      all_passing: true
+      new_tests: 41
+      test_details:
+        - file: src/__tests__/sync-utils.test.ts
+          change: "Updated POLLING_INTERVAL_MS assertion from 2500 to 10000"
+        - file: src/__tests__/integration/sync-realtime.integration.test.ts
+          change: "Updated POLLING_INTERVAL_MS assertion from 2500 to 10000"
+      qa_verdict: "APPROVED - 41 new tests, 1222 total, all passing"
+      coverage_gaps: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Apply migration 029"
+        command: |
+          Via Management API (HTTPS):
+          SQL: ALTER TABLE device_push_tokens ADD COLUMN role TEXT;
+        reason: "Adds role column to device_push_tokens (required before Edge Function and app update)"
+        urgency: high
+        notes: "Must be deployed BEFORE process-notifications and app update. Existing rows will have NULL role until user next opens the app."
+
+      - step: 2
+        action: "Deploy Edge Functions send-reset-email and process-notifications"
+        command: |
+          supabase functions deploy send-reset-email --no-verify-jwt
+          supabase functions deploy process-notifications
+        reason: "send-reset-email: paginated listUsers fix. process-notifications: role-based token filtering, ward cache, 7-day cleanup."
+        urgency: high
+        notes: "Deploy AFTER migration 029. process-notifications now expects role column in device_push_tokens."
+
+      - step: 3
+        action: "EAS Build (app update)"
+        reason: "Client-side changes: role in push token upsert, useActiveTopics parallelization, useToggleCollection upsert, 10s polling."
+        urgency: medium
+        notes: "Deploy after migration and Edge Functions. The app upsert will populate role for existing tokens on next app open."
+
+    deploy_notes: |
+      Deploy order is critical:
+      1. Migration 029 FIRST (adds role column)
+      2. Edge Functions SECOND (they query the role column)
+      3. App update THIRD (populates role on upsert)
+      Deploying Edge Functions before migration would cause getTargetTokens
+      to fail silently (no 'role' column to filter on, returning empty results).
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: false
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_F012.yaml"
+        - "docs/arch/ARCH_M012.yaml"
+        - "docs/plans/PLAN_P012.yaml"
+        - "docs/qa/QA_PLAN_012.yaml"
+        - ".devteam/project-status.yaml"
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-273 (F064) implementation is correct and complete. All 7 Supabase
+      resource optimization items are properly addressed:
+      (1) CRITICAL: send-reset-email listUsers now paginates correctly;
+      (2) HIGH: N+1 getUserById eliminated via role column in device_push_tokens;
+      (3) HIGH: ward queries cached with batch Map;
+      (4) MEDIUM: 7-day retention cleanup for notification_queue;
+      (5) MEDIUM: useActiveTopics queries parallelized (4 sequential -> 2 rounds);
+      (6) MEDIUM: polling interval increased from 2.5s to 10s;
+      (7) MEDIUM: useToggleCollection check-then-act replaced with UPSERT.
+      Chain validation passes at all 4 levels (SPEC->ARCH->PLAN->CODE).
+      All 17 acceptance criteria are covered. 1222 tests passing across 55
+      test files, no regressions. No P0, P1, or P2 issues found. Three
+      pending deploys identified with correct ordering instructions.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 8
+      total_commits: 10
+      tests_total: 1222
+      tests_passing: 1222
+      tests_flaky: 0
+      test_files: 55

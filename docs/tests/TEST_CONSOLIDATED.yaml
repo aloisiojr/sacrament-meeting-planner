@@ -11,7 +11,6 @@ summary:
   total_test_files: 53
   total_tests: 1148
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
-  # 2 tests FAILING (F062 not implemented: getSession instead of refreshSession)
   framework: vitest
   categories:
     module_named: 47
@@ -2329,7 +2328,7 @@ test_suites:
         type: unit
         covers_acs: ["AC-062-1"]
         covers_ecs: []
-        status: failing
+        status: passing
 
       - name: "callEdgeFunction throws auth/no-session when session is null"
         file: src/__tests__/f060-f061-f062.test.ts
@@ -2343,7 +2342,7 @@ test_suites:
         type: unit
         covers_acs: ["AC-062-1"]
         covers_ecs: ["EC-062-1", "EC-062-2"]
-        status: failing
+        status: passing
 
 coverage:
   acceptance_criteria:
@@ -2945,17 +2944,12 @@ gaps:
   # Edge cases EC-061-1 (auth/no-session), EC-061-2 (multi-line CSV), EC-061-3 (import empty) covered.
 
   # F062 gaps
-  # AC-062-1: FAILING - callEdgeFunction still uses getSession() instead of refreshSession()
-  # AC-062-2: Passing - auth/no-session guard exists
-  # AC-062-3: Not testable (Supabase SDK internal behavior)
-  # EC-062-1, EC-062-2: FAILING - refreshError not checked (getSession path has no error check)
-  # EC-062-3: Not testable (SDK deduplication)
-  - id: AC-062-CODE-BUG
-    reason: "F062 NOT IMPLEMENTED: callEdgeFunction in users.tsx line 47 still uses getSession() instead of refreshSession(). ADR-024 comment not updated to ADR-028."
-    recommendation: "Coder must replace getSession() with refreshSession() and check refreshError as specified in PLAN_P010 STEP-04."
+  # All F062 ACs (01-03) covered. AC-062-3 and EC-062-3 not testable (Supabase SDK internal behavior).
+  # EC-060-3 (manage_prayers=false) not testable: edge case cannot occur in normal use.
+  # Redundant refreshSession() calls in onSuccess handlers removed by coder.
 
 stats:
   total_tests: 1148
-  passing: 1146
-  failing: 2
+  passing: 1148
+  failing: 0
   skipped: 0

@@ -114,7 +114,7 @@ export default function InviteRegistrationScreen() {
       }
 
       if (data?.error) {
-        setError(data.error);
+        setError(t('auth.registrationFailed'));
         return;
       }
 
@@ -131,7 +131,7 @@ export default function InviteRegistrationScreen() {
       if (message.includes('Failed to fetch') || message.includes('Network')) {
         setError(t('auth.requiresConnection'));
       } else {
-        setError(message);
+        setError(t('auth.registrationFailed'));
       }
     } finally {
       setSubmitting(false);

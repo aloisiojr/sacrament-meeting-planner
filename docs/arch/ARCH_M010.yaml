@@ -1,0 +1,663 @@
+# =============================================================================
+# ARCH_M010.yaml
+# Architecture: Prayer-aware designation notifications (CR-270),
+#               User-friendly error messages (CR-271),
+#               Refresh session before edge function invoke (CR-272)
+# Status: complete
+# Created: 2026-03-05
+# =============================================================================
+
+type: architecture
+status: complete
+artifact_id: "010"
+features: [F060, F061, F062]
+change_requests: [CR-270, CR-271, CR-272]
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ---------------------------------------------------------------------------
+  # C010-01: Prayer-aware designation text in process-notifications
+  # ---------------------------------------------------------------------------
+  - id: C010-01
+    name: Prayer-Aware Designation Grouping and Text (Server)
+    feature: F060
+    cr: 270
+    type: bugfix
+    file: supabase/functions/process-notifications/index.ts
+    description: |
+      Modify the designation grouping loop and buildDesignationText() to
+      differentiate prayer designations (position 0 or 4) from speech
+      designations (position 1-3).
+
+      Change 1: Update buildDesignationText() signature to accept an optional
+      position parameter (position?: number | null). When position is 0 or 4,
+      use getPrayerLabel() and produce prayer-specific title and body. When
+      position is null or 1-3, use existing speech text unchanged.
+
+      Change 2: Update the designation grouping loop (lines 220-229). During
+      iteration, check each entry's speech_position. If position is 0 or 4
+      (prayer), push the entry to immediateEntries instead of the
+      designationGroups map. If position is 1-3 or null (speech), continue
+      grouping by (ward_id, sunday_date) as before.
+
+      Change 3: In the immediateEntries processing switch, add a case for
+      'designation' that calls buildDesignationText() with the entry's
+      speech_position, speaker_name, and sunday_date (single entry, not grouped).
+
+    input:
+      - name: entry.speech_position
+        type: "number | null"
+        description: "Position from notification_queue: 0=opening prayer, 1-3=speech, 4=closing prayer, null=legacy"
+      - name: entry.speaker_name
+        type: "string | null"
+        description: "Speaker/prayer giver name from notification_queue"
+
+    output:
+      - name: title
+        type: string
+        description: |
+          Prayer: 'Designacao de Oracao' (pt-BR) / 'Prayer Assignment' (en-US) / 'Asignacion de Oracion' (es-LA)
+          Speech: 'Designacao de Discurso' (pt-BR) / 'Speech Assignment' (en-US) / 'Asignacion de Discurso' (es-LA) (unchanged)
+      - name: body
+        type: string
+        description: |
+          Prayer: "[name] foi designado(a) para a [prayer label] em [date]..."
+          Speech: grouped names with speech text (unchanged)
+
+    logic: |
+      // --- buildDesignationText updated signature ---
+      function buildDesignationText(
+        language: string,
+        names: string[],
+        date: string,
+        position?: number | null
+      ): { title: string; body: string } {
+        const prayerLabel = position != null ? getPrayerLabel(position, language) : null;
+        if (prayerLabel) {
+          // Prayer-specific text (position 0 or 4)
+          return {
+            title: { 'pt-BR': 'Designação de Oração', 'en-US': 'Prayer Assignment', 'es-LA': 'Asignación de Oración' }[language],
+            body: `${names[0]} foi designado(a) para a ${prayerLabel} em ${date}...` // per language
+          };
+        }
+        // Existing speech text (unchanged)
+        return existingSpeechText(language, names, date);
+      }
+
+      // --- Grouping loop updated ---
+      for (const entry of entries) {
+        if (entry.type === 'designation') {
+          if (entry.speech_position === 0 || entry.speech_position === 4) {
+            // Prayer: process individually (like confirmed/withdrew)
+            immediateEntries.push(entry);
+          } else {
+            // Speech: group by (ward_id, sunday_date)
+            const key = `${entry.ward_id}:${entry.sunday_date}`;
+            const group = designationGroups.get(key) ?? [];
+            group.push(entry);
+            designationGroups.set(key, group);
+          }
+        } else {
+          immediateEntries.push(entry);
+        }
+      }
+
+      // --- immediateEntries switch updated ---
+      case 'designation': {
+        const text = buildDesignationText(
+          language,
+          [entry.speaker_name ?? ''],
+          entry.sunday_date,
+          entry.speech_position
+        );
+        title = text.title;
+        body = text.body;
+        break;
+      }
+
+    acceptance_criteria: [AC-060-1, AC-060-2, AC-060-3, AC-060-4]
+    edge_cases: [EC-060-1, EC-060-2]
+
+  # ---------------------------------------------------------------------------
+  # C010-02: Prayer-aware designation text in notificationUtils
+  # ---------------------------------------------------------------------------
+  - id: C010-02
+    name: Prayer-Aware Designation Text (Client)
+    feature: F060
+    cr: 270
+    type: bugfix
+    file: src/lib/notificationUtils.ts
+    description: |
+      Update the designation builder in buildNotificationText() for all
+      3 languages to check d.position. When position is 0 or 4, produce
+      prayer-specific title and body using getPrayerLabel(). When position
+      is null or 1-3, use existing speech text unchanged.
+
+      The data parameter already includes position?: number, so no type
+      change is needed. The designation builder currently ignores d.position;
+      this change makes it position-aware like speaker_confirmed and
+      speaker_withdrew already are.
+
+    input:
+      - name: data.position
+        type: "number | undefined"
+        description: "Speech position from the caller. 0=opening prayer, 1-3=speech, 4=closing prayer, undefined=legacy"
+      - name: data.name
+        type: "string | undefined"
+        description: "Single prayer giver name (used when position is 0 or 4)"
+      - name: data.names
+        type: "string[] | undefined"
+        description: "Grouped speaker names (used when position is null/1-3)"
+
+    output:
+      - name: "{ title, body }"
+        type: "{ title: string; body: string }"
+        description: "Prayer-specific or speech-specific title and body text"
+
+    logic: |
+      // Inside the designation builder for each language:
+      designation: (d) => {
+        const prayerLabel = getPrayerLabel(d.position ?? -1, language);
+        if (prayerLabel) {
+          const name = d.name ?? d.names?.[0] ?? '';
+          return {
+            title: 'Designação de Oração', // per language
+            body: `${name} foi designado(a) para a ${prayerLabel} em ${d.date}...`
+          };
+        }
+        // Existing speech text (unchanged)
+        const nameList = formatNameList(d.names ?? [], language);
+        ...
+      }
+
+    acceptance_criteria: [AC-060-5]
+    edge_cases: [EC-060-2]
+
+  # ---------------------------------------------------------------------------
+  # C010-03: User-friendly error in invite mutation (P0)
+  # ---------------------------------------------------------------------------
+  - id: C010-03
+    name: Invite Mutation Error i18n
+    feature: F061
+    cr: 271
+    type: bugfix
+    file: src/app/(tabs)/settings/users.tsx
+    description: |
+      In inviteMutation.onError (line 111), replace err.message with
+      i18n-mapped message. The callEdgeFunction already extracts
+      serverMessage from error.context.json().error. Known error codes:
+        - 'auth/no-session' -> t('users.sessionExpired')
+        - any other -> t('users.inviteFailed')
+
+      Current code:
+        Alert.alert(t('common.error'), err.message || t('users.inviteFailed'));
+
+      Fixed code:
+        const msg = err.message === 'auth/no-session'
+          ? t('users.sessionExpired')
+          : t('users.inviteFailed');
+        Alert.alert(t('common.error'), msg);
+
+    input:
+      - name: err
+        type: Error
+        description: "Error from callEdgeFunction, err.message may be raw server text or 'auth/no-session'"
+
+    output:
+      - name: Alert dialog
+        type: UI
+        description: "Always shows translated user-friendly message, never raw error text"
+
+    acceptance_criteria: [AC-061-1]
+    edge_cases: [EC-061-1]
+
+  # ---------------------------------------------------------------------------
+  # C010-04: Invite registration error i18n (P1)
+  # ---------------------------------------------------------------------------
+  - id: C010-04
+    name: Invite Registration Error i18n
+    feature: F061
+    cr: 271
+    type: bugfix
+    file: src/app/(auth)/invite/[token].tsx
+    description: |
+      Two changes in handleRegister():
+
+      1. Line 117: Replace `setError(data.error)` with
+         `setError(t('auth.registrationFailed'))` for unknown server errors.
+         The 3 known codes (token_expired, token_used, token_invalid) are
+         already mapped above and continue to use their specific i18n keys.
+
+      2. Line 134: Replace `setError(message)` with
+         `setError(t('auth.registrationFailed'))` in the non-network catch
+         branch. The network check (Failed to fetch / Network) already uses
+         t('auth.requiresConnection') and is unchanged.
+
+    input:
+      - name: data.error
+        type: "string (unknown server error code)"
+        description: "An unrecognized error code from register-invited-user edge function"
+      - name: err.message
+        type: "string (exception message)"
+        description: "Raw exception text from a non-network error"
+
+    output:
+      - name: setError()
+        type: "string (i18n)"
+        description: "Always sets a translated user-friendly error message"
+
+    acceptance_criteria: [AC-061-2, AC-061-3]
+
+  # ---------------------------------------------------------------------------
+  # C010-05: Settings error i18n (P2)
+  # ---------------------------------------------------------------------------
+  - id: C010-05
+    name: Settings Error i18n
+    feature: F061
+    cr: 271
+    type: bugfix
+    file: src/app/(tabs)/settings/index.tsx
+    description: |
+      Two changes:
+
+      1. Line 153: In handleAppLanguageSelect catch, replace `String(err)`
+         with `t('settings.languageChangeFailed')`.
+
+      2. Line 195: In handleSignOut catch, replace `String(err)` with
+         `t('settings.signOutFailed')`.
+
+    input:
+      - name: err
+        type: "unknown (catch parameter)"
+        description: "Exception from updateAppLanguage() or signOut()"
+
+    output:
+      - name: Alert dialog
+        type: UI
+        description: "Shows translated error message instead of String(err)"
+
+    acceptance_criteria: [AC-061-4, AC-061-5]
+
+  # ---------------------------------------------------------------------------
+  # C010-06: Members import error i18n and future speeches i18n (P3-P4)
+  # ---------------------------------------------------------------------------
+  - id: C010-06
+    name: Members Error i18n
+    feature: F061
+    cr: 271
+    type: bugfix
+    file: src/app/(tabs)/settings/members.tsx
+    description: |
+      Two changes:
+
+      1. Line 356 (P4): Replace hardcoded `(${futureCount} future speeches)`
+         with `(${t('members.futureSpeechWarning', { count: futureCount })})`.
+
+      2. Lines 431-476 (P3): Distinguish CSV validation errors from RPC
+         errors in importMutation. CSV validation errors from parseCsv() are
+         already translated line-by-line and thrown as Error with translated
+         message. The issue is when supabase.rpc('import_members') fails
+         (line 464: if (error) throw error), the Supabase error object has
+         a raw .message. In onError, we need to distinguish these two cases.
+
+         Approach: Tag CSV validation errors by setting a custom property
+         before throwing. In mutationFn, after parseCsv validation errors
+         are built:
+           const err = new Error(errorMessages);
+           (err as any).isCsvValidation = true;
+           throw err;
+         Similarly for importEmpty:
+           const err = new Error(t('members.importEmpty'));
+           (err as any).isCsvValidation = true;
+           throw err;
+
+         In onError:
+           if ((err as any).isCsvValidation) {
+             Alert.alert(t('common.error'), err.message);  // already i18n'd
+           } else {
+             Alert.alert(t('common.error'), t('members.importRpcError'));
+           }
+
+    input:
+      - name: err
+        type: Error
+        description: "Either a CSV validation error (already i18n'd) or a Supabase RPC error (raw)"
+
+    output:
+      - name: Alert dialog
+        type: UI
+        description: "CSV errors show translated per-line messages; RPC errors show generic i18n message"
+
+    acceptance_criteria: [AC-061-6, AC-061-7, AC-061-8]
+    edge_cases: [EC-061-2, EC-061-3]
+
+  # ---------------------------------------------------------------------------
+  # C010-07: i18n keys for error messages (3 locales)
+  # ---------------------------------------------------------------------------
+  - id: C010-07
+    name: Error Message i18n Keys
+    feature: F061
+    cr: 271
+    type: bugfix
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    description: |
+      Add 6 new i18n keys to each of the 3 locale files:
+
+      pt-BR:
+        settings.languageChangeFailed: "Falha ao alterar o idioma. Tente novamente."
+        settings.signOutFailed: "Falha ao sair. Tente novamente."
+        members.futureSpeechWarning: "{{count}} discursos futuros"
+        members.importRpcError: "Falha ao importar membros. Tente novamente."
+        users.sessionExpired: "Sua sessão expirou. Faça login novamente."
+        auth.registrationFailed: "Falha no registro. Tente novamente."
+
+      en-US:
+        settings.languageChangeFailed: "Failed to change language. Please try again."
+        settings.signOutFailed: "Failed to sign out. Please try again."
+        members.futureSpeechWarning: "{{count}} future speeches"
+        members.importRpcError: "Failed to import members. Please try again."
+        users.sessionExpired: "Your session has expired. Please log in again."
+        auth.registrationFailed: "Registration failed. Please try again."
+
+      es-LA:
+        settings.languageChangeFailed: "Error al cambiar el idioma. Intente nuevamente."
+        settings.signOutFailed: "Error al cerrar sesión. Intente nuevamente."
+        members.futureSpeechWarning: "{{count}} discursos futuros"
+        members.importRpcError: "Error al importar miembros. Intente nuevamente."
+        users.sessionExpired: "Su sesión ha expirado. Inicie sesión nuevamente."
+        auth.registrationFailed: "Error en el registro. Intente nuevamente."
+
+    input: []
+    output:
+      - name: i18n keys
+        type: "JSON entries in 3 locale files"
+        description: "6 new keys x 3 locales = 18 new translation entries"
+
+    acceptance_criteria: [AC-061-1, AC-061-2, AC-061-3, AC-061-4, AC-061-5, AC-061-6, AC-061-8]
+
+  # ---------------------------------------------------------------------------
+  # C010-08: Refresh session before edge function invoke
+  # ---------------------------------------------------------------------------
+  - id: C010-08
+    name: Refresh Session Guard in callEdgeFunction
+    feature: F062
+    cr: 272
+    type: bugfix
+    file: src/app/(tabs)/settings/users.tsx
+    description: |
+      In callEdgeFunction() (lines 46-48), replace getSession() with
+      refreshSession() to ensure the JWT is fresh before invoking edge
+      functions.
+
+      Current code:
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('auth/no-session');
+
+      Fixed code:
+        const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !session) throw new Error('auth/no-session');
+
+      refreshSession() checks if the current token is expired and refreshes
+      it if needed. If the token is still valid, Supabase SDK returns the
+      existing session without a network call. If the refresh token is also
+      expired, it returns null session and an error, which triggers the
+      'auth/no-session' throw.
+
+      The ADR-024 comment is kept but the mechanism changes from passive
+      check to active refresh. ADR-024 was about collection sort order
+      (not the session guard), so the comment reference should be updated
+      to reflect this is the session freshness guard (ADR-029).
+
+      Note: C010-03 (invite error i18n) and C010-08 (refresh session) both
+      modify users.tsx. C010-08 changes callEdgeFunction lines 46-48, while
+      C010-03 changes inviteMutation.onError at line 111. No conflict.
+
+    input:
+      - name: supabase.auth.refreshSession()
+        type: "Supabase Auth API"
+        description: "Returns { data: { session }, error } - refreshes JWT if expired"
+
+    output:
+      - name: session
+        type: "Session | null"
+        description: "Fresh session with valid JWT, or null if refresh failed"
+      - name: side_effect
+        type: "Supabase internal session state updated"
+        description: "invoke() will use the freshly refreshed token from internal state"
+
+    acceptance_criteria: [AC-062-1, AC-062-2, AC-062-3]
+    edge_cases: [EC-062-1, EC-062-2, EC-062-3]
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+integrations:
+
+  - id: INT-010-01
+    name: "process-notifications grouping -> buildDesignationText"
+    from: C010-01
+    to: "buildDesignationText function (same file)"
+    contract:
+      input: "(language: string, names: string[], date: string, position?: number | null)"
+      output: "{ title: string; body: string }"
+    description: |
+      The grouping loop splits designation entries into two paths:
+      1. Prayer entries (position 0,4) -> immediateEntries -> switch case
+         'designation' calls buildDesignationText with position
+      2. Speech entries (position 1-3/null) -> designationGroups -> existing
+         grouped processing calls buildDesignationText without position
+         (backward compatible, position defaults to undefined)
+
+  - id: INT-010-02
+    name: "buildDesignationText -> getPrayerLabel"
+    from: C010-01
+    to: "getPrayerLabel function (same file)"
+    contract:
+      input: "(position: number, language: string)"
+      output: "string | null (null if not a prayer position)"
+    description: |
+      buildDesignationText calls getPrayerLabel when position is provided.
+      getPrayerLabel already exists and is used by buildConfirmedText and
+      buildWithdrewText. No changes needed to getPrayerLabel itself.
+
+  - id: INT-010-03
+    name: "notificationUtils designation builder -> getPrayerLabel"
+    from: C010-02
+    to: "getPrayerLabel function (same file, notificationUtils.ts)"
+    contract:
+      input: "(position: number, language: OrdinalLanguage)"
+      output: "string | null"
+    description: |
+      The client-side designation builder calls getPrayerLabel (which is
+      already defined in notificationUtils.ts but not used by the designation
+      type until this change). Mirrors the server-side integration INT-010-02.
+
+  - id: INT-010-04
+    name: "callEdgeFunction (refreshSession) -> supabase.functions.invoke"
+    from: C010-08
+    to: "Supabase Edge Functions"
+    contract:
+      input: "callEdgeFunction(functionName: string, body: Record<string, unknown>)"
+      output: "data: any (edge function response)"
+    description: |
+      callEdgeFunction now calls refreshSession() before invoke(). The
+      refreshed session updates the internal Supabase client state, so
+      invoke() automatically uses the fresh JWT. No change to invoke()
+      itself or the edge function contract.
+
+  - id: INT-010-05
+    name: "inviteMutation.onError -> i18n keys"
+    from: C010-03
+    to: C010-07
+    contract:
+      input: "err.message (string from callEdgeFunction throw)"
+      output: "t('users.sessionExpired') or t('users.inviteFailed')"
+    description: |
+      The invite mutation error handler maps err.message to i18n keys.
+      'auth/no-session' maps to users.sessionExpired, all other errors
+      map to users.inviteFailed. The i18n keys are defined in C010-07.
+
+  - id: INT-010-06
+    name: "invite/[token] error handler -> i18n keys"
+    from: C010-04
+    to: C010-07
+    contract:
+      input: "data.error (unknown server code) or caught exception"
+      output: "t('auth.registrationFailed')"
+    description: |
+      Unknown server errors and non-network exceptions are both mapped
+      to auth.registrationFailed. Known codes (token_expired/used/invalid)
+      and network errors retain their existing i18n mappings.
+
+  - id: INT-010-07
+    name: "members.tsx importMutation error tagging"
+    from: C010-06
+    to: C010-07
+    contract:
+      input: "err with optional .isCsvValidation boolean"
+      output: "err.message (if CSV validation) or t('members.importRpcError') (if RPC)"
+    description: |
+      CSV validation errors are tagged with isCsvValidation=true before
+      throwing. In onError, tagged errors show err.message (already i18n'd),
+      untagged errors show t('members.importRpcError').
+
+# =============================================================================
+# MODULE UPDATES
+# =============================================================================
+
+module_updates:
+
+  - module_id: M012
+    module_name: Push Notifications
+    action: update
+    reason: "F060 adds prayer-aware designation notification text to both server and client"
+    features_after: [F034, F059, F060]
+
+  - module_id: M001
+    module_name: Authentication
+    action: update
+    reason: "F061 adds i18n error handling to invite/[token].tsx; F062 changes session management in callEdgeFunction"
+    features_after: [F001, F002, F003, F004, F005, F062]
+
+  - module_id: M013
+    module_name: "UI & Navigation"
+    action: update
+    reason: "F061 adds i18n error handling to settings/index.tsx, settings/users.tsx, settings/members.tsx"
+    features_after: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052, F058, F061]
+
+# =============================================================================
+# ADRs (Architecture Decision Records)
+# =============================================================================
+
+adrs:
+
+  - id: ADR-026
+    title: "Prayer designations sent individually, not grouped"
+    decision: |
+      In process-notifications, prayer designation entries (speech_position 0 or 4)
+      are routed to immediateEntries for individual processing, rather than being
+      grouped with speech designations by (ward_id, sunday_date).
+    context: |
+      The current grouping logic collects all designation entries for the same
+      Sunday and produces a single notification with a list of names. This works
+      for speeches but produces confusing text for prayers because:
+      1. Prayer title should be "Prayer Assignment" not "Speech Assignment"
+      2. Prayers are individual (one per position) not grouped
+      3. The body should mention the specific prayer label (opening/closing)
+    rationale: |
+      Prayers are individual assignments (one person per position). Grouping them
+      with speeches would mix prayer-specific and speech-specific text. The
+      confirmed and withdrew notification types already handle prayers individually
+      via getPrayerLabel(). Sending prayer designations individually is consistent
+      with this established pattern.
+    alternatives_considered:
+      - "Group all designations and detect prayer positions in buildDesignationText: Would require buildDesignationText to return multiple notifications for one group, breaking its contract."
+      - "Create a separate notification type 'prayer_designation': Would require DB trigger changes and add unnecessary complexity."
+    applies_to: [C010-01]
+
+  - id: ADR-027
+    title: "Tag-based error discrimination for CSV import errors"
+    decision: |
+      Use a custom boolean property (isCsvValidation) on Error objects to
+      distinguish CSV validation errors from Supabase RPC errors in the
+      import mutation, rather than using error subclasses or separate
+      mutation paths.
+    context: |
+      importMutation.mutationFn throws Error in two distinct scenarios:
+      1. CSV validation failures (parseCsv errors) - already i18n'd, should
+         show detailed per-line messages
+      2. Supabase RPC failures (import_members error) - raw database errors,
+         must show generic i18n message
+      Both arrive at onError as Error objects with .message strings.
+    rationale: |
+      - Error subclass (class CsvValidationError extends Error): adds a class
+        definition for a single use case; instanceof checks can be fragile
+        across module boundaries.
+      - Separate mutation paths: would duplicate the file picker and result
+        handling logic.
+      - Tag-based approach: minimal change, single property check in onError,
+        no new classes or restructuring needed. The tag is set at throw time
+        and checked at catch time, both in the same function scope.
+    alternatives_considered:
+      - "CsvValidationError subclass: More formal but adds complexity for a simple boolean discrimination."
+      - "Two separate mutations: Would duplicate file picker integration."
+      - "Parse error message format (check for newlines): Fragile and breaks if error message format changes."
+    applies_to: [C010-06]
+
+  - id: ADR-028
+    title: "refreshSession() over getSession() for edge function guard"
+    decision: |
+      Replace supabase.auth.getSession() with supabase.auth.refreshSession()
+      in callEdgeFunction() to ensure the JWT is fresh before invoking edge
+      functions.
+    context: |
+      getSession() returns the cached session from memory. If the JWT has
+      expired (typically after 1 hour of inactivity), the cached session
+      still exists (non-null) but the access_token is expired. The session
+      guard passes (session is not null) but invoke() sends the expired
+      token, causing 401 errors from edge functions.
+    rationale: |
+      refreshSession() checks token expiry and refreshes if needed. If the
+      token is still valid, the SDK returns the existing session without a
+      network call (no performance penalty for fresh tokens). If the refresh
+      token is also expired, it returns error/null, correctly triggering
+      the 'auth/no-session' path. The Supabase SDK internally deduplicates
+      concurrent refresh requests, so parallel callEdgeFunction calls are safe.
+    alternatives_considered:
+      - "Add token expiry check before invoke: Requires manual JWT parsing and threshold logic, duplicating what refreshSession already does."
+      - "Catch 401 from invoke and retry with refresh: Adds complexity with retry logic and doubles the latency in the expired-token case."
+      - "Use auth.onAuthStateChange to proactively refresh: Would require global state management and doesn't guarantee freshness at invocation time."
+    applies_to: [C010-08]
+
+# =============================================================================
+# CONSOLIDATED UPDATES
+# =============================================================================
+
+consolidated_updates:
+  arch_consolidated:
+    modules_to_update: [M012, M001, M013]
+    adrs_to_add: [ADR-026, ADR-027, ADR-028]
+    metadata:
+      total_modules: 13   # unchanged
+      total_adrs: 28       # was 25 + ADR-026, ADR-027, ADR-028
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_spec: true
+  GATE-02_read_consolidated: true
+  GATE-03_components_single_responsibility: true
+  GATE-04_contracts_defined: true
+  GATE-05_integrations_mapped: true
+  GATE-06_adrs_documented: true
+  GATE-07_status_complete: true

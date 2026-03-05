@@ -6,9 +6,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-04"
+  last_updated: "2026-03-05"
   total_modules: 13
-  total_adrs: 25
+  total_adrs: 28
 
 # =============================================================================
 # TECH STACK
@@ -108,7 +108,7 @@ modules:
       Email/password authentication via Supabase Auth. Manages login, logout,
       registration (first user and invited user), password reset, and session
       persistence. Role and ward_id extracted from app_metadata.
-    features: [F001, F002, F003, F004, F005]
+    features: [F001, F002, F003, F004, F005, F062]
     components:
       - path: src/contexts/AuthContext.tsx
         responsibility: Auth state provider; derives role, wardId, userName from session; language management
@@ -381,7 +381,7 @@ modules:
       notifications on speech status changes. Edge Function processes queue
       on cron. Token registered on login (non-observers). Notification tap
       navigates to Home.
-    features: [F034, F059]
+    features: [F034, F059, F060]
     components:
       - path: src/hooks/useNotifications.ts
         responsibility: Push token registration, notification tap handler
@@ -402,7 +402,7 @@ modules:
       Application shell, tab navigation, theme system, error handling,
       reusable UI components, and SVG icon system. Four-tab bottom
       navigation. Light/dark theme with system detection.
-    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052, F058]
+    features: [F012, F024, F025, F026, F027, F028, F029, F030, F031, F035, F036, F037, F038, F049, F050, F051, F052, F058, F061]
     components:
       - path: src/app/_layout.tsx
         responsibility: Root layout with provider stack (ErrorBoundary > GestureHandler > PersistQueryClient > I18n > Theme > Auth > Sync > OnlineStatus)
@@ -993,3 +993,43 @@ adrs:
       assignment (not_assigned -> assigned_not_invited). A negative guard would
       still allow spurious notifications from manual status reverts. The
       TG_OP = 'INSERT' OR clause is preserved for consistency and defense-in-depth.
+
+  - id: ADR-026
+    title: "Prayer designations sent individually, not grouped"
+    decision: |
+      In process-notifications, prayer designation entries (speech_position 0 or 4)
+      are routed to immediateEntries for individual processing, rather than being
+      grouped with speech designations by (ward_id, sunday_date).
+    rationale: |
+      Prayers are individual assignments (one person per position). Grouping them
+      with speeches would mix prayer-specific and speech-specific text. The
+      confirmed and withdrew types already handle prayers individually via
+      getPrayerLabel(). Sending prayer designations individually is consistent
+      with this established pattern.
+
+  - id: ADR-027
+    title: "Tag-based error discrimination for CSV import errors"
+    decision: |
+      Use a custom boolean property (isCsvValidation) on Error objects to
+      distinguish CSV validation errors from Supabase RPC errors in the
+      import mutation, rather than using error subclasses or separate
+      mutation paths.
+    rationale: |
+      Error subclass adds complexity for a single boolean discrimination.
+      Separate mutation paths would duplicate file picker logic. Tag-based
+      approach is minimal: single property check in onError, no new classes
+      or restructuring. The tag is set at throw time and checked at catch
+      time, both in the same function scope.
+
+  - id: ADR-028
+    title: "refreshSession() over getSession() for edge function guard"
+    decision: |
+      Replace supabase.auth.getSession() with supabase.auth.refreshSession()
+      in callEdgeFunction() to ensure the JWT is fresh before invoking edge
+      functions.
+    rationale: |
+      getSession() returns cached token which may be expired. refreshSession()
+      checks expiry and refreshes if needed. No performance penalty for fresh
+      tokens (SDK returns existing session). If refresh token is also expired,
+      returns error/null correctly triggering 'auth/no-session' path. SDK
+      deduplicates concurrent refresh requests internally.

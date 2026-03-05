@@ -1,0 +1,643 @@
+# =============================================================================
+# SPEC_F010.yaml
+# Bug fixes: Designation notification text for prayers (CR-270),
+#            Raw error messages in UI alerts (CR-271),
+#            Stale JWT on edge function invoke (CR-272)
+# Status: complete
+# Created: 2026-03-05
+# =============================================================================
+
+type: spec
+status: complete
+artifact_id: "010"
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # CR-270: Designation notification uses speech text for prayers
+  # ---------------------------------------------------------------------------
+
+  - id: F060
+    name: Prayer-Aware Designation Notification Text
+    cr: 270
+    type: bugfix
+    area: notifications
+    description: |
+      The designation notification type is grouped by (ward_id, sunday_date)
+      in process-notifications. Currently, buildDesignationText() produces
+      generic speech-assignment text ("Designacao de Discurso" / "Speech
+      Assignment") regardless of whether the assigned position is a prayer
+      (position 0 or 4) or a speech (position 1-3).
+
+      The confirmed and withdrew notification types already differentiate
+      between prayers and speeches using getPrayerLabel(position, language).
+      The designation type must follow the same pattern.
+
+      The fix requires:
+      1. Server (process-notifications/index.ts): Stop grouping all
+         designations together. Instead, separate prayer designations
+         (position 0 or 4) from speech designations (position 1-3).
+         For prayers, use prayer-specific title ("Designacao de Oracao" /
+         "Prayer Assignment") and prayer-specific body with the opening/
+         closing prayer label. For speeches, keep the existing grouped
+         behavior with speech-specific text.
+      2. Client (notificationUtils.ts): Update the designation builder
+         to accept optional position data and produce prayer-specific
+         text when position is 0 or 4, matching the server behavior.
+
+    current_behavior: |
+      Server (process-notifications/index.ts lines 216-263):
+      - All designation entries are grouped by (ward_id, sunday_date) key
+      - Names are collected from all entries in the group
+      - buildDesignationText() is called with just (language, names, date)
+      - Output is always "Designacao de Discurso" / "Speech Assignment"
+      - The speech_position field from notification_queue is available in
+        each entry but is discarded during grouping
+
+      Client (notificationUtils.ts lines 67-73, 111-117, 155-161):
+      - The designation builder always produces speech text
+      - It does not receive or use position data
+      - getPrayerLabel() exists in the same file but is not called for
+        the designation type
+
+    scope: |
+      Server: process-notifications/index.ts
+        - Update buildDesignationText() signature to accept optional position
+        - Add prayer-specific text when position is 0 or 4
+        - Split designation grouping: prayers are sent individually (with
+          position), speeches continue to be grouped by (ward_id, sunday_date)
+
+      Client: src/lib/notificationUtils.ts
+        - Update designation builder to check position and produce
+          prayer-specific text when position is 0 or 4
+
+    implementation:
+      files_to_modify:
+        - path: supabase/functions/process-notifications/index.ts
+          changes:
+            - description: |
+                Update buildDesignationText() to accept an optional position
+                parameter. When position is 0 or 4, use prayer-specific
+                title and body with getPrayerLabel(). When position is null
+                or 1-3, use existing speech text.
+            - description: |
+                Update designation grouping logic. During the grouping loop
+                (lines 220-229), separate entries where speech_position is
+                0 or 4 (prayer) from entries where speech_position is 1-3
+                (speech). Prayer entries go to immediateEntries for individual
+                processing (like confirmed/withdrew). Speech entries continue
+                to be grouped by (ward_id, sunday_date).
+            - description: |
+                In the immediateEntries processing loop, add a case for
+                'designation' that calls buildDesignationText() with position.
+
+        - path: src/lib/notificationUtils.ts
+          changes:
+            - description: |
+                Update the designation builder in all 3 languages to check
+                d.position. When position is 0 or 4, produce prayer-specific
+                title and body using getPrayerLabel(). When position is null
+                or 1-3, use existing speech text.
+
+      files_to_create: []
+      client_side_changes: notificationUtils.ts updated for test consistency
+
+    acceptance_criteria:
+      - id: AC-060-1
+        description: "Prayer designation (position 0) shows prayer-specific text"
+        given: "A member is assigned to opening prayer (position 0)"
+        when: "The designation notification is processed"
+        then: "Notification title is 'Designacao de Oracao' (pt-BR) / 'Prayer Assignment' (en-US) / 'Asignacion de Oracion' (es-LA) and body mentions 'oracao de abertura' / 'opening prayer' / 'oracion de apertura'"
+
+      - id: AC-060-2
+        description: "Prayer designation (position 4) shows prayer-specific text"
+        given: "A member is assigned to closing prayer (position 4)"
+        when: "The designation notification is processed"
+        then: "Notification title is 'Designacao de Oracao' and body mentions 'oracao de encerramento' / 'closing prayer' / 'oracion de clausura'"
+
+      - id: AC-060-3
+        description: "Speech designation (positions 1-3) keeps existing grouped text"
+        given: "Multiple speakers are assigned to speeches (positions 1-3) for the same Sunday"
+        when: "The designation notification is processed"
+        then: "Notification is grouped and shows 'Designacao de Discurso' / 'Speech Assignment' with all names listed, same as current behavior"
+
+      - id: AC-060-4
+        description: "Prayer designation is sent individually, not grouped"
+        given: "Both a prayer (position 0) and a speech (position 1) are designated for the same Sunday"
+        when: "Notifications are processed"
+        then: "Prayer gets its own individual notification. Speech is grouped with other speeches for the same Sunday."
+
+      - id: AC-060-5
+        description: "Client notificationUtils matches server behavior"
+        given: "buildNotificationText is called with type='designation' and position=0"
+        when: "Text is built"
+        then: "Returns prayer-specific title and body, same as server"
+
+    edge_cases:
+      - id: EC-060-1
+        case: "Both opening and closing prayer assigned for same Sunday"
+        expected: "Each prayer gets its own individual notification with the correct label (opening/closing). They are NOT grouped together."
+
+      - id: EC-060-2
+        case: "Designation entry with null speech_position"
+        expected: "Treated as speech (fallback). Grouped with other speech designations. Uses speech-specific text. This handles legacy entries."
+
+      - id: EC-060-3
+        case: "Prayer designation when manage_prayers is false"
+        expected: "When manage_prayers=false, prayer assignment sets status directly to assigned_confirmed, not assigned_not_invited. So the designation trigger never fires for prayers. This edge case cannot actually occur in normal use."
+
+  # ---------------------------------------------------------------------------
+  # CR-271: Raw error messages shown in UI alerts
+  # ---------------------------------------------------------------------------
+
+  - id: F061
+    name: User-Friendly Error Messages in All Alerts
+    cr: 271
+    type: bugfix
+    area: ui
+    description: |
+      Audit and fix all 7 locations where raw/untranslated error messages
+      are shown to the user in Alert dialogs. Every alert must use i18n keys
+      instead of raw error strings (err.message, String(err), data.error).
+
+      The 7 points, in priority order:
+
+      P0 - src/app/(tabs)/settings/users.tsx:111
+        inviteMutation.onError shows err.message which can contain server
+        error strings like "non 2xx response" or raw edge function errors.
+        Fix: Map known error codes to i18n keys, fallback to generic
+        t('users.inviteFailed').
+
+      P1 - src/app/(auth)/invite/[token].tsx:117
+        After handleRegister(), if data.error is truthy but not one of the
+        3 known codes (token_expired/used/invalid), it shows data.error
+        raw. Fix: Replace with t('auth.registrationFailed').
+
+      P1 - src/app/(auth)/invite/[token].tsx:134
+        In the catch block, if the error message is not network-related,
+        it shows the raw message. Fix: Replace with t('auth.registrationFailed').
+
+      P2 - src/app/(tabs)/settings/index.tsx:153
+        handleAppLanguageSelect catch shows String(err) which exposes the
+        error object. Fix: Replace with t('settings.languageChangeFailed').
+
+      P2 - src/app/(tabs)/settings/index.tsx:195
+        handleSignOut catch shows String(err). Fix: Replace with
+        t('settings.signOutFailed').
+
+      P3 - src/app/(tabs)/settings/members.tsx:475
+        importMutation.onError shows err.message. For CSV parse errors
+        (from parseCsv), this is fine because they are already translated.
+        But for Supabase RPC errors (from supabase.rpc('import_members')),
+        err.message contains raw PostgreSQL/Supabase error text.
+        Fix: Distinguish CSV validation errors (already i18n'd) from
+        RPC errors. For RPC errors, use t('members.importRpcError').
+
+      P4 - src/app/(tabs)/settings/members.tsx:356
+        handleDelete shows "(X future speeches)" hardcoded in English.
+        Fix: Use i18n key t('members.futureSpeechWarning', { count: N }).
+
+    current_behavior: |
+      P0: users.tsx:111 - err.message shows raw server errors to user
+      P1: invite/[token].tsx:117 - setError(data.error) shows server error code
+      P1: invite/[token].tsx:134 - setError(message) shows raw exception text
+      P2: settings/index.tsx:153 - Alert.alert(t('common.error'), String(err))
+      P2: settings/index.tsx:195 - Alert.alert(t('common.error'), String(err))
+      P3: members.tsx:475 - Alert.alert(t('common.error'), err.message) for RPC
+      P4: members.tsx:356 - hardcoded "(X future speeches)" string
+
+    scope: |
+      Client-only changes across 4 files plus 3 i18n locale files.
+      No server-side changes needed.
+
+    implementation:
+      files_to_modify:
+        - path: src/app/(tabs)/settings/users.tsx
+          changes:
+            - description: |
+                Line 111: In inviteMutation.onError, map known error codes
+                from callEdgeFunction to i18n keys. The callEdgeFunction
+                already extracts serverMessage from error.context.json().error.
+                Known codes from create-invitation edge function:
+                  - 'auth/no-session' -> t('users.sessionExpired')
+                  - any other -> t('users.inviteFailed')
+                Remove err.message from the Alert body.
+
+        - path: src/app/(auth)/invite/[token].tsx
+          changes:
+            - description: |
+                Line 117: Replace `setError(data.error)` with
+                `setError(t('auth.registrationFailed'))` for unknown
+                server errors. The 3 known codes (token_expired,
+                token_used, token_invalid) are already mapped above.
+            - description: |
+                Line 134: Replace `setError(message)` with
+                `setError(t('auth.registrationFailed'))` in the non-network
+                catch branch.
+
+        - path: src/app/(tabs)/settings/index.tsx
+          changes:
+            - description: |
+                Line 153: Replace `String(err)` with
+                `t('settings.languageChangeFailed')`.
+            - description: |
+                Line 195: Replace `String(err)` with
+                `t('settings.signOutFailed')`.
+
+        - path: src/app/(tabs)/settings/members.tsx
+          changes:
+            - description: |
+                Line 356: Replace `(${futureCount} future speeches)` with
+                `t('members.futureSpeechWarning', { count: futureCount })`.
+            - description: |
+                Lines 463-476: In importMutation.mutationFn, tag CSV
+                validation errors distinctly from RPC errors. Set a
+                custom property or use a subclass. In onError, check
+                if the error is a CSV validation error (already i18n'd)
+                and show err.message, or if it's an RPC error show
+                t('members.importRpcError').
+
+        - path: src/i18n/locales/pt-BR.json
+          changes:
+            - description: |
+                Add keys:
+                  settings.languageChangeFailed: "Falha ao alterar o idioma. Tente novamente."
+                  settings.signOutFailed: "Falha ao sair. Tente novamente."
+                  members.futureSpeechWarning: "({{count}} discursos futuros)"
+                  members.importRpcError: "Falha ao importar membros. Tente novamente."
+                  users.sessionExpired: "Sua sessao expirou. Faca login novamente."
+                  auth.registrationFailed: "Falha no registro. Tente novamente."
+
+        - path: src/i18n/locales/en-US.json
+          changes:
+            - description: |
+                Add keys:
+                  settings.languageChangeFailed: "Failed to change language. Please try again."
+                  settings.signOutFailed: "Failed to sign out. Please try again."
+                  members.futureSpeechWarning: "({{count}} future speeches)"
+                  members.importRpcError: "Failed to import members. Please try again."
+                  users.sessionExpired: "Your session has expired. Please log in again."
+                  auth.registrationFailed: "Registration failed. Please try again."
+
+        - path: src/i18n/locales/es-LA.json
+          changes:
+            - description: |
+                Add keys:
+                  settings.languageChangeFailed: "Error al cambiar el idioma. Intente nuevamente."
+                  settings.signOutFailed: "Error al cerrar sesion. Intente nuevamente."
+                  members.futureSpeechWarning: "({{count}} discursos futuros)"
+                  members.importRpcError: "Error al importar miembros. Intente nuevamente."
+                  users.sessionExpired: "Su sesion ha expirado. Inicie sesion nuevamente."
+                  auth.registrationFailed: "Error en el registro. Intente nuevamente."
+
+      files_to_create: []
+      client_side_changes: 4 tsx files + 3 i18n locale files
+
+    acceptance_criteria:
+      - id: AC-061-1
+        description: "Invite existing email shows friendly error (P0)"
+        given: "User tries to invite an email that causes a server error"
+        when: "The invite mutation returns an error"
+        then: "Alert shows translated 'Falha ao criar convite' (or equivalent), NOT raw error message like 'non 2xx response'"
+
+      - id: AC-061-2
+        description: "Invite token unknown server error shows friendly text (P1)"
+        given: "User opens an invite link and submits registration"
+        when: "Server returns an unknown data.error value"
+        then: "Error text shows translated 'Falha no registro. Tente novamente.' NOT the raw server error code"
+
+      - id: AC-061-3
+        description: "Invite registration catch-all shows friendly text (P1)"
+        given: "User opens an invite link and submits registration"
+        when: "An unexpected non-network exception occurs"
+        then: "Error text shows translated 'Falha no registro. Tente novamente.' NOT the raw error message"
+
+      - id: AC-061-4
+        description: "App language change error shows friendly text (P2)"
+        given: "User changes app language in settings"
+        when: "updateAppLanguage throws an error"
+        then: "Alert shows translated 'Falha ao alterar o idioma.' NOT String(err)"
+
+      - id: AC-061-5
+        description: "Sign out error shows friendly text (P2)"
+        given: "User taps sign out"
+        when: "signOut throws an error"
+        then: "Alert shows translated 'Falha ao sair.' NOT String(err)"
+
+      - id: AC-061-6
+        description: "CSV import RPC error shows friendly text (P3)"
+        given: "User imports a valid CSV file"
+        when: "The supabase.rpc('import_members') call fails"
+        then: "Alert shows translated 'Falha ao importar membros.' NOT raw PostgreSQL error"
+
+      - id: AC-061-7
+        description: "CSV import validation errors still show detailed lines (P3)"
+        given: "User imports a CSV file with validation errors"
+        when: "parseCsv returns validation errors"
+        then: "Alert shows the per-line translated error messages (existing behavior preserved)"
+
+      - id: AC-061-8
+        description: "Future speeches warning is translated (P4)"
+        given: "User deletes a member who has future speeches"
+        when: "Delete confirmation alert is shown"
+        then: "Alert shows '(2 discursos futuros)' (pt-BR) instead of '(2 future speeches)'"
+
+    edge_cases:
+      - id: EC-061-1
+        case: "callEdgeFunction throws 'auth/no-session' error"
+        expected: "Alert shows t('users.sessionExpired') with specific session expired message"
+
+      - id: EC-061-2
+        case: "CSV import error has newlines from multiple validation errors"
+        expected: "These are already translated per-line by translateCsvError(). Show err.message as-is (these are i18n'd)."
+
+      - id: EC-061-3
+        case: "Import member count is 0 but parse succeeded"
+        expected: "Shows t('members.importEmpty') which is already an i18n key (existing behavior, no change needed)"
+
+  # ---------------------------------------------------------------------------
+  # CR-272: Stale JWT when invoking edge functions
+  # ---------------------------------------------------------------------------
+
+  - id: F062
+    name: Refresh Session Before Edge Function Invoke
+    cr: 272
+    type: bugfix
+    area: auth
+    description: |
+      The callEdgeFunction() in users.tsx uses supabase.auth.getSession()
+      to verify a session exists before invoking an edge function. However,
+      getSession() returns the cached session which may contain a stale/expired
+      JWT. When the JWT is expired, supabase.functions.invoke() sends the
+      expired token and the edge function rejects it with 401.
+
+      Fix: Replace getSession() with refreshSession() in callEdgeFunction().
+      refreshSession() forces a token refresh if the current token is expired
+      or about to expire, ensuring invoke() always sends a valid JWT.
+
+      Note: supabase.functions.invoke() uses the token from the current
+      session internally. By calling refreshSession() first, the internal
+      session state is updated with a fresh token.
+
+    current_behavior: |
+      In src/app/(tabs)/settings/users.tsx lines 42-68:
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('auth/no-session');
+        const { data, error } = await supabase.functions.invoke(functionName, { body });
+
+      getSession() returns whatever is in the local cache. If the JWT
+      has expired (typically after 1 hour), the cached session still exists
+      (non-null) but the access_token is expired. The guard passes (session
+      is not null), but invoke() fails because the edge function validates
+      the expired JWT.
+
+    scope: |
+      Single file change: src/app/(tabs)/settings/users.tsx
+      Replace getSession() with refreshSession() in callEdgeFunction().
+
+    implementation:
+      files_to_modify:
+        - path: src/app/(tabs)/settings/users.tsx
+          changes:
+            - description: |
+                In callEdgeFunction() (lines 46-48), replace:
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) throw new Error('auth/no-session');
+                With:
+                  const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+                  if (refreshError || !session) throw new Error('auth/no-session');
+
+      files_to_create: []
+      client_side_changes: users.tsx callEdgeFunction updated
+
+    acceptance_criteria:
+      - id: AC-062-1
+        description: "Edge function invoke succeeds with refreshed token"
+        given: "User's cached JWT has expired"
+        when: "User invokes any edge function (invite, list users, change role, delete user, update name)"
+        then: "callEdgeFunction refreshes the session first, gets a new valid JWT, and the edge function call succeeds"
+
+      - id: AC-062-2
+        description: "No-session error when truly logged out"
+        given: "User has no valid session (logged out or refresh token also expired)"
+        when: "User tries to invoke an edge function"
+        then: "callEdgeFunction throws 'auth/no-session' error because refreshSession() returns null session"
+
+      - id: AC-062-3
+        description: "Fresh token is not unnecessarily refreshed"
+        given: "User's JWT is still valid (not expired)"
+        when: "User invokes an edge function"
+        then: "refreshSession() returns the current valid session without making an unnecessary network call (Supabase SDK handles this internally)"
+
+    edge_cases:
+      - id: EC-062-1
+        case: "Refresh token is also expired"
+        expected: "refreshSession() returns error or null session. callEdgeFunction throws 'auth/no-session'. User sees session expired message (from CR-271 fix)."
+
+      - id: EC-062-2
+        case: "Network error during refresh"
+        expected: "refreshSession() returns error. callEdgeFunction throws 'auth/no-session'. Invite mutation onError shows translated error."
+
+      - id: EC-062-3
+        case: "Concurrent edge function calls"
+        expected: "Each call refreshes independently. Supabase SDK internally deduplicates concurrent refresh requests."
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    assumption: "Prayer designation notifications should be sent individually, not grouped with speech designations"
+    status: confirmed
+    reason: "Prayers are individual assignments (one person per prayer) unlike speeches which can be multiple per Sunday. Grouping a prayer with speeches would produce confusing text mixing 'Designacao de Oracao' concept with 'Designacao de Discurso'. The confirmed/withdrew notification types already handle prayers individually."
+
+  - id: A-2
+    assumption: "The notification_queue.speech_position field is correctly populated for prayer positions (0 and 4)"
+    status: confirmed
+    reason: "QA PRE confirmed: 'notification_queue.speech_position ja armazena a posicao corretamente no DB'. The DB trigger enqueue_speech_notification() passes NEW.position into the speech_position column."
+
+  - id: A-3
+    assumption: "CSV validation errors from parseCsv() are already i18n'd and should be shown as-is"
+    status: confirmed
+    reason: "The translateCsvError() function (members.tsx lines 273-285) maps CsvErrorCode to i18n keys. The error message passed to throw new Error() is built from t() calls. Only Supabase RPC errors are raw."
+
+  - id: A-4
+    assumption: "supabase.auth.refreshSession() is the correct replacement for getSession() to ensure fresh JWT"
+    status: confirmed
+    reason: "QA PRE confirmed root cause: 'getSession() retorna cached JWT sem refresh'. refreshSession() forces the SDK to check token expiry and refresh if needed, ensuring invoke() gets a valid token. The Supabase JS SDK v2 documentation confirms this behavior."
+
+  - id: A-5
+    assumption: "The ADR-024 comment in callEdgeFunction can be kept but the implementation changes from getSession to refreshSession"
+    status: confirmed
+    reason: "ADR-024 was about guarding against no-session. The intent is preserved but the mechanism is upgraded from passive check (getSession) to active refresh (refreshSession)."
+
+  - id: A-6
+    assumption: "No new i18n keys needed for CR-270 (notification text is server-side hardcoded, not from i18n files)"
+    status: confirmed
+    reason: "Notification text in process-notifications and notificationUtils is built with inline string literals per language, not from i18n resource files. The prayer labels already exist in getPrayerLabel()."
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies:
+
+  - id: INC-1
+    type: spec_gap
+    status: resolved
+    description: |
+      SPEC_CONSOLIDATED F034 description says 'Prayer-specific notification
+      titles and bodies for positions 0 and 4' but this only applies to
+      speaker_confirmed and speaker_withdrew types. The designation type
+      does not have prayer-specific text.
+    resolution: |
+      F060 extends prayer-specific text to the designation notification type,
+      making F034 description accurate for all notification types.
+
+  - id: INC-2
+    type: code_inconsistency
+    status: resolved
+    description: |
+      The client notificationUtils.ts and server process-notifications/index.ts
+      have duplicated notification text builders but they are not always in sync.
+      The designation builder in notificationUtils does not use position, while
+      the server one also does not (both are wrong).
+    resolution: |
+      F060 fixes both files to be consistent. Both will support position-aware
+      designation text for prayers.
+
+  - id: INC-3
+    type: i18n_gap
+    status: resolved
+    description: |
+      Multiple error handlers use raw error messages instead of i18n keys.
+      This is inconsistent with the pattern established in CR-263 where
+      register-first-user errors were properly mapped to i18n keys.
+    resolution: |
+      F061 applies the same i18n-first pattern to all 7 identified error
+      points, adding 6 new i18n keys across 3 locale files.
+
+# =============================================================================
+# CONSOLIDATED SPEC UPDATES
+# =============================================================================
+
+consolidated_updates:
+
+  features_to_update:
+    - id: F034
+      field: description
+      action: append
+      new_value: |
+        Designation notifications are prayer-aware: for positions 0 and 4,
+        the title is 'Designacao de Oracao'/'Prayer Assignment' and the body
+        mentions the specific prayer label (opening/closing). Prayer designations
+        are sent individually, not grouped with speech designations. [CR-270]
+
+    - id: F001
+      field: acceptance_criteria
+      action: add
+      new_value:
+        - given: "User opens invite link and registration fails with unknown server error"
+          when: "data.error is not a recognized code"
+          then: "Error message shows translated 'Falha no registro' instead of raw server error [CR-271]"
+
+  features_to_add:
+    - id: F060
+      name: Prayer-Aware Designation Notification Text
+      area: notifications
+      description: |
+        Designation notifications differentiate between prayer assignments
+        (position 0, 4) and speech assignments (position 1-3). Prayer
+        designations use prayer-specific title ('Designacao de Oracao' /
+        'Prayer Assignment') and body with opening/closing prayer label.
+        Prayer designations are sent individually, not grouped. Speech
+        designations continue to be grouped by (ward_id, sunday_date).
+        Both server (process-notifications) and client (notificationUtils)
+        are updated. [CR-270]
+      acceptance_criteria:
+        - given: "Member is assigned to opening prayer (position 0)"
+          when: "Designation notification is processed"
+          then: "Notification shows prayer-specific title and body with opening prayer label"
+        - given: "Member is assigned to closing prayer (position 4)"
+          when: "Designation notification is processed"
+          then: "Notification shows prayer-specific title and body with closing prayer label"
+        - given: "Members are assigned to speeches (positions 1-3)"
+          when: "Designation notification is processed"
+          then: "Notifications are grouped by Sunday and show speech-specific text (unchanged)"
+
+    - id: F061
+      name: User-Friendly Error Messages in All Alerts
+      area: ui
+      description: |
+        All alert/dialog error messages use i18n keys instead of raw error
+        strings. 7 points fixed: invite error in users.tsx (P0), invite
+        registration unknown error and catch-all in invite/[token].tsx (P1),
+        app language change and sign out in settings/index.tsx (P2), CSV
+        import RPC error in members.tsx (P3), future speeches count in
+        members.tsx (P4). 6 new i18n keys added across 3 locales. [CR-271]
+      acceptance_criteria:
+        - given: "Any error occurs in any alert/dialog in the app"
+          when: "Error is displayed to the user"
+          then: "Error message is always a translated, user-friendly string, never a raw error message or code"
+
+    - id: F062
+      name: Refresh Session Before Edge Function Invoke
+      area: auth
+      description: |
+        callEdgeFunction() in users.tsx uses refreshSession() instead of
+        getSession() to ensure the JWT is fresh before invoking edge
+        functions. Prevents 401 errors when cached JWT has expired. [CR-272]
+      acceptance_criteria:
+        - given: "User's cached JWT has expired"
+          when: "User invokes any edge function via callEdgeFunction"
+          then: "Session is refreshed and edge function receives a valid JWT"
+
+  business_rules_to_add:
+    - id: BR035
+      rule: "Prayer-aware designation notifications"
+      description: "Designation notifications for prayer positions (0, 4) use prayer-specific title and body and are sent individually. Speech designations (positions 1-3) are grouped by Sunday."
+
+    - id: BR036
+      rule: "No raw errors in UI"
+      description: "All error messages shown to users in Alert/dialog must use i18n keys. Raw error messages (err.message, String(err), data.error) are never shown directly."
+
+    - id: BR037
+      rule: "Fresh JWT for edge function invocation"
+      description: "callEdgeFunction() refreshes the session before invoking to ensure a valid JWT. Uses refreshSession() instead of getSession()."
+
+  design_decisions_to_add:
+    - id: DD027
+      decision: "Prayer designations sent individually, not grouped"
+      rationale: "Prayers are individual assignments (one person per position). Grouping them with speeches would produce confusing mixed notifications. This matches the individual handling used by confirmed/withdrew types."
+
+    - id: DD028
+      decision: "Distinguish CSV validation errors from RPC errors in import"
+      rationale: "CSV validation errors are already translated line-by-line and should be shown as-is. RPC errors are raw database errors and must be replaced with a generic i18n message."
+
+    - id: DD029
+      decision: "refreshSession() over getSession() for edge function guard"
+      rationale: "getSession() returns cached token which may be expired. refreshSession() ensures the token is valid, preventing 401 errors. The Supabase SDK internally handles the case where the token is still fresh (no unnecessary network call)."
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01_read_consolidated: true
+  GATE-02_identified_ambiguities: true
+  GATE-03_open_questions_with_ids: true     # None - all questions resolved
+  GATE-04_assumptions_with_ids: true        # A-1 through A-6 - ALL CONFIRMED
+  GATE-05_inconsistencies_reported: true    # INC-1 through INC-3 - ALL RESOLVED
+  GATE-06_status_complete: true

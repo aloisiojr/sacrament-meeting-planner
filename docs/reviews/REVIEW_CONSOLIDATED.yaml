@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-04"
-  version: 11
-  last_updated_by: "phase-009"
+  last_updated: "2026-03-05"
+  version: 12
+  last_updated_by: "phase-010"
 
 reviews:
   - id: REV-001
@@ -2708,3 +2708,448 @@ reviews:
       tests_passing: 1090
       tests_flaky: 0
       test_files: 52
+
+  # ===========================================================================
+  # REV-012: Phase 10 - Notification text, error i18n, session refresh
+  #          (CR-270, CR-271, CR-272)
+  # ===========================================================================
+
+  - id: REV-012
+    scope: "F060/F061/F062 Phase 10 - Prayer-Aware Designation Notifications (CR-270), User-Friendly Error Messages (CR-271), Refresh Session Before Edge Function Invoke (CR-272)"
+    date: "2026-03-05"
+    reviewer: reviewer-agent
+    spec: SPEC_F010
+    arch: ARCH_M010
+    plan: PLAN_P010
+    iteration: 1
+    commits:
+      # STEP-01: i18n keys (CR-270/CR-271/CR-272)
+      - hash: 9612ef9
+        step: STEP-01
+        message: "feat(i18n): add 5 new error message i18n keys to all 3 locales (CR-270, CR-271, CR-272)"
+      # STEP-02: Server-side prayer-aware designation text (CR-270)
+      - hash: 59734d5
+        step: STEP-02
+        message: "feat(process-notifications): prayer-aware designation text for position 0/4 (CR-270)"
+      # STEP-03: Client-side prayer-aware designation text (CR-270)
+      - hash: 6749af7
+        step: STEP-03
+        message: "feat(notificationUtils): prayer-aware designation text for position 0/4 (CR-270)"
+      # STEP-04: Invite error i18n (CR-271) - users.tsx
+      - hash: cb03b90
+        step: STEP-04
+        message: "fix(users): replace raw error with i18n key in invite error handler (CR-271)"
+      # STEP-05 (actually STEP-06 in PLAN): Settings error i18n (CR-271)
+      - hash: 1f4b56b
+        step: STEP-05
+        message: "fix(settings): replace raw errors with i18n keys for language change and sign out (CR-271)"
+      # STEP-06 (actually STEP-07 in PLAN): Members error i18n (CR-271)
+      - hash: 5155acf
+        step: STEP-06
+        message: "fix(members): replace raw errors with i18n keys for delete warning and import error (CR-271)"
+      # STEP-07 (actually STEP-05 in PLAN): Invite registration error i18n (CR-271)
+      - hash: dc84aaf
+        step: STEP-07
+        message: "fix(invite): replace raw errors with i18n registrationFailed key (CR-271)"
+      # STEP-08: refreshSession guard (CR-272) - initial attempt
+      - hash: 3e29e1c
+        step: STEP-08
+        message: "feat(users): add refreshSession() after role change and user deletion (CR-272)"
+      # STEP-08-fix: Correct refreshSession placement (CR-272)
+      - hash: 98f2149
+        step: STEP-08-fix
+        message: "fix(users): use refreshSession() in callEdgeFunction guard (CR-272)"
+    verdict: approved
+
+    summary: |
+      All 9 commits for Phase 10 (CR-270, CR-271, CR-272) correctly implement
+      prayer-aware designation notification text, user-friendly error messages
+      in all UI alerts, and session refresh before edge function invocation.
+      Chain validation passes: SPEC -> ARCH -> PLAN -> CODE is fully aligned.
+      All 1148 tests pass (53 test files, 0 failures). Repository is clean
+      (no uncommitted code files). One P2 deviation noted: members.tsx import
+      error discrimination uses message-content checking instead of the tag-based
+      approach specified in PLAN/ARCH (ADR-027), but is functionally correct.
+      No P0 or P1 issues found.
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          User requested 3 bug fixes:
+          CR-270: Designation notification uses speech text for prayers - SPEC_F010
+          defines F060 with 5 ACs covering prayer-specific title/body for positions
+          0 and 4, individual (not grouped) processing, and client-server consistency.
+          CR-271: Raw error messages shown in UI alerts - SPEC_F010 defines F061
+          with 8 ACs covering all 7 identified error points across 4 files.
+          CR-272: Stale JWT when invoking edge functions - SPEC_F010 defines F062
+          with 3 ACs covering refreshSession replacement.
+          All user requirements are faithfully captured.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M010 maps each feature to architectural components:
+          F060: C010-01 (server grouping + buildDesignationText), C010-02 (client notificationUtils)
+          F061: C010-03 (users.tsx), C010-04 (invite/[token].tsx), C010-05 (settings/index.tsx),
+                C010-06 (members.tsx), C010-07 (i18n keys)
+          F062: C010-08 (callEdgeFunction refreshSession)
+          7 integrations mapped. 3 ADRs documented (ADR-026, ADR-027, ADR-028).
+          All components map correctly to SPEC features.
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P010 has 8 steps covering all 8 ARCH components. Step order is
+          correct: i18n keys first (STEP-01), then server notification (STEP-02),
+          client notification (STEP-03), then error i18n fixes (STEP-04 to STEP-07),
+          verification (STEP-08). STEP-04 combines F061+F062 users.tsx changes
+          (correct since both modify same file, different functions).
+          Validation matrix maps all 22 ACs and 9 edge cases to steps.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 8 plan steps implemented in 9 commits. STEP-08 was split into
+          two commits (3e29e1c initial attempt + 98f2149 fix) to correctly place
+          refreshSession() in the callEdgeFunction guard rather than after
+          individual mutation calls. The step ordering was slightly different
+          from PLAN (invite/[token].tsx done as STEP-07 instead of STEP-05),
+          but all changes are complete and correct. One implementation deviation:
+          members.tsx uses message-content checking for CSV error discrimination
+          instead of the isCsvValidation tag specified in PLAN/ARCH (P2 issue).
+
+      chain_intact: true
+
+    # =========================================================================
+    # PER-CR VERIFICATION
+    # =========================================================================
+
+    cr_reviews:
+
+      # -----------------------------------------------------------------------
+      # CR-270: Prayer-Aware Designation Notification Text (F060)
+      # -----------------------------------------------------------------------
+      - cr: CR-270
+        title: "Prayer-aware designation notification text"
+        verdict: pass
+        verification:
+
+          # Server-side (process-notifications/index.ts)
+          - check: "buildDesignationText accepts optional position parameter"
+            status: pass
+            file: supabase/functions/process-notifications/index.ts
+            detail: "Line 66-70: function buildDesignationText(language, names, date, position?: number | null)"
+
+          - check: "Prayer position (0,4) returns prayer-specific title and body"
+            status: pass
+            detail: |
+              Lines 73-90: When getPrayerLabel returns non-null, returns prayer-specific
+              text. pt-BR: 'Designacao de Oracao', en-US: 'Prayer Assignment',
+              es-LA: 'Asignacion de Oracion'. Body includes prayer label (abertura/encerramento).
+
+          - check: "Speech position (1-3, null) returns existing text unchanged"
+            status: pass
+            detail: "Lines 93-109: Existing speech text with nameList, verb conjugation, unchanged."
+
+          - check: "Grouping loop splits prayer vs speech designations"
+            status: pass
+            detail: |
+              Lines 244-258: entry.speech_position === 0 || 4 -> immediateEntries.
+              Otherwise -> designationGroups map by (ward_id:sunday_date).
+
+          - check: "immediateEntries switch has 'designation' case"
+            status: pass
+            detail: |
+              Lines 316-325: case 'designation' calls buildDesignationText with
+              [entry.speaker_name ?? ''], entry.sunday_date, entry.speech_position.
+
+          # Client-side (notificationUtils.ts)
+          - check: "pt-BR designation builder checks prayer position"
+            status: pass
+            file: src/lib/notificationUtils.ts
+            detail: "Lines 67-83: Checks d.position != null, calls getPrayerLabel. Returns 'Designacao de Oracao' for prayer."
+
+          - check: "en-US designation builder checks prayer position"
+            status: pass
+            detail: "Lines 120-135: Same pattern. Returns 'Prayer Assignment' for prayer."
+
+          - check: "es-LA designation builder checks prayer position"
+            status: pass
+            detail: "Lines 173-188: Same pattern. Returns 'Asignacion de Oracion' for prayer."
+
+          - check: "Client and server text match"
+            status: pass
+            detail: |
+              Both use getPrayerLabel() for position detection. Both produce
+              identical title strings per language. Body format matches
+              (name + prayer label + date + call to action).
+
+        ac_coverage:
+          - ac: AC-060-1
+            status: covered
+            detail: "Position 0 -> getPrayerLabel returns 'oracao de abertura'/'opening prayer' -> prayer title+body"
+          - ac: AC-060-2
+            status: covered
+            detail: "Position 4 -> getPrayerLabel returns 'oracao de encerramento'/'closing prayer' -> prayer title+body"
+          - ac: AC-060-3
+            status: covered
+            detail: "Positions 1-3 -> grouped by (ward_id, sunday_date), speech text unchanged"
+          - ac: AC-060-4
+            status: covered
+            detail: "Prayer entries (0,4) pushed to immediateEntries, not designationGroups"
+          - ac: AC-060-5
+            status: covered
+            detail: "Client notificationUtils mirrors server behavior with same getPrayerLabel"
+
+        ec_coverage:
+          - ec: EC-060-1
+            status: covered
+            detail: "Both position 0 and 4 go to immediateEntries independently, each gets own notification"
+          - ec: EC-060-2
+            status: covered
+            detail: "null position -> getPrayerLabel returns null -> falls through to speech text"
+
+      # -----------------------------------------------------------------------
+      # CR-271: User-Friendly Error Messages (F061)
+      # -----------------------------------------------------------------------
+      - cr: CR-271
+        title: "User-friendly error messages in all alerts"
+        verdict: pass
+        verification:
+
+          # P0: users.tsx invite error
+          - check: "inviteMutation.onError maps auth/no-session to i18n key"
+            status: pass
+            file: src/app/(tabs)/settings/users.tsx
+            detail: |
+              Lines 110-116: if (err.message === 'auth/no-session') -> t('users.sessionExpired')
+              else -> t('users.inviteFailed'). No raw err.message shown.
+
+          # P1: invite/[token].tsx unknown error
+          - check: "Unknown data.error uses t('auth.registrationFailed')"
+            status: pass
+            file: src/app/(auth)/invite/[token].tsx
+            detail: "Line 117: setError(t('auth.registrationFailed')) after known codes check."
+
+          # P1: invite/[token].tsx catch-all
+          - check: "Non-network catch uses t('auth.registrationFailed')"
+            status: pass
+            detail: "Line 134: setError(t('auth.registrationFailed')) instead of raw message."
+
+          # P1: Known codes preserved
+          - check: "Known error codes (token_expired/used/invalid) still mapped correctly"
+            status: pass
+            detail: |
+              Lines 101-114: token_expired -> t('auth.inviteExpired'),
+              token_used -> t('auth.inviteUsed'), token_invalid -> t('auth.inviteInvalid').
+              Unchanged from before.
+
+          # P1: Network error preserved
+          - check: "Network error still uses t('auth.requiresConnection')"
+            status: pass
+            detail: "Lines 131-132: message includes 'Failed to fetch' or 'Network' -> t('auth.requiresConnection')"
+
+          # P2: settings/index.tsx language change
+          - check: "handleAppLanguageSelect uses t('settings.languageChangeFailed')"
+            status: pass
+            file: src/app/(tabs)/settings/index.tsx
+            detail: "Line 153: Alert.alert(t('common.error'), t('settings.languageChangeFailed'))"
+
+          # P2: settings/index.tsx sign out
+          - check: "handleSignOut uses t('settings.signOutFailed')"
+            status: pass
+            detail: "Line 195: Alert.alert(t('common.error'), t('settings.signOutFailed'))"
+
+          # P3: members.tsx import RPC error
+          - check: "Import RPC error shows t('members.importRpcError')"
+            status: pass
+            file: src/app/(tabs)/settings/members.tsx
+            detail: |
+              Lines 474-479: onError checks isCsvParseError (message-based detection),
+              shows err.message for CSV errors, t('members.importRpcError') for RPC errors.
+
+          # P3: CSV validation errors preserved
+          - check: "CSV validation errors still show detailed per-line messages"
+            status: pass
+            detail: "CSV parse errors contain newlines from join('\\n'). Detected by includes('\\n')."
+
+          # P4: members.tsx future speeches i18n
+          - check: "Future speeches uses t('members.futureSpeechWarning')"
+            status: pass
+            detail: "Line 356: t('members.futureSpeechWarning', { count: futureCount })"
+
+          # i18n keys
+          - check: "All 6 new i18n keys present in all 3 locales"
+            status: pass
+            detail: |
+              Verified in pt-BR.json, en-US.json, es-LA.json:
+              - settings.languageChangeFailed: present in all 3
+              - settings.signOutFailed: present in all 3
+              - members.futureSpeechWarning: present in all 3 with {{count}}
+              - members.importRpcError: present in all 3
+              - users.sessionExpired: present in all 3
+              - auth.registrationFailed: present in all 3
+              Total: 18 new entries (6 per locale).
+
+        ac_coverage:
+          - ac: AC-061-1
+            status: covered
+            detail: "inviteMutation.onError uses t('users.inviteFailed'), not err.message"
+          - ac: AC-061-2
+            status: covered
+            detail: "Unknown data.error shows t('auth.registrationFailed')"
+          - ac: AC-061-3
+            status: covered
+            detail: "Non-network catch shows t('auth.registrationFailed')"
+          - ac: AC-061-4
+            status: covered
+            detail: "handleAppLanguageSelect catch shows t('settings.languageChangeFailed')"
+          - ac: AC-061-5
+            status: covered
+            detail: "handleSignOut catch shows t('settings.signOutFailed')"
+          - ac: AC-061-6
+            status: covered
+            detail: "RPC import error shows t('members.importRpcError')"
+          - ac: AC-061-7
+            status: covered
+            detail: "CSV validation errors show err.message (already i18n'd)"
+          - ac: AC-061-8
+            status: covered
+            detail: "Future speeches uses t('members.futureSpeechWarning', { count })"
+
+      # -----------------------------------------------------------------------
+      # CR-272: Refresh Session Before Edge Function Invoke (F062)
+      # -----------------------------------------------------------------------
+      - cr: CR-272
+        title: "Refresh session before edge function invoke"
+        verdict: pass
+        verification:
+          - check: "callEdgeFunction uses refreshSession() not getSession()"
+            status: pass
+            file: src/app/(tabs)/settings/users.tsx
+            detail: "Line 47: const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();"
+
+          - check: "refreshError checked in guard"
+            status: pass
+            detail: "Line 48: if (refreshError || !session) throw new Error('auth/no-session');"
+
+          - check: "Comment references ADR-028"
+            status: pass
+            detail: "Line 46: // Guard: refresh session before calling invoke (ADR-028)"
+
+        ac_coverage:
+          - ac: AC-062-1
+            status: covered
+            detail: "refreshSession() returns fresh JWT; invoke() uses updated internal state"
+          - ac: AC-062-2
+            status: covered
+            detail: "refreshError || !session -> throws 'auth/no-session'"
+          - ac: AC-062-3
+            status: covered
+            detail: "Supabase SDK internally returns existing session if token is still valid (no unnecessary network call)"
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+      - id: P2-010-01
+        severity: P2
+        category: quality
+        location: "src/app/(tabs)/settings/members.tsx:474-479"
+        description: |
+          Import error discrimination uses message-content checking (includes('\n')
+          and includes(t('members.importEmpty'))) instead of the isCsvValidation tag
+          approach specified in PLAN_P010 STEP-07 and ARCH_M010 ADR-027. The ARCH
+          explicitly noted "Parse error message format (check for newlines): Fragile
+          and breaks if error message format changes" as a rejected alternative.
+        suggestion: |
+          Consider tagging errors with a custom property (isCsvValidation = true)
+          before throwing, as specified in the PLAN. However, this is a minor quality
+          concern - the current approach works correctly for all current error formats.
+          Not blocking approval.
+
+    # =========================================================================
+    # TEST VERIFICATION
+    # =========================================================================
+
+    test_verification:
+      total_tests: 1148
+      total_files: 53
+      all_passing: true
+      new_tests:
+        - file: src/__tests__/f060-f061-f062.test.ts
+          covers: "All 3 CRs: prayer-aware designation text, error i18n, refreshSession guard"
+      coverage_gaps:
+        - cr: CR-270
+          component: "Server-side process-notifications grouping"
+          reason: "Edge Function (Deno runtime) cannot be imported in vitest Node environment"
+          risk: low
+          mitigation: "Code review verified grouping logic. Client-side equivalent is tested."
+        - cr: CR-272
+          component: "refreshSession actual behavior"
+          reason: "Cannot mock Supabase auth.refreshSession in unit tests for real SDK behavior"
+          risk: low
+          mitigation: "Code review verified correct API usage. Tests verify the code path exists."
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Deploy process-notifications Edge Function"
+        command: "supabase functions deploy process-notifications"
+        reason: "CR-270: Prayer-aware designation grouping and text changes"
+        urgency: medium
+        instructions: |
+          Deploy the updated process-notifications Edge Function:
+            supabase functions deploy process-notifications
+          No downtime needed. The change is backward-compatible:
+          - Existing speech designations continue to be grouped as before
+          - New prayer designations (position 0,4) will be sent individually
+          No database migration needed for this change.
+        notes: |
+          This deployment can be done independently of the app update.
+          After deploying, verify by assigning a prayer and checking that
+          the notification has prayer-specific title ('Prayer Assignment')
+          instead of speech title ('Speech Assignment').
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M010.yaml"
+        - "docs/plans/PLAN_P010.yaml"
+        - "docs/qa/QA_PLAN_010.yaml"
+        - "docs/specs/SPEC_F010.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+
+    # =========================================================================
+    # STATS
+    # =========================================================================
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 1
+      files_reviewed: 10
+      total_commits: 9
+      tests_total: 1148
+      tests_passing: 1148
+      tests_flaky: 0
+      test_files: 53

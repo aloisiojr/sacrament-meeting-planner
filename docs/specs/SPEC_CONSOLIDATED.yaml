@@ -7,10 +7,10 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-04"
-  total_features: 52
-  total_business_rules: 41
-  total_design_decisions: 36
+  last_updated: "2026-03-05"
+  total_features: 55
+  total_business_rules: 44
+  total_design_decisions: 39
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -868,6 +868,10 @@ features:
       Token registered on login/app open (non-observers only). Observers
       don't receive push. Prayer-specific notification titles and bodies
       for positions 0 and 4. Notification tap navigates to Home tab.
+      Designation notifications are prayer-aware: for positions 0 and 4,
+      the title is 'Designacao de Oracao'/'Prayer Assignment' and the body
+      mentions the specific prayer label (opening/closing). Prayer designations
+      are sent individually, not grouped with speech designations. [CR-270]
     acceptance_criteria:
       - given: "Speaker is initially assigned to a speech (status transitions from not_assigned to assigned_not_invited)"
         when: "Assignment is saved"
@@ -1157,6 +1161,68 @@ features:
         when: "User manually changes status to assigned_not_invited"
         then: "No designation notification is enqueued"
 
+  # ---------------------------------------------------------------------------
+  # F060: Prayer-Aware Designation Notification Text [CR-270]
+  # ---------------------------------------------------------------------------
+
+  - id: F060
+    name: Prayer-Aware Designation Notification Text
+    area: notifications
+    description: |
+      Designation notifications differentiate between prayer assignments
+      (position 0, 4) and speech assignments (position 1-3). Prayer
+      designations use prayer-specific title ('Designacao de Oracao' /
+      'Prayer Assignment') and body with opening/closing prayer label.
+      Prayer designations are sent individually, not grouped. Speech
+      designations continue to be grouped by (ward_id, sunday_date).
+      Both server (process-notifications) and client (notificationUtils)
+      are updated. [CR-270]
+    acceptance_criteria:
+      - given: "Member is assigned to opening prayer (position 0)"
+        when: "Designation notification is processed"
+        then: "Notification shows prayer-specific title and body with opening prayer label"
+      - given: "Member is assigned to closing prayer (position 4)"
+        when: "Designation notification is processed"
+        then: "Notification shows prayer-specific title and body with closing prayer label"
+      - given: "Members are assigned to speeches (positions 1-3)"
+        when: "Designation notification is processed"
+        then: "Notifications are grouped by Sunday and show speech-specific text (unchanged)"
+
+  # ---------------------------------------------------------------------------
+  # F061: User-Friendly Error Messages in All Alerts [CR-271]
+  # ---------------------------------------------------------------------------
+
+  - id: F061
+    name: User-Friendly Error Messages in All Alerts
+    area: ui
+    description: |
+      All alert/dialog error messages use i18n keys instead of raw error
+      strings. 7 points fixed: invite error in users.tsx (P0), invite
+      registration unknown error and catch-all in invite/[token].tsx (P1),
+      app language change and sign out in settings/index.tsx (P2), CSV
+      import RPC error in members.tsx (P3), future speeches count in
+      members.tsx (P4). 6 new i18n keys added across 3 locales. [CR-271]
+    acceptance_criteria:
+      - given: "Any error occurs in any alert/dialog in the app"
+        when: "Error is displayed to the user"
+        then: "Error message is always a translated, user-friendly string, never a raw error message or code"
+
+  # ---------------------------------------------------------------------------
+  # F062: Refresh Session Before Edge Function Invoke [CR-272]
+  # ---------------------------------------------------------------------------
+
+  - id: F062
+    name: Refresh Session Before Edge Function Invoke
+    area: auth
+    description: |
+      callEdgeFunction() in users.tsx uses refreshSession() instead of
+      getSession() to ensure the JWT is fresh before invoking edge
+      functions. Prevents 401 errors when cached JWT has expired. [CR-272]
+    acceptance_criteria:
+      - given: "User's cached JWT has expired"
+        when: "User invokes any edge function via callEdgeFunction"
+        then: "Session is refreshed and edge function receives a valid JWT"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1305,6 +1371,18 @@ business_rules:
     rule: "Designation notification guard"
     description: "Designation notifications only fire on initial assignment (OLD.status = not_assigned AND NEW.status = assigned_not_invited). Manual status reverts to assigned_not_invited do not trigger notifications."
 
+  - id: BR035
+    rule: "Prayer-aware designation notifications"
+    description: "Designation notifications for prayer positions (0, 4) use prayer-specific title and body and are sent individually. Speech designations (positions 1-3) are grouped by Sunday."
+
+  - id: BR036
+    rule: "No raw errors in UI"
+    description: "All error messages shown to users in Alert/dialog must use i18n keys. Raw error messages (err.message, String(err), data.error) are never shown directly."
+
+  - id: BR037
+    rule: "Fresh JWT for edge function invocation"
+    description: "callEdgeFunction() refreshes the session before invoking to ensure a valid JWT. Uses refreshSession() instead of getSession()."
+
 # =============================================================================
 # DESIGN DECISIONS
 # =============================================================================
@@ -1414,6 +1492,18 @@ design_decisions:
   - id: DD026
     decision: "Guard pattern for notification trigger Case 1"
     rationale: "Uses (TG_OP = 'INSERT' OR OLD.status = 'not_assigned') guard for designation notifications, consistent with existing guard pattern in Cases 4 and 5 of the same trigger function."
+
+  - id: DD027
+    decision: "Prayer designations sent individually, not grouped"
+    rationale: "Prayers are individual assignments (one person per position). Grouping them with speeches would produce confusing mixed notifications. This matches the individual handling used by confirmed/withdrew types."
+
+  - id: DD028
+    decision: "Distinguish CSV validation errors from RPC errors in import"
+    rationale: "CSV validation errors are already translated line-by-line and should be shown as-is. RPC errors are raw database errors and must be replaced with a generic i18n message."
+
+  - id: DD029
+    decision: "refreshSession() over getSession() for edge function guard"
+    rationale: "getSession() returns cached token which may be expired. refreshSession() ensures the token is valid, preventing 401 errors. The Supabase SDK internally handles the case where the token is still fresh (no unnecessary network call)."
 
 # =============================================================================
 # EDGE CASES

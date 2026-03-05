@@ -1,0 +1,653 @@
+# =============================================================================
+# PLAN_P010.yaml - Implementation Plan for Phase 1
+# CR-270: Prayer-Aware Designation Notification Text (F060)
+# CR-271: User-Friendly Error Messages in All Alerts (F061)
+# CR-272: Refresh Session Before Edge Function Invoke (F062)
+# Generated: 2026-03-05
+# Artifact ID: 010
+# =============================================================================
+
+type: plan
+version: 1
+
+goal: |
+  Fix 3 bugs across notifications and UI:
+  1. F060 (CR-270): Designation notifications for prayer positions (0,4) use
+     prayer-specific text and are sent individually, not grouped with speeches.
+  2. F061 (CR-271): Replace all 7 raw error messages in UI alerts with i18n keys.
+  3. F062 (CR-272): Replace getSession() with refreshSession() in callEdgeFunction()
+     to prevent stale JWT errors.
+
+strategy:
+  order: "i18n keys -> server notification fix -> client notification fix -> error i18n fixes -> refreshSession -> verification"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "Test created together with or before the code change"
+
+steps:
+  # =========================================================================
+  # F061 (partial): i18n keys must exist before referencing them
+  # =========================================================================
+
+  - id: STEP-01
+    description: |
+      CR-271/F061/C010-07: Add 6 new i18n keys to each of the 3 locale files.
+
+      src/i18n/locales/pt-BR.json - add to "settings" section:
+        "languageChangeFailed": "Falha ao alterar o idioma. Tente novamente."
+        "signOutFailed": "Falha ao sair. Tente novamente."
+      Add to "members" section:
+        "futureSpeechWarning": "{{count}} discursos futuros"
+        "importRpcError": "Falha ao importar membros. Tente novamente."
+      Add to "users" section:
+        "sessionExpired": "Sua sessão expirou. Faça login novamente."
+      Add to "auth" section:
+        "registrationFailed": "Falha no registro. Tente novamente."
+
+      src/i18n/locales/en-US.json - same sections:
+        settings.languageChangeFailed: "Failed to change language. Please try again."
+        settings.signOutFailed: "Failed to sign out. Please try again."
+        members.futureSpeechWarning: "{{count}} future speeches"
+        members.importRpcError: "Failed to import members. Please try again."
+        users.sessionExpired: "Your session has expired. Please log in again."
+        auth.registrationFailed: "Registration failed. Please try again."
+
+      src/i18n/locales/es-LA.json - same sections:
+        settings.languageChangeFailed: "Error al cambiar el idioma. Intente nuevamente."
+        settings.signOutFailed: "Error al cerrar sesión. Intente nuevamente."
+        members.futureSpeechWarning: "{{count}} discursos futuros"
+        members.importRpcError: "Error al importar miembros. Intente nuevamente."
+        users.sessionExpired: "Su sesión ha expirado. Inicie sesión nuevamente."
+        auth.registrationFailed: "Error en el registro. Intente nuevamente."
+    files:
+      - src/i18n/locales/pt-BR.json
+      - src/i18n/locales/en-US.json
+      - src/i18n/locales/es-LA.json
+    dependencies: []
+    parallelizable_with: []
+    done_when:
+      - "pt-BR.json contains key settings.languageChangeFailed"
+      - "pt-BR.json contains key settings.signOutFailed"
+      - "pt-BR.json contains key members.futureSpeechWarning with {{count}}"
+      - "pt-BR.json contains key members.importRpcError"
+      - "pt-BR.json contains key users.sessionExpired"
+      - "pt-BR.json contains key auth.registrationFailed"
+      - "en-US.json contains the same 6 keys with English text"
+      - "es-LA.json contains the same 6 keys with Spanish text"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test that all 18 new i18n keys (6 per locale) exist and are non-empty:
+          1. Load each locale JSON and verify key exists
+          2. Verify {{count}} interpolation variable is present in futureSpeechWarning
+          3. Verify no key collision with existing keys
+    covers:
+      acceptance_criteria:
+        - "AC-061-1: (partial) i18n key users.sessionExpired exists"
+        - "AC-061-2: (partial) i18n key auth.registrationFailed exists"
+        - "AC-061-3: (partial) i18n key auth.registrationFailed exists"
+        - "AC-061-4: (partial) i18n key settings.languageChangeFailed exists"
+        - "AC-061-5: (partial) i18n key settings.signOutFailed exists"
+        - "AC-061-6: (partial) i18n key members.importRpcError exists"
+        - "AC-061-8: (partial) i18n key members.futureSpeechWarning exists"
+      edge_cases: []
+    risks:
+      - risk: "Key placement in wrong JSON section"
+        mitigation: "Each key is namespaced (settings.X, members.X, users.X, auth.X) and placed in the matching section."
+
+  # =========================================================================
+  # F060: Prayer-Aware Designation Notification Text (CR-270)
+  # =========================================================================
+
+  - id: STEP-02
+    description: |
+      CR-270/F060/C010-01: Update process-notifications/index.ts to handle
+      prayer designations individually.
+
+      Change 1 - Update buildDesignationText() signature (line 66-87):
+        Add optional 4th parameter: position?: number | null
+        When position is 0 or 4 (getPrayerLabel returns non-null):
+          title: 'Designação de Oração' / 'Prayer Assignment' / 'Asignación de Oración'
+          body: "[name] foi designado(a) para a [prayerLabel] em [date]..."
+          (per language, matching the pattern used by buildConfirmedText)
+        When position is null or 1-3: use existing speech text unchanged.
+
+      Change 2 - Update designation grouping loop (lines 220-229):
+        In the for-loop over entries, when entry.type === 'designation':
+          If entry.speech_position === 0 || entry.speech_position === 4:
+            Push to immediateEntries (prayer, process individually)
+          Else:
+            Group by (ward_id, sunday_date) as before (speech)
+
+      Change 3 - Add 'designation' case in immediateEntries switch (line 279):
+        case 'designation': {
+          const text = buildDesignationText(
+            language,
+            [entry.speaker_name ?? ''],
+            entry.sunday_date,
+            entry.speech_position
+          );
+          title = text.title;
+          body = text.body;
+          break;
+        }
+    files:
+      - supabase/functions/process-notifications/index.ts
+    dependencies: []
+    parallelizable_with: ["STEP-01"]
+    done_when:
+      - "buildDesignationText accepts optional 4th param position?: number | null"
+      - "When position=0, title is 'Designação de Oração' (pt-BR), body mentions oração de abertura"
+      - "When position=4, title is 'Designação de Oração' (pt-BR), body mentions oração de encerramento"
+      - "When position=null/1/2/3, existing speech text is returned unchanged"
+      - "Grouping loop sends prayer entries (position 0,4) to immediateEntries"
+      - "Grouping loop sends speech entries (position 1-3, null) to designationGroups"
+      - "immediateEntries switch has case 'designation' that calls buildDesignationText with position"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test buildDesignationText() and the grouping logic:
+          1. AC-060-1: buildDesignationText('pt-BR', ['João'], '2026-03-08', 0)
+             -> title: 'Designação de Oração', body contains 'oração de abertura'
+          2. AC-060-1: buildDesignationText('en-US', ['John'], '2026-03-08', 0)
+             -> title: 'Prayer Assignment', body contains 'opening prayer'
+          3. AC-060-1: buildDesignationText('es-LA', ['Juan'], '2026-03-08', 0)
+             -> title: 'Asignación de Oración', body contains 'oración de apertura'
+          4. AC-060-2: buildDesignationText('pt-BR', ['Maria'], '2026-03-08', 4)
+             -> title: 'Designação de Oração', body contains 'oração de encerramento'
+          5. AC-060-2: buildDesignationText('en-US', ['Mary'], '2026-03-08', 4)
+             -> title: 'Prayer Assignment', body contains 'closing prayer'
+          6. AC-060-3: buildDesignationText('pt-BR', ['A', 'B'], '2026-03-08')
+             -> title: 'Designação de Discurso' (unchanged speech behavior)
+          7. AC-060-3: buildDesignationText('en-US', ['A'], '2026-03-08', 2)
+             -> title: 'Speech Assignment' (position 2 = speech)
+          8. EC-060-2: buildDesignationText('pt-BR', ['A'], '2026-03-08', null)
+             -> title: 'Designação de Discurso' (null treated as speech fallback)
+          9. AC-060-4 / EC-060-1: Grouping test - given entries with positions
+             [0, 1, 2, 4], verify position 0 and 4 go to immediateEntries,
+             positions 1 and 2 go to designationGroups under same key.
+    covers:
+      acceptance_criteria:
+        - "AC-060-1: Prayer designation (position 0) shows prayer-specific text"
+        - "AC-060-2: Prayer designation (position 4) shows prayer-specific text"
+        - "AC-060-3: Speech designation (positions 1-3) keeps existing grouped text"
+        - "AC-060-4: Prayer designation is sent individually, not grouped"
+      edge_cases:
+        - "EC-060-1: Both opening and closing prayer get individual notifications"
+        - "EC-060-2: null speech_position treated as speech (fallback)"
+    risks:
+      - risk: "Existing grouped designation behavior breaks for speeches"
+        mitigation: "Speech path (position 1-3, null) is unchanged. buildDesignationText without position param uses existing logic. Grouping loop only diverts positions 0 and 4."
+
+  - id: STEP-03
+    description: |
+      CR-270/F060/C010-02: Update client notificationUtils.ts to handle
+      prayer-aware designation text.
+
+      In buildNotificationText(), update the designation builder for all
+      3 languages (pt-BR lines 67-73, en-US lines 111-117, es-LA lines 155-161):
+
+      Before the existing speech logic, add a prayer check:
+        designation: (d) => {
+          const prayerLabel = getPrayerLabel(d.position ?? -1, language);
+          if (prayerLabel) {
+            const name = d.name ?? d.names?.[0] ?? '';
+            return {
+              title: 'Designação de Oração',  // per language
+              body: `${name} foi designado(a) para a ${prayerLabel} em ${d.date}...`
+            };
+          }
+          // Existing speech text (unchanged)
+          ...
+        }
+
+      The data parameter already has position?: number, so no type change needed.
+      getPrayerLabel() is already defined in notificationUtils.ts but not used
+      by the designation builder until this change.
+    files:
+      - src/lib/notificationUtils.ts
+    dependencies: ["STEP-02"]
+    parallelizable_with: []
+    done_when:
+      - "pt-BR designation builder checks getPrayerLabel(d.position ?? -1, language)"
+      - "en-US designation builder checks getPrayerLabel(d.position ?? -1, language)"
+      - "es-LA designation builder checks getPrayerLabel(d.position ?? -1, language)"
+      - "Prayer position (0,4) returns prayer-specific title and body"
+      - "Non-prayer position returns existing speech text unchanged"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          Test buildNotificationText() with designation type and prayer positions:
+          1. AC-060-5: buildNotificationText('designation', 'pt-BR', { position: 0, name: 'João', date: '2026-03-08' })
+             -> title: 'Designação de Oração', body contains 'oração de abertura'
+          2. AC-060-5: buildNotificationText('designation', 'en-US', { position: 0, name: 'John', date: '2026-03-08' })
+             -> title: 'Prayer Assignment', body contains 'opening prayer'
+          3. AC-060-5: buildNotificationText('designation', 'es-LA', { position: 4, name: 'Juan', date: '2026-03-08' })
+             -> title: 'Asignación de Oración', body contains 'oración de clausura'
+          4. buildNotificationText('designation', 'pt-BR', { names: ['A', 'B'], date: '...' })
+             -> title: 'Designação de Discurso' (no position = speech behavior unchanged)
+          5. EC-060-2: buildNotificationText('designation', 'en-US', { names: ['A'], date: '...' })
+             -> title: 'Speech Assignment' (undefined position = speech fallback)
+    covers:
+      acceptance_criteria:
+        - "AC-060-5: Client notificationUtils matches server behavior"
+      edge_cases:
+        - "EC-060-2: undefined position treated as speech (client-side fallback)"
+    risks:
+      - risk: "Client and server text diverge"
+        mitigation: "Both use the same getPrayerLabel() function and the same pattern. Tests verify both produce matching titles and body structure."
+
+  # =========================================================================
+  # F061: User-Friendly Error Messages (CR-271)
+  # =========================================================================
+
+  - id: STEP-04
+    description: |
+      CR-271/F061/C010-03+C010-08: Fix users.tsx - invite mutation error i18n (P0)
+      AND refreshSession guard (F062/CR-272).
+
+      Both changes are in the same file (users.tsx) and are independent
+      (different functions), so they are combined in one step.
+
+      Change 1 (C010-03 / F061 / AC-061-1):
+      In inviteMutation.onError (line 110-112), replace:
+        Alert.alert(t('common.error'), err.message || t('users.inviteFailed'));
+      With:
+        const msg = err.message === 'auth/no-session'
+          ? t('users.sessionExpired')
+          : t('users.inviteFailed');
+        Alert.alert(t('common.error'), msg);
+
+      Change 2 (C010-08 / F062 / AC-062-1,2,3):
+      In callEdgeFunction() (lines 46-50), replace:
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('auth/no-session');
+        }
+      With:
+        const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !session) {
+          throw new Error('auth/no-session');
+        }
+
+      Update the comment on the guard line (line 46) from ADR-024 to ADR-028:
+        // Guard: refresh session before calling invoke (ADR-028)
+    files:
+      - src/app/(tabs)/settings/users.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-03"]
+    done_when:
+      - "callEdgeFunction uses supabase.auth.refreshSession() not getSession()"
+      - "callEdgeFunction checks refreshError in addition to !session"
+      - "Comment references ADR-028"
+      - "inviteMutation.onError maps 'auth/no-session' to t('users.sessionExpired')"
+      - "inviteMutation.onError uses t('users.inviteFailed') as fallback, not err.message"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          1. AC-061-1: Mock callEdgeFunction to throw Error('some-server-error').
+             Verify inviteMutation.onError Alert shows t('users.inviteFailed'), NOT 'some-server-error'.
+          2. EC-061-1: Mock callEdgeFunction to throw Error('auth/no-session').
+             Verify inviteMutation.onError Alert shows t('users.sessionExpired').
+          3. AC-062-1: Mock supabase.auth.refreshSession to return valid session.
+             Verify callEdgeFunction proceeds to invoke.
+          4. AC-062-2: Mock supabase.auth.refreshSession to return { session: null, error: someError }.
+             Verify callEdgeFunction throws 'auth/no-session'.
+          5. AC-062-3: Verify refreshSession is called (not getSession).
+          6. EC-062-1: Mock refreshSession to return error (refresh token expired).
+             Verify 'auth/no-session' is thrown.
+          7. EC-062-2: Mock refreshSession to throw network error.
+             Verify error propagates.
+    covers:
+      acceptance_criteria:
+        - "AC-061-1: Invite error shows friendly text, not raw error message"
+        - "AC-062-1: Edge function invoke succeeds with refreshed token"
+        - "AC-062-2: No-session error when truly logged out"
+        - "AC-062-3: Fresh token is not unnecessarily refreshed (SDK handles internally)"
+      edge_cases:
+        - "EC-061-1: 'auth/no-session' maps to t('users.sessionExpired')"
+        - "EC-062-1: Refresh token expired -> auth/no-session"
+        - "EC-062-2: Network error during refresh"
+        - "EC-062-3: Concurrent calls (SDK deduplicates internally, no code change needed)"
+    risks:
+      - risk: "refreshSession changes behavior for valid sessions"
+        mitigation: "Supabase SDK returns existing session without network call when token is still valid. No performance impact."
+
+  - id: STEP-05
+    description: |
+      CR-271/F061/C010-04: Fix invite/[token].tsx - registration error i18n (P1).
+
+      Change 1 (line 116-118): Replace unknown server error display.
+      Current:
+        if (data?.error) {
+          setError(data.error);
+          return;
+        }
+      Fixed:
+        if (data?.error) {
+          setError(t('auth.registrationFailed'));
+          return;
+        }
+
+      Change 2 (line 133-134): Replace catch-all non-network error display.
+      Current:
+        } else {
+          setError(message);
+        }
+      Fixed:
+        } else {
+          setError(t('auth.registrationFailed'));
+        }
+    files:
+      - src/app/(auth)/invite/[token].tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04"]
+    done_when:
+      - "Line 117: setError uses t('auth.registrationFailed') instead of data.error"
+      - "Line 134: setError uses t('auth.registrationFailed') instead of message"
+      - "3 known error codes (token_expired, token_used, token_invalid) still use their specific i18n keys"
+      - "Network error still uses t('auth.requiresConnection')"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          1. AC-061-2: Mock response with data.error = 'unknown_server_code'.
+             Verify setError called with t('auth.registrationFailed'), NOT 'unknown_server_code'.
+          2. AC-061-3: Mock catch with non-network Error('unexpected thing').
+             Verify setError called with t('auth.registrationFailed'), NOT 'unexpected thing'.
+          3. Regression: Mock data.error = 'token_expired'.
+             Verify setError called with t('auth.inviteExpired') (unchanged).
+          4. Regression: Mock data.error = 'token_used'.
+             Verify setError called with t('auth.inviteUsed') (unchanged).
+          5. Regression: Mock data.error = 'token_invalid'.
+             Verify setError called with t('auth.inviteInvalid') (unchanged).
+          6. Regression: Mock catch with Error('Failed to fetch').
+             Verify setError called with t('auth.requiresConnection') (unchanged).
+    covers:
+      acceptance_criteria:
+        - "AC-061-2: Unknown server error shows translated text"
+        - "AC-061-3: Non-network catch-all shows translated text"
+      edge_cases: []
+    risks:
+      - risk: "Breaking known error code mappings"
+        mitigation: "Known codes (token_expired/used/invalid) are checked before the catch-all. Tests verify all 3 known codes still use their specific keys."
+
+  - id: STEP-06
+    description: |
+      CR-271/F061/C010-05: Fix settings/index.tsx - language change and sign out
+      error i18n (P2).
+
+      Change 1 (line 153): In handleAppLanguageSelect catch, replace:
+        Alert.alert(t('common.error'), String(err));
+      With:
+        Alert.alert(t('common.error'), t('settings.languageChangeFailed'));
+
+      Change 2 (line 195): In handleSignOut onPress catch, replace:
+        Alert.alert(t('common.error'), String(err));
+      With:
+        Alert.alert(t('common.error'), t('settings.signOutFailed'));
+    files:
+      - src/app/(tabs)/settings/index.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04", "STEP-05"]
+    done_when:
+      - "handleAppLanguageSelect catch uses t('settings.languageChangeFailed') not String(err)"
+      - "handleSignOut catch uses t('settings.signOutFailed') not String(err)"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          1. AC-061-4: Mock updateAppLanguage to throw. Verify Alert shows
+             t('settings.languageChangeFailed'), NOT String(err).
+          2. AC-061-5: Mock signOut to throw. Verify Alert shows
+             t('settings.signOutFailed'), NOT String(err).
+    covers:
+      acceptance_criteria:
+        - "AC-061-4: App language change error shows friendly text"
+        - "AC-061-5: Sign out error shows friendly text"
+      edge_cases: []
+    risks:
+      - risk: "None - simple string replacement"
+        mitigation: "Direct substitution of String(err) with t() call."
+
+  - id: STEP-07
+    description: |
+      CR-271/F061/C010-06: Fix members.tsx - import RPC error i18n (P3) and
+      future speeches i18n (P4).
+
+      Change 1 (P4, line 356): Replace hardcoded English text.
+      Current:
+        ? `${t('members.deleteConfirm')} (${futureCount} future speeches)`
+      Fixed:
+        ? `${t('members.deleteConfirm')} (${t('members.futureSpeechWarning', { count: futureCount })})`
+
+      Change 2 (P3, lines 435-439): Tag CSV validation errors.
+      Current:
+        throw new Error(errorMessages);
+      Fixed:
+        const csvErr = new Error(errorMessages);
+        (csvErr as any).isCsvValidation = true;
+        throw csvErr;
+
+      Change 3 (P3, lines 442-443): Tag importEmpty error.
+      Current:
+        throw new Error(t('members.importEmpty'));
+      Fixed:
+        const emptyErr = new Error(t('members.importEmpty'));
+        (emptyErr as any).isCsvValidation = true;
+        throw emptyErr;
+
+      Change 4 (P3, lines 474-476): Discriminate error types in onError.
+      Current:
+        onError: (err: Error) => {
+          Alert.alert(t('common.error'), err.message);
+        },
+      Fixed:
+        onError: (err: Error) => {
+          if ((err as any).isCsvValidation) {
+            Alert.alert(t('common.error'), err.message);
+          } else {
+            Alert.alert(t('common.error'), t('members.importRpcError'));
+          }
+        },
+    files:
+      - src/app/(tabs)/settings/members.tsx
+    dependencies: ["STEP-01"]
+    parallelizable_with: ["STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06"]
+    done_when:
+      - "Future speeches text uses t('members.futureSpeechWarning', { count: futureCount })"
+      - "CSV validation errors tagged with isCsvValidation = true before throw"
+      - "importEmpty error tagged with isCsvValidation = true before throw"
+      - "onError checks isCsvValidation: true -> show err.message, false -> show t('members.importRpcError')"
+      - "npm test passes with 0 failures"
+    tests:
+      - type: unit
+        description: |
+          1. AC-061-8: Verify handleDelete shows
+             '(2 discursos futuros)' when language is pt-BR and futureCount=2,
+             NOT '(2 future speeches)'.
+          2. AC-061-7: Mock parseCsv to return errors. Verify onError shows
+             err.message (CSV validation errors are already translated).
+          3. AC-061-6: Mock supabase.rpc to return error. Verify onError shows
+             t('members.importRpcError'), NOT raw PostgreSQL error.
+          4. EC-061-2: CSV error with multiple lines (newlines). Verify
+             err.message shown as-is (each line already translated by translateCsvError).
+          5. EC-061-3: parseCsv returns success with 0 members.
+             Verify onError shows t('members.importEmpty') (already i18n,
+             tagged as isCsvValidation).
+    covers:
+      acceptance_criteria:
+        - "AC-061-6: CSV import RPC error shows friendly text"
+        - "AC-061-7: CSV import validation errors still show detailed lines"
+        - "AC-061-8: Future speeches warning is translated"
+      edge_cases:
+        - "EC-061-2: Multi-line CSV errors shown as-is (already i18n'd)"
+        - "EC-061-3: Import empty shows t('members.importEmpty') (existing behavior)"
+    risks:
+      - risk: "isCsvValidation tag lost during error propagation"
+        mitigation: "Tag is set immediately before throw and checked in onError, both in the same mutation scope. useMutation passes the Error object directly to onError without wrapping."
+
+  # =========================================================================
+  # VERIFICATION
+  # =========================================================================
+
+  - id: STEP-08
+    description: |
+      Run full test suite to verify no regressions from all changes.
+      Verify all code changes pass linting, type-checking, and tests.
+    files: []
+    dependencies: ["STEP-01", "STEP-02", "STEP-03", "STEP-04", "STEP-05", "STEP-06", "STEP-07"]
+    parallelizable_with: []
+    done_when:
+      - "npm test passes with 0 failures"
+      - "npx tsc --noEmit passes (if applicable)"
+      - "No regressions in any existing tests"
+    tests:
+      - type: integration
+        description: |
+          Full test suite run. All existing + new tests must pass.
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+    risks:
+      - risk: "Unforeseen interaction between F060/F061/F062 changes"
+        mitigation: "F060 is server+client notification text. F061 is client-side error messages. F062 is auth session refresh. No overlap except both F061 and F062 modify users.tsx (different functions). Combined in STEP-04."
+
+# =============================================================================
+# VALIDATION MATRIX
+# =============================================================================
+
+validation:
+  # F060 Acceptance Criteria (CR-270)
+  - ac_id: AC-060-1
+    description: "Prayer designation (position 0) shows prayer-specific text"
+    how_to_verify: "buildDesignationText with position=0 returns prayer title and body with opening prayer label in all 3 languages."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-060-2
+    description: "Prayer designation (position 4) shows prayer-specific text"
+    how_to_verify: "buildDesignationText with position=4 returns prayer title and body with closing prayer label."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-060-3
+    description: "Speech designation (positions 1-3) keeps existing grouped text"
+    how_to_verify: "buildDesignationText with position=1/2/3 or no position returns speech title and grouped names body."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-060-4
+    description: "Prayer designation is sent individually, not grouped"
+    how_to_verify: "Grouping loop routes position 0,4 to immediateEntries instead of designationGroups."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: AC-060-5
+    description: "Client notificationUtils matches server behavior"
+    how_to_verify: "buildNotificationText('designation', lang, {position: 0/4, ...}) returns prayer text matching server output."
+    covered_by_steps: ["STEP-03"]
+
+  # F060 Edge Cases
+  - ac_id: EC-060-1
+    description: "Both opening and closing prayer get individual notifications"
+    how_to_verify: "Two entries with positions 0 and 4 for same Sunday both go to immediateEntries, each processed individually."
+    covered_by_steps: ["STEP-02"]
+
+  - ac_id: EC-060-2
+    description: "Null speech_position treated as speech (fallback)"
+    how_to_verify: "buildDesignationText with position=null uses existing speech text. Grouping loop routes null to designationGroups."
+    covered_by_steps: ["STEP-02", "STEP-03"]
+
+  - ac_id: EC-060-3
+    description: "Prayer designation when manage_prayers is false"
+    how_to_verify: "No code change needed. When manage_prayers=false, prayer status is set directly to assigned_confirmed (not assigned_not_invited), so designation trigger never fires for prayers."
+    covered_by_steps: ["STEP-02"]
+
+  # F061 Acceptance Criteria (CR-271)
+  - ac_id: AC-061-1
+    description: "Invite existing email shows friendly error"
+    how_to_verify: "inviteMutation.onError maps to t('users.inviteFailed'), never shows err.message."
+    covered_by_steps: ["STEP-01", "STEP-04"]
+
+  - ac_id: AC-061-2
+    description: "Invite token unknown server error shows friendly text"
+    how_to_verify: "setError uses t('auth.registrationFailed') when data.error is not a known code."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-061-3
+    description: "Invite registration catch-all shows friendly text"
+    how_to_verify: "Non-network catch uses t('auth.registrationFailed') instead of raw message."
+    covered_by_steps: ["STEP-01", "STEP-05"]
+
+  - ac_id: AC-061-4
+    description: "App language change error shows friendly text"
+    how_to_verify: "handleAppLanguageSelect catch uses t('settings.languageChangeFailed') not String(err)."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-061-5
+    description: "Sign out error shows friendly text"
+    how_to_verify: "handleSignOut catch uses t('settings.signOutFailed') not String(err)."
+    covered_by_steps: ["STEP-01", "STEP-06"]
+
+  - ac_id: AC-061-6
+    description: "CSV import RPC error shows friendly text"
+    how_to_verify: "onError checks isCsvValidation flag. RPC errors (no flag) show t('members.importRpcError')."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  - ac_id: AC-061-7
+    description: "CSV import validation errors still show detailed lines"
+    how_to_verify: "CSV errors tagged isCsvValidation=true show err.message (already i18n'd)."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: AC-061-8
+    description: "Future speeches warning is translated"
+    how_to_verify: "handleDelete uses t('members.futureSpeechWarning', {count}) instead of hardcoded English."
+    covered_by_steps: ["STEP-01", "STEP-07"]
+
+  # F061 Edge Cases
+  - ac_id: EC-061-1
+    description: "callEdgeFunction throws 'auth/no-session' error"
+    how_to_verify: "inviteMutation.onError checks err.message === 'auth/no-session' -> shows t('users.sessionExpired')."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: EC-061-2
+    description: "CSV import error has newlines from multiple validation errors"
+    how_to_verify: "Tagged as isCsvValidation, shown as err.message. Multi-line display preserved."
+    covered_by_steps: ["STEP-07"]
+
+  - ac_id: EC-061-3
+    description: "Import member count is 0 but parse succeeded"
+    how_to_verify: "importEmpty error tagged isCsvValidation=true, shown as err.message which is t('members.importEmpty')."
+    covered_by_steps: ["STEP-07"]
+
+  # F062 Acceptance Criteria (CR-272)
+  - ac_id: AC-062-1
+    description: "Edge function invoke succeeds with refreshed token"
+    how_to_verify: "callEdgeFunction calls refreshSession() which returns fresh JWT. invoke() uses the updated internal session."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-062-2
+    description: "No-session error when truly logged out"
+    how_to_verify: "refreshSession() returns null session or error -> throw 'auth/no-session'."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: AC-062-3
+    description: "Fresh token is not unnecessarily refreshed"
+    how_to_verify: "refreshSession() returns existing session when token is still valid (Supabase SDK behavior). No explicit code change needed."
+    covered_by_steps: ["STEP-04"]
+
+  # F062 Edge Cases
+  - ac_id: EC-062-1
+    description: "Refresh token is also expired"
+    how_to_verify: "refreshSession() returns error/null -> 'auth/no-session' thrown -> users.sessionExpired shown."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: EC-062-2
+    description: "Network error during refresh"
+    how_to_verify: "refreshSession() returns error -> 'auth/no-session' thrown."
+    covered_by_steps: ["STEP-04"]
+
+  - ac_id: EC-062-3
+    description: "Concurrent edge function calls"
+    how_to_verify: "Supabase SDK internally deduplicates concurrent refresh requests. No code change needed."
+    covered_by_steps: ["STEP-04"]

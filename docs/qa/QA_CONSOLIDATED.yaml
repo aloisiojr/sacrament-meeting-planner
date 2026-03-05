@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-04"
-  version: 10
+  last_updated: "2026-03-05"
+  version: 11
 
 validations:
 
@@ -1837,3 +1837,184 @@ validations:
         description: "CHANGE_REQUESTS.yaml updated with CR-269 entry"
         result: FAIL
         evidence: "grep 'CR-269' docs/CHANGE_REQUESTS.yaml returns no matches. CR-269 is NOT listed in CHANGE_REQUESTS.yaml."
+
+  # ===========================================================================
+  # Phase 10: Error Handling, Invite Fix, Notification Text (QA_PLAN_010)
+  # ===========================================================================
+
+  - id: QA_011
+    plan: QA_PLAN_010
+    date: "2026-03-05"
+    scope: "Phase 10 - 3 bugfixes (CR-270, CR-271, CR-272)"
+    verdict: passed
+    must_pass: 16/16
+    should_pass: 7/7
+    total_checks: 23/23
+    reviewer_verdict: "APPROVED (1 P2 non-blocking)"
+    tester_verdict: "PASSED (1148 tests, 31 new)"
+
+    checks:
+
+      # --- CR-270: Prayer-aware designation notification ---
+      - id: CR270_MP1
+        cr: CR-270
+        type: must_pass
+        description: "buildDesignationText differentiates prayer vs speech based on position"
+        result: PASS
+        evidence: "process-notifications/index.ts:66-110 buildDesignationText now accepts 'position?: number | null' (line 70). Line 73: getPrayerLabel(position, language) called. Lines 74-91: prayer-specific text returned for positions 0/4. Lines 93-109: speech text for positions 1-3 (unchanged)."
+
+      - id: CR270_MP2
+        cr: CR-270
+        type: must_pass
+        description: "Prayer designation uses correct title in all 3 languages"
+        result: PASS
+        evidence: "process-notifications/index.ts: line 78 'Designacao de Oracao', line 82 'Prayer Assignment', line 86 'Asignacion de Oracion'. Client notificationUtils.ts: line 73 'Designacao de Oracao', line 126 'Prayer Assignment', line 179 'Asignacion de Oracion'."
+
+      - id: CR270_MP3
+        cr: CR-270
+        type: must_pass
+        description: "Prayer designation body uses prayer label (opening/closing) not speech ordinal"
+        result: PASS
+        evidence: "Server line 73: getPrayerLabel(position, language) returns 'oracao de abertura'/'opening prayer'/'oracion de apertura' for pos 0 and 'oracao de encerramento'/'closing prayer'/'oracion de clausura' for pos 4. Body templates at lines 79,83,87 use prayerLabel in body text."
+
+      - id: CR270_MP4
+        cr: CR-270
+        type: must_pass
+        description: "Speech designation (positions 1-3) still uses speech text unchanged"
+        result: PASS
+        evidence: "Server lines 93-109: When prayerLabel is null (positions 1-3), falls through to original speech text. Line 97 'Designacao de Discurso', line 101 'Speech Assignment', line 105 'Asignacion de Discurso'. Same for client notificationUtils.ts lines 77-82,130-135,183-188."
+
+      - id: CR270_MP5
+        cr: CR-270
+        type: must_pass
+        description: "Client-side notificationUtils.ts updated to match server-side"
+        result: PASS
+        evidence: "notificationUtils.ts designation builder updated in all 3 languages (lines 67-83, 120-136, 173-189): checks d.position != null, calls getPrayerLabel, returns prayer-specific title/body for positions 0/4, speech text for others. Logic matches server implementation."
+
+      - id: CR270_MP6
+        cr: CR-270
+        type: must_pass
+        description: "Designation entries are correctly split/grouped to separate prayers from speeches"
+        result: PASS
+        evidence: "process-notifications/index.ts lines 244-254: Prayer entries (speech_position === 0 || speech_position === 4) are pushed to immediateEntries for individual processing. Speech entries (positions 1-3) are grouped by (ward_id, sunday_date). Lines 316-326: new 'designation' case in immediate switch calls buildDesignationText with entry.speech_position."
+
+      - id: CR270_SP1
+        cr: CR-270
+        type: should_pass
+        description: "Existing tests for notification text builders updated/added for prayer designation"
+        result: PASS
+        evidence: "f060-f061-f062.test.ts: 15 tests in 'F060: buildNotificationText - prayer-aware designation' covering position 0 (opening) in pt-BR/en-US/es-LA, position 4 (closing) in pt-BR/en-US/es-LA, speech positions (1-3), undefined position fallback, and body content verification."
+
+      - id: CR270_SP2
+        cr: CR-270
+        type: should_pass
+        description: "No regressions in confirmed/withdrew notification text"
+        result: PASS
+        evidence: "buildConfirmedText (lines 130-170) and buildWithdrewText (lines 172-212) unchanged. Existing test coverage in f059 (35 tests) still passing per tester report (1148 total tests, 0 failures)."
+
+      # --- CR-271: Raw error messages replaced with i18n ---
+      - id: CR271_MP1
+        cr: CR-271
+        type: must_pass
+        description: "users.tsx invite onError uses i18n fallback instead of err.message"
+        result: PASS
+        evidence: "users.tsx lines 110-116: onError checks err.message === 'auth/no-session' -> t('users.sessionExpired'), else -> t('users.inviteFailed'). No raw err.message in Alert body."
+
+      - id: CR271_MP2
+        cr: CR-271
+        type: must_pass
+        description: "invite/[token].tsx catch-all data.error uses i18n fallback"
+        result: PASS
+        evidence: "invite/[token].tsx lines 116-118: 'if (data?.error) { setError(t('auth.registrationFailed')); return; }'. Raw data.error no longer shown."
+
+      - id: CR271_MP3
+        cr: CR-271
+        type: must_pass
+        description: "invite/[token].tsx catch block uses i18n fallback for non-network errors"
+        result: PASS
+        evidence: "invite/[token].tsx lines 129-135: catch block checks for network errors -> t('auth.requiresConnection'), else -> t('auth.registrationFailed'). No raw setError(message)."
+
+      - id: CR271_MP4
+        cr: CR-271
+        type: must_pass
+        description: "settings/index.tsx app language change error uses i18n message"
+        result: PASS
+        evidence: "settings/index.tsx line 153: 'Alert.alert(t('common.error'), t('settings.languageChangeFailed'))'. No String(err). catch block uses bare 'catch {' (no variable)."
+
+      - id: CR271_MP5
+        cr: CR-271
+        type: must_pass
+        description: "settings/index.tsx sign out error uses i18n message"
+        result: PASS
+        evidence: "settings/index.tsx line 195: 'Alert.alert(t('common.error'), t('settings.signOutFailed'))'. No String(err). catch block uses bare 'catch {' (no variable)."
+
+      - id: CR271_MP6
+        cr: CR-271
+        type: must_pass
+        description: "members.tsx import RPC error uses i18n message"
+        result: PASS
+        evidence: "members.tsx lines 474-478: onError distinguishes CSV parse errors (err.message contains newlines or importEmpty text) from RPC errors. RPC errors use t('members.importRpcError'). CSV parse errors pass err.message (already i18n'd via translateCsvError)."
+
+      - id: CR271_MP7
+        cr: CR-271
+        type: must_pass
+        description: "members.tsx future speeches text is i18n'd, not hardcoded English"
+        result: PASS
+        evidence: "members.tsx line 356: uses t('members.futureSpeechWarning', { count: futureCount }) instead of hardcoded '(X future speeches)'. grep 'future speeches' in members.tsx returns 0 matches."
+
+      - id: CR271_SP1
+        cr: CR-271
+        type: should_pass
+        description: "New i18n keys added to all 3 locale files"
+        result: PASS
+        evidence: "All 5 new keys exist in all 3 locales: auth.registrationFailed (en-US:52, pt-BR:52, es-LA:52), settings.languageChangeFailed (en-US:144, pt-BR:144, es-LA:144), settings.signOutFailed (en-US:145, pt-BR:145, es-LA:145), members.futureSpeechWarning with {{count}} (en-US:197, pt-BR:197, es-LA:197), members.importRpcError (en-US:198, pt-BR:198, es-LA:198), users.sessionExpired (en-US:312, pt-BR:312, es-LA:312)."
+
+      - id: CR271_SP2
+        cr: CR-271
+        type: should_pass
+        description: "No other raw error messages remain in Alert.alert or setError calls"
+        result: PASS
+        evidence: "grep 'Alert.alert.*String(err)|Alert.alert.*err.message|setError(message)|setError(data.error)' in src/app/ returns only 1 match: members.tsx:478 which is the intentional CSV parse error path (already i18n'd). All 7 identified points fixed."
+
+      - id: CR271_SP3
+        cr: CR-271
+        type: should_pass
+        description: "The parseCsv validation error path still works correctly"
+        result: PASS
+        evidence: "members.tsx lines 474-478: isCsvParseError check (err.message.includes newline or importEmpty text) correctly routes CSV parse errors to show err.message (i18n'd via translateCsvError), while RPC errors use t('members.importRpcError'). Test f060-f061-f062.test.ts 'CSV parse errors pass err.message to Alert' confirms."
+
+      # --- CR-272: Invite user fix (session refresh) ---
+      - id: CR272_MP1
+        cr: CR-272
+        type: must_pass
+        description: "callEdgeFunction refreshes session before invoke to avoid stale JWT"
+        result: PASS
+        evidence: "users.tsx lines 46-50: 'const { data: { session }, error: refreshError } = await supabase.auth.refreshSession()' replaces previous getSession(). ADR-028 comment at line 46. Checks both refreshError and !session before throwing."
+
+      - id: CR272_MP2
+        cr: CR-272
+        type: must_pass
+        description: "Invitation flow succeeds end-to-end after fix"
+        result: PASS
+        evidence: "Code path: callEdgeFunction refreshes session -> supabase.functions.invoke('create-invitation') with fresh JWT -> onSuccess sets inviteResult with deepLink -> modal shows success state. No code-level blockers remain. Test f060-f061-f062.test.ts confirms callEdgeFunction calls refreshSession and checks refreshError."
+
+      - id: CR272_MP3
+        cr: CR-272
+        type: must_pass
+        description: "Error handling graceful when edge function is unreachable"
+        result: PASS
+        evidence: "Tied to CR-271 fix: users.tsx lines 110-116 inviteMutation.onError uses i18n fallback t('users.inviteFailed') for all errors except auth/no-session. No raw error messages reach the user."
+
+      - id: CR272_SP1
+        cr: CR-272
+        type: should_pass
+        description: "Session refresh does not break other edge function calls"
+        result: PASS
+        evidence: "callEdgeFunction is shared by all edge function mutations (list-users line 95, create-invitation line 104, update-user-role line 128, delete-user line 151, update-user-name line 181). refreshSession() returns existing valid session if not expired, only refreshes when needed. 1148 tests passing with no regressions."
+
+      - id: CR272_SP2
+        cr: CR-272
+        type: should_pass
+        description: "auth/no-session error properly mapped to i18n message"
+        result: PASS
+        evidence: "users.tsx line 111-112: 'if (err.message === 'auth/no-session') { Alert.alert(t('common.error'), t('users.sessionExpired')); }'. Key users.sessionExpired exists in all 3 locales (en-US:312, pt-BR:312, es-LA:312)."

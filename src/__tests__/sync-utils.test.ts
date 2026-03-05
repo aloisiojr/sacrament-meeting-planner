@@ -66,7 +66,7 @@ describe('getQueryKeysForTable', () => {
 });
 
 describe('POLLING_INTERVAL_MS', () => {
-  it('is 2500ms', () => {
-    expect(POLLING_INTERVAL_MS).toBe(2500);
+  it('is 10000ms', () => {
+    expect(POLLING_INTERVAL_MS).toBe(10000);
   });
 });

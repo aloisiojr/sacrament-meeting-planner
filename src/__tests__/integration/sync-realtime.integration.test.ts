@@ -106,8 +106,8 @@ describe('Sync configuration integration', () => {
     expect(getQueryKeysForTable('unknown_table')).toEqual([]);
   });
 
-  it('POLLING_INTERVAL_MS is 2500ms', () => {
-    expect(POLLING_INTERVAL_MS).toBe(2500);
+  it('POLLING_INTERVAL_MS is 10000ms', () => {
+    expect(POLLING_INTERVAL_MS).toBe(10000);
   });
 });
 

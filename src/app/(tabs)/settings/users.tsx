@@ -108,7 +108,11 @@ export default function UserManagementScreen() {
       setInviteResult({ deepLink: data.invitation.deepLink });
     },
     onError: (err: Error) => {
-      Alert.alert(t('common.error'), err.message || t('users.inviteFailed'));
+      if (err.message === 'auth/no-session') {
+        Alert.alert(t('common.error'), t('users.sessionExpired'));
+      } else {
+        Alert.alert(t('common.error'), t('users.inviteFailed'));
+      }
     },
   });
 

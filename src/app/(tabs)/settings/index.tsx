@@ -149,8 +149,8 @@ export default function SettingsScreen() {
       if (newLanguage === currentAppLanguage) return;
       try {
         await updateAppLanguage(newLanguage);
-      } catch (err) {
-        Alert.alert(t('common.error'), String(err));
+      } catch {
+        Alert.alert(t('common.error'), t('settings.languageChangeFailed'));
       }
     },
     [currentAppLanguage, updateAppLanguage, t]
@@ -191,8 +191,8 @@ export default function SettingsScreen() {
             try {
               queryClient.clear();
               await signOut();
-            } catch (err) {
-              Alert.alert(t('common.error'), String(err));
+            } catch {
+              Alert.alert(t('common.error'), t('settings.signOutFailed'));
             }
           },
         },

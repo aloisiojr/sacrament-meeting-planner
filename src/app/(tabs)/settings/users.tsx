@@ -134,6 +134,7 @@ export default function UserManagementScreen() {
         Alert.alert(t('common.success'), t('users.roleChangeSuccess'));
       }
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
+      supabase.auth.refreshSession();
     },
     onError: (err: any) => {
       const msg = err?.message || err?.context?.body?.error;
@@ -154,6 +155,7 @@ export default function UserManagementScreen() {
       Alert.alert(t('common.success'), t('users.deleteSuccess'));
       setExpandedUserId(null);
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
+      supabase.auth.refreshSession();
       if (currentUser) {
         logAction(
           currentUser.app_metadata?.ward_id ?? '',

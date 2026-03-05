@@ -65,6 +65,15 @@ export function buildNotificationText(
   const texts: Record<OrdinalLanguage, Record<string, (d: typeof data) => { title: string; body: string }>> = {
     'pt-BR': {
       designation: (d) => {
+        // Prayer-specific text for position 0 (opening) or 4 (closing)
+        const prayerLabel = d.position != null ? getPrayerLabel(d.position, language) : null;
+        if (prayerLabel) {
+          const name = d.name ?? d.names?.[0] ?? '';
+          return {
+            title: 'Designação de Oração',
+            body: `${name} foi designado(a) para a ${prayerLabel} em ${d.date}. Hora de enviar o convite!`,
+          };
+        }
         const nameList = formatNameList(d.names ?? [], language);
         const verb = (d.names?.length ?? 0) > 1 ? 'foram designados' : 'foi designado(a)';
         return {
@@ -109,6 +118,15 @@ export function buildNotificationText(
     },
     'en-US': {
       designation: (d) => {
+        // Prayer-specific text for position 0 (opening) or 4 (closing)
+        const prayerLabel = d.position != null ? getPrayerLabel(d.position, language) : null;
+        if (prayerLabel) {
+          const name = d.name ?? d.names?.[0] ?? '';
+          return {
+            title: 'Prayer Assignment',
+            body: `${name} was assigned to give the ${prayerLabel} on ${d.date}. Time to send the invitation!`,
+          };
+        }
         const nameList = formatNameList(d.names ?? [], language);
         const verb = (d.names?.length ?? 0) > 1 ? 'were assigned' : 'was assigned';
         return {
@@ -153,6 +171,15 @@ export function buildNotificationText(
     },
     'es-LA': {
       designation: (d) => {
+        // Prayer-specific text for position 0 (opening) or 4 (closing)
+        const prayerLabel = d.position != null ? getPrayerLabel(d.position, language) : null;
+        if (prayerLabel) {
+          const name = d.name ?? d.names?.[0] ?? '';
+          return {
+            title: 'Asignación de Oración',
+            body: `${name} fue asignado(a) para la ${prayerLabel} el ${d.date}. ¡Es hora de enviar la invitación!`,
+          };
+        }
         const nameList = formatNameList(d.names ?? [], language);
         const verb = (d.names?.length ?? 0) > 1 ? 'fueron asignados' : 'fue asignado(a)';
         return {

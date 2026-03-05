@@ -8,7 +8,7 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  total_features: 55
+  total_features: 56
   total_business_rules: 44
   total_design_decisions: 39
 
@@ -1222,6 +1222,28 @@ features:
       - given: "User's cached JWT has expired"
         when: "User invokes any edge function via callEdgeFunction"
         then: "Session is refreshed and edge function receives a valid JWT"
+
+  - id: F063
+    name: Missing Topic Indicator in Invite Management
+    area: invite_management
+    description: |
+      In the Invite Management section on Home screen, speech positions 1-3
+      that have a speaker but no topic (topic_title null/empty) show an i18n
+      indicator "(Falta Tema)" next to the speaker name in error color. The
+      WhatsApp action button (for assigned_not_invited status) is disabled
+      (opacity 0.4, no-op onPress) when topic is missing, preventing sending
+      incomplete invitation messages. Prayer positions (0, 4) are not affected.
+      Three-dot dropdown for assigned_invited status is NOT disabled. [CR-274]
+    acceptance_criteria:
+      - given: "Speech position 1-3 has speaker but topic_title is null/empty"
+        when: "Invite row renders in InviteManagementSection"
+        then: "Localized '(Falta Tema)' text shown next to speaker name in colors.error"
+      - given: "Speech position 1-3 has status assigned_not_invited and no topic"
+        when: "User sees WhatsApp button"
+        then: "Button is disabled (opacity 0.4, no-op) preventing incomplete invite"
+      - given: "Prayer position 0 or 4 in invite list"
+        when: "Invite row renders"
+        then: "No missing topic indicator shown regardless of topic_title"
 
 # =============================================================================
 # BUSINESS RULES

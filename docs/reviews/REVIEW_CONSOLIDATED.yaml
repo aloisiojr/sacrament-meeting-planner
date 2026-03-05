@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  version: 12
-  last_updated_by: "phase-010"
+  version: 13
+  last_updated_by: "phase-011"
 
 reviews:
   - id: REV-001
@@ -3153,3 +3153,198 @@ reviews:
       tests_passing: 1148
       tests_flaky: 0
       test_files: 53
+
+  # ===========================================================================
+  # REV-012: Phase 11 - CR-274 (F063)
+  # Missing Topic Indicator in Invite Management
+  # ===========================================================================
+
+  - id: REV-012
+    scope: "CR-274 (F063) - Missing Topic Indicator in Invite Management"
+    phase: 11
+    date: "2026-03-05"
+    reviewer: reviewer-agent
+    iteration: 1
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        details: |
+          User request: Indicador "(Falta Tema)" ao lado do nome para discursos sem
+          tema, destaque visual, botao WhatsApp indisponivel quando falta tema.
+          SPEC_F011 covers all these: AC-01 through AC-07, i18n keys for 3 locales,
+          WhatsApp button disabled via opacity+no-op, prayer positions excluded.
+          The SPEC faithfully represents the user request with no scope creep.
+
+      arch_vs_spec:
+        status: pass
+        details: |
+          ARCH_M011 maps to SPEC correctly:
+          - UI-only change (no backend/database) matches SPEC scope
+          - Contracts define isSpeechPosition, isTopicMissing, isWhatsAppDisabled
+          - i18n keys match SPEC exactly (3 locales, correct values)
+          - ADR-029 (inline logic vs helper) is reasonable for 2-line booleans
+          - Diagram shows correct component hierarchy
+
+      plan_vs_arch:
+        status: pass
+        details: |
+          PLAN_P011 follows ARCH_M011:
+          - STEP-01: i18n keys (dependency for STEP-02) matches ARCH i18n section
+          - STEP-02: Component changes follow ARCH contracts and UI changes exactly
+          - STEP-03: Verification step
+          - Validation matrix covers all 7 ACs + 4 edge cases
+
+      code_vs_plan:
+        status: pass
+        details: |
+          Code implementation matches PLAN_P011:
+          - STEP-01 commits (ba87f0a): i18n keys added to all 3 locales with correct values
+          - STEP-02 commit (f19942e): InviteManagementSection modified with:
+            * const isSpeech, topicMissing, isWhatsAppDisabled (per ADR-029)
+            * speakerNameRow View wrapper with indicator Text
+            * Pressable opacity 0.4 + onPress undefined when disabled
+            * styles.speakerNameRow and styles.topicMissing added
+          - Tests cover all ACs and edge cases
+          All matches PLAN specifications.
+
+      chain_intact: true
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA VERIFICATION
+    # =========================================================================
+
+    acceptance_criteria_verification:
+      - ac: AC-01
+        status: covered
+        detail: |
+          Lines 230-231: isSpeech (position 1-3) + topicMissing check (!topic_title || trim).
+          Lines 247-251: conditional Text with t('invite.topicMissing') and colors.error.
+          Tests: 3 cases (null, empty, whitespace) verified in test file.
+      - ac: AC-02
+        status: covered
+        detail: |
+          When topic_title is non-empty, topicMissing=false, no indicator rendered.
+          Tests: position 1 with 'My Topic' -> topicMissing=false.
+      - ac: AC-03
+        status: covered
+        detail: |
+          Position 0 and 4: isSpeech=false -> topicMissing=false.
+          Tests: EC-02 and EC-03 verify positions 0 and 4 never trigger.
+      - ac: AC-04
+        status: covered
+        detail: |
+          Line 232: isWhatsAppDisabled = topicMissing && isNotInvited.
+          Line 279: opacity 0.4 when disabled. Line 281: onPress=undefined.
+          Tests: position 1 + null topic + assigned_not_invited -> disabled=true.
+      - ac: AC-05
+        status: covered
+        detail: |
+          When topic_title present, topicMissing=false, isWhatsAppDisabled=false.
+          Pressable works normally with full opacity and original onPress.
+          Tests: position 1 + 'My Topic' + assigned_not_invited -> disabled=false.
+      - ac: AC-06
+        status: covered
+        detail: |
+          When status=assigned_invited, isNotInvited=false, isWhatsAppDisabled=false.
+          Three-dot dropdown not affected. Indicator text IS shown (topicMissing=true).
+          Tests: position 2 + null topic + assigned_invited -> disabled=false, topicMissing=true.
+      - ac: AC-07
+        status: covered
+        detail: |
+          i18n keys in all 3 locales:
+          pt-BR: "(Falta Tema)", en-US: "(Missing Topic)", es-LA: "(Falta Tema)"
+          Tests: 3 explicit assertions in STEP-01 test block.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+      - id: P2-011-01
+        severity: P2
+        category: quality
+        location: "src/components/InviteManagementSection.tsx:336-338,244"
+        description: |
+          The speakerName Text inside the new speakerNameRow flex row lacks
+          flexShrink: 1 (or flex: 1). With a very long speaker name, the
+          "(Falta Tema)" indicator could be pushed off-screen since the Text
+          will try to take its full natural width. The numberOfLines={1} prop
+          will truncate the text, but without flexShrink, the truncation
+          happens at the container boundary rather than before the indicator.
+        suggestion: |
+          Add flexShrink: 1 to the speakerName style to ensure the name
+          truncates to make room for the indicator. Not blocking approval
+          because the parent details View has flex: 1 which provides some
+          constraint, and the visual impact is minor (long names are rare).
+
+    # =========================================================================
+    # TEST VERIFICATION
+    # =========================================================================
+
+    test_verification:
+      total_tests: 1181
+      total_files: 54
+      all_passing: true
+      new_tests:
+        - file: src/__tests__/f063-topic-missing-indicator.test.ts
+          test_count: 33
+          covers: |
+            STEP-01: 3 i18n key assertions
+            STEP-02: 21 boolean logic tests (isSpeech, topicMissing, isWhatsAppDisabled)
+            SUPPLEMENTARY: 9 integration tests with getInviteItems
+      coverage_gaps: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys: []
+    deploy_notes: |
+      CR-274 is a purely client-side, UI-only change. No Edge Function or
+      database migration needed. Changes will be included in the next
+      EAS Build / app update.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/plans/PLAN_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M011.yaml"
+        - "docs/plans/PLAN_P011.yaml"
+        - "docs/qa/QA_PLAN_011.yaml"
+        - "docs/specs/SPEC_F011.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-274 (F063) implementation is correct and complete. Chain validation
+      passes at all 4 levels. All 7 ACs are covered by both code and tests.
+      1181 tests passing, no regressions. One minor P2 (flexShrink on speaker
+      name in flex row) noted but not blocking. No deploys needed.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 1
+      files_reviewed: 5
+      total_commits: 2
+      tests_total: 1181
+      tests_passing: 1181
+      tests_flaky: 0
+      test_files: 54

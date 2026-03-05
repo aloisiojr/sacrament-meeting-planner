@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-05"
-  version: 11
+  version: 12
 
 validations:
 
@@ -2018,3 +2018,116 @@ validations:
         description: "auth/no-session error properly mapped to i18n message"
         result: PASS
         evidence: "users.tsx line 111-112: 'if (err.message === 'auth/no-session') { Alert.alert(t('common.error'), t('users.sessionExpired')); }'. Key users.sessionExpired exists in all 3 locales (en-US:312, pt-BR:312, es-LA:312)."
+
+  # ===========================================================================
+  # Phase 11: CR-274 / F063 (QA_PLAN_011)
+  # ===========================================================================
+
+  - id: QA_011
+    plan: QA_PLAN_011
+    date: "2026-03-05"
+    scope: "CR-274 (F063) - Missing Topic Indicator in Invite Management + WhatsApp unavailable without topic"
+    verdict: passed
+    must_pass: 7/7
+    should_pass: 5/5
+    total_checks: 12/12
+    reviewer_verdict: "APPROVED (REV-012, 0 P0/P1, 1 P2 non-blocking)"
+    tester_verdict: "PASSED (1181 tests, 17 new, 0 failures)"
+
+    checks:
+
+      # --- CR274_MP1: i18n keys ---
+      - id: CR274_MP1
+        cr: CR-274
+        type: must_pass
+        description: "i18n key invite.topicMissing exists in all 3 locales (pt-BR, en-US, es-LA)"
+        result: PASS
+        evidence: "pt-BR.json line 391: '\"topicMissing\": \"(Falta Tema)\"'. en-US.json line 391: '\"topicMissing\": \"(Missing Topic)\"'. es-LA.json line 391: '\"topicMissing\": \"(Falta Tema)\"'. All under 'invite' namespace."
+
+      # --- CR274_MP2: Indicator display ---
+      - id: CR274_MP2
+        cr: CR-274
+        type: must_pass
+        description: "InviteManagementSection displays '(Falta Tema)' indicator for speeches (positions 1-3) with null/empty topic_title"
+        result: PASS
+        evidence: "InviteManagementSection.tsx lines 230-231: 'const isSpeech = speech.position >= 1 && speech.position <= 3; const topicMissing = isSpeech && (!speech.topic_title || speech.topic_title.trim() === \"\");'. Lines 247-251: conditional render '{topicMissing && (<Text style={[styles.topicMissing, { color: colors.error }]}>{t(\"invite.topicMissing\")}</Text>)}' inside speakerNameRow."
+
+      # --- CR274_MP3: Prayers excluded ---
+      - id: CR274_MP3
+        cr: CR-274
+        type: must_pass
+        description: "'(Falta Tema)' indicator does NOT appear for prayer positions (0 and 4)"
+        result: PASS
+        evidence: "Line 230: 'const isSpeech = speech.position >= 1 && speech.position <= 3' excludes positions 0 and 4. Tests at f063 lines 70-76 confirm computeTopicMissing(0, null) and computeTopicMissing(4, null) both return false."
+
+      # --- CR274_MP4: WhatsApp disabled ---
+      - id: CR274_MP4
+        cr: CR-274
+        type: must_pass
+        description: "WhatsApp button disabled when topic missing for speech positions (1, 2, 3)"
+        result: PASS
+        evidence: "Line 232: 'const isWhatsAppDisabled = topicMissing && isNotInvited;'. Line 279: 'isWhatsAppDisabled && { opacity: 0.4 }' reduces opacity. Line 281: 'onPress={isWhatsAppDisabled ? undefined : ...}' makes it a no-op. Both visual and functional disabling confirmed."
+
+      # --- CR274_MP5: Prayers unaffected ---
+      - id: CR274_MP5
+        cr: CR-274
+        type: must_pass
+        description: "WhatsApp button remains available for prayers (positions 0, 4) regardless of topic"
+        result: PASS
+        evidence: "isSpeech is false for positions 0 and 4, so topicMissing is always false, so isWhatsAppDisabled is always false. Tests f063 lines 98-106 confirm isWhatsAppDisabled(0, null, 'assigned_not_invited')=false and isWhatsAppDisabled(4, null, 'assigned_not_invited')=false."
+
+      # --- CR274_MP6: Indicator disappears with topic ---
+      - id: CR274_MP6
+        cr: CR-274
+        type: must_pass
+        description: "'(Falta Tema)' indicator disappears once a topic is assigned"
+        result: PASS
+        evidence: "Condition '!speech.topic_title || speech.topic_title.trim() === \"\"' evaluates to false when topic_title has content. Test f063 line 66: computeTopicMissing(1, 'My Topic')=false. Supplementary test line 222: topic_title='Fé em Cristo' -> topicMissing=false."
+
+      # --- CR274_MP7: WhatsApp enabled with topic ---
+      - id: CR274_MP7
+        cr: CR-274
+        type: must_pass
+        description: "WhatsApp button becomes available once topic is assigned to speech"
+        result: PASS
+        evidence: "When topicMissing=false, isWhatsAppDisabled=false regardless of status. Test f063 line 85: isWhatsAppDisabled(1, 'My Topic', 'assigned_not_invited')=false. Tests lines 128-133 confirm for positions 2 and 3 as well."
+
+      # --- CR274_SP1: Visual highlight ---
+      - id: CR274_SP1
+        cr: CR-274
+        type: should_pass
+        description: "'(Falta Tema)' text is visually highlighted/distinguished from regular text"
+        result: PASS
+        evidence: "Line 248: 'color: colors.error' applies error/warning color. Style topicMissing (lines 344-348): fontSize 15, fontWeight '500', marginLeft 6. Matches speakerName styling but uses distinct error color for visual differentiation."
+
+      # --- CR274_SP2: Disabled button visual ---
+      - id: CR274_SP2
+        cr: CR-274
+        type: should_pass
+        description: "Disabled WhatsApp button has visual indication of being unavailable"
+        result: PASS
+        evidence: "Line 279: 'isWhatsAppDisabled && { opacity: 0.4 }' applied to Pressable style array. Matches disabledOption pattern used in InviteActionDropdown.tsx line 162. Consistent with SPEC DD-02."
+
+      # --- CR274_SP3: Tests for indicator ---
+      - id: CR274_SP3
+        cr: CR-274
+        type: should_pass
+        description: "Tests cover missing topic indicator rendering for speeches"
+        result: PASS
+        evidence: "f063-topic-missing-indicator.test.ts: 7 tests verify computeTopicMissing for positions 1-3 with null/empty/whitespace topic_title (lines 52-62, 60-62 whitespace edge case, 109-111 undefined). Supplementary tests lines 205-213 and 227-247 verify integration with getInviteItems."
+
+      # --- CR274_SP4: Tests for disabled button ---
+      - id: CR274_SP4
+        cr: CR-274
+        type: should_pass
+        description: "Tests cover WhatsApp button disabled state when topic is missing"
+        result: PASS
+        evidence: "f063-topic-missing-indicator.test.ts: Tests at lines 79-81 (pos 1), 94-96 (pos 2), 123-125 (pos 3) verify isWhatsAppDisabled=true when topic_title=null and status=assigned_not_invited. Tests at lines 84-86, 128-133 verify enabled when topic present."
+
+      # --- CR274_SP5: Tests for prayer exemption ---
+      - id: CR274_SP5
+        cr: CR-274
+        type: should_pass
+        description: "Tests confirm prayers are unaffected by missing topic check"
+        result: PASS
+        evidence: "f063-topic-missing-indicator.test.ts: Lines 70-76 confirm computeTopicMissing(0, null)=false and computeTopicMissing(4, null)=false. Lines 98-106 confirm isWhatsAppDisabled(0/4, null, 'assigned_not_invited')=false. Supplementary test lines 249-264 with getInviteItems integration confirms prayers never flagged."

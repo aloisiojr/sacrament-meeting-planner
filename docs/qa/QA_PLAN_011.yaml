@@ -1,0 +1,112 @@
+# =============================================================================
+# QA_PLAN_011.yaml
+# PRE-validation plan for CR-274
+# Missing Topic Indicator in Invite Management + WhatsApp unavailable
+# =============================================================================
+
+metadata:
+  plan_id: QA_PLAN_011
+  artifact_id: "011"
+  cr: CR-274
+  type: feature_request
+  date: "2026-03-05"
+  mode: PRE
+  scope: "Indicador '(Falta Tema)' no Gerenciamento de Convites + WhatsApp indisponível sem tema"
+
+pre_validation:
+  validated: true
+  reason: >
+    Feature request is clear and implementable. Current codebase analysis shows:
+    (1) InviteManagementSection displays speech items with speaker_name, position label,
+    and status LED but does NOT show topic information or indicate when topic is missing;
+    (2) The WhatsApp button (handleNotInvitedAction) currently sends messages with
+    topic_title ?? '' (empty string) when no topic is assigned - it does not prevent sending;
+    (3) Speech type has topic_title: string | null field - null/empty means no topic;
+    (4) Only speech positions 1, 2, 3 need topics; positions 0 and 4 are prayers (no topic needed);
+    (5) i18n infrastructure exists (3 languages: pt-BR, en-US, es-LA) - new keys needed;
+    (6) No existing i18n keys for "missing topic" indicator exist yet.
+
+  evidence:
+    - path: "src/components/InviteManagementSection.tsx"
+      observation: "Lines 228-286: inviteItems.map renders speaker_name (line 241), position label (lines 245-251), and StatusLED (line 256). No topic information displayed. No check for missing topic."
+
+    - path: "src/components/InviteManagementSection.tsx"
+      observation: "Lines 127-148: handleNotInvitedAction for speeches uses speech.topic_title ?? '' (line 142). WhatsApp message is sent even when topic_title is null/empty, resulting in a message with empty topic placeholders."
+
+    - path: "src/types/database.ts"
+      observation: "Lines 149-151: Speech interface has topic_title: string | null, topic_link: string | null, topic_collection: string | null"
+
+    - path: "src/lib/whatsappUtils.ts"
+      observation: "Lines 136-146: resolveTemplate replaces {titulo} with vars.topic (which would be empty string). Line 144 cleans up double spaces from empty placeholders."
+
+    - path: "src/i18n/locales/pt-BR.json"
+      observation: "No existing key for 'missing topic' indicator. invite section (lines 387-391) only has noPhone-related keys."
+
+    - path: "src/components/SpeechSlot.tsx"
+      observation: "Lines 154-157: SpeechSlot already has topicDisplay logic (topic_title + topic_collection). Line 169: showTopicRow = !isPrayer - topics only shown for non-prayer positions."
+
+validation_checks:
+
+  must_pass:
+
+    - id: CR274_MP1
+      description: "i18n key for '(Falta Tema)' exists in all 3 locales (pt-BR, en-US, es-LA)"
+      acceptance: "New key (e.g., invite.missingTopic or speeches.missingTopic) with appropriate text in each locale file"
+      how_to_verify: "grep for the new i18n key in all 3 locale files under src/i18n/locales/"
+
+    - id: CR274_MP2
+      description: "InviteManagementSection displays '(Falta Tema)' indicator next to speaker name for speeches (positions 1, 2, 3) with null/empty topic_title"
+      acceptance: "Text rendered with highlight styling (e.g., warning/error color) when speech.topic_title is null or empty, only for positions 1-3"
+      how_to_verify: "Read InviteManagementSection.tsx and verify conditional rendering of missing topic text based on speech.topic_title and speech.position"
+
+    - id: CR274_MP3
+      description: "'(Falta Tema)' indicator does NOT appear for prayer positions (0 and 4)"
+      acceptance: "Condition checks position !== 0 && position !== 4 (or equivalent isPrayer check) before showing indicator"
+      how_to_verify: "Read the conditional logic in InviteManagementSection.tsx - indicator should only show for positions 1, 2, 3"
+
+    - id: CR274_MP4
+      description: "WhatsApp button is disabled/unavailable when topic is missing for speech positions (1, 2, 3)"
+      acceptance: "The WhatsApp action button for 'assigned_not_invited' speeches is visually disabled and non-functional when topic_title is null/empty"
+      how_to_verify: "Read InviteManagementSection.tsx - check that handleNotInvitedAction or the button rendering has a guard for missing topic"
+
+    - id: CR274_MP5
+      description: "WhatsApp button remains available for prayers (positions 0, 4) regardless of topic"
+      acceptance: "Prayer items do not check topic_title for WhatsApp availability since prayers don't have topics"
+      how_to_verify: "Read InviteManagementSection.tsx - confirm topic check is scoped to speech positions only"
+
+    - id: CR274_MP6
+      description: "'(Falta Tema)' indicator disappears once a topic is assigned"
+      acceptance: "When speech.topic_title is non-null and non-empty, the indicator is not rendered"
+      how_to_verify: "Verify the conditional logic - topic_title being truthy should hide the indicator"
+
+    - id: CR274_MP7
+      description: "WhatsApp button becomes available once topic is assigned to speech"
+      acceptance: "When topic_title is non-null/non-empty, the WhatsApp button becomes enabled/functional for that speech"
+      how_to_verify: "Verify the disabled/enabled logic is tied to topic_title presence"
+
+  should_pass:
+
+    - id: CR274_SP1
+      description: "'(Falta Tema)' text is visually highlighted/distinguished from regular text"
+      acceptance: "Uses a distinct color (e.g., warning/error color from theme) or styling to draw attention"
+      how_to_verify: "Check styling props applied to the missing topic Text element"
+
+    - id: CR274_SP2
+      description: "Disabled WhatsApp button has visual indication of being unavailable"
+      acceptance: "Button shows reduced opacity, grayed out icon, or similar visual cue when disabled"
+      how_to_verify: "Check styles and opacity/color changes applied when topic is missing"
+
+    - id: CR274_SP3
+      description: "Tests cover missing topic indicator rendering for speeches"
+      acceptance: "At least one test verifies '(Falta Tema)' appears when topic_title is null for speech positions"
+      how_to_verify: "Search test files for missing topic / missingTopic related tests"
+
+    - id: CR274_SP4
+      description: "Tests cover WhatsApp button disabled state when topic is missing"
+      acceptance: "At least one test verifies WhatsApp button is disabled when topic_title is null for speech positions"
+      how_to_verify: "Search test files for WhatsApp disabled / topic missing related tests"
+
+    - id: CR274_SP5
+      description: "Tests confirm prayers are unaffected by missing topic check"
+      acceptance: "At least one test verifies prayer positions (0, 4) do not show missing topic indicator and WhatsApp remains enabled"
+      how_to_verify: "Search test files for prayer + topic related tests"

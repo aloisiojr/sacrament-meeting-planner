@@ -393,7 +393,7 @@ async function getTargetTokens(
   wardId: string,
   targetRole: string
 ): Promise<PushToken[]> {
-  // Get users with the target role in this ward
+  // Build roles array from targetRole
   // target_role can be: 'secretary', 'bishopric', 'secretary_and_bishopric'
   const roles: string[] = [];
   if (targetRole === 'secretary' || targetRole === 'secretary_and_bishopric') {
@@ -403,29 +403,14 @@ async function getTargetTokens(
     roles.push('bishopric');
   }
 
-  // Get all tokens for the ward
+  // Single query filtering by role in SQL (ADR-030: no getUserById loop)
   const { data: tokens } = await supabase
     .from('device_push_tokens')
     .select('expo_push_token, user_id')
-    .eq('ward_id', wardId);
+    .eq('ward_id', wardId)
+    .in('role', roles);
 
-  if (!tokens || tokens.length === 0) return [];
-
-  // Filter by user role (check auth.users app_metadata)
-  // In Supabase, we can use the admin API to check user roles
-  const userIds = [...new Set(tokens.map((t) => t.user_id))];
-  const validTokens: PushToken[] = [];
-
-  for (const userId of userIds) {
-    const { data: userData } = await supabase.auth.admin.getUserById(userId);
-    const userRole = userData?.user?.app_metadata?.role;
-    if (userRole && roles.includes(userRole)) {
-      const userTokens = tokens.filter((t) => t.user_id === userId);
-      validTokens.push(...userTokens);
-    }
-  }
-
-  return validTokens;
+  return (tokens as PushToken[] | null) ?? [];
 }
 
 async function sendPush(

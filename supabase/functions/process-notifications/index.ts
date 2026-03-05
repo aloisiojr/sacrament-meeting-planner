@@ -236,6 +236,18 @@ Deno.serve(async (req: Request) => {
 
     const entries = pending as NotificationQueueEntry[];
 
+    // Ward cache: batch fetch all unique wards (ADR-031)
+    const wardIds = [...new Set(entries.map((e) => e.ward_id))];
+    const { data: wards } = await supabase
+      .from('wards')
+      .select('id, language, timezone')
+      .in('id', wardIds);
+
+    const wardCache = new Map<string, WardInfo>();
+    (wards ?? []).forEach((w: { id: string; language: string; timezone: string }) =>
+      wardCache.set(w.id, { language: w.language, timezone: w.timezone })
+    );
+
     // 2. Group designation entries by (ward_id, sunday_date)
     const designationGroups = new Map<string, NotificationQueueEntry[]>();
     const immediateEntries: NotificationQueueEntry[] = [];
@@ -270,14 +282,9 @@ Deno.serve(async (req: Request) => {
         .map((e) => e.speaker_name)
         .filter((n): n is string => !!n);
 
-      // Get ward language
-      const { data: ward } = await supabase
-        .from('wards')
-        .select('language, timezone')
-        .eq('id', wardId)
-        .single();
-
-      const language = (ward as WardInfo | null)?.language ?? 'pt-BR';
+      // Get ward language from cache
+      const ward = wardCache.get(wardId);
+      const language = ward?.language ?? 'pt-BR';
 
       // Build notification text
       const { title, body } = buildDesignationText(language, names, sundayDate);
@@ -294,13 +301,8 @@ Deno.serve(async (req: Request) => {
 
     // Process immediate entries
     for (const entry of immediateEntries) {
-      const { data: ward } = await supabase
-        .from('wards')
-        .select('language, timezone')
-        .eq('id', entry.ward_id)
-        .single();
-
-      const language = (ward as WardInfo | null)?.language ?? 'pt-BR';
+      const ward = wardCache.get(entry.ward_id);
+      const language = ward?.language ?? 'pt-BR';
 
       let title = '';
       let body = '';

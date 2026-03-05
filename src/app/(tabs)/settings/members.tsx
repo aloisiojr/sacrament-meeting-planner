@@ -353,7 +353,7 @@ export default function MembersScreen() {
         const futureCount = await checkFutureSpeeches(member.id);
         const message =
           futureCount > 0
-            ? `${t('members.deleteConfirm')} (${futureCount} future speeches)`
+            ? `${t('members.deleteConfirm')} (${t('members.futureSpeechWarning', { count: futureCount })})`
             : t('members.deleteConfirm');
 
         Alert.alert(t('common.confirm'), message, [
@@ -472,7 +472,10 @@ export default function MembersScreen() {
       }
     },
     onError: (err: Error) => {
-      Alert.alert(t('common.error'), err.message);
+      // CSV parse errors already have user-friendly translated messages from parseCsv.
+      // RPC/network errors get a generic i18n fallback.
+      const isCsvParseError = err.message.includes('\n') || err.message.includes(t('members.importEmpty'));
+      Alert.alert(t('common.error'), isCsvParseError ? err.message : t('members.importRpcError'));
     },
   });
 

@@ -227,6 +227,9 @@ export function InviteManagementSection() {
 
       {inviteItems.map(({ speech, compactDate }) => {
         const isNotInvited = speech.status === 'assigned_not_invited';
+        const isSpeech = speech.position >= 1 && speech.position <= 3;
+        const topicMissing = isSpeech && (!speech.topic_title || speech.topic_title.trim() === '');
+        const isWhatsAppDisabled = topicMissing && isNotInvited;
 
         return (
           <View
@@ -237,9 +240,16 @@ export function InviteManagementSection() {
               {compactDate}
             </Text>
             <View style={styles.details}>
-              <Text style={[styles.speakerName, { color: colors.text }]} numberOfLines={1}>
-                {speech.speaker_name}
-              </Text>
+              <View style={styles.speakerNameRow}>
+                <Text style={[styles.speakerName, { color: colors.text }]} numberOfLines={1}>
+                  {speech.speaker_name}
+                </Text>
+                {topicMissing && (
+                  <Text style={[styles.topicMissing, { color: colors.error }]}>
+                    {t('invite.topicMissing')}
+                  </Text>
+                )}
+              </View>
               <View style={styles.speechInfoRow}>
                 <Text style={[styles.speechNum, { color: colors.textSecondary }]}>
                   {speech.position === 0
@@ -266,8 +276,9 @@ export function InviteManagementSection() {
                   backgroundColor: isNotInvited ? colors.primary : colors.primaryContainer,
                   borderColor: colors.primary,
                 },
+                isWhatsAppDisabled && { opacity: 0.4 },
               ]}
-              onPress={() =>
+              onPress={isWhatsAppDisabled ? undefined : () =>
                 isNotInvited
                   ? handleNotInvitedAction(speech)
                   : handleInvitedAction(speech)
@@ -325,6 +336,15 @@ const styles = StyleSheet.create({
   speakerName: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  speakerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  topicMissing: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   speechNum: {
     fontSize: 12,

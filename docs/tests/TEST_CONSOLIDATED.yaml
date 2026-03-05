@@ -4,16 +4,17 @@
 # =============================================================================
 
 type: test_consolidated
-version: 10
-last_updated: "2026-03-04"
+version: 11
+last_updated: "2026-03-05"
 
 summary:
-  total_test_files: 52
-  total_tests: 1090
-  # Note: F059 added 35 tests (coder), already counted in total above
+  total_test_files: 53
+  total_tests: 1148
+  # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
+  # 2 tests FAILING (F062 not implemented: getSession instead of refreshSession)
   framework: vitest
   categories:
-    module_named: 46
+    module_named: 47
     integration: 6
   infrastructure:
     setup: 1
@@ -546,6 +547,37 @@ module_tests:
       - EC-059-1: Reassign after unassign fires new notification (full cycle)
       - EC-059-2: Unmanaged prayer auto-confirm skips designation (INSERT assigned_confirmed)
       - EC-059-3: INSERT with assigned_not_invited fires notification via TG_OP branch
+
+  # --- F060-F061-F062 Tests (CR-270, CR-271, CR-272) ---
+
+  - file: src/__tests__/f060-f061-f062.test.ts
+    tests: 58
+    module: "src/lib/notificationUtils.ts, src/app/(tabs)/settings/users.tsx, src/app/(auth)/invite/[token].tsx, src/app/(tabs)/settings/index.tsx, src/app/(tabs)/settings/members.tsx, supabase/functions/process-notifications/index.ts"
+    covers:
+      - "F060 (CR-270): Prayer-Aware Designation Notification Text"
+      - AC-060-1: Prayer designation (position 0) shows prayer-specific text (all 3 languages)
+      - AC-060-2: Prayer designation (position 4) shows prayer-specific text (all 3 languages)
+      - AC-060-3: Speech designation (positions 1-3) keeps existing grouped text
+      - AC-060-4: Prayer sent individually - server routes prayer to immediateEntries
+      - AC-060-5: Client notificationUtils matches server behavior
+      - EC-060-1: Opening and closing prayer produce different labels
+      - EC-060-2: Undefined/null position treated as speech fallback
+      - "F061 (CR-271): User-Friendly Error Messages in All Alerts"
+      - AC-061-1: Invite error uses i18n key, not raw error message
+      - AC-061-2: Unknown data.error uses auth.registrationFailed
+      - AC-061-3: Catch-all non-network uses registrationFailed, not raw message
+      - AC-061-4: Language change error uses i18n
+      - AC-061-5: Sign out error uses i18n
+      - AC-061-6: CSV import RPC error uses i18n
+      - AC-061-7: CSV validation errors still show detailed lines
+      - AC-061-8: Future speeches warning translated
+      - EC-061-1: auth/no-session maps to users.sessionExpired
+      - EC-061-2: CSV parse vs RPC error discrimination
+      - EC-061-3: Import empty detection
+      - "F062 (CR-272): Refresh Session Before Edge Function Invoke"
+      - AC-062-1: callEdgeFunction calls refreshSession (FAILING - not implemented)
+      - AC-062-2: Throws auth/no-session when no session
+      - EC-062-1: refreshError checked (FAILING - not implemented)
       - Early exit guard: same-status UPDATE is no-op for all 5 statuses
       - Exhaustive guard: only not_assigned source triggers designation
       - Case 4 & 5 self-transition guards
@@ -2039,6 +2071,280 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # F060-F061-F062 PRAYER DESIGNATION, ERROR I18N, REFRESH SESSION (CR-270, CR-271, CR-272)
+
+  - feature: F060
+    tests:
+      - name: "designation with position=0 returns prayer title in pt-BR"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with position=0 returns prayer title in en-US"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with position=0 returns prayer title in es-LA"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with position=4 returns prayer title in pt-BR"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-2", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with position=4 returns prayer title in en-US"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-2", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with position=4 returns prayer title in es-LA"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-2", "AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation without position returns speech title (unchanged)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: ["EC-060-2"]
+        status: passing
+
+      - name: "designation with position=2 returns speech title"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "designation with undefined position returns speech title"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: ["EC-060-2"]
+        status: passing
+
+      - name: "speech designation body lists names and date in pt-BR"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "speech designation body lists names in en-US"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "speech designation body lists names in es-LA"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "prayer designation body includes date"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "opening and closing prayer produce different labels"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-2"]
+        covers_ecs: ["EC-060-1"]
+        status: passing
+
+      - name: "server buildDesignationText accepts position parameter"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "server uses prayer-specific titles"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-1", "AC-060-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "server routes prayer positions to immediateEntries"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-4"]
+        covers_ecs: ["EC-060-1"]
+        status: passing
+
+      - name: "server switch has designation case for individual prayer processing"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-4"]
+        covers_ecs: []
+        status: passing
+
+      - name: "server grouped designations call buildDesignationText without position"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-060-3"]
+        covers_ecs: []
+        status: passing
+
+  - feature: F061
+    tests:
+      - name: "i18n keys exist in all 3 locales (18 parameterized + 1 collision check)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-1", "AC-061-2", "AC-061-3", "AC-061-4", "AC-061-5", "AC-061-6", "AC-061-8"]
+        covers_ecs: ["EC-061-1"]
+        status: passing
+
+      - name: "inviteMutation.onError uses t(users.inviteFailed)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "inviteMutation.onError does NOT show raw err.message"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-1"]
+        covers_ecs: []
+        status: passing
+
+      - name: "auth/no-session maps to t(users.sessionExpired)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: ["EC-061-1"]
+        status: passing
+
+      - name: "unknown data.error uses t(auth.registrationFailed)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "token_expired/used/invalid still map to specific keys (3 tests)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "catch-all non-network uses registrationFailed, not raw message"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "network error still uses auth.requiresConnection"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-3"]
+        covers_ecs: []
+        status: passing
+
+      - name: "handleAppLanguageSelect uses t(settings.languageChangeFailed)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-4"]
+        covers_ecs: []
+        status: passing
+
+      - name: "handleSignOut uses t(settings.signOutFailed)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "no String(err) used in alert dialogs"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-4", "AC-061-5"]
+        covers_ecs: []
+        status: passing
+
+      - name: "handleDelete uses t(members.futureSpeechWarning)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-8"]
+        covers_ecs: []
+        status: passing
+
+      - name: "no hardcoded future speeches in English"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-8"]
+        covers_ecs: []
+        status: passing
+
+      - name: "importMutation.onError uses t(members.importRpcError)"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-6"]
+        covers_ecs: []
+        status: passing
+
+      - name: "CSV parse errors pass err.message to Alert"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-7"]
+        covers_ecs: ["EC-061-2"]
+        status: passing
+
+      - name: "distinguishes CSV parse errors from RPC errors in onError"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-061-6", "AC-061-7"]
+        covers_ecs: ["EC-061-2", "EC-061-3"]
+        status: passing
+
+  - feature: F062
+    tests:
+      - name: "callEdgeFunction calls refreshSession"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-062-1"]
+        covers_ecs: []
+        status: failing
+
+      - name: "callEdgeFunction throws auth/no-session when session is null"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-062-2"]
+        covers_ecs: []
+        status: passing
+
+      - name: "callEdgeFunction checks refreshError"
+        file: src/__tests__/f060-f061-f062.test.ts
+        type: unit
+        covers_acs: ["AC-062-1"]
+        covers_ecs: ["EC-062-1", "EC-062-2"]
+        status: failing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -2630,8 +2936,26 @@ gaps:
   # All F059 ACs (01-07) covered. All edge cases (EC-059-01 to EC-059-03) covered. No gaps.
   # Behavioral simulation tests mirror SQL trigger logic 1:1.
 
+  # F060 gaps
+  # All F060 ACs (01-05) covered. Edge cases EC-060-1, EC-060-2 covered.
+  # EC-060-3 (manage_prayers=false) not testable: edge case cannot occur in normal use.
+
+  # F061 gaps
+  # All F061 ACs (01-08) covered via source-code verification and i18n key existence tests.
+  # Edge cases EC-061-1 (auth/no-session), EC-061-2 (multi-line CSV), EC-061-3 (import empty) covered.
+
+  # F062 gaps
+  # AC-062-1: FAILING - callEdgeFunction still uses getSession() instead of refreshSession()
+  # AC-062-2: Passing - auth/no-session guard exists
+  # AC-062-3: Not testable (Supabase SDK internal behavior)
+  # EC-062-1, EC-062-2: FAILING - refreshError not checked (getSession path has no error check)
+  # EC-062-3: Not testable (SDK deduplication)
+  - id: AC-062-CODE-BUG
+    reason: "F062 NOT IMPLEMENTED: callEdgeFunction in users.tsx line 47 still uses getSession() instead of refreshSession(). ADR-024 comment not updated to ADR-028."
+    recommendation: "Coder must replace getSession() with refreshSession() and check refreshError as specified in PLAN_P010 STEP-04."
+
 stats:
-  total_tests: 1090
-  passing: 1090
-  failing: 0
+  total_tests: 1148
+  passing: 1146
+  failing: 2
   skipped: 0

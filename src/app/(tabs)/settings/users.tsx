@@ -43,9 +43,9 @@ async function callEdgeFunction(
   functionName: string,
   body: Record<string, unknown>
 ) {
-  // Guard: verify session before calling invoke (ADR-024)
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // Guard: refresh session before calling invoke (ADR-028)
+  const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !session) {
     throw new Error('auth/no-session');
   }
 
@@ -134,7 +134,6 @@ export default function UserManagementScreen() {
         Alert.alert(t('common.success'), t('users.roleChangeSuccess'));
       }
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
-      supabase.auth.refreshSession();
     },
     onError: (err: any) => {
       const msg = err?.message || err?.context?.body?.error;
@@ -155,7 +154,6 @@ export default function UserManagementScreen() {
       Alert.alert(t('common.success'), t('users.deleteSuccess'));
       setExpandedUserId(null);
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
-      supabase.auth.refreshSession();
       if (currentUser) {
         logAction(
           currentUser.app_metadata?.ward_id ?? '',
@@ -186,7 +184,6 @@ export default function UserManagementScreen() {
     },
     onSuccess: (_data, newName) => {
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
-      supabase.auth.refreshSession();
       Alert.alert(t('common.success'), t('users.nameUpdated'));
       // Log the name change
       if (currentUser) {

@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 20
-last_updated: "2026-03-04T12:00:00"
+version: 21
+last_updated: "2026-03-05T16:23:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -764,3 +764,36 @@ deploy_history:
       - "speech_notification_trigger: ativo em INSERT e UPDATE"
       - "REST API health check: HTTP 200"
     notes: "Migration file nao incluia SET search_path = ''. Corrigido via ALTER FUNCTION separado e arquivo local atualizado."
+
+  - date: "2026-03-05"
+    action: "Migration 029_add_device_push_tokens_role.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - coluna role TEXT nullable adicionada a device_push_tokens"
+    verified: true
+    cr: "CR-273"
+    verification:
+      - "information_schema.columns: role TEXT, nullable, no default"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-05"
+    action: "Redeploy Edge Function process-notifications"
+    method: "supabase functions deploy process-notifications"
+    reason: "CR-270: prayer-aware designation text for positions 0/4. CR-273: ward cache Map for batch query, filter tokens by role in SQL (eliminates N+1 getUserById), 7-day retention cleanup."
+    result: "Sucesso - Function redeployada e ACTIVE (version 9)"
+    verified: true
+    cr: "CR-270, CR-273"
+    verification:
+      - "supabase functions list mostra process-notifications como ACTIVE v9"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-05"
+    action: "Redeploy Edge Function send-reset-email"
+    method: "supabase functions deploy send-reset-email --no-verify-jwt"
+    reason: "CR-273: paginate listUsers to handle >50 users (Supabase defaults to max 50 per page)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 8)"
+    verified: true
+    cr: "CR-273"
+    verification:
+      - "supabase functions list mostra send-reset-email como ACTIVE v8"
+      - "REST API health check: HTTP 200"

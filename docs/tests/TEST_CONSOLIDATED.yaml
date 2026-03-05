@@ -4,17 +4,18 @@
 # =============================================================================
 
 type: test_consolidated
-version: 12
+version: 13
 last_updated: "2026-03-05"
 
 summary:
-  total_test_files: 54
-  total_tests: 1181
+  total_test_files: 55
+  total_tests: 1222
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
+  # Note: F064 added 41 tests (tester)
   framework: vitest
   categories:
-    module_named: 47
+    module_named: 48
     integration: 6
   infrastructure:
     setup: 1
@@ -582,6 +583,22 @@ module_tests:
       - Exhaustive guard: only not_assigned source triggers designation
       - Case 4 & 5 self-transition guards
       - Cancellation only fires on UPDATE, not INSERT
+
+  # --- F064 Supabase Resource Optimization Tests (CR-273) ---
+
+  - file: src/__tests__/f064-supabase-resource-optimization.test.ts
+    tests: 41
+    module: "supabase/functions/send-reset-email/index.ts, supabase/functions/process-notifications/index.ts, src/hooks/useNotifications.ts, src/hooks/useTopics.ts, src/lib/sync.ts"
+    covers:
+      - "F064 (CR-273): Supabase Resource Optimization"
+      - S1: send-reset-email paginated listUsers loop (8 tests)
+      - S2: device_push_tokens role column + getTargetTokens SQL filter (7 tests)
+      - S3: Ward cache Map in process-notifications (5 tests)
+      - S4: notification_queue 7-day retention cleanup (5 tests)
+      - S5: useActiveTopics Promise.all parallelization (4 integration tests)
+      - S6: POLLING_INTERVAL_MS 2500->10000 (3 tests)
+      - S7: useToggleCollection UPSERT replaces check-then-act (5 integration tests)
+      - Cross-feature backward compatibility (4 tests)
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -2582,6 +2599,309 @@ test_suites:
         covers_ecs: []
         status: passing
 
+  # ===========================================================================
+  # F064 SUPABASE RESOURCE OPTIMIZATION - TEST COVERAGE (CR-273)
+  # ===========================================================================
+
+  - feature: F064
+    tests:
+      # S1: send-reset-email paginated listUsers
+      - name: "AC-064-01: finds user on page 2 when page 1 has 50 users without target"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-02: finds user on first page with early exit (single call)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-02"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-03: returns null when user not found after all pages (anti-enumeration)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-03"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-01: exactly 50 users on first page, target on page 2"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-01"]
+        covers_ecs: ["EC-064-01"]
+        status: passing
+
+      - name: "EC-064-02: empty user list (0 users) returns null"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-03"]
+        covers_ecs: ["EC-064-02"]
+        status: passing
+
+      - name: "throws error when listUsers returns an error"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "case-insensitive email matching"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-01"]
+        covers_ecs: []
+        status: passing
+
+      - name: "handles page 3+ pagination for large user bases"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-01"]
+        covers_ecs: []
+        status: passing
+
+      # S2: getTargetTokens role-based SQL filtering
+      - name: "AC-064-04: target_role secretary -> roles = [secretary]"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-04: target_role bishopric -> roles = [bishopric]"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-04: target_role secretary_and_bishopric -> roles = [secretary, bishopric]"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-04: returns empty roles for unknown target_role"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-04"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-04: tokens with NULL role are excluded by .in filter"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-04"]
+        covers_ecs: ["EC-064-04"]
+        status: passing
+
+      # S2: useRegisterPushToken role in upsert
+      - name: "AC-064-05/AC-064-06: upsert payload includes role field from useAuth"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-05", "AC-064-06"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-03: observer role is guarded - useRegisterPushToken skips registration"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-06"]
+        covers_ecs: ["EC-064-03"]
+        status: passing
+
+      # S3: Ward cache in process-notifications
+      - name: "AC-064-07/AC-064-08: ward cache built from batch query and used for lookups"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-07", "AC-064-08"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-07: unique ward_ids collected from entries before batch query"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-07"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-08: multiple entries for same ward result in only 1 cache lookup"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-08"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-05: deleted ward falls back to pt-BR language"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-07"]
+        covers_ecs: ["EC-064-05"]
+        status: passing
+
+      - name: "EC-064-05: ward cache returns undefined for missing ward, fallback works"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-07"]
+        covers_ecs: ["EC-064-05"]
+        status: passing
+
+      # S4: notification_queue 7-day retention cleanup
+      - name: "AC-064-09: cleanup targets entries with status sent or cancelled"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-09"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-09: 7-day calculation is correct"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-09"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-10: pending entries are never deleted by cleanup"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-10"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-10: entries newer than 7 days are not deleted"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-10"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-06: cleanup error does not fail the overall response"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-09"]
+        covers_ecs: ["EC-064-06"]
+        status: passing
+
+      # S5: useActiveTopics Promise.all parallelization
+      - name: "AC-064-11: Round 1 runs ward_topics and ward_collection_config in parallel"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-11"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-12: Round 2 runs general_collections and general_topics in parallel when active collections exist"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-12"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-07: Round 2 skipped when no active collections"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-12"]
+        covers_ecs: ["EC-064-07"]
+        status: passing
+
+      - name: "AC-064-13: result set includes ward topics + general topics sorted by collection:title"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-13"]
+        covers_ecs: []
+        status: passing
+
+      # S6: POLLING_INTERVAL_MS
+      - name: "AC-064-14: POLLING_INTERVAL_MS equals 10000 (10 seconds)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-14"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-14: POLLING_INTERVAL_MS is not 2500 (old value)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-14"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-15: getQueryKeysForTable still returns keys for all synced tables"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-15"]
+        covers_ecs: []
+        status: passing
+
+      # S7: useToggleCollection UPSERT
+      - name: "AC-064-16: useToggleCollection calls upsert with onConflict"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-16"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-17: toggle ON a collection (active: true)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-17"]
+        covers_ecs: []
+        status: passing
+
+      - name: "AC-064-17: toggle OFF a collection (active: false)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-17"]
+        covers_ecs: []
+        status: passing
+
+      - name: "EC-064-08: upsert handles both new config (INSERT) and existing config (UPDATE)"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: integration
+        covers_acs: ["AC-064-16", "AC-064-17"]
+        covers_ecs: ["EC-064-08"]
+        status: passing
+
+      # Migration 029 verification
+      - name: "AC-064-05: migration adds role TEXT column without NOT NULL constraint"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: ["AC-064-05"]
+        covers_ecs: []
+        status: passing
+
+      # Cross-feature backward compatibility
+      - name: "FIXED_COLLECTION_ORDER exported from useTopics with 9 entries"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: "SYNCED_TABLES still has 7 tables"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: "TABLE_TO_QUERY_KEYS.speeches includes speechCountKeys"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
+      - name: "topicKeys shape unchanged"
+        file: src/__tests__/f064-supabase-resource-optimization.test.ts
+        type: unit
+        covers_acs: []
+        covers_ecs: []
+        status: passing
+
 coverage:
   acceptance_criteria:
     # --- F039 (Phase 1) ---
@@ -3228,8 +3548,14 @@ gaps:
   # 33 total tests: 16 coder + 17 tester supplementary.
   # Integration tests verify getInviteItems preserves topic_title for downstream topicMissing logic.
 
+  # F064 gaps
+  # All F064 ACs (01-17) covered. All edge cases (EC-064-01 to EC-064-08) covered. No gaps.
+  # 41 tests: S1 paginated listUsers (8), S2 role filtering (7), S3 ward cache (5),
+  # S4 retention cleanup (5), S5 Promise.all (4), S6 polling interval (3),
+  # S7 UPSERT (5), cross-feature (4).
+
 stats:
-  total_tests: 1181
-  passing: 1181
+  total_tests: 1222
+  passing: 1222
   failing: 0
   skipped: 0

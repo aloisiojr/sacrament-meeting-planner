@@ -361,16 +361,24 @@ export function useActiveTopics() {
     queryFn: async (): Promise<TopicWithCollection[]> => {
       const results: TopicWithCollection[] = [];
 
-      // 1. Ward topics
-      const { data: wardTopics, error: wtErr } = await supabase
-        .from('ward_topics')
-        .select('*')
-        .eq('ward_id', wardId);
+      // Round 1: ward_topics and ward_collection_config in parallel (ADR-033)
+      const [wardTopicsResult, activeConfigsResult] = await Promise.all([
+        supabase
+          .from('ward_topics')
+          .select('*')
+          .eq('ward_id', wardId),
+        supabase
+          .from('ward_collection_config')
+          .select('collection_id')
+          .eq('ward_id', wardId)
+          .eq('active', true),
+      ]);
 
-      if (wtErr) throw wtErr;
+      if (wardTopicsResult.error) throw wardTopicsResult.error;
+      if (activeConfigsResult.error) throw activeConfigsResult.error;
 
       const wardTopicLabel = t('topics.wardTopics');
-      (wardTopics ?? []).forEach((t) => {
+      (wardTopicsResult.data ?? []).forEach((t) => {
         results.push({
           id: t.id,
           title: t.title,
@@ -380,38 +388,28 @@ export function useActiveTopics() {
         });
       });
 
-      // 2. Active general collections and their topics
-      const { data: activeConfigs, error: acErr } = await supabase
-        .from('ward_collection_config')
-        .select('collection_id')
-        .eq('ward_id', wardId)
-        .eq('active', true);
-
-      if (acErr) throw acErr;
-
-      const activeCollectionIds = (activeConfigs ?? []).map((c) => c.collection_id);
+      const activeCollectionIds = (activeConfigsResult.data ?? []).map((c) => c.collection_id);
 
       if (activeCollectionIds.length > 0) {
-        // Fetch collection names
-        const { data: collections, error: colErr } = await supabase
-          .from('general_collections')
-          .select('*')
-          .in('id', activeCollectionIds);
+        // Round 2: general_collections and general_topics in parallel (ADR-033)
+        const [collectionsResult, generalTopicsResult] = await Promise.all([
+          supabase
+            .from('general_collections')
+            .select('*')
+            .in('id', activeCollectionIds),
+          supabase
+            .from('general_topics')
+            .select('*')
+            .in('collection_id', activeCollectionIds),
+        ]);
 
-        if (colErr) throw colErr;
+        if (collectionsResult.error) throw collectionsResult.error;
+        if (generalTopicsResult.error) throw generalTopicsResult.error;
 
         const collectionMap = new Map<string, string>();
-        (collections ?? []).forEach((c) => collectionMap.set(c.id, c.name));
+        (collectionsResult.data ?? []).forEach((c) => collectionMap.set(c.id, c.name));
 
-        // Fetch topics from active collections
-        const { data: generalTopics, error: gtErr } = await supabase
-          .from('general_topics')
-          .select('*')
-          .in('collection_id', activeCollectionIds);
-
-        if (gtErr) throw gtErr;
-
-        (generalTopics ?? []).forEach((t: GeneralTopic) => {
+        (generalTopicsResult.data ?? []).forEach((t: GeneralTopic) => {
           const collectionName = collectionMap.get(t.collection_id) ?? '';
           results.push({
             id: t.id,

@@ -373,6 +373,18 @@ Deno.serve(async (req: Request) => {
         .in('expo_push_token', invalidTokens);
     }
 
+    // 6. Cleanup: delete processed entries older than 7 days
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase
+        .from('notification_queue')
+        .delete()
+        .in('status', ['sent', 'cancelled'])
+        .lt('created_at', sevenDaysAgo);
+    } catch (cleanupErr) {
+      console.error('Notification queue cleanup error:', cleanupErr);
+    }
+
     return new Response(
       JSON.stringify({
         processed: processedIds.length,

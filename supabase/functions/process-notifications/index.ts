@@ -66,8 +66,31 @@ function formatNameList(names: string[], language: string): string {
 function buildDesignationText(
   language: string,
   names: string[],
-  date: string
+  date: string,
+  position?: number | null
 ): { title: string; body: string } {
+  // Prayer-specific text for position 0 (opening) or 4 (closing)
+  const prayerLabel = position != null ? getPrayerLabel(position, language) : null;
+  if (prayerLabel) {
+    const name = names[0] ?? '';
+    const texts: Record<string, { title: string; body: string }> = {
+      'pt-BR': {
+        title: 'Designação de Oração',
+        body: `${name} foi designado(a) para a ${prayerLabel} em ${date}. Hora de enviar o convite!`,
+      },
+      'en-US': {
+        title: 'Prayer Assignment',
+        body: `${name} was assigned to give the ${prayerLabel} on ${date}. Time to send the invitation!`,
+      },
+      'es-LA': {
+        title: 'Asignación de Oración',
+        body: `${name} fue asignado(a) para la ${prayerLabel} el ${date}. ¡Es hora de enviar la invitación!`,
+      },
+    };
+    return texts[language] ?? texts['pt-BR'];
+  }
+
+  // Existing speech text (unchanged)
   const nameList = formatNameList(names, language);
   const texts: Record<string, { title: string; body: string }> = {
     'pt-BR': {
@@ -219,10 +242,16 @@ Deno.serve(async (req: Request) => {
 
     for (const entry of entries) {
       if (entry.type === 'designation') {
-        const key = `${entry.ward_id}:${entry.sunday_date}`;
-        const group = designationGroups.get(key) ?? [];
-        group.push(entry);
-        designationGroups.set(key, group);
+        if (entry.speech_position === 0 || entry.speech_position === 4) {
+          // Prayer: process individually (like confirmed/withdrew)
+          immediateEntries.push(entry);
+        } else {
+          // Speech: group by (ward_id, sunday_date)
+          const key = `${entry.ward_id}:${entry.sunday_date}`;
+          const group = designationGroups.get(key) ?? [];
+          group.push(entry);
+          designationGroups.set(key, group);
+        }
       } else {
         immediateEntries.push(entry);
       }
@@ -280,6 +309,17 @@ Deno.serve(async (req: Request) => {
         case 'weekly_assignment':
         case 'weekly_confirmation': {
           const text = buildWeeklyText(language);
+          title = text.title;
+          body = text.body;
+          break;
+        }
+        case 'designation': {
+          const text = buildDesignationText(
+            language,
+            [entry.speaker_name ?? ''],
+            entry.sunday_date,
+            entry.speech_position
+          );
           title = text.title;
           body = text.body;
           break;

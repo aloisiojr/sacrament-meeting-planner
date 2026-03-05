@@ -290,30 +290,14 @@ export function useToggleCollection() {
       collectionName?: string;
       active: boolean;
     }): Promise<{ active: boolean; collectionName?: string }> => {
-      // Check if config exists
-      const { data: existing } = await supabase
+      // Single upsert with onConflict (UNIQUE(ward_id, collection_id) at 001_initial_schema.sql:81)
+      const { error } = await supabase
         .from('ward_collection_config')
-        .select('id')
-        .eq('ward_id', wardId)
-        .eq('collection_id', collectionId)
-        .single();
-
-      if (existing) {
-        const { error } = await supabase
-          .from('ward_collection_config')
-          .update({ active })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('ward_collection_config')
-          .insert({
-            ward_id: wardId,
-            collection_id: collectionId,
-            active,
-          });
-        if (error) throw error;
-      }
+        .upsert(
+          { ward_id: wardId, collection_id: collectionId, active },
+          { onConflict: 'ward_id,collection_id' }
+        );
+      if (error) throw error;
 
       return { active, collectionName };
     },

@@ -64,4 +64,4 @@ export function getQueryKeysForTable(table: string): readonly (readonly string[]
 /**
  * Default polling interval (ms) for fallback mode.
  */
-export const POLLING_INTERVAL_MS = 2500;
+export const POLLING_INTERVAL_MS = 10000;

@@ -80,7 +80,7 @@ export function useRegisterPushToken(isOnline: boolean): void {
           });
         }
 
-        // Upsert token in device_push_tokens
+        // Upsert token in device_push_tokens (includes role for SQL-based filtering)
         const { error } = await supabase
           .from('device_push_tokens')
           .upsert(
@@ -88,6 +88,7 @@ export function useRegisterPushToken(isOnline: boolean): void {
               user_id: userId,
               ward_id: wardId,
               expo_push_token: expoPushToken,
+              role,
             },
             {
               onConflict: 'user_id,expo_push_token',

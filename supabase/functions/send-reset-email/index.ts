@@ -118,27 +118,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Lookup user by email
-    const {
-      data: { users },
-      error: listError,
-    } = await supabaseAdmin.auth.admin.listUsers();
+    // Lookup user by email (paginated: Supabase defaults to max 50 per page)
+    let user = null;
+    let page = 1;
+    while (!user) {
+      const { data, error: listError } =
+        await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
 
-    if (listError) {
-      console.error('Error listing users:', listError);
-      return new Response(
-        JSON.stringify({ error: 'Internal server error' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      if (listError) {
+        console.error('Error listing users:', listError);
+        return new Response(
+          JSON.stringify({ error: 'Internal server error' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      user = data.users.find(
+        (u: { email?: string }) =>
+          u.email?.toLowerCase() === trimmedEmail
+      ) ?? null;
+
+      if (user || data.users.length < 50) break;
+      page++;
     }
-
-    const user = users.find(
-      (u: { email?: string }) =>
-        u.email?.toLowerCase() === trimmedEmail
-    );
 
     // Anti-enumeration: return success even if user not found
     if (!user) {

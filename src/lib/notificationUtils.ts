@@ -50,7 +50,7 @@ function getPrayerLabel(position: number, language: OrdinalLanguage): string | n
 }
 
 /**
- * Build notification text for the 5 notification cases.
+ * Build notification text for the 6 notification cases.
  */
 export function buildNotificationText(
   type: string,
@@ -60,6 +60,7 @@ export function buildNotificationText(
     date?: string;
     position?: number;
     name?: string;
+    topic_title?: string;
   }
 ): { title: string; body: string } {
   const texts: Record<OrdinalLanguage, Record<string, (d: typeof data) => { title: string; body: string }>> = {
@@ -115,6 +116,19 @@ export function buildNotificationText(
           body: `ATENÇÃO! ${d.name} NÃO poderá proferir o ${getOrdinal(d.position ?? 1, language)} discurso em ${d.date}. Designe outro orador!`,
         };
       },
+      secretary_review: (d) => {
+        if (d.topic_title) {
+          return {
+            title: 'Revisão de Designação',
+            body: `Atenção: o secretário designou o tema ${d.topic_title} para ${d.name} no dia ${d.date}. Revise a designação.`,
+          };
+        }
+        const ordinal = getOrdinal(d.position ?? 1, language);
+        return {
+          title: 'Revisão de Designação',
+          body: `Atenção: o secretário designou ${d.name} para o ${ordinal} discurso do dia ${d.date}. Revise a designação.`,
+        };
+      },
     },
     'en-US': {
       designation: (d) => {
@@ -168,6 +182,19 @@ export function buildNotificationText(
           body: `ATTENTION! ${d.name} will NOT be able to give the ${getOrdinal(d.position ?? 1, language)} speech on ${d.date}. Assign another speaker!`,
         };
       },
+      secretary_review: (d) => {
+        if (d.topic_title) {
+          return {
+            title: 'Assignment Review',
+            body: `Attention: the secretary assigned the topic ${d.topic_title} to ${d.name} on ${d.date}. Review the assignment.`,
+          };
+        }
+        const ordinal = getOrdinal(d.position ?? 1, language);
+        return {
+          title: 'Assignment Review',
+          body: `Attention: the secretary assigned ${d.name} to the ${ordinal} speech on ${d.date}. Review the assignment.`,
+        };
+      },
     },
     'es-LA': {
       designation: (d) => {
@@ -219,6 +246,19 @@ export function buildNotificationText(
         return {
           title: '¡ATENCIÓN! Desistimiento',
           body: `¡ATENCIÓN! ${d.name} NO podrá dar el ${getOrdinal(d.position ?? 1, language)} discurso el ${d.date}. ¡Asigne otro orador!`,
+        };
+      },
+      secretary_review: (d) => {
+        if (d.topic_title) {
+          return {
+            title: 'Revisión de Asignación',
+            body: `Atención: el secretario asignó el tema ${d.topic_title} a ${d.name} el ${d.date}. Revise la asignación.`,
+          };
+        }
+        const ordinal = getOrdinal(d.position ?? 1, language);
+        return {
+          title: 'Revisión de Asignación',
+          body: `Atención: el secretario asignó a ${d.name} para el ${ordinal} discurso del ${d.date}. Revise la asignación.`,
         };
       },
     },

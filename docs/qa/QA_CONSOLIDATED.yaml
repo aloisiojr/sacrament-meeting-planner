@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 15
+  version: 16
 
 validations:
 
@@ -2699,3 +2699,250 @@ validations:
         description: "Visual consistency with existing form styles (border, padding, font size)"
         result: PASS
         evidence: "AnnouncementsList.tsx:227-251: itemRow style has borderRadius:6, paddingHorizontal:10, paddingVertical:8, fontSize:15. addInput style has borderRadius:6, paddingHorizontal:10, paddingVertical:8, fontSize:15. These match AgendaForm.tsx selectorField/textInput styles."
+
+  # ===========================================================================
+  # Phase 15: EditableListField evolution (QA_PLAN_015)
+  # ===========================================================================
+
+  - id: QA_015
+    plan: QA_PLAN_015
+    date: "2026-03-08"
+    scope: "CR-278, CR-279, CR-280 - EditableListField generalization, grip icon + word-wrap, zebra striping (F068/F069/F070)"
+    verdict: passed
+    must_pass: 20/20
+    should_pass: 10/10
+    total_checks: 30/30
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1572 tests, 98 new, 34/34 ACs, 11/11 ECs)"
+
+    checks:
+
+      # --- CR-278: Generalize AnnouncementsList to EditableListField ---
+
+      - id: CR278_MP1
+        cr: CR-278
+        type: must_pass
+        description: "Component renamed from AnnouncementsList to EditableListField"
+        result: PASS
+        evidence: "src/components/EditableListField.tsx exists (245 lines). Old AnnouncementsList.tsx removed (Glob returns no results). Exported function name is EditableListField (line 41). Import in AgendaForm.tsx:31 uses EditableListField."
+
+      - id: CR278_MP2
+        cr: CR-278
+        type: must_pass
+        description: "welcome_new_families field uses EditableListField instead of DebouncedTextInput"
+        result: PASS
+        evidence: "AgendaForm.tsx:234-239: <EditableListField value={agenda.welcome_new_families ?? null} onSave={(text) => updateField('welcome_new_families', text)} disabled={isObserver} placeholder={t('agenda.addWelcome')} />. DebouncedTextInput no longer used for this field."
+
+      - id: CR278_MP3
+        cr: CR-278
+        type: must_pass
+        description: "sustaining_releasing field uses EditableListField instead of DebouncedTextInput"
+        result: PASS
+        evidence: "AgendaForm.tsx:354-359: <EditableListField value={agenda.sustaining_releasing ?? null} onSave={(text) => updateField('sustaining_releasing', text)} disabled={isObserver} placeholder={t('agenda.addWardBusiness')} />. DebouncedTextInput no longer used for this field."
+
+      - id: CR278_MP4
+        cr: CR-278
+        type: must_pass
+        description: "announcements field still uses EditableListField (renamed from AnnouncementsList)"
+        result: PASS
+        evidence: "AgendaForm.tsx:243-248: <EditableListField value={agenda.announcements ?? null} onSave={(text) => updateField('announcements', text)} disabled={isObserver} placeholder={t('agenda.addAnnouncement')} />. Same props pattern as before."
+
+      - id: CR278_MP5
+        cr: CR-278
+        type: must_pass
+        description: "Auto-split on add: pasting text with \\n into add field creates multiple items"
+        result: PASS
+        evidence: "EditableListField.tsx:67: handleAdd splits addText by '\\n', trims each, filters empty: const newEntries = addText.split('\\n').map(s => s.trim()).filter(s => s !== ''). Line 69: spreads all entries: [...items, ...newEntries]. Multi-line paste creates multiple items."
+
+      - id: CR278_MP6
+        cr: CR-278
+        type: must_pass
+        description: "Auto-split on inline edit: editing an item to contain \\n splits into multiple items"
+        result: PASS
+        evidence: "EditableListField.tsx:102: finishEdit splits editText by '\\n': const newEntries = editText.split('\\n').map(s => s.trim()).filter(s => s !== ''). Lines 107-116: handles 0 entries (delete), 1 entry (update), N entries (splice at editingIndex to replace 1 item with N)."
+
+      - id: CR278_MP7
+        cr: CR-278
+        type: must_pass
+        description: "Presentation mode uses bullet_list for welcome_new_families"
+        result: PASS
+        evidence: "usePresentationMode.ts:91: welcome_new_families field has type: 'bullet_list' (was 'multiline'). Confirmed in buildPresentationCards function."
+
+      - id: CR278_MP8
+        cr: CR-278
+        type: must_pass
+        description: "Presentation mode uses bullet_list for sustaining_releasing"
+        result: PASS
+        evidence: "usePresentationMode.ts:117: sustaining_releasing field has type: 'bullet_list' (was 'multiline'). Confirmed in buildPresentationCards function."
+
+      - id: CR278_MP9
+        cr: CR-278
+        type: must_pass
+        description: "recognized_names NOT changed - still uses ActorSelector"
+        result: PASS
+        evidence: "AgendaForm.tsx:198-230: recognized_names section unchanged - Pressable with ActorSelector at line 585. Maps recognized_names array to Text elements. No EditableListField used for this field."
+
+      - id: CR278_MP10
+        cr: CR-278
+        type: must_pass
+        description: "parseItems and joinItems helpers still exported and functional"
+        result: PASS
+        evidence: "EditableListField.tsx:22-27: export function parseItems(value: string | null): string[] and export function joinItems(items: string[]): string | null. Same signatures and logic as before. Used in tests via inline copies."
+
+      - id: CR278_MP11
+        cr: CR-278
+        type: must_pass
+        description: "New i18n keys for welcome and sustaining placeholders in all 3 locales"
+        result: PASS
+        evidence: "pt-BR.json:247-248: addWelcome='Adicionar boas-vindas', addWardBusiness='Adicionar apoio ou desobrigacao'. en-US.json:247-248: addWelcome='Add welcome', addWardBusiness='Add sustaining or release'. es-LA.json:247-248: addWelcome='Agregar bienvenida', addWardBusiness='Agregar apoyo o relevo'. All 3 locales confirmed."
+
+      - id: CR278_SP1
+        cr: CR-278
+        type: should_pass
+        description: "No DB migration needed - all fields already TEXT"
+        result: PASS
+        evidence: "No migration 032 exists (Glob returns empty). database.ts:188-198: fields remain string | null. No schema changes."
+
+      - id: CR278_SP2
+        cr: CR-278
+        type: should_pass
+        description: "Existing data with \\n is correctly parsed by new list UI"
+        result: PASS
+        evidence: "EditableListField.tsx:22-23: parseItems splits by \\n and filters empty strings. Same logic as before, existing welcome_new_families/sustaining_releasing data with \\n will be correctly split into list items."
+
+      - id: CR278_SP3
+        cr: CR-278
+        type: should_pass
+        description: "Old AnnouncementsList import references updated or backwards-compatible"
+        result: PASS
+        evidence: "Grep 'import.*AnnouncementsList' returns 0 matches across entire src/. All references updated to EditableListField. Old file removed completely."
+
+      - id: CR278_SP4
+        cr: CR-278
+        type: should_pass
+        description: "Existing tests updated to reflect rename and new features"
+        result: PASS
+        evidence: "f067-announcements-list.test.ts: updated header to 'F067/F068: EditableListField (CR-277, CR-278)'. All AnnouncementsList references replaced with EditableListField. New describe block 'F068 S015-02' with 6 tests for welcome/sustaining integration. f068-f069-f070-tester.test.ts: 98 new tests covering auto-split, grip icon, zebra striping."
+
+      # --- CR-279: Grip icon + word-wrap ---
+
+      - id: CR279_MP1
+        cr: CR-279
+        type: must_pass
+        description: "ChevronUp/ChevronDown arrows replaced with grip/drag handle icon"
+        result: PASS
+        evidence: "EditableListField.tsx:18: imports GripIcon (not ChevronUpIcon/ChevronDownIcon). Grep for ChevronUp/ChevronDown in EditableListField.tsx returns 0 matches. Line 157-158: <Pressable hitSlop={6} onLongPress={drag}><GripIcon size={16} color={colors.textTertiary} /></Pressable>."
+
+      - id: CR279_MP2
+        cr: CR-279
+        type: must_pass
+        description: "Grip icon is positioned to the LEFT of each item text"
+        result: PASS
+        evidence: "EditableListField.tsx:156-179: Inside itemRow (flexDirection: 'row'), GripIcon Pressable at line 157 appears BEFORE the text Pressable at line 171. Layout order: GripIcon -> Text/TextInput -> XIcon."
+
+      - id: CR279_MP3
+        cr: CR-279
+        type: must_pass
+        description: "New GripIcon SVG component created in icons"
+        result: PASS
+        evidence: "icons/index.tsx:370-379: GripIcon exported with 6 Circle elements (2 rows of 3 dots) forming a grip/drag-handle pattern. Uses fill={color} on circles. Standard IconProps interface."
+
+      - id: CR279_MP4
+        cr: CR-279
+        type: must_pass
+        description: "Item text shows full content with word-wrap, no truncation"
+        result: PASS
+        evidence: "EditableListField.tsx:172: <Text style={[styles.itemText, { color: colors.text }]}> - no numberOfLines prop. Line 142: disabled Text also has no numberOfLines. Both allow unlimited lines/word-wrap."
+
+      - id: CR279_MP5
+        cr: CR-279
+        type: must_pass
+        description: "Item row height increases with wrapped content"
+        result: PASS
+        evidence: "EditableListField.tsx:215: alignItems: 'flex-start' (changed from 'center'). No fixed height on itemRow. Text with flex:1 (line 227-228) wraps naturally, and row grows vertically."
+
+      - id: CR279_SP1
+        cr: CR-279
+        type: should_pass
+        description: "Grip icon enables real drag-and-drop reorder (exceeds original spec)"
+        result: PASS
+        evidence: "EditableListField.tsx:16: imports DraggableFlatList and ScaleDecorator from react-native-draggable-flatlist. Line 157: onLongPress={drag} activates drag. Line 123-131: handleDragEnd receives reordered data array and calls saveItems. ADR-046 documents this decision. Exceeds original CR-279 spec (visual indicator) with real drag-and-drop."
+
+      - id: CR279_SP2
+        cr: CR-279
+        type: should_pass
+        description: "Disabled state also shows full text without truncation"
+        result: PASS
+        evidence: "EditableListField.tsx:142: disabled Text has no numberOfLines prop - <Text style={[styles.disabledText, { color: colors.text }]}>{item}</Text>. Full text displayed."
+
+      - id: CR279_SP3
+        cr: CR-279
+        type: should_pass
+        description: "Grip icon not shown in disabled state"
+        result: PASS
+        evidence: "EditableListField.tsx:134-148: disabled block renders plain Text without GripIcon, XIcon, or any interactive elements. Only text content shown."
+
+      # --- CR-280: Zebra striping font color in bullet_list presentation ---
+
+      - id: CR280_MP1
+        cr: CR-280
+        type: must_pass
+        description: "Presentation bullet_list items have alternating font colors"
+        result: PASS
+        evidence: "presentation.tsx:182: color: idx % 2 === 0 ? colors.text : colors.textZebraFaded. Index-based alternating color applied to each bullet item's Text style."
+
+      - id: CR280_MP2
+        cr: CR-280
+        type: must_pass
+        description: "Light mode: odd items (idx 0,2,...) normal, even items (idx 1,3,...) lighter"
+        result: PASS
+        evidence: "theme.ts:63: light text='#1A1A1A'. theme.ts:68: light textZebraFaded='#4A4A4A'. #4A4A4A is between text (#1A1A1A) and textSecondary (#5A5A5A) - subtle lighter shade."
+
+      - id: CR280_MP3
+        cr: CR-280
+        type: must_pass
+        description: "Dark mode: odd items (idx 0,2,...) normal, even items (idx 1,3,...) darker"
+        result: PASS
+        evidence: "theme.ts:94: dark text='#F1F5F9'. theme.ts:100: dark textZebraFaded='#B8C5D4'. #B8C5D4 is between text (#F1F5F9) and textSecondary (#94A3B8) - subtle darker shade."
+
+      - id: CR280_MP4
+        cr: CR-280
+        type: must_pass
+        description: "Zebra striping applies to all 3 bullet_list fields"
+        result: PASS
+        evidence: "Single code path in presentation.tsx:178-188 handles all bullet_list fields generically. usePresentationMode.ts confirms all 3 fields (announcements:98, welcome_new_families:91, sustaining_releasing:117) use type: 'bullet_list'. Zebra applies to all."
+
+      - id: CR280_MP5
+        cr: CR-280
+        type: must_pass
+        description: "Zebra striping is FONT color only, not background"
+        result: PASS
+        evidence: "presentation.tsx:182: only 'color' property is alternated (idx % 2 === 0 ? colors.text : colors.textZebraFaded). No 'backgroundColor' set on bullet items."
+
+      - id: CR280_MP6
+        cr: CR-280
+        type: must_pass
+        description: "Subtle color difference (not jarring)"
+        result: PASS
+        evidence: "Light: #4A4A4A is ~75% between #1A1A1A and #5A5A5A (text to textSecondary). Dark: #B8C5D4 is ~60% between #F1F5F9 and #94A3B8. Both are subtle midpoint values, not extreme. textZebraFaded added to ThemeColors interface (theme.ts:18)."
+
+      - id: CR280_SP1
+        cr: CR-280
+        type: should_pass
+        description: "Zebra striping does NOT affect non-bullet_list presentation fields"
+        result: PASS
+        evidence: "presentation.tsx:193-210: non-bullet_list return block uses only colors.text (line 201) and colors.textTertiary for empty (line 203). No textZebraFaded reference. Zebra only in bullet_list if-branch (line 155-191)."
+
+      - id: CR280_SP2
+        cr: CR-280
+        type: should_pass
+        description: "Zebra striping respects font size toggle"
+        result: PASS
+        evidence: "presentation.tsx:183: fontSize: fontSizes?.value ?? 16 applied alongside zebra color in same style object. Font size toggle works independently of color alternation."
+
+      - id: CR280_SP3
+        cr: CR-280
+        type: should_pass
+        description: "Single-item lists still look normal (first item always normal color)"
+        result: PASS
+        evidence: "presentation.tsx:182: idx=0 -> idx % 2 === 0 -> colors.text (normal). Single-item list only has idx=0, so always normal color."

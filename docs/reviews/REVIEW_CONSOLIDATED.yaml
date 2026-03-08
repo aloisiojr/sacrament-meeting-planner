@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 16
-  last_updated_by: "phase-014"
+  version: 17
+  last_updated_by: "phase-015"
 
 reviews:
   - id: REV-001
@@ -4221,3 +4221,269 @@ reviews:
       tests_total: 1421
       tests_passing: 1421
       test_files: 62
+
+  # ===========================================================================
+  # REV-017: Phase 015 - F068 (CR-278) + F069 (CR-279) + F070 (CR-280)
+  # EditableListField generalization + grip icon + zebra striping
+  # ===========================================================================
+
+  - id: REV-017
+    scope: "F068+F069+F070 Phase 015 - EditableListField generalization, grip icon, zebra striping (CR-278, CR-279, CR-280)"
+    date: "2026-03-08"
+    reviewer: reviewer-agent
+    phase: 15
+    features: [F068, F069, F070]
+    iteration: 1
+    spec: SPEC_F015
+    arch: ARCH_M015
+    plan: PLAN_P015
+
+    commits:
+      - sha: 5cc099c
+        message: "feat(EditableListField): rename AnnouncementsList to EditableListField and add i18n keys (CR-278)"
+      - sha: 0435634
+        message: "feat(AgendaForm): replace DebouncedTextInput with EditableListField for welcome/sustaining (CR-278)"
+      - sha: 3e89fb3
+        message: "feat(EditableListField): add auto-split for \\n in add-input and inline-edit (CR-278)"
+      - sha: e210cd8
+        message: "feat(EditableListField): replace arrows with GripIcon drag-to-reorder (CR-279)"
+      - sha: 07da63c
+        message: "feat(presentation): add zebra striping to bullet_list and change welcome/sustaining to bullet_list (CR-278, CR-280)"
+      - sha: b4b7c6f
+        message: "docs(phase-015): add ADR-044 to ADR-047, update consolidated docs (CR-278, CR-279, CR-280)"
+      - sha: 5afb6e9
+        message: "docs(tests): update TEST_CONSOLIDATED and CODE_LEDGER after F068/F069/F070 - all 1474 tests passing"
+      - sha: caf0150
+        message: "test(f068-f070): add 98 tester tests for EditableListField, GripIcon, zebra striping (CR-278, CR-279, CR-280)"
+      - sha: 3fe5a2f
+        message: "docs(tests): update TEST_CONSOLIDATED after F068/F069/F070 tester - all 1572 tests passing"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        result: pass
+        notes: |
+          SPEC_F015 faithfully captures all 3 user requests:
+          - CR-278: Rename AnnouncementsList to EditableListField, apply to
+            welcome_new_families and sustaining_releasing, auto-split \n on
+            paste/edit, presentation mode bullet_list for all 3 fields, new
+            i18n keys (addWelcome, addWardBusiness) in 3 locales. recognized_names
+            excluded (kept on ActorSelector) as requested.
+          - CR-279: Replace ChevronUp/Down arrows with grip icon on LEFT side,
+            word-wrap (remove numberOfLines={1}).
+          - CR-280: Zebra striping font color in bullet_list presentation items.
+            Font color only, not background. Subtle difference.
+          19 acceptance criteria across F068 (19 ACs), F069 (7 ACs), F070 (8 ACs)
+          cover all behaviors. 5 OQs resolved with defaults. 6 assumptions documented.
+
+      arch_vs_spec:
+        result: pass
+        notes: |
+          ARCH_M015 correctly maps SPEC to components:
+          - EditableListField.tsx (RENAMED): auto-split in handleAdd + finishEdit,
+            DraggableFlatList for drag-and-drop, GripIcon on left
+          - AgendaForm.tsx (MODIFIED): 3 EditableListField usages (announcements,
+            welcome_new_families, sustaining_releasing)
+          - GripIcon (NEW): added to icons/index.tsx, 6-circle grip pattern
+          - usePresentationMode.ts: welcome/sustaining changed to bullet_list
+          - presentation.tsx: zebra striping via textZebraFaded color
+          - theme.ts: new textZebraFaded color added
+          - i18n: 2 new keys in 3 locales
+          - 4 ADRs (044-047), 2 superseded (041, 043)
+          - Contracts defined for all integrations
+
+      plan_vs_arch:
+        result: pass
+        notes: |
+          PLAN_P015 has 7 steps covering all ARCH components:
+          - S015-01: i18n keys + rename component + update imports
+          - S015-02: Apply to welcome/sustaining fields
+          - S015-03: Auto-split \n
+          - S015-04: Install draggable-flatlist + GripIcon + drag
+          - S015-05: Presentation mode (bullet_list + zebra)
+          - S015-06: Documentation (ADRs)
+          - S015-07: Final verification
+          Dependency graph is correct. Coverage matrix maps all 34 ACs and
+          11 edge cases to steps. No circular dependencies.
+
+      code_vs_plan:
+        result: pass
+        notes: |
+          Code implementation follows PLAN accurately across 9 commits:
+          - S015-01 (5cc099c): File renamed via git mv, component/props renamed,
+            no references to AnnouncementsList remain in codebase. i18n keys
+            addWelcome and addWardBusiness added to all 3 locales.
+          - S015-02 (0435634): welcome_new_families and sustaining_releasing both
+            use EditableListField with correct props (value ?? null, disabled=isObserver,
+            correct placeholders). announcementsInput style removed.
+          - S015-03 (3e89fb3): handleAdd and finishEdit both split by \n, filter
+            empty, and trim. finishEdit handles 0 items (delete), 1 item (update),
+            N items (splice). Add-input is multiline with blurOnSubmit.
+          - S015-04 (e210cd8): react-native-draggable-flatlist installed,
+            DraggableFlatList replaces items.map(), GripIcon on left with
+            onLongPress={drag}, ScaleDecorator wraps rows, XIcon on right.
+            ChevronUp/Down removed. numberOfLines removed from both active
+            and disabled states. Disabled state has no bullet prefix (ADR-047).
+            alignItems: 'flex-start' for text wrap alignment.
+          - S015-05 (07da63c): theme.ts has textZebraFaded in ThemeColors
+            interface and both palettes. usePresentationMode changes welcome and
+            sustaining to bullet_list. presentation.tsx applies alternating
+            color via idx % 2.
+          - S015-06 (b4b7c6f): ADR-044 to ADR-047 documented, ADR-041/043
+            marked superseded.
+          - S015-07: Tester added 98 tests (caf0150), total 1572 passing.
+          All done_when criteria satisfied.
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW
+    # =========================================================================
+
+    code_review:
+
+      - area: "EditableListField.tsx (renamed)"
+        finding: |
+          Clean rename from AnnouncementsList. Props interface unchanged
+          (value, onSave, disabled, placeholder). Auto-split logic correctly
+          implemented in both handleAdd and finishEdit using split('\n').map(trim).
+          filter(nonEmpty) pattern. DraggableFlatList properly integrated with
+          keyExtractor, onDragEnd, scrollEnabled={false}. GripIcon positioned
+          on left with onLongPress={drag}. ScaleDecorator wraps each row.
+          Disabled state renders plain text without controls or bullet prefix
+          (consistent with ADR-047). handleDragEnd cancels editing state.
+          All callbacks wrapped in useCallback with correct dependencies.
+          multiline add-input with blurOnSubmit allows pasting multi-line text.
+
+      - area: "AgendaForm.tsx integration"
+        finding: |
+          Three EditableListField instances correctly configured:
+          - announcements: value ?? null, placeholder addAnnouncement (unchanged)
+          - welcome_new_families: value ?? null, placeholder addWelcome (new)
+          - sustaining_releasing: value ?? null, placeholder addWardBusiness (new)
+          All use disabled={isObserver} and updateField callback.
+          DebouncedTextInput removed from both fields. announcementsInput style
+          removed (no orphaned styles). recognized_names correctly unchanged
+          (still uses ActorSelector).
+
+      - area: "GripIcon (icons/index.tsx)"
+        finding: |
+          GripIcon follows existing icon pattern (IconProps with size/color).
+          Uses 6 Circle elements from react-native-svg (already imported).
+          Lucide grip-horizontal pattern: 3x2 grid at cx={5,12,19} cy={9,15}.
+          fill={color} (not stroke) for solid dots. Consistent with other icons.
+
+      - area: "usePresentationMode.ts"
+        finding: |
+          welcome_new_families changed from 'multiline' to 'bullet_list' (line 91).
+          sustaining_releasing changed from 'multiline' to 'bullet_list' (line 117).
+          announcements already used 'bullet_list' from CR-277.
+          recognized_names still uses 'multiline' - correct.
+
+      - area: "presentation.tsx (zebra striping)"
+        finding: |
+          PresentationFieldRow bullet_list branch correctly applies alternating
+          color: idx % 2 === 0 uses colors.text (normal), idx % 2 === 1 uses
+          colors.textZebraFaded (faded). Applied to all bullet items uniformly.
+          Non-bullet_list fields (text, hymn, multiline) are unaffected - they
+          use the default return which always uses colors.text.
+
+      - area: "theme.ts"
+        finding: |
+          textZebraFaded added to ThemeColors interface after textInverse.
+          lightColors: '#4A4A4A' (midpoint between text #1A1A1A and textSecondary
+          #5A5A5A). darkColors: '#B8C5D4' (midpoint between text #F1F5F9 and
+          textSecondary #94A3B8). Both are distinct from textTertiary.
+          Subtle difference that aids line tracking without looking disabled.
+
+      - area: "i18n locales (3 files)"
+        finding: |
+          pt-BR: addWelcome "Adicionar boas-vindas", addWardBusiness "Adicionar apoio ou desobrigacao"
+          en-US: addWelcome "Add welcome", addWardBusiness "Add sustaining or release"
+          es-LA: addWelcome "Agregar bienvenida", addWardBusiness "Agregar apoyo o relevo"
+          All at line 247-248 in the agenda section. Translations are correct.
+
+      - area: "Tests"
+        finding: |
+          1572 total tests passing across 63 test files. Phase 15 added 151 new
+          tests (1421 -> 1572) covering all ACs and edge cases for F068/F069/F070.
+          Test files updated to reference EditableListField (no AnnouncementsList
+          references remaining). Tests cover: i18n keys, parseItems/joinItems,
+          auto-split behavior, GripIcon presence, word-wrap, disabled state,
+          zebra striping colors, presentation mode bullet_list for all 3 fields.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "EAS Build (app update)"
+        reason: |
+          Client-side changes: EditableListField (renamed + auto-split + drag),
+          AgendaForm (welcome/sustaining fields updated), GripIcon (new icon),
+          theme (textZebraFaded), presentation (zebra striping, bullet_list for
+          welcome/sustaining), i18n (2 new keys). New npm dependency:
+          react-native-draggable-flatlist.
+        urgency: low
+        notes: |
+          No database migration, no Edge Function changes. Pure UI enhancement.
+          The new npm dependency (react-native-draggable-flatlist) requires a
+          native rebuild (EAS Build), not just an OTA update.
+          Can be bundled with other pending client-side changes.
+
+    deploy_notes: |
+      CR-278/279/280 are client-only changes. No server-side deploys required.
+      The welcome_new_families and sustaining_releasing TEXT columns and storage
+      format are unchanged. The new react-native-draggable-flatlist dependency
+      requires a native EAS Build (not an OTA update via expo-updates).
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files: []
+      notes: |
+        Git status is clean. All Phase 15 code changes committed across 9
+        commits (5cc099c..3fe5a2f). Working tree clean, nothing to commit.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-278, CR-279, CR-280 (F068, F069, F070) implementation is correct and
+      complete. AnnouncementsList successfully renamed to EditableListField and
+      applied to all 3 fields (announcements, welcome_new_families,
+      sustaining_releasing). Auto-split for \n works in both add-input and
+      inline edit. GripIcon with react-native-draggable-flatlist provides real
+      drag-and-drop reorder, replacing ChevronUp/Down arrows. Word-wrap enabled
+      (no truncation). Zebra striping via textZebraFaded theme color provides
+      subtle alternating font colors in bullet_list presentation items.
+      Chain validation passes at all 4 levels. All 34 acceptance criteria and
+      11 edge cases covered. 1572 tests pass (63 test files). No P0, P1, or
+      P2 issues found. Only deploy needed is EAS Build (client-side + new
+      native dependency).
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 10
+      total_commits: 9
+      tests_total: 1572
+      tests_passing: 1572
+      test_files: 63

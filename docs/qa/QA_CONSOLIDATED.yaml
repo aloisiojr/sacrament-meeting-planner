@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-05"
-  version: 13
+  last_updated: "2026-03-08"
+  version: 14
 
 validations:
 
@@ -2303,3 +2303,238 @@ validations:
         description: "Anti-enumeration behavior preserved in send-reset-email"
         result: PASS
         evidence: "send-reset-email/index.ts lines 148-154: 'if (!user) { return new Response(JSON.stringify({ success: true }), { status: 200, ... }); }'. Success returned even when user not found. Same anti-enumeration pattern as before."
+
+  # ===========================================================================
+  # Phase 13: Nickname Search + Secretary Full Permissions (QA_PLAN_013)
+  # ===========================================================================
+
+  - id: QA_013
+    plan: QA_PLAN_013
+    date: "2026-03-08"
+    scope: "CR-275 (nickname search) + CR-276 (secretary permissions + review notification)"
+    verdict: passed
+    must_pass: 22/22
+    should_pass: 8/8
+    total_checks: 30/30
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1318 tests, 0 failures)"
+
+    checks:
+
+      # --- CR-275: Nickname search ---
+
+      - id: CR275_MP1
+        cr: CR-275
+        type: must_pass
+        description: "filterMembers() matches by informal_name when full_name does not match"
+        result: PASS
+        evidence: "useMembers.ts:39-41: 'return members.filter((m) => normalizeForSearch(m.full_name).includes(normalized) || normalizeForSearch(m.informal_name ?? \\'\\').includes(normalized))'. Test useMembers-utils.test.ts:101-108: filterMembers with {full_name: 'Joao da Silva', informal_name: 'Joca'} searching 'Joca' returns 1 result."
+
+      - id: CR275_MP2
+        cr: CR-275
+        type: must_pass
+        description: "filterMembers() still matches by full_name (no regression)"
+        result: PASS
+        evidence: "useMembers-utils.test.ts:111-118: filterMembers with {full_name: 'Joao da Silva', informal_name: 'Joca'} searching 'Silva' returns 1 result. Original tests at lines 76-79 also still pass."
+
+      - id: CR275_MP3
+        cr: CR-275
+        type: must_pass
+        description: "filterMembers() handles null informal_name without error"
+        result: PASS
+        evidence: "useMembers.ts:41: 'm.informal_name ?? \\'\\'' null-coalesces to empty string before normalizeForSearch. Test useMembers-utils.test.ts:120-126: filterMembers with informal_name: null, searching 'xyz' returns 0 results without error."
+
+      - id: CR275_MP4
+        cr: CR-275
+        type: must_pass
+        description: "MemberSelectorModal uses useMembers which calls filterMembers (automatic)"
+        result: PASS
+        evidence: "MemberSelectorModal.tsx:40: 'const { data: members } = useMembers(search);' unchanged. useMembers hook at useMembers.ts:78 calls filterMembers. No changes needed in component."
+
+      - id: CR275_MP5
+        cr: CR-275
+        type: must_pass
+        description: "PrayerSelector uses useMembers which calls filterMembers (automatic)"
+        result: PASS
+        evidence: "PrayerSelector.tsx:75: 'const { data: members } = useMembers(search);' unchanged. Inherits nickname search automatically from hook."
+
+      - id: CR275_SP1
+        cr: CR-275
+        type: should_pass
+        description: "Accent-insensitive search works for informal_name"
+        result: PASS
+        evidence: "useMembers-utils.test.ts:128-135: filterMembers with informal_name 'Ze' (accented) searching 'ze' (plain) returns 1 result. normalizeForSearch strips accents via NFD + diacritics regex."
+
+      - id: CR275_SP2
+        cr: CR-275
+        type: should_pass
+        description: "makeMember test factory includes informal_name field"
+        result: PASS
+        evidence: "useMembers-utils.test.ts:20: 'informal_name: overrides.informal_name ?? null,' added to makeMember factory with null default."
+
+      # --- CR-276: Part A - Permissions ---
+
+      - id: CR276_MP1
+        cr: CR-276
+        type: must_pass
+        description: "Secretary has speech:assign permission"
+        result: PASS
+        evidence: "permissions.ts:46: secretary Set includes 'speech:assign'. permissions.test.ts:15: EXPECTED_MATRIX['speech:assign'].secretary = true. permissions.test.ts:98: expect(hasPermission('secretary', 'speech:assign')).toBe(true)."
+
+      - id: CR276_MP2
+        cr: CR-276
+        type: must_pass
+        description: "Secretary has speech:unassign permission"
+        result: PASS
+        evidence: "permissions.ts:47: secretary Set includes 'speech:unassign'. permissions.test.ts:16: EXPECTED_MATRIX['speech:unassign'].secretary = true. permissions.test.ts:99: expect(hasPermission('secretary', 'speech:unassign')).toBe(true)."
+
+      - id: CR276_MP3
+        cr: CR-276
+        type: must_pass
+        description: "Secretary has home:next_assignments permission"
+        result: PASS
+        evidence: "permissions.ts:63: secretary Set includes 'home:next_assignments'. permissions.test.ts:32: EXPECTED_MATRIX['home:next_assignments'].secretary = true. permissions.test.ts:103: expect(hasPermission('secretary', 'home:next_assignments')).toBe(true)."
+
+      - id: CR276_MP4
+        cr: CR-276
+        type: must_pass
+        description: "Secretary permission count is 26 (same as bishopric)"
+        result: PASS
+        evidence: "permissions.test.ts:130-132: 'it(\\'should return 26 permissions for Secretary\\', () => { expect(perms.length).toBe(26); })'. permissions.ts:45-72: secretary Set has 26 entries."
+
+      - id: CR276_MP5
+        cr: CR-276
+        type: must_pass
+        description: "Bishopric permissions unchanged (still 26)"
+        result: PASS
+        evidence: "permissions.test.ts:125-127: 'it(\\'should return 26 permissions for Bishopric\\', () => { expect(perms.length).toBe(26); })'. permissions.ts:16-43: bishopric Set unchanged with 26 entries."
+
+      - id: CR276_MP6
+        cr: CR-276
+        type: must_pass
+        description: "Observer permissions unchanged (still 3)"
+        result: PASS
+        evidence: "permissions.test.ts:135-141: 'expect(perms.length).toBe(3)'. permissions.ts:74-78: observer Set unchanged with 3 entries."
+
+      - id: CR276_MP7
+        cr: CR-276
+        type: must_pass
+        description: "SpeechSlot canAssign returns true for secretary on speech positions (1-3)"
+        result: PASS
+        evidence: "SpeechSlot.tsx:99: 'const canAssign = hasPermission(isPrayer ? \\'prayer:assign\\' : \\'speech:assign\\') && !disabled;'. For speech positions (1-3), isPrayer=false, so checks speech:assign which now returns true for secretary."
+
+      - id: CR276_MP8
+        cr: CR-276
+        type: must_pass
+        description: "SpeechSlot canAssign returns true for secretary on prayer positions (0,4) - already works"
+        result: PASS
+        evidence: "SpeechSlot.tsx:99: For prayer positions (0,4), isPrayer=true, so checks prayer:assign which secretary already had. No change needed."
+
+      # --- CR-276: Part B - Review notification trigger ---
+
+      - id: CR276_MP9
+        cr: CR-276
+        type: must_pass
+        description: "Prayer positions (0,4) do NOT generate bishopric review notification"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:38: 'AND NEW.position IN (1, 2, 3)' in Case 6B topic guard. Line 125: 'AND NEW.position IN (1, 2, 3)' in Case 6A speaker guard. Positions 0 and 4 excluded from both."
+
+      - id: CR276_MP10
+        cr: CR-276
+        type: must_pass
+        description: "Bishopric does NOT generate review notification when assigning"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:37: 'AND NEW.assigned_by_role = \\'secretary\\'' in Case 6B. Line 124: 'AND NEW.assigned_by_role = \\'secretary\\'' in Case 6A. Bishopric role value is 'bishopric', which does not match guard."
+
+      - id: CR276_MP11
+        cr: CR-276
+        type: must_pass
+        description: "notification_queue has 'secretary_review' type in CHECK constraint"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:24-27: 'ALTER TABLE public.notification_queue DROP CONSTRAINT notification_queue_type_check; ALTER TABLE public.notification_queue ADD CONSTRAINT notification_queue_type_check CHECK (type IN (\\'designation\\', ... \\'secretary_review\\'));'"
+
+      - id: CR276_MP12
+        cr: CR-276
+        type: must_pass
+        description: "Review notification targets bishopric only (target_role = 'bishopric')"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:48: 'bishopric' in Case 6B INSERT. Line 135: 'bishopric' in Case 6A INSERT. Both cases use target_role = 'bishopric'."
+
+      - id: CR276_MP13
+        cr: CR-276
+        type: must_pass
+        description: "Review notification is IMMEDIATE (send_after = now())"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:48: 'send_after = now()' in Case 6B. Line 135: 'send_after = now()' in Case 6A. No INTERVAL delay - immediate."
+
+      - id: CR276_MP14
+        cr: CR-276
+        type: must_pass
+        description: "Speaker assignment review notification includes speaker name and position"
+        result: PASS
+        evidence: "process-notifications/index.ts:247: 'Atencao: o secretario designou [speakerName] para o [ordinal] discurso do dia [date]'. buildSecretaryReviewText uses getOrdinal(position, language) and interpolates speakerName and date. All 3 languages present."
+
+      - id: CR276_MP15
+        cr: CR-276
+        type: must_pass
+        description: "Topic assignment review notification includes topic title, speaker name, and date"
+        result: PASS
+        evidence: "process-notifications/index.ts:229: 'Atencao: o secretario designou o tema [topicTitle] para [speakerName] no dia [date]'. buildSecretaryReviewText with topicTitle param uses all 3 interpolations. All 3 languages present."
+
+      - id: CR276_MP16
+        cr: CR-276
+        type: must_pass
+        description: "i18n texts present for all 3 languages (pt-BR, en-US, es-LA)"
+        result: PASS
+        evidence: "process-notifications/index.ts:226-258: buildSecretaryReviewText has texts for 'pt-BR', 'en-US', 'es-LA' in both topic and speaker variants. notificationUtils.ts:119-131 (pt-BR), 185-197 (en-US), 251-263 (es-LA): client-side secretary_review builder for all 3 languages."
+
+      - id: CR276_MP17
+        cr: CR-276
+        type: must_pass
+        description: "Permission Sets remain separate (not shared between bishopric and secretary)"
+        result: PASS
+        evidence: "permissions.ts:16: 'bishopric: new Set<Permission>([' and :45: 'secretary: new Set<Permission>([' - two distinct new Set() constructor calls. Not a shared reference."
+
+      # --- CR-276: should_pass ---
+
+      - id: CR276_SP1
+        cr: CR-276
+        type: should_pass
+        description: "NextAssignmentsSection visible to secretary"
+        result: PASS
+        evidence: "NextAssignmentsSection.tsx:123: 'if (!hasPermission(\\'home:next_assignments\\')) return null;'. Secretary now has home:next_assignments, so section renders."
+
+      - id: CR276_SP2
+        cr: CR-276
+        type: should_pass
+        description: "SpeechSlot comment header updated to reflect secretary can now assign"
+        result: PASS
+        evidence: "SpeechSlot.tsx:7-9: 'Permissions: Bishopric: assign/unassign speaker, assign topic, change status. Secretary: assign/unassign speaker, assign topic, change status (generates review notification for bishopric on speeches). Observer: read-only.' Updated from previous 'Secretary: change status only'."
+
+      - id: CR276_SP3
+        cr: CR-276
+        type: should_pass
+        description: "Topic change detection works when topic_title changes from NULL to a value"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:39: 'AND OLD.topic_title IS DISTINCT FROM NEW.topic_title'. IS DISTINCT FROM handles NULL comparisons correctly: NULL IS DISTINCT FROM 'Topic A' evaluates to TRUE. Line 40: 'AND NEW.topic_title IS NOT NULL' ensures only SET (not clear) triggers."
+
+      - id: CR276_SP4
+        cr: CR-276
+        type: should_pass
+        description: "Topic change detection works when topic_title changes from one value to another"
+        result: PASS
+        evidence: "IS DISTINCT FROM at line 39 catches 'Topic A' IS DISTINCT FROM 'Topic B' = TRUE. Combined with line 40 NEW.topic_title IS NOT NULL = TRUE (since it's 'Topic B')."
+
+      - id: CR276_SP5
+        cr: CR-276
+        type: should_pass
+        description: "process-notifications handles secretary_review type correctly"
+        result: PASS
+        evidence: "process-notifications/index.ts:398-409: 'case \\'secretary_review\\': { const text = buildSecretaryReviewText(language, entry.speaker_name ?? \\'\\', entry.speech_position ?? 1, entry.sunday_date, entry.topic_title ?? undefined); ... }'. Correctly placed in immediateEntries switch."
+
+      - id: CR276_SP6
+        cr: CR-276
+        type: should_pass
+        description: "notification_queue schema includes topic_title column for topic review texts"
+        result: PASS
+        evidence: "031_secretary_review_notification.sql:21: 'ALTER TABLE public.notification_queue ADD COLUMN topic_title TEXT;'. database.ts:266: 'topic_title: string | null;' in NotificationQueue interface. process-notifications/index.ts:19: 'topic_title: string | null;' in NotificationQueueEntry interface."

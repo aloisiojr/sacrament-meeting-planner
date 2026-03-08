@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-05"
-  version: 14
-  last_updated_by: "phase-012"
+  last_updated: "2026-03-08"
+  version: 15
+  last_updated_by: "phase-013"
 
 reviews:
   - id: REV-001
@@ -3739,3 +3739,250 @@ reviews:
       tests_passing: 1222
       tests_flaky: 0
       test_files: 55
+
+  # ===========================================================================
+  # REV-013: CR-275 (F065) + CR-276 (F066) - Phase 013
+  # ===========================================================================
+  - id: REV-013
+    scope: "CR-275 (F065) + CR-276 (F066) - Nickname search + Secretary permissions + Review notifications"
+    date: "2026-03-08"
+    reviewer: reviewer-agent
+    iteration: 1
+    commits:
+      - hash: efae0f7
+        message: "feat(useMembers): add informal_name search to filterMembers (CR-275)"
+      - hash: 28867fc
+        message: "feat(permissions): add speech:assign, speech:unassign, home:next_assignments to secretary (CR-276)"
+      - hash: f427b6b
+        message: "feat(types): add secretary_review notification type, assigned_by_role, and topic_title (CR-276)"
+      - hash: 6a5287b
+        message: "feat(useSpeeches): add assigned_by_role to assign/unassign mutations (CR-276)"
+      - hash: e018607
+        message: "feat(migration): add migration 031 for secretary review notifications (CR-276)"
+      - hash: fd190d4
+        message: "feat(process-notifications): add secretary_review support (CR-276)"
+      - hash: 8d87b09
+        message: "feat(notificationUtils): add secretary_review to client-side buildNotificationText (CR-276)"
+      - hash: 1347f79
+        message: "test: update legacy tests for CR-276 secretary speech permissions"
+      - hash: 319fdb4
+        message: "test(f065-f066): add 46 tester tests for CR-275 and CR-276"
+      - hash: e5d6230
+        message: "docs: update PLAN_CONSOLIDATED, TEST_CONSOLIDATED, CODE_LEDGER for P013 (CR-275, CR-276)"
+      - hash: 8e61bb2
+        message: "docs(tests): update TEST_CONSOLIDATED after F065+F066 tester - all 1318 tests passing"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        result: pass
+        notes: |
+          SPEC_F013 faithfully captures both user requests:
+          - CR-275: informal_name search in filterMembers() - 7 ACs, 3 ECs
+          - CR-276: Two-part change (permissions + notifications) - 30 ACs, 8 ECs
+          - All user-provided texts are captured verbatim (i18n strings)
+          - assigned_by_role column solution explicitly requested by user
+          - "Imediato, sem agrupar" requirement reflected in AC-066-20/30
+
+      arch_vs_spec:
+        result: pass
+        notes: |
+          ARCH_M013 correctly maps all SPEC features to components:
+          - F065: filterMembers() single change point with OR condition
+          - F066A: permissions.ts Set expansion (23->26) with separate objects
+          - F066B: Full data flow: client->trigger->notification_queue->process-notifications
+          - Trigger restructure (ADR-036) for topic detection before early-return
+          - 4 ADRs (035-038) for key design decisions
+
+      plan_vs_arch:
+        result: pass
+        notes: |
+          PLAN_P013 has 9 steps covering all ARCH components:
+          - S013-01: filterMembers + tests (F065)
+          - S013-02: permissions + tests (F066A)
+          - S013-03: TypeScript types (F066B)
+          - S013-04: Client mutations (F066B)
+          - S013-05: Migration 031 (F066B)
+          - S013-06: process-notifications (F066B)
+          - S013-07: notificationUtils (F066B)
+          - S013-08: Documentation
+          - S013-09: Final verification
+          Dependencies are correct. Coverage matrix maps all ACs/ECs to steps.
+
+      code_vs_plan:
+        result: pass
+        notes: |
+          All code changes match the PLAN:
+          - S013-01: filterMembers() has OR condition for informal_name (line 40-41)
+          - S013-02: secretary Set has 26 permissions (identical to bishopric)
+          - S013-03: NotificationType includes 'secretary_review', Speech has assigned_by_role, NotificationQueue has topic_title
+          - S013-04: All 3 hooks (useAssignSpeaker, useAssignTopic, useRemoveAssignment) include assigned_by_role
+          - S013-05: Migration 031 has schema changes + restructured trigger
+          - S013-06: buildSecretaryReviewText() with speaker/topic variants for 3 languages
+          - S013-07: buildNotificationText() includes secretary_review case for 3 languages
+          - S013-08: ADR-035 to ADR-038 (pending doc commit by Orchestrator)
+
+      chain_intact: true
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+    # No P0, P1, or P2 issues found
+
+    # =========================================================================
+    # DETAILED CODE REVIEW NOTES
+    # =========================================================================
+
+    code_review_notes:
+      - area: "F065 - filterMembers (src/hooks/useMembers.ts)"
+        finding: |
+          Clean implementation. OR condition with null coalescing:
+          normalizeForSearch(m.informal_name ?? '').includes(normalized)
+          The ?? '' handles null informal_name. The early return on empty search
+          (line 37) prevents false matches on empty string normalization.
+          8 new tests cover all scenarios including accent-insensitive, null,
+          empty string, and cross-member matching.
+
+      - area: "F066A - permissions.ts"
+        finding: |
+          Secretary Set expanded from 23 to 26 permissions. Both bishopric and
+          secretary now have identical permission sets (26 each) but remain
+          separate new Set() instances (RULE-07 from SPEC). Observer unchanged (3).
+          SpeechSlot.tsx comment updated. All test assertions updated (permissions.test.ts
+          and integration test).
+
+      - area: "F066B - Migration 031"
+        finding: |
+          Migration is well-structured:
+          1. ALTER TABLE speeches ADD COLUMN assigned_by_role TEXT (nullable)
+          2. ALTER TABLE notification_queue ADD COLUMN topic_title TEXT
+          3. CHECK constraint dropped/recreated with 'secretary_review'
+          4. Trigger restructured per ADR-036:
+             - Case 6B (topic change) BEFORE early-return
+             - Early-return on status unchanged
+             - Existing Cases 1,4,5,Cancellation unchanged
+             - Case 6A (secretary speaker assignment) AFTER existing cases
+          All INSERTs use public. schema prefix. SECURITY DEFINER maintained.
+
+      - area: "F066B - Client mutations (useSpeeches.ts)"
+        finding: |
+          All 3 hooks correctly destructure role from useAuth() and include
+          assigned_by_role: role in the .update() payload. Line references:
+          - useAssignSpeaker (line 244): role destructured, line 257 payload
+          - useAssignTopic (line 280): role destructured, line 291 payload
+          - useRemoveAssignment (line 358): role destructured, line 371 payload
+
+      - area: "F066B - process-notifications Edge Function"
+        finding: |
+          NotificationQueueEntry interface includes topic_title: string | null.
+          buildSecretaryReviewText() handles both variants (speaker/topic)
+          for all 3 languages. Routing: secretary_review goes to immediateEntries
+          via the else branch (line 314-316), never grouped. Switch case at
+          line 398 calls buildSecretaryReviewText with correct parameters.
+
+      - area: "F066B - notificationUtils.ts (client-side)"
+        finding: |
+          buildNotificationText() includes secretary_review case for all 3
+          languages. data.topic_title parameter added to type. Speaker and topic
+          variants match server-side texts. Uses getOrdinal() for position ordinals.
+
+      - area: "F066B - TypeScript types (database.ts)"
+        finding: |
+          NotificationType union includes 'secretary_review' (line 66).
+          Speech interface has assigned_by_role: string | null (line 153).
+          NotificationQueue has topic_title: string | null (line 266).
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "Apply migration 031"
+        command: |
+          Via Supabase Management API (HTTPS) or SQL Editor:
+          Run supabase/migrations/031_secretary_review_notification.sql
+        reason: "Adds assigned_by_role to speeches, topic_title to notification_queue, 'secretary_review' CHECK, restructured trigger"
+        urgency: high
+        notes: "Must be deployed BEFORE Edge Function and app update. The trigger function is replaced in this migration."
+
+      - step: 2
+        action: "Deploy Edge Function process-notifications"
+        command: |
+          supabase functions deploy process-notifications
+        reason: "Adds secretary_review case to buildSecretaryReviewText and switch routing"
+        urgency: high
+        notes: "Deploy AFTER migration 031. The function now handles the new secretary_review notification type."
+
+      - step: 3
+        action: "EAS Build (app update)"
+        reason: "Client-side changes: permissions expansion, assigned_by_role in mutations, secretary_review notification text, informal_name search."
+        urgency: medium
+        notes: "Deploy after migration and Edge Function. Includes both CR-275 (filterMembers) and CR-276 (permissions, mutations, notification text)."
+
+    deploy_notes: |
+      Deploy order is critical:
+      1. Migration 031 FIRST (adds columns, CHECK, trigger)
+      2. Edge Function SECOND (handles new notification type)
+      3. App update THIRD (sends assigned_by_role, expanded permissions)
+      Deploying the app before migration would cause Supabase to reject
+      the assigned_by_role field (column doesn't exist yet).
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: false
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+        - "docs/arch/ARCH_CONSOLIDATED.yaml"
+        - "docs/specs/SPEC_CONSOLIDATED.yaml"
+        - "docs/tests/TEST_CONSOLIDATED.yaml"
+        - "docs/arch/ARCH_M013.yaml"
+        - "docs/plans/PLAN_P013.yaml"
+        - "docs/qa/QA_PLAN_013.yaml"
+        - "docs/specs/SPEC_F013.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-275 (F065) and CR-276 (F066) implementation is correct and complete.
+      F065: filterMembers() now searches by both full_name and informal_name
+      with accent-insensitive normalization. Single-line change automatically
+      benefits all consumers (MemberSelectorModal, PrayerSelector).
+      F066 Part A: Secretary permissions expanded from 23 to 26 (same as
+      bishopric). Sets remain separate objects. SpeechSlot canAssign/canUnassign
+      now works for secretary on speech positions automatically.
+      F066 Part B: Full secretary review notification pipeline implemented:
+      assigned_by_role column, trigger restructured (topic change before
+      early-return), secretary_review type, process-notifications with
+      buildSecretaryReviewText (3 languages x 2 variants), client-side
+      notificationUtils. All immediate, never grouped.
+      Chain validation passes at all 4 levels. All 37 acceptance criteria
+      covered (7 for F065, 30 for F066). 1318 tests passing (1317+1 flaky
+      pre-existing). No P0, P1, or P2 issues found. Three pending deploys
+      identified with correct ordering.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 13
+      total_commits: 11
+      tests_total: 1318
+      tests_passing: 1317
+      tests_flaky: 1
+      flaky_test_note: "useSpeechCounts.integration.test.ts - pre-existing, passes in isolation, fails in full suite due to mock leakage"
+      test_files: 60

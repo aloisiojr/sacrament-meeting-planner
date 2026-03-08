@@ -1,0 +1,685 @@
+# =============================================================================
+# PLAN_P013.yaml
+# Artifact ID: 013
+# Phase: 1 of 1
+# Features: F065 (CR-275) + F066 (CR-276)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "013"
+  phase: 1
+  total_phases: 1
+  feature_ids: [F065, F066]
+  crs: [275, 276]
+  status: pending
+  created: "2026-03-07"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    F065: Enable member search by informal_name (nickname) in filterMembers().
+    F066 Part A: Add speech:assign, speech:unassign, home:next_assignments to secretary permissions.
+    F066 Part B: Add assigned_by_role column to speeches, restructure trigger to detect
+    secretary assignments and topic changes, enqueue secretary_review notifications,
+    process them in process-notifications Edge Function, and add client-side i18n text.
+
+  principles:
+    - "Minimal change surface: filterMembers() is the single search function"
+    - "Permission-driven UI: no hardcoded role checks in SpeechSlot"
+    - "Trigger-based notifications: consistent with existing Cases 1/4/5"
+    - "Client-provided context: assigned_by_role column for trigger role detection"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: F065 - Nickname search in filterMembers() + tests
+  # ---------------------------------------------------------------------------
+  - id: S013-01
+    title: "Add informal_name search to filterMembers() and tests"
+    feature: F065
+    depends_on: []
+    files:
+      - path: src/hooks/useMembers.ts
+        action: edit
+        description: |
+          In filterMembers() (line 39), add OR condition:
+            normalizeForSearch(m.informal_name ?? '').includes(normalized)
+          The ?? '' handles null informal_name. normalizeForSearch('') returns ''
+          which only matches empty search (already guarded by line 37 early return).
+
+      - path: src/__tests__/useMembers-utils.test.ts
+        action: edit
+        description: |
+          1. Add informal_name to makeMember() factory (default: null).
+             Currently makeMember() is missing informal_name (line 15-25).
+             Add: informal_name: overrides.informal_name ?? null,
+
+          2. Add new test group 'filterMembers - informal_name search' with cases:
+             - Match by informal_name ('Joca' finds member with informal_name='Joca')
+             - Still match by full_name (no regression)
+             - Null informal_name does not crash
+             - Accent-insensitive search on informal_name
+             - Empty string informal_name treated same as null
+             - Both members returned when search matches informal_name of one and full_name of another
+             - Member with informal_name equal to full_name appears once
+
+    done_when: |
+      - filterMembers('Joca') returns member with informal_name='Joca'
+      - filterMembers('Silva') still returns member with full_name='Joao da Silva'
+      - filterMembers('xyz') on member with informal_name=null returns empty (no crash)
+      - All existing filterMembers tests still pass
+      - All new tests pass
+
+    acceptance_criteria:
+      - AC-065-01  # filterMembers matches by informal_name
+      - AC-065-02  # filterMembers still matches by full_name (no regression)
+      - AC-065-03  # filterMembers handles null informal_name
+      - AC-065-04  # Accent-insensitive search works for informal_name
+      - AC-065-05  # MemberSelectorModal inherits nickname search (automatic)
+      - AC-065-06  # PrayerSelector inherits nickname search (automatic)
+      - AC-065-07  # makeMember test factory includes informal_name
+
+    edge_cases:
+      - EC-065-01  # Empty string informal_name
+      - EC-065-02  # informal_name equals full_name (member appears once)
+      - EC-065-03  # Search matches informal_name of one member and full_name of another
+
+    tests:
+      - file: src/__tests__/useMembers-utils.test.ts
+        type: unit
+        cases:
+          - "filterMembers matches member by informal_name"
+          - "filterMembers still matches by full_name (no regression)"
+          - "filterMembers handles null informal_name without error"
+          - "filterMembers handles accent-insensitive informal_name"
+          - "filterMembers handles empty string informal_name"
+          - "filterMembers returns both when search matches informal_name and full_name of different members"
+          - "filterMembers returns member once when informal_name equals full_name"
+          - "makeMember defaults informal_name to null"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: F066 Part A - Secretary permissions + tests
+  # ---------------------------------------------------------------------------
+  - id: S013-02
+    title: "Add speech:assign, speech:unassign, home:next_assignments to secretary permissions"
+    feature: F066
+    depends_on: []
+    files:
+      - path: src/lib/permissions.ts
+        action: edit
+        description: |
+          Add 3 permissions to the secretary Set (lines 45-69):
+            'speech:assign',
+            'speech:unassign',
+            'home:next_assignments',
+          Secretary count goes from 23 to 26.
+          Sets remain SEPARATE objects (two distinct new Set() calls).
+
+      - path: src/components/SpeechSlot.tsx
+        action: edit
+        description: |
+          Update header comment (lines 7-9) from:
+            * - Secretary: change status only (cannot assign)
+          To:
+            * - Secretary: assign/unassign speaker, assign topic, change status
+            *              (generates review notification for bishopric on speeches)
+
+      - path: src/__tests__/permissions.test.ts
+        action: edit
+        description: |
+          1. EXPECTED_MATRIX (lines 15-16):
+             secretary speech:assign -> true, speech:unassign -> true
+          2. EXPECTED_MATRIX (line 32):
+             secretary home:next_assignments -> true
+          3. Specific secretary test (lines 97-103):
+             Change speech:assign -> true, speech:unassign -> true,
+             home:next_assignments -> true
+          4. Secretary count assertion (line 132): 23 -> 26
+
+      - path: src/__tests__/integration/permissions-roles.integration.test.ts
+        action: edit
+        description: |
+          1. Lines 125-134: Update test name/description, change assertions:
+             secretary speech:assign -> true
+             secretary speech:unassign -> true
+             secretary home:next_assignments -> true
+          2. Lines 229-231: auth context secretary:
+             speech:assign -> true
+
+    done_when: |
+      - hasPermission('secretary', 'speech:assign') returns true
+      - hasPermission('secretary', 'speech:unassign') returns true
+      - hasPermission('secretary', 'home:next_assignments') returns true
+      - getPermissions('secretary').length === 26
+      - getPermissions('bishopric').length === 26 (unchanged)
+      - getPermissions('observer').length === 3 (unchanged)
+      - All permissions tests pass
+      - SpeechSlot comment updated
+      - Integration tests pass
+
+    acceptance_criteria:
+      - AC-066-01  # Secretary has speech:assign
+      - AC-066-02  # Secretary has speech:unassign
+      - AC-066-03  # Secretary has home:next_assignments
+      - AC-066-04  # Secretary permission count is 26
+      - AC-066-05  # Bishopric permissions unchanged (26)
+      - AC-066-06  # Observer permissions unchanged (3)
+      - AC-066-07  # Permission Sets are separate objects
+      - AC-066-08  # SpeechSlot canAssign works for secretary (automatic)
+      - AC-066-09  # SpeechSlot canUnassign works for secretary (automatic)
+      - AC-066-10  # NextAssignmentsSection visible to secretary (automatic)
+
+    edge_cases:
+      - EC-066-06  # Observer never gets speech:assign
+
+    tests:
+      - file: src/__tests__/permissions.test.ts
+        type: unit
+        cases:
+          - "secretary HAS speech:assign (EXPECTED_MATRIX)"
+          - "secretary HAS speech:unassign (EXPECTED_MATRIX)"
+          - "secretary HAS home:next_assignments (EXPECTED_MATRIX)"
+          - "secretary permission count is 26"
+          - "bishopric permission count is 26 (unchanged)"
+          - "observer permission count is 3 (unchanged)"
+      - file: src/__tests__/integration/permissions-roles.integration.test.ts
+        type: integration
+        cases:
+          - "secretary has speech:assign and speech:unassign permissions"
+          - "secretary has home:next_assignments"
+          - "auth context secretary speech:assign returns true"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: F066 Part B - TypeScript types update
+  # ---------------------------------------------------------------------------
+  - id: S013-03
+    title: "Update TypeScript types for secretary_review notification and assigned_by_role"
+    feature: F066
+    depends_on: []
+    files:
+      - path: src/types/database.ts
+        action: edit
+        description: |
+          1. NotificationType union (line 60-65): Add '| secretary_review'
+             After 'speaker_withdrew' add '| secretary_review'
+
+          2. Speech interface (after line 152, after topic_collection):
+             Add: assigned_by_role: string | null;
+
+          3. NotificationQueue interface (after line 263, after send_after):
+             Add: topic_title: string | null;
+
+    done_when: |
+      - NotificationType includes 'secretary_review'
+      - Speech interface has assigned_by_role: string | null
+      - NotificationQueue interface has topic_title: string | null
+      - TypeScript compiles without errors
+
+    acceptance_criteria:
+      - AC-066-11  # speeches has assigned_by_role (type level)
+      - AC-066-12  # notification_queue has secretary_review type (type level)
+      - AC-066-13  # notification_queue has topic_title (type level)
+
+    edge_cases: []
+
+    tests: []
+    # Type correctness is verified by TypeScript compiler, not runtime tests
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: F066 Part B - Client-side mutations (assigned_by_role)
+  # ---------------------------------------------------------------------------
+  - id: S013-04
+    title: "Add assigned_by_role to useAssignSpeaker, useAssignTopic, useRemoveAssignment"
+    feature: F066
+    depends_on: [S013-03]
+    files:
+      - path: src/hooks/useSpeeches.ts
+        action: edit
+        description: |
+          1. useAssignSpeaker (line 244):
+             Change destructuring to: const { wardId, user, userName, role } = useAuth();
+             Add to .update() payload (after line 256): assigned_by_role: role,
+
+          2. useAssignTopic (line 279):
+             Change destructuring to: const { wardId, user, userName, role } = useAuth();
+             Add to .update() payload (after line 289): assigned_by_role: role,
+
+          3. useRemoveAssignment (line 356):
+             Change destructuring to: const { wardId, user, userName, role } = useAuth();
+             Add to .update() payload (after line 368): assigned_by_role: role,
+
+          4. Update comment on useAssignSpeaker (line 241):
+             "Bishopric-only operation." -> "Bishopric and Secretary operation."
+          5. Update comment on useRemoveAssignment (line 354):
+             "Bishopric-only operation." -> "Bishopric and Secretary operation."
+
+    done_when: |
+      - useAssignSpeaker mutation payload includes assigned_by_role
+      - useAssignTopic mutation payload includes assigned_by_role
+      - useRemoveAssignment mutation payload includes assigned_by_role
+      - TypeScript compiles without errors
+      - role is destructured from useAuth() in all 3 hooks
+
+    acceptance_criteria:
+      - AC-066-14  # useAssignSpeaker sends assigned_by_role
+      - AC-066-15  # useAssignTopic sends assigned_by_role
+      - AC-066-29  # useRemoveAssignment sends assigned_by_role
+
+    edge_cases:
+      - EC-066-04  # assigned_by_role NULL for legacy data (handled by trigger guard)
+
+    tests:
+      - file: src/__tests__/useSpeeches-mutations.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "useAssignSpeaker includes assigned_by_role in update payload"
+          - "useAssignTopic includes assigned_by_role in update payload"
+          - "useRemoveAssignment includes assigned_by_role in update payload"
+          - "assigned_by_role matches the role from useAuth"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: F066 Part B - Migration 031 (schema + trigger restructure)
+  # ---------------------------------------------------------------------------
+  - id: S013-05
+    title: "Create migration 031: assigned_by_role, topic_title, secretary_review type, trigger restructure"
+    feature: F066
+    depends_on: []
+    files:
+      - path: supabase/migrations/031_secretary_review_notification.sql
+        action: create
+        description: |
+          1. ALTER TABLE public.speeches ADD COLUMN assigned_by_role TEXT;
+             Nullable, no default.
+
+          2. ALTER TABLE public.notification_queue ADD COLUMN topic_title TEXT;
+
+          3. ALTER TABLE public.notification_queue DROP CONSTRAINT notification_queue_type_check;
+             ALTER TABLE public.notification_queue ADD CONSTRAINT notification_queue_type_check
+               CHECK (type IN ('designation', 'weekly_assignment', 'weekly_confirmation',
+                               'speaker_confirmed', 'speaker_withdrew', 'secretary_review'));
+
+          4. CREATE OR REPLACE FUNCTION enqueue_speech_notification()
+             Restructured trigger function:
+
+             a) Case 6B: Topic change (BEFORE early-return)
+                IF TG_OP = 'UPDATE'
+                  AND NEW.assigned_by_role = 'secretary'
+                  AND NEW.position IN (1,2,3)
+                  AND OLD.topic_title IS DISTINCT FROM NEW.topic_title
+                  AND NEW.topic_title IS NOT NULL
+                THEN INSERT secretary_review with topic_title, send_after=now()
+                END IF;
+
+             b) Early-return: IF TG_OP = 'UPDATE' AND OLD.status = NEW.status
+                THEN RETURN NEW;
+
+             c) Case 1: Assignment notification (unchanged from migration 030)
+             d) Case 4: Speaker confirmed (unchanged)
+             e) Case 5: Speaker gave up (unchanged)
+             f) Cancellation (unchanged)
+
+             g) Case 6A: Secretary speaker assignment (AFTER existing cases)
+                IF NEW.assigned_by_role = 'secretary'
+                  AND NEW.position IN (1,2,3)
+                  AND NEW.status = 'assigned_not_invited'
+                  AND (TG_OP = 'INSERT' OR OLD.status = 'not_assigned')
+                THEN INSERT secretary_review (no topic_title), send_after=now()
+                END IF;
+
+             All INSERTs use public. schema prefix.
+             SECURITY DEFINER + SET search_path = '' maintained.
+
+    done_when: |
+      - speeches table has assigned_by_role TEXT column
+      - notification_queue has topic_title TEXT column
+      - notification_queue CHECK allows 'secretary_review'
+      - Trigger function restructured with Case 6B before early-return
+      - Case 6A after existing cases
+      - All existing cases (1, 4, 5, cancellation) unchanged
+      - All references use public. schema prefix
+      - Migration file exists at supabase/migrations/031_secretary_review_notification.sql
+
+    acceptance_criteria:
+      - AC-066-11  # assigned_by_role column exists
+      - AC-066-12  # secretary_review is valid type
+      - AC-066-13  # topic_title column exists
+      - AC-066-16  # Secretary speaker assignment enqueues review
+      - AC-066-17  # Secretary topic assignment enqueues review
+      - AC-066-18  # Prayer positions do NOT generate review
+      - AC-066-19  # Bishopric assignments do NOT generate review
+      - AC-066-20  # Review notification is immediate (send_after=now())
+      - AC-066-25  # Existing notification cases still work
+      - AC-066-26  # Topic change NULL -> value detected
+      - AC-066-27  # Topic change value -> different value detected
+      - AC-066-28  # Topic clearing does NOT notify
+
+    edge_cases:
+      - EC-066-01  # Two separate notifications for speaker then topic
+      - EC-066-02  # Only topic change generates review when bishopric assigned speaker
+      - EC-066-04  # NULL assigned_by_role = no review notification
+      - EC-066-05  # Position 0 excluded from review
+      - EC-066-07  # Same topic value = no notification
+      - EC-066-08  # Rapid succession = two separate notifications
+
+    tests:
+      - file: src/__tests__/migration-031.test.ts
+        type: unit
+        new_file: true
+        cases:
+          - "migration file exists and is valid SQL"
+          - "Case 6B: secretary topic change (pos 1-3) enqueues secretary_review"
+          - "Case 6B: topic clearing (NULL) does NOT notify"
+          - "Case 6B: same topic value does NOT notify"
+          - "Case 6B: bishopric topic change does NOT enqueue review"
+          - "Case 6A: secretary speaker assignment (pos 1-3) enqueues review"
+          - "Case 6A: position 0 excluded from review"
+          - "Case 6A: position 4 excluded from review"
+          - "Case 6A: bishopric speaker assignment does NOT enqueue review"
+          - "Case 6A: NULL assigned_by_role does NOT enqueue review"
+          - "Early-return still blocks non-status-change cases (except Case 6B)"
+          - "Case 1: Assignment notification unchanged"
+          - "Case 4: Speaker confirmed unchanged"
+          - "Case 5: Speaker gave up unchanged"
+          - "Cancellation unchanged"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: F066 Part B - process-notifications Edge Function
+  # ---------------------------------------------------------------------------
+  - id: S013-06
+    title: "Add secretary_review support to process-notifications Edge Function"
+    feature: F066
+    depends_on: [S013-05]
+    files:
+      - path: supabase/functions/process-notifications/index.ts
+        action: edit
+        description: |
+          1. NotificationQueueEntry interface (line 12-22):
+             Add: topic_title: string | null;
+
+          2. New function buildSecretaryReviewText():
+             Parameters: language, speakerName, position, date, topicTitle?
+             Returns: { title, body }
+             Logic:
+               if (topicTitle): Topic review text
+               else: Speaker review text
+             Uses getOrdinal() for position ordinals.
+             i18n texts for all 3 languages (from SPEC).
+
+          3. Routing: In the for loop for immediateEntries (line 303-358),
+             add 'secretary_review' case to the switch statement:
+             case 'secretary_review': {
+               const text = buildSecretaryReviewText(
+                 language,
+                 entry.speaker_name ?? '',
+                 entry.speech_position ?? 1,
+                 entry.sunday_date,
+                 entry.topic_title ?? undefined
+               );
+               title = text.title;
+               body = text.body;
+               break;
+             }
+
+          Secretary review notifications are always immediate (never grouped).
+          They are already routed to immediateEntries by the else branch (line 267-269).
+
+    done_when: |
+      - NotificationQueueEntry has topic_title field
+      - buildSecretaryReviewText() exists with speaker and topic variants
+      - secretary_review case in switch routes to buildSecretaryReviewText
+      - Speaker review text correct for pt-BR, en-US, es-LA
+      - Topic review text correct for pt-BR, en-US, es-LA
+      - secretary_review is never grouped (always immediate)
+
+    acceptance_criteria:
+      - AC-066-21  # Review notification targets bishopric only (via target_role in trigger)
+      - AC-066-22  # Speaker review text correct (pt-BR)
+      - AC-066-23  # Topic review text correct (pt-BR)
+      - AC-066-24  # i18n texts for all 3 languages
+      - AC-066-30  # secretary_review never grouped
+
+    edge_cases:
+      - EC-066-03  # Client-side disabled, but trigger still fires correctly
+
+    tests:
+      - file: src/__tests__/process-notifications-secretary-review.test.ts
+        type: unit
+        new_file: true
+        cases:
+          - "buildSecretaryReviewText returns correct speaker review text (pt-BR)"
+          - "buildSecretaryReviewText returns correct speaker review text (en-US)"
+          - "buildSecretaryReviewText returns correct speaker review text (es-LA)"
+          - "buildSecretaryReviewText returns correct topic review text (pt-BR)"
+          - "buildSecretaryReviewText returns correct topic review text (en-US)"
+          - "buildSecretaryReviewText returns correct topic review text (es-LA)"
+          - "secretary_review entry routed to immediateEntries (never grouped)"
+          - "secretary_review with topic_title uses topic variant"
+          - "secretary_review without topic_title uses speaker variant"
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: F066 Part B - Client-side notification text utils
+  # ---------------------------------------------------------------------------
+  - id: S013-07
+    title: "Add secretary_review to client-side buildNotificationText"
+    feature: F066
+    depends_on: [S013-03]
+    files:
+      - path: src/lib/notificationUtils.ts
+        action: edit
+        description: |
+          1. Add topic_title to the data parameter type (line 58-63):
+             data: { names?: string[]; date?: string; position?: number;
+                     name?: string; topic_title?: string; }
+
+          2. Add 'secretary_review' case to each language in the texts record:
+             For each language (pt-BR, en-US, es-LA), add:
+             secretary_review: (d) => {
+               if (d.topic_title) {
+                 return { title: ..., body: ... (topic variant) };
+               }
+               return { title: ..., body: ... (speaker variant) };
+             },
+
+             Speaker review texts (from SPEC):
+               pt-BR: title "Revisao de Designacao"
+                      body "Atencao: o secretario designou [Nome] para o [Xo] discurso do dia [DD/MM]. Revise a designacao."
+               en-US: title "Assignment Review"
+                      body "Attention: the secretary assigned [Name] to the [Xth] speech on [DD/MM]. Review the assignment."
+               es-LA: title "Revision de Asignacion"
+                      body "Atencion: el secretario asigno a [Nombre] para el [Xo] discurso del [DD/MM]. Revise la asignacion."
+
+             Topic review texts (from SPEC):
+               pt-BR: body "Atencao: o secretario designou o tema [Tema] para [Nome] no dia [DD/MM]. Revise a designacao."
+               en-US: body "Attention: the secretary assigned the topic [Topic] to [Name] on [DD/MM]. Review the assignment."
+               es-LA: body "Atencion: el secretario asigno el tema [Tema] a [Nombre] el [DD/MM]. Revise la asignacion."
+
+    done_when: |
+      - buildNotificationText('secretary_review', 'pt-BR', {...}) returns correct text
+      - Speaker and topic variants work for all 3 languages
+      - data.topic_title distinguishes the two variants
+      - Existing notification types still work (no regression)
+
+    acceptance_criteria:
+      - AC-066-22  # Speaker review text correct (pt-BR) - client side
+      - AC-066-23  # Topic review text correct (pt-BR) - client side
+      - AC-066-24  # i18n texts for all 3 languages - client side
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/notificationUtils.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "secretary_review speaker variant pt-BR"
+          - "secretary_review speaker variant en-US"
+          - "secretary_review speaker variant es-LA"
+          - "secretary_review topic variant pt-BR"
+          - "secretary_review topic variant en-US"
+          - "secretary_review topic variant es-LA"
+          - "existing notification types still work (no regression)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: Documentation updates (ADRs)
+  # ---------------------------------------------------------------------------
+  - id: S013-08
+    title: "Add ADR-035 to ADR-038 documentation"
+    feature: F066
+    depends_on: [S013-05]
+    files:
+      - path: docs/arch/ARCH_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Add 4 new ADRs:
+          - ADR-035: assigned_by_role column for trigger role detection
+          - ADR-036: Topic check before status-change early-return
+          - ADR-037: Immediate, never-grouped secretary_review notifications
+          - ADR-038: Topic clearing does NOT notify
+
+      - path: docs/specs/SPEC_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Update F023 (Permissions): secretary has 26 permissions (was 23).
+          Add note: CR-276 added speech:assign, speech:unassign, home:next_assignments.
+
+    done_when: |
+      - ADR-035 to ADR-038 documented in ARCH_CONSOLIDATED
+      - SPEC_CONSOLIDATED F023 updated with secretary 26 permissions
+      - All design decisions from ARCH_M013 reflected in consolidated docs
+
+    acceptance_criteria: []
+    edge_cases: []
+    tests: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S013-09
+    title: "Final verification: run all tests and type check"
+    feature: "F065+F066"
+    depends_on: [S013-01, S013-02, S013-03, S013-04, S013-05, S013-06, S013-07, S013-08]
+    files: []
+    done_when: |
+      - npx tsc --noEmit passes with no errors
+      - npx vitest run passes (all tests green)
+      - Total test count increased by the new tests added
+      - No regressions in existing tests
+      - docs/plans/PLAN_CONSOLIDATED.yaml updated with P013 entry
+      - TEST_CONSOLIDATED.yaml updated with new test counts
+
+    acceptance_criteria:
+      - AC-065-01 through AC-065-07  # All F065 ACs verified by tests
+      - AC-066-01 through AC-066-30  # All F066 ACs verified by tests
+
+    edge_cases:
+      - EC-065-01 through EC-065-03  # All F065 ECs verified
+      - EC-066-01 through EC-066-08  # All F066 ECs verified
+
+    tests: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S013-01 (F065: filterMembers) ─────────────────────────────────────┐
+  S013-02 (F066A: permissions) ──────────────────────────────────────┤
+  S013-03 (F066B: types) ─────────┬──────────────────────────────────┤
+                                   │                                  │
+  S013-04 (F066B: mutations) ◄────┘                                  │
+  S013-05 (F066B: migration 031) ─┬──────────────────────────────────┤
+                                   │                                  │
+  S013-06 (F066B: process-notif) ◄┘                                  │
+  S013-07 (F066B: notifUtils) ◄──── S013-03                          │
+  S013-08 (docs/ADRs) ◄──────────── S013-05                          │
+                                                                      │
+  S013-09 (final verification) ◄──────────────────────────── ALL ─────┘
+
+  Parallelizable:
+    Group A (independent): S013-01, S013-02, S013-03, S013-05
+    Group B (after S013-03): S013-04, S013-07
+    Group C (after S013-05): S013-06, S013-08
+    Group D (after all): S013-09
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  F065:
+    acceptance_criteria:
+      AC-065-01: S013-01
+      AC-065-02: S013-01
+      AC-065-03: S013-01
+      AC-065-04: S013-01
+      AC-065-05: S013-01  # Automatic via filterMembers
+      AC-065-06: S013-01  # Automatic via filterMembers
+      AC-065-07: S013-01
+    edge_cases:
+      EC-065-01: S013-01
+      EC-065-02: S013-01
+      EC-065-03: S013-01
+
+  F066:
+    acceptance_criteria:
+      AC-066-01: S013-02
+      AC-066-02: S013-02
+      AC-066-03: S013-02
+      AC-066-04: S013-02
+      AC-066-05: S013-02
+      AC-066-06: S013-02
+      AC-066-07: S013-02
+      AC-066-08: S013-02
+      AC-066-09: S013-02
+      AC-066-10: S013-02
+      AC-066-11: [S013-03, S013-05]
+      AC-066-12: [S013-03, S013-05]
+      AC-066-13: [S013-03, S013-05]
+      AC-066-14: S013-04
+      AC-066-15: S013-04
+      AC-066-16: S013-05
+      AC-066-17: S013-05
+      AC-066-18: S013-05
+      AC-066-19: S013-05
+      AC-066-20: S013-05
+      AC-066-21: S013-06
+      AC-066-22: [S013-06, S013-07]
+      AC-066-23: [S013-06, S013-07]
+      AC-066-24: [S013-06, S013-07]
+      AC-066-25: S013-05
+      AC-066-26: S013-05
+      AC-066-27: S013-05
+      AC-066-28: S013-05
+      AC-066-29: S013-04
+      AC-066-30: S013-06
+    edge_cases:
+      EC-066-01: S013-05
+      EC-066-02: S013-05
+      EC-066-03: S013-06
+      EC-066-04: [S013-04, S013-05]
+      EC-066-05: S013-05
+      EC-066-06: S013-02
+      EC-066-07: S013-05
+      EC-066-08: S013-05
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All edge cases covered
+  GATE-PLAN-06: true  # File paths match ARCH_M013 components

@@ -7,10 +7,10 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-05"
-  total_features: 57
+  last_updated: "2026-03-07"
+  total_features: 59
   total_business_rules: 44
-  total_design_decisions: 39
+  total_design_decisions: 43
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -1281,6 +1281,63 @@ features:
         when: "Mutation executes"
         then: "Single upsert with onConflict replaces select+update/insert"
 
+  - id: F065
+    name: Nickname Search in Speaker Selector
+    area: members
+    description: |
+      The filterMembers() function searches by both full_name and informal_name
+      (nickname), using the same accent-insensitive normalization. This enables
+      finding members by their nickname in all search fields (MemberSelectorModal
+      for speeches, PrayerSelector for prayers). Single change in filterMembers()
+      propagates to all consumers via useMembers(search) hook. [CR-275]
+    acceptance_criteria:
+      - given: "A member has full_name='Joao da Silva' and informal_name='Joca'"
+        when: "User searches for 'Joca' in speaker selector"
+        then: "The member appears in search results"
+      - given: "A member has informal_name=null"
+        when: "User searches for any term"
+        then: "No error occurs; member is only matched by full_name"
+      - given: "A member has informal_name with accented characters"
+        when: "User searches without accents"
+        then: "Accent-insensitive matching finds the member"
+
+  - id: F066
+    name: Secretary Speech Permissions with Review Notification
+    area: permissions_notifications
+    description: |
+      Part A: Secretary gains speech:assign, speech:unassign, home:next_assignments
+      permissions (23 -> 26, same count as bishopric). Permission Sets remain
+      separate objects. SpeechSlot canAssign automatically enables for secretary
+      on speech positions (1-3). NextAssignmentsSection becomes visible.
+
+      Part B: When secretary assigns a speaker or topic to speech positions 1-3,
+      an IMMEDIATE push notification is sent to bishopric for review. Uses SQL
+      trigger pattern (new type 'secretary_review' in notification_queue).
+      assigned_by_role column added to speeches table for trigger role detection.
+      Topic changes detected via IS DISTINCT FROM in trigger. Prayers (pos 0,4)
+      and bishopric assignments do NOT generate review notifications.
+
+      i18n texts for speaker and topic review in pt-BR, en-US, es-LA. [CR-276]
+    acceptance_criteria:
+      - given: "Role is 'secretary'"
+        when: "hasPermission is checked for speech:assign, speech:unassign, home:next_assignments"
+        then: "All three return true"
+      - given: "Secretary assigns speaker to position 1-3"
+        when: "Trigger fires on speeches UPDATE with assigned_by_role='secretary'"
+        then: "secretary_review notification is enqueued with target_role='bishopric', send_after=now()"
+      - given: "Secretary assigns topic to position 1-3"
+        when: "Trigger fires detecting topic_title change with assigned_by_role='secretary'"
+        then: "secretary_review notification with topic_title is enqueued immediately"
+      - given: "Secretary assigns speaker/topic to position 0 or 4 (prayer)"
+        when: "Trigger fires"
+        then: "No secretary_review notification is generated"
+      - given: "Bishopric assigns speaker to position 1-3"
+        when: "Trigger fires with assigned_by_role='bishopric'"
+        then: "No secretary_review notification is generated"
+      - given: "process-notifications processes secretary_review entries"
+        when: "Push notification is built"
+        then: "Correct i18n text is used for the ward's language"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1322,12 +1379,13 @@ business_rules:
   - id: BR009
     rule: "Permission matrix"
     description: |
-      Bishopric: 25 permissions (all permissions including prayer:assign, prayer:unassign).
-      Secretary: 22 permissions (all except home:next_assignments, speech:assign, speech:unassign;
-        has prayer:assign and prayer:unassign for prayer positions 0/4; has speech:change_status
-        for all positions).
+      Bishopric: 26 permissions (all permissions including prayer:assign, prayer:unassign).
+      Secretary: 26 permissions (same as bishopric; includes speech:assign, speech:unassign,
+        home:next_assignments since CR-276; has prayer:assign and prayer:unassign for prayer
+        positions 0/4; has speech:change_status for all positions). Permission Sets are
+        separate objects (not shared).
       Observer: member:read, agenda:read, presentation:start (3 permissions).
-      [Modified by CR-253]
+      [Modified by CR-253, CR-276]
 
   - id: BR010
     rule: "Observer limited settings"
@@ -1562,6 +1620,22 @@ design_decisions:
   - id: DD029
     decision: "refreshSession() over getSession() for edge function guard"
     rationale: "getSession() returns cached token which may be expired. refreshSession() ensures the token is valid, preventing 401 errors. The Supabase SDK internally handles the case where the token is still fresh (no unnecessary network call)."
+
+  - id: DD030
+    decision: "assigned_by_role column for trigger role detection"
+    rationale: "SQL trigger cannot access authenticated user's role. Column in speeches table set by client on assign mutations allows trigger to check NEW.assigned_by_role = 'secretary' for review notifications. [CR-276, ADR-035]"
+
+  - id: DD031
+    decision: "Topic change detection before status-change early-return in trigger"
+    rationale: "useAssignTopic does not change status, so the existing early-return (IF OLD.status = NEW.status THEN RETURN) would block topic change detection. Topic check runs before the early-return. [CR-276, ADR-036]"
+
+  - id: DD032
+    decision: "secretary_review notifications are immediate and never grouped"
+    rationale: "Review notifications require timely bishopric attention, unlike designation notifications which can be batched with 5-minute delay. send_after = now(). [CR-276, ADR-037]"
+
+  - id: DD033
+    decision: "Topic clearing does not generate review notification"
+    rationale: "Only setting a topic (NULL -> value or value -> different value) is a new assignment worth reviewing. Clearing is not. Guard: NEW.topic_title IS NOT NULL. [CR-276, ADR-038]"
 
 # =============================================================================
 # EDGE CASES

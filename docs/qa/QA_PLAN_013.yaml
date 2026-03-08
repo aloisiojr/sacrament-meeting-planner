@@ -1,0 +1,380 @@
+# =============================================================================
+# QA_PLAN_013.yaml
+# PRE validation for CR-275 and CR-276
+# =============================================================================
+
+metadata:
+  artifact_id: "013"
+  date: "2026-03-07"
+  mode: PRE
+  type: feature_request
+  scope: "CR-275 (nickname search) + CR-276 (secretary permissions + review notification)"
+
+pre_validation:
+  validated: true
+  reason: "Both CRs are feasible with clear implementation paths. All touch-points identified."
+
+# =============================================================================
+# CR-275: Nickname search in speaker selector fields
+# =============================================================================
+
+cr_275:
+  summary: "Search by informal_name (nickname) in member search fields"
+
+  current_state:
+    filterMembers:
+      path: "src/hooks/useMembers.ts:36-39"
+      behavior: "Only searches m.full_name, ignores m.informal_name"
+      code: "return members.filter((m) => normalizeForSearch(m.full_name).includes(normalized))"
+
+    consumers:
+      - path: "src/hooks/useMembers.ts:75"
+        component: "useMembers hook (select callback)"
+        note: "Passes search to filterMembers"
+      - path: "src/components/MemberSelectorModal.tsx:40"
+        component: "MemberSelectorModal"
+        note: "Uses useMembers(search) for speech speaker selection"
+      - path: "src/components/PrayerSelector.tsx:75"
+        component: "PrayerSelector"
+        note: "Uses useMembers(search) for prayer person selection"
+
+    member_type:
+      path: "src/types/database.ts:96"
+      has_informal_name: true
+      type: "informal_name: string | null"
+
+    test_factory:
+      path: "src/__tests__/useMembers-utils.test.ts:15-25"
+      missing_informal_name: true
+      note: "makeMember() does not include informal_name field"
+
+  required_changes:
+    - file: "src/hooks/useMembers.ts"
+      function: "filterMembers"
+      change: "Add OR check for normalizeForSearch(m.informal_name ?? '').includes(normalized)"
+      impact: "Low - single line change, all consumers automatically benefit"
+
+    - file: "src/__tests__/useMembers-utils.test.ts"
+      change: "Add informal_name to makeMember factory; add tests for nickname search"
+      impact: "Test-only"
+
+  validation_checks:
+    must_pass:
+      - id: CR275_MP1
+        description: "filterMembers() matches by informal_name when full_name does not match"
+        verify: "filterMembers([{full_name: 'Joao da Silva', informal_name: 'Joca'}], 'Joca') returns 1 result"
+
+      - id: CR275_MP2
+        description: "filterMembers() still matches by full_name (no regression)"
+        verify: "filterMembers([{full_name: 'Joao da Silva', informal_name: 'Joca'}], 'Silva') returns 1 result"
+
+      - id: CR275_MP3
+        description: "filterMembers() handles null informal_name without error"
+        verify: "filterMembers([{full_name: 'Joao da Silva', informal_name: null}], 'xyz') returns 0 results, no exception"
+
+      - id: CR275_MP4
+        description: "MemberSelectorModal uses useMembers which calls filterMembers (automatic)"
+        verify: "No changes needed in MemberSelectorModal.tsx - inherits from hook"
+
+      - id: CR275_MP5
+        description: "PrayerSelector uses useMembers which calls filterMembers (automatic)"
+        verify: "No changes needed in PrayerSelector.tsx - inherits from hook"
+
+    should_pass:
+      - id: CR275_SP1
+        description: "Accent-insensitive search works for informal_name"
+        verify: "filterMembers with informal_name containing accented chars matches normalized search"
+
+      - id: CR275_SP2
+        description: "makeMember test factory includes informal_name field"
+        verify: "Test factory updated with informal_name: null default"
+
+# =============================================================================
+# CR-276: Secretary permissions + review notification
+# =============================================================================
+
+cr_276:
+  summary: "Secretary gets speech:assign, speech:unassign, home:next_assignments + bishopric review notification"
+
+  current_state:
+    permissions:
+      path: "src/lib/permissions.ts:45-69"
+      secretary_has:
+        speech_assign: false
+        speech_unassign: false
+        home_next_assignments: false
+      secretary_count: 23
+      bishopric_count: 26
+
+    speechSlot_canAssign:
+      path: "src/components/SpeechSlot.tsx:99"
+      code: "const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign') && !disabled"
+      note: "Position-aware: pos 0,4 check prayer:assign (secretary already has), pos 1-3 check speech:assign (secretary lacks)"
+
+    trigger:
+      path: "supabase/migrations/030_fix_enqueue_notification_search_path.sql"
+      behavior: "Only fires on status changes. Early return when OLD.status = NEW.status"
+      topic_detection: "None - trigger ignores topic_title changes entirely"
+      note: "useAssignTopic updates topic_title/topic_link/topic_collection but NOT status, so trigger skips"
+
+    notification_queue_schema:
+      path: "supabase/migrations/001_initial_schema.sql:264-293"
+      columns: "id, ward_id, type, sunday_date, speech_position, speaker_name, target_role, status, send_after, created_at"
+      has_topic_title: false
+      notification_types: "designation, weekly_assignment, weekly_confirmation, speaker_confirmed, speaker_withdrew"
+      target_roles: "secretary, bishopric, secretary_and_bishopric"
+
+    process_notifications:
+      path: "supabase/functions/process-notifications/index.ts"
+      text_builders: "buildDesignationText, buildWeeklyText, buildConfirmedText, buildWithdrewText"
+      no_review_type: true
+
+    notificationUtils:
+      path: "src/lib/notificationUtils.ts"
+      text_builders: "buildNotificationText with types: designation, weekly, confirmed, withdrew"
+      no_review_type: true
+
+    database_types:
+      path: "src/types/database.ts:60-65"
+      notification_type: "designation | weekly_assignment | weekly_confirmation | speaker_confirmed | speaker_withdrew"
+      target_role: "secretary | bishopric | secretary_and_bishopric"
+
+    tests:
+      permissions_test:
+        path: "src/__tests__/permissions.test.ts"
+        secretary_speech_assign: "expect false (line 98)"
+        secretary_speech_unassign: "expect false (line 99)"
+        secretary_next_assignments: "expect false (line 103)"
+        secretary_count: "expect 23 (line 132)"
+
+      integration_test:
+        path: "src/__tests__/integration/permissions-roles.integration.test.ts"
+        secretary_next_assignments: "expect false (line 134)"
+
+  required_changes:
+    # Part A: Permissions
+    - file: "src/lib/permissions.ts"
+      change: "Add speech:assign, speech:unassign, home:next_assignments to secretary Set"
+      note: "Secretary count goes from 23 to 26 (same as bishopric). Sets remain separate (not shared object)"
+
+    - file: "src/__tests__/permissions.test.ts"
+      change: "Update EXPECTED_MATRIX for secretary speech:assign/unassign/home:next_assignments to true. Update count from 23 to 26"
+
+    - file: "src/__tests__/integration/permissions-roles.integration.test.ts"
+      change: "Update assertions for secretary permissions"
+
+    - file: "src/components/SpeechSlot.tsx"
+      change: "No code change needed - canAssign already uses hasPermission('speech:assign') which will now return true for secretary"
+      note: "IMPORTANT: Verify SpeechSlot comment at top (lines 8-9) still accurate after change"
+
+    # Part B: Review notification trigger
+    - file: "supabase/migrations/031_secretary_review_notification.sql (NEW)"
+      changes:
+        - "Add topic_title column to notification_queue (for topic change notifications)"
+        - "Add 'secretary_review' to notification_queue type CHECK constraint"
+        - "Expand enqueue_speech_notification() to detect:"
+        - "  B1: Secretary assigns speaker (pos 1-3): status changed to assigned_not_invited, need to know WHO changed it"
+        - "  B2: Secretary assigns topic (pos 1-3): topic_title changed from NULL or different value"
+        - "CRITICAL: The trigger cannot determine WHO made the change (no session context in SQL triggers)"
+        - "  SOLUTION: The trigger must use a different detection mechanism"
+
+      design_decision: |
+        CRITICAL DESIGN CHALLENGE: The SQL trigger fires on the speeches table but has no way
+        to know which user's role (bishopric vs secretary) triggered the change. The trigger
+        receives OLD and NEW row values but NOT the authenticated user's role.
+
+        OPTION A (Recommended): Add a column to speeches like `last_modified_by_role TEXT`
+        that the client sets on update. Trigger checks this column.
+
+        OPTION B: Move notification logic to client-side (after successful mutation in
+        useAssignSpeaker/useAssignTopic hooks, call an edge function to enqueue if role=secretary).
+
+        OPTION C: Use a Supabase RPC or edge function instead of trigger. Secretary calls
+        a specific RPC to assign, which handles both the update and the notification in one
+        transaction.
+
+        The user specified "Novo tipo de notificacao via trigger SQL (padrao do app - Opcao C)"
+        which means using the trigger pattern. However, the trigger still needs to know the
+        actor's role. Possible approaches within trigger pattern:
+
+        1. Add `assigned_by_role TEXT` column to speeches table - set by client on assign.
+           Trigger checks: IF NEW.assigned_by_role = 'secretary' AND NEW.position IN (1,2,3) THEN...
+
+        2. Use Supabase auth.uid() in trigger + lookup ward_users to find role.
+           Trigger checks: SELECT role FROM auth.users ... (complex, couples trigger to auth).
+
+        3. Use `current_setting('request.jwt.claims', true)` to extract role from JWT in trigger.
+           More Supabase-idiomatic but requires RLS context.
+
+    - file: "src/types/database.ts"
+      change: "Add 'secretary_review' to NotificationType union"
+
+    - file: "supabase/functions/process-notifications/index.ts"
+      change: "Add buildSecretaryReviewText function for speaker and topic assignment texts"
+
+    - file: "src/lib/notificationUtils.ts"
+      change: "Add secretary_review text builder for client-side (if needed)"
+
+    # Part C: Topic change detection in trigger
+    - note: |
+        Current trigger early-returns when OLD.status = NEW.status.
+        Topic assignment (useAssignTopic) does NOT change status, so trigger exits early.
+        To detect topic changes, the trigger must ALSO check:
+          IF OLD.topic_title IS DISTINCT FROM NEW.topic_title AND NEW.position IN (1,2,3)
+        This runs AFTER the status-change early return, so it needs a separate IF block.
+
+        Additionally: The user wants IMMEDIATE notification (send_after = now(), not 5 min delay)
+        for secretary review notifications.
+
+    # Part D: i18n texts (process-notifications server-side)
+    - texts:
+        speaker_review:
+          pt-BR: "Atenção: o secretário designou [Nome] para o [Xo] discurso do dia [DD/MM]. Revise a designação."
+          en-US: "Attention: the secretary assigned [Name] to the [Xth] speech on [DD/MM]. Review the assignment."
+          es-LA: "Atención: el secretario asignó a [Nombre] para el [Xo] discurso del [DD/MM]. Revise la asignación."
+        topic_review:
+          pt-BR: "Atenção: o secretário designou o tema [Tema] para [Nome] no dia [DD/MM]. Revise a designação."
+          en-US: "Attention: the secretary assigned the topic [Topic] to [Name] on [DD/MM]. Review the assignment."
+          es-LA: "Atención: el secretario asignó el tema [Tema] a [Nombre] el [DD/MM]. Revise la asignación."
+
+  validation_checks:
+    must_pass:
+      # Part A: Permissions
+      - id: CR276_MP1
+        description: "Secretary has speech:assign permission"
+        verify: "hasPermission('secretary', 'speech:assign') === true"
+
+      - id: CR276_MP2
+        description: "Secretary has speech:unassign permission"
+        verify: "hasPermission('secretary', 'speech:unassign') === true"
+
+      - id: CR276_MP3
+        description: "Secretary has home:next_assignments permission"
+        verify: "hasPermission('secretary', 'home:next_assignments') === true"
+
+      - id: CR276_MP4
+        description: "Secretary permission count is 26 (same as bishopric)"
+        verify: "getPermissions('secretary').length === 26"
+
+      - id: CR276_MP5
+        description: "Bishopric permissions unchanged (still 26)"
+        verify: "getPermissions('bishopric').length === 26"
+
+      - id: CR276_MP6
+        description: "Observer permissions unchanged (still 3)"
+        verify: "getPermissions('observer').length === 3"
+
+      - id: CR276_MP7
+        description: "SpeechSlot canAssign returns true for secretary on speech positions (1-3)"
+        verify: "With role=secretary, hasPermission('speech:assign') returns true, enabling speech field interaction"
+
+      - id: CR276_MP8
+        description: "SpeechSlot canAssign returns true for secretary on prayer positions (0,4) - already works"
+        verify: "With role=secretary, hasPermission('prayer:assign') already returns true"
+
+      - id: CR276_MP9
+        description: "Prayer positions (0,4) do NOT generate bishopric review notification"
+        verify: "Trigger guard: NEW.position IN (1,2,3) excludes positions 0 and 4"
+
+      - id: CR276_MP10
+        description: "Bishopric does NOT generate review notification when assigning"
+        verify: "Trigger or hook checks actor role != 'bishopric' before enqueueing review"
+
+      - id: CR276_MP11
+        description: "notification_queue has 'secretary_review' type in CHECK constraint"
+        verify: "Migration adds 'secretary_review' to type CHECK"
+
+      - id: CR276_MP12
+        description: "Review notification targets bishopric only (target_role = 'bishopric')"
+        verify: "INSERT into notification_queue with target_role = 'bishopric'"
+
+      - id: CR276_MP13
+        description: "Review notification is IMMEDIATE (send_after = now())"
+        verify: "INSERT uses send_after = now(), not now() + INTERVAL"
+
+      - id: CR276_MP14
+        description: "Speaker assignment review notification includes speaker name and position"
+        verify: "Text contains [Name], [Xo] ordinal, and [DD/MM] date"
+
+      - id: CR276_MP15
+        description: "Topic assignment review notification includes topic title, speaker name, and date"
+        verify: "Text contains [Topic], [Name], and [DD/MM] date"
+
+      - id: CR276_MP16
+        description: "i18n texts present for all 3 languages (pt-BR, en-US, es-LA)"
+        verify: "buildSecretaryReviewText has entries for all 3 languages"
+
+      - id: CR276_MP17
+        description: "Permission Sets remain separate (not shared between bishopric and secretary)"
+        verify: "permissions.ts has two distinct new Set() calls, not a shared reference"
+
+    should_pass:
+      - id: CR276_SP1
+        description: "NextAssignmentsSection visible to secretary"
+        verify: "hasPermission('home:next_assignments') returns true for secretary, section renders"
+
+      - id: CR276_SP2
+        description: "SpeechSlot comment header updated to reflect secretary can now assign"
+        verify: "Comment at top of SpeechSlot.tsx updated"
+
+      - id: CR276_SP3
+        description: "Topic change detection works when topic_title changes from NULL to a value"
+        verify: "OLD.topic_title IS DISTINCT FROM NEW.topic_title catches NULL->value transition"
+
+      - id: CR276_SP4
+        description: "Topic change detection works when topic_title changes from one value to another"
+        verify: "IS DISTINCT FROM catches value->different_value transition"
+
+      - id: CR276_SP5
+        description: "process-notifications handles secretary_review type correctly"
+        verify: "Switch case for 'secretary_review' in immediate entries processing"
+
+      - id: CR276_SP6
+        description: "notification_queue schema includes topic_title column for topic review texts"
+        verify: "Migration adds topic_title TEXT column to notification_queue"
+
+# =============================================================================
+# Design decisions requiring implementor attention
+# =============================================================================
+
+design_notes:
+  - id: DN1
+    topic: "How to detect secretary role in SQL trigger"
+    detail: |
+      The SQL trigger on the speeches table cannot natively determine which user's role
+      triggered the UPDATE. The implementor must choose an approach:
+
+      RECOMMENDED (for trigger pattern): Add `assigned_by_role TEXT` column to speeches table.
+      Client sets this field during speaker/topic assignment. Trigger checks:
+        IF NEW.assigned_by_role = 'secretary' AND NEW.position IN (1,2,3) THEN ...
+
+      Alternatively: Use current_setting('request.jwt.claims', true)::json->>'user_metadata'
+      to extract role from the Supabase JWT within the trigger. This is more implicit but
+      avoids schema changes to the speeches table.
+
+      The user said "trigger SQL (padrao do app - Opcao C)" which means they want the
+      trigger-based approach consistent with existing notification patterns.
+
+  - id: DN2
+    topic: "notification_queue needs topic_title column"
+    detail: |
+      Current schema has speaker_name but no topic_title. For topic review notifications,
+      the queue entry needs to store the topic text to include in the push notification body.
+      Migration must ADD COLUMN topic_title TEXT to notification_queue.
+
+  - id: DN3
+    topic: "useAssignTopic does not change status"
+    detail: |
+      The current trigger early-returns when OLD.status = NEW.status. Topic assignment
+      (via useAssignTopic) only updates topic_title, topic_link, topic_collection - NOT status.
+      The trigger MUST be expanded to NOT early-return when topic changes are detected,
+      or add a separate trigger for topic changes.
+
+  - id: DN4
+    topic: "Existing tests will break"
+    detail: |
+      Tests that assert secretary has 23 permissions, lacks speech:assign/unassign/home:next_assignments
+      will fail and must be updated:
+      - src/__tests__/permissions.test.ts (lines 15-16, 32, 98-99, 103, 132)
+      - src/__tests__/integration/permissions-roles.integration.test.ts (lines 125-134)
+      - src/__tests__/database-types.test.ts (line 73 context)

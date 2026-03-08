@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-05 (CR-273: Supabase resource optimization)
+# Last updated: 2026-03-07 (CR-275 + CR-276: Nickname search + Secretary permissions)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-05"
+  last_updated: "2026-03-07"
   total_modules: 13
-  total_adrs: 34
+  total_adrs: 38
 
 # =============================================================================
 # TECH STACK
@@ -1108,3 +1108,53 @@ adrs:
       only activates when WebSocket is disconnected. For a meeting planning
       app where data changes infrequently, 10s staleness during degraded
       connectivity is acceptable.
+
+  - id: ADR-035
+    title: "assigned_by_role column for trigger role detection"
+    decision: |
+      Add assigned_by_role TEXT column to speeches table. Client sets this
+      field in every assign/unassign mutation. The trigger checks
+      NEW.assigned_by_role = 'secretary' to decide whether to enqueue
+      a secretary_review notification.
+    rationale: |
+      SQL triggers cannot access the authenticated user's role natively.
+      Three options evaluated: (1) assigned_by_role column (chosen) - explicit,
+      testable, follows existing data-driven trigger pattern; (2)
+      current_setting('request.jwt.claims') - implicit, couples trigger to auth;
+      (3) client-side notification via edge function - breaks trigger pattern.
+      NULL (legacy data) safely treated as non-secretary (no notification).
+
+  - id: ADR-036
+    title: "Topic check before status-change early-return in trigger"
+    decision: |
+      Place Case 6B (secretary topic change detection) BEFORE the
+      status-change early-return (IF OLD.status = NEW.status THEN RETURN NEW).
+      All existing cases (1, 4, 5, cancellation) remain after the early-return.
+    rationale: |
+      useAssignTopic updates topic fields without changing status. The
+      early-return would block topic-change detection. Moving Case 6B
+      before the early-return allows it to execute regardless of status
+      changes. Existing cases are all status-dependent and correctly
+      remain after the early-return. ADR-025 guard for Case 1 preserved.
+
+  - id: ADR-037
+    title: "Immediate, never-grouped secretary_review notifications"
+    decision: |
+      secretary_review notifications are always routed to immediateEntries
+      in process-notifications, never to designationGroups. send_after = now()
+      in the trigger. Each is processed individually.
+    rationale: |
+      User specified "Imediato (send_after = now()), sem agrupar". These are
+      review notifications requiring timely bishopric attention, unlike
+      designation notifications which can be batched with 5-minute delay.
+
+  - id: ADR-038
+    title: "Topic clearing does NOT generate review notification"
+    decision: |
+      The trigger guard includes AND NEW.topic_title IS NOT NULL. Only
+      setting a topic (NULL -> value or value -> different value) triggers
+      a review notification. Clearing a topic does not notify.
+    rationale: |
+      Clearing a topic is not a new assignment that requires bishopric
+      review. Only meaningful changes (new topic set) generate notifications.
+      Prevents spam from topic clear/re-add cycles.

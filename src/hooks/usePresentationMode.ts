@@ -24,7 +24,7 @@ export interface PresentationCard {
 export interface PresentationField {
   label: string;
   value: string;
-  type: 'text' | 'hymn' | 'multiline';
+  type: 'text' | 'hymn' | 'multiline' | 'bullet_list';
 }
 
 export interface PresentationData {
@@ -95,7 +95,7 @@ export function buildPresentationCards(
     welcomeFields.push({
       label: t('agenda.announcements'),
       value: agenda.announcements,
-      type: 'multiline',
+      type: 'bullet_list',
     });
   }
   welcomeFields.push(

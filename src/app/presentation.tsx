@@ -152,6 +152,41 @@ function PresentationFieldRow({
   colors: ThemeColors;
   fontSizes?: { label: number; value: number };
 }) {
+  if (field.type === 'bullet_list') {
+    const bulletItems = (field.value || '')
+      .split('\n')
+      .filter((s: string) => s.trim() !== '');
+
+    if (bulletItems.length === 0) {
+      return (
+        <View style={styles.fieldRow}>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+            {field.label}
+          </Text>
+          <Text style={[styles.fieldValue, { color: colors.textTertiary, fontSize: fontSizes?.value ?? 16 }]}>
+            ---
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.fieldRow}>
+        <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+          {field.label}
+        </Text>
+        {bulletItems.map((item: string, idx: number) => (
+          <Text
+            key={idx}
+            style={[styles.fieldValue, { color: colors.text, fontSize: fontSizes?.value ?? 16 }]}
+          >
+            {'\u2022 '}{item}
+          </Text>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.fieldRow}>
       <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>

@@ -365,6 +365,19 @@ export const MoreVerticalIcon = ({ size = 24, color = 'currentColor' }: IconProp
 
 // --- Fill-based brand icon ---
 
+/** Lucide: grip-horizontal (https://lucide.dev/icons/grip-horizontal)
+ *  6 filled circles in 3x2 grid for drag handle. */
+export const GripIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={9} r={1} fill={color} />
+    <Circle cx={19} cy={9} r={1} fill={color} />
+    <Circle cx={5} cy={9} r={1} fill={color} />
+    <Circle cx={12} cy={15} r={1} fill={color} />
+    <Circle cx={19} cy={15} r={1} fill={color} />
+    <Circle cx={5} cy={15} r={1} fill={color} />
+  </Svg>
+);
+
 /** WhatsApp brand icon (fill-based). Default color: WhatsApp green #25D366. */
 export const WhatsAppIcon = ({ size = 24, color = '#25D366' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

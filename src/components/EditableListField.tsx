@@ -1,6 +1,6 @@
 /**
  * EditableListField: Reusable structured list UI for editable \n-joined text fields.
- * Supports add, delete, inline-edit, and reorder (up/down arrows).
+ * Supports add, delete, inline-edit, and drag-to-reorder (via react-native-draggable-flatlist).
  * Storage format: \n-joined TEXT string (no migration needed).
  * Disabled state: read-only plain text, no controls.
  */
@@ -13,8 +13,9 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useTheme } from '../contexts/ThemeContext';
-import { XIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import { XIcon, GripIcon } from './icons';
 
 // --- Helpers (exported for testing) ---
 
@@ -118,35 +119,15 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
     isEditingRef.current = false;
   }, [editingIndex, editText, items, saveItems]);
 
-  // --- Reorder ---
-  const handleMoveUp = useCallback(
-    (index: number) => {
-      if (index === 0) return;
-      if (editingIndex !== null) {
-        setEditingIndex(null);
-        setEditText('');
-        isEditingRef.current = false;
-      }
-      const newItems = [...items];
-      [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
-      saveItems(newItems);
+  // --- Reorder (drag-and-drop) ---
+  const handleDragEnd = useCallback(
+    ({ data }: { data: string[] }) => {
+      setEditingIndex(null);
+      setEditText('');
+      isEditingRef.current = false;
+      saveItems(data);
     },
-    [items, editingIndex, saveItems]
-  );
-
-  const handleMoveDown = useCallback(
-    (index: number) => {
-      if (index === items.length - 1) return;
-      if (editingIndex !== null) {
-        setEditingIndex(null);
-        setEditText('');
-        isEditingRef.current = false;
-      }
-      const newItems = [...items];
-      [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
-      saveItems(newItems);
-    },
-    [items, editingIndex, saveItems]
+    [saveItems]
   );
 
   // --- Disabled state ---
@@ -158,8 +139,8 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
       <View>
         {items.map((item, idx) => (
           <View key={idx} style={styles.disabledRow}>
-            <Text style={[styles.disabledText, { color: colors.text }]} numberOfLines={1}>
-              {'\u2022 '}{item}
+            <Text style={[styles.disabledText, { color: colors.text }]}>
+              {item}
             </Text>
           </View>
         ))}
@@ -167,14 +148,15 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
     );
   }
 
-  // --- Active state ---
-  return (
-    <View>
-      {items.map((item, idx) => (
-        <View
-          key={idx}
-          style={[styles.itemRow, { borderColor: colors.border }]}
-        >
+  // --- Render item for DraggableFlatList ---
+  const renderItem = ({ item, drag, getIndex }: RenderItemParams<string>) => {
+    const idx = getIndex() ?? 0;
+    return (
+      <ScaleDecorator>
+        <View style={[styles.itemRow, { borderColor: colors.border }]}>
+          <Pressable hitSlop={6} onLongPress={drag}>
+            <GripIcon size={16} color={colors.textTertiary} />
+          </Pressable>
           {editingIndex === idx ? (
             <TextInput
               style={[styles.itemText, { color: colors.text }]}
@@ -187,32 +169,29 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
             />
           ) : (
             <Pressable style={styles.itemTextPressable} onPress={() => startEdit(idx)}>
-              <Text style={[styles.itemText, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.itemText, { color: colors.text }]}>
                 {item}
               </Text>
             </Pressable>
           )}
-          <Pressable
-            hitSlop={6}
-            onPress={() => handleMoveUp(idx)}
-            disabled={idx === 0}
-            style={{ opacity: idx === 0 ? 0.3 : 1 }}
-          >
-            <ChevronUpIcon size={16} color={colors.textTertiary} />
-          </Pressable>
-          <Pressable
-            hitSlop={6}
-            onPress={() => handleMoveDown(idx)}
-            disabled={idx === items.length - 1}
-            style={{ opacity: idx === items.length - 1 ? 0.3 : 1 }}
-          >
-            <ChevronDownIcon size={16} color={colors.textTertiary} />
-          </Pressable>
           <Pressable hitSlop={6} onPress={() => handleDelete(idx)}>
             <XIcon size={18} color={colors.error} />
           </Pressable>
         </View>
-      ))}
+      </ScaleDecorator>
+    );
+  };
+
+  // --- Active state ---
+  return (
+    <View>
+      <DraggableFlatList
+        data={items}
+        keyExtractor={(_, index) => `${index}`}
+        renderItem={renderItem}
+        onDragEnd={handleDragEnd}
+        scrollEnabled={false}
+      />
       <TextInput
         ref={addInputRef}
         style={[styles.addInput, { color: colors.text, borderColor: colors.border }]}
@@ -233,7 +212,7 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
 const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,

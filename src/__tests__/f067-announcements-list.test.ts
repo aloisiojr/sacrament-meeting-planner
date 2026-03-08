@@ -8,6 +8,7 @@
  * S015-01: i18n keys agenda.addWelcome, agenda.addWardBusiness
  * S015-02: AgendaForm EditableListField for welcome/sustaining
  * S015-03: Auto-split \n in add-input and inline-edit
+ * S015-04: GripIcon drag handle replaces ChevronUp/ChevronDown arrows
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -17,6 +18,8 @@ import esLA from '../i18n/locales/es-LA.json';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
 import type { PresentationField } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
+import fs from 'fs';
+import path from 'path';
 
 // Inline copies of the exported helpers (cannot import from component
 // because it transitively imports react-native which fails in node env)
@@ -611,5 +614,95 @@ describe('F067 S014-04: PresentationField bullet_list type', () => {
     const value = 'A\n\n\nB';
     const bulletItems = value.split('\n').filter((s) => s.trim() !== '');
     expect(bulletItems).toEqual(['A', 'B']);
+  });
+});
+
+// =============================================================================
+// S015-04: GripIcon + DraggableFlatList (source-level verification)
+// =============================================================================
+
+describe('F069 S015-04: GripIcon and drag-to-reorder', () => {
+  const iconsSource = fs.readFileSync(
+    path.resolve(__dirname, '../components/icons/index.tsx'),
+    'utf-8'
+  );
+  const editableListSource = fs.readFileSync(
+    path.resolve(__dirname, '../components/EditableListField.tsx'),
+    'utf-8'
+  );
+
+  it('GripIcon is exported from icons/index.tsx', () => {
+    expect(iconsSource).toContain('export const GripIcon');
+  });
+
+  it('EditableListField does not import ChevronUpIcon or ChevronDownIcon', () => {
+    expect(editableListSource).not.toContain('ChevronUpIcon');
+    expect(editableListSource).not.toContain('ChevronDownIcon');
+  });
+
+  it('EditableListField imports DraggableFlatList', () => {
+    expect(editableListSource).toContain('DraggableFlatList');
+    expect(editableListSource).toContain("from 'react-native-draggable-flatlist'");
+  });
+
+  it('EditableListField imports GripIcon', () => {
+    expect(editableListSource).toContain('GripIcon');
+    expect(editableListSource).toContain("from './icons'");
+  });
+
+  it('Active state does not set numberOfLines on item Text', () => {
+    // The active state section comes after "Render item for DraggableFlatList"
+    const renderItemSection = editableListSource.split('Render item for DraggableFlatList')[1];
+    expect(renderItemSection).toBeDefined();
+    // The Text inside renderItem should NOT have numberOfLines
+    const textMatches = renderItemSection!.match(/<Text[^>]*>/g) || [];
+    for (const textTag of textMatches) {
+      expect(textTag).not.toContain('numberOfLines');
+    }
+  });
+
+  it('Disabled state does not set numberOfLines on item Text', () => {
+    // The disabled state section is between "// --- Disabled state ---" and "// --- Render item"
+    const disabledSection = editableListSource.split('// --- Disabled state ---')[1]?.split('// --- Render item')[0];
+    expect(disabledSection).toBeDefined();
+    const textMatches = disabledSection!.match(/<Text[^>]*>/g) || [];
+    for (const textTag of textMatches) {
+      expect(textTag).not.toContain('numberOfLines');
+    }
+  });
+
+  it('Disabled state does not show bullet prefix', () => {
+    // The disabled state should not contain the bullet character '\u2022'
+    const disabledSection = editableListSource.split('// --- Disabled state ---')[1]?.split('// --- Render item')[0];
+    expect(disabledSection).toBeDefined();
+    expect(disabledSection).not.toContain('\\u2022');
+    expect(disabledSection).not.toContain('\u2022');
+  });
+
+  it('Disabled state does not render GripIcon', () => {
+    const disabledSection = editableListSource.split('// --- Disabled state ---')[1]?.split('// --- Render item')[0];
+    expect(disabledSection).toBeDefined();
+    expect(disabledSection).not.toContain('GripIcon');
+  });
+
+  it('Grip icon on single-item list is still shown', () => {
+    // GripIcon is rendered for every item in renderItem, no conditional hiding
+    const renderItemSection = editableListSource.split('Render item for DraggableFlatList')[1];
+    expect(renderItemSection).toBeDefined();
+    expect(renderItemSection).toContain('GripIcon');
+    // Verify there's no condition like items.length > 1 guarding GripIcon
+    expect(renderItemSection).not.toContain('items.length > 1');
+  });
+
+  it('GripIcon uses onLongPress for drag activation', () => {
+    expect(editableListSource).toContain('onLongPress={drag}');
+  });
+
+  it('itemRow uses alignItems flex-start for word-wrap support', () => {
+    expect(editableListSource).toContain("alignItems: 'flex-start'");
+  });
+
+  it('DraggableFlatList has scrollEnabled={false}', () => {
+    expect(editableListSource).toContain('scrollEnabled={false}');
   });
 });

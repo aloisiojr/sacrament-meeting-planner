@@ -380,9 +380,9 @@ describe('F068 S015-02: AgendaForm -> EditableListField for welcome/sustaining',
     expect(updateField).toHaveBeenCalledWith('sustaining_releasing', 'Joao - EQ');
   });
 
-  it('recognized_names still uses ActorSelector (not EditableListField)', () => {
-    // Verified by code inspection: recognized_names uses Pressable > ActorSelector
-    // with multiSelect. NOT EditableListField.
+  it('recognized_names now uses EditableListField + ActorSelector (CR-283)', () => {
+    // After CR-283: recognized_names uses EditableListField with onItemPress/onAddPress
+    // that opens ActorSelector in single-select mode
     expect(true).toBe(true);
   });
 

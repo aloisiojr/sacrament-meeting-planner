@@ -204,18 +204,17 @@ describe('F068 Tester: sustaining_releasing integration (AC-068-06 to AC-068-08)
 // F068 AC-068-09: recognized_names still uses ActorSelector
 // =============================================================================
 
-describe('F068 Tester: recognized_names unchanged (AC-068-09)', () => {
-  it('recognized_names uses multiline type (not bullet_list) in presentation', () => {
-    // recognized_names is an array in DB, joined with \n for presentation
-    const agenda = makeAgenda({ recognized_names: ['John Doe', 'Jane Doe'] as any });
+describe('F068 Tester: recognized_names uses bullet_list (updated by CR-283)', () => {
+  it('recognized_names uses bullet_list type in presentation', () => {
+    // After CR-283: recognized_names is TEXT (not TEXT[]) and uses bullet_list
+    const agenda = makeAgenda({ recognized_names: 'John Doe\nJane Doe' });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     const welcomeCard = cards[0];
     const recognizedField = welcomeCard.fields.find(
       (f) => f.label === 'agenda.recognizing'
     );
     expect(recognizedField).toBeDefined();
-    expect(recognizedField!.type).toBe('multiline');
-    expect(recognizedField!.type).not.toBe('bullet_list');
+    expect(recognizedField!.type).toBe('bullet_list');
   });
 });
 

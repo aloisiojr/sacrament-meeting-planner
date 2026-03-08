@@ -36,7 +36,10 @@ export function normalizeForSearch(text: string): string {
 export function filterMembers(members: Member[], search: string): Member[] {
   if (!search.trim()) return members;
   const normalized = normalizeForSearch(search);
-  return members.filter((m) => normalizeForSearch(m.full_name).includes(normalized));
+  return members.filter((m) =>
+    normalizeForSearch(m.full_name).includes(normalized) ||
+    normalizeForSearch(m.informal_name ?? '').includes(normalized)
+  );
 }
 
 /**

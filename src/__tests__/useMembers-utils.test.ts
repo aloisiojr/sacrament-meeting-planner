@@ -17,6 +17,7 @@ function makeMember(overrides: Partial<Member> & { full_name: string }): Member 
     id: overrides.id ?? `uuid-${Math.random().toString(36).slice(2)}`,
     ward_id: overrides.ward_id ?? 'ward-1',
     full_name: overrides.full_name,
+    informal_name: overrides.informal_name ?? null,
     country_code: overrides.country_code ?? '+55',
     phone: overrides.phone ?? null,
     created_at: overrides.created_at ?? '2026-01-01T00:00:00Z',
@@ -93,6 +94,74 @@ describe('useMembers utilities', () => {
     it('should return empty array when no match', () => {
       const result = filterMembers(members, 'xyz123');
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('filterMembers - informal_name search', () => {
+    it('matches member by informal_name', () => {
+      const members = [
+        makeMember({ full_name: 'Jo\u00e3o da Silva', informal_name: 'Joca' }),
+        makeMember({ full_name: 'Maria Santos' }),
+      ];
+      const result = filterMembers(members, 'Joca');
+      expect(result).toHaveLength(1);
+      expect(result[0].full_name).toBe('Jo\u00e3o da Silva');
+    });
+
+    it('still matches by full_name (no regression)', () => {
+      const members = [
+        makeMember({ full_name: 'Jo\u00e3o da Silva', informal_name: 'Joca' }),
+      ];
+      const result = filterMembers(members, 'Silva');
+      expect(result).toHaveLength(1);
+      expect(result[0].full_name).toBe('Jo\u00e3o da Silva');
+    });
+
+    it('handles null informal_name without error', () => {
+      const members = [
+        makeMember({ full_name: 'Jo\u00e3o da Silva', informal_name: null }),
+      ];
+      const result = filterMembers(members, 'xyz');
+      expect(result).toHaveLength(0);
+    });
+
+    it('handles accent-insensitive informal_name', () => {
+      const members = [
+        makeMember({ full_name: 'Jos\u00e9 Carlos', informal_name: 'Z\u00e9' }),
+      ];
+      const result = filterMembers(members, 'ze');
+      expect(result).toHaveLength(1);
+      expect(result[0].full_name).toBe('Jos\u00e9 Carlos');
+    });
+
+    it('handles empty string informal_name', () => {
+      const members = [
+        makeMember({ full_name: 'Jo\u00e3o da Silva', informal_name: '' }),
+      ];
+      const result = filterMembers(members, 'xyz');
+      expect(result).toHaveLength(0);
+    });
+
+    it('returns both when search matches informal_name and full_name of different members', () => {
+      const members = [
+        makeMember({ full_name: 'Carlos Alberto', informal_name: 'Beto' }),
+        makeMember({ full_name: 'Beto Carvalho' }),
+      ];
+      const result = filterMembers(members, 'Beto');
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns member once when informal_name equals full_name', () => {
+      const members = [
+        makeMember({ full_name: 'Ana', informal_name: 'Ana' }),
+      ];
+      const result = filterMembers(members, 'Ana');
+      expect(result).toHaveLength(1);
+    });
+
+    it('makeMember defaults informal_name to null', () => {
+      const member = makeMember({ full_name: 'Test' });
+      expect(member.informal_name).toBeNull();
     });
   });
 

@@ -62,7 +62,8 @@ export type NotificationType =
   | 'weekly_assignment'
   | 'weekly_confirmation'
   | 'speaker_confirmed'
-  | 'speaker_withdrew';
+  | 'speaker_withdrew'
+  | 'secretary_review';
 
 export type NotificationTargetRole =
   | 'secretary'
@@ -149,6 +150,7 @@ export interface Speech {
   topic_title: string | null;
   topic_link: string | null;
   topic_collection: string | null;
+  assigned_by_role: string | null;
   status: SpeechStatus;
   created_at: string;
   updated_at: string;
@@ -261,6 +263,7 @@ export interface NotificationQueue {
   target_role: NotificationTargetRole;
   status: NotificationStatus;
   send_after: string;
+  topic_title: string | null;
   created_at: string;
 }
 

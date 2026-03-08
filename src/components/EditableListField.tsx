@@ -19,7 +19,8 @@ import { XIcon, GripIcon } from './icons';
 
 // --- Helpers (exported for testing) ---
 
-export function parseItems(value: string | null): string[] {
+export function parseItems(value: string | string[] | null): string[] {
+  if (Array.isArray(value)) return value.filter((s) => s.trim() !== '');
   return (value ?? '').split('\n').filter((s) => s.trim() !== '');
 }
 
@@ -30,7 +31,7 @@ export function joinItems(items: string[]): string | null {
 // --- Props ---
 
 interface EditableListFieldProps {
-  value: string | null;
+  value: string | string[] | null;
   onSave: (value: string | null) => void;
   disabled: boolean;
   placeholder: string;

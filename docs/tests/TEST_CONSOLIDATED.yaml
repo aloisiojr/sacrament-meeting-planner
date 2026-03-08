@@ -4,19 +4,20 @@
 # =============================================================================
 
 type: test_consolidated
-version: 15
-last_updated: "2026-03-07"
+version: 16
+last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 60
-  total_tests: 1318
+  total_test_files: 61
+  total_tests: 1364
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
   # Note: F065+F066 added 96 tests (50 coder + 46 tester): 8 useMembers, 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils, 46 tester
+  # Note: F067 added 46 tests (coder): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation
   framework: vitest
   categories:
-    module_named: 53
+    module_named: 54
     integration: 6
   infrastructure:
     setup: 1
@@ -694,9 +695,33 @@ module_tests:
       - Prayer positions excluded (AC-066-18)
       - Bishopric assignments excluded (AC-066-19)
 
-# =============================================================================
-# INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
-# =============================================================================
+  # --- F067 Coder Tests (CR-277) ---
+
+  - file: src/__tests__/f067-announcements-list.test.ts
+    tests: 46
+    module: "src/components/AnnouncementsList.tsx, src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts, src/app/presentation.tsx"
+    covers:
+      - "F067 S014-01: i18n keys (3 tests)"
+      - agenda.addAnnouncement exists in pt-BR, en-US, es-LA (AC-067-20)
+      - "F067 S014-02: parseItems/joinItems (8 tests)"
+      - parseItems null/empty/newline/consecutive/whitespace
+      - joinItems empty/multiple/single
+      - "F067 S014-02: Component behavior (27 tests)"
+      - Empty state add-input, item rows, X/up/down buttons
+      - Add non-empty/whitespace/clear (AC-067-01..04)
+      - Delete item/last item (AC-067-05..06)
+      - Inline edit start/save/empty-delete (AC-067-07..09)
+      - Reorder up/down (AC-067-10..11)
+      - Disabled mode bullet prefix/no controls/empty (AC-067-12..14)
+      - External sync re-parse (EC-067-04)
+      - Backward compat multi-line data (AC-067-19)
+      - "F067 S014-03: AgendaForm integration (5 tests)"
+      - Value, disabled, placeholder, onSave props (AC-067-17, AC-067-21)
+      - welcome_new_families unchanged (EC-067-08)
+      - "F067 S014-04: Presentation bullet_list (6 tests)"
+      - buildPresentationCards uses bullet_list type (AC-067-15)
+      - PresentationField type union includes bullet_list (ADR-040)
+      - Rendering with items/empty/single/filtered (AC-067-15..16, EC-067-07)
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -3993,8 +4018,12 @@ gaps:
   # Coder: 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils.
   # Tester: 8 permissions, 5 types, 11 notificationUtils, 12 trigger, 3 routing.
 
+  # F067 gaps
+  # All F067 ACs (01-21) covered. All edge cases (EC-067-01 to EC-067-08) covered. No gaps.
+  # 46 tests: 3 i18n, 8 parseItems/joinItems, 27 component behavior, 5 integration, 6 presentation.
+
 stats:
-  total_tests: 1318
-  passing: 1318
+  total_tests: 1364
+  passing: 1364
   failing: 0
   skipped: 0

@@ -34,11 +34,13 @@ interface EditableListFieldProps {
   onSave: (value: string | null) => void;
   disabled: boolean;
   placeholder: string;
+  onItemPress?: (index: number, item: string) => void;
+  onAddPress?: () => void;
 }
 
 // --- Component ---
 
-export function EditableListField({ value, onSave, disabled, placeholder }: EditableListFieldProps) {
+export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress }: EditableListFieldProps) {
   const { colors } = useTheme();
   const [items, setItems] = useState<string[]>(() => parseItems(value));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -170,7 +172,13 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
               returnKeyType="done"
             />
           ) : (
-            <Pressable style={styles.itemTextPressable} onPress={() => startEdit(idx)}>
+            <Pressable style={styles.itemTextPressable} onPress={() => {
+                if (onItemPress) {
+                  onItemPress(idx, item);
+                } else {
+                  startEdit(idx);
+                }
+              }}>
               <Text style={[styles.itemText, { color: colors.text }]}>
                 {item}
               </Text>
@@ -195,19 +203,30 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
         scrollEnabled={false}
         activationDistance={9999}
       />
-      <TextInput
-        ref={addInputRef}
-        style={[styles.addInput, { color: colors.text, borderColor: colors.border }]}
-        value={addText}
-        onChangeText={setAddText}
-        onSubmitEditing={handleAdd}
-        onBlur={handleAdd}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textTertiary}
-        returnKeyType="done"
-        multiline
-        blurOnSubmit
-      />
+      {onAddPress ? (
+        <Pressable
+          style={[styles.addInput, { borderColor: colors.border }]}
+          onPress={onAddPress}
+        >
+          <Text style={{ color: colors.textTertiary, fontSize: 15 }}>
+            {placeholder}
+          </Text>
+        </Pressable>
+      ) : (
+        <TextInput
+          ref={addInputRef}
+          style={[styles.addInput, { color: colors.text, borderColor: colors.border }]}
+          value={addText}
+          onChangeText={setAddText}
+          onSubmitEditing={handleAdd}
+          onBlur={handleAdd}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textTertiary}
+          returnKeyType="done"
+          multiline
+          blurOnSubmit
+        />
+      )}
     </View>
   );
 }

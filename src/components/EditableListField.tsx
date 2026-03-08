@@ -1,8 +1,8 @@
 /**
- * AnnouncementsList: Structured list UI for announcements.
+ * EditableListField: Reusable structured list UI for editable \n-joined text fields.
  * Supports add, delete, inline-edit, and reorder (up/down arrows).
  * Storage format: \n-joined TEXT string (no migration needed).
- * Disabled state: read-only with bullet prefix, no controls.
+ * Disabled state: read-only plain text, no controls.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -28,7 +28,7 @@ export function joinItems(items: string[]): string | null {
 
 // --- Props ---
 
-interface AnnouncementsListProps {
+interface EditableListFieldProps {
   value: string | null;
   onSave: (value: string | null) => void;
   disabled: boolean;
@@ -37,7 +37,7 @@ interface AnnouncementsListProps {
 
 // --- Component ---
 
-export function AnnouncementsList({ value, onSave, disabled, placeholder }: AnnouncementsListProps) {
+export function EditableListField({ value, onSave, disabled, placeholder }: EditableListFieldProps) {
   const { colors } = useTheme();
   const [items, setItems] = useState<string[]>(() => parseItems(value));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);

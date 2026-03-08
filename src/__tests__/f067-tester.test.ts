@@ -1,7 +1,7 @@
 /**
- * F067 Tester Tests (CR-277)
+ * F067/F068 Tester Tests (CR-277, CR-278)
  *
- * Behavioral tests verifying AnnouncementsList feature:
+ * Behavioral tests verifying EditableListField feature:
  * - parseItems/joinItems edge cases and round-trip
  * - buildPresentationCards bullet_list integration
  * - No migration for CR-277 (AC-067-18)
@@ -24,7 +24,7 @@ import fs from 'fs';
 import path from 'path';
 
 // --- Inline copies of parseItems/joinItems (component imports react-native) ---
-// These replicate the exported functions from AnnouncementsList.tsx exactly.
+// These replicate the exported functions from EditableListField.tsx exactly.
 
 function parseItems(value: string | null): string[] {
   return (value ?? '').split('\n').filter((s) => s.trim() !== '');

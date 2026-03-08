@@ -1,10 +1,11 @@
 /**
- * Tests for F067: Announcements List Items (CR-277)
+ * Tests for F067/F068: EditableListField (CR-277, CR-278)
  *
  * S014-01: i18n key agenda.addAnnouncement in all 3 locales
- * S014-02: AnnouncementsList component (parseItems, joinItems, rendering, interactions)
+ * S014-02: EditableListField component (parseItems, joinItems, rendering, interactions)
  * S014-03: AgendaForm integration
  * S014-04: Presentation Mode bullet_list type
+ * S015-01: i18n keys agenda.addWelcome, agenda.addWardBusiness
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -17,6 +18,7 @@ import type { SundayAgenda } from '../types/database';
 
 // Inline copies of the exported helpers (cannot import from component
 // because it transitively imports react-native which fails in node env)
+// These replicate the exported functions from EditableListField.tsx exactly.
 function parseItems(value: string | null): string[] {
   return (value ?? '').split('\n').filter((s) => s.trim() !== '');
 }
@@ -40,6 +42,38 @@ describe('F067 S014-01: i18n key agenda.addAnnouncement', () => {
 
   it('es-LA has agenda.addAnnouncement = "Agregar anuncio"', () => {
     expect((esLA as any).agenda.addAnnouncement).toBe('Agregar anuncio');
+  });
+});
+
+// =============================================================================
+// S015-01: i18n keys for addWelcome and addWardBusiness
+// =============================================================================
+
+describe('F068 S015-01: i18n key agenda.addWelcome', () => {
+  it('pt-BR has agenda.addWelcome = "Adicionar boas-vindas"', () => {
+    expect((ptBR as any).agenda.addWelcome).toBe('Adicionar boas-vindas');
+  });
+
+  it('en-US has agenda.addWelcome = "Add welcome"', () => {
+    expect((enUS as any).agenda.addWelcome).toBe('Add welcome');
+  });
+
+  it('es-LA has agenda.addWelcome = "Agregar bienvenida"', () => {
+    expect((esLA as any).agenda.addWelcome).toBe('Agregar bienvenida');
+  });
+});
+
+describe('F068 S015-01: i18n key agenda.addWardBusiness', () => {
+  it('pt-BR has agenda.addWardBusiness = "Adicionar apoio ou desobrigação"', () => {
+    expect((ptBR as any).agenda.addWardBusiness).toBe('Adicionar apoio ou desobrigação');
+  });
+
+  it('en-US has agenda.addWardBusiness = "Add sustaining or release"', () => {
+    expect((enUS as any).agenda.addWardBusiness).toBe('Add sustaining or release');
+  });
+
+  it('es-LA has agenda.addWardBusiness = "Agregar apoyo o relevo"', () => {
+    expect((esLA as any).agenda.addWardBusiness).toBe('Agregar apoyo o relevo');
   });
 });
 
@@ -84,10 +118,10 @@ describe('F067 S014-02: joinItems', () => {
 });
 
 // =============================================================================
-// S014-02: AnnouncementsList component behavior (logic-level tests)
+// S014-02: EditableListField component behavior (logic-level tests)
 // =============================================================================
 
-describe('F067 S014-02: AnnouncementsList component behavior', () => {
+describe('F067 S014-02: EditableListField component behavior', () => {
   it('renders add-input with placeholder when items empty', () => {
     const items = parseItems(null);
     expect(items).toEqual([]);
@@ -258,15 +292,15 @@ describe('F067 S014-02: AnnouncementsList component behavior', () => {
 // S014-03: AgendaForm integration (logic-level)
 // =============================================================================
 
-describe('F067 S014-03: AgendaForm -> AnnouncementsList integration', () => {
-  it('AgendaForm passes agenda.announcements as value to AnnouncementsList', () => {
+describe('F067 S014-03: AgendaForm -> EditableListField integration', () => {
+  it('AgendaForm passes agenda.announcements as value to EditableListField', () => {
     const agenda = { announcements: 'A\nB' } as any;
     expect(agenda.announcements ?? null).toBe('A\nB');
     const emptyAgenda = { announcements: null } as any;
     expect(emptyAgenda.announcements ?? null).toBeNull();
   });
 
-  it('AgendaForm passes isObserver as disabled to AnnouncementsList', () => {
+  it('AgendaForm passes isObserver as disabled to EditableListField', () => {
     const hasPermission = (perm: string) => perm === 'agenda:write';
     const isObserver = !hasPermission('agenda:write');
     expect(isObserver).toBe(false);

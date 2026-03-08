@@ -112,15 +112,16 @@ describe('Database Types', () => {
   });
 
   describe('NotificationType type', () => {
-    it('should define all 5 notification types matching migration CHECK constraint', () => {
+    it('should define all 6 notification types matching migration CHECK constraint', () => {
       const types: NotificationType[] = [
         'designation',
         'weekly_assignment',
         'weekly_confirmation',
         'speaker_confirmed',
         'speaker_withdrew',
+        'secretary_review',
       ];
-      expect(types).toHaveLength(5);
+      expect(types).toHaveLength(6);
     });
   });
 

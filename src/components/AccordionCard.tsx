@@ -140,10 +140,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
-  chevron: {
-    fontSize: 12,
-    marginLeft: 8,
-  },
   cardContent: {
     flex: 1,
   },

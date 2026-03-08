@@ -199,7 +199,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
         renderItem={renderItem}
         onDragEnd={handleDragEnd}
         scrollEnabled={false}
-        activationDistance={9999}
+        dragHitSlop={{ left: 0, width: 40 }}
       />
       {onAddPress ? (
         <Pressable

@@ -193,6 +193,7 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
         renderItem={renderItem}
         onDragEnd={handleDragEnd}
         scrollEnabled={false}
+        activationDistance={9999}
       />
       <TextInput
         ref={addInputRef}

@@ -52,8 +52,14 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
 
   // External value sync
   useEffect(() => {
-    if (editingIndex === null && !isEditingRef.current) {
-      setItems(parseItems(value));
+    if (editingIndex === null) {
+      if (!isEditingRef.current) {
+        setItems(parseItems(value));
+      } else {
+        // Just finished editing — skip this sync (value prop is stale),
+        // reset flag so next value change will sync.
+        isEditingRef.current = false;
+      }
     }
   }, [value, editingIndex]);
 
@@ -81,7 +87,6 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
       if (editingIndex === index) {
         setEditingIndex(null);
         setEditText('');
-        isEditingRef.current = false;
       }
       const newItems = items.filter((_, i) => i !== index);
       saveItems(newItems);
@@ -119,7 +124,6 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
     }
     setEditingIndex(null);
     setEditText('');
-    isEditingRef.current = false;
   }, [editingIndex, editText, items, saveItems]);
 
   // --- Reorder (drag-and-drop) ---
@@ -127,7 +131,6 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
     ({ data }: { data: string[] }) => {
       setEditingIndex(null);
       setEditText('');
-      isEditingRef.current = false;
       saveItems(data);
     },
     [saveItems]

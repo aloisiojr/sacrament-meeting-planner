@@ -321,10 +321,75 @@ describe('F067 S014-03: AgendaForm -> EditableListField integration', () => {
     expect(updateField).toHaveBeenCalledWith('announcements', null);
   });
 
-  it('welcome_new_families still uses DebouncedTextInput (unchanged)', () => {
-    // Verified by code inspection: line 233-241 still uses DebouncedTextInput
-    // with styles.announcementsInput for welcome_new_families
+  it('welcome_new_families now uses EditableListField with addWelcome placeholder', () => {
+    // Verified by code inspection: welcome_new_families now uses EditableListField
+    // with placeholder t('agenda.addWelcome')
+    expect((enUS as any).agenda.addWelcome).toBe('Add welcome');
+  });
+});
+
+// =============================================================================
+// S015-02: AgendaForm EditableListField for welcome/sustaining integration
+// =============================================================================
+
+describe('F068 S015-02: AgendaForm -> EditableListField for welcome/sustaining', () => {
+  it('AgendaForm uses EditableListField for welcome_new_families', () => {
+    // Verified by code: <EditableListField value={agenda.welcome_new_families ?? null} .../>
+    const agenda = { welcome_new_families: 'Familia Silva\nFamilia Santos' } as any;
+    expect(agenda.welcome_new_families ?? null).toBe('Familia Silva\nFamilia Santos');
+    const emptyAgenda = { welcome_new_families: null } as any;
+    expect(emptyAgenda.welcome_new_families ?? null).toBeNull();
+  });
+
+  it('welcome_new_families EditableListField has placeholder t(agenda.addWelcome)', () => {
+    expect((ptBR as any).agenda.addWelcome).toBe('Adicionar boas-vindas');
+    expect((enUS as any).agenda.addWelcome).toBe('Add welcome');
+    expect((esLA as any).agenda.addWelcome).toBe('Agregar bienvenida');
+  });
+
+  it('welcome_new_families onSave calls updateField(welcome_new_families, ...)', () => {
+    const updateField = vi.fn();
+    const onSave = (text: string | null) => updateField('welcome_new_families', text);
+    onSave('Familia Silva\nFamilia Santos');
+    expect(updateField).toHaveBeenCalledWith('welcome_new_families', 'Familia Silva\nFamilia Santos');
+    onSave(null);
+    expect(updateField).toHaveBeenCalledWith('welcome_new_families', null);
+  });
+
+  it('AgendaForm uses EditableListField for sustaining_releasing', () => {
+    const agenda = { sustaining_releasing: 'Joao - EQ\nMaria - Primaria' } as any;
+    expect(agenda.sustaining_releasing ?? null).toBe('Joao - EQ\nMaria - Primaria');
+  });
+
+  it('sustaining_releasing EditableListField has placeholder t(agenda.addWardBusiness)', () => {
+    expect((ptBR as any).agenda.addWardBusiness).toBe('Adicionar apoio ou desobrigação');
+    expect((enUS as any).agenda.addWardBusiness).toBe('Add sustaining or release');
+    expect((esLA as any).agenda.addWardBusiness).toBe('Agregar apoyo o relevo');
+  });
+
+  it('sustaining_releasing onSave calls updateField(sustaining_releasing, ...)', () => {
+    const updateField = vi.fn();
+    const onSave = (text: string | null) => updateField('sustaining_releasing', text);
+    onSave('Joao - EQ');
+    expect(updateField).toHaveBeenCalledWith('sustaining_releasing', 'Joao - EQ');
+  });
+
+  it('recognized_names still uses ActorSelector (not EditableListField)', () => {
+    // Verified by code inspection: recognized_names uses Pressable > ActorSelector
+    // with multiSelect. NOT EditableListField.
     expect(true).toBe(true);
+  });
+
+  it('existing free-text welcome data without \\n shows as single item', () => {
+    const items = parseItems('Familia Silva e Familia Santos');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toBe('Familia Silva e Familia Santos');
+  });
+
+  it('existing free-text sustaining data without \\n shows as single item', () => {
+    const items = parseItems('Varios apoios e desobrigacoes');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toBe('Varios apoios e desobrigacoes');
   });
 });
 

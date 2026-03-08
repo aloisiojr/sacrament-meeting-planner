@@ -231,14 +231,11 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
-        <DebouncedTextInput
-          style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
-          value={agenda.welcome_new_families ?? ''}
+        <EditableListField
+          value={agenda.welcome_new_families ?? null}
           onSave={(text) => updateField('welcome_new_families', text)}
-          placeholder={t('agenda.welcomeNewFamilies')}
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          editable={!isObserver}
+          disabled={isObserver}
+          placeholder={t('agenda.addWelcome')}
         />
       </FieldRow>
 
@@ -354,14 +351,11 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       <SectionHeader title={t('agenda.sectionSacrament')} colors={colors} />
 
       <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
-        <DebouncedTextInput
-          style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
-          value={agenda.sustaining_releasing ?? ''}
+        <EditableListField
+          value={agenda.sustaining_releasing ?? null}
           onSave={(text) => updateField('sustaining_releasing', text)}
-          placeholder={t('agenda.wardBusiness')}
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          editable={!isObserver}
+          disabled={isObserver}
+          placeholder={t('agenda.addWardBusiness')}
         />
       </FieldRow>
 
@@ -945,9 +939,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 15,
     minHeight: 36,
-  },
-  announcementsInput: {
-    minHeight: 66,
   },
   indented: {
     marginLeft: 16,

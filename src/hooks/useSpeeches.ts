@@ -238,10 +238,10 @@ export function useLazyCreateSpeeches() {
 /**
  * Assign a speaker to a speech.
  * Sets member_id + snapshot fields + status = assigned_not_invited.
- * Bishopric-only operation.
+ * Bishopric and Secretary operation.
  */
 export function useAssignSpeaker() {
-  const { wardId, user, userName } = useAuth();
+  const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -254,6 +254,7 @@ export function useAssignSpeaker() {
           speaker_informal_name: input.speakerInformalName,
           speaker_phone: input.speakerPhone,
           status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
+          assigned_by_role: role,
         })
         .eq('id', input.speechId)
         .select()
@@ -276,7 +277,7 @@ export function useAssignSpeaker() {
  * Sets topic_title, topic_link, topic_collection (all snapshots).
  */
 export function useAssignTopic() {
-  const { wardId, user, userName } = useAuth();
+  const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -287,6 +288,7 @@ export function useAssignTopic() {
           topic_title: input.topicTitle,
           topic_link: input.topicLink ?? null,
           topic_collection: input.topicCollection,
+          assigned_by_role: role,
         })
         .eq('id', input.speechId)
         .select()
@@ -350,10 +352,10 @@ export function useChangeStatus() {
  * Remove a speaker assignment.
  * Resets speaker fields + status = not_assigned.
  * Topic remains assigned.
- * Bishopric-only operation.
+ * Bishopric and Secretary operation.
  */
 export function useRemoveAssignment() {
-  const { wardId, user, userName } = useAuth();
+  const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -366,6 +368,7 @@ export function useRemoveAssignment() {
           speaker_informal_name: null,
           speaker_phone: null,
           status: 'not_assigned' as SpeechStatus,
+          assigned_by_role: role,
         })
         .eq('id', speechId)
         .select()

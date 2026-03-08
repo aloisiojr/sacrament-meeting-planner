@@ -38,6 +38,7 @@ export interface ActorSelectorProps {
   onClose: () => void;
   selectedNames?: string[];
   multiSelect?: boolean;
+  disabledNames?: string[];
 }
 
 export function ActorSelector({
@@ -47,6 +48,7 @@ export function ActorSelector({
   onClose,
   selectedNames,
   multiSelect,
+  disabledNames,
 }: ActorSelectorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -167,6 +169,7 @@ export function ActorSelector({
     ({ item, index }: { item: MeetingActor; index: number }) => {
       const isEditing = editingId === item.id;
       const isSelected = multiSelect && selectedNames?.includes(item.name);
+      const isDisabled = disabledNames?.includes(item.name) ?? false;
 
       return (
         <View style={[styles.actorRow, { borderBottomColor: colors.divider }]}>
@@ -181,7 +184,11 @@ export function ActorSelector({
               returnKeyType="done"
             />
           ) : (
-            <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+            <Pressable
+              style={[styles.actorNameArea, isDisabled && { opacity: 0.4 }]}
+              onPress={isDisabled ? undefined : () => handleSelect(item)}
+              disabled={isDisabled}
+            >
               {multiSelect && (
                 <View style={{ marginRight: 8 }}>
                   {isSelected
@@ -214,7 +221,7 @@ export function ActorSelector({
         </View>
       );
     },
-    [colors, editingId, editingName, handleSelect, handleEditSave, handleDelete, multiSelect, selectedNames]
+    [colors, editingId, editingName, handleSelect, handleEditSave, handleDelete, multiSelect, selectedNames, disabledNames]
   );
 
   return (

@@ -159,12 +159,14 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
           </Pressable>
           {editingIndex === idx ? (
             <TextInput
-              style={[styles.itemText, { color: colors.text }]}
+              style={[styles.itemText, styles.editInput, { color: colors.text }]}
               value={editText}
               onChangeText={setEditText}
               onSubmitEditing={finishEdit}
               onBlur={finishEdit}
               autoFocus
+              multiline
+              blurOnSubmit
               returnKeyType="done"
             />
           ) : (
@@ -226,6 +228,9 @@ const styles = StyleSheet.create({
   itemText: {
     flex: 1,
     fontSize: 15,
+  },
+  editInput: {
+    paddingVertical: 0,
   },
   addInput: {
     borderWidth: 1,

@@ -5,7 +5,8 @@
  *
  * Permissions:
  * - Bishopric: assign/unassign speaker, assign topic, change status
- * - Secretary: change status only (cannot assign)
+ * - Secretary: assign/unassign speaker, assign topic, change status
+ *              (generates review notification for bishopric on speeches)
  * - Observer: read-only
  */
 

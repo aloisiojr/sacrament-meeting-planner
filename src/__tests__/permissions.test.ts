@@ -12,8 +12,8 @@ import type { Role, Permission } from '../lib/permissions';
  * true = role has permission, false = role does not.
  */
 const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
-  'speech:assign': { bishopric: true, secretary: false, observer: false },
-  'speech:unassign': { bishopric: true, secretary: false, observer: false },
+  'speech:assign': { bishopric: true, secretary: true, observer: false },
+  'speech:unassign': { bishopric: true, secretary: true, observer: false },
   'speech:change_status': { bishopric: true, secretary: true, observer: false },
   'prayer:assign': { bishopric: true, secretary: true, observer: false },
   'prayer:unassign': { bishopric: true, secretary: true, observer: false },
@@ -29,7 +29,7 @@ const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
   'settings:timezone': { bishopric: true, secretary: true, observer: false },
   'settings:users': { bishopric: true, secretary: true, observer: false },
   'invite:manage': { bishopric: true, secretary: true, observer: false },
-  'home:next_assignments': { bishopric: true, secretary: false, observer: false },
+  'home:next_assignments': { bishopric: true, secretary: true, observer: false },
   'home:invite_mgmt': { bishopric: true, secretary: true, observer: false },
   'agenda:read': { bishopric: true, secretary: true, observer: true },
   'agenda:write': { bishopric: true, secretary: true, observer: false },
@@ -94,13 +94,13 @@ describe('Permissions', () => {
       expect(hasPermission('bishopric', 'home:invite_mgmt')).toBe(true);
     });
 
-    it('should grant Secretary appropriate permissions (no speech:assign/unassign, has prayer:assign/unassign)', () => {
-      expect(hasPermission('secretary', 'speech:assign')).toBe(false);
-      expect(hasPermission('secretary', 'speech:unassign')).toBe(false);
+    it('should grant Secretary appropriate permissions (has speech:assign/unassign, has prayer:assign/unassign)', () => {
+      expect(hasPermission('secretary', 'speech:assign')).toBe(true);
+      expect(hasPermission('secretary', 'speech:unassign')).toBe(true);
       expect(hasPermission('secretary', 'speech:change_status')).toBe(true);
       expect(hasPermission('secretary', 'prayer:assign')).toBe(true);
       expect(hasPermission('secretary', 'prayer:unassign')).toBe(true);
-      expect(hasPermission('secretary', 'home:next_assignments')).toBe(false);
+      expect(hasPermission('secretary', 'home:next_assignments')).toBe(true);
 
       expect(hasPermission('secretary', 'settings:users')).toBe(true);
 
@@ -127,9 +127,9 @@ describe('Permissions', () => {
       expect(perms.length).toBe(26);
     });
 
-    it('should return 23 permissions for Secretary', () => {
+    it('should return 26 permissions for Secretary', () => {
       const perms = getPermissions('secretary');
-      expect(perms.length).toBe(23);
+      expect(perms.length).toBe(26);
     });
 
     it('should return 3 permissions for Observer', () => {

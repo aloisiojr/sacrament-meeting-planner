@@ -43,6 +43,8 @@ const PERMISSIONS_MAP: Record<Role, ReadonlySet<Permission>> = {
   ]),
 
   secretary: new Set<Permission>([
+    'speech:assign',
+    'speech:unassign',
     'speech:change_status',
     'prayer:assign',
     'prayer:unassign',
@@ -58,6 +60,7 @@ const PERMISSIONS_MAP: Record<Role, ReadonlySet<Permission>> = {
     'settings:timezone',
     'settings:users',
     'invite:manage',
+    'home:next_assignments',
     'home:invite_mgmt',
     'agenda:read',
     'agenda:write',

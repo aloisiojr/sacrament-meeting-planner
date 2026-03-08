@@ -122,16 +122,16 @@ describe('Permission matrix integration', () => {
       expect(hasPermission(role, 'presentation:start')).toBe(true);
     });
 
-    it('does not have bishopric-exclusive permission home:next_assignments', () => {
+    it('has speech:assign, speech:unassign, and home:next_assignments permissions (CR-276)', () => {
       const role: Role = 'secretary';
-      // Secretary does NOT have speech:assign/unassign (CR-253)
-      expect(hasPermission(role, 'speech:assign')).toBe(false);
-      expect(hasPermission(role, 'speech:unassign')).toBe(false);
+      // Secretary HAS speech:assign/unassign (CR-276)
+      expect(hasPermission(role, 'speech:assign')).toBe(true);
+      expect(hasPermission(role, 'speech:unassign')).toBe(true);
       // Secretary HAS prayer:assign/unassign (CR-253)
       expect(hasPermission(role, 'prayer:assign')).toBe(true);
       expect(hasPermission(role, 'prayer:unassign')).toBe(true);
-      // Secretary still does NOT have home:next_assignments (bishopric-only)
-      expect(hasPermission(role, 'home:next_assignments')).toBe(false);
+      // Secretary HAS home:next_assignments (CR-276)
+      expect(hasPermission(role, 'home:next_assignments')).toBe(true);
     });
   });
 
@@ -226,7 +226,7 @@ describe('Auth context permission gating', () => {
 
     expect(authCtx.hasPermission('member:read')).toBe(true);
     expect(authCtx.hasPermission('member:write')).toBe(true);
-    expect(authCtx.hasPermission('speech:assign')).toBe(false);
+    expect(authCtx.hasPermission('speech:assign')).toBe(true);
     expect(authCtx.hasPermission('prayer:assign')).toBe(true);
     expect(authCtx.hasPermission('agenda:write')).toBe(true);
   });

@@ -160,30 +160,27 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
           <Pressable hitSlop={6} onLongPress={drag}>
             <GripIcon size={16} color={colors.textTertiary} />
           </Pressable>
-          {editingIndex === idx ? (
-            <TextInput
-              style={[styles.itemText, styles.editInput, { color: colors.text }]}
-              value={editText}
-              onChangeText={setEditText}
-              onSubmitEditing={finishEdit}
-              onBlur={finishEdit}
-              autoFocus
-              multiline
-              blurOnSubmit
-              returnKeyType="done"
-            />
-          ) : (
-            <Pressable style={styles.itemTextPressable} onPress={() => {
-                if (onItemPress) {
-                  onItemPress(idx, item);
-                } else {
-                  startEdit(idx);
-                }
-              }}>
+          {onItemPress ? (
+            <Pressable style={styles.itemTextPressable} onPress={() => onItemPress(idx, item)}>
               <Text style={[styles.itemText, { color: colors.text }]}>
                 {item}
               </Text>
             </Pressable>
+          ) : (
+            <TextInput
+              style={[styles.itemText, styles.editInput, { color: colors.text }]}
+              value={editingIndex === idx ? editText : item}
+              onChangeText={(text) => {
+                if (editingIndex !== idx) startEdit(idx);
+                setEditText(text);
+              }}
+              onFocus={() => { if (editingIndex !== idx) startEdit(idx); }}
+              onSubmitEditing={finishEdit}
+              onBlur={finishEdit}
+              multiline
+              blurOnSubmit
+              returnKeyType="done"
+            />
           )}
           <Pressable hitSlop={6} onPress={() => handleDelete(idx)}>
             <XIcon size={18} color={colors.error} />

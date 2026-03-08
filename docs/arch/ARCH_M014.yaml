@@ -1,0 +1,598 @@
+# =============================================================================
+# ARCH_M014.yaml - CR-277
+# Artifact ID: 014
+# Features: F067 (Announcements list items with add/delete/reorder/inline-edit)
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    F067: Transform the announcements field in AgendaForm from a single multiline
+    DebouncedTextInput into a structured list of individually manageable items.
+    Each item supports add, delete, inline-edit, and drag-to-reorder. Storage
+    format is unchanged (\n-joined TEXT column). Presentation Mode renders each
+    item as a bullet point. Offline/observer mode disables all interactive
+    controls.
+  principles:
+    - "Single component responsibility: AnnouncementsList encapsulates all list logic"
+    - "Zero schema change: \n-joined TEXT column preserved, no migration"
+    - "Existing save pattern: updateField('announcements', ...) used for all operations"
+    - "Progressive enhancement: drag-to-reorder via up/down buttons (no new deps)"
+    - "Presentation type extension: new 'bullet_list' type, no special-casing of 'multiline'"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  F067: Announcements List Architecture
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/components/AgendaForm.tsx (MODIFIED)                        │
+  │                                                                 │
+  │   BEFORE (lines 244-254):                                      │
+  │     <FieldRow label="Announcements">                           │
+  │       <DebouncedTextInput multiline value={agenda.announcements}│
+  │         onSave={text => updateField('announcements', text)} /> │
+  │     </FieldRow>                                                │
+  │                                                                 │
+  │   AFTER:                                                        │
+  │     <FieldRow label="Announcements">                           │
+  │       <AnnouncementsList                                       │
+  │         value={agenda.announcements}                           │
+  │         onSave={text => updateField('announcements', text)}    │
+  │         disabled={isObserver}                                  │
+  │         placeholder={t('agenda.addAnnouncement')}              │
+  │       />                                                       │
+  │     </FieldRow>                                                │
+  └─────────────────────────────────────────────────────────────────┘
+         │
+         │ value (raw \n-joined string), onSave (joined string or null)
+         ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/components/AnnouncementsList.tsx (NEW)                      │
+  │                                                                 │
+  │   Props:                                                        │
+  │     value: string | null     (raw DB value)                    │
+  │     onSave: (v: string | null) => void                         │
+  │     disabled: boolean                                           │
+  │     placeholder: string                                         │
+  │                                                                 │
+  │   Internal state:                                               │
+  │     items: string[]  (parsed from value, split on \n, filter)  │
+  │     editingIndex: number | null                                │
+  │     editText: string                                           │
+  │     addText: string                                            │
+  │                                                                 │
+  │   Rendering (disabled=false):                                   │
+  │     ┌──────────────────────────────────────────────┐            │
+  │     │ Item 1 text (tap=edit)     [↑] [↓]    [X]   │            │
+  │     │ Item 2 text (tap=edit)     [↑] [↓]    [X]   │            │
+  │     │ Item 3 text (tap=edit)     [↑] [↓]    [X]   │            │
+  │     │ [____Add announcement placeholder____]       │            │
+  │     └──────────────────────────────────────────────┘            │
+  │                                                                 │
+  │   Rendering (disabled=true):                                    │
+  │     ┌──────────────────────────────────────────────┐            │
+  │     │ • Item 1 text (plain, no controls)           │            │
+  │     │ • Item 2 text (plain, no controls)           │            │
+  │     │ • Item 3 text (plain, no controls)           │            │
+  │     └──────────────────────────────────────────────┘            │
+  │                                                                 │
+  │   Save: joins items with \n → onSave(joined) or onSave(null)  │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/hooks/usePresentationMode.ts (MODIFIED)                     │
+  │                                                                 │
+  │   PresentationField.type: 'text' | 'hymn' | 'multiline'       │
+  │                           → 'text' | 'hymn' | 'multiline'     │
+  │                             | 'bullet_list'                     │
+  │                                                                 │
+  │   buildPresentationCards():                                     │
+  │     announcements field: type 'multiline' → 'bullet_list'      │
+  │     value remains raw \n-joined string (unchanged)              │
+  └─────────────────────────────────────────────────────────────────┘
+         │
+         │ PresentationField with type='bullet_list'
+         ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/app/presentation.tsx (MODIFIED)                             │
+  │                                                                 │
+  │   PresentationFieldRow:                                         │
+  │     if field.type === 'bullet_list':                            │
+  │       split field.value by \n                                  │
+  │       filter empty strings                                     │
+  │       render each as "• item text" (bullet prefix)             │
+  │       numberOfLines=undefined (like multiline)                  │
+  │     else:                                                       │
+  │       existing rendering (unchanged)                            │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ i18n locales (3 files MODIFIED)                                 │
+  │   pt-BR: "agenda.addAnnouncement": "Adicionar anuncio"          │
+  │   en-US: "agenda.addAnnouncement": "Add announcement"           │
+  │   es-LA: "agenda.addAnnouncement": "Agregar anuncio"            │
+  └─────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ===========================================================================
+  # F067: AnnouncementsList (NEW)
+  # ===========================================================================
+
+  - name: AnnouncementsList
+    file: src/components/AnnouncementsList.tsx (NEW)
+    responsibility: "Structured list UI for announcements with add, delete, inline-edit, and reorder"
+    changes:
+      - what: "New component encapsulating announcements list logic"
+        details: |
+          Props interface:
+            interface AnnouncementsListProps {
+              value: string | null;
+              onSave: (value: string | null) => void;
+              disabled: boolean;
+              placeholder: string;
+            }
+
+          Internal state management:
+            - items: string[] - parsed from value prop by splitting on \n
+              and filtering empty strings. Re-parsed when value prop changes
+              AND component is not actively editing (same pattern as
+              DebouncedTextInput isFocusedRef guard).
+            - editingIndex: number | null - which item is being inline-edited
+            - editText: string - text of the item being edited
+            - addText: string - text in the add-input at the bottom
+
+          Helper function (module-level, exported for testing):
+            parseItems(value: string | null): string[]
+              → (value ?? '').split('\n').filter(s => s.trim() !== '')
+
+            joinItems(items: string[]): string | null
+              → items.length === 0 ? null : items.join('\n')
+
+          Save function (internal):
+            saveItems(newItems: string[]):
+              1. Set items state to newItems
+              2. Call onSave(joinItems(newItems))
+
+          Add behavior:
+            - TextInput at bottom with placeholder, returnKeyType='done'
+            - onSubmitEditing: if addText.trim() !== '', append to items,
+              call saveItems, clear addText, refocus input (via ref)
+            - onBlur: same logic as onSubmitEditing (save non-empty text)
+            - After adding, focus remains on add-input for rapid entry
+
+          Delete behavior:
+            - Pressable with XIcon on right side of each item row
+            - On press: remove item at index, call saveItems
+            - If editingIndex === deleted index: clear editing state
+
+          Inline edit behavior:
+            - Tap on item Text → set editingIndex to that index,
+              set editText to item text
+            - TextInput replaces Text, pre-filled with editText
+            - onSubmitEditing / onBlur:
+              - If editText.trim() !== '': update item at editingIndex,
+                call saveItems, clear editing state
+              - If editText.trim() === '': delete item at editingIndex,
+                call saveItems, clear editing state
+            - TextInput autoFocus (cursor active on appear)
+
+          Reorder behavior (up/down arrow buttons):
+            - Each item row (except disabled) has ChevronUpIcon and
+              ChevronDownIcon buttons
+            - First item: up button hidden/disabled
+            - Last item: down button hidden/disabled
+            - On press: swap item with adjacent item, call saveItems
+            - If editingIndex is active, cancel editing first
+
+          Disabled state (disabled=true):
+            - Items rendered as plain Text with bullet prefix ("• ")
+            - No X buttons, no up/down buttons, no add-input
+            - No tap-to-edit handlers
+            - If value is null/empty and disabled: render nothing
+              (empty area, consistent with AC-067-14)
+
+          External value sync:
+            - useEffect watches value prop
+            - If not editing (editingIndex === null) and not focused on
+              add-input: re-parse items from value
+            - Uses isEditingRef to prevent external sync during edits
+              (same guard pattern as DebouncedTextInput)
+
+          Styling:
+            - Item row: flexDirection 'row', alignItems 'center',
+              borderWidth 1, borderRadius 6, paddingHorizontal 10,
+              paddingVertical 8 (matches AgendaForm.textInput style)
+            - Gap between rows: marginBottom 4
+            - XIcon: color colors.error, size 18
+            - Chevron buttons: color colors.textTertiary, size 16
+            - Add-input: same style as item row, no border or lighter border
+            - Uses useTheme() for all colors
+
+  # ===========================================================================
+  # F067: AgendaForm (MODIFIED)
+  # ===========================================================================
+
+  - name: AgendaForm (modified)
+    file: src/components/AgendaForm.tsx
+    responsibility: "Replace DebouncedTextInput for announcements with AnnouncementsList"
+    changes:
+      - what: "Replace announcements DebouncedTextInput with AnnouncementsList"
+        location: "Lines 244-254"
+        details: |
+          1. Add import:
+             import { AnnouncementsList } from './AnnouncementsList';
+
+          2. Replace lines 244-254:
+             BEFORE:
+               <FieldRow label={t('agenda.announcements')} colors={colors}>
+                 <DebouncedTextInput
+                   style={[styles.textInput, styles.announcementsInput,
+                     { color: colors.text, borderColor: colors.border }]}
+                   value={agenda.announcements ?? ''}
+                   onSave={(text) => updateField('announcements', text)}
+                   placeholder={t('agenda.announcements')}
+                   placeholderTextColor={colors.textTertiary}
+                   multiline
+                   editable={!isObserver}
+                 />
+               </FieldRow>
+
+             AFTER:
+               <FieldRow label={t('agenda.announcements')} colors={colors}>
+                 <AnnouncementsList
+                   value={agenda.announcements ?? null}
+                   onSave={(text) => updateField('announcements', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addAnnouncement')}
+                 />
+               </FieldRow>
+
+          3. KEEP styles.announcementsInput - it is still used by
+             welcome_new_families DebouncedTextInput on line 234.
+
+  # ===========================================================================
+  # F067: PresentationField type (MODIFIED)
+  # ===========================================================================
+
+  - name: usePresentationMode (modified types)
+    file: src/hooks/usePresentationMode.ts
+    responsibility: "Add 'bullet_list' to PresentationField.type union"
+    changes:
+      - what: "Extend PresentationField.type union"
+        location: "Line 27 (type field in PresentationField interface)"
+        details: |
+          BEFORE:
+            type: 'text' | 'hymn' | 'multiline';
+
+          AFTER:
+            type: 'text' | 'hymn' | 'multiline' | 'bullet_list';
+
+  # ===========================================================================
+  # F067: buildPresentationCards (MODIFIED)
+  # ===========================================================================
+
+  - name: buildPresentationCards (modified)
+    file: src/hooks/usePresentationMode.ts
+    responsibility: "Change announcements field type from 'multiline' to 'bullet_list'"
+    changes:
+      - what: "Change type for announcements PresentationField"
+        location: "Lines 94-99 (announcements push in welcomeFields)"
+        details: |
+          BEFORE:
+            if (agenda?.announcements) {
+              welcomeFields.push({
+                label: t('agenda.announcements'),
+                value: agenda.announcements,
+                type: 'multiline',
+              });
+            }
+
+          AFTER:
+            if (agenda?.announcements) {
+              welcomeFields.push({
+                label: t('agenda.announcements'),
+                value: agenda.announcements,
+                type: 'bullet_list',
+              });
+            }
+
+          The value remains the raw \n-joined string. The rendering layer
+          in presentation.tsx handles splitting and bullet formatting.
+
+  # ===========================================================================
+  # F067: PresentationFieldRow (MODIFIED)
+  # ===========================================================================
+
+  - name: PresentationFieldRow (modified)
+    file: src/app/presentation.tsx
+    responsibility: "Render bullet_list type as individual bullet-prefixed lines"
+    changes:
+      - what: "Add bullet_list rendering branch in PresentationFieldRow"
+        location: "Lines 155-172 (PresentationFieldRow function body)"
+        details: |
+          Add handling for field.type === 'bullet_list' BEFORE the return
+          statement, or modify the existing return to branch:
+
+          if (field.type === 'bullet_list') {
+            const bulletItems = (field.value || '')
+              .split('\n')
+              .filter(s => s.trim() !== '');
+
+            if (bulletItems.length === 0) {
+              return (
+                <View style={styles.fieldRow}>
+                  <Text style={[styles.fieldLabel, { ... }]}>{field.label}</Text>
+                  <Text style={[styles.fieldValue, { color: colors.textTertiary, ... }]}>
+                    ---
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={styles.fieldRow}>
+                <Text style={[styles.fieldLabel, { ... }]}>
+                  {field.label}
+                </Text>
+                {bulletItems.map((item, idx) => (
+                  <Text
+                    key={idx}
+                    style={[styles.fieldValue, { color: colors.text, ... }]}
+                  >
+                    {'\u2022 '}{item}
+                  </Text>
+                ))}
+              </View>
+            );
+          }
+
+          The bullet character is U+2022 (BULLET). Each item is rendered
+          as a separate Text element, so they each get their own line.
+          Font sizes follow the existing fontSizes pattern from props.
+
+  # ===========================================================================
+  # F067: i18n (MODIFIED - 3 files)
+  # ===========================================================================
+
+  - name: i18n locales (modified)
+    file: src/i18n/locales/pt-BR.json
+    responsibility: "Add agenda.addAnnouncement key"
+    changes:
+      - what: "Add i18n key"
+        details: |
+          In the "agenda" section, add:
+            "addAnnouncement": "Adicionar anuncio"
+
+  - name: i18n locales (modified)
+    file: src/i18n/locales/en-US.json
+    responsibility: "Add agenda.addAnnouncement key"
+    changes:
+      - what: "Add i18n key"
+        details: |
+          In the "agenda" section, add:
+            "addAnnouncement": "Add announcement"
+
+  - name: i18n locales (modified)
+    file: src/i18n/locales/es-LA.json
+    responsibility: "Add agenda.addAnnouncement key"
+    changes:
+      - what: "Add i18n key"
+        details: |
+          In the "agenda" section, add:
+            "addAnnouncement": "Agregar anuncio"
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # AnnouncementsList props contract
+  - name: announcementsListProps
+    component: AnnouncementsList
+    description: "Props contract for the AnnouncementsList component"
+    methods:
+      - name: "Component interface"
+        input: |
+          {
+            value: string | null,       // Raw \n-joined DB value
+            onSave: (v: string | null) => void,  // Save callback
+            disabled: boolean,          // Observer or offline mode
+            placeholder: string         // i18n add-input placeholder text
+          }
+        output: "React element rendering the announcements list UI"
+        logic: |
+          1. Parse value into string[] (split \n, filter empty)
+          2. Render item rows with edit/delete/reorder controls
+          3. Render add-input at bottom (if not disabled)
+          4. On any mutation: join items with \n → onSave(result)
+          5. If all items deleted: onSave(null)
+
+  # AnnouncementsList internal helpers (exported for testing)
+  - name: announcementsListHelpers
+    component: AnnouncementsList
+    description: "Exported utility functions for parsing/joining"
+    methods:
+      - name: parseItems
+        input: "value: string | null"
+        output: "string[] (non-empty trimmed items)"
+        logic: "(value ?? '').split('\\n').filter(s => s.trim() !== '')"
+      - name: joinItems
+        input: "items: string[]"
+        output: "string | null (null if empty, \\n-joined otherwise)"
+        logic: "items.length === 0 ? null : items.join('\\n')"
+
+  # AgendaForm → AnnouncementsList integration
+  - name: agendaFormAnnouncementsIntegration
+    component: AgendaForm
+    description: "Integration between AgendaForm and AnnouncementsList"
+    methods:
+      - name: "announcements onSave"
+        input: "value: string | null (from AnnouncementsList)"
+        output: "updateField('announcements', value) mutation call"
+        logic: |
+          The onSave callback passed to AnnouncementsList calls
+          updateField('announcements', text) which triggers the
+          existing useUpdateAgenda mutation. This is the same
+          pattern used by DebouncedTextInput for other agenda fields.
+
+  # PresentationField type contract
+  - name: presentationFieldBulletList
+    component: usePresentationMode
+    description: "PresentationField with bullet_list type for announcements"
+    methods:
+      - name: "bullet_list field"
+        input: |
+          PresentationField {
+            label: string (t('agenda.announcements')),
+            value: string (raw \n-joined announcements),
+            type: 'bullet_list'
+          }
+        output: "Rendered as individual bullet-prefixed text lines in PresentationFieldRow"
+        logic: |
+          1. Split value by \n
+          2. Filter empty strings
+          3. Render each as "• item" Text element
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  unchanged_entities:
+    - sunday_agendas  # announcements TEXT column unchanged, \n-joined format
+    - speeches        # No changes
+    - wards           # No changes
+
+  notes: |
+    No database migration needed. The announcements column remains TEXT.
+    Storage format is preserved: items joined by \n characters.
+    Empty/null announcements continue to work as before.
+    Existing data with \n naturally converts to separate list items.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes:
+    - "No new RLS policies needed: uses existing sunday_agendas RLS"
+    - "No new permissions: uses existing 'agenda:write' permission"
+    - "TextInput is single-line (no multiline prop), preventing \n injection within items"
+    - "Items are trimmed and empty items are filtered, preventing storage of whitespace-only items"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes:
+    - "No new logging needed: updateField already triggers TanStack Query mutation"
+    - "Activity log (if agenda changes are tracked) captures announcements field changes as before"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-039
+    title: "Store announcements as \\n-joined string in existing TEXT column"
+    decision: |
+      Keep the existing TEXT column for announcements. The UI parses
+      the string by splitting on \n and joins items with \n before
+      saving. No database schema change or migration is needed.
+    rationale: |
+      The storage format is unchanged from the current multiline text.
+      Existing data naturally converts to separate items when split by \n.
+      This avoids migration complexity, schema changes, and maintains
+      backward compatibility. The \n separator is a natural choice since
+      each item is single-line (TextInput without multiline prop prevents
+      users from typing \n within items).
+
+  - id: ADR-040
+    title: "New 'bullet_list' type in PresentationField for announcements"
+    decision: |
+      Add a new type 'bullet_list' to the PresentationField.type union:
+      'text' | 'hymn' | 'multiline' | 'bullet_list'. The announcements
+      field uses 'bullet_list' instead of 'multiline'. The rendering
+      layer splits by \n and prepends a bullet character to each item.
+    rationale: |
+      A new type is cleaner than special-casing 'multiline'. Other fields
+      using 'multiline' (recognized_names, welcome_new_families,
+      ward_business) should NOT render as bullet lists. Only announcements
+      has this behavior. The rendering change is localized to the
+      PresentationFieldRow component.
+
+  - id: ADR-041
+    title: "AnnouncementsList as dedicated component separate from AgendaForm"
+    decision: |
+      Create src/components/AnnouncementsList.tsx as a new component that
+      encapsulates all list logic (parse, add, delete, edit, reorder, save).
+      AgendaForm passes the raw value and onSave callback.
+    rationale: |
+      Encapsulating complex field logic in a separate component keeps
+      AgendaForm clean. This follows the existing pattern of extracting
+      complex field logic into separate components (ActorSelector for
+      actor selection, PrayerSelector for prayer selection,
+      DebouncedTextInput for text with debounce).
+
+  - id: ADR-042
+    title: "Inline edit saves on blur/submitEditing only (no debounce)"
+    decision: |
+      The inline edit TextInput saves only on blur or submitEditing events.
+      No debounce timer is used. The save is immediate on the discrete
+      event. The add-input follows the same pattern.
+    rationale: |
+      Unlike DebouncedTextInput which fires on every keystroke (debounced),
+      the list items save only on discrete completion events. This is
+      simpler and avoids per-item debounce timer complexity. Each save
+      sends the full joined string, consistent with updateField pattern.
+
+  - id: ADR-043
+    title: "Up/down arrow buttons for item reorder instead of drag gesture"
+    decision: |
+      Use ChevronUpIcon and ChevronDownIcon buttons adjacent to each item
+      for reorder, instead of long-press drag gesture. The up button swaps
+      the item with the one above; down swaps with below. First item hides
+      up, last item hides down.
+    rationale: |
+      Although react-native-gesture-handler and react-native-reanimated are
+      installed, adding react-native-draggable-flatlist would introduce a
+      new dependency. A custom drag implementation with gesture-handler
+      requires significant effort for proper hit-testing, visual feedback,
+      and cross-platform behavior. Up/down arrow buttons satisfy the reorder
+      requirement with zero new dependencies, minimal implementation
+      complexity, and work identically on iOS, Android, and Web. The SPEC
+      explicitly allows this fallback: "up/down arrows are acceptable
+      fallback" (OQ-1 resolution). For a typical announcements list of
+      3-7 items, arrow buttons are practical and sufficient. The icons
+      ChevronUpIcon and ChevronDownIcon already exist in the icon set.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-ARCH-01: true  # Read SPEC_F014.yaml completely
+  GATE-ARCH-02: true  # Read ARCH_CONSOLIDATED.yaml
+  GATE-ARCH-03: true  # Read all affected source files
+  GATE-ARCH-04: true  # Components have single responsibility
+  GATE-ARCH-05: true  # Contracts defined for all integrations
+  GATE-ARCH-06: true  # ADRs for decisions affecting multiple components
+  GATE-ARCH-07: true  # No conflicts with existing ARCH_CONSOLIDATED

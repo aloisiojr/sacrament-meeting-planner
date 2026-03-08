@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 21
-last_updated: "2026-03-05T16:23:00"
+version: 23
+last_updated: "2026-03-08T04:18:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -797,3 +797,56 @@ deploy_history:
     verification:
       - "supabase functions list mostra send-reset-email como ACTIVE v8"
       - "REST API health check: HTTP 200"
+
+  - date: "2026-03-08"
+    action: "Migration 030_fix_enqueue_notification_search_path.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - enqueue_speech_notification() atualizada com public. prefix em todas as 4 referencias a notification_queue"
+    verified: true
+    cr: "CR-275"
+    verification:
+      - "pg_proc.prosrc: todas 4 referencias usam public.notification_queue"
+      - "pg_proc.prosecdef = true (SECURITY DEFINER mantido)"
+      - "pg_proc.proconfig = [search_path=\"\"] mantido"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-08"
+    action: "Migration 031_secretary_review_notification.sql"
+    method: "Management API (HTTPS) via python3 JSON encoding (2 requests: schema changes, trigger function)"
+    reason: "Porta 5432 bloqueada por firewall no ambiente de execucao"
+    result: "Sucesso - assigned_by_role TEXT adicionado a speeches, topic_title TEXT adicionado a notification_queue, CHECK constraint atualizado com secretary_review, trigger reestruturado com Cases 6A e 6B"
+    verified: true
+    cr: "CR-276"
+    verification:
+      - "information_schema.columns: speeches.assigned_by_role TEXT, nullable"
+      - "information_schema.columns: notification_queue.topic_title TEXT, nullable"
+      - "pg_constraint: notification_queue_type_check inclui secretary_review"
+      - "pg_proc.prosrc: Case 6B (topic change) ANTES do early-return, Case 6A (speaker assignment) APOS casos existentes"
+      - "pg_proc.prosecdef = true (SECURITY DEFINER mantido)"
+      - "pg_proc.proconfig = [search_path=\"\"] mantido"
+      - "speech_notification_trigger: ativo em INSERT e UPDATE"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-08"
+    action: "Redeploy Edge Function process-notifications"
+    method: "supabase functions deploy process-notifications"
+    reason: "CR-276: secretary_review notification type support (buildSecretaryReviewText with speaker and topic variants, 3 languages)"
+    result: "Sucesso - Function redeployada e ACTIVE (version 10)"
+    verified: true
+    cr: "CR-276"
+    verification:
+      - "supabase functions list mostra process-notifications como ACTIVE v10"
+      - "REST API health check: HTTP 200"
+
+  - date: "2026-03-08"
+    action: "EAS Build (Android preview)"
+    method: "eas build --profile preview --platform all --non-interactive"
+    reason: "Client-side changes: secretary full permissions, assigned_by_role in mutations, informal_name search, secretary_review notification text"
+    result: "Android build em progresso (ID: 1eb89b27-0562-44b1-a614-1c700c7e8f1b). iOS falhou - credenciais para distribuicao interna requerem setup interativo."
+    verified: false
+    cr: "CR-275, CR-276"
+    verification:
+      - "Android build in progress no EAS (preview profile, version code 2)"
+      - "iOS build requer: eas credentials para configurar distribuicao interna"
+    notes: "iOS precisa de setup interativo de credenciais (provisioning profile para ad-hoc/internal distribution). Rodar 'eas build --profile preview --platform ios' interativamente."

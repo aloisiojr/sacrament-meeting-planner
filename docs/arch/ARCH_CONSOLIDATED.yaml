@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-07 (CR-275 + CR-276: Nickname search + Secretary permissions)
+# Last updated: 2026-03-08 (CR-277: Announcements list UX improvement)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-07"
+  last_updated: "2026-03-08"
   total_modules: 13
-  total_adrs: 38
+  total_adrs: 43
 
 # =============================================================================
 # TECH STACK
@@ -291,12 +291,15 @@ modules:
       Full meeting agenda editing and display. Agenda records lazily created.
       Auto-save on field change with debounced text inputs. Collapsed cards
       show status lines. Includes speaker overrides for last-minute changes.
-    features: [F021, F022]
+      Announcements field uses structured list with add/delete/reorder/inline-edit.
+    features: [F021, F022, F067]
     components:
       - path: src/hooks/useAgenda.ts
         responsibility: TanStack Query hooks for agenda CRUD, lazy creation
       - path: src/components/AgendaForm.tsx
         responsibility: Full agenda editing form with sections (Welcome, Sacrament, Speeches, Closing)
+      - path: src/components/AnnouncementsList.tsx
+        responsibility: Structured announcements list with add, delete, inline-edit, and up/down reorder
       - path: src/components/DebouncedTextInput.tsx
         responsibility: Flicker-free text input with isFocusedRef preventing query overwrite
       - path: src/app/(tabs)/agenda.tsx
@@ -315,13 +318,13 @@ modules:
     description: |
       Full-screen read-only view for conducting sacrament meetings. Accordion
       cards with directional arrows. Font size toggle. Navigates to Agenda tab
-      for editing.
+      for editing. Supports bullet_list field type for announcements rendering.
     features: [F023]
     components:
       - path: src/hooks/usePresentationMode.ts
-        responsibility: Data aggregation for presentation view
+        responsibility: Data aggregation for presentation view; PresentationField type union includes bullet_list
       - path: src/app/presentation.tsx
-        responsibility: Presentation screen (outside tab group)
+        responsibility: Presentation screen (outside tab group); PresentationFieldRow renders bullet_list as individual bullet-prefixed lines
       - path: src/components/AccordionCard.tsx
         responsibility: Expandable card with directional arrow indicators
     dependencies:
@@ -1158,3 +1161,60 @@ adrs:
       Clearing a topic is not a new assignment that requires bishopric
       review. Only meaningful changes (new topic set) generate notifications.
       Prevents spam from topic clear/re-add cycles.
+
+  - id: ADR-039
+    title: "Store announcements as \\n-joined string in existing TEXT column"
+    decision: |
+      Keep the existing TEXT column for announcements. The UI parses the
+      string by splitting on \n and joins items with \n before saving.
+      No database schema change or migration is needed.
+    rationale: |
+      The storage format is unchanged from the current multiline text.
+      Existing data naturally converts to separate items when split by \n.
+      Avoids migration complexity and maintains backward compatibility.
+
+  - id: ADR-040
+    title: "New 'bullet_list' type in PresentationField for announcements"
+    decision: |
+      Add 'bullet_list' to PresentationField.type union. Announcements
+      field uses 'bullet_list' instead of 'multiline'. Rendering layer
+      splits by \n and prepends bullet character to each item.
+    rationale: |
+      A new type is cleaner than special-casing 'multiline'. Other fields
+      using 'multiline' (recognized_names, welcome_new_families, ward_business)
+      should not render as bullet lists. Only announcements has this behavior.
+
+  - id: ADR-041
+    title: "AnnouncementsList as dedicated component separate from AgendaForm"
+    decision: |
+      Create AnnouncementsList.tsx encapsulating all list logic (parse,
+      add, delete, edit, reorder, save). AgendaForm passes raw value
+      and onSave callback.
+    rationale: |
+      Follows existing pattern of extracting complex field logic into
+      separate components (ActorSelector, PrayerSelector, DebouncedTextInput).
+      Keeps AgendaForm clean.
+
+  - id: ADR-042
+    title: "Inline edit saves on blur/submitEditing only (no debounce)"
+    decision: |
+      Inline edit and add-input save only on blur or submitEditing events.
+      No debounce timer is used. Save is immediate on the discrete event.
+    rationale: |
+      Unlike DebouncedTextInput which fires on every keystroke (debounced),
+      list items save only on discrete completion events. Simpler and avoids
+      per-item debounce timer complexity.
+
+  - id: ADR-043
+    title: "Up/down arrow buttons for item reorder instead of drag gesture"
+    decision: |
+      Use ChevronUpIcon/ChevronDownIcon buttons for reorder instead of
+      long-press drag gesture. Up swaps with item above, down swaps with
+      below. First item hides up, last item hides down.
+    rationale: |
+      Avoids new dependency (react-native-draggable-flatlist). Custom drag
+      requires significant effort. Arrow buttons satisfy the reorder
+      requirement with zero new dependencies, minimal complexity, and
+      identical behavior on iOS, Android, and Web. SPEC allows this
+      fallback (OQ-1: "up/down arrows are acceptable fallback").
+      ChevronUpIcon and ChevronDownIcon already exist in the icon set.

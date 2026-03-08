@@ -1,0 +1,576 @@
+# =============================================================================
+# SPEC_F014.yaml - CR-277
+# Artifact ID: 014
+# Feature IDs: F067
+# Status: complete
+# =============================================================================
+
+metadata:
+  artifact_id: "014"
+  feature_ids: [F067]
+  crs: [277]
+  status: complete
+  created: "2026-03-08"
+  finalized: "2026-03-08"
+  author: requirements-extractor
+
+# =============================================================================
+# USER REQUEST (verbatim)
+# =============================================================================
+user_request: |
+  Esse campo geralmente e uma lista de itens e, as vezes, em cima da hora, eu
+  preciso adicionar ou remover esses itens. Fazer isso posicionando o cursor nao
+  e tao bom pois o campo e pequeno. Eu pensei na seguinte solucao: faca o campo
+  com 1 linha so, quando eu clico adiciono algo nela, ela ganha um botao de X na
+  direita para deletar, e um campo novo para adicao aparece abaixo dela. Se eu
+  colocar 5 itens, por exemplo, eu verei 5 linhas com texto e um x do lado e uma
+  linha vazia abaixo para edicao. Todos os itens podem ser guardados juntos, num
+  campo so formatado como uma itemizacao.
+
+  Decisoes confirmadas pelo usuario:
+  1. Campo vazio: mostra 1 input com placeholder "Adicionar anuncio" (i18n)
+  2. Clique no texto de um item existente: fica editavel inline
+  3. Drag-to-reorder para reordenar itens
+  4. Offline: itens disabled, sem X, sem campo de adicao, sem drag
+  5. Apresentacao: cada item como bullet point
+
+# =============================================================================
+# FEATURE SPECIFICATIONS
+# =============================================================================
+
+features:
+
+  # ===========================================================================
+  # F067: CR-277 - Announcements list items
+  # ===========================================================================
+  - id: F067
+    cr: 277
+    name: "Announcements list items with add/delete/reorder/inline-edit"
+    area: agenda
+    description: |
+      Transform the announcements field in AgendaForm from a single multiline
+      DebouncedTextInput into a structured list of individually manageable items.
+      Each item is displayed as a single-line row with an X delete button on the
+      right. Clicking the text of an existing item makes it editable inline.
+      A new empty input with placeholder "Add announcement" (i18n) always appears
+      below the last item for adding new entries. Items support drag-to-reorder
+      via long-press.
+
+      Storage format is unchanged: all items are joined with \n and saved as a
+      single TEXT string in the existing announcements column. No database schema
+      change is needed.
+
+      In Presentation Mode, each item renders as a bullet point (bullet character
+      prefix) instead of the current plain multiline text block.
+
+      In offline mode (disabled prop) or for observers (isObserver), items display
+      as read-only text rows without X buttons, without the add-input, and without
+      drag handles.
+
+    affected_files:
+      # New component
+      - path: src/components/AnnouncementsList.tsx (NEW)
+        change: |
+          New component that encapsulates the announcements list UI. Props:
+            - items: string[] (parsed from announcements string)
+            - onSave: (items: string[]) => void (joins with \n and calls updateField)
+            - disabled: boolean (isObserver or offline)
+            - placeholder: string (i18n add-announcement text)
+
+          Internal state:
+            - Parses initial items from props
+            - Tracks which item index is in edit mode (editingIndex: number | null)
+            - Tracks the add-input text (addText: string)
+
+          Rendering:
+            - For each item: a row with Text (tappable to enter edit mode) + XIcon
+              Pressable for delete. When in edit mode, Text is replaced with a
+              TextInput pre-filled with the item text.
+            - Below all items: an empty TextInput with placeholder for adding.
+            - Items are wrapped in a drag-to-reorder container.
+
+          Behavior:
+            - Add: user types in bottom input, on submitEditing (or blur with
+              non-empty trimmed text), item is appended to the list and saved.
+            - Delete: pressing X removes the item at that index, triggers save.
+            - Edit: tapping item text sets editingIndex; TextInput appears. On
+              blur or submitEditing, if text is non-empty trimmed, item is updated
+              and saved. If empty, item is deleted.
+            - Reorder: long-press + drag to reorder. On drop, new order is saved.
+            - Save: all operations call onSave with the updated items array.
+
+          Disabled state:
+            - Items rendered as plain Text (no tap handler).
+            - No X buttons, no add-input, no drag handles.
+
+      - path: src/components/AgendaForm.tsx
+        change: |
+          Replace the DebouncedTextInput for announcements (lines 244-254) with
+          the new AnnouncementsList component.
+
+          Import AnnouncementsList. Parse agenda.announcements into string[] by
+          splitting on \n and filtering empty strings. Pass:
+            - items: parsed array
+            - onSave: callback that joins items with \n (or null if empty) and
+              calls updateField('announcements', joinedString)
+            - disabled: isObserver
+            - placeholder: t('agenda.addAnnouncement')
+
+      - path: src/hooks/usePresentationMode.ts
+        change: |
+          In buildPresentationCards, change the announcements field from type
+          'multiline' to a new type 'bullet_list'. The value remains the
+          \n-joined string. The rendering layer will split and format as bullets.
+
+          Alternatively, split the announcements string into individual items
+          and add each as a separate PresentationField with a bullet prefix.
+
+          Chosen approach: Add a new PresentationField type 'bullet_list' to
+          the type union. The value is the raw \n-joined string. Rendering
+          splits by \n and prepends bullet character to each line.
+
+      - path: src/hooks/usePresentationMode.ts (types)
+        change: |
+          Update PresentationField.type union to include 'bullet_list':
+            type: 'text' | 'hymn' | 'multiline' | 'bullet_list'
+
+      - path: src/app/presentation.tsx
+        change: |
+          In PresentationFieldRow, add handling for field.type === 'bullet_list'.
+          Split field.value by \n, filter empty strings, and render each item
+          as a Text with a bullet prefix character (e.g., "\u2022 " or "- ").
+          Each item on its own line/row.
+
+      - path: src/i18n/locales/pt-BR.json
+        change: |
+          Add key "agenda.addAnnouncement": "Adicionar anuncio"
+
+      - path: src/i18n/locales/en-US.json
+        change: |
+          Add key "agenda.addAnnouncement": "Add announcement"
+
+      - path: src/i18n/locales/es-LA.json
+        change: |
+          Add key "agenda.addAnnouncement": "Agregar anuncio"
+
+    current_behavior: |
+      The announcements field in AgendaForm (lines 244-254) is a single
+      DebouncedTextInput with multiline=true and minHeight: 66px. Users type
+      free-form text. The entire text is stored as a single string in the
+      announcements TEXT column. In Presentation Mode, it renders as a plain
+      text block (type: 'multiline', numberOfLines=undefined). Editing individual
+      items within the text requires cursor positioning, which is difficult on
+      a small field.
+
+    acceptance_criteria:
+      # --- Empty state ---
+      - id: AC-067-01
+        description: "Empty announcements shows single add-input"
+        given: "agenda.announcements is null or empty string"
+        when: "AgendaForm renders the announcements field"
+        then: "A single TextInput is shown with placeholder t('agenda.addAnnouncement') and no item rows above it"
+
+      # --- Adding items ---
+      - id: AC-067-02
+        description: "Adding first announcement creates item row"
+        given: "Announcements is empty, user types 'Atividade dia 15' in add-input"
+        when: "User presses Enter/submit or blurs the input"
+        then: "A new item row appears with text 'Atividade dia 15' and X button; add-input clears and remains below; announcements is saved as 'Atividade dia 15'"
+
+      - id: AC-067-03
+        description: "Adding subsequent items appends to list"
+        given: "Announcements has 2 items ('Item1\\nItem2')"
+        when: "User types 'Item3' in add-input and submits"
+        then: "3 item rows are shown (Item1, Item2, Item3); announcements saved as 'Item1\\nItem2\\nItem3'"
+
+      - id: AC-067-04
+        description: "Empty or whitespace-only add-input is not saved"
+        given: "User types spaces or nothing in add-input"
+        when: "User blurs the input or presses Enter"
+        then: "No new item is added to the list; no save is triggered"
+
+      # --- Deleting items ---
+      - id: AC-067-05
+        description: "Pressing X deletes item and triggers save"
+        given: "Announcements has 3 items ('A\\nB\\nC')"
+        when: "User presses X on item 'B'"
+        then: "Item 'B' is removed; 2 items remain ('A', 'C'); announcements saved as 'A\\nC'"
+
+      - id: AC-067-06
+        description: "Deleting last item saves null"
+        given: "Announcements has 1 item ('A')"
+        when: "User presses X on item 'A'"
+        then: "No item rows remain; empty add-input is shown; announcements saved as null or empty string"
+
+      # --- Inline editing ---
+      - id: AC-067-07
+        description: "Clicking item text enters inline edit mode"
+        given: "Announcements has items, user is not observer"
+        when: "User taps on the text of item 'Atividade dia 15'"
+        then: "Text is replaced by a TextInput pre-filled with 'Atividade dia 15'; cursor is active"
+
+      - id: AC-067-08
+        description: "Inline edit saves on blur/submit"
+        given: "Item is in edit mode with text changed to 'Atividade dia 20'"
+        when: "User presses Enter or blurs the TextInput"
+        then: "Item text is updated to 'Atividade dia 20'; announcements saved with updated item"
+
+      - id: AC-067-09
+        description: "Inline edit with empty text deletes item"
+        given: "Item is in edit mode, user clears all text"
+        when: "User blurs the TextInput"
+        then: "Item is deleted from the list; announcements saved without that item"
+
+      # --- Drag-to-reorder ---
+      - id: AC-067-10
+        description: "Long-press starts drag-to-reorder"
+        given: "Announcements has 3+ items, user is not observer/offline"
+        when: "User long-presses on an item"
+        then: "Item enters drag state and can be moved up/down among other items"
+
+      - id: AC-067-11
+        description: "Dropping item in new position triggers save"
+        given: "User is dragging item 'C' from position 3"
+        when: "User drops it at position 1"
+        then: "Items reorder to ('C', 'A', 'B'); announcements saved as 'C\\nA\\nB'"
+
+      # --- Offline / Observer ---
+      - id: AC-067-12
+        description: "Offline mode shows items as read-only"
+        given: "AgendaForm disabled prop is true (offline)"
+        when: "Announcements field renders with 3 items"
+        then: "3 text rows are visible but no X buttons, no add-input, no drag handles; items are not tappable for editing"
+
+      - id: AC-067-13
+        description: "Observer role shows items as read-only"
+        given: "User has observer role (no agenda:write permission)"
+        when: "Announcements field renders with items"
+        then: "Items display as plain text without any interactive controls"
+
+      - id: AC-067-14
+        description: "Offline with empty announcements shows nothing or placeholder"
+        given: "Offline mode and announcements is null"
+        when: "Announcements field renders"
+        then: "No add-input is shown; either empty area or a non-interactive placeholder"
+
+      # --- Presentation Mode ---
+      - id: AC-067-15
+        description: "Presentation mode renders each item as bullet point"
+        given: "Announcements has items 'A\\nB\\nC'"
+        when: "Presentation Mode renders the Welcome card"
+        then: "Each item appears on its own line with a bullet prefix character (e.g., bullet dot or dash)"
+
+      - id: AC-067-16
+        description: "Presentation mode with empty announcements"
+        given: "Announcements is null or empty"
+        when: "Presentation Mode renders the Welcome card"
+        then: "Announcements field is omitted from the card (existing behavior preserved)"
+
+      # --- Storage format ---
+      - id: AC-067-17
+        description: "Storage format is \\n-joined string in TEXT column"
+        given: "User adds/edits/reorders/deletes items"
+        when: "Save is triggered"
+        then: "updateField('announcements', ...) is called with items joined by \\n or null if empty"
+
+      - id: AC-067-18
+        description: "No database migration needed"
+        given: "CR-277 implementation"
+        when: "Checking for new migration files"
+        then: "No new migration file exists for announcements column change"
+
+      # --- Backward compatibility ---
+      - id: AC-067-19
+        description: "Existing multi-line announcements display correctly"
+        given: "Existing data has 'Line1\\nLine2\\nLine3' from pre-CR-277 free-form input"
+        when: "AgendaForm renders"
+        then: "3 separate item rows are shown: 'Line1', 'Line2', 'Line3'"
+
+      # --- i18n ---
+      - id: AC-067-20
+        description: "i18n key agenda.addAnnouncement exists in all 3 locales"
+        given: "i18n locale files"
+        when: "Key 'agenda.addAnnouncement' is accessed"
+        then: "pt-BR: 'Adicionar anuncio', en-US: 'Add announcement', es-LA: 'Agregar anuncio'"
+
+      # --- Auto-save pattern ---
+      - id: AC-067-21
+        description: "Save uses existing updateField pattern"
+        given: "User adds/edits/deletes/reorders an item"
+        when: "Save is triggered"
+        then: "updateField('announcements', joinedString) is called, consistent with other agenda auto-save fields"
+
+    edge_cases:
+      - id: EC-067-01
+        case: "Item text contains \\n (newline within a single item)"
+        expected: |
+          TextInput for add/edit is single-line (no multiline prop), so users cannot
+          type newlines within an item. If existing data somehow contains consecutive
+          \\n, empty strings are filtered out during parsing.
+
+      - id: EC-067-02
+        case: "Very long announcement text in a single item"
+        expected: |
+          The item row truncates long text with numberOfLines={1} for display.
+          When in edit mode, full text is visible in the TextInput (scrollable).
+
+      - id: EC-067-03
+        case: "Rapid add/delete/edit operations"
+        expected: |
+          Each operation triggers a save with the full joined string. The
+          updateField mutation handles optimistic updates via TanStack Query.
+          No debounce needed for add/delete since they are discrete actions.
+          Inline edit may benefit from a short debounce on blur.
+
+      - id: EC-067-04
+        case: "Concurrent editing by two users"
+        expected: |
+          Supabase Realtime will sync the latest announcements value. When the
+          external value changes while the user is not actively editing, the
+          component re-parses items from the new value. If actively editing,
+          the local edit takes precedence (same as DebouncedTextInput behavior).
+
+      - id: EC-067-05
+        case: "Drag-to-reorder with only 1 item"
+        expected: |
+          Drag gesture is technically possible but has no effect (only 1 item).
+          The save is not triggered unnecessarily.
+
+      - id: EC-067-06
+        case: "Item text is only whitespace"
+        expected: |
+          On save (blur/submit), whitespace-only items are treated as empty
+          and removed from the list (same as add-input empty check).
+
+      - id: EC-067-07
+        case: "Presentation Mode with single-item announcements"
+        expected: |
+          Even a single item renders with bullet prefix for consistency.
+
+      - id: EC-067-08
+        case: "welcomeNewFamilies field unchanged"
+        expected: |
+          The welcome_new_families field remains a DebouncedTextInput with
+          multiline. Only the announcements field is converted to list items.
+          No changes to welcome_new_families.
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+open_questions:
+  - id: OQ-1
+    status: RESOLVED
+    question: "What library should be used for drag-to-reorder?"
+    resolution: |
+      Use react-native-draggable-flatlist which builds on top of
+      react-native-gesture-handler (already installed at ~2.28.0) and
+      react-native-reanimated. If react-native-reanimated is not installed,
+      a simpler approach can be used: move-up/move-down buttons instead of
+      actual drag gesture. The implementer should check dependencies and
+      choose the approach with minimal new dependencies.
+
+      Alternatively, a lightweight custom drag implementation using
+      react-native-gesture-handler directly is acceptable. The key
+      requirement is that items can be reordered via some intuitive gesture
+      (long-press + drag is preferred; up/down arrows are acceptable fallback).
+
+  - id: OQ-2
+    status: RESOLVED
+    question: "Should inline edit use debounce like DebouncedTextInput?"
+    resolution: |
+      No debounce timer is needed for inline editing. Unlike the current
+      DebouncedTextInput which fires on every keystroke (debounced), the
+      new inline edit saves only on blur or submitEditing (discrete events).
+      This is simpler and more predictable. The save is immediate on
+      blur/submit, not debounced.
+
+  - id: OQ-3
+    status: RESOLVED
+    question: "What happens to the existing announcements DebouncedTextInput styles?"
+    resolution: |
+      The announcementsInput style (minHeight: 66) is no longer needed since
+      the new component renders individual item rows + add-input. The style
+      can be removed from the stylesheet if not used elsewhere. The new
+      component uses per-item row styling consistent with other AgendaForm
+      fields (borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8).
+
+  - id: OQ-4
+    status: RESOLVED
+    question: "How does the add-input submit work? On Enter, on blur, or both?"
+    resolution: |
+      Both. On submitEditing (Enter key) AND on blur. This ensures items are
+      saved regardless of how the user leaves the input. The add-input
+      returnKeyType is 'done' (or 'next' to keep focus for rapid adds).
+      After adding, the input clears and remains focused for rapid entry.
+
+  - id: OQ-5
+    status: RESOLVED
+    question: "Should the bullet list type be added to PresentationField, or just split and render multiline differently?"
+    resolution: |
+      Add a new type 'bullet_list' to PresentationField.type union. This is
+      cleaner than special-casing multiline, since multiline is also used
+      for other fields (recognized_names, welcome_new_families, ward business).
+      Only announcements should render as bullet points.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+assumptions:
+  - id: A-1
+    assumption: |
+      Existing announcements data that contains \n characters will naturally
+      convert to separate list items. Users who previously typed multi-line
+      free text will see each line as a separate item.
+    reason: "The storage format is the same (\n-joined). Parsing splits on \n."
+    impact_if_wrong: "If users intentionally had \n within a single announcement concept, those will become separate items. This is acceptable since the new UX is designed around single-line items."
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: |
+      The add-input uses single-line TextInput (no multiline prop). This
+      prevents users from entering newlines within a single item, which
+      would conflict with the \n separator in storage.
+    reason: "Each item is a single line. The \n character is reserved as the item separator."
+    impact_if_wrong: "If multiline were allowed, items with internal newlines would be incorrectly split on re-parse."
+    needs_confirmation: false
+
+  - id: A-3
+    assumption: |
+      The drag-to-reorder feature requires react-native-gesture-handler
+      which is already installed. The implementer will choose the best
+      library or custom approach for drag gesture handling based on
+      available dependencies.
+    reason: "react-native-gesture-handler ~2.28.0 is in package.json. Additional dependencies may be needed."
+    impact_if_wrong: "If the chosen drag library has compatibility issues, the fallback is move-up/move-down buttons."
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: |
+      The inline edit TextInput for existing items does NOT need debouncing
+      because saves only happen on discrete events (blur/submitEditing),
+      not on every keystroke.
+    reason: "Unlike the current DebouncedTextInput which saves on typing, inline edit is a single save on completion."
+    impact_if_wrong: "If the implementer wants debounce for inline edit, it would still work but is unnecessary."
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: |
+      The welcome_new_families field is NOT changed by this CR. It remains
+      a DebouncedTextInput with multiline. Only the announcements field is
+      converted to a list component.
+    reason: "The user request specifically mentions the announcements field. No mention of welcome_new_families."
+    impact_if_wrong: "None - the scope is clear from the user request."
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: |
+      react-native-reanimated is available in the project for use with
+      drag-to-reorder libraries. If not, the implementer will either
+      install it or use an alternative approach.
+    reason: "Many drag libraries require reanimated. The project may or may not have it."
+    impact_if_wrong: "Implementer falls back to gesture-handler-only solution or up/down buttons."
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+inconsistencies:
+  - id: INC-1
+    type: spec_update_needed
+    status: RESOLVED
+    description: |
+      SPEC_CONSOLIDATED F021 (Agenda Form) describes the announcements field
+      as part of the Welcome section but does not mention list-item behavior.
+      After CR-277, F021 description should note that announcements uses a
+      list component with add/delete/reorder/inline-edit.
+    existing_spec: "F021 description: 'announcements' listed as a plain field in Welcome section."
+    new_request: "CR-277 transforms announcements into a list of individually manageable items."
+    resolution: "Update SPEC_CONSOLIDATED F021 description after implementation."
+
+  - id: INC-2
+    type: spec_update_needed
+    status: RESOLVED
+    description: |
+      SPEC_CONSOLIDATED does not document the PresentationField type union.
+      Adding 'bullet_list' to the type is a new design decision that should
+      be documented.
+    existing_spec: "Not documented in SPEC_CONSOLIDATED."
+    new_request: "New PresentationField type 'bullet_list' for announcements rendering."
+    resolution: "Add design decision DD-014-02 and update SPEC_CONSOLIDATED after implementation."
+
+  - id: INC-3
+    type: style_removal
+    status: RESOLVED
+    description: |
+      The announcementsInput style in AgendaForm.tsx (minHeight: 66) will
+      become unused after the DebouncedTextInput is replaced. It should be
+      removed if not used by welcome_new_families.
+    existing_spec: "AgendaForm.tsx line 951-953: announcementsInput style."
+    new_request: "Remove unused style if not referenced elsewhere."
+    resolution: |
+      Check if announcementsInput is used by welcome_new_families. From code
+      review: yes, line 234 uses styles.announcementsInput for welcome_new_families.
+      Therefore the style must be KEPT. Only the announcements field stops using it.
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+design_decisions:
+  - id: DD-014-01
+    decision: "Store announcements as \\n-joined string in existing TEXT column"
+    rationale: |
+      No database schema change is needed. The existing TEXT column stores
+      the joined string. The UI parses/joins on the client side. This is the
+      simplest approach and avoids migration complexity. Existing data with
+      \n naturally converts to separate items.
+    adr: ADR-039
+
+  - id: DD-014-02
+    decision: "Add 'bullet_list' type to PresentationField for announcements"
+    rationale: |
+      A new field type is cleaner than special-casing 'multiline'. Other
+      multiline fields (recognized_names, welcome_new_families, ward_business)
+      should NOT render as bullet lists. Only announcements has this behavior.
+      The rendering layer splits by \n and prepends a bullet character.
+    adr: ADR-040
+
+  - id: DD-014-03
+    decision: "AnnouncementsList as a new dedicated component"
+    rationale: |
+      Encapsulating the list logic (parse, add, delete, edit, reorder, save)
+      in a separate component keeps AgendaForm clean. The component receives
+      parsed items and an onSave callback, similar to how other fields work
+      in AgendaForm. This follows the existing pattern of extracting complex
+      field logic into separate components (ActorSelector, PrayerSelector).
+    adr: ADR-041
+
+  - id: DD-014-04
+    decision: "Inline edit saves on blur/submitEditing only (no debounce timer)"
+    rationale: |
+      Unlike the current DebouncedTextInput which fires on keystrokes with
+      a timer, the list items save only on discrete completion events. This
+      is simpler and avoids the complexity of per-item debounce timers. Each
+      save sends the full joined string, consistent with updateField pattern.
+    adr: ADR-042
+
+  - id: DD-014-05
+    decision: "Drag-to-reorder via long-press gesture"
+    rationale: |
+      Long-press to initiate drag is the standard mobile pattern for
+      reorderable lists. react-native-gesture-handler is already available.
+      The implementer chooses the specific library or custom approach based
+      on project dependencies. If drag proves too complex, up/down arrow
+      buttons are an acceptable fallback that still satisfies the reorder
+      requirement.
+    adr: ADR-043
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+validation_gate:
+  GATE-01: true   # Read SPEC_CONSOLIDATED before starting
+  GATE-02: true   # Identified all ambiguities
+  GATE-03: true   # Listed ALL open questions with IDs
+  GATE-04: true   # Listed ALL assumptions with IDs
+  GATE-05: true   # Reported inconsistencies with SPEC_CONSOLIDATED
+  GATE-06: true   # Status is complete (all OQs resolved)

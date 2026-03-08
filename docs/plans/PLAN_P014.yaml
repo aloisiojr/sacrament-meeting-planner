@@ -1,0 +1,574 @@
+# =============================================================================
+# PLAN_P014.yaml
+# Artifact ID: 014
+# Phase: 1 of 1
+# Features: F067 (CR-277)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "014"
+  phase: 1
+  total_phases: 1
+  feature_ids: [F067]
+  crs: [277]
+  status: pending
+  created: "2026-03-08"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    F067: Transform the announcements field in AgendaForm from a single multiline
+    DebouncedTextInput into a structured list of individually manageable items.
+    Each item supports add, delete, inline-edit, and reorder (via up/down arrows).
+    Storage format is unchanged (\n-joined TEXT column, no migration).
+    Presentation Mode renders each item as a bullet point (new 'bullet_list' type).
+    Offline/observer mode disables all interactive controls.
+
+  principles:
+    - "Single component responsibility: AnnouncementsList encapsulates all list logic"
+    - "Zero schema change: \\n-joined TEXT column preserved, no migration"
+    - "Existing save pattern: updateField('announcements', ...) for all operations"
+    - "Progressive enhancement: up/down arrow buttons for reorder (no new deps)"
+    - "Presentation type extension: new 'bullet_list' type in PresentationField"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: i18n keys for all 3 locales
+  # ---------------------------------------------------------------------------
+  - id: S014-01
+    title: "Add agenda.addAnnouncement i18n key to all 3 locales"
+    feature: F067
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: edit
+        description: |
+          In the "agenda" section, after the "announcements" key (line 245),
+          add:
+            "addAnnouncement": "Adicionar anúncio"
+
+      - path: src/i18n/locales/en-US.json
+        action: edit
+        description: |
+          In the "agenda" section, after the "announcements" key (line 245),
+          add:
+            "addAnnouncement": "Add announcement"
+
+      - path: src/i18n/locales/es-LA.json
+        action: edit
+        description: |
+          In the "agenda" section, after the "announcements" key (line 245),
+          add:
+            "addAnnouncement": "Agregar anuncio"
+
+    done_when: |
+      - t('agenda.addAnnouncement') returns correct text for all 3 locales
+      - pt-BR: "Adicionar anúncio"
+      - en-US: "Add announcement"
+      - es-LA: "Agregar anuncio"
+      - Existing i18n keys unchanged
+
+    acceptance_criteria:
+      - AC-067-20  # i18n key exists in all 3 locales
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: true
+        cases:
+          - "i18n key agenda.addAnnouncement exists in pt-BR"
+          - "i18n key agenda.addAnnouncement exists in en-US"
+          - "i18n key agenda.addAnnouncement exists in es-LA"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: AnnouncementsList component (NEW)
+  # ---------------------------------------------------------------------------
+  - id: S014-02
+    title: "Create AnnouncementsList component with add/delete/inline-edit/reorder"
+    feature: F067
+    depends_on: [S014-01]
+    files:
+      - path: src/components/AnnouncementsList.tsx
+        action: create
+        description: |
+          New component with the following structure:
+
+          Exports (module-level, for testing):
+            parseItems(value: string | null): string[]
+              → (value ?? '').split('\n').filter(s => s.trim() !== '')
+
+            joinItems(items: string[]): string | null
+              → items.length === 0 ? null : items.join('\n')
+
+          Props interface:
+            interface AnnouncementsListProps {
+              value: string | null;
+              onSave: (value: string | null) => void;
+              disabled: boolean;
+              placeholder: string;
+            }
+
+          Internal state:
+            - items: string[] (parsed from value prop)
+            - editingIndex: number | null
+            - editText: string
+            - addText: string
+            - isEditingRef: useRef<boolean> (prevents external sync during edits)
+            - addInputRef: useRef<TextInput> (for refocus after add)
+
+          Save function (internal):
+            saveItems(newItems: string[]):
+              1. Set items state to newItems
+              2. Call onSave(joinItems(newItems))
+
+          Add behavior:
+            - TextInput at bottom with placeholder, returnKeyType='done'
+            - onSubmitEditing: if addText.trim() !== '', append to items,
+              call saveItems, clear addText, refocus addInputRef
+            - onBlur: same logic (save non-empty trimmed text)
+
+          Delete behavior:
+            - Pressable with XIcon (colors.error, size 18) on right side of row
+            - On press: remove item at index, call saveItems
+            - If editingIndex === deleted index: clear editing state
+
+          Inline edit behavior:
+            - Tap on item Text → set editingIndex, set editText to item text,
+              set isEditingRef.current = true
+            - TextInput replaces Text, pre-filled with editText, autoFocus
+            - onSubmitEditing / onBlur:
+              - If editText.trim() !== '': update item, saveItems, clear editing
+              - If editText.trim() === '': delete item, saveItems, clear editing
+              - Set isEditingRef.current = false
+
+          Reorder behavior (up/down arrow buttons):
+            - Each item row has ChevronUpIcon and ChevronDownIcon buttons
+            - First item: up button disabled (opacity 0.3)
+            - Last item: down button disabled (opacity 0.3)
+            - On press: swap item with adjacent, call saveItems
+            - If editingIndex is active, cancel editing first
+
+          Disabled state (disabled=true):
+            - Items rendered as plain Text with bullet prefix ("• ")
+            - No X buttons, no up/down buttons, no add-input
+            - No tap-to-edit handlers
+            - If value is null/empty and disabled: render nothing (empty View)
+
+          External value sync:
+            - useEffect watches value prop
+            - If not editing (editingIndex === null and !isEditingRef.current):
+              re-parse items from value
+
+          Styling:
+            - Item row: flexDirection 'row', alignItems 'center',
+              borderWidth 1, borderRadius 6, paddingHorizontal 10,
+              paddingVertical 8, marginBottom 4
+            - Uses useTheme() for colors (border, text, error, textTertiary)
+            - Item text: flex 1, numberOfLines={1} for display
+            - Chevron buttons: color colors.textTertiary, size 16
+            - XIcon: color colors.error, size 18
+            - Add-input: borderWidth 1, borderStyle 'dashed', same borderRadius
+
+    done_when: |
+      - parseItems('A\nB\nC') returns ['A', 'B', 'C']
+      - parseItems(null) returns []
+      - parseItems('A\n\nB') returns ['A', 'B'] (empty strings filtered)
+      - joinItems(['A', 'B']) returns 'A\nB'
+      - joinItems([]) returns null
+      - Component renders item rows with X, up/down, add-input
+      - Disabled state shows bullet-prefixed text without controls
+      - Add, delete, edit, reorder operations trigger onSave correctly
+
+    acceptance_criteria:
+      - AC-067-01  # Empty announcements shows single add-input
+      - AC-067-02  # Adding first announcement creates item row
+      - AC-067-03  # Adding subsequent items appends to list
+      - AC-067-04  # Empty/whitespace add-input not saved
+      - AC-067-05  # Pressing X deletes item and saves
+      - AC-067-06  # Deleting last item saves null
+      - AC-067-07  # Clicking item text enters inline edit
+      - AC-067-08  # Inline edit saves on blur/submit
+      - AC-067-09  # Inline edit with empty text deletes item
+      - AC-067-10  # Reorder via up/down arrows
+      - AC-067-11  # Reorder triggers save with new order
+      - AC-067-12  # Offline mode shows items as read-only
+      - AC-067-13  # Observer role shows items as read-only
+      - AC-067-14  # Offline with empty announcements shows nothing
+      - AC-067-17  # Storage format is \n-joined string
+      - AC-067-19  # Existing multi-line data displays as items
+      - AC-067-21  # Save uses updateField pattern (via onSave)
+
+    edge_cases:
+      - EC-067-01  # TextInput single-line prevents \n in items
+      - EC-067-02  # Long text truncated with numberOfLines={1}
+      - EC-067-03  # Rapid add/delete discrete (no debounce needed)
+      - EC-067-04  # External value sync when not editing
+      - EC-067-05  # Reorder with 1 item has no effect
+      - EC-067-06  # Whitespace-only items removed on save
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          # parseItems tests
+          - "parseItems returns empty array for null"
+          - "parseItems returns empty array for empty string"
+          - "parseItems splits by newline"
+          - "parseItems filters empty strings from consecutive newlines"
+          - "parseItems filters whitespace-only strings"
+
+          # joinItems tests
+          - "joinItems returns null for empty array"
+          - "joinItems joins items with newline"
+          - "joinItems returns single item without newline"
+
+          # Component rendering - empty state
+          - "renders add-input with placeholder when items empty"
+          - "does not render item rows when items empty"
+
+          # Component rendering - with items
+          - "renders item rows for each parsed item"
+          - "renders X button on each item row"
+          - "renders up/down arrow buttons on each item row"
+          - "first item up button is disabled"
+          - "last item down button is disabled"
+
+          # Add behavior
+          - "adding non-empty text creates new item and calls onSave"
+          - "adding whitespace-only text does not save"
+          - "add-input clears after successful add"
+
+          # Delete behavior
+          - "pressing X deletes item and calls onSave with remaining items"
+          - "deleting last item calls onSave with null"
+
+          # Inline edit behavior
+          - "tapping item text enters edit mode with TextInput"
+          - "inline edit saves updated text on blur"
+          - "inline edit with empty text deletes item"
+
+          # Reorder behavior
+          - "pressing down arrow swaps item with next and calls onSave"
+          - "pressing up arrow swaps item with previous and calls onSave"
+
+          # Disabled state
+          - "disabled mode renders items as plain text with bullet prefix"
+          - "disabled mode does not render X buttons"
+          - "disabled mode does not render add-input"
+          - "disabled mode does not render up/down buttons"
+          - "disabled mode with null value renders nothing"
+
+          # External sync
+          - "re-parses items when value prop changes and not editing"
+
+          # Backward compatibility
+          - "existing multi-line data displays as separate items"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: AgendaForm integration (replace DebouncedTextInput)
+  # ---------------------------------------------------------------------------
+  - id: S014-03
+    title: "Replace announcements DebouncedTextInput with AnnouncementsList in AgendaForm"
+    feature: F067
+    depends_on: [S014-02]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: edit
+        description: |
+          1. Add import at top (after DebouncedTextInput import, line 30):
+             import { AnnouncementsList } from './AnnouncementsList';
+
+          2. Replace lines 244-254:
+             BEFORE:
+               <FieldRow label={t('agenda.announcements')} colors={colors}>
+                 <DebouncedTextInput
+                   style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
+                   value={agenda.announcements ?? ''}
+                   onSave={(text) => updateField('announcements', text)}
+                   placeholder={t('agenda.announcements')}
+                   placeholderTextColor={colors.textTertiary}
+                   multiline
+                   editable={!isObserver}
+                 />
+               </FieldRow>
+
+             AFTER:
+               <FieldRow label={t('agenda.announcements')} colors={colors}>
+                 <AnnouncementsList
+                   value={agenda.announcements ?? null}
+                   onSave={(text) => updateField('announcements', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addAnnouncement')}
+                 />
+               </FieldRow>
+
+          3. KEEP styles.announcementsInput - it is still used by
+             welcome_new_families DebouncedTextInput on line 234.
+
+          4. The DebouncedTextInput import (line 30) MUST remain because
+             other fields in AgendaForm still use it (welcome_new_families,
+             ward_business, etc.).
+
+    done_when: |
+      - AgendaForm renders AnnouncementsList for announcements
+      - value passes agenda.announcements ?? null (not empty string)
+      - onSave calls updateField('announcements', text)
+      - disabled passes isObserver
+      - placeholder uses t('agenda.addAnnouncement')
+      - styles.announcementsInput preserved for welcome_new_families
+      - DebouncedTextInput import preserved for other fields
+      - TypeScript compiles without errors
+
+    acceptance_criteria:
+      - AC-067-01  # Empty state shows add-input (via AnnouncementsList)
+      - AC-067-13  # Observer gets disabled=true
+      - AC-067-17  # updateField('announcements', ...) called
+      - AC-067-18  # No database migration needed
+      - AC-067-21  # Uses existing updateField pattern
+
+    edge_cases:
+      - EC-067-08  # welcome_new_families unchanged (still DebouncedTextInput)
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "AgendaForm passes agenda.announcements as value to AnnouncementsList"
+          - "AgendaForm passes isObserver as disabled to AnnouncementsList"
+          - "AgendaForm passes t('agenda.addAnnouncement') as placeholder"
+          - "AgendaForm onSave calls updateField('announcements', text)"
+          - "welcome_new_families still uses DebouncedTextInput (unchanged)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Presentation Mode (bullet_list type)
+  # ---------------------------------------------------------------------------
+  - id: S014-04
+    title: "Add bullet_list type to PresentationField and render as bullet points"
+    feature: F067
+    depends_on: []
+    files:
+      - path: src/hooks/usePresentationMode.ts
+        action: edit
+        description: |
+          1. Extend PresentationField.type union (line 27):
+             BEFORE: type: 'text' | 'hymn' | 'multiline';
+             AFTER:  type: 'text' | 'hymn' | 'multiline' | 'bullet_list';
+
+          2. Change announcements type (line 98):
+             BEFORE: type: 'multiline',
+             AFTER:  type: 'bullet_list',
+
+      - path: src/app/presentation.tsx
+        action: edit
+        description: |
+          In PresentationFieldRow (lines 155-172), add bullet_list handling.
+          Before the existing return statement, add:
+
+          if (field.type === 'bullet_list') {
+            const bulletItems = (field.value || '')
+              .split('\n')
+              .filter((s: string) => s.trim() !== '');
+
+            if (bulletItems.length === 0) {
+              return (
+                <View style={styles.fieldRow}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+                    {field.label}
+                  </Text>
+                  <Text style={[styles.fieldValue, { color: colors.textTertiary, fontSize: fontSizes?.value ?? 16 }]}>
+                    ---
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={styles.fieldRow}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+                  {field.label}
+                </Text>
+                {bulletItems.map((item: string, idx: number) => (
+                  <Text
+                    key={idx}
+                    style={[styles.fieldValue, { color: colors.text, fontSize: fontSizes?.value ?? 16 }]}
+                  >
+                    {'\u2022 '}{item}
+                  </Text>
+                ))}
+              </View>
+            );
+          }
+
+    done_when: |
+      - PresentationField.type includes 'bullet_list'
+      - buildPresentationCards uses type 'bullet_list' for announcements
+      - PresentationFieldRow renders bullet_list as individual "• item" lines
+      - Empty bullet_list renders "---" placeholder
+      - TypeScript compiles without errors
+
+    acceptance_criteria:
+      - AC-067-15  # Each item renders as bullet point in Presentation Mode
+      - AC-067-16  # Empty announcements omitted or shows placeholder
+
+    edge_cases:
+      - EC-067-07  # Single item renders with bullet prefix
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          # PresentationField type tests
+          - "buildPresentationCards uses 'bullet_list' type for announcements"
+          - "PresentationField type union includes 'bullet_list'"
+
+          # PresentationFieldRow rendering tests
+          - "PresentationFieldRow renders bullet_list items with bullet prefix"
+          - "PresentationFieldRow renders bullet_list empty as ---"
+          - "PresentationFieldRow renders single-item bullet_list with bullet"
+          - "PresentationFieldRow filters empty lines in bullet_list"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: Documentation (ADRs)
+  # ---------------------------------------------------------------------------
+  - id: S014-05
+    title: "Add ADR-039 to ADR-043 documentation and update SPEC_CONSOLIDATED"
+    feature: F067
+    depends_on: [S014-02, S014-04]
+    files:
+      - path: docs/arch/ARCH_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Add 5 new ADRs:
+          - ADR-039: Store announcements as \n-joined string (no migration)
+          - ADR-040: New 'bullet_list' type in PresentationField
+          - ADR-041: AnnouncementsList as dedicated component
+          - ADR-042: Inline edit saves on blur/submitEditing only (no debounce)
+          - ADR-043: Up/down arrow buttons for reorder instead of drag gesture
+
+      - path: docs/specs/SPEC_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Update F021 (Agenda Form) description to note that the announcements
+          field now uses a list component with add/delete/reorder/inline-edit.
+
+    done_when: |
+      - ADR-039 through ADR-043 documented in ARCH_CONSOLIDATED
+      - SPEC_CONSOLIDATED F021 updated to reflect announcements list behavior
+      - All design decisions from ARCH_M014 reflected in consolidated docs
+
+    acceptance_criteria: []
+    edge_cases: []
+    tests: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S014-06
+    title: "Final verification: run all tests and type check"
+    feature: F067
+    depends_on: [S014-01, S014-02, S014-03, S014-04, S014-05]
+    files: []
+    done_when: |
+      - npx tsc --noEmit passes with no errors
+      - npx vitest run passes (all tests green)
+      - Total test count increased by the new tests added
+      - No regressions in existing tests
+      - docs/plans/PLAN_CONSOLIDATED.yaml updated with P014 entry
+      - TEST_CONSOLIDATED.yaml updated with new test counts
+
+    acceptance_criteria:
+      - AC-067-01 through AC-067-21  # All F067 ACs verified
+
+    edge_cases:
+      - EC-067-01 through EC-067-08  # All F067 ECs verified
+
+    tests: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S014-01 (i18n keys) ──────────────────────────────────────────┐
+       │                                                         │
+  S014-02 (AnnouncementsList component) ◄── S014-01             │
+       │                                                         │
+  S014-03 (AgendaForm integration) ◄──────── S014-02            │
+                                                                 │
+  S014-04 (Presentation Mode bullet_list) ──────────────────────┤
+                                                                 │
+  S014-05 (Documentation ADRs) ◄──────── S014-02, S014-04       │
+                                                                 │
+  S014-06 (Final verification) ◄──────────────────────── ALL ───┘
+
+  Parallelizable:
+    Group A (independent): S014-01, S014-04
+    Group B (after S014-01): S014-02
+    Group C (after S014-02): S014-03
+    Group D (after S014-02 + S014-04): S014-05
+    Group E (after all): S014-06
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  F067:
+    acceptance_criteria:
+      AC-067-01: [S014-02, S014-03]
+      AC-067-02: S014-02
+      AC-067-03: S014-02
+      AC-067-04: S014-02
+      AC-067-05: S014-02
+      AC-067-06: S014-02
+      AC-067-07: S014-02
+      AC-067-08: S014-02
+      AC-067-09: S014-02
+      AC-067-10: S014-02
+      AC-067-11: S014-02
+      AC-067-12: S014-02
+      AC-067-13: [S014-02, S014-03]
+      AC-067-14: S014-02
+      AC-067-15: S014-04
+      AC-067-16: S014-04
+      AC-067-17: [S014-02, S014-03]
+      AC-067-18: S014-03
+      AC-067-19: S014-02
+      AC-067-20: S014-01
+      AC-067-21: [S014-02, S014-03]
+    edge_cases:
+      EC-067-01: S014-02
+      EC-067-02: S014-02
+      EC-067-03: S014-02
+      EC-067-04: S014-02
+      EC-067-05: S014-02
+      EC-067-06: S014-02
+      EC-067-07: S014-04
+      EC-067-08: S014-03
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All edge cases covered
+  GATE-PLAN-06: true  # File paths match ARCH_M014 components

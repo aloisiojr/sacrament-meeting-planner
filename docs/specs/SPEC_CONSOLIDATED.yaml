@@ -7,10 +7,10 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-07"
-  total_features: 59
+  last_updated: "2026-03-08"
+  total_features: 60
   total_business_rules: 44
-  total_design_decisions: 43
+  total_design_decisions: 48
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -556,7 +556,8 @@ features:
       Full meeting agenda editing form. Lazy-creates agenda record on first expand.
       Auto-save on each field change (debounced for text inputs via DebouncedTextInput).
       Sections: Welcome (presiding, conducting, recognizing multi-select, welcome
-      new families, announcements, pianist, conductor, opening hymn, opening prayer),
+      new families, announcements list with add/delete/reorder/inline-edit [CR-277],
+      pianist, conductor, opening hymn, opening prayer),
       Designations & Sacrament (ward business, baby blessing, baptism confirmation,
       stake announcements, sacrament hymn), Speeches (speaker overrides with pencil
       edit, special presentation or intermediate hymn toggle, intermediate hymn),
@@ -1338,6 +1339,42 @@ features:
         when: "Push notification is built"
         then: "Correct i18n text is used for the ward's language"
 
+  - id: F067
+    name: Announcements List Items
+    area: agenda
+    description: |
+      Announcements field in AgendaForm transformed from single multiline
+      DebouncedTextInput into a structured list of individually manageable items.
+      Each item is a single-line row with X delete button. Tapping item text
+      enables inline editing. Empty add-input with i18n placeholder always
+      appears below last item. Items support drag-to-reorder via long-press.
+      Storage format unchanged: items joined with \n in existing TEXT column.
+      Presentation Mode renders each item as bullet point (new 'bullet_list'
+      PresentationField type). Offline/observer: read-only without controls.
+      New component: AnnouncementsList. [CR-277]
+    acceptance_criteria:
+      - given: "agenda.announcements is null or empty"
+        when: "AgendaForm renders announcements field"
+        then: "Single add-input shown with placeholder t('agenda.addAnnouncement')"
+      - given: "User types text in add-input and submits"
+        when: "Enter or blur with non-empty text"
+        then: "Item is appended to list, saved as \\n-joined string"
+      - given: "User taps X on an item"
+        when: "Item is deleted"
+        then: "Remaining items saved; if last item deleted, saved as null"
+      - given: "User taps item text"
+        when: "Inline edit mode activates"
+        then: "TextInput appears with current text; saves on blur/submit"
+      - given: "User long-presses and drags item"
+        when: "Item dropped in new position"
+        then: "Items reordered and saved"
+      - given: "Offline or observer mode"
+        when: "Announcements field renders"
+        then: "Items shown as plain text without X, add-input, or drag"
+      - given: "Presentation Mode with \\n-separated announcements"
+        when: "Welcome card renders"
+        then: "Each item rendered as bullet point"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1636,6 +1673,26 @@ design_decisions:
   - id: DD033
     decision: "Topic clearing does not generate review notification"
     rationale: "Only setting a topic (NULL -> value or value -> different value) is a new assignment worth reviewing. Clearing is not. Guard: NEW.topic_title IS NOT NULL. [CR-276, ADR-038]"
+
+  - id: DD034
+    decision: "Announcements stored as \\n-joined string in existing TEXT column"
+    rationale: "No schema change needed. Client-side parse/join. Existing data with \\n naturally converts to separate items. [CR-277, ADR-039]"
+
+  - id: DD035
+    decision: "New 'bullet_list' type for PresentationField announcements rendering"
+    rationale: "Separate type avoids special-casing 'multiline' which is used by other fields (recognized_names, welcome_new_families). Only announcements renders as bullet points. [CR-277, ADR-040]"
+
+  - id: DD036
+    decision: "AnnouncementsList as dedicated component in AgendaForm"
+    rationale: "Encapsulates list logic (parse/add/delete/edit/reorder/save) keeping AgendaForm clean. Follows pattern of ActorSelector, PrayerSelector. [CR-277, ADR-041]"
+
+  - id: DD037
+    decision: "Inline edit saves on blur/submitEditing only (no debounce timer)"
+    rationale: "List items save on discrete events, not keystrokes. Simpler than per-item debounce timers. [CR-277, ADR-042]"
+
+  - id: DD038
+    decision: "Drag-to-reorder via long-press gesture for announcement items"
+    rationale: "Standard mobile pattern. react-native-gesture-handler already installed. Fallback: up/down arrow buttons. [CR-277, ADR-043]"
 
 # =============================================================================
 # EDGE CASES

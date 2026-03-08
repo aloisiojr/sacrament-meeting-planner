@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 17
-  last_updated_by: "phase-015"
+  version: 18
+  last_updated_by: "phase-016"
 
 reviews:
   - id: REV-001
@@ -4487,3 +4487,306 @@ reviews:
       tests_total: 1572
       tests_passing: 1572
       test_files: 63
+
+  # ===========================================================================
+  # REV-016 — Phase 016: CR-281, CR-282, CR-283 (F068/F069 bugfixes + F071)
+  # ===========================================================================
+
+  - id: REV-016
+    scope: "CR-281, CR-282, CR-283 - EditableListField bugfixes + recognized_names rework"
+    date: "2026-03-08"
+    reviewer: reviewer-agent
+    iteration: 1
+    commits:
+      - hash: 687b37e
+        step: S016-01
+        message: "fix(EditableListField): add multiline, blurOnSubmit, paddingVertical:0 to inline edit TextInput (CR-281)"
+      - hash: 538b2cc
+        step: S016-02
+        message: "fix(EditableListField): add activationDistance={9999} to DraggableFlatList (CR-282)"
+      - hash: 5e3e952
+        step: S016-03
+        message: "feat(i18n+types): add agenda.addPresence i18n key + change recognized_names to string|null (CR-283)"
+      - hash: 17e5a74
+        step: S016-04
+        message: "feat(migration): add migration 032 to convert recognized_names from TEXT[] to TEXT (CR-283)"
+      - hash: d758fa5
+        step: S016-05
+        message: "feat(EditableListField): add onItemPress and onAddPress callback props (CR-283)"
+      - hash: ccc31e5
+        step: S016-06
+        message: "feat(ActorSelector): add disabledNames prop for graying out selected actors (CR-283)"
+      - hash: cf95cf5
+        step: S016-07
+        message: "feat(AgendaForm): replace recognized_names with EditableListField + ActorSelector integration (CR-283)"
+      - hash: 08cca39
+        step: S016-08
+        message: "test(f071): add 39 tests for CR-281/282/283 and update existing tests (S016-08)"
+      # Documentation and test updates
+      - hash: 1278c0d
+        step: S016-09
+        message: "docs(phase-016): update TEST_CONSOLIDATED with F071 tests (S016-09)"
+      - hash: 1113ddf
+        step: S016-10
+        message: "docs(phase-016): update CODE_LEDGER with CR-281/282/283 commits (S016-10)"
+      - hash: e92dae0
+        step: S016-10
+        message: "docs(phase-016): mark PLAN_P016 as done"
+      - hash: 792d5a1
+        step: tester
+        message: "test(f071): add 96 tester tests for CR-281/282/283 and fix flaky useSpeechCounts test"
+      - hash: d19bce3
+        step: tester
+        message: "docs(tests): update TEST_CONSOLIDATED after F071 tester - all 1707 tests passing"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        detail: |
+          User requested three changes:
+          1. CR-281: Bug - EditableListField inline edit becomes one line, cursor disappears.
+          2. CR-282: Bug - Scroll blocked when touching list items (gesture handler captures touch).
+          3. CR-283: Feature - recognized_names -> EditableListField with ActorSelector single-select.
+          SPEC_F016 covers all three CRs comprehensively:
+          - CR-281: Root cause identified (missing multiline, paddingVertical, autoFocus position).
+            4 ACs + 2 edge cases all faithful to user's bug report.
+          - CR-282: Root cause identified (activationDistance=0 captures all touches).
+            4 ACs + 2 edge cases covering scroll, drag, tap behavior.
+          - CR-283: Full feature specification with 12 ACs + 5 edge cases covering
+            add/edit/delete via ActorSelector, disabledNames, drag reorder, presentation,
+            offline mode, empty state, DB migration 032. 6 open questions resolved.
+          No scope creep. All requirements match user intent.
+
+      arch_vs_spec:
+        status: pass
+        detail: |
+          ARCH_M016 maps every SPEC requirement to components:
+          - CR-281 -> EditableListField TextInput: multiline, blurOnSubmit, editInput style
+          - CR-282 -> DraggableFlatList: activationDistance={9999}
+          - CR-283 -> 5 components: EditableListField (onItemPress/onAddPress), ActorSelector
+            (disabledNames), AgendaForm (integration), usePresentationMode (bullet_list),
+            database.ts (type change), migration 032
+          Minor documentation discrepancy: ARCH diagram (line 53) mentions renderAddArea
+          prop that is not in the components spec or code. This is a P2 doc-only issue
+          in the diagram section; the authoritative components section correctly specifies
+          only onItemPress and onAddPress.
+
+      plan_vs_arch:
+        status: pass
+        detail: |
+          PLAN_P016 has 10 steps that follow ARCH precisely:
+          S016-01 (CR-281 bugfix) -> ARCH component 1
+          S016-02 (CR-282 bugfix) -> ARCH component 2
+          S016-03 (i18n + TS type) -> ARCH i18n + types
+          S016-04 (migration 032) -> ARCH migration
+          S016-05 (new props) -> ARCH component 3 (depends on S01+S02)
+          S016-06 (disabledNames) -> ARCH component 4
+          S016-07 (AgendaForm rework) -> ARCH component 5 (depends on S03+S05+S06)
+          S016-08 (test updates) -> follows S07
+          S016-09 (documentation) -> follows S07
+          S016-10 (final verification) -> depends on all
+          Dependencies are correct. File paths match.
+
+      code_vs_plan:
+        status: pass
+        detail: |
+          All 10 plan steps implemented correctly:
+          S016-01: TextInput has multiline, blurOnSubmit, editInput style with paddingVertical:0.
+            autoFocus preserved, returnKeyType="done" preserved. (lines 163-173)
+          S016-02: DraggableFlatList has activationDistance={9999}, scrollEnabled={false}
+            preserved. (lines 198-205)
+          S016-03: i18n key agenda.addPresence added in all 3 locales with correct
+            translations. SundayAgenda.recognized_names type changed to string | null.
+          S016-04: Migration 032 exists with temp column strategy, array_to_string,
+            NULL/empty array guards.
+          S016-05: onItemPress and onAddPress props added. Backward compatible: when
+            not provided, original inline edit and TextInput add area preserved.
+          S016-06: disabledNames prop on ActorSelector. Disabled actors at opacity 0.4,
+            onPress undefined, disabled={true}. renderItem deps include disabledNames.
+          S016-07: AgendaForm uses EditableListField with onItemPress/onAddPress.
+            recognizeSelector state manages add/edit mode. ActorSelector integration
+            with roleFilter="recognize", disabledNames computed correctly (edit excludes
+            current, add includes all). Old recognizing code removed.
+          S016-08: Tests updated for new recognized_names behavior.
+          S016-09/10: Documentation and verification complete.
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW FINDINGS
+    # =========================================================================
+
+    code_review:
+      - area: "EditableListField.tsx (CR-281 + CR-282 + CR-283)"
+        finding: |
+          CR-281 fix is correct: TextInput at line 163-173 has multiline, blurOnSubmit,
+          and styles.editInput with paddingVertical:0. autoFocus preserved for cursor.
+          CR-282 fix is correct: DraggableFlatList at line 204 has activationDistance={9999}.
+          Drag only activates via onLongPress={drag} on GripIcon Pressable (line 159).
+          CR-283 props are correct: onItemPress/onAddPress optional, backward compatible.
+          When onItemPress provided, tap calls it (line 175-181). When onAddPress
+          provided, add area is Pressable (lines 206-214). Both callbacks properly
+          integrated. parseItems/joinItems exported for AgendaForm import.
+
+      - area: "ActorSelector.tsx (CR-283)"
+        finding: |
+          disabledNames prop added to interface (line 41) and destructured (line 51).
+          In renderItem (line 172): isDisabled check uses includes(). Disabled actors
+          have opacity 0.4, onPress=undefined, disabled={true} (lines 188-190).
+          renderItem useCallback deps correctly include disabledNames (line 224).
+          Implementation matches SPEC AC-283-05 and AC-283-12.
+
+      - area: "AgendaForm.tsx (CR-283)"
+        finding: |
+          Import: EditableListField, parseItems, joinItems from EditableListField (line 31).
+          State: recognizeSelector with mode/editIndex (lines 83-86).
+          recognized_names FieldRow (lines 202-215): uses EditableListField with
+          value, onSave, disabled, placeholder, onItemPress, onAddPress.
+          ActorSelector integration (lines 582-608): visible when recognizeSelector set,
+          roleFilter="recognize", onSelect handles add/edit modes correctly.
+          disabledNames IIFE correctly excludes current edit target.
+          Old recognizing code fully removed (no recognizingContent/Names/Name styles).
+          No multiSelect usage in AgendaForm.
+
+      - area: "usePresentationMode.ts (CR-283)"
+        finding: |
+          recognized_names field (lines 80-86): guard uses truthy check (not .length),
+          value is raw string (not .join), type is 'bullet_list'. All correct per PLAN.
+
+      - area: "database.ts (CR-283)"
+        finding: |
+          recognized_names type changed from string[] | null to string | null (line 187).
+          No remaining string[] references in production code (grep verified).
+
+      - area: "Migration 032"
+        finding: |
+          Correct 3-step approach: add temp column, migrate data with
+          array_to_string(recognized_names, E'\n'), drop old + rename.
+          WHERE clause guards NULL and empty arrays.
+          Note: Migration must be deployed via SQL Editor BEFORE the
+          client-side update, since the client now expects string | null.
+
+      - area: "i18n locales (3 files)"
+        finding: |
+          pt-BR: "Reconhecer nova presenca" (line 247)
+          en-US: "Recognize new presence" (line 247)
+          es-LA: "Reconocer nueva presencia" (line 247)
+          All under agenda.addPresence key. Translations are correct.
+
+      - area: "Tests"
+        finding: |
+          1707 total tests passing across 65 test files. Phase 16 added 135 new
+          tests (1572 -> 1707) covering all ACs and edge cases for CR-281/282/283.
+          Test file f071-recognized-names.test.ts covers: inline edit props,
+          DraggableFlatList props, i18n keys, type checks, migration file checks,
+          EditableListField callback props, ActorSelector disabledNames,
+          AgendaForm integration, presentation mode.
+          Test file f071-tester.test.ts (96 tester tests) covers: behavior
+          verification including parseItems/joinItems, reorder, presentation
+          rendering, migration edge cases, offline/observer mode.
+          Existing tests updated (f068-f069-f070-tester, f067-announcements-list,
+          f067-tester) for new recognized_names behavior.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+      - id: R016-P2-001
+        severity: P2
+        category: quality
+        location: "docs/arch/ARCH_M016.yaml:53"
+        description: |
+          ARCH_M016 diagram section (line 53) mentions "renderAddArea?: () => React.ReactNode"
+          as a prop on EditableListField. This prop does not exist in the code or in the
+          authoritative components section of the ARCH. The diagram is stale/inaccurate
+          on this point.
+        suggestion: |
+          Remove renderAddArea reference from the ARCH_M016 diagram lines 53 and 58.
+          No functional impact - the authoritative components section is correct.
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "DB Migration 032 via SQL Editor"
+        reason: |
+          Migration 032 converts recognized_names from TEXT[] to TEXT.
+          Must be run BEFORE the client-side update because the new client
+          code expects string | null, not string[] | null.
+        urgency: high
+        notes: |
+          Deploy order:
+          1. Migration 032 via SQL Editor (FIRST - breaking change for old client)
+          2. EAS Build (client-side update with new EditableListField features)
+          Migration is backward-compatible during transition: old client that
+          expects TEXT[] will fail on string data, so migration must be
+          paired with client update promptly.
+
+      - step: 2
+        action: "EAS Build (app update)"
+        reason: |
+          Client-side changes: EditableListField (multiline fix, activationDistance fix,
+          onItemPress/onAddPress props), ActorSelector (disabledNames prop),
+          AgendaForm (recognized_names EditableListField integration),
+          usePresentationMode (bullet_list for recognized_names),
+          database.ts (type change), i18n (addPresence key).
+        urgency: high
+        notes: |
+          Must be deployed shortly after Migration 032. The react-native-draggable-flatlist
+          native dependency (from Phase 015) already requires an EAS Build. This can
+          be bundled with the Phase 015 EAS Build if not yet deployed.
+
+    deploy_notes: |
+      CR-281/CR-282 are client-only bugfixes. CR-283 requires BOTH a database
+      migration (032) AND a client-side update. Deploy order is critical:
+      1. Migration 032 via SQL Editor (converts TEXT[] to TEXT)
+      2. EAS Build (new client code that reads/writes string | null)
+      The migration is NOT backward-compatible with old client code that expects
+      TEXT[], so the EAS Build should follow promptly after migration.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files: []
+      notes: |
+        Git status is clean. All Phase 16 code changes committed across 13
+        commits (687b37e..d19bce3). Working tree clean, nothing to commit.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-281, CR-282, CR-283 (F068/F069 bugfixes + F071 recognized_names rework)
+      implementation is correct and complete. Chain validation passes at all 4 levels.
+      CR-281: Inline edit TextInput fixed with multiline, blurOnSubmit, paddingVertical:0.
+      CR-282: Scroll blocking fixed with activationDistance={9999} on DraggableFlatList.
+      CR-283: recognized_names successfully transformed from TEXT[] multi-select to
+      EditableListField + single-select ActorSelector. Migration 032 converts data.
+      New disabledNames prop on ActorSelector prevents duplicate selection. Presentation
+      mode uses bullet_list with zebra striping. All 20 acceptance criteria and 9 edge
+      cases covered. 1707 tests pass (65 test files). One P2 doc issue (stale
+      renderAddArea in ARCH diagram). No P0 or P1 issues. Deploy requires Migration 032
+      first, then EAS Build.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 1
+      files_reviewed: 8
+      total_commits: 13
+      tests_total: 1707
+      tests_passing: 1707
+      test_files: 65

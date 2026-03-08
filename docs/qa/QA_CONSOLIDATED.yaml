@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 16
+  version: 17
 
 validations:
 
@@ -2946,3 +2946,194 @@ validations:
         description: "Single-item lists still look normal (first item always normal color)"
         result: PASS
         evidence: "presentation.tsx:182: idx=0 -> idx % 2 === 0 -> colors.text (normal). Single-item list only has idx=0, so always normal color."
+
+  # ===========================================================================
+  # Phase 16: EditableListField bugfixes + recognized_names (QA_PLAN_016)
+  # ===========================================================================
+
+  - id: QA_016
+    plan: QA_PLAN_016
+    date: "2026-03-08"
+    scope: "2 bugfixes (CR-281, CR-282) + 1 feature (CR-283)"
+    verdict: passed
+    must_pass: 14/14
+    should_pass: 7/7
+    total_checks: 21/21
+    reviewer_verdict: "APPROVED (0 P0, 0 P1, 1 P2 minor)"
+    tester_verdict: "PASSED (1707 tests, 96 new, 20/20 ACs, 9/9 ECs)"
+
+    checks:
+
+      # --- CR-281: Inline-edit TextInput single-line collapse ---
+
+      - id: CR281_MP1
+        cr: CR-281
+        type: must_pass
+        description: "Inline-edit TextInput in EditableListField has multiline prop"
+        result: PASS
+        evidence: "EditableListField.tsx:170: multiline prop present on inline-edit TextInput"
+
+      - id: CR281_MP2
+        cr: CR-281
+        type: must_pass
+        description: "Inline-edit TextInput has matching padding so height does not collapse"
+        result: PASS
+        evidence: "EditableListField.tsx:164: style includes styles.editInput. Line 252-254: editInput = { paddingVertical: 0 }. Combined with itemRow paddingVertical:8 (line 241), TextInput has zero internal padding, matching Text visual height exactly."
+
+      - id: CR281_MP3
+        cr: CR-281
+        type: must_pass
+        description: "Inline-edit TextInput does not use autoFocus alone (uses multiline+blurOnSubmit pattern)"
+        result: PASS
+        evidence: "EditableListField.tsx:169-171: autoFocus + multiline + blurOnSubmit. autoFocus is kept for immediate focus but multiline ensures text wraps. blurOnSubmit (line 171) ensures Return key triggers blur/finishEdit instead of newline."
+
+      - id: CR281_SP1
+        cr: CR-281
+        type: should_pass
+        description: "Cursor appears at end of text when entering inline edit mode"
+        result: PASS
+        evidence: "EditableListField.tsx:169: autoFocus with multiline. React Native multiline TextInput with autoFocus places cursor at end by default. No selection prop overriding."
+
+      - id: CR281_SP2
+        cr: CR-281
+        type: should_pass
+        description: "Inline-edit TextInput visual height matches read-only Text view"
+        result: PASS
+        evidence: "EditableListField.tsx:164: style=[styles.itemText, styles.editInput, { color }]. itemText has flex:1, fontSize:15. editInput adds paddingVertical:0. Parent itemRow has paddingVertical:8 (line 241), so Text and TextInput have identical vertical space. multiline ensures wrapping matches."
+
+      # --- CR-282: Gesture handler blocks page scroll ---
+
+      - id: CR282_MP1
+        cr: CR-282
+        type: must_pass
+        description: "DraggableFlatList has activationDistance=9999 to prevent PanGesture from intercepting parent scroll"
+        result: PASS
+        evidence: "EditableListField.tsx:204: activationDistance={9999} on DraggableFlatList. This value >> any screen dimension, so the PanGesture never auto-activates. Only explicit drag() calls from onLongPress trigger drag."
+
+      - id: CR282_MP2
+        cr: CR-282
+        type: must_pass
+        description: "Drag-and-drop still activates via long-press on grip icon"
+        result: PASS
+        evidence: "EditableListField.tsx:159: <Pressable hitSlop={6} onLongPress={drag}>. GripIcon wrapped in Pressable with onLongPress={drag} is preserved. drag() is provided by DraggableFlatList RenderItemParams."
+
+      - id: CR282_SP1
+        cr: CR-282
+        type: should_pass
+        description: "No other gesture handler props conflict"
+        result: PASS
+        evidence: "EditableListField.tsx:198-205: DraggableFlatList only has data, keyExtractor, renderItem, onDragEnd, scrollEnabled={false}, activationDistance={9999}. No simultaneousHandlers or other gesture props needed."
+
+      # --- CR-283: recognized_names -> EditableListField + ActorSelector ---
+
+      - id: CR283_MP1
+        cr: CR-283
+        type: must_pass
+        description: "Database migration exists converting recognized_names from TEXT[] to TEXT"
+        result: PASS
+        evidence: "supabase/migrations/032_recognized_names_to_text.sql: ALTER TABLE adds recognized_names_new TEXT, migrates data with array_to_string(recognized_names, E'\\n'), drops old column, renames new to recognized_names."
+
+      - id: CR283_MP2
+        cr: CR-283
+        type: must_pass
+        description: "TypeScript type SundayAgenda.recognized_names changed from string[] | null to string | null"
+        result: PASS
+        evidence: "src/types/database.ts:187: recognized_names: string | null (was string[] | null)"
+
+      - id: CR283_MP3
+        cr: CR-283
+        type: must_pass
+        description: "AgendaForm renders EditableListField for recognized_names field"
+        result: PASS
+        evidence: "AgendaForm.tsx:203-214: <EditableListField value={agenda.recognized_names ?? null} onSave={(text) => updateField('recognized_names', text)} disabled={isObserver} placeholder={t('agenda.addPresence')} onItemPress={...} onAddPress={...} />"
+
+      - id: CR283_MP4
+        cr: CR-283
+        type: must_pass
+        description: "Add button opens ActorSelector (single-select, roleFilter='recognize')"
+        result: PASS
+        evidence: "AgendaForm.tsx:211-213: onAddPress={() => setRecognizeSelector({ mode: 'add' })}. Lines 583-608: ActorSelector with roleFilter='recognize', no multiSelect (defaults to false = single-select)."
+
+      - id: CR283_MP5
+        cr: CR-283
+        type: must_pass
+        description: "Clicking existing name opens ActorSelector to swap (single-select)"
+        result: PASS
+        evidence: "AgendaForm.tsx:208-210: onItemPress={(index, _item) => setRecognizeSelector({ mode: 'edit', editIndex: index })}. Lines 592-595: mode==='edit' replaces item at editIndex with selected actor name."
+
+      - id: CR283_MP6
+        cr: CR-283
+        type: must_pass
+        description: "Already-selected names are visible but disabled in ActorSelector"
+        result: PASS
+        evidence: "ActorSelector.tsx:41: disabledNames?: string[] prop added. Line 172: isDisabled = disabledNames?.includes(item.name) ?? false. Line 188: opacity: 0.4 when disabled. Line 189-190: onPress=undefined and disabled=true when isDisabled. AgendaForm.tsx:600-606: disabledNames passes current items (excluding editIndex in edit mode)."
+
+      - id: CR283_MP7
+        cr: CR-283
+        type: must_pass
+        description: "Reorder works via drag (grip icon + long-press)"
+        result: PASS
+        evidence: "EditableListField.tsx:159: <Pressable hitSlop={6} onLongPress={drag}> wrapping GripIcon. DraggableFlatList at line 198 with onDragEnd at line 125-132 saves reordered items."
+
+      - id: CR283_MP8
+        cr: CR-283
+        type: must_pass
+        description: "Storage format is TEXT with \\n separator"
+        result: PASS
+        evidence: "Migration 032 converts TEXT[] to TEXT with array_to_string(E'\\n'). database.ts:187: string | null. AgendaForm.tsx:204-205: value={agenda.recognized_names ?? null} passed directly to EditableListField which uses parseItems/joinItems for \\n splitting/joining."
+
+      - id: CR283_MP9
+        cr: CR-283
+        type: must_pass
+        description: "Presentation mode uses type 'bullet_list' with zebra striping"
+        result: PASS
+        evidence: "usePresentationMode.ts:80-85: if (agenda?.recognized_names) { type: 'bullet_list' }. presentation.tsx:178-188: bullet_list renders with idx % 2 === 0 ? colors.text : colors.textZebraFaded (zebra striping)."
+
+      - id: CR283_MP10
+        cr: CR-283
+        type: must_pass
+        description: "i18n key agenda.addPresence exists in all 3 locales"
+        result: PASS
+        evidence: "pt-BR.json:247: 'Reconhecer nova presenca'. en-US.json:247: 'Recognize new presence'. es-LA.json:247: 'Reconocer nueva presencia'."
+
+      - id: CR283_MP11
+        cr: CR-283
+        type: must_pass
+        description: "Placeholder text uses t('agenda.addPresence')"
+        result: PASS
+        evidence: "AgendaForm.tsx:207: placeholder={t('agenda.addPresence')}"
+
+      - id: CR283_SP1
+        cr: CR-283
+        type: should_pass
+        description: "Old ActorSelector multiSelect code for recognized_names removed"
+        result: PASS
+        evidence: "grep 'multiSelect|recognizingContent|recognizingNames' in AgendaForm.tsx returns 0 matches. Old Pressable+multiSelect block (was lines 198-231) fully replaced by EditableListField."
+
+      - id: CR283_SP2
+        cr: CR-283
+        type: should_pass
+        description: "Existing tests updated to reflect string|null type and bullet_list presentation"
+        result: PASS
+        evidence: "f068-f069-f070-tester.test.ts:207-218: updated to 'bullet_list' type with string value 'John Doe\\nJane Doe'. f067-announcements-list.test.ts:383: updated to 'recognized_names now uses EditableListField + ActorSelector (CR-283)'. database-types.test.ts:237: recognized_names: null (compatible with string|null). All 1707 tests pass."
+
+      - id: CR283_SP3
+        cr: CR-283
+        type: should_pass
+        description: "Disabled state shows plain text list without controls"
+        result: PASS
+        evidence: "EditableListField.tsx:136-151: disabled state renders items.map() with plain Text, no GripIcon, no XIcon, no Pressable handlers. Same code path for all EditableListField instances including recognized_names."
+
+      - id: CR283_SP4
+        cr: CR-283
+        type: should_pass
+        description: "Delete (X icon) removes name from list and saves"
+        result: PASS
+        evidence: "EditableListField.tsx:187-189: <Pressable hitSlop={6} onPress={() => handleDelete(idx)}><XIcon size={18} color={colors.error} /></Pressable>. handleDelete at lines 78-89 removes item by index and calls saveItems."
+
+      - id: CR283_SP5
+        cr: CR-283
+        type: should_pass
+        description: "XIcon clear-all button removed (was on old Pressable display)"
+        result: PASS
+        evidence: "Old AgendaForm code had hitSlop={8} onPress={() => updateField('recognized_names', null)} with XIcon clear-all. Now replaced by EditableListField per-item X delete. grep 'recognized_names.*null' in AgendaForm only appears in ActorSelector logic (joinItems returns null when empty)."

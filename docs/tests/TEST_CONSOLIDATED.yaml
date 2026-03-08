@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 20
+version: 21
 last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 64
-  total_tests: 1611
+  total_test_files: 65
+  total_tests: 1707
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -18,9 +18,10 @@ summary:
   # Note: F068+F069+F070 added 53 tests (coder): 6 i18n, 9 welcome/sustaining integration, 15 auto-split, 12 GripIcon/drag, 11 zebra+bullet_list
   # Note: F068+F069+F070 added 98 tests (tester): EditableListField generalization, drag reorder, zebra striping
   # Note: F071 added 39 tests (coder): CR-281 multiline fix, CR-282 activationDistance, CR-283 recognized_names rework
+  # Note: F071 added 96 tests (tester): CR-281/282/283 behavioral tests + flaky useSpeechCounts fix
   framework: vitest
   categories:
-    module_named: 56
+    module_named: 57
     integration: 6
   infrastructure:
     setup: 1
@@ -868,6 +869,42 @@ module_tests:
       - EditableListField rendered, onItemPress, onAddPress, placeholder, recognizeSelector state, roleFilter=recognize, disabledNames add/edit logic, onSelect add/edit, onClose, old styles removed
       - "CR-283 S016-07: usePresentationMode recognized_names (4 tests)"
       - bullet_list type, raw string value, truthy guard, null omitted
+
+  - file: src/__tests__/f071-tester.test.ts
+    tests: 96
+    module: "src/components/EditableListField.tsx, src/components/ActorSelector.tsx, src/hooks/usePresentationMode.ts"
+    covers:
+      - "CR-281 AC-281-01: multiline TextInput matches display height (2 tests)"
+      - "CR-281 AC-281-02: autoFocus cursor visibility (2 tests)"
+      - "CR-281 AC-281-03: shared component for all three fields (4 tests)"
+      - "CR-281 AC-281-04: short items work correctly (3 tests)"
+      - "CR-281 EC-281-01: very long text in TextInput (2 tests)"
+      - "CR-281 EC-281-02: editing text shorter (2 tests)"
+      - "CR-282 AC-282-01: page scroll on item text touch (1 test)"
+      - "CR-282 AC-282-02: drag reorder via grip icon long-press (3 tests)"
+      - "CR-282 AC-282-03: tap triggers edit not drag (2 tests)"
+      - "CR-282 AC-282-04: grip without long-press allows scroll (1 test)"
+      - "CR-282 EC-282-01: long-press on text does not drag (1 test)"
+      - "CR-282 EC-282-02: single-item list grip behavior (3 tests)"
+      - "CR-283 AC-283-01: recognized persons as separate items (5 tests)"
+      - "CR-283 AC-283-02: add area opens ActorSelector (5 tests)"
+      - "CR-283 AC-283-03: selecting actor appends name (4 tests)"
+      - "CR-283 AC-283-04: onItemPress for edit/replace (4 tests)"
+      - "CR-283 AC-283-05: disabledNames computation (6 tests)"
+      - "CR-283 AC-283-06: recognized_names reorder (3 tests)"
+      - "CR-283 AC-283-07: delete recognized name via X (4 tests)"
+      - "CR-283 AC-283-08: presentation mode bullet_list (6 tests)"
+      - "CR-283 AC-283-09: disabled/offline mode (3 tests)"
+      - "CR-283 AC-283-10: empty state placeholder (3 tests)"
+      - "CR-283 AC-283-11: recognized_names type change (5 tests)"
+      - "CR-283 AC-283-12: ActorSelector disabledNames (5 tests)"
+      - "CR-283 EC-283-01: close without selecting preserves name (3 tests)"
+      - "CR-283 EC-283-02: all items deleted saves null (3 tests)"
+      - "CR-283 EC-283-03: inline actor creation (2 tests)"
+      - "CR-283 EC-283-04: actor deleted but name persists (2 tests)"
+      - "CR-283 EC-283-05: actor for current name not in list (2 tests)"
+      - "CR-283 EC-038: migration 032 NULL handling (4 tests)"
+      - "All 4 bullet_list fields coexist in presentation (2 tests)"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4178,9 +4215,12 @@ gaps:
   # All edge cases covered. No gaps.
   # 39 coder tests: 4 inline edit props, 2 activationDistance, 4 i18n+type, 4 migration,
   #   5 callback props, 5 disabledNames, 11 AgendaForm rework, 4 usePresentationMode.
+  # 96 tester tests: behavioral tests covering all ACs and ECs with no fs.readFileSync.
+  #   CR-281: 13 tests (4 ACs + 2 ECs). CR-282: 11 tests (4 ACs + 2 ECs).
+  #   CR-283: 72 tests (12 ACs + 5 ECs + 2 presentation coexistence).
 
 stats:
-  total_tests: 1611
-  passing: 1611
+  total_tests: 1707
+  passing: 1707
   failing: 0
   skipped: 0

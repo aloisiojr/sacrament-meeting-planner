@@ -404,7 +404,7 @@ describe('F067 AC-067-15/16: Presentation Mode bullet_list integration', () => {
     expect(bulletItems).toHaveLength(1);
   });
 
-  it('welcome_new_families still uses multiline type (EC-067-08)', () => {
+  it('welcome_new_families uses bullet_list type (CR-278 supersedes EC-067-08)', () => {
     const agenda = makeAgenda({
       announcements: 'A\nB',
       welcome_new_families: 'Família Silva\nFamília Santos',
@@ -415,7 +415,7 @@ describe('F067 AC-067-15/16: Presentation Mode bullet_list integration', () => {
       (f) => f.label === 'agenda.welcomeNewFamilies'
     );
     expect(welcomeField).toBeDefined();
-    expect(welcomeField!.type).toBe('multiline');
+    expect(welcomeField!.type).toBe('bullet_list');
     const announcementsField = welcomeCard.fields.find(
       (f) => f.label === 'agenda.announcements'
     );

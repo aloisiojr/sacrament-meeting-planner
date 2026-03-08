@@ -15,6 +15,7 @@ export interface ThemeColors {
   textSecondary: string;
   textTertiary: string;
   textInverse: string;
+  textZebraFaded: string;
 
   // Primary
   primary: string;
@@ -64,6 +65,7 @@ export const lightColors: ThemeColors = {
   textSecondary: '#5A5A5A',     // contrast 6.0:1 on Slate-100
   textTertiary: '#8A8A8A',      // contrast 3.0:1 on Slate-100 (large text only)
   textInverse: '#FFFFFF',
+  textZebraFaded: '#4A4A4A',
 
   primary: '#2563EB',           // unchanged
   primaryContainer: '#DBEAFE',
@@ -95,6 +97,7 @@ export const darkColors: ThemeColors = {
   textSecondary: '#94A3B8',  // contrast 5.5:1 on #0F172A
   textTertiary: '#64748B',   // contrast 3.2:1 on #0F172A (large text only)
   textInverse: '#0F172A',
+  textZebraFaded: '#B8C5D4',
 
   primary: '#60A5FA',        // contrast 5.8:1 on #0F172A
   primaryContainer: '#1E3A5F',

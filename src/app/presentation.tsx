@@ -178,7 +178,10 @@ function PresentationFieldRow({
         {bulletItems.map((item: string, idx: number) => (
           <Text
             key={idx}
-            style={[styles.fieldValue, { color: colors.text, fontSize: fontSizes?.value ?? 16 }]}
+            style={[styles.fieldValue, {
+              color: idx % 2 === 0 ? colors.text : colors.textZebraFaded,
+              fontSize: fontSizes?.value ?? 16,
+            }]}
           >
             {'\u2022 '}{item}
           </Text>

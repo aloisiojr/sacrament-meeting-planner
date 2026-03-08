@@ -88,7 +88,7 @@ export function buildPresentationCards(
     welcomeFields.push({
       label: t('agenda.welcomeNewFamilies'),
       value: agenda.welcome_new_families,
-      type: 'multiline',
+      type: 'bullet_list',
     });
   }
   if (agenda?.announcements) {
@@ -114,7 +114,7 @@ export function buildPresentationCards(
     designationFields.push({
       label: t('agenda.wardBusiness'),
       value: agenda.sustaining_releasing,
-      type: 'multiline',
+      type: 'bullet_list',
     });
   }
   if (agenda?.has_baby_blessing && agenda?.baby_blessing_names) {

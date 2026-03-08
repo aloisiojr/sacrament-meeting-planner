@@ -6,6 +6,8 @@
  * S014-03: AgendaForm integration
  * S014-04: Presentation Mode bullet_list type
  * S015-01: i18n keys agenda.addWelcome, agenda.addWardBusiness
+ * S015-02: AgendaForm EditableListField for welcome/sustaining
+ * S015-03: Auto-split \n in add-input and inline-edit
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -390,6 +392,130 @@ describe('F068 S015-02: AgendaForm -> EditableListField for welcome/sustaining',
     const items = parseItems('Varios apoios e desobrigacoes');
     expect(items).toHaveLength(1);
     expect(items[0]).toBe('Varios apoios e desobrigacoes');
+  });
+});
+
+// =============================================================================
+// S015-03: Auto-split \n in add-input and inline-edit
+// =============================================================================
+
+describe('F068 S015-03: handleAdd auto-split', () => {
+  // Simulates handleAdd logic from EditableListField.tsx
+  function simulateHandleAdd(existingItems: string[], addText: string) {
+    const newEntries = addText.split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (newEntries.length === 0) return { items: existingItems, saved: false };
+    const newItems = [...existingItems, ...newEntries];
+    return { items: newItems, saved: true, savedValue: joinItems(newItems) };
+  }
+
+  it("handleAdd auto-splits 'A\\nB\\nC' into 3 items", () => {
+    const result = simulateHandleAdd([], 'A\nB\nC');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['A', 'B', 'C']);
+    expect(result.savedValue).toBe('A\nB\nC');
+  });
+
+  it("handleAdd with '\\n\\n\\n' adds nothing", () => {
+    const result = simulateHandleAdd(['Existing'], '\n\n\n');
+    expect(result.saved).toBe(false);
+    expect(result.items).toEqual(['Existing']);
+  });
+
+  it("handleAdd with '  A  \\n  B  ' trims to 'A' and 'B'", () => {
+    const result = simulateHandleAdd([], '  A  \n  B  ');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['A', 'B']);
+  });
+
+  it("handleAdd with 'A\\r\\nB' handles \\r\\n correctly", () => {
+    // \r\n splits on \n, then trim() removes \r from 'A\r'
+    const result = simulateHandleAdd([], 'A\r\nB');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['A', 'B']);
+  });
+
+  it('handleAdd appends auto-split entries to existing items', () => {
+    const result = simulateHandleAdd(['X', 'Y'], 'A\nB');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['X', 'Y', 'A', 'B']);
+    expect(result.savedValue).toBe('X\nY\nA\nB');
+  });
+
+  it('handleAdd with single item (no \\n) works normally', () => {
+    const result = simulateHandleAdd(['X'], 'New Item');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['X', 'New Item']);
+  });
+
+  it('handleAdd with whitespace-only lines filters them out', () => {
+    const result = simulateHandleAdd([], 'A\n   \n  \nB');
+    expect(result.saved).toBe(true);
+    expect(result.items).toEqual(['A', 'B']);
+  });
+});
+
+describe('F068 S015-03: finishEdit auto-split', () => {
+  // Simulates finishEdit logic from EditableListField.tsx
+  function simulateFinishEdit(existingItems: string[], editingIndex: number, editText: string) {
+    const newEntries = editText.split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (newEntries.length === 0) {
+      const newItems = existingItems.filter((_, i) => i !== editingIndex);
+      return { items: newItems, savedValue: joinItems(newItems) };
+    } else if (newEntries.length === 1) {
+      const newItems = existingItems.map((item, i) => (i === editingIndex ? newEntries[0] : item));
+      return { items: newItems, savedValue: joinItems(newItems) };
+    } else {
+      const newItems = [...existingItems];
+      newItems.splice(editingIndex, 1, ...newEntries);
+      return { items: newItems, savedValue: joinItems(newItems) };
+    }
+  }
+
+  it("finishEdit auto-splits 'A\\nB' into 2 items replacing original", () => {
+    const result = simulateFinishEdit(['X', 'Y', 'Z'], 1, 'A\nB');
+    expect(result.items).toEqual(['X', 'A', 'B', 'Z']);
+    expect(result.savedValue).toBe('X\nA\nB\nZ');
+  });
+
+  it('finishEdit with only empty lines deletes item', () => {
+    const result = simulateFinishEdit(['A', 'B', 'C'], 1, '\n\n\n');
+    expect(result.items).toEqual(['A', 'C']);
+    expect(result.savedValue).toBe('A\nC');
+  });
+
+  it('finishEdit with single line updates item normally', () => {
+    const result = simulateFinishEdit(['A', 'B', 'C'], 1, 'Updated');
+    expect(result.items).toEqual(['A', 'Updated', 'C']);
+    expect(result.savedValue).toBe('A\nUpdated\nC');
+  });
+
+  it('finishEdit with empty string deletes item', () => {
+    const result = simulateFinishEdit(['A', 'B', 'C'], 0, '');
+    expect(result.items).toEqual(['B', 'C']);
+    expect(result.savedValue).toBe('B\nC');
+  });
+
+  it('finishEdit auto-splits 3 items replacing first', () => {
+    const result = simulateFinishEdit(['X', 'Y'], 0, 'A\nB\nC');
+    expect(result.items).toEqual(['A', 'B', 'C', 'Y']);
+    expect(result.savedValue).toBe('A\nB\nC\nY');
+  });
+
+  it('finishEdit auto-splits and trims whitespace', () => {
+    const result = simulateFinishEdit(['X'], 0, '  Hello  \n  World  ');
+    expect(result.items).toEqual(['Hello', 'World']);
+    expect(result.savedValue).toBe('Hello\nWorld');
+  });
+
+  it('finishEdit with \\r\\n handles correctly', () => {
+    const result = simulateFinishEdit(['X'], 0, 'A\r\nB');
+    expect(result.items).toEqual(['A', 'B']);
+  });
+
+  it('finishEdit deleting last item returns null', () => {
+    const result = simulateFinishEdit(['Only'], 0, '');
+    expect(result.items).toEqual([]);
+    expect(result.savedValue).toBeNull();
   });
 });
 

@@ -61,11 +61,11 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
     [onSave]
   );
 
-  // --- Add ---
+  // --- Add (with auto-split for \n) ---
   const handleAdd = useCallback(() => {
-    const trimmed = addText.trim();
-    if (trimmed === '') return;
-    const newItems = [...items, trimmed];
+    const newEntries = addText.split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (newEntries.length === 0) return;
+    const newItems = [...items, ...newEntries];
     saveItems(newItems);
     setAddText('');
     setTimeout(() => addInputRef.current?.focus(), 50);
@@ -98,14 +98,19 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
 
   const finishEdit = useCallback(() => {
     if (editingIndex === null) return;
-    const trimmed = editText.trim();
-    if (trimmed === '') {
-      // Delete item
+    const newEntries = editText.split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (newEntries.length === 0) {
+      // Delete item (all empty after split)
       const newItems = items.filter((_, i) => i !== editingIndex);
       saveItems(newItems);
+    } else if (newEntries.length === 1) {
+      // Update single item
+      const newItems = items.map((item, i) => (i === editingIndex ? newEntries[0] : item));
+      saveItems(newItems);
     } else {
-      // Update item
-      const newItems = items.map((item, i) => (i === editingIndex ? trimmed : item));
+      // Replace 1 item with N items at same position
+      const newItems = [...items];
+      newItems.splice(editingIndex, 1, ...newEntries);
       saveItems(newItems);
     }
     setEditingIndex(null);
@@ -218,6 +223,8 @@ export function EditableListField({ value, onSave, disabled, placeholder }: Edit
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
         returnKeyType="done"
+        multiline
+        blurOnSubmit
       />
     </View>
   );

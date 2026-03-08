@@ -4,20 +4,20 @@
 # =============================================================================
 
 type: test_consolidated
-version: 16
+version: 17
 last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 61
-  total_tests: 1364
+  total_test_files: 62
+  total_tests: 1421
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
   # Note: F065+F066 added 96 tests (50 coder + 46 tester): 8 useMembers, 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils, 46 tester
-  # Note: F067 added 46 tests (coder): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation
+  # Note: F067 added 103 tests (46 coder + 57 tester): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation, 57 tester
   framework: vitest
   categories:
-    module_named: 54
+    module_named: 55
     integration: 6
   infrastructure:
     setup: 1
@@ -722,6 +722,53 @@ module_tests:
       - buildPresentationCards uses bullet_list type (AC-067-15)
       - PresentationField type union includes bullet_list (ADR-040)
       - Rendering with items/empty/single/filtered (AC-067-15..16, EC-067-07)
+
+  # --- F067 Tester Tests (CR-277) ---
+
+  - file: src/__tests__/f067-tester.test.ts
+    tests: 57
+    module: "src/components/AnnouncementsList.tsx, src/hooks/usePresentationMode.ts"
+    covers:
+      - "AC-067-17: Storage format round-trip (5 tests)"
+      - parseItems -> joinItems identity, strips empty/whitespace lines, null round-trip, single item
+      - "AC-067-21: onSave callback contract (5 tests)"
+      - add/delete/delete-last/edit/reorder all call onSave with correct joined string
+      - "AC-067-19: Backward compatibility (4 tests)"
+      - Pre-CR-277 multi-line data, single-line, trailing/leading newlines
+      - "EC-067-01: Single-line TextInput (2 tests)"
+      - No newlines in single item, join+reparse preserves items
+      - "EC-067-05: Reorder with single item (2 tests)"
+      - Move up/down on single item does nothing, no save triggered
+      - "EC-067-06: Whitespace-only item handling (3 tests)"
+      - Inline edit to spaces/tabs deletes item, whitespace add does not save
+      - "EC-067-03: Rapid add/delete discrete (2 tests)"
+      - Multiple sequential adds, add then immediate delete
+      - "AC-067-18: No database migration (1 test)"
+      - Last migration is 031 (CR-276), no 032+ exists
+      - "AC-067-15/16: Presentation Mode integration (5 tests)"
+      - bullet_list for multi-item, null/empty omitted, single item bullet, welcome_new_families still multiline
+      - "AC-067-20: i18n values (3 tests)"
+      - pt-BR accented, en-US lowercase, es-LA Agregar
+      - "PresentationField type validation (2 tests)"
+      - bullet_list and multiline both valid
+      - "AC-067-04: Empty/whitespace add guard (3 tests)"
+      - Empty/newline-only/mixed whitespace add does not save
+      - "AC-067-06: Delete last item (2 tests)"
+      - Single item deletion returns null, sequential deletion ends at null
+      - "AC-067-09: Inline edit empty deletion (3 tests)"
+      - Edit to empty removes middle/first/last item
+      - "AC-067-01/14: Empty state (3 tests)"
+      - Null/empty string parse to empty array, disabled empty renders nothing
+      - "EC-067-02: Long text handling (2 tests)"
+      - 500-char item preserved, 10 long items round-trip
+      - "EC-067-04: External value sync (3 tests)"
+      - Value change re-parses, completely different items, value to null
+      - "Reorder comprehensive (4 tests)"
+      - Move last up, move first down, move down+up returns to original, multi-step reorder
+      - "AC-067-08: Inline edit trim (1 test)"
+      - Leading/trailing spaces saved as trimmed version
+      - "AC-067-02/03: Adding items (2 tests)"
+      - First item to empty list, add with spaces trims
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4020,10 +4067,15 @@ gaps:
 
   # F067 gaps
   # All F067 ACs (01-21) covered. All edge cases (EC-067-01 to EC-067-08) covered. No gaps.
-  # 46 tests: 3 i18n, 8 parseItems/joinItems, 27 component behavior, 5 integration, 6 presentation.
+  # 103 tests total: 46 coder + 57 tester.
+  # Coder: 3 i18n, 8 parseItems/joinItems, 27 component behavior, 5 AgendaForm, 6 presentation.
+  # Tester: 5 round-trip, 5 onSave contract, 4 backward compat, 2 single-line, 2 single-item reorder,
+  #   3 whitespace, 2 rapid ops, 1 no-migration, 5 presentation integration, 3 i18n values,
+  #   2 type validation, 3 empty add guard, 2 delete-last, 3 edit-empty deletion, 3 empty state,
+  #   2 long text, 3 external sync, 4 reorder comprehensive, 1 edit trim, 2 adding items.
 
 stats:
-  total_tests: 1364
-  passing: 1364
+  total_tests: 1421
+  passing: 1421
   failing: 0
   skipped: 0

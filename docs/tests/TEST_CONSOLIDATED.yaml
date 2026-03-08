@@ -4,21 +4,22 @@
 # =============================================================================
 
 type: test_consolidated
-version: 18
+version: 19
 last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 62
-  total_tests: 1474
+  total_test_files: 63
+  total_tests: 1572
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
   # Note: F065+F066 added 96 tests (50 coder + 46 tester): 8 useMembers, 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils, 46 tester
   # Note: F067 added 103 tests (46 coder + 57 tester): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation, 57 tester
-  # Note: F068+F069+F070 added 53 tests: 6 i18n, 9 welcome/sustaining integration, 15 auto-split, 12 GripIcon/drag, 11 zebra+bullet_list
+  # Note: F068+F069+F070 added 53 tests (coder): 6 i18n, 9 welcome/sustaining integration, 15 auto-split, 12 GripIcon/drag, 11 zebra+bullet_list
+  # Note: F068+F069+F070 added 98 tests (tester): EditableListField generalization, drag reorder, zebra striping
   framework: vitest
   categories:
-    module_named: 55
+    module_named: 56
     integration: 6
   infrastructure:
     setup: 1
@@ -789,6 +790,60 @@ module_tests:
       - Leading/trailing spaces saved as trimmed version
       - "AC-067-02/03: Adding items (2 tests)"
       - First item to empty list, add with spaces trims
+
+  # --- F068+F069+F070 Tester Tests (CR-278, CR-279, CR-280) ---
+
+  - file: src/__tests__/f068-f069-f070-tester.test.ts
+    tests: 98
+    module: "src/components/EditableListField.tsx, src/lib/theme.ts, src/hooks/usePresentationMode.ts"
+    covers:
+      - "F068 AC-068-01/02: EditableListField rename (2 tests)"
+      - parseItems/joinItems function behavior verification
+      - "F068 AC-068-03/04/05: welcome_new_families integration (6 tests)"
+      - Data parsing, joining, i18n addWelcome values, onSave callback
+      - "F068 AC-068-06/07/08: sustaining_releasing integration (6 tests)"
+      - Data parsing, joining, i18n addWardBusiness values, onSave callback
+      - "F068 AC-068-09: recognized_names unchanged (1 test)"
+      - recognized_names uses multiline type (not bullet_list)
+      - "F068 AC-068-10/11/12/13: auto-split add/edit (10 tests)"
+      - handleAdd multi-line split, empty filter, trim, single item; finishEdit split/replace/delete
+      - "F068 AC-068-14/15: presentation bullet_list (4 tests)"
+      - welcome_new_families, sustaining_releasing, announcements as bullet_list, all 3 coexist
+      - "F068 AC-068-16/17: backward compatibility (4 tests)"
+      - Existing free-text without \n as single item, with \n as multiple, round-trip
+      - "F068 AC-068-18: i18n keys completeness (3 tests)"
+      - addWelcome, addWardBusiness, addAnnouncement exist in all locales
+      - "F068 AC-068-19: no migration (1 test)"
+      - Existing TEXT column \n-joined format verified
+      - "F069 AC-069-01/02/03: drag-to-reorder behavior (6 tests)"
+      - Drag reorder logic, same position no-op, single-item drag, onSave with joined string
+      - "F069 AC-069-05/06/07: word-wrap / no truncation (3 tests)"
+      - Short/long text preserved, round-trip without truncation
+      - "F070 AC-070-01/02: light mode zebra striping (5 tests)"
+      - lightColors.text #1A1A1A, textZebraFaded #4A4A4A, alternating pattern for 4 items
+      - "F070 AC-070-03/04: dark mode zebra striping (5 tests)"
+      - darkColors.text #F1F5F9, textZebraFaded #B8C5D4, alternating pattern for 4 items
+      - "F070 AC-070-05: all 3 bullet_list fields (3 tests)"
+      - announcements, welcome_new_families, sustaining_releasing eligible for zebra
+      - "F070 AC-070-06: non-bullet_list no zebra (2 tests)"
+      - text fields not bullet_list, hymn fields not bullet_list
+      - "F070 AC-070-07: color subtlety (5 tests)"
+      - textZebraFaded between text and textTertiary, differs from both
+      - "F070 AC-070-08: single-item normal color (3 tests)"
+      - idx 0 uses text color in both modes, single-item welcome verified
+      - "EC-068-01: welcome data with \\n (2 tests)"
+      - "EC-068-02: sustaining data without \\n (2 tests)"
+      - "EC-068-03: mixed \\r\\n line endings (3 tests)"
+      - "EC-068-04: all-empty auto-split (3 tests)"
+      - "EC-068-05: orphan style removed (1 test)"
+      - "EC-069-01: very long item text (2 tests)"
+      - "EC-069-02: layout data integrity (1 test)"
+      - "EC-069-03: single-item grip (2 tests)"
+      - "EC-070-01: empty bullet_list omitted (3 tests)"
+      - "EC-070-02: zebra with large font (1 test)"
+      - "EC-070-03: textZebraFaded vs textTertiary (4 tests)"
+      - "ThemeColors textZebraFaded property (3 tests)"
+      - "PresentationField type bullet_list (2 tests)"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts

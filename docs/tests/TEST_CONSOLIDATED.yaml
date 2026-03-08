@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 19
+version: 20
 last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 63
-  total_tests: 1572
+  total_test_files: 64
+  total_tests: 1611
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -17,6 +17,7 @@ summary:
   # Note: F067 added 103 tests (46 coder + 57 tester): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation, 57 tester
   # Note: F068+F069+F070 added 53 tests (coder): 6 i18n, 9 welcome/sustaining integration, 15 auto-split, 12 GripIcon/drag, 11 zebra+bullet_list
   # Note: F068+F069+F070 added 98 tests (tester): EditableListField generalization, drag reorder, zebra striping
+  # Note: F071 added 39 tests (coder): CR-281 multiline fix, CR-282 activationDistance, CR-283 recognized_names rework
   framework: vitest
   categories:
     module_named: 56
@@ -804,7 +805,7 @@ module_tests:
       - "F068 AC-068-06/07/08: sustaining_releasing integration (6 tests)"
       - Data parsing, joining, i18n addWardBusiness values, onSave callback
       - "F068 AC-068-09: recognized_names unchanged (1 test)"
-      - recognized_names uses multiline type (not bullet_list)
+      - recognized_names uses bullet_list type (updated by CR-283)
       - "F068 AC-068-10/11/12/13: auto-split add/edit (10 tests)"
       - handleAdd multi-line split, empty filter, trim, single item; finishEdit split/replace/delete
       - "F068 AC-068-14/15: presentation bullet_list (4 tests)"
@@ -844,6 +845,29 @@ module_tests:
       - "EC-070-03: textZebraFaded vs textTertiary (4 tests)"
       - "ThemeColors textZebraFaded property (3 tests)"
       - "PresentationField type bullet_list (2 tests)"
+
+  # --- F071 Tests (CR-281, CR-282, CR-283) ---
+
+  - file: src/__tests__/f071-recognized-names.test.ts
+    tests: 39
+    module: "src/components/EditableListField.tsx, src/components/ActorSelector.tsx, src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts"
+    covers:
+      - "CR-281 S016-01: inline edit TextInput props (4 tests)"
+      - multiline, blurOnSubmit, editInput paddingVertical, autoFocus
+      - "CR-282 S016-02: DraggableFlatList activationDistance (2 tests)"
+      - activationDistance={9999}, scrollEnabled={false} preserved
+      - "CR-283 S016-03: i18n key agenda.addPresence (4 tests)"
+      - pt-BR, en-US, es-LA, SundayAgenda.recognized_names type string|null
+      - "CR-283 S016-04: migration 032 (4 tests)"
+      - File exists, array_to_string, NULL exclusion, empty array exclusion
+      - "CR-283 S016-05: onItemPress/onAddPress callback props (5 tests)"
+      - onItemPress in interface, tap triggers startEdit or onItemPress, onAddPress Pressable, backward compat TextInput, placeholder text
+      - "CR-283 S016-06: ActorSelector disabledNames (5 tests)"
+      - disabledNames in interface, opacity 0.4, onPress undefined, disabled={isDisabled}, non-disabled selectable
+      - "CR-283 S016-07: AgendaForm recognized_names rework (11 tests)"
+      - EditableListField rendered, onItemPress, onAddPress, placeholder, recognizeSelector state, roleFilter=recognize, disabledNames add/edit logic, onSelect add/edit, onClose, old styles removed
+      - "CR-283 S016-07: usePresentationMode recognized_names (4 tests)"
+      - bullet_list type, raw string value, truthy guard, null omitted
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4149,8 +4173,14 @@ gaps:
   #   2 type validation, 3 empty add guard, 2 delete-last, 3 edit-empty deletion, 3 empty state,
   #   2 long text, 3 external sync, 4 reorder comprehensive, 1 edit trim, 2 adding items.
 
+  # F071 gaps
+  # All CR-281 ACs (01-04) covered. All CR-282 ACs (01-04) covered. All CR-283 ACs (01-12) covered.
+  # All edge cases covered. No gaps.
+  # 39 coder tests: 4 inline edit props, 2 activationDistance, 4 i18n+type, 4 migration,
+  #   5 callback props, 5 disabledNames, 11 AgendaForm rework, 4 usePresentationMode.
+
 stats:
-  total_tests: 1474
-  passing: 1421
+  total_tests: 1611
+  passing: 1611
   failing: 0
   skipped: 0

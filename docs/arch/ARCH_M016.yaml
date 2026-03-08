@@ -1,0 +1,953 @@
+# =============================================================================
+# ARCH_M016.yaml - CR-281, CR-282, CR-283
+# Artifact ID: 016
+# Features: F068/F069 bugfixes (inline edit + scroll), F071 (recognized_names rework)
+# Status: complete
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    CR-281 (bugfix): Fix EditableListField inline edit TextInput shrinking to
+    one line and cursor disappearing. Root cause: missing multiline prop, missing
+    paddingVertical, autoFocus forcing cursor to position 0.
+    CR-282 (bugfix): Fix page scroll being blocked by DraggableFlatList gesture
+    handler. Root cause: default activationDistance=0 captures all touch events.
+    Fix via high activationDistance so drag only activates via onLongPress={drag}.
+    CR-283 (feature F071): Transform recognized_names from TEXT[] with
+    multi-select ActorSelector into EditableListField + single-select ActorSelector.
+    DB migration 032 converts TEXT[] to TEXT. Each name is a separate list item
+    with add/edit/delete via ActorSelector (no free text). New disabledNames
+    prop on ActorSelector. Presentation mode changes from multiline to bullet_list.
+  principles:
+    - "CR-281: Minimal prop additions to existing TextInput (multiline, paddingVertical)"
+    - "CR-282: Single prop change (activationDistance) on DraggableFlatList"
+    - "CR-283: Extend EditableListField with onItemPress + onAddPress callbacks for ActorSelector integration"
+    - "CR-283: No free text input for recognized_names - always via ActorSelector"
+    - "CR-283: DB migration 032 converts TEXT[] to TEXT with \\n separator"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  CR-281/CR-282/CR-283: EditableListField bugfixes + recognized_names rework
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/components/EditableListField.tsx (MODIFIED)                  │
+  │                                                                 │
+  │  CR-281 fixes:                                                  │
+  │    - TextInput: +multiline, +paddingVertical:8, keep autoFocus  │
+  │  CR-282 fix:                                                    │
+  │    - DraggableFlatList: +activationDistance={9999}               │
+  │  CR-283 new props:                                              │
+  │    - onItemPress?: (index: number, item: string) => void        │
+  │    - onAddPress?: () => void                                    │
+  │    - renderAddArea?: () => React.ReactNode                      │
+  │                                                                 │
+  │  When onItemPress provided: tap calls onItemPress instead of    │
+  │    inline TextInput edit                                        │
+  │  When onAddPress provided: add area is Pressable (not TextInput)│
+  │  When renderAddArea provided: custom add area rendering         │
+  └─────────────────────────────────────────────────────────────────┘
+       │ value, onSave, disabled, placeholder, onItemPress?, onAddPress?
+       ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/components/AgendaForm.tsx (MODIFIED)                         │
+  │                                                                 │
+  │  recognized_names field:                                        │
+  │    BEFORE: Pressable → ActorSelector (multiSelect=true)         │
+  │    AFTER:  EditableListField with:                              │
+  │      - value: agenda.recognized_names (now string|null, was []) │
+  │      - onItemPress: opens ActorSelector to replace name         │
+  │      - onAddPress: opens ActorSelector to add name              │
+  │      - onSave: updateField('recognized_names', value)           │
+  │                                                                 │
+  │  ActorSelector integration:                                     │
+  │    - roleFilter='recognize', multiSelect=false                  │
+  │    - disabledNames: other names in list (not current edit)      │
+  │    - onSelect: add/replace name in list, save, close            │
+  └─────────────────────────────────────────────────────────────────┘
+       │ disabledNames prop
+       ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/components/ActorSelector.tsx (MODIFIED)                      │
+  │                                                                 │
+  │  CR-283 new prop:                                               │
+  │    - disabledNames?: string[]                                   │
+  │    - Disabled actors: grayed out (opacity 0.4), onPress ignored │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/types/database.ts (MODIFIED)                                 │
+  │   recognized_names: string[] | null → string | null             │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ src/hooks/usePresentationMode.ts (MODIFIED)                      │
+  │   recognized_names: type 'multiline' → 'bullet_list'           │
+  │   value: .join('\n') → raw string (already \n-joined)          │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ supabase/migrations/032_recognized_names_to_text.sql             │
+  │   ALTER COLUMN recognized_names from TEXT[] to TEXT              │
+  │   Data migration: array_to_string(recognized_names, E'\n')     │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ i18n (3 locale files MODIFIED)                                   │
+  │   + agenda.addPresence                                          │
+  └─────────────────────────────────────────────────────────────────┘
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  # ===========================================================================
+  # CR-281: EditableListField inline edit bugfix
+  # ===========================================================================
+
+  - name: EditableListField (CR-281 bugfix)
+    file: src/components/EditableListField.tsx
+    responsibility: "Fix inline edit TextInput visual regression"
+    changes:
+      - what: "Add multiline prop and paddingVertical to inline edit TextInput"
+        details: |
+          Line 161-169 (renderItem, TextInput for inline edit):
+
+          BEFORE:
+            <TextInput
+              style={[styles.itemText, { color: colors.text }]}
+              value={editText}
+              onChangeText={setEditText}
+              onSubmitEditing={finishEdit}
+              onBlur={finishEdit}
+              autoFocus
+              returnKeyType="done"
+            />
+
+          AFTER:
+            <TextInput
+              style={[styles.itemText, styles.editInput, { color: colors.text }]}
+              value={editText}
+              onChangeText={setEditText}
+              onSubmitEditing={finishEdit}
+              onBlur={finishEdit}
+              autoFocus
+              multiline
+              blurOnSubmit
+              returnKeyType="done"
+            />
+
+          Changes:
+          1. Add multiline prop: TextInput renders multiple lines matching
+             the height of the word-wrapped display Text. Without multiline,
+             TextInput forces single-line rendering regardless of content.
+          2. Add blurOnSubmit: ensures "done" key triggers onSubmitEditing
+             AND blurs (consistent with add-input behavior).
+          3. Add styles.editInput with paddingVertical: 0 to ensure the
+             TextInput matches the same vertical sizing as the display Text.
+             The paddingVertical of the itemRow already provides spacing.
+          4. Keep autoFocus: cursor appears in the field. Position is
+             determined by the OS (typically end of text for multiline).
+
+          New style in StyleSheet:
+            editInput: {
+              paddingVertical: 0,
+            },
+
+          Note: autoFocus in multiline mode places cursor at end of text
+          on both iOS and Android, which is acceptable behavior. The
+          previous bug was that single-line autoFocus forced cursor to
+          position 0 due to the text being truncated.
+
+  # ===========================================================================
+  # CR-282: DraggableFlatList scroll bugfix
+  # ===========================================================================
+
+  - name: EditableListField (CR-282 bugfix)
+    file: src/components/EditableListField.tsx
+    responsibility: "Fix page scroll blocked by drag gesture handler"
+    changes:
+      - what: "Add activationDistance to DraggableFlatList"
+        details: |
+          Line 188-194 (DraggableFlatList):
+
+          BEFORE:
+            <DraggableFlatList
+              data={items}
+              keyExtractor={(_, index) => `${index}`}
+              renderItem={renderItem}
+              onDragEnd={handleDragEnd}
+              scrollEnabled={false}
+            />
+
+          AFTER:
+            <DraggableFlatList
+              data={items}
+              keyExtractor={(_, index) => `${index}`}
+              renderItem={renderItem}
+              onDragEnd={handleDragEnd}
+              scrollEnabled={false}
+              activationDistance={9999}
+            />
+
+          Root cause: DraggableFlatList internally wraps items in a
+          GestureDetector with PanGesture. The default activationDistance=0
+          means ANY touch on an item row activates the pan gesture, which
+          blocks the parent ScrollView from receiving the scroll event.
+
+          Fix: Set activationDistance={9999} so the internal PanGesture
+          effectively NEVER activates from direct touch. Drag reorder
+          only activates via the explicit onLongPress={drag} callback
+          on the GripIcon Pressable (line 157). This is the documented
+          pattern from react-native-draggable-flatlist: use onLongPress
+          on a specific handle element rather than the internal gesture.
+
+          Result:
+          - Normal touch on item text: page scrolls normally
+          - Tap on item text: inline edit activates (CR-281)
+          - Long-press on grip icon: drag-to-reorder activates
+          - Touch grip icon and scroll immediately: page scrolls (no long-press)
+
+  # ===========================================================================
+  # CR-283: EditableListField new props for ActorSelector integration
+  # ===========================================================================
+
+  - name: EditableListField (CR-283 new props)
+    file: src/components/EditableListField.tsx
+    responsibility: "Add onItemPress and onAddPress callback props for external selection flow"
+    changes:
+      - what: "Extend EditableListFieldProps with optional callback props"
+        details: |
+          1. Update interface (line 32-37):
+
+          BEFORE:
+            interface EditableListFieldProps {
+              value: string | null;
+              onSave: (value: string | null) => void;
+              disabled: boolean;
+              placeholder: string;
+            }
+
+          AFTER:
+            interface EditableListFieldProps {
+              value: string | null;
+              onSave: (value: string | null) => void;
+              disabled: boolean;
+              placeholder: string;
+              onItemPress?: (index: number, item: string) => void;
+              onAddPress?: () => void;
+            }
+
+          2. Destructure new props (line 41):
+             Add onItemPress, onAddPress to destructuring.
+
+          3. Modify renderItem (line 152-183):
+             The tap-to-edit Pressable on item text:
+
+             BEFORE:
+               <Pressable style={styles.itemTextPressable} onPress={() => startEdit(idx)}>
+
+             AFTER:
+               <Pressable style={styles.itemTextPressable} onPress={() => {
+                 if (onItemPress) {
+                   onItemPress(idx, item);
+                 } else {
+                   startEdit(idx);
+                 }
+               }}>
+
+             When onItemPress is provided, tapping an item calls the
+             external callback instead of entering inline edit mode.
+             This allows recognized_names to open ActorSelector on tap.
+
+             When onItemPress is NOT provided (default), existing inline
+             edit behavior is preserved for announcements, welcome,
+             sustaining fields.
+
+          4. Modify add area (line 195-208):
+             When onAddPress is provided, render a Pressable instead of TextInput:
+
+             BEFORE (always):
+               <TextInput
+                 ref={addInputRef}
+                 style={[styles.addInput, ...]}
+                 ...
+               />
+
+             AFTER:
+               {onAddPress ? (
+                 <Pressable
+                   style={[styles.addInput, { borderColor: colors.border }]}
+                   onPress={onAddPress}
+                 >
+                   <Text style={{ color: colors.textTertiary, fontSize: 15 }}>
+                     {placeholder}
+                   </Text>
+                 </Pressable>
+               ) : (
+                 <TextInput
+                   ref={addInputRef}
+                   style={[styles.addInput, ...]}
+                   ...
+                 />
+               )}
+
+             When onAddPress is provided, the add area is a Pressable
+             showing the placeholder text, styled like the existing dashed
+             border TextInput. Tapping opens ActorSelector (via the callback).
+
+             When onAddPress is NOT provided (default), existing TextInput
+             add-input behavior is preserved.
+
+  # ===========================================================================
+  # CR-283: AgendaForm recognized_names rework
+  # ===========================================================================
+
+  - name: AgendaForm (CR-283 modified)
+    file: src/components/AgendaForm.tsx
+    responsibility: "Replace recognized_names multi-select Pressable with EditableListField + ActorSelector"
+    changes:
+      - what: "Replace recognized_names field rendering"
+        details: |
+          1. Add state for recognized_names ActorSelector:
+
+             // State for recognized_names ActorSelector
+             const [recognizeSelector, setRecognizeSelector] = useState<{
+               mode: 'add' | 'edit';
+               editIndex?: number;
+             } | null>(null);
+
+          2. Replace recognized_names FieldRow content (lines 198-231):
+
+             BEFORE:
+               <FieldRow label={t('agenda.recognizing')} colors={colors}>
+                 <Pressable
+                   style={[styles.selectorField, { borderColor: colors.border }]}
+                   onPress={isObserver ? undefined : () => {
+                     setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'recognize' });
+                   }}
+                   disabled={isObserver}
+                 >
+                   {(agenda.recognized_names?.length ?? 0) > 0 ? (
+                     <View style={styles.recognizingContent}>
+                       <View style={styles.recognizingNames}>
+                         {agenda.recognized_names!.map((name, idx) => (
+                           <Text key={idx} style={[styles.recognizingName, { color: colors.text }]} numberOfLines={1}>
+                             {name}
+                           </Text>
+                         ))}
+                       </View>
+                       {!isObserver && (
+                         <Pressable hitSlop={8} onPress={() => updateField('recognized_names', null)}>
+                           <XIcon size={20} color={colors.error} />
+                         </Pressable>
+                       )}
+                     </View>
+                   ) : (
+                     <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
+                       {t('agenda.recognizing')}
+                     </Text>
+                   )}
+                 </Pressable>
+               </FieldRow>
+
+             AFTER:
+               <FieldRow label={t('agenda.recognizing')} colors={colors}>
+                 <EditableListField
+                   value={agenda.recognized_names ?? null}
+                   onSave={(text) => updateField('recognized_names', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addPresence')}
+                   onItemPress={(index, _item) => {
+                     setRecognizeSelector({ mode: 'edit', editIndex: index });
+                   }}
+                   onAddPress={() => {
+                     setRecognizeSelector({ mode: 'add' });
+                   }}
+                 />
+               </FieldRow>
+
+          3. Add ActorSelector for recognized_names (after existing actor selector):
+
+             Compute disabledNames for the ActorSelector:
+               - Get current items: parseItems(agenda.recognized_names ?? null)
+               - In 'edit' mode: exclude the item being edited (items[editIndex])
+               - In 'add' mode: all current items are disabled
+
+             {recognizeSelector && (
+               <ActorSelector
+                 visible
+                 roleFilter="recognize"
+                 onSelect={(actor) => {
+                   const currentItems = parseItems(agenda.recognized_names ?? null);
+                   if (recognizeSelector.mode === 'add') {
+                     const newItems = [...currentItems, actor.name];
+                     updateField('recognized_names', joinItems(newItems));
+                   } else if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+                     const newItems = [...currentItems];
+                     newItems[recognizeSelector.editIndex] = actor.name;
+                     updateField('recognized_names', joinItems(newItems));
+                   }
+                   setRecognizeSelector(null);
+                 }}
+                 onClose={() => setRecognizeSelector(null)}
+                 disabledNames={(() => {
+                   const currentItems = parseItems(agenda.recognized_names ?? null);
+                   if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+                     return currentItems.filter((_, i) => i !== recognizeSelector.editIndex);
+                   }
+                   return currentItems;
+                 })()}
+               />
+             )}
+
+          4. Remove old recognizing-related logic:
+             - Remove the 'recognizing' case from selectorModal onSelect handler
+               (lines 589-596)
+             - Remove the recognizing spread props from ActorSelector
+               (lines 604-607: selectedNames/multiSelect)
+             - Remove recognizingContent, recognizingNames, recognizingName styles
+               (lines 923-934)
+
+          5. Add import for parseItems and joinItems:
+             import { EditableListField, parseItems, joinItems } from './EditableListField';
+
+      - what: "Handle ActorSelector modal interactions"
+        details: |
+          The recognizeSelector state is separate from selectorModal to avoid
+          conflicts with existing actor selectors (presiding, conducting, pianist,
+          conductor). These selectors use selectorModal state; recognized_names
+          uses recognizeSelector state.
+
+          When user taps item text (onItemPress):
+            1. setRecognizeSelector({ mode: 'edit', editIndex: index })
+            2. ActorSelector opens with disabledNames = all items except current
+            3. User selects actor → name replaces item at editIndex
+            4. setRecognizeSelector(null) → ActorSelector closes
+
+          When user taps add area (onAddPress):
+            1. setRecognizeSelector({ mode: 'add' })
+            2. ActorSelector opens with disabledNames = all current items
+            3. User selects actor → name appended to list
+            4. setRecognizeSelector(null) → ActorSelector closes
+
+          When user closes ActorSelector without selecting:
+            1. onClose → setRecognizeSelector(null)
+            2. Original list preserved unchanged (EC-283-01)
+
+          When user deletes last item via X button:
+            1. EditableListField handleDelete removes item
+            2. onSave(null) called → updateField('recognized_names', null)
+            3. Field saved as null (EC-283-02)
+
+  # ===========================================================================
+  # CR-283: ActorSelector disabledNames prop
+  # ===========================================================================
+
+  - name: ActorSelector (CR-283 modified)
+    file: src/components/ActorSelector.tsx
+    responsibility: "Add disabledNames prop to gray out and prevent selection of specified names"
+    changes:
+      - what: "Add disabledNames prop and rendering logic"
+        details: |
+          1. Update ActorSelectorProps interface (line 34-41):
+
+          BEFORE:
+            export interface ActorSelectorProps {
+              visible: boolean;
+              roleFilter: ActorRoleFilter;
+              onSelect: (actor: MeetingActor) => void;
+              onClose: () => void;
+              selectedNames?: string[];
+              multiSelect?: boolean;
+            }
+
+          AFTER:
+            export interface ActorSelectorProps {
+              visible: boolean;
+              roleFilter: ActorRoleFilter;
+              onSelect: (actor: MeetingActor) => void;
+              onClose: () => void;
+              selectedNames?: string[];
+              multiSelect?: boolean;
+              disabledNames?: string[];
+            }
+
+          2. Destructure disabledNames in component (line 43):
+             Add disabledNames to destructuring.
+
+          3. Modify renderItem (line 166-218):
+             Add disabled check at the top of renderItem:
+
+               const isDisabled = disabledNames?.includes(item.name) ?? false;
+
+             Wrap the actor name Pressable with disabled logic:
+
+             BEFORE:
+               <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+
+             AFTER:
+               <Pressable
+                 style={[styles.actorNameArea, isDisabled && { opacity: 0.4 }]}
+                 onPress={isDisabled ? undefined : () => handleSelect(item)}
+                 disabled={isDisabled}
+               >
+
+             When isDisabled is true:
+             - Row has opacity 0.4 (grayed out / dimmed)
+             - onPress is undefined (no action on tap)
+             - disabled={true} prevents Pressable activation
+             - Edit and delete buttons are still shown for the actor
+               (actor management is separate from selection)
+
+  # ===========================================================================
+  # CR-283: Database migration 032
+  # ===========================================================================
+
+  - name: Migration 032 (CR-283)
+    file: supabase/migrations/032_recognized_names_to_text.sql
+    responsibility: "Convert recognized_names from TEXT[] to TEXT with \\n separator"
+    changes:
+      - what: "ALTER COLUMN type and migrate data"
+        details: |
+          Migration SQL:
+
+          -- Step 1: Add temporary column
+          ALTER TABLE sunday_agendas ADD COLUMN recognized_names_new TEXT;
+
+          -- Step 2: Migrate data (array → \n-joined string)
+          UPDATE sunday_agendas
+          SET recognized_names_new = array_to_string(recognized_names, E'\n')
+          WHERE recognized_names IS NOT NULL
+            AND array_length(recognized_names, 1) > 0;
+
+          -- Step 3: Drop old column and rename new
+          ALTER TABLE sunday_agendas DROP COLUMN recognized_names;
+          ALTER TABLE sunday_agendas RENAME COLUMN recognized_names_new TO recognized_names;
+
+          Notes:
+          - array_to_string with E'\n' joins array elements with newline
+          - NULL arrays remain NULL (WHERE clause excludes them)
+          - Empty arrays ('{}') remain NULL (array_length check)
+          - 3-step approach (add temp, migrate, drop+rename) is safer than
+            ALTER COLUMN TYPE which may fail with complex casts
+          - RLS policies on sunday_agendas are unaffected (they check ward_id,
+            not column types)
+          - No index changes needed (recognized_names has no index)
+
+  # ===========================================================================
+  # CR-283: database.ts type change
+  # ===========================================================================
+
+  - name: database.ts (CR-283 modified)
+    file: src/types/database.ts
+    responsibility: "Update recognized_names type from string[] to string"
+    changes:
+      - what: "Change recognized_names type in SundayAgenda interface"
+        details: |
+          Line 187:
+
+          BEFORE:
+            recognized_names: string[] | null;
+
+          AFTER:
+            recognized_names: string | null;
+
+          This matches the new TEXT column type after migration 032.
+          All code referencing recognized_names as array must be updated.
+
+  # ===========================================================================
+  # CR-283: usePresentationMode change
+  # ===========================================================================
+
+  - name: usePresentationMode (CR-283 modified)
+    file: src/hooks/usePresentationMode.ts
+    responsibility: "Change recognized_names from multiline to bullet_list; remove .join()"
+    changes:
+      - what: "Update recognized_names field in buildPresentationCards"
+        details: |
+          Lines 80-85:
+
+          BEFORE:
+            if (agenda?.recognized_names?.length) {
+              welcomeFields.push({
+                label: t('agenda.recognizing'),
+                value: agenda.recognized_names.join('\n'),
+                type: 'multiline',
+              });
+            }
+
+          AFTER:
+            if (agenda?.recognized_names) {
+              welcomeFields.push({
+                label: t('agenda.recognizing'),
+                value: agenda.recognized_names,
+                type: 'bullet_list',
+              });
+            }
+
+          Changes:
+          1. Guard: .length check on array → truthy check on string
+             (null/empty string are both falsy)
+          2. Value: .join('\n') removed - the value is already a \n-joined
+             string after migration 032
+          3. Type: 'multiline' → 'bullet_list' - enables zebra striping
+             and bullet prefix in presentation mode (AC-283-08)
+
+  # ===========================================================================
+  # CR-283: i18n (3 locale files)
+  # ===========================================================================
+
+  - name: i18n locales (CR-283 modified)
+    file: src/i18n/locales/pt-BR.json
+    responsibility: "Add addPresence key"
+    changes:
+      - what: "Add agenda.addPresence"
+        details: |
+          "addPresence": "Reconhecer nova presenca"
+          (placed after addAnnouncement in the agenda section)
+
+  - name: i18n locales (CR-283 modified)
+    file: src/i18n/locales/en-US.json
+    responsibility: "Add addPresence key"
+    changes:
+      - what: "Add agenda.addPresence"
+        details: |
+          "addPresence": "Recognize new presence"
+
+  - name: i18n locales (CR-283 modified)
+    file: src/i18n/locales/es-LA.json
+    responsibility: "Add addPresence key"
+    changes:
+      - what: "Add agenda.addPresence"
+        details: |
+          "addPresence": "Reconocer nueva presencia"
+
+  # ===========================================================================
+  # CR-283: Test files
+  # ===========================================================================
+
+  - name: Test files (CR-283)
+    file: src/__tests__/f071-recognized-names.test.ts
+    responsibility: "Tests for recognized_names rework and EditableListField new props"
+    changes:
+      - what: "New test file for F071"
+        details: |
+          Test suites:
+          1. EditableListField onItemPress callback
+             - When onItemPress provided, tap calls callback (not inline edit)
+             - When onItemPress not provided, tap triggers inline edit (backward compat)
+          2. EditableListField onAddPress callback
+             - When onAddPress provided, add area is Pressable (not TextInput)
+             - When onAddPress not provided, add area is TextInput (backward compat)
+          3. ActorSelector disabledNames prop
+             - Disabled actors have opacity 0.4
+             - Disabled actors cannot be selected (onPress ignored)
+             - Non-disabled actors remain selectable
+          4. DB type change: SundayAgenda.recognized_names is string | null
+          5. Presentation mode: recognized_names uses bullet_list type
+          6. i18n: agenda.addPresence key exists in all 3 locales
+
+      - what: "Update existing test files"
+        details: |
+          1. f068-f069-f070-tester.test.ts:
+             - Update test "recognized_names uses multiline type" →
+               change expectation to 'bullet_list' (no longer 'multiline')
+             - Update makeAgenda mock: recognized_names from string[] to string|null
+
+          2. f067-announcements-list.test.ts:
+             - Update test "recognized_names still uses ActorSelector (not EditableListField)"
+               → Remove or update this test (recognized_names now DOES use EditableListField)
+
+          3. Integration setup (setup-integration.ts):
+             - Update recognized_names mock from null (array) to null (string) - no change needed
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  # CR-281: TextInput multiline contract
+  - name: inlineEditTextInputContract
+    component: EditableListField
+    description: "Inline edit TextInput must be multiline with consistent sizing"
+    methods:
+      - name: "TextInput rendering"
+        input: "editText: string, editingIndex: number"
+        output: "Multiline TextInput that matches display Text height"
+        logic: |
+          1. TextInput has multiline={true} - renders multiple lines
+          2. TextInput has blurOnSubmit={true} - "done" key blurs and fires onSubmitEditing
+          3. TextInput has paddingVertical: 0 (via editInput style) - matches Text padding
+          4. TextInput has autoFocus - cursor appears, OS-determined position (end of text)
+          5. Height auto-grows with content (multiline default behavior)
+
+  # CR-282: Scroll activation contract
+  - name: scrollActivationContract
+    component: EditableListField
+    description: "Page scroll must not be blocked by DraggableFlatList gesture"
+    methods:
+      - name: "Touch handling priority"
+        input: "User touch on EditableListField area"
+        output: "Correct handler activated based on gesture"
+        logic: |
+          activationDistance={9999} disables DraggableFlatList's internal PanGesture.
+          Touch routing:
+          1. Vertical drag on item text → parent ScrollView handles (page scroll)
+          2. Tap on item text → Pressable onPress (inline edit or onItemPress)
+          3. Long-press on grip icon → onLongPress={drag} activates drag mode
+          4. Touch grip + immediate scroll → parent ScrollView (no long-press)
+
+  # CR-283: EditableListField callback props contract
+  - name: editableListFieldCallbackProps
+    component: EditableListField
+    description: "Optional callback props for external selection flow"
+    methods:
+      - name: "onItemPress"
+        input: "(index: number, item: string) - index in items array, item text"
+        output: "External callback invoked instead of inline edit"
+        logic: |
+          When onItemPress is provided:
+            1. Tap on item text calls onItemPress(index, item)
+            2. No inline TextInput editing
+          When onItemPress is NOT provided:
+            1. Tap on item text calls startEdit(index)
+            2. Normal inline TextInput editing (existing behavior)
+
+      - name: "onAddPress"
+        input: "() - no parameters"
+        output: "External callback invoked instead of TextInput add"
+        logic: |
+          When onAddPress is provided:
+            1. Add area renders as Pressable with placeholder text
+            2. Tap on add area calls onAddPress()
+            3. No TextInput for manual text entry
+          When onAddPress is NOT provided:
+            1. Add area renders as TextInput (existing behavior)
+            2. Type text and submit to add items
+
+  # CR-283: ActorSelector disabledNames contract
+  - name: actorSelectorDisabledNames
+    component: ActorSelector
+    description: "disabledNames prop grays out and prevents selection"
+    methods:
+      - name: "Disabled actor rendering"
+        input: "disabledNames: string[]"
+        output: "Matching actors are dimmed and non-selectable"
+        logic: |
+          1. For each actor in filtered list:
+             isDisabled = disabledNames?.includes(item.name) ?? false
+          2. If isDisabled:
+             - actorNameArea style gets opacity: 0.4
+             - Pressable onPress = undefined (no action)
+             - Pressable disabled = true
+          3. If NOT isDisabled:
+             - Normal rendering (no opacity change)
+             - Pressable onPress = handleSelect(item)
+          4. Edit/delete buttons remain functional for all actors
+             (actor management is independent of selection disabling)
+
+  # CR-283: AgendaForm → recognized_names integration
+  - name: agendaFormRecognizedNamesIntegration
+    component: AgendaForm
+    description: "Integration between AgendaForm, EditableListField, and ActorSelector for recognized_names"
+    methods:
+      - name: "Add flow"
+        input: "User taps add area Pressable"
+        output: "New name appended to recognized_names"
+        logic: |
+          1. onAddPress → setRecognizeSelector({ mode: 'add' })
+          2. ActorSelector opens (roleFilter='recognize', multiSelect=false)
+          3. disabledNames = all current names in list
+          4. User selects actor → actor.name appended to items
+          5. updateField('recognized_names', joinItems(newItems))
+          6. setRecognizeSelector(null) → ActorSelector closes
+
+      - name: "Edit flow"
+        input: "User taps existing name item"
+        output: "Name replaced with selected actor"
+        logic: |
+          1. onItemPress(index, item) → setRecognizeSelector({ mode: 'edit', editIndex: index })
+          2. ActorSelector opens (roleFilter='recognize', multiSelect=false)
+          3. disabledNames = all current names EXCEPT items[editIndex]
+             (current name is selectable for "keep" / re-select)
+          4. User selects actor → newItems[editIndex] = actor.name
+          5. updateField('recognized_names', joinItems(newItems))
+          6. setRecognizeSelector(null) → ActorSelector closes
+
+      - name: "Delete flow"
+        input: "User taps X button on item"
+        output: "Name removed from recognized_names"
+        logic: |
+          1. EditableListField handleDelete removes item at index
+          2. onSave(joinItems(remaining)) or onSave(null) if empty
+          3. updateField('recognized_names', value)
+
+      - name: "Reorder flow"
+        input: "User long-presses grip icon and drags"
+        output: "Names reordered in recognized_names"
+        logic: |
+          1. DraggableFlatList onDragEnd fires with reordered data
+          2. onSave(joinItems(data))
+          3. updateField('recognized_names', value)
+
+  # CR-283: Migration contract
+  - name: migration032Contract
+    component: Migration 032
+    description: "Data conversion from TEXT[] to TEXT"
+    methods:
+      - name: "Column conversion"
+        input: "recognized_names TEXT[] column"
+        output: "recognized_names TEXT column with \\n-joined values"
+        logic: |
+          1. Add temp column recognized_names_new TEXT
+          2. UPDATE: array_to_string(recognized_names, E'\n') → recognized_names_new
+             - NULL arrays → NULL (excluded by WHERE)
+             - Empty arrays → NULL (excluded by array_length check)
+             - ['Alice'] → 'Alice'
+             - ['Alice', 'Bob'] → 'Alice\nBob'
+          3. DROP old column, RENAME new → recognized_names
+          4. RLS policies unaffected (check ward_id, not column type)
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  modified_entities:
+    - name: sunday_agendas
+      changes:
+        - column: recognized_names
+          before: "TEXT[] (PostgreSQL text array)"
+          after: "TEXT (plain text with \\n separator)"
+          migration: "032_recognized_names_to_text.sql"
+
+  notes: |
+    After migration 032, all four list fields in sunday_agendas use the same
+    storage format: TEXT with \n-joined items.
+      - announcements: TEXT (unchanged)
+      - welcome_new_families: TEXT (unchanged)
+      - sustaining_releasing: TEXT (unchanged)
+      - recognized_names: TEXT (was TEXT[], now TEXT after migration 032)
+
+    The TypeScript type in database.ts changes from string[] | null to
+    string | null. All code referencing recognized_names as an array must
+    be updated to use the string format.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes:
+    - "No new RLS policies: uses existing sunday_agendas RLS"
+    - "No new permissions: uses existing 'agenda:write' permission"
+    - "disabledNames is purely visual; server-side has no concept of disabled actors"
+    - "Migration 032 preserves existing RLS policies (ward_id check unchanged)"
+    - "Actor names in recognized_names are stored as plain text (existing pattern)"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes:
+    - "No new logging: updateField triggers existing TanStack Query mutation"
+    - "Activity log entries for agenda edits capture recognized_names changes"
+    - "Migration 032 is a one-time schema change with no runtime logging needs"
+
+# =============================================================================
+# ADRs
+# =============================================================================
+
+adrs:
+  - id: ADR-048
+    title: "activationDistance={9999} to disable DraggableFlatList internal PanGesture"
+    decision: |
+      Set activationDistance={9999} on DraggableFlatList in EditableListField
+      to effectively disable the internal PanGesture that captures all touch
+      events. Drag reorder is activated exclusively via onLongPress={drag}
+      on the GripIcon Pressable.
+    rationale: |
+      DraggableFlatList's internal GestureDetector with PanGesture has
+      default activationDistance=0, which means any touch on an item row
+      activates the pan gesture before the parent ScrollView can handle it.
+      This blocks page scrolling. Setting activationDistance to a very high
+      value (9999) ensures the internal pan gesture never activates from
+      direct touch. The onLongPress={drag} pattern on the grip icon is the
+      recommended approach from react-native-draggable-flatlist for handle-
+      based drag activation.
+
+  - id: ADR-049
+    title: "onItemPress/onAddPress callback props for external selection in EditableListField"
+    decision: |
+      Add optional onItemPress and onAddPress callback props to
+      EditableListField. When provided, these override the default inline
+      TextInput behavior: onItemPress replaces tap-to-edit, onAddPress
+      replaces the add TextInput with a Pressable. This allows
+      recognized_names to use ActorSelector for name selection while
+      reusing EditableListField for list management (delete, reorder, display).
+    rationale: |
+      EditableListField already handles list layout, delete, reorder, and
+      disabled state. For recognized_names, only the input mechanism differs
+      (ActorSelector instead of TextInput). Adding callback props allows
+      reuse without duplicating list management logic. The props are optional,
+      preserving backward compatibility for announcements, welcome, and
+      sustaining fields that use inline text editing.
+
+  - id: ADR-050
+    title: "disabledNames prop on ActorSelector for preventing duplicate selection"
+    decision: |
+      Add optional disabledNames: string[] prop to ActorSelector. Actors
+      whose name appears in disabledNames are rendered with opacity 0.4
+      and their Pressable onPress is set to undefined (non-selectable).
+      The edit/delete buttons remain functional.
+    rationale: |
+      When editing recognized_names, actors already in the list should not
+      be selectable (except the one being edited). disabledNames is a simple,
+      declarative prop that keeps the selection logic in AgendaForm while
+      ActorSelector handles only the visual presentation. The opacity approach
+      is consistent with disabled UI patterns in the app. Matching by name
+      (not ID) is correct because recognized_names stores names as text,
+      and an actor may have been deleted but the name persists in the list.
+
+  - id: ADR-051
+    title: "Migrate recognized_names from TEXT[] to TEXT via temp column strategy"
+    decision: |
+      Use a 3-step migration (add temp column, migrate data, drop+rename)
+      to convert recognized_names from TEXT[] to TEXT with \n separator.
+      Use array_to_string(recognized_names, E'\n') for data conversion.
+    rationale: |
+      Direct ALTER COLUMN TYPE with USING clause can fail with complex casts
+      between array and scalar types. The temp column approach is safer and
+      explicit: the data migration step is clearly separated from the schema
+      change. NULL and empty arrays are handled by the WHERE clause guard.
+      The \n separator is consistent with the other three list fields
+      (announcements, welcome_new_families, sustaining_releasing).
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Read ARCH_CONSOLIDATED.yaml before starting
+  GATE-02: true  # Components have single responsibility
+  GATE-03: true  # Contracts defined for all integrations
+  GATE-04: true  # ADRs registered for decisions affecting multiple components
+  GATE-05: true  # ARCH_M016.yaml saved to disk
+  GATE-06: true  # ARCH_CONSOLIDATED will be updated
+  GATE-07: true  # ARCH_SUMMARY included in response
+  GATE-08: true  # Max 10 components per module (13 component entries)

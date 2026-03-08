@@ -1,0 +1,831 @@
+# =============================================================================
+# PLAN_P016.yaml
+# Artifact ID: 016
+# Phase: 1 of 1
+# Features: F068/F069 bugfixes (CR-281, CR-282), F071 (CR-283)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "016"
+  phase: 1
+  total_phases: 1
+  feature_ids: [F068, F069, F071]
+  crs: [281, 282, 283]
+  status: pending
+  created: "2026-03-08"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    CR-281 (bugfix): Fix EditableListField inline edit TextInput shrinking to
+    one line - add multiline prop, paddingVertical, blurOnSubmit.
+    CR-282 (bugfix): Fix page scroll blocked by DraggableFlatList gesture
+    handler - set activationDistance={9999} so drag only via long-press on grip.
+    CR-283 (feature F071): Transform recognized_names from TEXT[] multi-select
+    into EditableListField + single-select ActorSelector. DB migration 032
+    converts TEXT[] to TEXT. New disabledNames prop on ActorSelector.
+    Presentation mode changes from multiline to bullet_list with zebra striping.
+
+  principles:
+    - "Happy path first: bugfixes (CR-281, CR-282), then migration, then feature"
+    - "1 step = 1 atomic commit; each step independently verifiable"
+    - "Test-along: tests created in same step as production code"
+    - "CR-281 and CR-282 are independent bugfixes with no cross-dependencies"
+    - "CR-283 depends on CR-281 and CR-282 being applied first (EditableListField must be working)"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: CR-281 bugfix - inline edit TextInput multiline
+  # ---------------------------------------------------------------------------
+  - id: S016-01
+    title: "Fix inline edit TextInput: add multiline, blurOnSubmit, paddingVertical:0"
+    feature: F068
+    depends_on: []
+    files:
+      - path: src/components/EditableListField.tsx
+        action: edit
+        description: |
+          1. In renderItem, modify the inline edit TextInput:
+             - Add multiline prop
+             - Add blurOnSubmit prop
+             - Apply new editInput style with paddingVertical: 0
+             BEFORE:
+               <TextInput
+                 style={[styles.itemText, { color: colors.text }]}
+                 value={editText}
+                 onChangeText={setEditText}
+                 onSubmitEditing={finishEdit}
+                 onBlur={finishEdit}
+                 autoFocus
+                 returnKeyType="done"
+               />
+             AFTER:
+               <TextInput
+                 style={[styles.itemText, styles.editInput, { color: colors.text }]}
+                 value={editText}
+                 onChangeText={setEditText}
+                 onSubmitEditing={finishEdit}
+                 onBlur={finishEdit}
+                 autoFocus
+                 multiline
+                 blurOnSubmit
+                 returnKeyType="done"
+               />
+          2. Add editInput style to StyleSheet:
+               editInput: {
+                 paddingVertical: 0,
+               },
+
+    done_when:
+      - "Inline edit TextInput has multiline={true} prop"
+      - "Inline edit TextInput has blurOnSubmit={true} prop"
+      - "Inline edit TextInput applies styles.editInput with paddingVertical: 0"
+      - "autoFocus is preserved"
+      - "returnKeyType='done' is preserved"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-281-01  # TextInput matches display height (multiline)
+      - AC-281-02  # Cursor visible and field focused (autoFocus)
+      - AC-281-03  # All three fields exhibit correct behavior (shared component)
+      - AC-281-04  # Short items still work correctly
+
+    edge_cases:
+      - EC-281-01  # Very long text - TextInput grows to full height
+      - EC-281-02  # Text edited shorter - TextInput shrinks
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: true
+        cases:
+          - "Inline edit TextInput has multiline prop"
+          - "Inline edit TextInput has blurOnSubmit prop"
+          - "Inline edit TextInput has editInput style with paddingVertical 0"
+          - "Inline edit TextInput preserves autoFocus"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: CR-282 bugfix - DraggableFlatList activationDistance
+  # ---------------------------------------------------------------------------
+  - id: S016-02
+    title: "Fix scroll blocking: add activationDistance={9999} to DraggableFlatList"
+    feature: F069
+    depends_on: []
+    files:
+      - path: src/components/EditableListField.tsx
+        action: edit
+        description: |
+          Add activationDistance={9999} prop to DraggableFlatList:
+          BEFORE:
+            <DraggableFlatList
+              data={items}
+              keyExtractor={(_, index) => `${index}`}
+              renderItem={renderItem}
+              onDragEnd={handleDragEnd}
+              scrollEnabled={false}
+            />
+          AFTER:
+            <DraggableFlatList
+              data={items}
+              keyExtractor={(_, index) => `${index}`}
+              renderItem={renderItem}
+              onDragEnd={handleDragEnd}
+              scrollEnabled={false}
+              activationDistance={9999}
+            />
+
+    done_when:
+      - "DraggableFlatList has activationDistance={9999} prop"
+      - "scrollEnabled={false} is preserved"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-282-01  # Page scrolls when touching item text
+      - AC-282-02  # Drag reorder only via long-press on grip icon
+      - AC-282-03  # Short tap on text triggers inline edit, not drag
+      - AC-282-04  # Scrolling works even when touching grip without long-press
+
+    edge_cases:
+      - EC-282-01  # Long-press on item text does not activate drag
+      - EC-282-02  # Single-item list: grip shown, no drag effect, scroll works
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "DraggableFlatList has activationDistance={9999}"
+          - "DraggableFlatList preserves scrollEnabled={false}"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: CR-283 i18n keys + database type change
+  # ---------------------------------------------------------------------------
+  - id: S016-03
+    title: "Add i18n key agenda.addPresence in 3 locales + update recognized_names type to string"
+    feature: F071
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: edit
+        description: |
+          In the "agenda" section, after "addAnnouncement" (or nearby keys), add:
+            "addPresence": "Reconhecer nova presenca"
+
+      - path: src/i18n/locales/en-US.json
+        action: edit
+        description: |
+          In the "agenda" section, add:
+            "addPresence": "Recognize new presence"
+
+      - path: src/i18n/locales/es-LA.json
+        action: edit
+        description: |
+          In the "agenda" section, add:
+            "addPresence": "Reconocer nueva presencia"
+
+      - path: src/types/database.ts
+        action: edit
+        description: |
+          Change recognized_names type in SundayAgenda interface:
+          BEFORE:
+            recognized_names: string[] | null;
+          AFTER:
+            recognized_names: string | null;
+
+    done_when:
+      - "t('agenda.addPresence') returns 'Reconhecer nova presenca' for pt-BR"
+      - "t('agenda.addPresence') returns 'Recognize new presence' for en-US"
+      - "t('agenda.addPresence') returns 'Reconocer nueva presencia' for es-LA"
+      - "SundayAgenda.recognized_names type is string | null"
+      - "npx tsc --noEmit passes (may require updating code referencing recognized_names as array)"
+
+    acceptance_criteria:
+      - AC-283-10  # Empty state shows placeholder (i18n key exists)
+      - AC-283-11  # DB migration type change (TypeScript type updated)
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "i18n key agenda.addPresence exists in pt-BR"
+          - "i18n key agenda.addPresence exists in en-US"
+          - "i18n key agenda.addPresence exists in es-LA"
+          - "SundayAgenda.recognized_names type is string | null (not string[])"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: DB migration 032 - TEXT[] to TEXT
+  # ---------------------------------------------------------------------------
+  - id: S016-04
+    title: "Create migration 032: convert recognized_names from TEXT[] to TEXT"
+    feature: F071
+    depends_on: []
+    files:
+      - path: supabase/migrations/032_recognized_names_to_text.sql
+        action: create
+        description: |
+          Migration to convert recognized_names column:
+
+          -- Step 1: Add temporary column
+          ALTER TABLE sunday_agendas ADD COLUMN recognized_names_new TEXT;
+
+          -- Step 2: Migrate data (array -> \n-joined string)
+          UPDATE sunday_agendas
+          SET recognized_names_new = array_to_string(recognized_names, E'\n')
+          WHERE recognized_names IS NOT NULL
+            AND array_length(recognized_names, 1) > 0;
+
+          -- Step 3: Drop old column and rename new
+          ALTER TABLE sunday_agendas DROP COLUMN recognized_names;
+          ALTER TABLE sunday_agendas RENAME COLUMN recognized_names_new TO recognized_names;
+
+    done_when:
+      - "File supabase/migrations/032_recognized_names_to_text.sql exists"
+      - "Migration adds temp column, migrates data with array_to_string, drops old and renames"
+      - "NULL arrays remain NULL"
+      - "Empty arrays ('{}') remain NULL (array_length check)"
+      - "['Alice','Bob'] converts to 'Alice\\nBob'"
+
+    acceptance_criteria:
+      - AC-283-11  # DB migration 032 converts TEXT[] to TEXT
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "Migration file 032_recognized_names_to_text.sql exists"
+          - "Migration uses array_to_string with E'\\n' separator"
+          - "Migration excludes NULL arrays (WHERE clause)"
+          - "Migration excludes empty arrays (array_length check)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: EditableListField new props (onItemPress, onAddPress)
+  # ---------------------------------------------------------------------------
+  - id: S016-05
+    title: "Add onItemPress and onAddPress callback props to EditableListField"
+    feature: F071
+    depends_on: [S016-01, S016-02]
+    files:
+      - path: src/components/EditableListField.tsx
+        action: edit
+        description: |
+          1. Update EditableListFieldProps interface:
+             Add:
+               onItemPress?: (index: number, item: string) => void;
+               onAddPress?: () => void;
+
+          2. Destructure new props in component.
+
+          3. Modify renderItem tap-to-edit Pressable:
+             BEFORE:
+               <Pressable style={styles.itemTextPressable} onPress={() => startEdit(idx)}>
+             AFTER:
+               <Pressable style={styles.itemTextPressable} onPress={() => {
+                 if (onItemPress) {
+                   onItemPress(idx, item);
+                 } else {
+                   startEdit(idx);
+                 }
+               }}>
+
+          4. Modify add area rendering:
+             BEFORE: always TextInput
+             AFTER:
+               {onAddPress ? (
+                 <Pressable
+                   style={[styles.addInput, { borderColor: colors.border }]}
+                   onPress={onAddPress}
+                 >
+                   <Text style={{ color: colors.textTertiary, fontSize: 15 }}>
+                     {placeholder}
+                   </Text>
+                 </Pressable>
+               ) : (
+                 <TextInput ... />  // existing TextInput
+               )}
+
+    done_when:
+      - "EditableListFieldProps has onItemPress?: (index: number, item: string) => void"
+      - "EditableListFieldProps has onAddPress?: () => void"
+      - "When onItemPress provided, tap calls onItemPress instead of startEdit"
+      - "When onItemPress NOT provided, tap calls startEdit (backward compat)"
+      - "When onAddPress provided, add area renders Pressable with placeholder text"
+      - "When onAddPress NOT provided, add area renders TextInput (backward compat)"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-283-02  # Add area is Pressable that opens ActorSelector (via callback)
+      - AC-283-04  # Editing a name opens ActorSelector to replace (via callback)
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "onItemPress callback: tap calls onItemPress when provided"
+          - "onItemPress not provided: tap triggers inline edit (backward compat)"
+          - "onAddPress callback: add area renders Pressable when provided"
+          - "onAddPress not provided: add area renders TextInput (backward compat)"
+          - "onAddPress Pressable shows placeholder text"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: ActorSelector disabledNames prop
+  # ---------------------------------------------------------------------------
+  - id: S016-06
+    title: "Add disabledNames prop to ActorSelector for graying out selected actors"
+    feature: F071
+    depends_on: []
+    files:
+      - path: src/components/ActorSelector.tsx
+        action: edit
+        description: |
+          1. Update ActorSelectorProps interface:
+             Add: disabledNames?: string[];
+
+          2. Destructure disabledNames in component.
+
+          3. Modify renderItem actor name Pressable:
+             Add disabled check:
+               const isDisabled = disabledNames?.includes(item.name) ?? false;
+
+             BEFORE:
+               <Pressable style={styles.actorNameArea} onPress={() => handleSelect(item)}>
+             AFTER:
+               <Pressable
+                 style={[styles.actorNameArea, isDisabled && { opacity: 0.4 }]}
+                 onPress={isDisabled ? undefined : () => handleSelect(item)}
+                 disabled={isDisabled}
+               >
+
+    done_when:
+      - "ActorSelectorProps has disabledNames?: string[]"
+      - "Disabled actors render with opacity: 0.4"
+      - "Disabled actors have onPress = undefined"
+      - "Disabled actors have disabled={true}"
+      - "Non-disabled actors remain fully functional"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-283-05  # Already-selected names disabled (except current)
+      - AC-283-12  # ActorSelector disabledNames prop
+
+    edge_cases:
+      - EC-283-05  # Current name's actor deleted - not in actor list
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "ActorSelectorProps includes disabledNames?: string[]"
+          - "Disabled actors have opacity 0.4"
+          - "Disabled actors have onPress undefined"
+          - "Disabled actors have disabled={true}"
+          - "Non-disabled actors remain selectable"
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: AgendaForm recognized_names rework + usePresentationMode
+  # ---------------------------------------------------------------------------
+  - id: S016-07
+    title: "Replace recognized_names in AgendaForm with EditableListField + ActorSelector integration"
+    feature: F071
+    depends_on: [S016-03, S016-05, S016-06]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: edit
+        description: |
+          1. Add import for parseItems and joinItems from EditableListField:
+             import { EditableListField, parseItems, joinItems } from './EditableListField';
+
+          2. Add state for recognized_names ActorSelector:
+             const [recognizeSelector, setRecognizeSelector] = useState<{
+               mode: 'add' | 'edit';
+               editIndex?: number;
+             } | null>(null);
+
+          3. Replace recognized_names FieldRow content:
+             BEFORE: Pressable + multi-select ActorSelector pattern
+             AFTER:
+               <FieldRow label={t('agenda.recognizing')} colors={colors}>
+                 <EditableListField
+                   value={agenda.recognized_names ?? null}
+                   onSave={(text) => updateField('recognized_names', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addPresence')}
+                   onItemPress={(index, _item) => {
+                     setRecognizeSelector({ mode: 'edit', editIndex: index });
+                   }}
+                   onAddPress={() => {
+                     setRecognizeSelector({ mode: 'add' });
+                   }}
+                 />
+               </FieldRow>
+
+          4. Add ActorSelector for recognized_names (after existing selectors):
+             {recognizeSelector && (
+               <ActorSelector
+                 visible
+                 roleFilter="recognize"
+                 onSelect={(actor) => {
+                   const currentItems = parseItems(agenda.recognized_names ?? null);
+                   if (recognizeSelector.mode === 'add') {
+                     const newItems = [...currentItems, actor.name];
+                     updateField('recognized_names', joinItems(newItems));
+                   } else if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+                     const newItems = [...currentItems];
+                     newItems[recognizeSelector.editIndex] = actor.name;
+                     updateField('recognized_names', joinItems(newItems));
+                   }
+                   setRecognizeSelector(null);
+                 }}
+                 onClose={() => setRecognizeSelector(null)}
+                 disabledNames={(() => {
+                   const currentItems = parseItems(agenda.recognized_names ?? null);
+                   if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+                     return currentItems.filter((_, i) => i !== recognizeSelector.editIndex);
+                   }
+                   return currentItems;
+                 })()}
+               />
+             )}
+
+          5. Remove old recognizing-related code:
+             - Remove 'recognizing' case from selectorModal onSelect handler
+             - Remove recognizing spread props from existing ActorSelector
+             - Remove recognizingContent, recognizingNames, recognizingName styles
+
+      - path: src/hooks/usePresentationMode.ts
+        action: edit
+        description: |
+          Update recognized_names field in buildPresentationCards:
+          BEFORE:
+            if (agenda?.recognized_names?.length) {
+              welcomeFields.push({
+                label: t('agenda.recognizing'),
+                value: agenda.recognized_names.join('\n'),
+                type: 'multiline',
+              });
+            }
+          AFTER:
+            if (agenda?.recognized_names) {
+              welcomeFields.push({
+                label: t('agenda.recognizing'),
+                value: agenda.recognized_names,
+                type: 'bullet_list',
+              });
+            }
+
+    done_when:
+      - "recognized_names renders EditableListField with onItemPress and onAddPress"
+      - "Add flow: tap add area -> ActorSelector opens -> select actor -> name appended"
+      - "Edit flow: tap name -> ActorSelector opens -> select actor -> name replaced"
+      - "disabledNames computed correctly (edit: exclude current; add: all current)"
+      - "Old recognizing-related code removed (Pressable, multi-select, styles)"
+      - "usePresentationMode: recognized_names uses bullet_list type"
+      - "usePresentationMode: recognized_names value is raw string (no .join())"
+      - "usePresentationMode: guard uses truthy check (not .length)"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-283-01  # Each recognized person is a separate list item
+      - AC-283-02  # Add area opens ActorSelector single-select
+      - AC-283-03  # Selecting actor adds to list
+      - AC-283-04  # Editing name opens ActorSelector to replace
+      - AC-283-05  # Already-selected names disabled (except current)
+      - AC-283-06  # Reorder via drag on grip icon
+      - AC-283-07  # Delete via X button
+      - AC-283-08  # Presentation Mode renders as bullet_list with zebra
+      - AC-283-09  # Offline/observer mode read-only
+      - AC-283-10  # Empty state shows placeholder
+
+    edge_cases:
+      - EC-283-01  # Close ActorSelector without selecting - name preserved
+      - EC-283-02  # All items deleted - saved as null
+      - EC-283-03  # Actor created inline in ActorSelector
+      - EC-283-04  # Actor deleted from actors but name persists in list
+
+    tests:
+      - file: src/__tests__/f071-recognized-names.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "recognized_names renders EditableListField (not old Pressable)"
+          - "EditableListField has onItemPress prop"
+          - "EditableListField has onAddPress prop"
+          - "EditableListField has placeholder t('agenda.addPresence')"
+          - "onAddPress sets recognizeSelector to add mode"
+          - "onItemPress sets recognizeSelector to edit mode with index"
+          - "ActorSelector opens when recognizeSelector is set"
+          - "ActorSelector has roleFilter='recognize'"
+          - "ActorSelector disabledNames: add mode = all current names"
+          - "ActorSelector disabledNames: edit mode = all except current"
+          - "onSelect in add mode appends actor name to list"
+          - "onSelect in edit mode replaces name at editIndex"
+          - "onClose clears recognizeSelector (name preserved)"
+          - "Old recognizing styles removed"
+          - "usePresentationMode: recognized_names uses 'bullet_list' type"
+          - "usePresentationMode: recognized_names value is raw string (no .join)"
+          - "usePresentationMode: guard is truthy check (not .length)"
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: Update existing tests + fix test references
+  # ---------------------------------------------------------------------------
+  - id: S016-08
+    title: "Update existing test files for recognized_names type change and new behavior"
+    feature: F071
+    depends_on: [S016-07]
+    files:
+      - path: src/__tests__/f068-f069-f070-tester.test.ts
+        action: edit
+        description: |
+          1. Update test "recognized_names uses multiline type":
+             Change expectation from 'multiline' to 'bullet_list'
+          2. Update makeAgenda mock: recognized_names from string[] to string|null
+             BEFORE: recognized_names: ['Alice', 'Bob']
+             AFTER: recognized_names: 'Alice\nBob'
+
+      - path: src/__tests__/f067-announcements-list.test.ts
+        action: edit
+        description: |
+          1. Update or remove test "recognized_names still uses ActorSelector (not EditableListField)"
+             This is no longer true - recognized_names NOW uses EditableListField.
+             Either remove the test or update it to verify the new behavior.
+
+      - path: src/__tests__/f067-tester.test.ts
+        action: edit
+        description: |
+          Update any test referencing recognized_names as string[] to string|null.
+
+    done_when:
+      - "No test references recognized_names as string[]"
+      - "No test expects recognized_names to use 'multiline' type"
+      - "Test for 'recognized_names uses ActorSelector (not EditableListField)' removed or inverted"
+      - "npx vitest run passes (all tests green)"
+
+    acceptance_criteria: []
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f068-f069-f070-tester.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "recognized_names uses 'bullet_list' type in presentation mode"
+          - "makeAgenda recognized_names is string|null (not string[])"
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: Documentation (ADRs)
+  # ---------------------------------------------------------------------------
+  - id: S016-09
+    title: "Add ADR-048 to ADR-051 and update consolidated docs"
+    feature: "F068+F069+F071"
+    depends_on: [S016-07]
+    files:
+      - path: docs/arch/ARCH_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Add 4 new ADRs:
+          - ADR-048: activationDistance={9999} to disable DraggableFlatList internal PanGesture
+          - ADR-049: onItemPress/onAddPress callback props for external selection in EditableListField
+          - ADR-050: disabledNames prop on ActorSelector for preventing duplicate selection
+          - ADR-051: Migrate recognized_names from TEXT[] to TEXT via temp column strategy
+
+      - path: docs/specs/SPEC_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Update recognized_names references from TEXT[] to TEXT.
+          Update recognized_names presentation type from 'multiline' to 'bullet_list'.
+          Update F068 description to note recognized_names now uses EditableListField.
+
+    done_when:
+      - "ADR-048 through ADR-051 documented in ARCH_CONSOLIDATED"
+      - "SPEC_CONSOLIDATED updated with recognized_names type changes"
+      - "No references to recognized_names as TEXT[] in SPEC_CONSOLIDATED"
+
+    acceptance_criteria: []
+    edge_cases: []
+    tests: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 10: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S016-10
+    title: "Final verification: run all tests, type check, update consolidated docs"
+    feature: "F068+F069+F071"
+    depends_on: [S016-01, S016-02, S016-03, S016-04, S016-05, S016-06, S016-07, S016-08, S016-09]
+    files: []
+    done_when:
+      - "npx tsc --noEmit passes with no errors"
+      - "npx vitest run passes (all tests green)"
+      - "Total test count increased by new tests added in f071-recognized-names.test.ts"
+      - "No regressions in existing tests"
+      - "No references to recognized_names as string[] in src/ (grep returns 0)"
+      - "No references to recognized_names with .join() or .length in src/ (grep returns 0)"
+      - "Migration file 032 exists in supabase/migrations/"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml updated with P016 entry"
+      - "TEST_CONSOLIDATED.yaml updated with new test counts"
+
+    acceptance_criteria:
+      - AC-281-01 through AC-281-04  # All CR-281 ACs verified
+      - AC-282-01 through AC-282-04  # All CR-282 ACs verified
+      - AC-283-01 through AC-283-12  # All CR-283 ACs verified
+
+    edge_cases:
+      - EC-281-01 through EC-281-02  # All CR-281 ECs verified
+      - EC-282-01 through EC-282-02  # All CR-282 ECs verified
+      - EC-283-01 through EC-283-05  # All CR-283 ECs verified
+
+    tests: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S016-01 (CR-281: inline edit fix)     ─────────┐
+  S016-02 (CR-282: scroll fix)          ─────────┤
+                                                   ├── S016-05 (new props)
+  S016-03 (i18n + TS type)             ──────────┤        │
+  S016-04 (migration 032)              ──────────┤        │
+  S016-06 (disabledNames)              ──────────┤        │
+                                                   │        │
+                                                   │   S016-07 (AgendaForm rework)
+                                                   │   ◄── S016-03 + S016-05 + S016-06
+                                                   │        │
+                                                   │   S016-08 (test updates) ◄── S016-07
+                                                   │   S016-09 (documentation) ◄── S016-07
+                                                   │        │
+  S016-10 (final verification) ◄────────────── ALL ────────┘
+
+  Parallelizable:
+    S016-01, S016-02, S016-03, S016-04, S016-06 can all run in parallel
+    After S016-01 + S016-02: S016-05
+    After S016-03 + S016-05 + S016-06: S016-07
+    After S016-07: S016-08 and S016-09 can run in parallel
+    After all: S016-10
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  CR-281:
+    acceptance_criteria:
+      AC-281-01: S016-01
+      AC-281-02: S016-01
+      AC-281-03: S016-01
+      AC-281-04: S016-01
+    edge_cases:
+      EC-281-01: S016-01
+      EC-281-02: S016-01
+
+  CR-282:
+    acceptance_criteria:
+      AC-282-01: S016-02
+      AC-282-02: S016-02
+      AC-282-03: S016-02
+      AC-282-04: S016-02
+    edge_cases:
+      EC-282-01: S016-02
+      EC-282-02: S016-02
+
+  CR-283:
+    acceptance_criteria:
+      AC-283-01: S016-07
+      AC-283-02: [S016-05, S016-07]
+      AC-283-03: S016-07
+      AC-283-04: [S016-05, S016-07]
+      AC-283-05: [S016-06, S016-07]
+      AC-283-06: S016-07
+      AC-283-07: S016-07
+      AC-283-08: S016-07
+      AC-283-09: S016-07
+      AC-283-10: [S016-03, S016-07]
+      AC-283-11: [S016-03, S016-04]
+      AC-283-12: S016-06
+    edge_cases:
+      EC-283-01: S016-07
+      EC-283-02: S016-07
+      EC-283-03: S016-07
+      EC-283-04: S016-07
+      EC-283-05: S016-06
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+validation:
+  - ac_id: AC-281-01
+    how_to_verify: "Inline edit TextInput has multiline prop; renders matching display height"
+    covered_by_steps: [S016-01]
+
+  - ac_id: AC-281-02
+    how_to_verify: "TextInput has autoFocus; cursor visible when field appears"
+    covered_by_steps: [S016-01]
+
+  - ac_id: AC-281-03
+    how_to_verify: "EditableListField is shared component; fix applies to all three fields"
+    covered_by_steps: [S016-01]
+
+  - ac_id: AC-281-04
+    how_to_verify: "multiline TextInput with short text renders single-line height"
+    covered_by_steps: [S016-01]
+
+  - ac_id: AC-282-01
+    how_to_verify: "activationDistance={9999} on DraggableFlatList; parent ScrollView receives scroll"
+    covered_by_steps: [S016-02]
+
+  - ac_id: AC-282-02
+    how_to_verify: "Drag only via onLongPress={drag} on GripIcon Pressable"
+    covered_by_steps: [S016-02]
+
+  - ac_id: AC-282-03
+    how_to_verify: "Tap on item text fires inline edit (or onItemPress), not drag"
+    covered_by_steps: [S016-02]
+
+  - ac_id: AC-282-04
+    how_to_verify: "Touch grip icon + immediate scroll = page scrolls (no long-press = no drag)"
+    covered_by_steps: [S016-02]
+
+  - ac_id: AC-283-01
+    how_to_verify: "recognized_names renders EditableListField; each name is a separate row"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-02
+    how_to_verify: "Add area is Pressable with placeholder; tapping opens ActorSelector single-select"
+    covered_by_steps: [S016-05, S016-07]
+
+  - ac_id: AC-283-03
+    how_to_verify: "onSelect in add mode appends actor.name to list and calls updateField"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-04
+    how_to_verify: "onItemPress opens ActorSelector; selecting replaces name at editIndex"
+    covered_by_steps: [S016-05, S016-07]
+
+  - ac_id: AC-283-05
+    how_to_verify: "disabledNames computed: edit mode excludes current, add mode includes all"
+    covered_by_steps: [S016-06, S016-07]
+
+  - ac_id: AC-283-06
+    how_to_verify: "EditableListField DraggableFlatList reorder works; saved via onSave"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-07
+    how_to_verify: "X button on item calls handleDelete; if last item, saved as null"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-08
+    how_to_verify: "usePresentationMode returns type 'bullet_list' for recognized_names"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-09
+    how_to_verify: "EditableListField disabled={isObserver}: no grip, no X, no add area"
+    covered_by_steps: [S016-07]
+
+  - ac_id: AC-283-10
+    how_to_verify: "i18n key agenda.addPresence in 3 locales; shown in add area Pressable"
+    covered_by_steps: [S016-03, S016-07]
+
+  - ac_id: AC-283-11
+    how_to_verify: "Migration 032 converts TEXT[] to TEXT; TypeScript type updated"
+    covered_by_steps: [S016-03, S016-04]
+
+  - ac_id: AC-283-12
+    how_to_verify: "ActorSelector has disabledNames prop; disabled actors grayed out and non-selectable"
+    covered_by_steps: [S016-06]
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All edge cases covered
+  GATE-PLAN-06: true  # File paths match ARCH_M016 components
+  GATE-PLAN-07: true  # Maximum 15 steps respected (10 steps)

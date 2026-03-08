@@ -8,9 +8,9 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  total_features: 63
+  total_features: 64
   total_business_rules: 44
-  total_design_decisions: 54
+  total_design_decisions: 59
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -555,8 +555,9 @@ features:
     description: |
       Full meeting agenda editing form. Lazy-creates agenda record on first expand.
       Auto-save on each field change (debounced for text inputs via DebouncedTextInput).
-      Sections: Welcome (presiding, conducting, recognizing multi-select, welcome
-      new families, announcements list with add/delete/reorder/inline-edit [CR-277],
+      Sections: Welcome (presiding, conducting, recognizing via EditableListField
+      with ActorSelector single-select [CR-283], welcome new families,
+      announcements list with add/delete/reorder/inline-edit [CR-277],
       pianist, conductor, opening hymn, opening prayer),
       Designations & Sacrament (ward business, baby blessing, baptism confirmation,
       stake announcements, sacrament hymn), Speeches (speaker overrides with pencil
@@ -570,9 +571,9 @@ features:
       - given: "User changes a text field"
         when: "Input is debounced"
         then: "Field is auto-saved to the database"
-      - given: "User taps Recognizing field"
-        when: "ActorSelector opens with multiSelect"
-        then: "Multiple actors with can_recognize can be toggled; names stored as array"
+      - given: "User taps Recognizing add area"
+        when: "ActorSelector opens in single-select mode"
+        then: "User selects one actor; name appended to recognizing list as EditableListField item [CR-283]"
       - given: "Observer views expanded agenda"
         when: "Fields are rendered"
         then: "All fields are read-only"
@@ -1384,7 +1385,8 @@ features:
       Auto-split: text containing \n pasted or typed into add-input or inline
       edit is automatically split into multiple items at save time.
       Presentation mode: all 3 fields render as bullet_list type.
-      recognized_names unchanged (uses ActorSelector). No DB migration. [CR-278]
+      Inline edit TextInput must be multiline with matching height and visible
+      cursor (CR-281 fix). [CR-278, CR-281]
     acceptance_criteria:
       - given: "Source code"
         when: "Checking file names and exports"
@@ -1416,7 +1418,9 @@ features:
       handle icon (horizontal lines pattern) on the LEFT side of each item.
       Remove numberOfLines={1} from item text to enable word-wrap with
       dynamic row height. Text is never truncated. Disabled state also
-      shows full text without truncation. [CR-279]
+      shows full text without truncation. Drag-to-reorder only activates
+      on LONG-PRESS on grip icon; normal touch allows page scrolling
+      (CR-282 fix). [CR-279, CR-282]
     acceptance_criteria:
       - given: "EditableListField renders with items"
         when: "User views the list"
@@ -1454,6 +1458,48 @@ features:
       - given: "Bullet list with only 1 item"
         when: "Item renders"
         then: "Uses normal text color (index 0 = odd)"
+
+  - id: F071
+    name: Recognized Names with EditableListField and ActorSelector
+    area: agenda
+    description: |
+      Transform recognized_names from ActorSelector multi-select to
+      EditableListField-based list with ActorSelector single-select.
+      Add: Pressable opens ActorSelector (single-select, roleFilter=recognize).
+      Edit: tapping a name opens ActorSelector to replace (via onItemPress
+      callback prop on EditableListField). Already-selected names are disabled
+      in ActorSelector (new disabledNames prop), except the currently-being-edited
+      name which remains selectable. Reorder via drag (grip icon, long-press).
+      Delete via X button. DB migration 032: ALTER COLUMN recognized_names from
+      TEXT[] to TEXT with data migration array_to_string(). Storage uses TEXT
+      with \n separator. Presentation Mode uses bullet_list with zebra striping.
+      Placeholder: agenda.addPresence (pt-BR: "Reconhecer nova presenca",
+      en-US: "Recognize new presence", es-LA: "Reconocer nueva presencia").
+      No free-text input; all names via ActorSelector. Offline/observer:
+      read-only with bullet prefix. Empty state hidden in Presentation Mode
+      (EC011 still valid). [CR-283]
+    acceptance_criteria:
+      - given: "Agenda with recognized_names containing 3 people"
+        when: "AgendaForm renders the recognizing field"
+        then: "3 separate rows shown with grip icon, name, and X delete button"
+      - given: "User taps the add Pressable"
+        when: "ActorSelector opens"
+        then: "Single-select mode, roleFilter=recognize"
+      - given: "User selects an actor in add mode"
+        when: "Actor selected"
+        then: "Name appended to list, ActorSelector closes, list saved"
+      - given: "User taps existing name in recognizing list"
+        when: "ActorSelector opens for replace"
+        then: "Selecting new actor replaces old name; other selected names disabled, current name selectable"
+      - given: "Recognizing list with 3+ items"
+        when: "User long-presses grip icon and drags"
+        then: "Items reorder, saved immediately"
+      - given: "Presentation Mode with recognized_names"
+        when: "Welcome card renders recognizing field"
+        then: "Each name shown as bullet point with zebra striping"
+      - given: "Existing agendas with recognized_names as TEXT[]"
+        when: "Migration 032 runs"
+        then: "Column type changed to TEXT, data converted via array_to_string()"
 
 # =============================================================================
 # BUSINESS RULES
@@ -1760,7 +1806,7 @@ design_decisions:
 
   - id: DD035
     decision: "New 'bullet_list' type for PresentationField"
-    rationale: "Separate type avoids special-casing 'multiline' which is used by recognized_names. Announcements, welcome_new_families, and sustaining_releasing all render as bullet points. [CR-277, CR-278, ADR-040]"
+    rationale: "Separate type for list items displayed as bullet points. Used by announcements, welcome_new_families, sustaining_releasing, and recognized_names. All render as bullet points with zebra striping. [CR-277, CR-278, CR-283, ADR-040]"
 
   - id: DD036
     decision: "EditableListField as dedicated reusable component"
@@ -1797,6 +1843,26 @@ design_decisions:
   - id: DD044
     decision: "Zebra striping only for bullet_list type in Presentation Mode"
     rationale: "Other field types (text, hymn, multiline) typically have 1-2 values. Bullet lists have multiple items where alternating colors aid line tracking. [CR-280]"
+
+  - id: DD045
+    decision: "Inline edit TextInput must be multiline with matching height"
+    rationale: "Without multiline={true}, TextInput collapses word-wrapped text to one line. paddingVertical must match display Text to prevent visual shrinkage on edit. [CR-281]"
+
+  - id: DD046
+    decision: "Drag activation restricted to long-press on grip icon only"
+    rationale: "DraggableFlatList default captures all touches for pan gesture. Setting activationDistance high (9999) disables implicit pan; drag only via onLongPress={drag} on grip icon. Allows normal page scrolling on item touch. [CR-282]"
+
+  - id: DD047
+    decision: "onItemPress callback prop on EditableListField"
+    rationale: "When provided, tapping an item calls onItemPress(index, item) instead of activating inline TextInput edit. Enables recognized_names to open ActorSelector on tap while other fields keep inline text editing. Minimal API change. [CR-283]"
+
+  - id: DD048
+    decision: "Recognized names add area as Pressable (not TextInput)"
+    rationale: "Recognized names must come from ActorSelector, not free text. A Pressable styled like the existing placeholder area opens ActorSelector in single-select mode. Consistent visual appearance, different interaction. [CR-283]"
+
+  - id: DD049
+    decision: "New disabledNames prop on ActorSelector"
+    rationale: "Separate from selectedNames (which shows checkmarks in multi-select). disabledNames grays out and prevents selection. When editing a name, other selected names are disabled but the current name remains selectable (user can re-select to keep). [CR-283]"
 
 # =============================================================================
 # EDGE CASES
@@ -1835,7 +1901,7 @@ edge_cases:
     description: "Hymn search with numeric input -> matches hymn number prefix instead of title"
 
   - id: EC011
-    description: "Empty recognized_names -> field hidden in Presentation Mode"
+    description: "Empty recognized_names -> field hidden in Presentation Mode. Still valid after CR-283 migration to TEXT with \\n and bullet_list rendering."
 
   - id: EC012
     description: "Speaker without phone trying to send WhatsApp -> Alert with option to mark as invited without sending"
@@ -1899,3 +1965,21 @@ edge_cases:
 
   - id: EC032
     description: "textZebraFaded (#4A4A4A light, #B8C5D4 dark) is distinct from textTertiary (#8A8A8A light, #64748B dark). [CR-280]"
+
+  - id: EC033
+    description: "Inline edit TextInput with very long text (5+ lines wrapped) -> TextInput grows to full height with multiline; no collapse. [CR-281]"
+
+  - id: EC034
+    description: "User edits inline text to become shorter -> TextInput height shrinks to match new content. [CR-281]"
+
+  - id: EC035
+    description: "User long-presses on item text (not grip icon) -> no drag activation; only grip icon long-press triggers drag. Page scroll works. [CR-282]"
+
+  - id: EC036
+    description: "User opens ActorSelector for recognized_names edit but closes without selecting -> original name preserved unchanged. [CR-283]"
+
+  - id: EC037
+    description: "Actor deleted from actors list but name exists in recognized_names -> name remains as stored text in list; does not break. [CR-283]"
+
+  - id: EC038
+    description: "Migration 032: existing agendas with NULL recognized_names -> column stays NULL after migration (no data to convert). [CR-283]"

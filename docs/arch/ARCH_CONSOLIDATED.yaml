@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-08 (CR-278/279/280: EditableListField, grip icon, zebra striping)
+# Last updated: 2026-03-08 (CR-281/282/283: EditableListField bugfixes, recognized_names rework)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
   total_modules: 13
-  total_adrs: 47
+  total_adrs: 51
 
 # =============================================================================
 # TECH STACK
@@ -189,7 +189,7 @@ modules:
       - path: src/hooks/useActors.ts
         responsibility: TanStack Query hooks for actor CRUD with role filtering
       - path: src/components/ActorSelector.tsx
-        responsibility: Role-filtered actor selector with inline creation and KeyboardAvoidingView
+        responsibility: Role-filtered actor selector with inline creation, KeyboardAvoidingView, and disabledNames support for preventing duplicate selection
     dependencies:
       - "DB CHECK constraint (role IN ('preside','conduct','recognize','pianist','conductor'))"
 
@@ -582,7 +582,7 @@ database_schema:
         - "id (UUID PK)"
         - "ward_id, sunday_date"
         - "presiding/conducting/pianist/conductor name + actor_id pairs"
-        - "recognized_names (TEXT array)"
+        - "recognized_names (TEXT, \\n-joined names; was TEXT[] before migration 032)"
         - "welcome_new_families, announcements"
         - "opening/sacrament/intermediate/closing hymn_id (FK -> hymns)"
         - "opening/closing prayer member_id + name"
@@ -1184,9 +1184,9 @@ adrs:
       field uses 'bullet_list' instead of 'multiline'. Rendering layer
       splits by \n and prepends bullet character to each item.
     rationale: |
-      A new type is cleaner than special-casing 'multiline'. After CR-278,
-      announcements, welcome_new_families, and sustaining_releasing all use
-      'bullet_list'. Only recognized_names still uses 'multiline'.
+      A new type is cleaner than special-casing 'multiline'. After CR-283,
+      all four list fields use 'bullet_list': announcements,
+      welcome_new_families, sustaining_releasing, and recognized_names.
 
   - id: ADR-041
     title: "AnnouncementsList as dedicated component separate from AgendaForm"
@@ -1269,3 +1269,58 @@ adrs:
     rationale: |
       Consistent visual between online and offline edit states. Bullets are
       a presentation-only visual aid for the audience view.
+
+  - id: ADR-048
+    title: "activationDistance={9999} to disable DraggableFlatList internal PanGesture"
+    decision: |
+      Set activationDistance={9999} on DraggableFlatList in EditableListField
+      to effectively disable the internal PanGesture that captures all touch
+      events. Drag reorder is activated exclusively via onLongPress={drag}
+      on the GripIcon Pressable.
+    rationale: |
+      DraggableFlatList's internal GestureDetector with PanGesture has
+      default activationDistance=0, which means any touch on an item row
+      activates the pan gesture before the parent ScrollView can handle it.
+      Setting activationDistance to a very high value (9999) ensures the
+      internal pan gesture never activates from direct touch. The
+      onLongPress={drag} pattern on the grip icon is the recommended
+      approach from react-native-draggable-flatlist.
+
+  - id: ADR-049
+    title: "onItemPress/onAddPress callback props for external selection in EditableListField"
+    decision: |
+      Add optional onItemPress and onAddPress callback props to
+      EditableListField. When provided, these override the default inline
+      TextInput behavior: onItemPress replaces tap-to-edit, onAddPress
+      replaces the add TextInput with a Pressable.
+    rationale: |
+      EditableListField already handles list layout, delete, reorder, and
+      disabled state. For recognized_names, only the input mechanism differs
+      (ActorSelector instead of TextInput). Adding callback props allows
+      reuse without duplicating list management logic. The props are optional,
+      preserving backward compatibility for fields that use inline text editing.
+
+  - id: ADR-050
+    title: "disabledNames prop on ActorSelector for preventing duplicate selection"
+    decision: |
+      Add optional disabledNames: string[] prop to ActorSelector. Actors
+      whose name appears in disabledNames are rendered with opacity 0.4
+      and their Pressable onPress is set to undefined (non-selectable).
+    rationale: |
+      When editing recognized_names, actors already in the list should not
+      be selectable (except the one being edited). disabledNames is a simple,
+      declarative prop. Matching by name (not ID) is correct because
+      recognized_names stores names as text. The opacity approach is
+      consistent with disabled UI patterns in the app.
+
+  - id: ADR-051
+    title: "Migrate recognized_names from TEXT[] to TEXT via temp column strategy"
+    decision: |
+      Use a 3-step migration (add temp column, migrate data, drop+rename)
+      to convert recognized_names from TEXT[] to TEXT with \n separator.
+      Use array_to_string(recognized_names, E'\n') for data conversion.
+    rationale: |
+      Direct ALTER COLUMN TYPE with USING clause can fail with complex casts
+      between array and scalar types. The temp column approach is safer and
+      explicit. The \n separator is consistent with the other three list
+      fields (announcements, welcome_new_families, sustaining_releasing).

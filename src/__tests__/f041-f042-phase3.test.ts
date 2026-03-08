@@ -61,10 +61,10 @@ describe('F041 (CR-253): Permission Model Rework', () => {
     });
   });
 
-  // --- AC-F005-02: Secretary cannot assign speakers to speech positions ---
-  describe('AC-F005-02: Secretary pos 1-3 speaker read-only (no speech:assign)', () => {
-    it('secretary does NOT have speech:assign', () => {
-      expect(hasPermission('secretary', 'speech:assign')).toBe(false);
+  // --- AC-F005-02: Secretary CAN assign speakers to speech positions (CR-276) ---
+  describe('AC-F005-02: Secretary pos 1-3 speaker assignable (has speech:assign, CR-276)', () => {
+    it('secretary HAS speech:assign', () => {
+      expect(hasPermission('secretary', 'speech:assign')).toBe(true);
     });
 
     it('position-aware logic: isPrayer=false uses speech:assign', () => {
@@ -72,17 +72,17 @@ describe('F041 (CR-253): Permission Model Rework', () => {
       const isPrayer = false;
       const permission: Permission = isPrayer ? 'prayer:assign' : 'speech:assign';
       expect(permission).toBe('speech:assign');
-      expect(hasPermission('secretary', permission)).toBe(false);
+      expect(hasPermission('secretary', permission)).toBe(true);
     });
   });
 
-  // --- AC-F005-03: Secretary cannot assign topics to speech positions ---
-  describe('AC-F005-03: Secretary pos 1-3 topic read-only (same permission as speaker)', () => {
+  // --- AC-F005-03: Secretary CAN assign topics to speech positions (CR-276) ---
+  describe('AC-F005-03: Secretary pos 1-3 topic assignable (same permission as speaker, CR-276)', () => {
     it('topic assignment uses same canAssign as speaker assignment', () => {
       // In SpeechSlot, topic press is gated by canAssign (same as speaker)
       const isPrayer = false;
       const permission: Permission = isPrayer ? 'prayer:assign' : 'speech:assign';
-      expect(hasPermission('secretary', permission)).toBe(false);
+      expect(hasPermission('secretary', permission)).toBe(true);
     });
   });
 
@@ -168,12 +168,12 @@ describe('F041 (CR-253): Permission Model Rework', () => {
     }
   });
 
-  // --- AC-F014-03: Secretary cannot assign to speech positions ---
-  describe('AC-F014-03: Secretary cannot assign speakers to speech positions', () => {
-    it('secretary at pos 1 (speech) cannot assign', () => {
+  // --- AC-F014-03: Secretary CAN assign to speech positions (CR-276) ---
+  describe('AC-F014-03: Secretary can assign speakers to speech positions (CR-276)', () => {
+    it('secretary at pos 1 (speech) CAN assign', () => {
       const isPrayer = false;
       const perm: Permission = isPrayer ? 'prayer:assign' : 'speech:assign';
-      expect(hasPermission('secretary', perm)).toBe(false);
+      expect(hasPermission('secretary', perm)).toBe(true);
     });
 
     it('secretary at pos 0 (prayer) CAN assign', () => {
@@ -197,9 +197,9 @@ describe('F041 (CR-253): Permission Model Rework', () => {
 
   // --- AC-F015-01/02: Topic assignment follows same permission model ---
   describe('AC-F015-01/02: Topic assignment permission at speech positions', () => {
-    it('secretary sees topic as read-only for pos 1-3 (no speech:assign)', () => {
+    it('secretary can assign topics to pos 1-3 (has speech:assign, CR-276)', () => {
       // Topic press is gated by canAssign, which is speech:assign for pos 1-3
-      expect(hasPermission('secretary', 'speech:assign')).toBe(false);
+      expect(hasPermission('secretary', 'speech:assign')).toBe(true);
     });
 
     it('bishopric can assign topics to pos 1-3 (has speech:assign)', () => {
@@ -218,12 +218,12 @@ describe('F041 (CR-253): Permission Model Rework', () => {
       expect(ALL_PERMISSIONS).toContain('prayer:unassign');
     });
 
-    it('secretary has 23 permissions (net zero: -2 speech + 2 prayer)', () => {
-      expect(getPermissions('secretary')).toHaveLength(23);
+    it('secretary has 26 permissions (CR-276: +3 speech:assign, speech:unassign, home:next_assignments)', () => {
+      expect(getPermissions('secretary')).toHaveLength(26);
     });
 
-    it('secretary does NOT have speech:unassign', () => {
-      expect(hasPermission('secretary', 'speech:unassign')).toBe(false);
+    it('secretary HAS speech:unassign (CR-276)', () => {
+      expect(hasPermission('secretary', 'speech:unassign')).toBe(true);
     });
 
     it('every permission in ALL_PERMISSIONS is checked against all 3 roles without error', () => {

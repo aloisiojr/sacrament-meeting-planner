@@ -181,6 +181,7 @@ describe('F063 SUPPLEMENTARY: getInviteItems + topicMissing integration', () => 
       topic_title: null,
       topic_link: null,
       topic_collection: null,
+      assigned_by_role: null,
       status: 'assigned_not_invited',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',

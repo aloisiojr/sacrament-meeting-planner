@@ -4,18 +4,19 @@
 # =============================================================================
 
 type: test_consolidated
-version: 13
-last_updated: "2026-03-05"
+version: 14
+last_updated: "2026-03-07"
 
 summary:
-  total_test_files: 55
-  total_tests: 1222
+  total_test_files: 59
+  total_tests: 1272
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
+  # Note: F065+F066 added 50 tests (coder): 8 useMembers, 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils
   framework: vitest
   categories:
-    module_named: 48
+    module_named: 52
     integration: 6
   infrastructure:
     setup: 1
@@ -599,6 +600,58 @@ module_tests:
       - S6: POLLING_INTERVAL_MS 2500->10000 (3 tests)
       - S7: useToggleCollection UPSERT replaces check-then-act (5 integration tests)
       - Cross-feature backward compatibility (4 tests)
+
+  # --- F065+F066 Nickname Search + Secretary Review Tests (CR-275, CR-276) ---
+
+  - file: src/__tests__/useSpeeches-mutations.test.ts
+    tests: 4
+    module: src/hooks/useSpeeches.ts
+    covers:
+      - "F066 (CR-276): assigned_by_role in mutation payloads"
+      - useAssignSpeaker includes assigned_by_role
+      - useAssignTopic includes assigned_by_role
+      - useRemoveAssignment includes assigned_by_role
+      - assigned_by_role matches role from useAuth
+
+  - file: src/__tests__/migration-031.test.ts
+    tests: 17
+    module: supabase/migrations/031_secretary_review_notification.sql
+    covers:
+      - "F066 (CR-276): Migration 031 behavioral simulation"
+      - Migration file exists and contains expected SQL
+      - Case 6B topic NULL->value fires secretary_review
+      - Case 6B topic value->different value fires review
+      - Case 6B topic clearing does NOT notify
+      - Case 6B same topic does NOT notify
+      - Case 6B bishopric topic change excluded
+      - Case 6A secretary speaker assignment fires review
+      - Case 6A positions 0,4 excluded
+      - Case 6A bishopric assignment excluded
+      - Case 6A NULL assigned_by_role excluded
+      - Early-return blocks non-status-change except Case 6B
+      - Cases 1,4,5 and cancellation unchanged
+
+  - file: src/__tests__/process-notifications-secretary-review.test.ts
+    tests: 10
+    module: supabase/functions/process-notifications/index.ts
+    covers:
+      - "F066 (CR-276): process-notifications secretary_review support"
+      - buildSecretaryReviewText speaker variant (pt-BR, en-US, es-LA)
+      - buildSecretaryReviewText topic variant (pt-BR, en-US, es-LA)
+      - secretary_review routed to immediateEntries (never grouped)
+      - secretary_review with topic_title uses topic variant
+      - secretary_review without topic_title uses speaker variant
+      - Edge Function source contains secretary_review case
+
+  - file: src/__tests__/notificationUtils.test.ts
+    tests: 11
+    module: src/lib/notificationUtils.ts
+    covers:
+      - "F066 (CR-276): Client-side secretary_review notification text"
+      - secretary_review speaker variant (pt-BR, en-US, es-LA)
+      - secretary_review topic variant (pt-BR, en-US, es-LA)
+      - Existing notification types regression test (designation, weekly, confirmed, withdrew)
+      - Unknown type returns empty strings
 
 # =============================================================================
 # INTEGRATION TESTS (hooks + Supabase + ReactQuery + Auth)
@@ -3554,8 +3607,16 @@ gaps:
   # S4 retention cleanup (5), S5 Promise.all (4), S6 polling interval (3),
   # S7 UPSERT (5), cross-feature (4).
 
+  # F065 gaps
+  # All F065 ACs (01-07) covered. All edge cases (EC-065-01 to EC-065-03) covered. No gaps.
+  # 8 new tests in useMembers-utils.test.ts for informal_name search.
+
+  # F066 gaps
+  # All F066 ACs (01-30) covered. All edge cases (EC-066-01 to EC-066-08) covered. No gaps.
+  # 42 new tests: 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils.
+
 stats:
-  total_tests: 1222
-  passing: 1222
+  total_tests: 1272
+  passing: 1272
   failing: 0
   skipped: 0

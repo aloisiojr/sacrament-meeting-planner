@@ -6,7 +6,7 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 14
+  version: 15
 
 validations:
 
@@ -2538,3 +2538,164 @@ validations:
         description: "notification_queue schema includes topic_title column for topic review texts"
         result: PASS
         evidence: "031_secretary_review_notification.sql:21: 'ALTER TABLE public.notification_queue ADD COLUMN topic_title TEXT;'. database.ts:266: 'topic_title: string | null;' in NotificationQueue interface. process-notifications/index.ts:19: 'topic_title: string | null;' in NotificationQueueEntry interface."
+
+  # ===========================================================================
+  # Phase 14: CR-277 Announcements List (QA_PLAN_014)
+  # ===========================================================================
+
+  - id: QA_014
+    plan: QA_PLAN_014
+    date: "2026-03-08"
+    scope: "CR-277 - Announcements list items with add/delete/reorder/inline-edit (F067)"
+    verdict: passed
+    must_pass: 13/13
+    should_pass: 7/7
+    total_checks: 20/20
+    reviewer_verdict: "APPROVED (0 issues)"
+    tester_verdict: "PASSED (1421 tests, 103 new, 21/21 ACs, 8/8 ECs)"
+
+    checks:
+
+      # --- CR-277: must_pass ---
+
+      - id: CR277_MP1
+        cr: CR-277
+        type: must_pass
+        description: "Announcements field replaced with list component (no longer a single DebouncedTextInput)"
+        result: PASS
+        evidence: "AgendaForm.tsx:245-252: FieldRow now contains <AnnouncementsList value={agenda.announcements ?? null} onSave={...} disabled={isObserver} placeholder={t('agenda.addAnnouncement')} />. The old DebouncedTextInput for announcements is gone. AnnouncementsList.tsx is a new 258-line component."
+
+      - id: CR277_MP2
+        cr: CR-277
+        type: must_pass
+        description: "Empty state shows single input with 'Add announcement' placeholder (i18n)"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:211-221: When items array is empty, component renders a TextInput with placeholder={placeholder} prop, which is t('agenda.addAnnouncement') from AgendaForm. No item rows rendered above."
+
+      - id: CR277_MP3
+        cr: CR-277
+        type: must_pass
+        description: "Each announcement item shows text + X delete button on the right"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:168-209: Each item row contains Pressable text (line 184-188) + XIcon delete button (line 206-208: <Pressable hitSlop={6} onPress={() => handleDelete(idx)}><XIcon size={18} color={colors.error} /></Pressable>)."
+
+      - id: CR277_MP4
+        cr: CR-277
+        type: must_pass
+        description: "Clicking item text enables inline editing"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:89-96: startEdit sets editingIndex and editText. Line 173-188: when editingIndex === idx, renders TextInput with autoFocus; otherwise renders Pressable Text with onPress={() => startEdit(idx)}."
+
+      - id: CR277_MP5
+        cr: CR-277
+        type: must_pass
+        description: "New add-item input always appears below the last item"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:211-221: After the items.map() loop (line 168-209), a TextInput with placeholder is always rendered. It uses ref={addInputRef}, onSubmitEditing={handleAdd}, onBlur={handleAdd}."
+
+      - id: CR277_MP6
+        cr: CR-277
+        type: must_pass
+        description: "Deleting an item removes it from the list and triggers save"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:75-86: handleDelete filters out the item at index, calls saveItems. saveItems (line 56-61) calls onSave(joinItems(newItems)). joinItems returns null for empty array (line 26). AgendaForm.tsx:248: onSave calls updateField('announcements', text)."
+
+      - id: CR277_MP7
+        cr: CR-277
+        type: must_pass
+        description: "Adding a new item via the add-input appends to list and triggers save"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:65-72: handleAdd trims addText, appends to items via [...items, trimmed], calls saveItems, clears addText, re-focuses input. Line 216-217: onSubmitEditing={handleAdd}, onBlur={handleAdd}."
+
+      - id: CR277_MP8
+        cr: CR-277
+        type: must_pass
+        description: "Storage format is items joined by \\n in TEXT column (no schema change)"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:25-27: joinItems joins with '\\n' or returns null. No new migration files after 031. Database column remains TEXT (001_initial_schema.sql:180). AgendaForm.tsx:248: onSave passes value directly to updateField('announcements', text)."
+
+      - id: CR277_MP9
+        cr: CR-277
+        type: must_pass
+        description: "Drag-to-reorder functionality exists for announcement items"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:117-145: handleMoveUp/handleMoveDown swap items via array destructuring and call saveItems. Lines 190-205: ChevronUpIcon and ChevronDownIcon Pressables on each row. Up disabled at idx===0 (opacity:0.3), Down disabled at idx===items.length-1. Per SPEC OQ-1: 'up/down arrows are acceptable fallback'."
+
+      - id: CR277_MP10
+        cr: CR-277
+        type: must_pass
+        description: "Offline mode: items display as read-only (no X, no add input, no drag)"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:148-163: if (disabled) block returns early. Empty items: returns <View />. Non-empty: renders plain Text with bullet prefix, no XIcon, no ChevronIcons, no add TextInput, no Pressable tap handlers."
+
+      - id: CR277_MP11
+        cr: CR-277
+        type: must_pass
+        description: "Presentation mode renders each announcement item as a bullet point"
+        result: PASS
+        evidence: "usePresentationMode.ts:94-99: announcements field uses type:'bullet_list'. presentation.tsx:155-188: PresentationFieldRow handles bullet_list by splitting value on '\\n', filtering empty, rendering each with '\\u2022 ' prefix. Empty renders '---'."
+
+      - id: CR277_MP12
+        cr: CR-277
+        type: must_pass
+        description: "New i18n key 'agenda.addAnnouncement' exists in all 3 locales"
+        result: PASS
+        evidence: "pt-BR.json:246: 'addAnnouncement': 'Adicionar anuncio'. en-US.json:246: 'addAnnouncement': 'Add announcement'. es-LA.json:246: 'addAnnouncement': 'Agregar anuncio'. All 3 locales confirmed."
+
+      - id: CR277_MP13
+        cr: CR-277
+        type: must_pass
+        description: "Observer role sees items as read-only (no X, no add, no drag, no edit)"
+        result: PASS
+        evidence: "AgendaForm.tsx:70: isObserver = !hasPermission('agenda:write') || disabled. Line 249: disabled={isObserver}. AnnouncementsList.tsx:91: startEdit returns early if disabled. Line 148-163: disabled renders plain text with bullet, no controls."
+
+      # --- CR-277: should_pass ---
+
+      - id: CR277_SP1
+        cr: CR-277
+        type: should_pass
+        description: "Inline editing uses debounced save pattern (consistent with existing fields)"
+        result: PASS
+        evidence: "Per SPEC OQ-2 resolution: 'No debounce timer is needed for inline editing... saves only on blur or submitEditing (discrete events)'. AnnouncementsList.tsx:99-114: finishEdit called on onBlur and onSubmitEditing (line 178-179). This is the spec-intended behavior - save on completion, not on keystroke."
+
+      - id: CR277_SP2
+        cr: CR-277
+        type: should_pass
+        description: "Editing an item inline preserves cursor position and does not flicker"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:174-182: TextInput with autoFocus, value={editText} with local state. No external re-render during editing: line 50-53 useEffect skips sync when editingIndex !== null. isEditingRef.current prevents external value overwrite during editing."
+
+      - id: CR277_SP3
+        cr: CR-277
+        type: should_pass
+        description: "Empty items (blank text) are not saved to the list"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:66-67: handleAdd checks 'if (trimmed === '') return'. Line 101-105: finishEdit with empty trimmed text deletes the item. parseItems (line 22) filters whitespace-only strings."
+
+      - id: CR277_SP4
+        cr: CR-277
+        type: should_pass
+        description: "Backward compatibility: existing multi-line announcements split correctly"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:21-23: parseItems splits on '\\n' and filters empty/whitespace. Existing 'Line1\\nLine2\\nLine3' produces ['Line1','Line2','Line3']. Test f067-announcements-list.test.ts:250-254 explicitly verifies legacy data parsing."
+
+      - id: CR277_SP5
+        cr: CR-277
+        type: should_pass
+        description: "Tests exist for announcement list logic (split/join/add/delete/reorder)"
+        result: PASS
+        evidence: "f067-announcements-list.test.ts: 46 tests covering parseItems (5), joinItems (3), component behavior (20+), AgendaForm integration (5), PresentationField bullet_list (6). f067-tester.test.ts: 57 tests covering all 21 ACs and 8 ECs. Total: 103 new tests."
+
+      - id: CR277_SP6
+        cr: CR-277
+        type: should_pass
+        description: "Presentation mode bullet rendering tested"
+        result: PASS
+        evidence: "f067-announcements-list.test.ts:342-390: 6 tests for PresentationField bullet_list type including buildPresentationCards type check, type union, bullet prefix rendering, empty rendering, single-item, and filtering empty lines. f067-tester.test.ts:367-460: 6 additional tests for AC-067-15/16 and EC-067-07."
+
+      - id: CR277_SP7
+        cr: CR-277
+        type: should_pass
+        description: "Visual consistency with existing form styles (border, padding, font size)"
+        result: PASS
+        evidence: "AnnouncementsList.tsx:227-251: itemRow style has borderRadius:6, paddingHorizontal:10, paddingVertical:8, fontSize:15. addInput style has borderRadius:6, paddingHorizontal:10, paddingVertical:8, fontSize:15. These match AgendaForm.tsx selectorField/textInput styles."

@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  version: 15
-  last_updated_by: "phase-013"
+  version: 16
+  last_updated_by: "phase-014"
 
 reviews:
   - id: REV-001
@@ -3986,3 +3986,238 @@ reviews:
       tests_flaky: 1
       flaky_test_note: "useSpeechCounts.integration.test.ts - pre-existing, passes in isolation, fails in full suite due to mock leakage"
       test_files: 60
+
+  # ===========================================================================
+  # REV-016: Phase 014 - F067 (CR-277)
+  # ===========================================================================
+
+  - id: REV-016
+    scope: "F067 Phase 014 - Announcements list UX improvement (CR-277)"
+    date: "2026-03-08"
+    reviewer: reviewer-agent
+    phase: 14
+    feature: F067
+    iteration: 1
+    spec: SPEC_F014
+    arch: ARCH_M014
+    plan: PLAN_P014
+
+    commits:
+      - sha: ce4ff67
+        message: "feat(i18n): add agenda.addAnnouncement key to all 3 locales (CR-277)"
+      - sha: 5ebfc0b
+        message: "feat(AnnouncementsList): add structured list component with add/delete/edit/reorder (CR-277)"
+      - sha: 84c4ee1
+        message: "feat(AgendaForm): replace announcements DebouncedTextInput with AnnouncementsList (CR-277)"
+      - sha: 35614b3
+        message: "feat(presentation): add bullet_list type to PresentationField and render as bullet points (CR-277)"
+      - sha: 0487b01
+        message: "docs(phase-014): add ADR-039 to ADR-043 and update consolidated docs (CR-277)"
+      - sha: 6a5c8c1
+        message: "test(f067): add 46 tests for AnnouncementsList and update CODE_LEDGER (CR-277)"
+      - sha: 37d9e0d
+        message: "test(f067): add 57 tester tests for AnnouncementsList (CR-277)"
+      - sha: 986e1b3
+        message: "docs(tests): update TEST_CONSOLIDATED after F067 tester - all 1421 tests passing"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        result: pass
+        notes: |
+          SPEC_F014 faithfully captures the user request for CR-277:
+          - Announcements field transformed from single multiline text to list items
+          - Add (bottom input, submit/blur), Delete (X button), Inline edit (tap to edit),
+            Reorder (long-press or up/down arrows per OQ-1 fallback) all specified
+          - Storage format unchanged: \n-joined TEXT column, no migration
+          - Disabled/observer: read-only, no controls
+          - Presentation Mode: bullet_list type, each item as "bullet item"
+          - i18n key agenda.addAnnouncement in 3 locales
+          - 21 acceptance criteria cover all behaviors, 8 edge cases
+          - User's confirmed decisions (empty state, inline edit, drag/reorder,
+            offline, presentation) all reflected in ACs
+
+      arch_vs_spec:
+        result: pass
+        notes: |
+          ARCH_M014 correctly maps SPEC to components:
+          - AnnouncementsList.tsx (NEW): encapsulates all list logic with props
+            matching SPEC (value, onSave, disabled, placeholder)
+          - AgendaForm.tsx (MODIFIED): replaces DebouncedTextInput with AnnouncementsList
+          - usePresentationMode.ts (MODIFIED): extends PresentationField type union
+            with 'bullet_list', changes announcements field type
+          - presentation.tsx (MODIFIED): renders bullet_list type as bullet-prefixed lines
+          - i18n (3 files): addAnnouncement key
+          - 5 ADRs (039-043): storage format, bullet_list type, dedicated component,
+            no debounce, up/down arrows instead of drag
+          - Contracts defined for all integrations
+
+      plan_vs_arch:
+        result: pass
+        notes: |
+          PLAN_P014 has 6 steps covering all ARCH components:
+          - S014-01: i18n keys (3 locales)
+          - S014-02: AnnouncementsList component (parseItems, joinItems, full UI)
+          - S014-03: AgendaForm integration (replace DebouncedTextInput)
+          - S014-04: Presentation Mode (bullet_list type + rendering)
+          - S014-05: Documentation (ADR-039 to ADR-043, consolidated docs)
+          - S014-06: Final verification (tsc + vitest)
+          Dependency graph is correct. Coverage matrix maps all 21 ACs and 8 ECs.
+
+      code_vs_plan:
+        result: pass
+        notes: |
+          Code implementation follows PLAN precisely:
+          - S014-01: All 3 locales have agenda.addAnnouncement with correct translations
+          - S014-02: AnnouncementsList.tsx created with exported parseItems/joinItems,
+            props interface matching ARCH contract, all behaviors (add, delete,
+            inline edit, reorder with up/down arrows, disabled state, external sync)
+          - S014-03: AgendaForm imports AnnouncementsList, replaces DebouncedTextInput
+            block, passes value/onSave/disabled/placeholder correctly,
+            announcementsInput style preserved for welcome_new_families
+          - S014-04: PresentationField type extended, announcements uses 'bullet_list',
+            PresentationFieldRow handles bullet_list rendering with bullet prefix
+          - S014-05: ADR-039 to ADR-043 added to ARCH_CONSOLIDATED, SPEC_CONSOLIDATED
+            updated
+          - S014-06: All 1421 tests pass, tsc compiles
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW
+    # =========================================================================
+
+    code_review:
+
+      - area: "AnnouncementsList.tsx"
+        finding: |
+          Well-structured component. parseItems/joinItems exported for testing.
+          Props interface matches ARCH contract exactly. Internal state management
+          uses useState and useRef for editing guards (isEditingRef pattern from
+          DebouncedTextInput). useEffect syncs external value when not editing.
+          All handlers (add, delete, edit, reorder) wrapped in useCallback with
+          correct dependency arrays. saveItems encapsulates state update + onSave.
+          Disabled state renders bullet-prefixed text with no controls.
+          Active state renders item rows with edit TextInput, ChevronUp/Down,
+          XIcon delete, and add-input at bottom with dashed border.
+          Styling follows existing patterns (borderRadius: 6, padding).
+
+      - area: "AgendaForm.tsx integration"
+        finding: |
+          Line 31: import { AnnouncementsList } from './AnnouncementsList';
+          Lines 245-252: AnnouncementsList replaces DebouncedTextInput.
+          value: agenda.announcements ?? null (correctly null, not empty string).
+          onSave: updateField('announcements', text) - same pattern.
+          disabled: isObserver - which includes offline mode (disabled prop ORed).
+          placeholder: t('agenda.addAnnouncement') - correct i18n key.
+          styles.announcementsInput preserved on line 949-951, still used by
+          welcome_new_families on line 235. DebouncedTextInput import kept.
+
+      - area: "usePresentationMode.ts"
+        finding: |
+          Line 27: type union extended to include 'bullet_list'.
+          Line 98: announcements field uses type: 'bullet_list' instead of 'multiline'.
+          Value remains raw \n-joined string, unchanged.
+          Other multiline fields (recognized_names, welcome_new_families,
+          ward_business) remain 'multiline' - correct separation.
+
+      - area: "presentation.tsx - PresentationFieldRow"
+        finding: |
+          Lines 155-188: bullet_list handling added before the default return.
+          Splits value by \n, filters empty strings. Empty list renders "---".
+          Non-empty list renders each item as Text with bullet prefix (\u2022).
+          Font sizes follow existing pattern (fontSizes?.label, fontSizes?.value).
+          Uses key={idx} for map - acceptable for this use case since items
+          don't have stable IDs and the list is read-only in presentation mode.
+
+      - area: "i18n locales (3 files)"
+        finding: |
+          pt-BR: "Adicionar anuncio" (with accent u on u)
+          en-US: "Add announcement"
+          es-LA: "Agregar anuncio"
+          All at line 246 in the agenda section after "announcements" key.
+          Translations are correct and natural.
+
+      - area: "Tests (f067-announcements-list.test.ts)"
+        finding: |
+          46 coder tests + 57 tester tests = 103 total tests for F067.
+          Tests cover: i18n keys, parseItems/joinItems, component behavior
+          (add, delete, edit, reorder, disabled state, external sync,
+          backward compatibility), AgendaForm integration, presentation mode
+          (bullet_list type, rendering, empty state, single item, filtering).
+          Tests use inline copies of parseItems/joinItems due to react-native
+          import limitation in node env - acceptable pattern.
+          buildPresentationCards tested with real function import.
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues: []
+
+    # =========================================================================
+    # PENDING DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - step: 1
+        action: "EAS Build (app update)"
+        reason: "Client-side only changes: new AnnouncementsList component, AgendaForm integration, presentation bullet_list rendering, i18n key."
+        urgency: low
+        notes: |
+          No database migration, no Edge Function changes. Pure UI enhancement.
+          Can be bundled with other pending client-side changes (CR-262, 271, 272, 273, 274).
+
+    deploy_notes: |
+      CR-277 is a client-only change. No server-side deploys required.
+      The announcements TEXT column and storage format are unchanged.
+      Can be deployed alongside the existing pending EAS Build.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: false
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - ".devteam/project-status.yaml"
+        - "docs/CHANGE_REQUESTS.yaml"
+      notes: |
+        Git status shows only 2 modified doc files (project-status.yaml and
+        CHANGE_REQUESTS.yaml). No uncommitted code files. All CR-277 code
+        changes are committed (8 commits: ce4ff67..986e1b3).
+        The doc files are expected to be committed by the Orchestrator.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-277 (F067) implementation is correct and complete. The announcements
+      field in AgendaForm has been successfully transformed from a single
+      multiline DebouncedTextInput into a structured list component
+      (AnnouncementsList) with add, delete, inline-edit, and reorder (up/down
+      arrows) capabilities. Storage format is preserved (\n-joined TEXT column,
+      no migration). Presentation Mode correctly renders announcements as
+      bullet-prefixed items using the new 'bullet_list' PresentationField type.
+      Disabled/observer mode shows read-only bullet text without controls.
+      i18n key agenda.addAnnouncement added to all 3 locales.
+      Chain validation passes at all 4 levels. All 21 acceptance criteria
+      and 8 edge cases are covered. 1421 tests pass (62 test files).
+      No P0, P1, or P2 issues found. Only deploy needed is a client-side
+      EAS Build which can be bundled with other pending deploys.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 7
+      total_commits: 8
+      tests_total: 1421
+      tests_passing: 1421
+      test_files: 62

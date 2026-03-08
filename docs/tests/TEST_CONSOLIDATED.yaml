@@ -4,17 +4,18 @@
 # =============================================================================
 
 type: test_consolidated
-version: 17
+version: 18
 last_updated: "2026-03-08"
 
 summary:
   total_test_files: 62
-  total_tests: 1421
+  total_tests: 1474
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
   # Note: F065+F066 added 96 tests (50 coder + 46 tester): 8 useMembers, 4 useSpeeches-mutations, 17 migration-031, 10 process-notifications, 11 notificationUtils, 46 tester
   # Note: F067 added 103 tests (46 coder + 57 tester): 3 i18n, 8 parseItems/joinItems, 27 component, 5 AgendaForm, 6 presentation, 57 tester
+  # Note: F068+F069+F070 added 53 tests: 6 i18n, 9 welcome/sustaining integration, 15 auto-split, 12 GripIcon/drag, 11 zebra+bullet_list
   framework: vitest
   categories:
     module_named: 55
@@ -698,11 +699,13 @@ module_tests:
   # --- F067 Coder Tests (CR-277) ---
 
   - file: src/__tests__/f067-announcements-list.test.ts
-    tests: 46
-    module: "src/components/AnnouncementsList.tsx, src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts, src/app/presentation.tsx"
+    tests: 99
+    module: "src/components/EditableListField.tsx, src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts, src/app/presentation.tsx, src/lib/theme.ts, src/components/icons/index.tsx"
     covers:
       - "F067 S014-01: i18n keys (3 tests)"
       - agenda.addAnnouncement exists in pt-BR, en-US, es-LA (AC-067-20)
+      - "F068 S015-01: i18n keys addWelcome/addWardBusiness (6 tests)"
+      - agenda.addWelcome and agenda.addWardBusiness in pt-BR, en-US, es-LA
       - "F067 S014-02: parseItems/joinItems (8 tests)"
       - parseItems null/empty/newline/consecutive/whitespace
       - joinItems empty/multiple/single
@@ -717,17 +720,34 @@ module_tests:
       - Backward compat multi-line data (AC-067-19)
       - "F067 S014-03: AgendaForm integration (5 tests)"
       - Value, disabled, placeholder, onSave props (AC-067-17, AC-067-21)
-      - welcome_new_families unchanged (EC-067-08)
+      - welcome_new_families uses EditableListField
+      - "F068 S015-02: AgendaForm welcome/sustaining integration (9 tests)"
+      - EditableListField for welcome_new_families and sustaining_releasing
+      - Placeholder, onSave, recognized_names still uses ActorSelector
+      - Backward compat for existing free-text data
+      - "F068 S015-03: Auto-split handleAdd/finishEdit (15 tests)"
+      - handleAdd splits A\\nB\\nC, filters empty, trims, handles \\r\\n
+      - finishEdit auto-splits, deletes on empty, updates single, replaces N
+      - "F069 S015-04: GripIcon and drag-to-reorder (12 tests)"
+      - GripIcon exported, DraggableFlatList imported, no Chevron icons
+      - No numberOfLines, no bullet prefix in disabled, grip on single item
+      - onLongPress drag, alignItems flex-start, scrollEnabled false
       - "F067 S014-04: Presentation bullet_list (6 tests)"
       - buildPresentationCards uses bullet_list type (AC-067-15)
       - PresentationField type union includes bullet_list (ADR-040)
       - Rendering with items/empty/single/filtered (AC-067-15..16, EC-067-07)
+      - "F068 S015-05: bullet_list for welcome/sustaining (2 tests)"
+      - buildPresentationCards uses bullet_list for welcome_new_families and sustaining_releasing
+      - "F070 S015-05: textZebraFaded + zebra striping (8 tests)"
+      - ThemeColors includes textZebraFaded, light/dark values
+      - textZebraFaded differs from textTertiary
+      - PresentationFieldRow applies idx%2 alternating colors
 
   # --- F067 Tester Tests (CR-277) ---
 
   - file: src/__tests__/f067-tester.test.ts
     tests: 57
-    module: "src/components/AnnouncementsList.tsx, src/hooks/usePresentationMode.ts"
+    module: "src/components/EditableListField.tsx, src/hooks/usePresentationMode.ts"
     covers:
       - "AC-067-17: Storage format round-trip (5 tests)"
       - parseItems -> joinItems identity, strips empty/whitespace lines, null round-trip, single item
@@ -4075,7 +4095,7 @@ gaps:
   #   2 long text, 3 external sync, 4 reorder comprehensive, 1 edit trim, 2 adding items.
 
 stats:
-  total_tests: 1421
+  total_tests: 1474
   passing: 1421
   failing: 0
   skipped: 0

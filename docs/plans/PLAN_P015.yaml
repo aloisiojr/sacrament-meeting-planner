@@ -1,0 +1,661 @@
+# =============================================================================
+# PLAN_P015.yaml
+# Artifact ID: 015
+# Phase: 1 of 1
+# Features: F068 (CR-278), F069 (CR-279), F070 (CR-280)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "015"
+  phase: 1
+  total_phases: 1
+  feature_ids: [F068, F069, F070]
+  crs: [278, 279, 280]
+  status: pending
+  created: "2026-03-08"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    F068: Rename AnnouncementsList to EditableListField; apply to
+    welcome_new_families and sustaining_releasing; add auto-split for \n text;
+    change both fields to bullet_list in presentation mode.
+    F069: Replace ChevronUp/ChevronDown arrows with GripIcon drag handle
+    (react-native-draggable-flatlist); remove numberOfLines={1} for word-wrap.
+    F070: Zebra-striped font colors for bullet_list items in presentation mode.
+
+  principles:
+    - "Happy path first: rename + i18n, then auto-split, then drag, then zebra"
+    - "1 step = 1 atomic commit; each step independently verifiable"
+    - "Test-along: tests created in same step as production code"
+    - "Zero schema change: all fields use existing TEXT columns"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: i18n keys + rename component + update imports
+  # ---------------------------------------------------------------------------
+  - id: S015-01
+    title: "Add i18n keys, rename AnnouncementsList to EditableListField, update all imports"
+    feature: F068
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: edit
+        description: |
+          In the "agenda" section, after "addAnnouncement" key, add:
+            "addWelcome": "Adicionar boas-vindas"
+            "addWardBusiness": "Adicionar apoio ou desobrigação"
+
+      - path: src/i18n/locales/en-US.json
+        action: edit
+        description: |
+          In the "agenda" section, after "addAnnouncement" key, add:
+            "addWelcome": "Add welcome"
+            "addWardBusiness": "Add sustaining or release"
+
+      - path: src/i18n/locales/es-LA.json
+        action: edit
+        description: |
+          In the "agenda" section, after "addAnnouncement" key, add:
+            "addWelcome": "Agregar bienvenida"
+            "addWardBusiness": "Agregar apoyo o relevo"
+
+      - path: src/components/AnnouncementsList.tsx -> src/components/EditableListField.tsx
+        action: rename
+        description: |
+          1. Rename file via git mv
+          2. Rename component: AnnouncementsList -> EditableListField
+          3. Rename interface: AnnouncementsListProps -> EditableListFieldProps
+          4. Update JSDoc comment at top
+
+      - path: src/components/AgendaForm.tsx
+        action: edit
+        description: |
+          1. Update import: AnnouncementsList -> EditableListField
+             BEFORE: import { AnnouncementsList } from './AnnouncementsList';
+             AFTER:  import { EditableListField } from './EditableListField';
+          2. Update announcements field: <AnnouncementsList -> <EditableListField
+             (props unchanged)
+
+      - path: src/__tests__/f067-announcements-list.test.ts
+        action: edit
+        description: |
+          Update all imports and references from AnnouncementsList to
+          EditableListField. Update describe block names.
+
+      - path: src/__tests__/f067-tester.test.ts
+        action: edit
+        description: |
+          Update all imports and references from AnnouncementsList to
+          EditableListField. Update describe block names.
+
+    done_when:
+      - "src/components/EditableListField.tsx exists with export EditableListField"
+      - "src/components/AnnouncementsList.tsx does NOT exist"
+      - "No references to 'AnnouncementsList' remain in the codebase (grep returns 0)"
+      - "t('agenda.addWelcome') returns correct text for pt-BR, en-US, es-LA"
+      - "t('agenda.addWardBusiness') returns correct text for pt-BR, en-US, es-LA"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes (all existing tests green with renamed imports)"
+
+    acceptance_criteria:
+      - AC-068-01  # Component renamed from AnnouncementsList to EditableListField
+      - AC-068-02  # All imports updated to EditableListField
+      - AC-068-18  # New i18n keys exist in all 3 locales
+      - AC-068-19  # No database migration needed
+
+    edge_cases: []
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "i18n key agenda.addWelcome exists in pt-BR"
+          - "i18n key agenda.addWelcome exists in en-US"
+          - "i18n key agenda.addWelcome exists in es-LA"
+          - "i18n key agenda.addWardBusiness exists in pt-BR"
+          - "i18n key agenda.addWardBusiness exists in en-US"
+          - "i18n key agenda.addWardBusiness exists in es-LA"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: Apply EditableListField to welcome_new_families + sustaining_releasing
+  # ---------------------------------------------------------------------------
+  - id: S015-02
+    title: "Replace DebouncedTextInput with EditableListField for welcome_new_families and sustaining_releasing"
+    feature: F068
+    depends_on: [S015-01]
+    files:
+      - path: src/components/AgendaForm.tsx
+        action: edit
+        description: |
+          1. Replace welcome_new_families DebouncedTextInput (lines 233-243):
+             BEFORE:
+               <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
+                 <DebouncedTextInput
+                   style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
+                   value={agenda.welcome_new_families ?? ''}
+                   onSave={(text) => updateField('welcome_new_families', text)}
+                   placeholder={t('agenda.welcomeNewFamilies')}
+                   placeholderTextColor={colors.textTertiary}
+                   multiline
+                   editable={!isObserver}
+                 />
+               </FieldRow>
+             AFTER:
+               <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
+                 <EditableListField
+                   value={agenda.welcome_new_families ?? null}
+                   onSave={(text) => updateField('welcome_new_families', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addWelcome')}
+                 />
+               </FieldRow>
+
+          2. Replace sustaining_releasing DebouncedTextInput (lines 356-366):
+             BEFORE:
+               <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
+                 <DebouncedTextInput
+                   style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+                   value={agenda.sustaining_releasing ?? ''}
+                   onSave={(text) => updateField('sustaining_releasing', text)}
+                   placeholder={t('agenda.wardBusiness')}
+                   placeholderTextColor={colors.textTertiary}
+                   multiline
+                   editable={!isObserver}
+                 />
+               </FieldRow>
+             AFTER:
+               <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
+                 <EditableListField
+                   value={agenda.sustaining_releasing ?? null}
+                   onSave={(text) => updateField('sustaining_releasing', text)}
+                   disabled={isObserver}
+                   placeholder={t('agenda.addWardBusiness')}
+                 />
+               </FieldRow>
+
+          3. Remove announcementsInput style from StyleSheet (line 949-951).
+             After this change, no field references it.
+
+    done_when:
+      - "welcome_new_families renders EditableListField with placeholder t('agenda.addWelcome')"
+      - "sustaining_releasing renders EditableListField with placeholder t('agenda.addWardBusiness')"
+      - "No reference to 'announcementsInput' style in AgendaForm.tsx"
+      - "recognized_names still uses ActorSelector (unchanged)"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-068-03  # welcome_new_families uses EditableListField
+      - AC-068-04  # welcome_new_families add-input has correct placeholder
+      - AC-068-05  # welcome_new_families saves as \n-joined string
+      - AC-068-06  # sustaining_releasing uses EditableListField
+      - AC-068-07  # sustaining_releasing add-input has correct placeholder
+      - AC-068-08  # sustaining_releasing saves as \n-joined string
+      - AC-068-09  # recognized_names still uses ActorSelector
+      - AC-068-16  # Existing welcome_new_families free-text data displays correctly
+      - AC-068-17  # Existing sustaining_releasing free-text data displays correctly
+
+    edge_cases:
+      - EC-068-01  # welcome_new_families existing data with \n
+      - EC-068-02  # sustaining_releasing existing data without \n
+      - EC-068-05  # announcementsInput style orphaned → removed
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "AgendaForm uses EditableListField for welcome_new_families"
+          - "welcome_new_families EditableListField has placeholder t('agenda.addWelcome')"
+          - "welcome_new_families onSave calls updateField('welcome_new_families', ...)"
+          - "AgendaForm uses EditableListField for sustaining_releasing"
+          - "sustaining_releasing EditableListField has placeholder t('agenda.addWardBusiness')"
+          - "sustaining_releasing onSave calls updateField('sustaining_releasing', ...)"
+          - "recognized_names still uses ActorSelector (not EditableListField)"
+          - "existing free-text welcome data without \\n shows as single item"
+          - "existing free-text sustaining data without \\n shows as single item"
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: Auto-split \n in add-input and inline-edit
+  # ---------------------------------------------------------------------------
+  - id: S015-03
+    title: "Add auto-split behavior for \\n in EditableListField add-input and inline-edit"
+    feature: F068
+    depends_on: [S015-01]
+    files:
+      - path: src/components/EditableListField.tsx
+        action: edit
+        description: |
+          1. Modify handleAdd to auto-split:
+             BEFORE: append single trimmed item
+             AFTER:
+               const newEntries = addText.split('\n').map(s => s.trim()).filter(s => s !== '');
+               if (newEntries.length === 0) return;
+               const newItems = [...items, ...newEntries];
+               saveItems(newItems);
+               setAddText('');
+               setTimeout(() => addInputRef.current?.focus(), 50);
+
+          2. Modify finishEdit to auto-split:
+             BEFORE: update single item at editingIndex
+             AFTER:
+               const newEntries = editText.split('\n').map(s => s.trim()).filter(s => s !== '');
+               if (newEntries.length === 0) {
+                 // Delete item (same as before for empty edit)
+                 const newItems = items.filter((_, i) => i !== editingIndex);
+                 saveItems(newItems);
+               } else if (newEntries.length === 1) {
+                 // Update single item (same as before)
+                 const newItems = items.map((item, i) => (i === editingIndex ? newEntries[0] : item));
+                 saveItems(newItems);
+               } else {
+                 // Replace 1 item with N items at same position
+                 const newItems = [...items];
+                 newItems.splice(editingIndex, 1, ...newEntries);
+                 saveItems(newItems);
+               }
+               setEditingIndex(null);
+               setEditText('');
+               isEditingRef.current = false;
+
+          3. Change add-input TextInput to multiline (so pasted \n is preserved
+             in the text before submit). Add blurOnSubmit={true} to still
+             dismiss on Enter.
+
+    done_when:
+      - "Pasting 'A\\nB\\nC' into add-input creates 3 separate items"
+      - "Editing item to 'A\\nB' replaces it with 2 items at same position"
+      - "Pasting '\\n\\n\\n' into add-input creates nothing (all empty filtered)"
+      - "Pasting '  A  \\n  B  ' trims to 'A' and 'B'"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-068-10  # Auto-split on paste in add-input
+      - AC-068-11  # Auto-split on paste in inline edit
+      - AC-068-12  # Auto-split filters empty lines
+      - AC-068-13  # Auto-split trims whitespace on each item
+
+    edge_cases:
+      - EC-068-03  # Paste text with mixed \r\n and \n line endings
+      - EC-068-04  # Auto-split produces only empty/whitespace items
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "handleAdd auto-splits 'A\\nB\\nC' into 3 items"
+          - "handleAdd with '\\n\\n\\n' adds nothing"
+          - "handleAdd with '  A  \\n  B  ' trims to 'A' and 'B'"
+          - "handleAdd with 'A\\r\\nB' handles \\r\\n correctly"
+          - "finishEdit auto-splits 'A\\nB' into 2 items replacing original"
+          - "finishEdit with only empty lines deletes item"
+          - "finishEdit with single line updates item normally"
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Install react-native-draggable-flatlist, add GripIcon, replace arrows with drag
+  # ---------------------------------------------------------------------------
+  - id: S015-04
+    title: "Install draggable-flatlist, add GripIcon, replace ChevronUp/Down with DraggableFlatList drag"
+    feature: F069
+    depends_on: [S015-03]
+    files:
+      - path: package.json
+        action: edit (via npm/npx install)
+        description: |
+          Install react-native-draggable-flatlist@4.0.3:
+            npx expo install react-native-draggable-flatlist
+          Peer deps already satisfied (react-native, gesture-handler, reanimated).
+
+      - path: src/components/icons/index.tsx
+        action: edit
+        description: |
+          Add GripIcon component (Lucide grip-horizontal pattern: 6 filled circles
+          arranged as 3x2 grid). Uses Circle from react-native-svg (already imported).
+
+          export const GripIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+            <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+              <Circle cx={12} cy={9} r={1} fill={color} />
+              <Circle cx={19} cy={9} r={1} fill={color} />
+              <Circle cx={5} cy={9} r={1} fill={color} />
+              <Circle cx={12} cy={15} r={1} fill={color} />
+              <Circle cx={19} cy={15} r={1} fill={color} />
+              <Circle cx={5} cy={15} r={1} fill={color} />
+            </Svg>
+          );
+
+      - path: src/components/EditableListField.tsx
+        action: edit
+        description: |
+          1. Remove ChevronUpIcon/ChevronDownIcon imports
+          2. Import GripIcon from './icons'
+          3. Import DraggableFlatList, ScaleDecorator, RenderItemParams
+             from 'react-native-draggable-flatlist'
+          4. Remove handleMoveUp and handleMoveDown callbacks
+          5. Replace items.map() with DraggableFlatList:
+             - data={items}
+             - keyExtractor={(_, index) => `${index}`}
+             - onDragEnd={({ data }) => { setEditingIndex(null); setEditText(''); isEditingRef.current = false; saveItems(data); }}
+             - renderItem receives { item, drag, isActive, getIndex }
+             - Each row: [GripIcon onLongPress={drag}] [text] [X]
+             - ScaleDecorator wraps each row
+          6. Remove numberOfLines={1} from active state Text (line 185)
+          7. Remove numberOfLines={1} from disabled state Text (line 156)
+          8. Remove bullet prefix ('\u2022 ') from disabled state (ADR-047)
+          9. Change itemRow alignItems from 'center' to 'flex-start'
+             (so grip/X align to top when text wraps)
+          10. GripIcon: color colors.textTertiary, size 16
+          11. Disabled state: no GripIcon shown (just plain text, no controls)
+
+    done_when:
+      - "react-native-draggable-flatlist appears in package.json dependencies"
+      - "GripIcon component exported from icons/index.tsx"
+      - "No ChevronUpIcon/ChevronDownIcon references in EditableListField.tsx"
+      - "DraggableFlatList renders items with GripIcon on left, X on right"
+      - "Long-press on GripIcon activates drag"
+      - "onDragEnd saves reordered items"
+      - "Text displays without numberOfLines limit (word-wrap)"
+      - "Disabled state shows plain text without bullet prefix or controls"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-069-01  # Grip icon appears on LEFT side of each item
+      - AC-069-02  # No more ChevronUp/ChevronDown arrows
+      - AC-069-03  # Grip icon serves as reorder touch target
+      - AC-069-04  # Disabled state hides grip icon
+      - AC-069-05  # Short text renders in a single line
+      - AC-069-06  # Long text wraps to multiple lines
+      - AC-069-07  # Disabled state shows full text without truncation
+
+    edge_cases:
+      - EC-069-01  # Very long item text - row grows
+      - EC-069-02  # Layout with grip + long text + X button
+      - EC-069-03  # Grip icon on single-item list
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "GripIcon is exported from icons/index.tsx"
+          - "EditableListField does not import ChevronUpIcon or ChevronDownIcon"
+          - "EditableListField imports DraggableFlatList"
+          - "Active state does not set numberOfLines on item Text"
+          - "Disabled state does not set numberOfLines on item Text"
+          - "Disabled state does not show bullet prefix"
+          - "Disabled state does not render GripIcon"
+          - "Grip icon on single-item list is still shown"
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: Presentation mode changes (bullet_list for 2 fields + zebra striping)
+  # ---------------------------------------------------------------------------
+  - id: S015-05
+    title: "Change welcome/sustaining to bullet_list in presentation; add textZebraFaded theme color; apply zebra striping"
+    feature: "F068+F070"
+    depends_on: [S015-02]
+    files:
+      - path: src/lib/theme.ts
+        action: edit
+        description: |
+          1. Add textZebraFaded to ThemeColors interface (after textInverse):
+               textZebraFaded: string;
+
+          2. Add to lightColors (after textTertiary):
+               textZebraFaded: '#4A4A4A',
+
+          3. Add to darkColors (after textTertiary):
+               textZebraFaded: '#B8C5D4',
+
+      - path: src/hooks/usePresentationMode.ts
+        action: edit
+        description: |
+          1. welcome_new_families (line 91):
+             BEFORE: type: 'multiline',
+             AFTER:  type: 'bullet_list',
+
+          2. sustaining_releasing (line 117):
+             BEFORE: type: 'multiline',
+             AFTER:  type: 'bullet_list',
+
+      - path: src/app/presentation.tsx
+        action: edit
+        description: |
+          In PresentationFieldRow bullet_list branch (line 181), change:
+          BEFORE:
+            style={[styles.fieldValue, { color: colors.text, fontSize: fontSizes?.value ?? 16 }]}
+          AFTER:
+            style={[styles.fieldValue, {
+              color: idx % 2 === 0 ? colors.text : colors.textZebraFaded,
+              fontSize: fontSizes?.value ?? 16,
+            }]}
+
+    done_when:
+      - "ThemeColors interface has textZebraFaded: string"
+      - "lightColors.textZebraFaded === '#4A4A4A'"
+      - "darkColors.textZebraFaded === '#B8C5D4'"
+      - "welcome_new_families type is 'bullet_list' in buildPresentationCards"
+      - "sustaining_releasing type is 'bullet_list' in buildPresentationCards"
+      - "PresentationFieldRow bullet_list items use alternating colors"
+      - "idx % 2 === 0 uses colors.text, idx % 2 === 1 uses colors.textZebraFaded"
+      - "npx tsc --noEmit passes"
+      - "npx vitest run passes"
+
+    acceptance_criteria:
+      - AC-068-14  # welcome_new_families renders as bullet_list in presentation
+      - AC-068-15  # sustaining_releasing renders as bullet_list in presentation
+      - AC-070-01  # Light mode: odd items use normal text color
+      - AC-070-02  # Light mode: even items use faded text color
+      - AC-070-03  # Dark mode: odd items use normal text color
+      - AC-070-04  # Dark mode: even items use faded text color
+      - AC-070-05  # Zebra striping applies to all 3 bullet_list fields
+      - AC-070-06  # Zebra striping does NOT apply to other field types
+      - AC-070-07  # Color difference is subtle but perceptible
+      - AC-070-08  # Single-item list shows normal color
+
+    edge_cases:
+      - EC-070-01  # Empty bullet list uses textTertiary (unchanged)
+      - EC-070-02  # Zebra striping with large font size
+      - EC-070-03  # Faded color distinct from textTertiary
+
+    tests:
+      - file: src/__tests__/f067-announcements-list.test.ts
+        type: unit
+        new_file: false
+        cases:
+          - "ThemeColors interface includes textZebraFaded"
+          - "lightColors.textZebraFaded is '#4A4A4A'"
+          - "darkColors.textZebraFaded is '#B8C5D4'"
+          - "textZebraFaded differs from textTertiary in both palettes"
+          - "buildPresentationCards uses 'bullet_list' for welcome_new_families"
+          - "buildPresentationCards uses 'bullet_list' for sustaining_releasing"
+          - "PresentationFieldRow applies alternating colors in bullet_list"
+          - "bullet_list idx 0 uses colors.text"
+          - "bullet_list idx 1 uses colors.textZebraFaded"
+          - "single-item bullet_list uses colors.text (idx 0)"
+          - "non-bullet_list fields do not use textZebraFaded"
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Documentation (ADRs)
+  # ---------------------------------------------------------------------------
+  - id: S015-06
+    title: "Add ADR-044 to ADR-047 documentation and update consolidated docs"
+    feature: "F068+F069+F070"
+    depends_on: [S015-04, S015-05]
+    files:
+      - path: docs/arch/ARCH_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Add 4 new ADRs:
+          - ADR-044: Rename AnnouncementsList to EditableListField for reuse
+          - ADR-045: Auto-split \n at save time in EditableListField
+          - ADR-046: Real drag-and-drop with react-native-draggable-flatlist
+          - ADR-047: No bullet prefix in edit/disabled state; bullets only in presentation
+
+          Mark superseded:
+          - ADR-041: Superseded by ADR-044 (rename)
+          - ADR-043: Superseded by ADR-046 (arrows -> drag)
+
+      - path: docs/specs/SPEC_CONSOLIDATED.yaml
+        action: edit
+        description: |
+          Update F067 description to reference EditableListField.
+          Update DD035 rationale (only recognized_names uses 'multiline' now).
+          Update DD036 to reference EditableListField.
+          Mark EC-067-08 as superseded by CR-278.
+          Update DD038 to reflect grip icon replacing arrows.
+
+    done_when:
+      - "ADR-044 through ADR-047 documented in ARCH_CONSOLIDATED"
+      - "ADR-041 and ADR-043 marked as superseded"
+      - "SPEC_CONSOLIDATED updated with EditableListField references"
+      - "DD035, DD036, DD038 rationales updated"
+      - "EC-067-08 marked as superseded"
+
+    acceptance_criteria: []
+    edge_cases: []
+    tests: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S015-07
+    title: "Final verification: run all tests, type check, update consolidated docs"
+    feature: "F068+F069+F070"
+    depends_on: [S015-01, S015-02, S015-03, S015-04, S015-05, S015-06]
+    files: []
+    done_when:
+      - "npx tsc --noEmit passes with no errors"
+      - "npx vitest run passes (all tests green)"
+      - "Total test count increased by new tests added"
+      - "No regressions in existing tests"
+      - "No references to 'AnnouncementsList' remain in codebase (grep returns 0)"
+      - "grep for 'ChevronUpIcon\\|ChevronDownIcon' in EditableListField returns 0"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml updated with P015 entry"
+      - "TEST_CONSOLIDATED.yaml updated with new test counts"
+
+    acceptance_criteria:
+      - AC-068-01 through AC-068-19  # All F068 ACs verified
+      - AC-069-01 through AC-069-07  # All F069 ACs verified
+      - AC-070-01 through AC-070-08  # All F070 ACs verified
+
+    edge_cases:
+      - EC-068-01 through EC-068-05  # All F068 ECs verified
+      - EC-069-01 through EC-069-03  # All F069 ECs verified
+      - EC-070-01 through EC-070-03  # All F070 ECs verified
+
+    tests: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S015-01 (rename + i18n) ────────────────────────────────────────────┐
+       │                                                               │
+       ├── S015-02 (apply to welcome/sustaining) ◄── S015-01          │
+       │        │                                                      │
+       │        └── S015-05 (presentation + zebra) ◄── S015-02        │
+       │                                                               │
+       ├── S015-03 (auto-split) ◄── S015-01                           │
+       │        │                                                      │
+       │        └── S015-04 (drag-drop + GripIcon) ◄── S015-03        │
+       │                                                               │
+       └── S015-06 (documentation) ◄── S015-04, S015-05               │
+                                                                       │
+  S015-07 (final verification) ◄──────────────────────── ALL ────────┘
+
+  Parallelizable:
+    After S015-01: S015-02 and S015-03 can run in parallel
+    After S015-02: S015-05
+    After S015-03: S015-04
+    After S015-04 + S015-05: S015-06
+    After all: S015-07
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  F068:
+    acceptance_criteria:
+      AC-068-01: S015-01
+      AC-068-02: S015-01
+      AC-068-03: S015-02
+      AC-068-04: S015-02
+      AC-068-05: S015-02
+      AC-068-06: S015-02
+      AC-068-07: S015-02
+      AC-068-08: S015-02
+      AC-068-09: S015-02
+      AC-068-10: S015-03
+      AC-068-11: S015-03
+      AC-068-12: S015-03
+      AC-068-13: S015-03
+      AC-068-14: S015-05
+      AC-068-15: S015-05
+      AC-068-16: S015-02
+      AC-068-17: S015-02
+      AC-068-18: S015-01
+      AC-068-19: S015-01
+    edge_cases:
+      EC-068-01: S015-02
+      EC-068-02: S015-02
+      EC-068-03: S015-03
+      EC-068-04: S015-03
+      EC-068-05: S015-02
+
+  F069:
+    acceptance_criteria:
+      AC-069-01: S015-04
+      AC-069-02: S015-04
+      AC-069-03: S015-04
+      AC-069-04: S015-04
+      AC-069-05: S015-04
+      AC-069-06: S015-04
+      AC-069-07: S015-04
+    edge_cases:
+      EC-069-01: S015-04
+      EC-069-02: S015-04
+      EC-069-03: S015-04
+
+  F070:
+    acceptance_criteria:
+      AC-070-01: S015-05
+      AC-070-02: S015-05
+      AC-070-03: S015-05
+      AC-070-04: S015-05
+      AC-070-05: S015-05
+      AC-070-06: S015-05
+      AC-070-07: S015-05
+      AC-070-08: S015-05
+    edge_cases:
+      EC-070-01: S015-05
+      EC-070-02: S015-05
+      EC-070-03: S015-05
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All edge cases covered
+  GATE-PLAN-06: true  # File paths match ARCH_M015 components
+  GATE-PLAN-07: true  # Maximum 15 steps respected (7 steps)

@@ -1,0 +1,855 @@
+# =============================================================================
+# SPEC_F015.yaml - CR-278, CR-279, CR-280
+# Artifact ID: 015
+# Feature IDs: F068, F069, F070
+# Status: pending_user_confirmation (DRAFT)
+# =============================================================================
+
+metadata:
+  artifact_id: "015"
+  feature_ids: [F068, F069, F070]
+  crs: [278, 279, 280]
+  status: complete
+  created: "2026-03-08"
+  author: requirements-extractor
+
+# =============================================================================
+# USER REQUESTS (verbatim from CHANGE_REQUESTS.yaml)
+# =============================================================================
+user_requests:
+  cr_278: |
+    Generalizar AnnouncementsList para EditableListField e aplicar em
+    welcome_new_families e sustaining_releasing. Auto-split: texto com \n
+    (colado ou digitado) quebra automaticamente em multiplos itens, tanto
+    no campo de adicao quanto na edicao inline. Presentation mode bullet_list
+    para os 3 campos. Ignorar recognized_names (manter ActorSelector).
+
+  cr_279: |
+    EditableListField: (1) Trocar setas up/down por icone de grip/drag handle
+    (linhas duplas horizontais) a esquerda de cada item, indicando que pode
+    arrastar. (2) Texto de cada item deve mostrar conteudo completo com
+    word-wrap, aumentando a altura do item conforme necessario — nunca truncar.
+
+  cr_280: |
+    Presentation mode: zebra striping (cores de fonte alternadas) nos itens
+    dos campos bullet_list (anuncios, boas-vindas, apoios/desobrigacoes).
+    Somente dentro desses campos. Cor da FONTE, nao do fundo. Light mode:
+    linhas impares preto normal, pares preto mais claro. Dark mode: linhas
+    impares branco normal, pares branco mais escuro. Diferenca sutil.
+
+# =============================================================================
+# FEATURE SPECIFICATIONS
+# =============================================================================
+
+features:
+
+  # ===========================================================================
+  # F068: CR-278 - Generalize EditableListField and apply to 3 fields
+  # ===========================================================================
+  - id: F068
+    cr: 278
+    name: "Generalize AnnouncementsList to EditableListField; apply to welcome_new_families & sustaining_releasing"
+    area: agenda
+    description: |
+      Rename AnnouncementsList component to EditableListField. The component
+      retains all existing functionality (add, delete, inline-edit, reorder,
+      disabled state) but becomes a reusable, field-agnostic list editor.
+
+      Apply EditableListField to three agenda fields:
+        1. announcements (already using AnnouncementsList)
+        2. welcome_new_families (currently DebouncedTextInput multiline)
+        3. sustaining_releasing (currently DebouncedTextInput multiline)
+
+      recognized_names is NOT changed (it uses ActorSelector with multi-select).
+
+      Auto-split behavior: When text containing \n is pasted or typed (e.g.,
+      via clipboard paste) into the add-input or during inline editing, the
+      text is automatically split at \n boundaries into multiple items.
+      - In the add-input: pasting "A\nB\nC" creates 3 separate items
+      - In inline edit: editing an item to "A\nB" replaces that item with
+        2 items ("A" and "B")
+
+      All three fields use the same \n-joined TEXT storage format in the DB.
+      No database migration needed.
+
+      Presentation Mode: Change welcome_new_families and sustaining_releasing
+      from 'multiline' to 'bullet_list' type in buildPresentationCards.
+      All 3 fields now render as bullet_list in presentation.
+
+    affected_files:
+      - path: src/components/AnnouncementsList.tsx -> src/components/EditableListField.tsx (RENAME)
+        change: |
+          Rename file and component. Props interface renamed from
+          AnnouncementsListProps to EditableListFieldProps. Export name
+          changes from AnnouncementsList to EditableListField.
+          Add auto-split logic: parseItems() applied to add-input text and
+          inline-edit text before save, so any \n in the text produces
+          multiple items.
+
+      - path: src/components/AgendaForm.tsx
+        change: |
+          1. Update import: AnnouncementsList -> EditableListField
+          2. Replace DebouncedTextInput for welcome_new_families (lines 233-243)
+             with EditableListField, passing:
+               - value: agenda.welcome_new_families ?? null
+               - onSave: (text) => updateField('welcome_new_families', text)
+               - disabled: isObserver
+               - placeholder: t('agenda.addWelcome') (NEW i18n key)
+          3. Replace DebouncedTextInput for sustaining_releasing (lines 356-366)
+             with EditableListField, passing:
+               - value: agenda.sustaining_releasing ?? null
+               - onSave: (text) => updateField('sustaining_releasing', text)
+               - disabled: isObserver
+               - placeholder: t('agenda.addWardBusiness') (NEW i18n key)
+          4. Update announcements usage to reference EditableListField
+          5. Remove announcementsInput style usage from welcome_new_families
+             (the style may no longer be needed at all)
+
+      - path: src/hooks/usePresentationMode.ts
+        change: |
+          In buildPresentationCards:
+          1. Change welcome_new_families type from 'multiline' to 'bullet_list'
+          2. Change sustaining_releasing type from 'multiline' to 'bullet_list'
+          (announcements already uses 'bullet_list')
+
+      - path: src/i18n/locales/pt-BR.json
+        change: |
+          Add keys:
+            "agenda.addWelcome": "Adicionar boas-vindas"
+            "agenda.addWardBusiness": "Adicionar apoio ou desobrigação"
+
+      - path: src/i18n/locales/en-US.json
+        change: |
+          Add keys:
+            "agenda.addWelcome": "Add welcome"
+            "agenda.addWardBusiness": "Add sustaining or release"
+
+      - path: src/i18n/locales/es-LA.json
+        change: |
+          Add keys:
+            "agenda.addWelcome": "Agregar bienvenida"
+            "agenda.addWardBusiness": "Agregar apoyo o relevo"
+
+      - path: src/__tests__/f067-announcements-list.test.ts
+        change: |
+          Update imports and references from AnnouncementsList to
+          EditableListField. Add tests for auto-split behavior.
+
+      - path: src/__tests__/f067-tester.test.ts
+        change: |
+          Update imports and references from AnnouncementsList to
+          EditableListField. Add tests for welcome_new_families and
+          sustaining_releasing usage.
+
+    current_behavior: |
+      - AnnouncementsList: Named component at src/components/AnnouncementsList.tsx.
+        Only used for the announcements field in AgendaForm.
+      - welcome_new_families: DebouncedTextInput with multiline at line 234.
+        Free-form text stored as TEXT. Presentation renders as 'multiline'.
+      - sustaining_releasing: DebouncedTextInput with multiline at line 358.
+        Free-form text stored as TEXT. Presentation renders as 'multiline'.
+      - recognized_names: Uses ActorSelector with multiSelect. Stored as
+        string[] (JSONB). NOT being changed.
+      - No auto-split behavior exists. Pasting text with \n into any field
+        keeps the \n within the single string.
+
+    acceptance_criteria:
+      # --- Rename ---
+      - id: AC-068-01
+        description: "Component renamed from AnnouncementsList to EditableListField"
+        given: "Source code"
+        when: "Checking file names and exports"
+        then: "src/components/EditableListField.tsx exists; src/components/AnnouncementsList.tsx is removed; export is EditableListField"
+
+      - id: AC-068-02
+        description: "All imports updated to EditableListField"
+        given: "AgendaForm.tsx and test files"
+        when: "Checking imports"
+        then: "No references to AnnouncementsList remain in the codebase"
+
+      # --- Apply to welcome_new_families ---
+      - id: AC-068-03
+        description: "welcome_new_families uses EditableListField"
+        given: "AgendaForm renders with a non-empty welcome_new_families value"
+        when: "User views the Welcome New Families field"
+        then: "Field renders as a list with add/delete/edit/reorder capabilities (same as announcements)"
+
+      - id: AC-068-04
+        description: "welcome_new_families add-input has correct placeholder"
+        given: "welcome_new_families is null or empty"
+        when: "AgendaForm renders the field"
+        then: "Add-input shows placeholder t('agenda.addWelcome')"
+
+      - id: AC-068-05
+        description: "welcome_new_families saves as \\n-joined string"
+        given: "User adds items 'Familia Silva' and 'Familia Santos'"
+        when: "Items are saved"
+        then: "updateField('welcome_new_families', 'Familia Silva\\nFamilia Santos') is called"
+
+      # --- Apply to sustaining_releasing ---
+      - id: AC-068-06
+        description: "sustaining_releasing uses EditableListField"
+        given: "AgendaForm renders with sustaining_releasing value"
+        when: "User views the Ward Business field"
+        then: "Field renders as a list with add/delete/edit/reorder capabilities"
+
+      - id: AC-068-07
+        description: "sustaining_releasing add-input has correct placeholder"
+        given: "sustaining_releasing is null or empty"
+        when: "AgendaForm renders the field"
+        then: "Add-input shows placeholder t('agenda.addWardBusiness')"
+
+      - id: AC-068-08
+        description: "sustaining_releasing saves as \\n-joined string"
+        given: "User adds items 'Joao Silva - EQ' and 'Maria Santos - Primaria'"
+        when: "Items are saved"
+        then: "updateField('sustaining_releasing', 'Joao Silva - EQ\\nMaria Santos - Primaria') is called"
+
+      # --- recognized_names unchanged ---
+      - id: AC-068-09
+        description: "recognized_names still uses ActorSelector"
+        given: "AgendaForm renders the recognizing field"
+        when: "User taps on recognizing field"
+        then: "ActorSelector opens with multiSelect; no EditableListField is used"
+
+      # --- Auto-split ---
+      - id: AC-068-10
+        description: "Auto-split on paste in add-input"
+        given: "User pastes 'Item A\\nItem B\\nItem C' into the add-input"
+        when: "User submits (Enter/blur)"
+        then: "3 separate items are created: 'Item A', 'Item B', 'Item C'"
+
+      - id: AC-068-11
+        description: "Auto-split on paste in inline edit"
+        given: "User is editing item 'Original' inline and pastes 'Part 1\\nPart 2'"
+        when: "User finishes editing (blur/submit)"
+        then: "'Original' is replaced by 2 items: 'Part 1' and 'Part 2' at the same position"
+
+      - id: AC-068-12
+        description: "Auto-split filters empty lines"
+        given: "User pastes 'A\\n\\n\\nB' into add-input"
+        when: "User submits"
+        then: "2 items created: 'A' and 'B' (empty lines filtered out)"
+
+      - id: AC-068-13
+        description: "Auto-split trims whitespace on each item"
+        given: "User pastes '  Item A  \\n  Item B  ' into add-input"
+        when: "User submits"
+        then: "2 items created: 'Item A' and 'Item B' (whitespace trimmed)"
+
+      # --- Presentation Mode ---
+      - id: AC-068-14
+        description: "welcome_new_families renders as bullet_list in presentation"
+        given: "welcome_new_families has value 'Familia A\\nFamilia B'"
+        when: "Presentation Mode renders Welcome card"
+        then: "Each family name shown with bullet prefix on its own line"
+
+      - id: AC-068-15
+        description: "sustaining_releasing renders as bullet_list in presentation"
+        given: "sustaining_releasing has value 'Apoio 1\\nApoio 2'"
+        when: "Presentation Mode renders Designations card"
+        then: "Each item shown with bullet prefix on its own line"
+
+      # --- Backward compatibility ---
+      - id: AC-068-16
+        description: "Existing welcome_new_families free-text data displays correctly"
+        given: "Existing data 'Familia Silva e Familia Santos' (no \\n)"
+        when: "AgendaForm renders"
+        then: "Single item row shows the entire text"
+
+      - id: AC-068-17
+        description: "Existing sustaining_releasing free-text data displays correctly"
+        given: "Existing data 'Varios apoios e desobrigacoes' (no \\n)"
+        when: "AgendaForm renders"
+        then: "Single item row shows the entire text"
+
+      # --- i18n ---
+      - id: AC-068-18
+        description: "New i18n keys exist in all 3 locales"
+        given: "i18n locale files"
+        when: "Keys 'agenda.addWelcome' and 'agenda.addWardBusiness' are accessed"
+        then: "Correct translations returned for pt-BR, en-US, es-LA"
+
+      # --- No migration ---
+      - id: AC-068-19
+        description: "No database migration needed"
+        given: "CR-278 implementation"
+        when: "Checking migration files"
+        then: "No new migration file exists"
+
+    edge_cases:
+      - id: EC-068-01
+        case: "welcome_new_families existing data with \\n from free-form input"
+        expected: |
+          Text like 'Familia A\nFamilia B' that was entered as free text
+          (using Enter key in multiline input) naturally converts to 2 list items.
+
+      - id: EC-068-02
+        case: "sustaining_releasing existing data without \\n"
+        expected: |
+          Single continuous text like 'Joao Silva apoiado como EQ presidente'
+          becomes a single list item. User can split into multiple items
+          by editing and adding new ones.
+
+      - id: EC-068-03
+        case: "Paste text with mixed \\r\\n and \\n line endings"
+        expected: |
+          parseItems handles both \\r\\n and \\n by splitting on \\n and trimming
+          (which removes trailing \\r). No special handling needed since
+          trim() removes \\r.
+
+      - id: EC-068-04
+        case: "Auto-split produces only empty/whitespace items"
+        expected: |
+          If user pastes '\\n\\n\\n' (only newlines), all items are filtered out
+          and nothing is added. No save triggered for empty result.
+
+      - id: EC-068-05
+        case: "announcementsInput style orphaned"
+        expected: |
+          The announcementsInput style in AgendaForm.tsx (minHeight: 66) was
+          used by both announcements AND welcome_new_families DebouncedTextInput.
+          After CR-278, both fields use EditableListField. The style should be
+          removed as it is no longer referenced.
+
+  # ===========================================================================
+  # F069: CR-279 - Drag handle icon and word-wrap
+  # ===========================================================================
+  - id: F069
+    cr: 279
+    name: "EditableListField: grip icon for reorder and word-wrap for item text"
+    area: agenda
+    description: |
+      Two visual improvements to EditableListField:
+
+      1. REORDER CONTROL: Replace ChevronUp/ChevronDown arrow buttons with a
+         single drag handle (grip) icon on the LEFT side of each item. The icon
+         consists of horizontal lines (grip/handle pattern), visually indicating
+         that the item can be dragged to reorder. The grip icon replaces the
+         two separate up/down arrow Pressables.
+
+         Note: The current implementation uses ChevronUp/ChevronDown arrows
+         on the RIGHT side with Pressable onPress handlers (not actual drag).
+         CR-279 replaces these with a grip icon on the LEFT side. The reorder
+         mechanism (whether tap-based move or actual drag gesture) depends on
+         implementation -- the grip icon serves as the visual indicator and
+         touch target for reordering.
+
+      2. WORD-WRAP: Item text must show the complete content with word-wrap,
+         increasing the height of each item row as needed. Text must NEVER be
+         truncated. Currently items have numberOfLines={1} which truncates
+         long text with ellipsis.
+
+    affected_files:
+      - path: src/components/EditableListField.tsx
+        change: |
+          1. Remove ChevronUpIcon and ChevronDownIcon imports
+          2. Add or create a GripIcon component (horizontal lines pattern)
+          3. Move reorder control from RIGHT side to LEFT side of each item row
+          4. Replace the two arrow Pressables with a single grip icon Pressable
+          5. Remove numberOfLines={1} from item Text (both in active and
+             disabled states) to allow word-wrap
+          6. Ensure item row height grows with content (no fixed height)
+
+      - path: src/components/icons/index.tsx
+        change: |
+          Add GripIcon component following the existing IconProps pattern.
+          The icon should render as 2-3 horizontal parallel lines (a standard
+          drag handle pattern) using SVG paths, consistent with other icons.
+
+    current_behavior: |
+      - Reorder: Two separate Pressable buttons on the RIGHT side of each item
+        row: ChevronUpIcon (move up) and ChevronDownIcon (move down). First
+        item has disabled/faded up arrow, last item has disabled/faded down
+        arrow. These use handleMoveUp/handleMoveDown callbacks.
+      - Text display: numberOfLines={1} truncates long text with ellipsis.
+        In disabled state, also numberOfLines={1}.
+
+    acceptance_criteria:
+      # --- Grip icon ---
+      - id: AC-069-01
+        description: "Grip icon appears on the LEFT side of each item"
+        given: "EditableListField renders with 3 items"
+        when: "User views the list"
+        then: "Each item row has a grip icon (horizontal lines) on the left, followed by text, followed by X delete button on the right"
+
+      - id: AC-069-02
+        description: "No more ChevronUp/ChevronDown arrows"
+        given: "EditableListField renders with items"
+        when: "User views the list"
+        then: "No up/down arrow icons are visible; only grip icon for reorder"
+
+      - id: AC-069-03
+        description: "Grip icon serves as reorder touch target"
+        given: "User sees the grip icon on an item"
+        when: "User interacts with the grip icon (tap or long-press)"
+        then: "Item can be reordered (specific mechanism TBD by implementation)"
+
+      - id: AC-069-04
+        description: "Disabled state hides grip icon"
+        given: "EditableListField disabled=true (offline/observer)"
+        when: "Items render in disabled state"
+        then: "No grip icon is shown; items are plain text with bullet prefix"
+
+      # --- Word-wrap ---
+      - id: AC-069-05
+        description: "Short text renders in a single line"
+        given: "Item has text 'Atividade dia 15'"
+        when: "Item row renders"
+        then: "Text displays on one line, row has normal height"
+
+      - id: AC-069-06
+        description: "Long text wraps to multiple lines"
+        given: "Item has long text 'Atividade de servico comunitario no proximo sabado dia 22 de marco as 9 horas da manha na praca central'"
+        when: "Item row renders"
+        then: "Text wraps to as many lines as needed; row height grows; no truncation or ellipsis"
+
+      - id: AC-069-07
+        description: "Disabled state also shows full text without truncation"
+        given: "EditableListField disabled=true with long item text"
+        when: "Item renders in disabled state"
+        then: "Full text shown with word-wrap; no numberOfLines limit"
+
+    edge_cases:
+      - id: EC-069-01
+        case: "Very long item text (multiple paragraphs worth)"
+        expected: |
+          Row height grows to accommodate all text. This is acceptable as each
+          item is expected to be a reasonably short entry (an announcement,
+          a sustaining, or a welcome). Extremely long items will make the row
+          tall but content remains fully visible.
+
+      - id: EC-069-02
+        case: "Item row layout with grip + long text + X button"
+        expected: |
+          Grip icon is fixed-width on left, X button is fixed-width on right.
+          Text fills remaining space with flexShrink/flex:1 and word-wrap.
+          The row's height is driven by the text content.
+
+      - id: EC-069-03
+        case: "Grip icon on single-item list"
+        expected: |
+          Grip icon is still shown even with only 1 item (consistent visual).
+          Tapping it has no effect since there is nowhere to move the item.
+
+  # ===========================================================================
+  # F070: CR-280 - Zebra striping font color in bullet_list presentation
+  # ===========================================================================
+  - id: F070
+    cr: 280
+    name: "Presentation mode zebra striping font color for bullet_list fields"
+    area: presentation
+    description: |
+      In Presentation Mode, apply alternating font colors (zebra striping) to
+      items in bullet_list fields. This applies to all three bullet_list fields:
+      announcements, welcome_new_families, and sustaining_releasing (after
+      CR-278 changes them to bullet_list).
+
+      The striping is on the FONT color, NOT the background color.
+
+      Light mode:
+        - Odd items (1st, 3rd, 5th...): normal black text color
+        - Even items (2nd, 4th, 6th...): lighter/faded black text color
+
+      Dark mode:
+        - Odd items (1st, 3rd, 5th...): normal white text color
+        - Even items (2nd, 4th, 6th...): dimmer/faded white text color
+
+      The difference should be subtle -- enough to help the reader track lines
+      but not so strong as to look like a UI error or disabled text.
+
+      This striping applies ONLY to bullet_list items in PresentationFieldRow,
+      not to any other field types.
+
+    affected_files:
+      - path: src/lib/theme.ts
+        change: |
+          1. Add textZebraFaded to ThemeColors interface
+          2. Add lightColors.textZebraFaded = '#4A4A4A'
+          3. Add darkColors.textZebraFaded = '#B8C5D4'
+
+      - path: src/app/presentation.tsx
+        change: |
+          In the PresentationFieldRow function, within the bullet_list branch,
+          apply alternating font color to each bullet item based on index.
+
+          Use idx % 2 === 0 for odd items (0-indexed, visually 1st) and
+          idx % 2 === 1 for even items (0-indexed, visually 2nd).
+
+          Colors:
+          - Odd (idx%2===0): colors.text (normal)
+            Light: #1A1A1A, Dark: #F1F5F9
+          - Even (idx%2===1): colors.textZebraFaded (new theme color)
+            Light: #4A4A4A (midpoint between text #1A1A1A and textSecondary #5A5A5A)
+            Dark: #B8C5D4 (midpoint between text #F1F5F9 and textSecondary #94A3B8)
+
+          Add two new theme colors in src/lib/theme.ts:
+            ThemeColors.textZebraFaded
+            lightColors.textZebraFaded = '#4A4A4A'
+            darkColors.textZebraFaded = '#B8C5D4'
+
+    current_behavior: |
+      All bullet_list items in PresentationFieldRow use the same font color
+      (colors.text) regardless of position. No alternating styling exists.
+
+    acceptance_criteria:
+      # --- Light mode ---
+      - id: AC-070-01
+        description: "Light mode: odd items use normal text color"
+        given: "Presentation Mode in light theme with 4 announcements"
+        when: "Bullet list renders"
+        then: "Items 1 and 3 (0-indexed: 0,2) use colors.text (normal black)"
+
+      - id: AC-070-02
+        description: "Light mode: even items use faded text color"
+        given: "Presentation Mode in light theme with 4 announcements"
+        when: "Bullet list renders"
+        then: "Items 2 and 4 (0-indexed: 1,3) use a lighter/faded black color"
+
+      # --- Dark mode ---
+      - id: AC-070-03
+        description: "Dark mode: odd items use normal text color"
+        given: "Presentation Mode in dark theme with 4 announcements"
+        when: "Bullet list renders"
+        then: "Items 1 and 3 use colors.text (normal white)"
+
+      - id: AC-070-04
+        description: "Dark mode: even items use faded text color"
+        given: "Presentation Mode in dark theme with 4 announcements"
+        when: "Bullet list renders"
+        then: "Items 2 and 4 use a dimmer/faded white color"
+
+      # --- Scope ---
+      - id: AC-070-05
+        description: "Zebra striping applies to all 3 bullet_list fields"
+        given: "Presentation Mode with announcements, welcome_new_families, and sustaining_releasing"
+        when: "Each field renders as bullet_list"
+        then: "All three fields have zebra-striped font colors"
+
+      - id: AC-070-06
+        description: "Zebra striping does NOT apply to other field types"
+        given: "Presentation Mode with text, hymn, and multiline fields"
+        when: "Non-bullet_list fields render"
+        then: "All use normal text color without striping"
+
+      # --- Subtlety ---
+      - id: AC-070-07
+        description: "Color difference is subtle but perceptible"
+        given: "Presentation Mode with multiple bullet items"
+        when: "User reads the list"
+        then: "Alternating colors are visible but do not look like disabled text or an error"
+
+      # --- Single item ---
+      - id: AC-070-08
+        description: "Single-item list shows normal color"
+        given: "Bullet list with only 1 item"
+        when: "Item renders"
+        then: "Uses normal text color (odd item = index 0)"
+
+    edge_cases:
+      - id: EC-070-01
+        case: "Empty bullet list"
+        expected: |
+          No items rendered, so zebra striping is irrelevant. The '---'
+          placeholder uses textTertiary color (existing behavior unchanged).
+
+      - id: EC-070-02
+        case: "Zebra striping with large font size (presentation toggle)"
+        expected: |
+          The zebra colors apply regardless of font size. The color values
+          are independent of fontSize. Large font mode uses same color logic.
+
+      - id: EC-070-03
+        case: "Faded color must not match textTertiary"
+        expected: |
+          textZebraFaded (#4A4A4A light, #B8C5D4 dark) is distinctly different
+          from textTertiary (#8A8A8A light, #64748B dark). It is closer to
+          colors.text than to colors.textTertiary, providing a subtle
+          difference without looking disabled.
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+open_questions:
+
+  - id: OQ-1
+    question: "What are the exact i18n texts for the new add-input placeholders?"
+    context: |
+      CR-278 requires new placeholders for welcome_new_families and
+      sustaining_releasing add-inputs. The current placeholder for
+      announcements is 'agenda.addAnnouncement' = 'Adicionar anuncio'.
+      We need consistent i18n keys and translations for the 2 new fields.
+    options:
+      - "pt-BR: 'Adicionar boas-vindas' / 'Adicionar apoio ou desobrigacao'"
+      - "pt-BR: 'Adicionar familia' / 'Adicionar item'"
+      - "Custom text provided by user"
+    default_suggestion: |
+      Option A:
+        agenda.addWelcome: pt-BR 'Adicionar boas-vindas', en-US 'Add welcome', es-LA 'Agregar bienvenida'
+        agenda.addWardBusiness: pt-BR 'Adicionar apoio ou desobrigação', en-US 'Add sustaining or release', es-LA 'Agregar apoyo o relevo'
+
+  - id: OQ-2
+    question: "What specific faded color should be used for zebra striping even items?"
+    context: |
+      CR-280 says 'subtle difference' in font color. The app has these
+      existing text colors in the theme:
+        Light: text=#1A1A1A, textSecondary=#5A5A5A, textTertiary=#8A8A8A
+        Dark: text=#F1F5F9, textSecondary=#94A3B8, textTertiary=#64748B
+      Using colors.textSecondary directly would be too faded (the gap
+      between text and textSecondary is large). A midpoint color between
+      text and textSecondary provides the subtle difference requested.
+    options:
+      - "Use colors.textSecondary for even items (too faded, contrast too stark)"
+      - "Use rgba with ~0.55-0.65 opacity of colors.text (runtime computation, harder to test)"
+      - "Add new theme color textZebraFaded: midpoint between text and textSecondary"
+    default_suggestion: |
+      Option C: Add textZebraFaded to ThemeColors.
+      Light: #4A4A4A (midpoint of #1A1A1A and #5A5A5A)
+      Dark: #B8C5D4 (midpoint of #F1F5F9 and #94A3B8)
+      This is subtle, testable, and avoids runtime opacity calculations.
+
+  - id: OQ-3
+    question: "What happens to the reorder mechanism when arrows are replaced by grip icon?"
+    context: |
+      CR-279 says to replace arrows with a grip/drag handle icon. The current
+      implementation uses handleMoveUp/handleMoveDown with Pressable onPress.
+      The grip icon implies drag-to-reorder, but actual drag gesture requires
+      additional libraries (react-native-draggable-flatlist or custom gesture
+      handler). Should the grip icon be purely visual (tap still moves item
+      up/down in some way) or should it implement actual drag gesture?
+    options:
+      - "Grip icon is purely visual; tapping it shows a menu or alternates move direction"
+      - "Grip icon with actual drag gesture using react-native-gesture-handler"
+      - "Grip icon with long-press to activate up/down mode (tap up/down after long-press)"
+    default_suggestion: |
+      Implement grip icon with actual drag gesture if possible (using
+      react-native-gesture-handler which is already installed). If drag
+      gesture proves too complex for this iteration, the grip icon can be
+      a visual indicator with tap-to-move-up behavior (simpler fallback).
+      The key visual requirement is the grip icon replacing arrows.
+
+  - id: OQ-4
+    question: "Should the announcementsInput style be removed after CR-278?"
+    context: |
+      The style announcementsInput (minHeight: 66) in AgendaForm.tsx is
+      currently used by BOTH the announcements field AND welcome_new_families
+      DebouncedTextInput (line 235: styles.announcementsInput). After CR-278,
+      both fields will use EditableListField and neither will reference this
+      style. Should it be removed?
+    options:
+      - "Remove the style entirely (no more references)"
+      - "Keep it for potential future use"
+    default_suggestion: "Remove it. Dead code should be cleaned up."
+
+  - id: OQ-5
+    question: "How should the disabled/offline state render for welcome_new_families and sustaining_releasing?"
+    context: |
+      Currently the disabled state of AnnouncementsList shows items with
+      bullet prefix and no controls. The existing DebouncedTextInput fields
+      for welcome_new_families and sustaining_releasing show as disabled
+      inputs when offline. After CR-278, they'll use EditableListField
+      which renders disabled items as plain text with bullet prefix.
+      Is this the desired behavior?
+    options:
+      - "Same as announcements: bullet prefix, plain text, no controls"
+      - "Different styling for these fields"
+    default_suggestion: |
+      Same behavior as announcements. Consistent disabled rendering across
+      all 3 EditableListField instances: bullet prefix, plain text, no
+      interactive controls.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+assumptions:
+
+  - id: A-1
+    assumption: |
+      The rename from AnnouncementsList to EditableListField is a simple
+      file rename + find-and-replace of the component name and props
+      interface name. No API/props changes beyond the name.
+    reason: "CR-278 says 'generalizar' which means making it generic, starting with the name."
+    impact_if_wrong: "If the API needs changes (e.g., additional props), those need to be specified."
+    needs_confirmation: false
+
+  - id: A-2
+    assumption: |
+      The auto-split behavior applies at save time, not during typing.
+      When the user finishes adding/editing (blur/submit), the text is
+      checked for \n and split into multiple items if found. The user
+      does NOT see live splitting as they paste.
+    reason: "Auto-split on save is simpler and matches the existing save-on-blur pattern."
+    impact_if_wrong: |
+      If live splitting during typing is expected, the implementation would
+      need to listen for \n in onChangeText and immediately split. This is
+      more complex and may cause cursor position issues.
+    needs_confirmation: true
+
+  - id: A-3
+    assumption: |
+      The GripIcon for CR-279 will be a new icon component added to the
+      icons file (src/components/icons.tsx or similar), following the
+      existing icon pattern (size + color props).
+    reason: "Consistent with existing icon components (XIcon, ChevronUpIcon, etc.)."
+    impact_if_wrong: "None significant - just implementation detail."
+    needs_confirmation: false
+
+  - id: A-4
+    assumption: |
+      Zebra striping (CR-280) uses 0-indexed position where index 0 = odd
+      (normal color) and index 1 = even (faded color). In visual terms,
+      the 1st item is normal, 2nd is faded, 3rd is normal, etc.
+    reason: "Natural mapping: first item is 'normal', alternating from there."
+    impact_if_wrong: "If the user wants opposite (1st faded, 2nd normal), just swap the condition."
+    needs_confirmation: false
+
+  - id: A-5
+    assumption: |
+      The three CRs (278, 279, 280) should be implemented in order:
+      278 first (rename + extend), then 279 (UI changes to the new component),
+      then 280 (presentation styling). This is because 279 and 280 depend
+      on the component created/renamed in 278.
+    reason: "Natural dependency chain."
+    impact_if_wrong: "Implementing out of order would require rework."
+    needs_confirmation: false
+
+  - id: A-6
+    assumption: |
+      The existing test files (f067-announcements-list.test.ts and
+      f067-tester.test.ts) will be updated to reference EditableListField
+      instead of AnnouncementsList. Test IDs and structure will be preserved
+      where possible, with new tests added for the new functionality.
+    reason: "Test files reference AnnouncementsList which is being renamed."
+    impact_if_wrong: "If tests should be in new files instead, the implementer can decide."
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+inconsistencies:
+
+  - id: INC-1
+    type: spec_update_needed
+    description: |
+      DD035 in SPEC_CONSOLIDATED says: "Separate type avoids special-casing
+      'multiline' which is used by other fields (recognized_names,
+      welcome_new_families)." After CR-278, welcome_new_families will ALSO
+      use 'bullet_list', so DD035's rationale needs updating. The only
+      field still using 'multiline' for display will be recognized_names.
+    existing_spec: "DD035 rationale mentions welcome_new_families uses 'multiline'"
+    new_request: "CR-278 changes welcome_new_families to 'bullet_list'"
+    question: "Should DD035 rationale be updated to only mention recognized_names?"
+
+  - id: INC-2
+    type: spec_update_needed
+    description: |
+      SPEC_CONSOLIDATED F067 description says "New component: AnnouncementsList."
+      After CR-278, this component is renamed to EditableListField. F067
+      description needs updating.
+    existing_spec: "F067: 'New component: AnnouncementsList. [CR-277]'"
+    new_request: "CR-278 renames to EditableListField"
+    question: "Update F067 to reference EditableListField after implementation."
+
+  - id: INC-3
+    type: spec_update_needed
+    description: |
+      DD036 says "AnnouncementsList as dedicated component in AgendaForm".
+      After CR-278, this should reference EditableListField.
+    existing_spec: "DD036: 'AnnouncementsList as dedicated component'"
+    new_request: "CR-278 renames to EditableListField"
+    question: "Update DD036 after implementation."
+
+  - id: INC-4
+    type: overlap
+    description: |
+      EC-067-08 in SPEC_F014 says "welcomeNewFamilies field unchanged" and
+      "Only the announcements field is converted to list items. No changes
+      to welcome_new_families." CR-278 explicitly changes this. The edge
+      case becomes invalid after CR-278.
+    existing_spec: "EC-067-08: welcome_new_families field unchanged"
+    new_request: "CR-278 applies EditableListField to welcome_new_families"
+    question: "EC-067-08 should be marked as superseded by CR-278."
+
+  - id: INC-5
+    type: spec_update_needed
+    description: |
+      SPEC_CONSOLIDATED DD038 says "Drag-to-reorder via long-press gesture
+      for announcement items" with rationale mentioning "Fallback: up/down
+      arrow buttons." CR-279 explicitly replaces arrows with grip icon.
+      After CR-279, DD038 needs updating.
+    existing_spec: "DD038: 'Fallback: up/down arrow buttons'"
+    new_request: "CR-279 removes arrows, replaces with grip icon"
+    question: "Update DD038 after implementation."
+
+  - id: INC-6
+    type: spec_update_needed
+    description: |
+      The sustaining_releasing field currently uses 'multiline' in
+      presentation mode (usePresentationMode.ts line 117). After CR-278,
+      it changes to 'bullet_list'. This also changes DD035's scope since
+      sustaining_releasing was not mentioned in DD035 at all.
+    existing_spec: "sustaining_releasing renders as 'multiline' in presentation"
+    new_request: "CR-278 changes it to 'bullet_list'"
+    question: "Documented in this spec; SPEC_CONSOLIDATED to be updated after implementation."
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+design_decisions:
+
+  - id: DD-015-01
+    decision: "Rename AnnouncementsList to EditableListField"
+    rationale: |
+      The component is no longer specific to announcements. A generic name
+      reflects its reusable nature across multiple agenda fields. The
+      interface (value, onSave, disabled, placeholder) is already generic.
+
+  - id: DD-015-02
+    decision: "Auto-split at save time, not during input"
+    rationale: |
+      Splitting \n on blur/submit is simpler than intercepting onChangeText.
+      It avoids cursor position issues and matches the existing save pattern.
+      The user types/pastes freely, and the split happens when they complete
+      the action.
+
+  - id: DD-015-03
+    decision: "Grip icon on LEFT, delete X on RIGHT"
+    rationale: |
+      Standard UX pattern: drag handle on the leading edge (left in LTR),
+      destructive action (delete) on the trailing edge (right in LTR).
+      This follows Material Design and iOS HIG conventions for reorderable
+      lists.
+
+  - id: DD-015-04
+    decision: "Remove numberOfLines={1} for word-wrap"
+    rationale: |
+      Users need to see the full content of each item without truncation.
+      Announcements, sustainings, and welcomes can be multi-word phrases
+      that need to be read completely. Row height growth is acceptable
+      since items are expected to be short-to-medium length text.
+
+  - id: DD-015-05
+    decision: "Zebra striping via new textZebraFaded theme color"
+    rationale: |
+      A dedicated theme color (midpoint between text and textSecondary)
+      provides a subtle, consistent difference that is easy to test.
+      Light: #4A4A4A, Dark: #B8C5D4. Avoids runtime opacity calculations
+      and semantic collision with textSecondary/textTertiary.
+
+  - id: DD-015-06
+    decision: "Zebra striping only for bullet_list type"
+    rationale: |
+      Other field types (text, hymn, multiline) do not benefit from zebra
+      striping because they typically have 1-2 values. Bullet lists have
+      multiple items where line tracking helps readability.
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+validation_gate:
+  GATE-01: true   # Read SPEC_CONSOLIDATED before starting
+  GATE-02: true   # Identified all ambiguities
+  GATE-03: true   # Listed ALL open questions with IDs (5 OQs)
+  GATE-04: true   # Listed ALL assumptions with IDs (6 As)
+  GATE-05: true   # Reported inconsistencies with SPEC_CONSOLIDATED (6 INCs)
+  GATE-06: true   # Status is complete (all OQs have default suggestions, INCs documented)

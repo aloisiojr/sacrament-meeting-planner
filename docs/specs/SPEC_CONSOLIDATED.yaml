@@ -8,9 +8,9 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  total_features: 60
+  total_features: 63
   total_business_rules: 44
-  total_design_decisions: 48
+  total_design_decisions: 54
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -1351,7 +1351,7 @@ features:
       Storage format unchanged: items joined with \n in existing TEXT column.
       Presentation Mode renders each item as bullet point (new 'bullet_list'
       PresentationField type). Offline/observer: read-only without controls.
-      New component: AnnouncementsList. [CR-277]
+      New component: AnnouncementsList (renamed to EditableListField in CR-278). [CR-277]
     acceptance_criteria:
       - given: "agenda.announcements is null or empty"
         when: "AgendaForm renders announcements field"
@@ -1374,6 +1374,86 @@ features:
       - given: "Presentation Mode with \\n-separated announcements"
         when: "Welcome card renders"
         then: "Each item rendered as bullet point"
+
+  - id: F068
+    name: Generalize EditableListField for multiple agenda fields
+    area: agenda
+    description: |
+      Rename AnnouncementsList to EditableListField and apply to three
+      agenda fields: announcements, welcome_new_families, sustaining_releasing.
+      Auto-split: text containing \n pasted or typed into add-input or inline
+      edit is automatically split into multiple items at save time.
+      Presentation mode: all 3 fields render as bullet_list type.
+      recognized_names unchanged (uses ActorSelector). No DB migration. [CR-278]
+    acceptance_criteria:
+      - given: "Source code"
+        when: "Checking file names and exports"
+        then: "src/components/EditableListField.tsx exists; AnnouncementsList removed"
+      - given: "AgendaForm renders welcome_new_families with data"
+        when: "User views the field"
+        then: "Field renders as EditableListField with add/delete/edit/reorder"
+      - given: "AgendaForm renders sustaining_releasing with data"
+        when: "User views the field"
+        then: "Field renders as EditableListField with add/delete/edit/reorder"
+      - given: "User pastes 'A\\nB\\nC' into add-input"
+        when: "User submits"
+        then: "3 separate items created, empty lines filtered"
+      - given: "User edits item to 'Part1\\nPart2' inline"
+        when: "User finishes editing"
+        then: "Original item replaced by 2 items at same position"
+      - given: "Presentation Mode with welcome_new_families"
+        when: "Welcome card renders"
+        then: "Items shown as bullet_list, not multiline"
+      - given: "Presentation Mode with sustaining_releasing"
+        when: "Designations card renders"
+        then: "Items shown as bullet_list, not multiline"
+
+  - id: F069
+    name: EditableListField grip icon and word-wrap
+    area: agenda
+    description: |
+      Replace ChevronUp/ChevronDown arrow buttons with a single grip/drag
+      handle icon (horizontal lines pattern) on the LEFT side of each item.
+      Remove numberOfLines={1} from item text to enable word-wrap with
+      dynamic row height. Text is never truncated. Disabled state also
+      shows full text without truncation. [CR-279]
+    acceptance_criteria:
+      - given: "EditableListField renders with items"
+        when: "User views the list"
+        then: "Grip icon on LEFT, text in middle, X delete on RIGHT"
+      - given: "EditableListField renders with items"
+        when: "User views the list"
+        then: "No ChevronUp/ChevronDown arrows visible"
+      - given: "Item has long text"
+        when: "Item row renders"
+        then: "Text wraps to multiple lines; row height grows; no truncation"
+      - given: "EditableListField disabled=true with long text"
+        when: "Items render"
+        then: "Full text shown with word-wrap; no numberOfLines limit"
+
+  - id: F070
+    name: Presentation mode zebra striping for bullet_list
+    area: presentation
+    description: |
+      Alternating font colors (zebra striping) on bullet_list items in
+      Presentation Mode. Odd items (1st, 3rd) use colors.text (normal).
+      Even items (2nd, 4th) use colors.textZebraFaded (new theme color:
+      light=#4A4A4A, dark=#B8C5D4). Applies to all 3 bullet_list fields.
+      Does NOT apply to other field types. Subtle difference for line
+      tracking readability. [CR-280]
+    acceptance_criteria:
+      - given: "Presentation Mode in light theme with 4 bullet items"
+        when: "Bullet list renders"
+        then: "Items 1,3 use #1A1A1A; items 2,4 use #4A4A4A"
+      - given: "Presentation Mode in dark theme with 4 bullet items"
+        when: "Bullet list renders"
+        then: "Items 1,3 use #F1F5F9; items 2,4 use #B8C5D4"
+      - given: "Presentation Mode with non-bullet_list fields"
+        when: "Text/hymn/multiline fields render"
+        then: "All use normal text color without striping"
+      - given: "Bullet list with only 1 item"
+        when: "Item renders"
+        then: "Uses normal text color (index 0 = odd)"
 
 # =============================================================================
 # BUSINESS RULES
@@ -1679,20 +1759,44 @@ design_decisions:
     rationale: "No schema change needed. Client-side parse/join. Existing data with \\n naturally converts to separate items. [CR-277, ADR-039]"
 
   - id: DD035
-    decision: "New 'bullet_list' type for PresentationField announcements rendering"
-    rationale: "Separate type avoids special-casing 'multiline' which is used by other fields (recognized_names, welcome_new_families). Only announcements renders as bullet points. [CR-277, ADR-040]"
+    decision: "New 'bullet_list' type for PresentationField"
+    rationale: "Separate type avoids special-casing 'multiline' which is used by recognized_names. Announcements, welcome_new_families, and sustaining_releasing all render as bullet points. [CR-277, CR-278, ADR-040]"
 
   - id: DD036
-    decision: "AnnouncementsList as dedicated component in AgendaForm"
-    rationale: "Encapsulates list logic (parse/add/delete/edit/reorder/save) keeping AgendaForm clean. Follows pattern of ActorSelector, PrayerSelector. [CR-277, ADR-041]"
+    decision: "EditableListField as dedicated reusable component"
+    rationale: "Encapsulates list logic (parse/add/delete/edit/reorder/save) keeping AgendaForm clean. Used by announcements, welcome_new_families, sustaining_releasing. [CR-277, CR-278, ADR-041]"
 
   - id: DD037
     decision: "Inline edit saves on blur/submitEditing only (no debounce timer)"
     rationale: "List items save on discrete events, not keystrokes. Simpler than per-item debounce timers. [CR-277, ADR-042]"
 
   - id: DD038
-    decision: "Drag-to-reorder via long-press gesture for announcement items"
-    rationale: "Standard mobile pattern. react-native-gesture-handler already installed. Fallback: up/down arrow buttons. [CR-277, ADR-043]"
+    decision: "Grip icon for reorder, replacing up/down arrow buttons"
+    rationale: "Standard drag handle UX pattern. Grip on LEFT, delete on RIGHT follows Material Design/iOS HIG conventions. [CR-277, CR-279, ADR-043]"
+
+  - id: DD039
+    decision: "Rename AnnouncementsList to EditableListField"
+    rationale: "Component is no longer specific to announcements. Generic name reflects reusable nature across announcements, welcome_new_families, sustaining_releasing. [CR-278]"
+
+  - id: DD040
+    decision: "Auto-split \\n at save time, not during input"
+    rationale: "Splitting on blur/submit is simpler than intercepting onChangeText. Avoids cursor position issues and matches existing save-on-blur pattern. [CR-278]"
+
+  - id: DD041
+    decision: "Remove numberOfLines={1} for word-wrap in EditableListField"
+    rationale: "Users need to see full content without truncation. Row height growth is acceptable since items are short-to-medium text. [CR-279]"
+
+  - id: DD042
+    decision: "GripIcon as new SVG icon in icons/index.tsx"
+    rationale: "Consistent with existing icon pattern (IconProps with size + color). Horizontal lines pattern for standard drag handle visual. [CR-279]"
+
+  - id: DD043
+    decision: "Zebra striping via textZebraFaded theme color"
+    rationale: "Dedicated color (midpoint between text and textSecondary) provides subtle, testable difference. Light: #4A4A4A, Dark: #B8C5D4. Avoids runtime opacity and semantic collision. [CR-280]"
+
+  - id: DD044
+    decision: "Zebra striping only for bullet_list type in Presentation Mode"
+    rationale: "Other field types (text, hymn, multiline) typically have 1-2 values. Bullet lists have multiple items where alternating colors aid line tracking. [CR-280]"
 
 # =============================================================================
 # EDGE CASES
@@ -1774,3 +1878,24 @@ edge_cases:
 
   - id: EC025
     description: "Concurrent collection toggle from two devices -> UPSERT with onConflict handles atomically, last write wins"
+
+  - id: EC026
+    description: "Existing welcome_new_families free-text without \\n -> displays as single list item in EditableListField. [CR-278]"
+
+  - id: EC027
+    description: "Existing sustaining_releasing free-text without \\n -> displays as single list item. User can add more via EditableListField. [CR-278]"
+
+  - id: EC028
+    description: "Paste text with mixed \\r\\n and \\n line endings -> parseItems splits on \\n and trim() removes trailing \\r. [CR-278]"
+
+  - id: EC029
+    description: "Auto-split produces only empty/whitespace items -> nothing added, no save triggered. [CR-278]"
+
+  - id: EC030
+    description: "Very long item text in EditableListField -> row height grows to accommodate; word-wrap ensures full visibility. [CR-279]"
+
+  - id: EC031
+    description: "Empty bullet_list in Presentation Mode -> '---' placeholder in textTertiary, zebra striping irrelevant. [CR-280]"
+
+  - id: EC032
+    description: "textZebraFaded (#4A4A4A light, #B8C5D4 dark) is distinct from textTertiary (#8A8A8A light, #64748B dark). [CR-280]"

@@ -1,0 +1,373 @@
+# =============================================================================
+# QA_PLAN_015.yaml
+# PRE-validation: CR-278, CR-279, CR-280 - EditableListField evolution
+# =============================================================================
+
+metadata:
+  artifact_id: "015"
+  mode: PRE
+  date: "2026-03-08"
+  scope: "CR-278 (generalize EditableListField), CR-279 (grip icon + word-wrap), CR-280 (zebra striping font color)"
+  type: feature_request
+  validated: true
+  verdict: "APPROVED for implementation"
+
+# =============================================================================
+# Evidence gathered during PRE validation
+# =============================================================================
+
+evidence:
+
+  # --- Existing component ---
+  - id: EV-001
+    description: "AnnouncementsList component exists and is functional"
+    path: "src/components/AnnouncementsList.tsx"
+    finding: "Component exports parseItems, joinItems helpers and AnnouncementsList component with add/delete/inline-edit/reorder (ChevronUp/ChevronDown arrows). Props: value (string|null), onSave, disabled, placeholder."
+
+  - id: EV-002
+    description: "AnnouncementsList used only for announcements field in AgendaForm"
+    path: "src/components/AgendaForm.tsx:246-251"
+    finding: "AnnouncementsList used at line 246 for announcements field only. welcome_new_families (line 233-243) and sustaining_releasing (line 356-366) still use DebouncedTextInput with multiline."
+
+  - id: EV-003
+    description: "welcome_new_families uses DebouncedTextInput (multiline, no list)"
+    path: "src/components/AgendaForm.tsx:234-242"
+    finding: "DebouncedTextInput with multiline, value=agenda.welcome_new_families ?? '', onSave updateField('welcome_new_families', text)"
+
+  - id: EV-004
+    description: "sustaining_releasing uses DebouncedTextInput (multiline, no list)"
+    path: "src/components/AgendaForm.tsx:357-365"
+    finding: "DebouncedTextInput with multiline, value=agenda.sustaining_releasing ?? '', onSave updateField('sustaining_releasing', text)"
+
+  - id: EV-005
+    description: "All three DB fields are string|null"
+    path: "src/types/database.ts:188-198"
+    finding: "welcome_new_families: string | null (line 188), announcements: string | null (line 189), sustaining_releasing: string | null (line 198). All TEXT columns, \\n-joined format."
+
+  - id: EV-006
+    description: "Presentation mode has bullet_list type for announcements only"
+    path: "src/hooks/usePresentationMode.ts:94-99"
+    finding: "announcements field uses type: 'bullet_list' (line 98). welcome_new_families uses type: 'multiline' (line 92). sustaining_releasing uses type: 'multiline' (line 117)."
+
+  - id: EV-007
+    description: "PresentationFieldRow renders bullet_list with bullet prefix"
+    path: "src/app/presentation.tsx:155-188"
+    finding: "bullet_list type splits by \\n, filters empty, renders each item with bullet prefix. All items use same colors.text color."
+
+  - id: EV-008
+    description: "Items currently truncated with numberOfLines={1}"
+    path: "src/components/AnnouncementsList.tsx:156,185"
+    finding: "Line 156: disabled Text has numberOfLines={1}. Line 185: active Pressable Text has numberOfLines={1}. Both truncate content."
+
+  - id: EV-009
+    description: "Reorder uses ChevronUp/ChevronDown icons"
+    path: "src/components/AnnouncementsList.tsx:17,190-205"
+    finding: "Imports ChevronUpIcon, ChevronDownIcon. Two separate Pressable buttons per item for up/down movement."
+
+  - id: EV-010
+    description: "No GripIcon or DragHandle icon exists"
+    path: "src/components/icons/index.tsx"
+    finding: "Grep for GripIcon/DragIcon/HandleIcon/MenuIcon returns 0 matches. A new grip/drag-handle SVG icon must be created."
+
+  - id: EV-011
+    description: "Theme provides mode (light/dark) and color palette"
+    path: "src/lib/theme.ts:4,44-45,63-65,94-96"
+    finding: "ResolvedTheme = 'light' | 'dark'. ThemeContextValue.mode. Light text=#1A1A1A, textSecondary=#5A5A5A. Dark text=#F1F5F9, textSecondary=#94A3B8."
+
+  - id: EV-012
+    description: "i18n keys exist for announcements placeholder only"
+    path: "src/i18n/locales/en-US.json:246"
+    finding: "addAnnouncement key exists in all 3 locales. No addWelcome or addSustaining keys yet. CR-278 needs new i18n keys for new placeholders."
+
+  - id: EV-013
+    description: "recognized_names uses ActorSelector (NOT to be changed per CR-278)"
+    path: "src/components/AgendaForm.tsx:198-231"
+    finding: "recognized_names uses Pressable + ActorSelector, not a text input. CR-278 explicitly says 'Ignorar recognized_names (manter ActorSelector)'."
+
+  - id: EV-014
+    description: "Existing test coverage for AnnouncementsList (CR-277)"
+    path: "src/__tests__/f067-announcements-list.test.ts"
+    finding: "46 tests covering i18n keys, parseItems/joinItems helpers, AgendaForm integration, presentation bullet_list. Tests use inline copies of helpers."
+
+# =============================================================================
+# Validation checks - to be verified POST-implementation
+# =============================================================================
+
+validation_checks:
+
+  # ===========================================================================
+  # CR-278: Generalize AnnouncementsList to EditableListField
+  # ===========================================================================
+
+  # --- must_pass ---
+
+  - id: CR278_MP1
+    cr: CR-278
+    type: must_pass
+    description: "Component renamed from AnnouncementsList to EditableListField"
+    how_to_verify: "File src/components/EditableListField.tsx exists. Old AnnouncementsList.tsx either removed or re-exports. Exported function name is EditableListField."
+    pre_evidence: "EV-001: current file is src/components/AnnouncementsList.tsx with export function AnnouncementsList"
+
+  - id: CR278_MP2
+    cr: CR-278
+    type: must_pass
+    description: "welcome_new_families field uses EditableListField instead of DebouncedTextInput"
+    how_to_verify: "AgendaForm.tsx imports EditableListField and uses it for welcome_new_families field with value=agenda.welcome_new_families, onSave updating the field, disabled=isObserver."
+    pre_evidence: "EV-003: currently uses DebouncedTextInput multiline at line 234-242"
+
+  - id: CR278_MP3
+    cr: CR-278
+    type: must_pass
+    description: "sustaining_releasing field uses EditableListField instead of DebouncedTextInput"
+    how_to_verify: "AgendaForm.tsx uses EditableListField for sustaining_releasing field with value=agenda.sustaining_releasing, onSave updating the field, disabled=isObserver."
+    pre_evidence: "EV-004: currently uses DebouncedTextInput multiline at line 357-365"
+
+  - id: CR278_MP4
+    cr: CR-278
+    type: must_pass
+    description: "announcements field still uses EditableListField (renamed from AnnouncementsList)"
+    how_to_verify: "AgendaForm.tsx uses EditableListField for announcements field (was AnnouncementsList). Same props: value, onSave, disabled, placeholder."
+    pre_evidence: "EV-002: currently uses AnnouncementsList at line 246-251"
+
+  - id: CR278_MP5
+    cr: CR-278
+    type: must_pass
+    description: "Auto-split on add: pasting text with \\n into add field creates multiple items"
+    how_to_verify: "handleAdd splits trimmed text by \\n and adds each non-empty line as a separate item (not one item with embedded newlines)."
+    pre_evidence: "EV-001: current handleAdd adds single item from addText.trim()"
+
+  - id: CR278_MP6
+    cr: CR-278
+    type: must_pass
+    description: "Auto-split on inline edit: editing an item to contain \\n splits into multiple items"
+    how_to_verify: "finishEdit splits editText by \\n and replaces the single item with multiple items at that position."
+    pre_evidence: "EV-001: current finishEdit saves single trimmed value"
+
+  - id: CR278_MP7
+    cr: CR-278
+    type: must_pass
+    description: "Presentation mode uses bullet_list for welcome_new_families"
+    how_to_verify: "buildPresentationCards sets type: 'bullet_list' for welcome_new_families field (was 'multiline')."
+    pre_evidence: "EV-006: currently type: 'multiline' at line 92"
+
+  - id: CR278_MP8
+    cr: CR-278
+    type: must_pass
+    description: "Presentation mode uses bullet_list for sustaining_releasing"
+    how_to_verify: "buildPresentationCards sets type: 'bullet_list' for sustaining_releasing field (was 'multiline')."
+    pre_evidence: "EV-006: currently type: 'multiline' at line 117"
+
+  - id: CR278_MP9
+    cr: CR-278
+    type: must_pass
+    description: "recognized_names NOT changed - still uses ActorSelector"
+    how_to_verify: "AgendaForm.tsx recognized_names section unchanged - still uses Pressable + ActorSelector, NOT EditableListField."
+    pre_evidence: "EV-013: uses ActorSelector at line 198-231"
+
+  - id: CR278_MP10
+    cr: CR-278
+    type: must_pass
+    description: "parseItems and joinItems helpers still exported and functional"
+    how_to_verify: "EditableListField.tsx exports parseItems and joinItems with same signatures and behavior."
+    pre_evidence: "EV-001: exported from AnnouncementsList.tsx lines 21-27"
+
+  - id: CR278_MP11
+    cr: CR-278
+    type: must_pass
+    description: "New i18n keys for welcome and sustaining placeholders in all 3 locales"
+    how_to_verify: "i18n locale files have keys for EditableListField placeholders for welcome_new_families and sustaining_releasing fields."
+    pre_evidence: "EV-012: only addAnnouncement key exists"
+
+  # --- should_pass ---
+
+  - id: CR278_SP1
+    cr: CR-278
+    type: should_pass
+    description: "No DB migration needed - all fields already TEXT"
+    how_to_verify: "No new migration files added. Fields remain string|null in database.ts."
+    pre_evidence: "EV-005: all three fields are string | null"
+
+  - id: CR278_SP2
+    cr: CR-278
+    type: should_pass
+    description: "Existing data with \\n is correctly parsed by new list UI"
+    how_to_verify: "Existing welcome_new_families/sustaining_releasing data containing \\n will be split into list items by parseItems."
+    pre_evidence: "EV-001: parseItems splits by \\n and filters empty strings"
+
+  - id: CR278_SP3
+    cr: CR-278
+    type: should_pass
+    description: "Old AnnouncementsList import references updated or backwards-compatible"
+    how_to_verify: "All import { AnnouncementsList } references updated to EditableListField, OR old file re-exports for backwards compatibility."
+    pre_evidence: "EV-002: imported in AgendaForm.tsx line 31"
+
+  - id: CR278_SP4
+    cr: CR-278
+    type: should_pass
+    description: "Existing tests updated to reflect rename and new features"
+    how_to_verify: "f067 test files updated for EditableListField name and auto-split behavior."
+    pre_evidence: "EV-014: 46 existing tests reference AnnouncementsList"
+
+  # ===========================================================================
+  # CR-279: Grip icon + word-wrap
+  # ===========================================================================
+
+  # --- must_pass ---
+
+  - id: CR279_MP1
+    cr: CR-279
+    type: must_pass
+    description: "ChevronUp/ChevronDown arrows replaced with grip/drag handle icon"
+    how_to_verify: "EditableListField no longer imports ChevronUpIcon/ChevronDownIcon. A new GripIcon (or similar) with horizontal lines is used to the LEFT of each item."
+    pre_evidence: "EV-009: currently imports ChevronUpIcon, ChevronDownIcon at line 17"
+
+  - id: CR279_MP2
+    cr: CR-279
+    type: must_pass
+    description: "Grip icon is positioned to the LEFT of each item text"
+    how_to_verify: "In itemRow layout, the grip icon appears BEFORE the text element (not after as arrows were)."
+    pre_evidence: "EV-009: current arrows appear after text at lines 190-205"
+
+  - id: CR279_MP3
+    cr: CR-279
+    type: must_pass
+    description: "New GripIcon SVG component created in icons"
+    how_to_verify: "src/components/icons/index.tsx exports a GripIcon (or similar name) with horizontal lines pattern."
+    pre_evidence: "EV-010: no grip/drag icon currently exists"
+
+  - id: CR279_MP4
+    cr: CR-279
+    type: must_pass
+    description: "Item text shows full content with word-wrap, no truncation"
+    how_to_verify: "numberOfLines={1} removed from both active and disabled item Text elements. Text wraps to multiple lines."
+    pre_evidence: "EV-008: numberOfLines={1} at lines 156 and 185"
+
+  - id: CR279_MP5
+    cr: CR-279
+    type: must_pass
+    description: "Item row height increases with wrapped content"
+    how_to_verify: "itemRow style uses flexWrap or allows height to grow (no fixed height). alignItems may need adjustment for multi-line text."
+    pre_evidence: "EV-001: current itemRow has alignItems: 'center' at line 229, paddingVertical: 8 at line 231"
+
+  # --- should_pass ---
+
+  - id: CR279_SP1
+    cr: CR-279
+    type: should_pass
+    description: "Grip icon is decorative (visual indicator), reorder still works via up/down logic"
+    how_to_verify: "The reorder mechanism (handleMoveUp/handleMoveDown) remains functional. Grip icon is visual-only (no actual drag-and-drop needed per CR description)."
+    pre_evidence: "EV-009: CR-279 says 'indicando que pode arrastar' - visual indicator only, not actual drag"
+
+  - id: CR279_SP2
+    cr: CR-279
+    type: should_pass
+    description: "Disabled state also shows full text without truncation"
+    how_to_verify: "Disabled state Text element has numberOfLines removed, allowing word-wrap."
+    pre_evidence: "EV-008: disabled Text has numberOfLines={1} at line 156"
+
+  - id: CR279_SP3
+    cr: CR-279
+    type: should_pass
+    description: "Grip icon not shown in disabled state"
+    how_to_verify: "Disabled state renders bullet prefix only, no grip icon."
+    pre_evidence: "EV-001: disabled state at lines 148-163 renders bullet prefix, no arrows"
+
+  # ===========================================================================
+  # CR-280: Zebra striping font color in bullet_list presentation
+  # ===========================================================================
+
+  # --- must_pass ---
+
+  - id: CR280_MP1
+    cr: CR-280
+    type: must_pass
+    description: "Presentation bullet_list items have alternating font colors"
+    how_to_verify: "PresentationFieldRow bullet_list rendering uses index-based color: odd items (idx % 2 === 0) use normal color, even items (idx % 2 === 1) use lighter/darker color."
+    pre_evidence: "EV-007: all items currently use same colors.text color"
+
+  - id: CR280_MP2
+    cr: CR-280
+    type: must_pass
+    description: "Light mode: odd items black normal, even items lighter black"
+    how_to_verify: "In light mode, odd items use colors.text (#1A1A1A), even items use a lighter color (between text and textSecondary)."
+    pre_evidence: "EV-011: light text=#1A1A1A, textSecondary=#5A5A5A"
+
+  - id: CR280_MP3
+    cr: CR-280
+    type: must_pass
+    description: "Dark mode: odd items white normal, even items darker white"
+    how_to_verify: "In dark mode, odd items use colors.text (#F1F5F9), even items use a less bright color (between text and textSecondary)."
+    pre_evidence: "EV-011: dark text=#F1F5F9, textSecondary=#94A3B8"
+
+  - id: CR280_MP4
+    cr: CR-280
+    type: must_pass
+    description: "Zebra striping applies to all 3 bullet_list fields"
+    how_to_verify: "Since PresentationFieldRow handles bullet_list generically, zebra applies to all bullet_list fields: announcements, welcome_new_families, sustaining_releasing."
+    pre_evidence: "EV-007: single code path for bullet_list at lines 155-188"
+
+  - id: CR280_MP5
+    cr: CR-280
+    type: must_pass
+    description: "Zebra striping is FONT color only, not background"
+    how_to_verify: "The alternating color is applied to the Text style's 'color' property, NOT to any 'backgroundColor'."
+    pre_evidence: "EV-007: current items use { color: colors.text }"
+
+  - id: CR280_MP6
+    cr: CR-280
+    type: must_pass
+    description: "Subtle color difference (not jarring)"
+    how_to_verify: "The even-item color is between colors.text and colors.textSecondary (not as far as textTertiary). Difference should be subtle."
+    pre_evidence: "EV-011: text-to-textSecondary span is substantial; a midpoint or 25% blend is appropriate"
+
+  # --- should_pass ---
+
+  - id: CR280_SP1
+    cr: CR-280
+    type: should_pass
+    description: "Zebra striping does NOT affect non-bullet_list presentation fields"
+    how_to_verify: "Only bullet_list type rendering has alternating colors. text, hymn, multiline types unchanged."
+    pre_evidence: "EV-007: bullet_list handled in separate if-branch at line 155"
+
+  - id: CR280_SP2
+    cr: CR-280
+    type: should_pass
+    description: "Zebra striping respects font size toggle"
+    how_to_verify: "Alternating colors applied alongside existing fontSize from fontSizes prop."
+    pre_evidence: "EV-007: fontSize from fontSizes?.value already applied per item"
+
+  - id: CR280_SP3
+    cr: CR-280
+    type: should_pass
+    description: "Single-item lists still look normal (first item always normal color)"
+    how_to_verify: "Item at index 0 always uses normal text color."
+    pre_evidence: "EV-007: idx 0 is first item, would get odd/normal styling"
+
+# =============================================================================
+# Summary
+# =============================================================================
+
+summary:
+  total_must_pass: 20
+  total_should_pass: 10
+  total_checks: 30
+  crs_covered: [CR-278, CR-279, CR-280]
+
+  key_risks:
+    - risk: "Auto-split may break existing data that uses literal \\n as part of content"
+      mitigation: "parseItems already splits by \\n (CR-277), so existing data is already treated as multi-line. Auto-split on edit/add is additive."
+    - risk: "Grip icon visual suggests drag-and-drop but actual reorder is still via button"
+      mitigation: "CR-279 says 'indicando que pode arrastar' - it's a visual indicator. Actual drag can be a future CR."
+    - risk: "Zebra striping color may not be visible enough or too visible"
+      mitigation: "Use a subtle midpoint color. Can be tuned in review."
+
+  files_to_modify:
+    - "src/components/AnnouncementsList.tsx -> rename to EditableListField.tsx"
+    - "src/components/AgendaForm.tsx (3 field usages)"
+    - "src/components/icons/index.tsx (new GripIcon)"
+    - "src/hooks/usePresentationMode.ts (2 type changes to bullet_list)"
+    - "src/app/presentation.tsx (zebra striping in PresentationFieldRow)"
+    - "src/i18n/locales/pt-BR.json (2 new keys)"
+    - "src/i18n/locales/en-US.json (2 new keys)"
+    - "src/i18n/locales/es-LA.json (2 new keys)"
+    - "src/__tests__/f067-announcements-list.test.ts (update for rename + new features)"

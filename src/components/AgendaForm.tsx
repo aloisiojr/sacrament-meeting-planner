@@ -28,6 +28,7 @@ import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '.
 import { getCurrentLanguage } from '../i18n';
 import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
+import { AnnouncementsList } from './AnnouncementsList';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import { SearchInput } from './SearchInput';
 import { XIcon, PencilIcon } from './icons';
@@ -242,14 +243,11 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.announcements')} colors={colors}>
-        <DebouncedTextInput
-          style={[styles.textInput, styles.announcementsInput, { color: colors.text, borderColor: colors.border }]}
-          value={agenda.announcements ?? ''}
+        <AnnouncementsList
+          value={agenda.announcements ?? null}
           onSave={(text) => updateField('announcements', text)}
-          placeholder={t('agenda.announcements')}
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          editable={!isObserver}
+          disabled={isObserver}
+          placeholder={t('agenda.addAnnouncement')}
         />
       </FieldRow>
 

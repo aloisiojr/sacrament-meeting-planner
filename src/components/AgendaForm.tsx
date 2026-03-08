@@ -28,7 +28,7 @@ import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '.
 import { getCurrentLanguage } from '../i18n';
 import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
-import { EditableListField } from './EditableListField';
+import { EditableListField, parseItems, joinItems } from './EditableListField';
 import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import { SearchInput } from './SearchInput';
 import { XIcon, PencilIcon } from './icons';
@@ -80,6 +80,10 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
 
   const [selectorModal, setSelectorModal] = useState<SelectorState | null>(null);
+  const [recognizeSelector, setRecognizeSelector] = useState<{
+    mode: 'add' | 'edit';
+    editIndex?: number;
+  } | null>(null);
 
   const isSpecial = isSpecialMeeting(exceptionReason);
 
@@ -196,38 +200,18 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <FieldRow label={t('agenda.recognizing')} colors={colors}>
-        <Pressable
-          style={[styles.selectorField, { borderColor: colors.border }]}
-          onPress={isObserver ? undefined : () => {
-            setSelectorModal({ type: 'actor', field: 'recognizing', roleFilter: 'recognize' });
-          }}
+        <EditableListField
+          value={agenda.recognized_names ?? null}
+          onSave={(text) => updateField('recognized_names', text)}
           disabled={isObserver}
-        >
-          {(agenda.recognized_names?.length ?? 0) > 0 ? (
-            <View style={styles.recognizingContent}>
-              <View style={styles.recognizingNames}>
-                {agenda.recognized_names!.map((name, idx) => (
-                  <Text
-                    key={idx}
-                    style={[styles.recognizingName, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {name}
-                  </Text>
-                ))}
-              </View>
-              {!isObserver && (
-                <Pressable hitSlop={8} onPress={() => updateField('recognized_names', null)}>
-                  <XIcon size={20} color={colors.error} />
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <Text style={[styles.selectorText, { color: colors.textTertiary }]}>
-              {t('agenda.recognizing')}
-            </Text>
-          )}
-        </Pressable>
+          placeholder={t('agenda.addPresence')}
+          onItemPress={(index, _item) => {
+            setRecognizeSelector({ mode: 'edit', editIndex: index });
+          }}
+          onAddPress={() => {
+            setRecognizeSelector({ mode: 'add' });
+          }}
+        />
       </FieldRow>
 
       <FieldRow label={t('agenda.welcomeNewFamilies')} colors={colors}>
@@ -586,25 +570,40 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           visible
           roleFilter={(selectorModal.roleFilter ?? 'all') as import('../hooks/useActors').ActorRoleFilter}
           onSelect={(actor) => {
-            if (selectorModal.field === 'recognizing') {
-              const current = agenda?.recognized_names ?? [];
-              const exists = current.includes(actor.name);
-              const updated = exists
-                ? current.filter((n) => n !== actor.name)
-                : [...current, actor.name];
-              updateField('recognized_names', updated.length > 0 ? updated : null);
-              return;
-            }
             const nameField = `${selectorModal.field}_name`;
             const idField = `${selectorModal.field}_actor_id`;
             handleActorSelect(actor, nameField, idField);
             setSelectorModal(null);
           }}
           onClose={() => setSelectorModal(null)}
-          {...(selectorModal.field === 'recognizing' ? {
-            selectedNames: agenda?.recognized_names ?? [],
-            multiSelect: true,
-          } : {})}
+        />
+      )}
+
+      {/* Recognized names ActorSelector */}
+      {recognizeSelector && (
+        <ActorSelector
+          visible
+          roleFilter="recognize"
+          onSelect={(actor) => {
+            const currentItems = parseItems(agenda?.recognized_names ?? null);
+            if (recognizeSelector.mode === 'add') {
+              const newItems = [...currentItems, actor.name];
+              updateField('recognized_names', joinItems(newItems));
+            } else if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+              const newItems = [...currentItems];
+              newItems[recognizeSelector.editIndex] = actor.name;
+              updateField('recognized_names', joinItems(newItems));
+            }
+            setRecognizeSelector(null);
+          }}
+          onClose={() => setRecognizeSelector(null)}
+          disabledNames={(() => {
+            const currentItems = parseItems(agenda?.recognized_names ?? null);
+            if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
+              return currentItems.filter((_, i) => i !== recognizeSelector.editIndex);
+            }
+            return currentItems;
+          })()}
         />
       )}
 
@@ -919,18 +918,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '300',
     paddingHorizontal: 4,
-  },
-  recognizingName: {
-    fontSize: 15,
-    paddingVertical: 2,
-  },
-  recognizingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  recognizingNames: {
-    flex: 1,
   },
   textInput: {
     borderWidth: 1,

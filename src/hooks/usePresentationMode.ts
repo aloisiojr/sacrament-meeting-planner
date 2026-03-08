@@ -77,11 +77,11 @@ export function buildPresentationCards(
     { label: t('agenda.presiding'), value: agenda?.presiding_name ?? '', type: 'text' },
     { label: t('agenda.conducting'), value: agenda?.conducting_name ?? '', type: 'text' },
   ];
-  if (agenda?.recognized_names?.length) {
+  if (agenda?.recognized_names) {
     welcomeFields.push({
       label: t('agenda.recognizing'),
-      value: agenda.recognized_names.join('\n'),
-      type: 'multiline',
+      value: agenda.recognized_names,
+      type: 'bullet_list',
     });
   }
   if (agenda?.welcome_new_families) {

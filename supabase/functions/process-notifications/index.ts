@@ -16,6 +16,7 @@ interface NotificationQueueEntry {
   sunday_date: string;
   speech_position: number | null;
   speaker_name: string | null;
+  topic_title: string | null;
   target_role: string;
   status: string;
   send_after: string;
@@ -211,6 +212,52 @@ function buildWithdrewText(
   return texts[language] ?? texts['pt-BR'];
 }
 
+function buildSecretaryReviewText(
+  language: string,
+  speakerName: string,
+  position: number,
+  date: string,
+  topicTitle?: string
+): { title: string; body: string } {
+  const ordinal = getOrdinal(position, language);
+
+  if (topicTitle) {
+    // Topic review variant
+    const texts: Record<string, { title: string; body: string }> = {
+      'pt-BR': {
+        title: 'Revis\u00e3o de Designa\u00e7\u00e3o',
+        body: `Aten\u00e7\u00e3o: o secret\u00e1rio designou o tema ${topicTitle} para ${speakerName} no dia ${date}. Revise a designa\u00e7\u00e3o.`,
+      },
+      'en-US': {
+        title: 'Assignment Review',
+        body: `Attention: the secretary assigned the topic ${topicTitle} to ${speakerName} on ${date}. Review the assignment.`,
+      },
+      'es-LA': {
+        title: 'Revisi\u00f3n de Asignaci\u00f3n',
+        body: `Atenci\u00f3n: el secretario asign\u00f3 el tema ${topicTitle} a ${speakerName} el ${date}. Revise la asignaci\u00f3n.`,
+      },
+    };
+    return texts[language] ?? texts['pt-BR'];
+  }
+
+  // Speaker review variant
+  const texts: Record<string, { title: string; body: string }> = {
+    'pt-BR': {
+      title: 'Revis\u00e3o de Designa\u00e7\u00e3o',
+      body: `Aten\u00e7\u00e3o: o secret\u00e1rio designou ${speakerName} para o ${ordinal} discurso do dia ${date}. Revise a designa\u00e7\u00e3o.`,
+    },
+    'en-US': {
+      title: 'Assignment Review',
+      body: `Attention: the secretary assigned ${speakerName} to the ${ordinal} speech on ${date}. Review the assignment.`,
+    },
+    'es-LA': {
+      title: 'Revisi\u00f3n de Asignaci\u00f3n',
+      body: `Atenci\u00f3n: el secretario asign\u00f3 a ${speakerName} para el ${ordinal} discurso del ${date}. Revise la asignaci\u00f3n.`,
+    },
+  };
+  return texts[language] ?? texts['pt-BR'];
+}
+
 // --- Main Handler ---
 
 Deno.serve(async (req: Request) => {
@@ -343,6 +390,18 @@ Deno.serve(async (req: Request) => {
             entry.speaker_name ?? '',
             entry.speech_position ?? 1,
             entry.sunday_date
+          );
+          title = text.title;
+          body = text.body;
+          break;
+        }
+        case 'secretary_review': {
+          const text = buildSecretaryReviewText(
+            language,
+            entry.speaker_name ?? '',
+            entry.speech_position ?? 1,
+            entry.sunday_date,
+            entry.topic_title ?? undefined
           );
           title = text.title;
           body = text.body;

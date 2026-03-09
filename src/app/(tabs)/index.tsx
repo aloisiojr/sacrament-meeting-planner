@@ -131,6 +131,7 @@ function HomeTabContent() {
             {t('home.meetingAgendaTitle')}
           </Text>
           <Pressable
+            testID="home-start-meeting-button"
             style={[styles.meetingButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push({ pathname: '/presentation', params: { date: sundayDate } })}
             accessibilityRole="button"
@@ -231,6 +232,7 @@ function HomeTabContent() {
 
               {isOnline && (
                 <Pressable
+                  testID="home-preview-pencil-button"
                   style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
                   onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
                   accessibilityRole="button"

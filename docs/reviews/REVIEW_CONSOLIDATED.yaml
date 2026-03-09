@@ -6,8 +6,8 @@
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-09"
-  version: 20
-  last_updated_by: "phase-018"
+  version: 21
+  last_updated_by: "phase-019"
 
 reviews:
   - id: REV-001
@@ -5338,3 +5338,409 @@ reviews:
       p2_count: 0
       files_reviewed: 9
       total_commits: 11
+
+  # ===========================================================================
+  # REVIEW 21 — Phase 019 (CR-284): E2E Testing with Maestro Phase 3
+  # ===========================================================================
+  - id: REV-021
+    scope: "CR-284 — E2E Testing with Maestro Phase 3: Speeches + Members Flows"
+    date: "2026-03-09"
+    reviewer: reviewer-agent
+    phase: 19
+    feature: F019_E2E
+    iteration: 1
+
+    commits:
+      - sha: e8fb533
+        message: "test(e2e): add testID to 6 SpeechSlot elements (CR-284, S019-01)"
+      - sha: cba9f8b
+        message: "test(e2e): add testID to 3 MemberSelectorModal elements (CR-284, S019-02)"
+      - sha: d45ad17
+        message: "test(e2e): add testID to 3 StatusChangeModal elements (CR-284, S019-03)"
+      - sha: f80e18c
+        message: "test(e2e): add testID to 2 TopicSelectorModal elements (CR-284, S019-04)"
+      - sha: 49b624a
+        message: "test(e2e): add testID prop to SundayCard + pass from speeches.tsx (CR-284, S019-05)"
+      - sha: 3ddf488
+        message: "test(e2e): add testID to 8 Members screen elements + SettingsItem prop (CR-284, S019-06)"
+      - sha: 26ef184
+        message: "test(e2e): add testID to 2 SwipeableCard action buttons (CR-284, S019-07)"
+      - sha: 90ba6c5
+        message: "test(e2e): create Maestro flow 05-speeches.yaml (CR-284, S019-09)"
+      - sha: 2adadca
+        message: "test(e2e): create Maestro flow 06-members.yaml (CR-284, S019-10)"
+      - sha: beed56f
+        message: "test(e2e): update flow count assertion for Phase 3 flows (CR-284, S019-11)"
+      - sha: d30ec26
+        message: "chore(code-ledger): add CR-284 Phase 3 E2E testing commits to CODE_LEDGER v19"
+      - sha: 97d7e32
+        message: "test(e2e): add tests for F019_E2E Phase 3 Speeches + Members"
+      - sha: 3dc6a2f
+        message: "docs(tests): update TEST_CONSOLIDATED v24 for F019_E2E Phase 3"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        notes: |
+          SPEC_F019 fully covers the user request for E2E testing Phase 3:
+          - testID props on SpeechSlot (6 dynamic), MemberSelectorModal (3),
+            StatusChangeModal (3), TopicSelectorModal (2), SundayCard (testID prop
+            + header), Members screen (8), SwipeableCard (2), SettingsItem (1)
+          - Two new Maestro flows: 05-speeches and 06-members
+          - 10 sub-features (SF1-SF10) with 22 acceptance criteria and 12 edge cases
+          - 6 open questions resolved, 7 assumptions confirmed, 0 inconsistencies
+          - Continues Phase 1+2 conventions (ADR-052, ADR-053)
+
+      arch_vs_spec:
+        status: pass
+        notes: |
+          ARCH_M019 correctly maps all SPEC components:
+          - 8 TestID Layer components for the 9 modified source files
+          - 2 Maestro Flow components with correct dependencies
+          - Contracts define all testIDs with correct component types
+          - ADR-056 (dynamic testID with position suffix) correctly specifies
+            the SpeechSlot testID scheme using the existing position prop
+          - ADR-057 (self-contained flow 05 with member pre-creation) ensures
+            flow independence — each flow creates its own test data
+          - Data model confirms no DB schema changes needed
+          - File changes summary matches SPEC files_to_modify exactly
+
+      plan_vs_arch:
+        status: pass
+        notes: |
+          PLAN_P019 has 11 steps (S019-01 through S019-11) that follow ARCH:
+          - Steps 1-7: testID additions (parallel group A)
+          - Step 8: ADR documentation (parallel with group A)
+          - Step 9: 05-speeches flow (depends on S019-01..06)
+          - Step 10: 06-members flow (depends on S019-06, S019-07)
+          - Step 11: Final verification (depends on all)
+          Dependencies match ARCH component dependencies exactly.
+          Coverage matrix maps all 22 ACs and 12 ECs to steps.
+          Validation gate confirms all plan gates passed.
+
+      code_vs_plan:
+        status: pass
+        notes: |
+          Code implements exactly what PLAN specifies:
+          - S019-01: SpeechSlot.tsx has 6 testID props (5 dynamic with position,
+            1 static for speech-slot-2-toggle) — verified in source
+          - S019-02: MemberSelectorModal.tsx has 3 testID props (search, close,
+            dynamic member item) — verified in source
+          - S019-03: StatusChangeModal.tsx has 3 testID props (current, close,
+            dynamic status option) — verified in source
+          - S019-04: TopicSelectorModal.tsx has 2 testID props (search, close)
+            — verified in source
+          - S019-05: SundayCard.tsx has testID prop in interface, forwarded to
+            root View and header Pressable (derived via replace). speeches.tsx
+            passes testID with date suffix — verified in both source files
+          - S019-06: members.tsx has 8 testID props. settings/index.tsx has
+            SettingsItem testID prop added and forwarded — verified in source
+          - S019-07: SwipeableCard.tsx has 2 static testID props — verified
+          - S019-09: 05-speeches.yaml has 8 parts (A-H) matching PLAN exactly
+          - S019-10: 06-members.yaml has 6 parts (A-F) matching PLAN exactly
+          - S019-11: Flow count assertion updated in test file
+          - CODE_LEDGER v19 has all 13 commits for this phase
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW FINDINGS
+    # =========================================================================
+
+    issues: []
+    # No P0, P1, or P2 issues found.
+
+    code_review_details:
+
+      speechslot_tsx:
+        file: src/components/SpeechSlot.tsx
+        testIDs_verified:
+          - "speech-slot-${position}-speaker-button on Pressable (line 240)"
+          - "speech-slot-${position}-topic-button on Pressable (line 279)"
+          - "speech-slot-${position}-status-button on Pressable (line 195)"
+          - "speech-slot-${position}-remove-button on Pressable (line 262)"
+          - "speech-slot-${position}-clear-topic-button on Pressable (line 300)"
+          - "speech-slot-2-toggle on Switch (line 181)"
+        count: 6
+        dynamic_count: 5
+        static_count: 1
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          All 5 dynamic testIDs use template literals with the existing position
+          prop. The Switch testID is static because it only appears for position 2.
+          No new imports, no logic changes. ADR-056 correctly applied.
+
+      memberselectormodal_tsx:
+        file: src/components/MemberSelectorModal.tsx
+        testIDs_verified:
+          - "member-selector-search-input on SearchInput (line 72)"
+          - "member-selector-close-button on Pressable (line 74)"
+          - "member-selector-item-${item.id} on Pressable (line 92)"
+        count: 3
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          SearchInput passes testID to inner TextInput via rest spread (confirmed
+          in Phase 2, A-3). Dynamic member item testID uses item.id (UUID).
+
+      statuschangemodal_tsx:
+        file: src/components/StatusChangeModal.tsx
+        testIDs_verified:
+          - "status-modal-current on View (line 89)"
+          - "status-modal-option-${item} on Pressable (line 103)"
+          - "status-modal-close-button on Pressable (line 122)"
+        count: 3
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          Dynamic status option testID uses the FlatList item variable which
+          is the status string value (assigned_not_invited, etc.). Correct
+          mapping to BR_E2E_P3_003.
+
+      topicselectormodal_tsx:
+        file: src/components/TopicSelectorModal.tsx
+        testIDs_verified:
+          - "topic-selector-search-input on SearchInput (line 86)"
+          - "topic-selector-close-button on Pressable (line 88)"
+        count: 2
+        naming_convention: pass
+        zero_functional_impact: true
+
+      sundaycard_tsx:
+        file: src/components/SundayCard.tsx
+        testIDs_verified:
+          - "testID prop added to SundayCardProps interface (line 68)"
+          - "testID={testID} on root View (line 457)"
+          - "testID={headerTestID} on header Pressable (line 466)"
+          - "headerTestID derived via testID.replace('card', 'card-header') (line 447)"
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          testID prop is optional. Callers that do not pass testID (e.g., agenda.tsx)
+          get testID=undefined (no impact). The headerTestID derivation uses
+          string replace which correctly transforms "speeches-card-2026-03-15"
+          to "speeches-card-header-2026-03-15". This pattern is clean and
+          avoids requiring a separate prop for the header.
+
+      speeches_tsx:
+        file: src/app/(tabs)/speeches.tsx
+        testIDs_verified:
+          - "testID={`speeches-card-${item.date}`} on SundayCard (line 447)"
+        count: 1
+        naming_convention: pass
+        zero_functional_impact: true
+
+      members_tsx:
+        file: src/app/(tabs)/settings/members.tsx
+        testIDs_verified:
+          - "members-back-button on Pressable (line 571)"
+          - "members-add-button on Pressable (line 583)"
+          - "members-search-input on SearchInput (line 603)"
+          - "members-editor-fullname-input on TextInput (line 98)"
+          - "members-editor-informal-input on TextInput (line 108)"
+          - "members-editor-phone-input on TextInput (line 128)"
+          - "members-editor-cancel-button on Pressable (line 138)"
+          - "members-editor-save-button on Pressable (line 148)"
+        count: 8
+        naming_convention: pass
+        zero_functional_impact: true
+
+      swipeablecard_tsx:
+        file: src/components/SwipeableCard.tsx
+        testIDs_verified:
+          - "swipeable-edit-button on Pressable (line 159)"
+          - "swipeable-delete-button on Pressable (line 170)"
+        count: 2
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          Static testIDs are correct because SwipeableCard uses single-reveal
+          management (activeId in parent). Only one set of action buttons
+          is visible at any time.
+
+      settings_index_tsx:
+        file: src/app/(tabs)/settings/index.tsx
+        testIDs_verified:
+          - "testID?: string added to SettingsItemProps (line 28)"
+          - "testID={testID} on SettingsItem Pressable (line 37)"
+          - "testID='settings-members-button' on members call site (line 224)"
+        naming_convention: pass
+        zero_functional_impact: true
+        notes: |
+          SettingsItem is a private component in settings/index.tsx. The testID
+          prop is forwarded to the outer Pressable. Only the members item
+          passes a testID value. The sign-out button already had a testID
+          from Phase 1 (settings-sign-out-button).
+
+      maestro_05_speeches:
+        file: e2e/maestro/05-speeches.yaml
+        structure: valid_yaml
+        appId: "com.alouisio.sacramentmeetingplanner"
+        parts:
+          - "Part A: Login with output.TEST_EMAIL/TEST_PASSWORD"
+          - "Part B: Navigate to Settings -> Members -> Add 'E2E Orador' -> Save -> Back"
+          - "Part C: Navigate to Speeches tab by text 'Discursos'"
+          - "Part D: evalScript NEXT_SUNDAY, tap speeches-card-header-{date}, wait 15s"
+          - "Part E: Tap speech-slot-1-speaker-button, select 'E2E Orador' from modal"
+          - "Part F: Tap speech-slot-1-status-button, select assigned_confirmed"
+          - "Part G: Open/close TopicSelectorModal without selection"
+          - "Part H: Collapse card, assert speech slots hidden"
+        element_targeting: "testID for interactive elements, text for assertions"
+        dynamic_date: "evalScript computes NEXT_SUNDAY via getDay() + toISOString()"
+        timeouts:
+          - "10000ms for login wait"
+          - "5000ms for settings/members/speeches navigation waits"
+          - "15000ms for lazy speech creation (extendedWaitUntil)"
+        i18n_verification: |
+          All pt-BR strings verified against src/i18n/locales/pt-BR.json:
+          - "Início" = tabs.home
+          - "Configurações" = settings.title (tapOn text for Settings tab)
+          - "Discursos" = speeches.title (tapOn text for Speeches tab)
+          - "E2E Orador" = test data (not i18n)
+        adr_057_applied: true
+        notes: |
+          Flow 05 is self-contained per ADR-057: creates its own member "E2E Orador"
+          in Part B before navigating to Speeches in Part C. This ensures flow
+          independence from flow 06. Part G correctly tests TopicSelectorModal
+          open/close without topic selection (per OQ-2 resolution, ward may have
+          no configured topics).
+
+      maestro_06_members:
+        file: e2e/maestro/06-members.yaml
+        structure: valid_yaml
+        appId: "com.alouisio.sacramentmeetingplanner"
+        parts:
+          - "Part A: Login with output.TEST_EMAIL/TEST_PASSWORD"
+          - "Part B: Navigate to Settings -> Members via settings-members-button"
+          - "Part C: Add 'E2E Membro Teste' with informal name 'Teste'"
+          - "Part D: Swipe left on member, tap swipeable-edit-button, edit to 'E2E Membro Editado'"
+          - "Part E: Swipe left, tap swipeable-delete-button, confirm via 'Excluir' Alert"
+          - "Part F: Navigate back to Settings via members-back-button"
+        element_targeting: "testID for interactive elements, text for swipe targets"
+        swipe_handling: |
+          Uses Maestro swipe command with direction: LEFT on text targets.
+          extendedWaitUntil after each swipe waits for action buttons to appear
+          (3000ms timeout). Two swipes in flow: one for edit, one for delete.
+        native_alert_handling: "tapOn 'Excluir' for iOS Alert delete confirmation"
+        i18n_verification: |
+          All pt-BR strings verified:
+          - "Início" = tabs.home
+          - "Configurações" = settings.title
+          - "Excluir" = common.delete (native Alert button)
+          - "E2E Membro Teste", "E2E Membro Editado" = test data
+        notes: |
+          Flow 06 uses unique member names ("E2E Membro Teste" / "E2E Membro Editado")
+          that do not conflict with flow 05's "E2E Orador" (EC_E2E_P3_010).
+          clearText on the fullname input before retyping ensures the edit test
+          is clean. The flow handles the full CRUD lifecycle: create -> edit -> delete.
+
+    # =========================================================================
+    # TESTS
+    # =========================================================================
+
+    tests:
+      file: src/__tests__/f019-e2e-phase3.test.ts
+      total: 123
+      status: all_passing
+      coverage:
+        - "AC-SF1-01, AC-SF1-02, AC-SF1-03: SpeechSlot 6 dynamic testIDs (9 tests)"
+        - "AC-SF2-01, AC-SF2-02: MemberSelectorModal 3 testIDs (4 tests)"
+        - "AC-SF3-01, AC-SF3-02: StatusChangeModal 3 testIDs (4 tests)"
+        - "AC-SF4-01, AC-SF4-02: TopicSelectorModal 2 testIDs (3 tests)"
+        - "AC-SF5-01, AC-SF5-02: SundayCard testID prop + forwarding (5 tests)"
+        - "AC-SF6-01, AC-SF6-02, AC-SF6-03: Members screen 8 testIDs (9 tests)"
+        - "AC-SF7-01, AC-SF7-02: SwipeableCard 2 testIDs (3 tests)"
+        - "AC-SF8-01: SettingsItem testID prop (3 tests)"
+        - "AC-SF9-01 to AC-SF9-04: 05-speeches flow structure (28 tests)"
+        - "AC-SF10-01, AC-SF10-02, AC-SF10-03: 06-members flow structure (22 tests)"
+        - "Cross-validation: flow testIDs exist in source (5 tests)"
+        - "ADR-052 + ADR-056: naming convention (4 tests)"
+        - "ADR-053: flow file naming (4 tests)"
+        - "pt-BR i18n strings (5 tests)"
+        - "Total testID count verification (1 test)"
+        - "EC_E2E_P3_009: Conference Sunday handling (2 tests)"
+        - "EC_E2E_P3_008: Keyboard covering (1 test)"
+
+      full_suite:
+        total: 2007
+        passing: 2007
+        failing: 0
+        test_files: 67
+
+    # =========================================================================
+    # SECURITY REVIEW
+    # =========================================================================
+
+    security:
+      notes: |
+        Same as Phase 1 and 2:
+        - No secrets stored in Maestro flow files. Credentials from 01-register output.
+        - Member data ("E2E Orador", "E2E Membro Teste") scoped to test ward via RLS.
+        - Speech assignments and status changes scoped to test ward.
+        - Test accounts identifiable by e2e-* email pattern for cleanup.
+
+    # =========================================================================
+    # DEPLOY IDENTIFICATION
+    # =========================================================================
+
+    pending_deploys: []
+    deploy_notes: |
+      No deploys required. Changes are:
+      - testID props on 9 source files (zero functional impact, client-side only)
+      - 2 Maestro YAML flow files (outside app bundle, in e2e/ directory)
+      testID props will be included in the next regular EAS Build. No database
+      migrations, Edge Function changes, or infrastructure updates needed.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - "docs/specs/SPEC_F019.yaml"
+        - "docs/arch/ARCH_M019.yaml"
+        - "docs/plans/PLAN_P019.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+      notes: |
+        All code changes for CR-284 Phase 3 are committed across 13 commits
+        (e8fb533..3dc6a2f). The 4 pending documentation files are project
+        artifacts that are committed by the Orchestrator at the end of the
+        phase, not by the Coder.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-284 (E2E Testing with Maestro Phase 3) implementation is correct and
+      complete. Chain validation passes at all 4 levels (SPEC->ARCH->PLAN->CODE).
+      27 testID props added across 9 source files: SpeechSlot (6 dynamic with
+      position suffix per ADR-056), MemberSelectorModal (3), StatusChangeModal (3),
+      TopicSelectorModal (2), SundayCard (testID prop + headerTestID derivation),
+      speeches.tsx (1 dynamic date), Members screen (8), SwipeableCard (2 static),
+      SettingsItem (1 + prop forwarding). All follow the {screen}-{element}-{type}
+      kebab-case convention (ADR-052). Two Maestro flows created: 05-speeches
+      (self-contained per ADR-057 — creates member before speech assignment,
+      tests speaker assignment, status change to assigned_confirmed, and topic
+      modal open/close) and 06-members (full CRUD: add -> swipe edit -> swipe
+      delete with native Alert confirmation). All pt-BR strings verified against
+      i18n locale file. 123 new tests, 2007 total passing. Zero functional impact.
+      No deploys required. No P0, P1, or P2 issues found.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 13
+      total_commits: 13
+      tests_total: 2007
+      tests_passing: 2007
+      test_files: 67

@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-08 (CR-284: E2E Testing with Maestro — Phase 2)
+# Last updated: 2026-03-09 (CR-284: E2E Testing with Maestro — Phase 3)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-08"
+  last_updated: "2026-03-09"
   total_modules: 14
-  total_adrs: 55
+  total_adrs: 57
 
 # =============================================================================
 # TECH STACK
@@ -473,9 +473,11 @@ modules:
       and settings sign-out button; 2 flow files (register, login-logout).
       Phase 2: testID props on Home tab, Agenda tab, AgendaForm (SelectorField
       + HymnSelectorModal), ActorSelector, Presentation Mode; 2 flow files
-      (home-presentation, agenda). Tests run against production Supabase with
-      RLS isolation.
-    features: [F017_E2E, F018_E2E]
+      (home-presentation, agenda). Phase 3: testID props on SpeechSlot,
+      MemberSelectorModal, StatusChangeModal, TopicSelectorModal, SundayCard,
+      Members screen, SwipeableCard, SettingsItem; 2 flow files (speeches,
+      members). Tests run against production Supabase with RLS isolation.
+    features: [F017_E2E, F018_E2E, F019_E2E]
     components:
       # Phase 1 flows
       - path: e2e/maestro/01-register.yaml
@@ -487,6 +489,11 @@ modules:
         responsibility: E2E flow for Home tab -> Presentation Mode -> verify + font toggle -> close
       - path: e2e/maestro/04-agenda.yaml
         responsibility: E2E flow for Agenda tab -> expand Sunday -> assign actor + hymn -> collapse
+      # Phase 3 flows
+      - path: e2e/maestro/05-speeches.yaml
+        responsibility: E2E flow for Settings -> add member -> Speeches tab -> assign speaker -> change status -> topic modal -> collapse
+      - path: e2e/maestro/06-members.yaml
+        responsibility: E2E flow for Settings -> Members -> add member -> edit (swipe) -> delete (swipe + confirm) -> verify
       - path: e2e/README.md
         responsibility: E2E testing documentation
     testid_targets:
@@ -496,7 +503,8 @@ modules:
       - path: src/app/(auth)/register.tsx
         count: 15
       - path: src/app/(tabs)/settings/index.tsx
-        count: 1
+        count: 2
+        note: "Phase 1: sign-out button; Phase 3: SettingsItem testID prop + members item"
       # Phase 2
       - path: src/app/(tabs)/index.tsx
         count: 2
@@ -510,6 +518,28 @@ modules:
         count: 5
       - path: src/app/presentation.tsx
         count: 5
+      # Phase 3
+      - path: src/components/SpeechSlot.tsx
+        count: 6
+        note: "Dynamic testIDs: speech-slot-{position}-{element} (speaker, topic, status, remove, clear-topic, toggle)"
+      - path: src/components/MemberSelectorModal.tsx
+        count: 3
+        note: "search input, close button, member item (dynamic per member.id)"
+      - path: src/components/StatusChangeModal.tsx
+        count: 3
+        note: "close button, current status View, option Pressable (dynamic per status)"
+      - path: src/components/TopicSelectorModal.tsx
+        count: 2
+      - path: src/components/SundayCard.tsx
+        count: 2
+        note: "testID prop on root View + headerTestID on header Pressable"
+      - path: src/app/(tabs)/speeches.tsx
+        count: 1
+        note: "Passes testID to SundayCard: speeches-card-{date}"
+      - path: src/app/(tabs)/settings/members.tsx
+        count: 8
+      - path: src/components/SwipeableCard.tsx
+        count: 2
     dependencies:
       - "Maestro CLI"
       - "Java 17"
@@ -1417,3 +1447,24 @@ adrs:
       Each Sunday card needs a unique, deterministic testID. The ISO date is already
       available as the card's date prop. evalScript in Maestro handles the dynamic
       computation at test runtime.
+
+  - id: ADR-056
+    title: "Dynamic testID with position suffix for SpeechSlot elements"
+    decision: |
+      Use template literal with position suffix for all SpeechSlot testIDs:
+      speech-slot-{position}-speaker-button, etc. Position is an existing numeric
+      prop (0-4) on SpeechSlot.
+    rationale: |
+      Multiple SpeechSlot instances render per expanded Sunday card. Dynamic testIDs
+      with position suffix provide unique identifiers. Follows the dynamic testID
+      pattern from Phase 2 (ADR-055 date suffix).
+
+  - id: ADR-057
+    title: "Self-contained flow 05 with member pre-creation for flow independence"
+    decision: |
+      Flow 05 navigates to Settings -> Members -> Add to create "E2E Orador" before
+      navigating to the Speeches tab. Each flow is self-contained and independent.
+    rationale: |
+      A fresh test ward has zero members. Creating the member within flow 05 makes
+      it independent of flow 06 execution order. Each flow can run individually
+      after 01-register.

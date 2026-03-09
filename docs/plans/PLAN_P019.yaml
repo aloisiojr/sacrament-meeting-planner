@@ -1,0 +1,998 @@
+# =============================================================================
+# PLAN_P019.yaml
+# Artifact ID: 019
+# Phase: 3 of 4
+# Features: F019_E2E (CR-284)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "019"
+  phase: 3
+  total_phases: 4
+  feature_ids: [F019_E2E]
+  crs: [284]
+  status: pending
+  created: "2026-03-09"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    Extend Maestro E2E testing infrastructure with testID props on SpeechSlot
+    (6 dynamic elements), MemberSelectorModal (3 elements), StatusChangeModal
+    (3 elements), TopicSelectorModal (2 elements), SundayCard (testID prop +
+    header testID), Members screen (8 elements), SwipeableCard (2 static elements),
+    and SettingsItem (testID prop for members navigation). Create two new Maestro
+    flow files (05-speeches.yaml, 06-members.yaml). Zero functional impact.
+
+  principles:
+    - "Zero functional impact: testID props do not affect rendering or behavior"
+    - "Reuse Phase 1+2 conventions: {screen}-{element}-{type} kebab-case naming (ADR-052)"
+    - "Numbered prefix YAML flow files (ADR-053)"
+    - "Dynamic testIDs with position suffix for SpeechSlot (ADR-056)"
+    - "Self-contained flows: flow 05 creates its own member (ADR-057)"
+    - "Static testIDs for SwipeableCard buttons (single-reveal management)"
+
+# =============================================================================
+# STRATEGY
+# =============================================================================
+
+strategy:
+  order: "Happy path -> Edge cases -> Hardening -> Observability"
+  commit_strategy: "1 commit per step, Conventional Commits"
+  test_strategy: "E2E flows (05-speeches, 06-members) ARE the tests. testID props verified by those flows."
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: Add testID props to SpeechSlot.tsx (6 dynamic elements)
+  # ---------------------------------------------------------------------------
+  - id: S019-01
+    title: "Add testID to 6 SpeechSlot elements (dynamic with position)"
+    feature: F019_E2E
+    sub_feature: SF1
+    depends_on: []
+    parallelizable_with: [S019-02, S019-03, S019-04, S019-05, S019-06, S019-07]
+    files:
+      - path: src/components/SpeechSlot.tsx
+        action: edit
+        description: |
+          Add testID prop to 6 existing elements using template literals with
+          the position prop. No new imports, no logic changes.
+
+          1. Status section Pressable (line ~190):
+             Add testID={`speech-slot-${position}-status-button`}
+
+          2. 2nd speech toggle Switch (line ~180, position 2 only):
+             Add testID="speech-slot-2-toggle"
+
+          3. Speaker field Pressable (line ~232):
+             Add testID={`speech-slot-${position}-speaker-button`}
+
+          4. Remove speaker (X) Pressable (line ~254):
+             Add testID={`speech-slot-${position}-remove-button`}
+
+          5. Topic field Pressable (line ~269):
+             Add testID={`speech-slot-${position}-topic-button`}
+
+          6. Clear topic (X) Pressable (line ~291):
+             Add testID={`speech-slot-${position}-clear-topic-button`}
+
+    done_when:
+      - "SpeechSlot.tsx has 6 testID props using position suffix"
+      - "testIDs: speech-slot-{position}-speaker-button, speech-slot-{position}-topic-button, speech-slot-{position}-status-button, speech-slot-{position}-remove-button, speech-slot-{position}-clear-topic-button, speech-slot-2-toggle"
+      - "npx tsc --noEmit passes (no type errors)"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml flow (step S019-09)"
+
+    covers:
+      acceptance_criteria: [AC-SF1-01, AC-SF1-02, AC-SF1-03]
+      edge_cases: []
+
+    risks:
+      - risk: "Line numbers may differ from SPEC due to prior changes"
+        mitigation: "Search by element context (Pressable onPress handler, Switch component) rather than line number"
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: Add testID to MemberSelectorModal.tsx (3 elements)
+  # ---------------------------------------------------------------------------
+  - id: S019-02
+    title: "Add testID to 3 MemberSelectorModal elements"
+    feature: F019_E2E
+    sub_feature: SF2
+    depends_on: []
+    parallelizable_with: [S019-01, S019-03, S019-04, S019-05, S019-06, S019-07]
+    files:
+      - path: src/components/MemberSelectorModal.tsx
+        action: edit
+        description: |
+          Add testID to 3 interactive elements. No logic changes.
+
+          1. SearchInput (line ~65):
+             Add testID="member-selector-search-input"
+             (SearchInput passes testID to inner TextInput via rest spread)
+
+          2. Close button Pressable (line ~73):
+             Add testID="member-selector-close-button"
+
+          3. Member item Pressable (line ~84, inside .map()):
+             Add testID={`member-selector-item-${member.id}`}
+             (Dynamic per member UUID)
+
+    done_when:
+      - "MemberSelectorModal.tsx has 3 testID props: member-selector-search-input, member-selector-close-button, member-selector-item-{member.id}"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml flow (step S019-09)"
+
+    covers:
+      acceptance_criteria: [AC-SF2-01, AC-SF2-02]
+      edge_cases: [EC_E2E_P3_003]
+
+    risks: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: Add testID to StatusChangeModal.tsx (3 elements)
+  # ---------------------------------------------------------------------------
+  - id: S019-03
+    title: "Add testID to 3 StatusChangeModal elements"
+    feature: F019_E2E
+    sub_feature: SF3
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-04, S019-05, S019-06, S019-07]
+    files:
+      - path: src/components/StatusChangeModal.tsx
+        action: edit
+        description: |
+          Add testID to 3 elements. No logic changes.
+
+          1. Current status View (line ~83):
+             Add testID="status-modal-current"
+
+          2. Status option Pressable (line ~99, inside .map()):
+             Add testID={`status-modal-option-${status}`}
+             (Dynamic per status value: assigned_not_invited, assigned_invited,
+             assigned_confirmed, gave_up)
+
+          3. Close button Pressable (line ~117):
+             Add testID="status-modal-close-button"
+
+    done_when:
+      - "StatusChangeModal.tsx has 3 testID props: status-modal-current, status-modal-option-{status}, status-modal-close-button"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml flow (step S019-09)"
+
+    covers:
+      acceptance_criteria: [AC-SF3-01, AC-SF3-02]
+      edge_cases: [EC_E2E_P3_004]
+
+    risks: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Add testID to TopicSelectorModal.tsx (2 elements)
+  # ---------------------------------------------------------------------------
+  - id: S019-04
+    title: "Add testID to 2 TopicSelectorModal elements"
+    feature: F019_E2E
+    sub_feature: SF4
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-03, S019-05, S019-06, S019-07]
+    files:
+      - path: src/components/TopicSelectorModal.tsx
+        action: edit
+        description: |
+          Add testID to 2 elements. No logic changes.
+
+          1. SearchInput (line ~80):
+             Add testID="topic-selector-search-input"
+             (SearchInput passes testID to inner TextInput via rest spread)
+
+          2. Close button Pressable (line ~87):
+             Add testID="topic-selector-close-button"
+
+    done_when:
+      - "TopicSelectorModal.tsx has 2 testID props: topic-selector-search-input, topic-selector-close-button"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml flow (step S019-09)"
+
+    covers:
+      acceptance_criteria: [AC-SF4-01, AC-SF4-02]
+      edge_cases: []
+
+    risks: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: Add testID prop to SundayCard + pass from speeches.tsx
+  # ---------------------------------------------------------------------------
+  - id: S019-05
+    title: "Add testID prop to SundayCard interface + pass from speeches.tsx"
+    feature: F019_E2E
+    sub_feature: SF5
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-03, S019-04, S019-06, S019-07]
+    files:
+      - path: src/components/SundayCard.tsx
+        action: edit
+        description: |
+          Add optional testID prop to SundayCardProps interface.
+          Forward testID to the root View.
+          Derive headerTestID from testID for the header Pressable:
+            const headerTestID = testID ? testID.replace('card', 'card-header') : undefined;
+
+          1. SundayCardProps interface (line ~32-67):
+             Add: testID?: string
+
+          2. Root View (line ~444):
+             Add testID={testID}
+
+          3. Header Pressable (line ~454):
+             Add testID={headerTestID}
+
+      - path: src/app/(tabs)/speeches.tsx
+        action: edit
+        description: |
+          Pass testID to each SundayCard instance using the date suffix:
+            testID={`speeches-card-${item.date}`}
+
+    done_when:
+      - "SundayCard.tsx has testID prop in SundayCardProps interface"
+      - "SundayCard root View forwards testID"
+      - "SundayCard header Pressable uses derived headerTestID"
+      - "speeches.tsx passes testID={`speeches-card-${item.date}`} to SundayCard"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml flow (step S019-09)"
+
+    covers:
+      acceptance_criteria: [AC-SF5-01, AC-SF5-02]
+      edge_cases: [EC_E2E_P3_001, EC_E2E_P3_011]
+
+    risks:
+      - risk: "SundayCard is shared by both agenda.tsx and speeches.tsx. Adding testID prop must not break agenda usage."
+        mitigation: "testID is optional. Agenda callers that do not pass testID will have testID=undefined (no impact)."
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Add testID to Members screen (8 elements) + SettingsItem testID prop
+  # ---------------------------------------------------------------------------
+  - id: S019-06
+    title: "Add testID to 8 Members screen elements + SettingsItem testID prop"
+    feature: F019_E2E
+    sub_features: [SF6, SF8]
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-03, S019-04, S019-05, S019-07]
+    files:
+      - path: src/app/(tabs)/settings/members.tsx
+        action: edit
+        description: |
+          Add testID to 8 interactive elements. No logic changes.
+
+          1. Back button Pressable (line ~566):
+             Add testID="members-back-button"
+
+          2. Add (+) button Pressable (line ~573):
+             Add testID="members-add-button"
+
+          3. Search input SearchInput (line ~593):
+             Add testID="members-search-input"
+
+          4. Full name TextInput (line ~82, inside MemberEditor):
+             Add testID="members-editor-fullname-input"
+
+          5. Informal name TextInput (line ~99, inside MemberEditor):
+             Add testID="members-editor-informal-input"
+
+          6. Phone TextInput (line ~117, inside MemberEditor):
+             Add testID="members-editor-phone-input"
+
+          7. Cancel button Pressable (line ~131, inside MemberEditor):
+             Add testID="members-editor-cancel-button"
+
+          8. Save button Pressable (line ~140, inside MemberEditor):
+             Add testID="members-editor-save-button"
+
+      - path: src/app/(tabs)/settings/index.tsx
+        action: edit
+        description: |
+          Add testID prop to SettingsItemProps interface (private component).
+          Forward testID to the outer Pressable.
+          Pass testID="settings-members-button" from the members SettingsItem call site.
+
+          1. SettingsItemProps interface:
+             Add: testID?: string
+
+          2. SettingsItem outer Pressable (line ~32):
+             Add testID={testID}
+
+          3. Members SettingsItem call site:
+             Add testID="settings-members-button"
+
+    done_when:
+      - "members.tsx has 8 testID props on add, back, search, fullname, informal, phone, save, cancel elements"
+      - "settings/index.tsx SettingsItem interface has testID?: string"
+      - "settings/index.tsx SettingsItem Pressable forwards testID"
+      - "settings/index.tsx members call site has testID='settings-members-button'"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 05-speeches.yaml Part B and 06-members.yaml (steps S019-09, S019-10)"
+
+    covers:
+      acceptance_criteria: [AC-SF6-01, AC-SF6-02, AC-SF6-03, AC-SF8-01]
+      edge_cases: [EC_E2E_P3_007, EC_E2E_P3_008]
+
+    risks: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: Add testID to SwipeableCard.tsx (2 static elements)
+  # ---------------------------------------------------------------------------
+  - id: S019-07
+    title: "Add testID to 2 SwipeableCard action buttons"
+    feature: F019_E2E
+    sub_feature: SF7
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-03, S019-04, S019-05, S019-06]
+    files:
+      - path: src/components/SwipeableCard.tsx
+        action: edit
+        description: |
+          Add static testID to edit and delete action button Pressables.
+          Static because only one SwipeableCard is revealed at a time
+          (managed by activeId in parent component).
+
+          1. Edit button Pressable (line ~154):
+             Add testID="swipeable-edit-button"
+
+          2. Delete button Pressable (line ~164):
+             Add testID="swipeable-delete-button"
+
+    done_when:
+      - "SwipeableCard.tsx has 2 testID props: swipeable-edit-button, swipeable-delete-button"
+      - "npx tsc --noEmit passes"
+      - "Existing tests pass (no regression)"
+
+    tests:
+      - type: e2e
+        description: "Verified by 06-members.yaml flow (step S019-10)"
+
+    covers:
+      acceptance_criteria: [AC-SF7-01, AC-SF7-02]
+      edge_cases: [EC_E2E_P3_005]
+
+    risks:
+      - risk: "Maestro swipeLeft on SwipeableCard may be flaky due to Pan gesture threshold"
+        mitigation: "Wait for action buttons to appear after swipe. If swipe fails, retry with longer distance."
+
+  # ---------------------------------------------------------------------------
+  # STEP 8: ADR documentation (ADR-056, ADR-057)
+  # ---------------------------------------------------------------------------
+  - id: S019-08
+    title: "Document ADR-056 and ADR-057 in PLAN_P019 and PLAN_CONSOLIDATED"
+    feature: F019_E2E
+    depends_on: []
+    parallelizable_with: [S019-01, S019-02, S019-03, S019-04, S019-05, S019-06, S019-07]
+    files: []
+    description: |
+      ADR-056: Dynamic testID with position suffix for SpeechSlot elements.
+      Defined in ARCH_M019.yaml, referenced in PLAN_P019.yaml.
+
+      ADR-057: Self-contained flow 05 with member pre-creation for flow independence.
+      Defined in ARCH_M019.yaml, referenced in PLAN_P019.yaml.
+
+      No separate ADR files needed. ADRs are documented inline in ARCH_M019.yaml
+      and referenced in the plan, same pattern as Phase 1+2.
+
+    done_when:
+      - "ADR-056 and ADR-057 are documented in ARCH_M019.yaml"
+      - "PLAN_CONSOLIDATED changelog references ADR-056 and ADR-057"
+
+    tests: []
+
+    covers:
+      acceptance_criteria: []
+      edge_cases: []
+
+    risks: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 9: Create Maestro flow 05-speeches.yaml
+  # ---------------------------------------------------------------------------
+  - id: S019-09
+    title: "Create Maestro E2E flow: 05-speeches.yaml"
+    feature: F019_E2E
+    sub_feature: SF9
+    depends_on: [S019-01, S019-02, S019-03, S019-04, S019-05, S019-06]
+    files:
+      - path: e2e/maestro/05-speeches.yaml
+        action: create
+        description: |
+          Maestro flow YAML that tests speech assignment + status change.
+          Runs AFTER 01-register.yaml (uses credentials from output).
+
+          Flow structure:
+          ```yaml
+          appId: com.alouisio.sacramentmeetingplanner
+          ---
+          # 05-speeches: Add member -> Speeches tab -> assign speaker -> change status -> topic modal
+
+          # ---- Part A: Login ----
+          - assertVisible:
+              id: "login-submit-button"
+          - tapOn:
+              id: "login-email-input"
+          - inputText: ${output.TEST_EMAIL}
+          - tapOn:
+              id: "login-password-input"
+          - inputText: ${output.TEST_PASSWORD}
+          - tapOn:
+              id: "login-submit-button"
+          - extendedWaitUntil:
+              visible: "Inicio"
+              timeout: 10000
+
+          # ---- Part B: Navigate to Members and add test member ----
+          - tapOn: "Configuracoes"
+          - extendedWaitUntil:
+              visible:
+                id: "settings-members-button"
+              timeout: 5000
+          - tapOn:
+              id: "settings-members-button"
+          - extendedWaitUntil:
+              visible:
+                id: "members-add-button"
+              timeout: 5000
+          - tapOn:
+              id: "members-add-button"
+          - tapOn:
+              id: "members-editor-fullname-input"
+          - inputText: "E2E Orador"
+          - tapOn:
+              id: "members-editor-save-button"
+          - extendedWaitUntil:
+              visible: "E2E Orador"
+              timeout: 5000
+          - tapOn:
+              id: "members-back-button"
+
+          # ---- Part C: Navigate to Speeches tab ----
+          - tapOn: "Discursos"
+          - extendedWaitUntil:
+              visible: "Discursos"
+              timeout: 5000
+
+          # ---- Part D: Expand next Sunday card ----
+          - evalScript: >
+              ${(() => {
+                const now = new Date();
+                const day = now.getDay();
+                const diff = day === 0 ? 0 : 7 - day;
+                const next = new Date(now.getTime() + diff * 86400000);
+                output.NEXT_SUNDAY = next.toISOString().split('T')[0];
+              })()}
+          - tapOn:
+              id: "speeches-card-header-${output.NEXT_SUNDAY}"
+          - extendedWaitUntil:
+              visible:
+                id: "speech-slot-1-speaker-button"
+              timeout: 15000
+
+          # ---- Part E: Assign speaker to 1st speech ----
+          - tapOn:
+              id: "speech-slot-1-speaker-button"
+          - extendedWaitUntil:
+              visible:
+                id: "member-selector-search-input"
+              timeout: 5000
+          - assertVisible: "E2E Orador"
+          - tapOn: "E2E Orador"
+          - extendedWaitUntil:
+              notVisible:
+                id: "member-selector-search-input"
+              timeout: 5000
+          - assertVisible: "E2E Orador"
+
+          # ---- Part F: Change status ----
+          - tapOn:
+              id: "speech-slot-1-status-button"
+          - extendedWaitUntil:
+              visible:
+                id: "status-modal-close-button"
+              timeout: 5000
+          - tapOn:
+              id: "status-modal-option-assigned_confirmed"
+          - extendedWaitUntil:
+              notVisible:
+                id: "status-modal-close-button"
+              timeout: 5000
+
+          # ---- Part G: Open/close topic modal ----
+          - tapOn:
+              id: "speech-slot-1-topic-button"
+          - extendedWaitUntil:
+              visible:
+                id: "topic-selector-close-button"
+              timeout: 5000
+          - tapOn:
+              id: "topic-selector-close-button"
+          - extendedWaitUntil:
+              notVisible:
+                id: "topic-selector-close-button"
+              timeout: 5000
+
+          # ---- Part H: Collapse card ----
+          - tapOn:
+              id: "speeches-card-header-${output.NEXT_SUNDAY}"
+          - assertNotVisible:
+              id: "speech-slot-1-speaker-button"
+          ```
+
+          Notes:
+          - Part A reuses login pattern from Phase 1+2
+          - Part B creates member "E2E Orador" for self-containment (ADR-057)
+          - Part D uses evalScript for dynamic Sunday date (EC_E2E_P3_001)
+          - Part D uses extendedWaitUntil 15s for lazy speech creation (EC_E2E_P3_002)
+          - Part E selects member by text tap (EC_E2E_P3_003 handled: member exists)
+          - Part F uses dynamic testID status-modal-option-assigned_confirmed
+          - Part G opens and immediately closes TopicSelectorModal (no topic selection)
+          - Part H collapses card and asserts slots hidden
+
+    done_when:
+      - "File e2e/maestro/05-speeches.yaml exists"
+      - "Flow has 8 parts (A-H): login, add member, navigate speeches, expand card, assign speaker, change status, topic modal, collapse"
+      - "Part A uses output.TEST_EMAIL and output.TEST_PASSWORD"
+      - "Part B navigates Settings -> Members -> Add -> 'E2E Orador' -> Save -> Back"
+      - "Part D uses evalScript for NEXT_SUNDAY computation"
+      - "Part E taps 'E2E Orador' text to select member"
+      - "Part F taps status-modal-option-assigned_confirmed"
+      - "Part G opens and closes TopicSelectorModal without selection"
+      - "All element targeting uses testID where available"
+      - "All text assertions use pt-BR strings"
+
+    tests: []
+    # This IS the E2E test
+
+    covers:
+      acceptance_criteria: [AC-SF9-01, AC-SF9-02, AC-SF9-03, AC-SF9-04]
+      edge_cases: [EC_E2E_P3_001, EC_E2E_P3_002, EC_E2E_P3_003, EC_E2E_P3_004, EC_E2E_P3_009, EC_E2E_P3_011, EC_E2E_P3_012]
+
+    risks:
+      - risk: "Next Sunday might be a conference (non-expandable)"
+        mitigation: "Same as Phase 2: flow would fail on tap; re-run on a non-conference week"
+      - risk: "Lazy speech creation may take longer than 15s on slow network"
+        mitigation: "extendedWaitUntil timeout is generous; increase if flaky"
+
+  # ---------------------------------------------------------------------------
+  # STEP 10: Create Maestro flow 06-members.yaml
+  # ---------------------------------------------------------------------------
+  - id: S019-10
+    title: "Create Maestro E2E flow: 06-members.yaml"
+    feature: F019_E2E
+    sub_feature: SF10
+    depends_on: [S019-06, S019-07]
+    files:
+      - path: e2e/maestro/06-members.yaml
+        action: create
+        description: |
+          Maestro flow YAML that tests member CRUD (add, edit via swipe, delete via swipe).
+          Runs AFTER 01-register.yaml (uses credentials from output).
+
+          Flow structure:
+          ```yaml
+          appId: com.alouisio.sacramentmeetingplanner
+          ---
+          # 06-members: Members CRUD — add, edit (swipe), delete (swipe)
+
+          # ---- Part A: Login ----
+          - assertVisible:
+              id: "login-submit-button"
+          - tapOn:
+              id: "login-email-input"
+          - inputText: ${output.TEST_EMAIL}
+          - tapOn:
+              id: "login-password-input"
+          - inputText: ${output.TEST_PASSWORD}
+          - tapOn:
+              id: "login-submit-button"
+          - extendedWaitUntil:
+              visible: "Inicio"
+              timeout: 10000
+
+          # ---- Part B: Navigate to Members ----
+          - tapOn: "Configuracoes"
+          - extendedWaitUntil:
+              visible:
+                id: "settings-members-button"
+              timeout: 5000
+          - tapOn:
+              id: "settings-members-button"
+          - extendedWaitUntil:
+              visible:
+                id: "members-add-button"
+              timeout: 5000
+
+          # ---- Part C: Add new member ----
+          - tapOn:
+              id: "members-add-button"
+          - tapOn:
+              id: "members-editor-fullname-input"
+          - inputText: "E2E Membro Teste"
+          - tapOn:
+              id: "members-editor-informal-input"
+          - inputText: "Teste"
+          - tapOn:
+              id: "members-editor-save-button"
+          - extendedWaitUntil:
+              visible: "E2E Membro Teste"
+              timeout: 5000
+
+          # ---- Part D: Edit member (swipe + edit) ----
+          - swipe:
+              from:
+                text: "E2E Membro Teste"
+              direction: LEFT
+          - extendedWaitUntil:
+              visible:
+                id: "swipeable-edit-button"
+              timeout: 3000
+          - tapOn:
+              id: "swipeable-edit-button"
+          - extendedWaitUntil:
+              visible:
+                id: "members-editor-fullname-input"
+              timeout: 3000
+          - clearText:
+              id: "members-editor-fullname-input"
+          - inputText: "E2E Membro Editado"
+          - tapOn:
+              id: "members-editor-save-button"
+          - extendedWaitUntil:
+              visible: "E2E Membro Editado"
+              timeout: 5000
+          - assertNotVisible: "E2E Membro Teste"
+
+          # ---- Part E: Delete member (swipe + delete) ----
+          - swipe:
+              from:
+                text: "E2E Membro Editado"
+              direction: LEFT
+          - extendedWaitUntil:
+              visible:
+                id: "swipeable-delete-button"
+              timeout: 3000
+          - tapOn:
+              id: "swipeable-delete-button"
+          - tapOn: "Excluir"
+          - extendedWaitUntil:
+              notVisible: "E2E Membro Editado"
+              timeout: 5000
+
+          # ---- Part F: Navigate back to Settings ----
+          - tapOn:
+              id: "members-back-button"
+          - extendedWaitUntil:
+              visible:
+                id: "settings-members-button"
+              timeout: 5000
+          ```
+
+          Notes:
+          - Part A reuses login pattern
+          - Part C adds member with both full name and informal name
+          - Part D swipes left to reveal edit, clears and retypes full name
+          - Part E swipes left to reveal delete, taps "Excluir" on native Alert
+          - Part F navigates back to Settings to verify navigation works
+          - EC_E2E_P3_005: swipe gesture; wait for action buttons after swipe
+          - EC_E2E_P3_006: native Alert handled via text "Excluir"
+          - EC_E2E_P3_010: no conflict with flow 05 members
+
+    done_when:
+      - "File e2e/maestro/06-members.yaml exists"
+      - "Flow has 6 parts (A-F): login, navigate members, add, edit swipe, delete swipe, navigate back"
+      - "Part A uses output.TEST_EMAIL and output.TEST_PASSWORD"
+      - "Part C creates 'E2E Membro Teste' with informal name 'Teste'"
+      - "Part D swipes left, taps swipeable-edit-button, edits to 'E2E Membro Editado'"
+      - "Part E swipes left, taps swipeable-delete-button, confirms via 'Excluir'"
+      - "Part F taps members-back-button, asserts Settings screen"
+      - "All element targeting uses testID where available"
+      - "All text assertions use pt-BR strings"
+
+    tests: []
+    # This IS the E2E test
+
+    covers:
+      acceptance_criteria: [AC-SF10-01, AC-SF10-02, AC-SF10-03]
+      edge_cases: [EC_E2E_P3_005, EC_E2E_P3_006, EC_E2E_P3_007, EC_E2E_P3_008, EC_E2E_P3_010]
+
+    risks:
+      - risk: "SwipeableCard swipe may be unreliable in Maestro"
+        mitigation: "Use extendedWaitUntil after swipe. If swipe fails, Maestro provides retry mechanism."
+      - risk: "Native Alert 'Excluir' button text may differ per iOS version"
+        mitigation: "pt-BR localization for the app-generated Alert is stable; tapOn by text"
+
+  # ---------------------------------------------------------------------------
+  # STEP 11: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S019-11
+    title: "Final verification: type check, existing tests, file count"
+    feature: F019_E2E
+    depends_on: [S019-01, S019-02, S019-03, S019-04, S019-05, S019-06, S019-07, S019-08, S019-09, S019-10]
+    files: []
+    done_when:
+      - "npx tsc --noEmit passes with no errors"
+      - "npx vitest run passes (all existing tests green, no regressions)"
+      - "e2e/maestro/05-speeches.yaml is valid YAML (parseable)"
+      - "e2e/maestro/06-members.yaml is valid YAML (parseable)"
+      - "Total new testID count: 27 (6 SpeechSlot + 3 MemberSelectorModal + 3 StatusChangeModal + 2 TopicSelectorModal + 2 SundayCard prop + 8 members.tsx + 2 SwipeableCard + 1 SettingsItem)"
+      - "Modified file count: 9 (SpeechSlot.tsx, MemberSelectorModal.tsx, StatusChangeModal.tsx, TopicSelectorModal.tsx, SundayCard.tsx, speeches.tsx, members.tsx, SwipeableCard.tsx, settings/index.tsx)"
+      - "Created file count: 2 (05-speeches.yaml, 06-members.yaml)"
+      - "docs/plans/PLAN_CONSOLIDATED.yaml updated with P019 entry"
+
+    tests: []
+
+    covers:
+      acceptance_criteria:
+        - AC-SF1-01
+        - AC-SF1-02
+        - AC-SF1-03
+        - AC-SF2-01
+        - AC-SF2-02
+        - AC-SF3-01
+        - AC-SF3-02
+        - AC-SF4-01
+        - AC-SF4-02
+        - AC-SF5-01
+        - AC-SF5-02
+        - AC-SF6-01
+        - AC-SF6-02
+        - AC-SF6-03
+        - AC-SF7-01
+        - AC-SF7-02
+        - AC-SF8-01
+        - AC-SF9-01
+        - AC-SF9-02
+        - AC-SF9-03
+        - AC-SF9-04
+        - AC-SF10-01
+        - AC-SF10-02
+        - AC-SF10-03
+      edge_cases:
+        - EC_E2E_P3_001
+        - EC_E2E_P3_002
+        - EC_E2E_P3_003
+        - EC_E2E_P3_004
+        - EC_E2E_P3_005
+        - EC_E2E_P3_006
+        - EC_E2E_P3_007
+        - EC_E2E_P3_008
+        - EC_E2E_P3_009
+        - EC_E2E_P3_010
+        - EC_E2E_P3_011
+        - EC_E2E_P3_012
+
+    risks: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S019-01 (SpeechSlot testIDs) ─────────────────┬───────────────────────────┐
+  S019-02 (MemberSelectorModal testIDs) ────────┤                           │
+  S019-03 (StatusChangeModal testIDs) ──────────┤                           │
+  S019-04 (TopicSelectorModal testIDs) ─────────┤                           │
+  S019-05 (SundayCard + speeches.tsx testIDs) ──┤                           │
+  S019-06 (Members + SettingsItem testIDs) ─────┤                           │
+  S019-07 (SwipeableCard testIDs) ──────────────┤                           │
+  S019-08 (ADR documentation) ─────────────────┤                           │
+                                                 │                           │
+  S019-09 (05-speeches.yaml) ◄── S019-01..06    │                           │
+  S019-10 (06-members.yaml) ◄── S019-06, S019-07│                           │
+                                                                             │
+  S019-11 (final verification) ◄──────────────────────────────────── ALL ──┘
+
+  Parallelizable:
+    Group A (independent): S019-01, S019-02, S019-03, S019-04, S019-05, S019-06, S019-07, S019-08
+    Group B (after S019-01..06): S019-09
+    Group C (after S019-06, S019-07): S019-10
+    Group D (after all): S019-11
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  SF1:
+    acceptance_criteria:
+      AC-SF1-01: S019-01  # speech-slot-1-speaker-button found and tappable
+      AC-SF1-02: S019-01  # speech-slot-1-status-button found and tappable
+      AC-SF1-03: S019-01  # speech-slot-1-topic-button found and tappable
+    edge_cases: []
+
+  SF2:
+    acceptance_criteria:
+      AC-SF2-01: S019-02  # member-selector-search-input found
+      AC-SF2-02: S019-02  # member-selector-close-button found
+    edge_cases:
+      EC_E2E_P3_003: S019-02  # Empty member list handled by flow 05 creating member first
+
+  SF3:
+    acceptance_criteria:
+      AC-SF3-01: S019-03  # status-modal-close-button found
+      AC-SF3-02: S019-03  # status-modal-option-assigned_confirmed found and tappable
+    edge_cases:
+      EC_E2E_P3_004: S019-09  # StatusChangeModal only opens after speaker assignment
+
+  SF4:
+    acceptance_criteria:
+      AC-SF4-01: S019-04  # topic-selector-search-input found
+      AC-SF4-02: S019-04  # topic-selector-close-button found
+    edge_cases: []
+
+  SF5:
+    acceptance_criteria:
+      AC-SF5-01: S019-05  # speeches-card-YYYY-MM-DD found
+      AC-SF5-02: S019-05  # speeches-card-header-YYYY-MM-DD tap expands card
+    edge_cases:
+      EC_E2E_P3_001: S019-09  # Dynamic date via evalScript
+      EC_E2E_P3_011: S019-09  # FlatList auto-scroll to highlighted Sunday
+
+  SF6:
+    acceptance_criteria:
+      AC-SF6-01: S019-06  # members-add-button found
+      AC-SF6-02: S019-06  # members-editor-fullname-input found
+      AC-SF6-03: S019-06  # members-editor-save-button found
+    edge_cases:
+      EC_E2E_P3_007: S019-09  # Informal name auto-fill on blur
+      EC_E2E_P3_008: S019-09  # Keyboard covering (KeyboardAvoidingView)
+
+  SF7:
+    acceptance_criteria:
+      AC-SF7-01: S019-07  # swipeable-edit-button found after swipe
+      AC-SF7-02: S019-07  # swipeable-delete-button found after swipe
+    edge_cases:
+      EC_E2E_P3_005: S019-10  # Swipe gesture reliability
+
+  SF8:
+    acceptance_criteria:
+      AC-SF8-01: S019-06  # settings-members-button found and tappable
+    edge_cases: []
+
+  SF9:
+    acceptance_criteria:
+      AC-SF9-01: S019-09  # Member 'E2E Orador' created via flow Part B
+      AC-SF9-02: S019-09  # Speaker assigned to slot, MemberSelectorModal worked
+      AC-SF9-03: S019-09  # Status changed to assigned_confirmed
+      AC-SF9-04: S019-09  # TopicSelectorModal opens and closes
+    edge_cases:
+      EC_E2E_P3_001: S019-09  # Dynamic date
+      EC_E2E_P3_002: S019-09  # Lazy speech creation wait
+      EC_E2E_P3_003: S019-09  # Member exists when modal opens
+      EC_E2E_P3_004: S019-09  # Status only after assignment
+      EC_E2E_P3_009: S019-09  # Conference Sunday
+      EC_E2E_P3_011: S019-09  # FlatList scroll
+      EC_E2E_P3_012: S019-09  # Position 2 toggle edge case avoided
+
+  SF10:
+    acceptance_criteria:
+      AC-SF10-01: S019-10  # Member 'E2E Membro Teste' added
+      AC-SF10-02: S019-10  # Swipe edit updates name to 'E2E Membro Editado'
+      AC-SF10-03: S019-10  # Swipe delete removes member after confirm
+    edge_cases:
+      EC_E2E_P3_005: S019-10  # Swipe gesture
+      EC_E2E_P3_006: S019-10  # Native Alert 'Excluir'
+      EC_E2E_P3_007: S019-10  # Informal name auto-fill
+      EC_E2E_P3_008: S019-10  # Keyboard covering
+      EC_E2E_P3_010: S019-10  # No conflict between flow 05 and 06 members
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation:
+  - ac_id: AC-SF1-01
+    how_to_verify: "Run 05-speeches.yaml, step taps speech-slot-1-speaker-button successfully"
+    covered_by_steps: [S019-01, S019-09]
+  - ac_id: AC-SF1-02
+    how_to_verify: "Run 05-speeches.yaml, step taps speech-slot-1-status-button successfully"
+    covered_by_steps: [S019-01, S019-09]
+  - ac_id: AC-SF1-03
+    how_to_verify: "Run 05-speeches.yaml, step taps speech-slot-1-topic-button successfully"
+    covered_by_steps: [S019-01, S019-09]
+  - ac_id: AC-SF2-01
+    how_to_verify: "Run 05-speeches.yaml, MemberSelectorModal search input is found"
+    covered_by_steps: [S019-02, S019-09]
+  - ac_id: AC-SF2-02
+    how_to_verify: "Run 05-speeches.yaml, MemberSelectorModal close button is found"
+    covered_by_steps: [S019-02, S019-09]
+  - ac_id: AC-SF3-01
+    how_to_verify: "Run 05-speeches.yaml, StatusChangeModal close button is found"
+    covered_by_steps: [S019-03, S019-09]
+  - ac_id: AC-SF3-02
+    how_to_verify: "Run 05-speeches.yaml, status-modal-option-assigned_confirmed tapped"
+    covered_by_steps: [S019-03, S019-09]
+  - ac_id: AC-SF4-01
+    how_to_verify: "Run 05-speeches.yaml, TopicSelectorModal search input is found"
+    covered_by_steps: [S019-04, S019-09]
+  - ac_id: AC-SF4-02
+    how_to_verify: "Run 05-speeches.yaml, TopicSelectorModal close button is tapped"
+    covered_by_steps: [S019-04, S019-09]
+  - ac_id: AC-SF5-01
+    how_to_verify: "Run 05-speeches.yaml, speeches-card-{date} root View is found"
+    covered_by_steps: [S019-05, S019-09]
+  - ac_id: AC-SF5-02
+    how_to_verify: "Run 05-speeches.yaml, header tap expands card showing speech slots"
+    covered_by_steps: [S019-05, S019-09]
+  - ac_id: AC-SF6-01
+    how_to_verify: "Run 05-speeches.yaml Part B, members-add-button is found"
+    covered_by_steps: [S019-06, S019-09, S019-10]
+  - ac_id: AC-SF6-02
+    how_to_verify: "Run 05-speeches.yaml Part B, members-editor-fullname-input receives text"
+    covered_by_steps: [S019-06, S019-09, S019-10]
+  - ac_id: AC-SF6-03
+    how_to_verify: "Run 05-speeches.yaml Part B, members-editor-save-button is tapped"
+    covered_by_steps: [S019-06, S019-09, S019-10]
+  - ac_id: AC-SF7-01
+    how_to_verify: "Run 06-members.yaml Part D, swipeable-edit-button is found after swipe"
+    covered_by_steps: [S019-07, S019-10]
+  - ac_id: AC-SF7-02
+    how_to_verify: "Run 06-members.yaml Part E, swipeable-delete-button is found after swipe"
+    covered_by_steps: [S019-07, S019-10]
+  - ac_id: AC-SF8-01
+    how_to_verify: "Run 05-speeches.yaml Part B, settings-members-button is tapped"
+    covered_by_steps: [S019-06, S019-09, S019-10]
+  - ac_id: AC-SF9-01
+    how_to_verify: "Run 05-speeches.yaml Part B succeeds, 'E2E Orador' visible"
+    covered_by_steps: [S019-09]
+  - ac_id: AC-SF9-02
+    how_to_verify: "Run 05-speeches.yaml Part E succeeds, speaker assigned"
+    covered_by_steps: [S019-09]
+  - ac_id: AC-SF9-03
+    how_to_verify: "Run 05-speeches.yaml Part F succeeds, status changed"
+    covered_by_steps: [S019-09]
+  - ac_id: AC-SF9-04
+    how_to_verify: "Run 05-speeches.yaml Part G succeeds, topic modal opens and closes"
+    covered_by_steps: [S019-09]
+  - ac_id: AC-SF10-01
+    how_to_verify: "Run 06-members.yaml Part C succeeds, 'E2E Membro Teste' visible"
+    covered_by_steps: [S019-10]
+  - ac_id: AC-SF10-02
+    how_to_verify: "Run 06-members.yaml Part D succeeds, name changed to 'E2E Membro Editado'"
+    covered_by_steps: [S019-10]
+  - ac_id: AC-SF10-03
+    how_to_verify: "Run 06-members.yaml Part E succeeds, member deleted after confirmation"
+    covered_by_steps: [S019-10]
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test (E2E flows ARE the tests)
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All 12 edge cases covered in at least 1 step
+  GATE-PLAN-06: true  # File paths match ARCH_M019 components

@@ -1,0 +1,942 @@
+# =============================================================================
+# SPEC_F019.yaml
+# E2E Testing with Maestro — Phase 3: Speeches + Members Flows
+# Artifact ID: 019
+# CR: 284
+# Created: 2026-03-09
+# Status: COMPLETE
+# =============================================================================
+
+metadata:
+  artifact_id: "019"
+  cr: 284
+  phase: 3
+  title: "E2E Testing with Maestro — Phase 3: Speeches + Members Flows"
+  status: complete
+  created: "2026-03-09"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  type: spec_summary
+  feature_id: F019_E2E
+  status: complete
+  ac_count: 22
+  edge_cases_count: 12
+
+  pending:
+    open_questions: 0
+    assumptions: 0
+    inconsistencies: 0
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    status: resolved
+    resolution: |
+      Flow 05 (speeches) will navigate to Settings -> Discursantes -> add a
+      member named "E2E Orador" first, then navigate to the Speeches tab to
+      assign that member to a speech slot. This makes the flow self-contained
+      and independent of flow 06 execution order.
+    question: |
+      New ward has NO members. Should flow 05 (speeches) depend on flow 06
+      (members) running first, or should flow 05 create its own member
+      before attempting speech assignment?
+    context: |
+      MemberSelectorModal will show an empty list in a new ward. Speaker
+      assignment requires at least one member. Two approaches: (a) flow 05
+      navigates to settings and adds a member itself, or (b) flow 06 runs
+      first to add members. Option (a) makes each flow self-contained.
+
+  - id: OQ-2
+    status: resolved
+    resolution: |
+      Test opening the TopicSelectorModal (tap topic field -> assert modal
+      opens -> close modal). Do NOT attempt to select a topic since the
+      ward may have no configured topic collections. This validates the
+      modal mechanism without depending on data.
+    question: |
+      New ward may have no topic collections configured. Should the E2E
+      flow attempt to assign a topic, or just verify the TopicSelectorModal
+      opens and closes?
+    context: |
+      TopicSelectorModal shows topics from active collections. A freshly
+      registered ward has default collections from the ward language, but
+      the topic list may be empty if general_collections have no topics
+      for that language variant. Attempting to select a topic could fail.
+
+  - id: OQ-3
+    status: resolved
+    resolution: |
+      Use Maestro's swipeLeft command on the member row element. The
+      SwipeableCard uses a Pan gesture that responds to leftward drag.
+      Add appropriate waits after the swipe for the action buttons to
+      appear. If swipe is unreliable, the edit/delete buttons have testIDs
+      for direct targeting after reveal.
+    question: |
+      SwipeableCard uses react-native-gesture-handler Pan gesture. Will
+      Maestro's swipe command reliably trigger the reveal animation?
+    context: |
+      Maestro supports swipeLeft/swipeRight on elements. The SwipeableCard
+      has a SWIPE_THRESHOLD of 20px and a spring animation. Gesture-based
+      interactions can be flaky in E2E tests.
+
+  - id: OQ-4
+    status: resolved
+    resolution: |
+      SettingsItem is a private component in settings/index.tsx. Add a
+      testID prop to its interface and forward it to the outer Pressable.
+      Pass testID="settings-members-button" from the members SettingsItem
+      call site.
+    question: |
+      SettingsItem component does not currently accept a testID prop.
+      Should we add testID to the SettingsItem interface, or target
+      the members item by its visible text "Discursantes"?
+    context: |
+      SettingsItem renders a Pressable with the label text. Maestro
+      could target by visible text, but using testID is more reliable
+      and follows the project convention. Adding testID to SettingsItem
+      requires modifying the interface.
+
+  - id: OQ-5
+    status: resolved
+    resolution: |
+      Use dynamic testIDs: speech-slot-{position}-speaker-button, etc.
+      Position values are 0, 1, 2, 3, 4. In the default config (managePrayers=false),
+      only positions 1, 2, 3 are visible. The E2E flow targets position 1
+      (1st speech) for assignment. Dynamic testIDs allow distinguishing
+      between slots when multiple are visible.
+    question: |
+      SpeechSlot renders multiple instances per expanded card (positions 1-3
+      for speeches, plus 0 and 4 for prayers when managePrayers=true).
+      Should testIDs be static or dynamic per position?
+    context: |
+      Multiple SpeechSlot instances need unique testIDs for Maestro to
+      target the correct one. Static testIDs would cause collisions.
+      Dynamic testIDs with position suffix match the convention established
+      in Phase 2 (agenda-card-{date}).
+
+  - id: OQ-6
+    status: resolved
+    resolution: |
+      SwipeableCard edit/delete button testIDs will be static since only
+      one SwipeableCard is revealed at a time (activeId management). The
+      buttons appear behind the swiped card and are unique in context.
+      Use swipeable-edit-button and swipeable-delete-button.
+    question: |
+      SwipeableCard is used for multiple member rows. Should the edit
+      and delete button testIDs be dynamic (per member) or static?
+    context: |
+      SwipeableCard has single-reveal management (only one card can be
+      revealed at a time via activeId). Since only one set of edit/delete
+      buttons is visible at any given time, static testIDs are sufficient
+      and simpler for Maestro targeting.
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    status: confirmed
+    assumption: |
+      Phase 1 and Phase 2 flows (01-register, 02-login-logout, 03-home-presentation,
+      04-agenda) are prerequisites. Phase 3 flows reuse TEST_EMAIL and TEST_PASSWORD
+      from 01-register. Each flow starts by logging in.
+    reason: |
+      Ward data created by 01-register is needed. Each flow file must be
+      independently runnable when the registered test account exists.
+    needs_confirmation: false
+
+  - id: A-2
+    status: confirmed
+    assumption: |
+      manage_prayers defaults to false for newly registered wards. Only
+      speech positions 1, 2, 3 are visible in the Speeches tab (no prayer
+      slots at positions 0, 4). The E2E flow tests only speech positions.
+    reason: |
+      New wards have manage_prayers=false (confirmed in Phase 1 EC043 and
+      Phase 2 A-6). Prayer slot testing would be Phase 4 scope.
+    needs_confirmation: false
+
+  - id: A-3
+    status: confirmed
+    assumption: |
+      SearchInput component already passes testID to its inner TextInput
+      via the ...rest spread pattern. No code change needed for
+      SearchInput.tsx. The callers (MemberSelectorModal, TopicSelectorModal,
+      members.tsx) just need to pass testID prop when rendering SearchInput.
+    reason: |
+      Verified in Phase 2 (EC_E2E_P2_011). SearchInput extends TextInputProps
+      and spreads rest props including testID.
+    needs_confirmation: false
+
+  - id: A-4
+    status: confirmed
+    assumption: |
+      After assigning a speaker to a speech slot, the status automatically
+      changes from not_assigned to assigned_not_invited. The StatusChangeModal
+      then shows available transitions: assigned_invited, assigned_confirmed,
+      and gave_up.
+    reason: |
+      Verified from useSpeeches hook and SpeechSlot component. Speaker
+      assignment triggers a mutation that sets status to assigned_not_invited.
+      getAvailableStatuses returns the valid next statuses.
+    needs_confirmation: false
+
+  - id: A-5
+    status: confirmed
+    assumption: |
+      The Speeches tab label in pt-BR is "Discursos" (not "Discursos e Oracoes")
+      because manage_prayers defaults to false. The tab is the 3rd tab
+      in the bottom navigation.
+    reason: |
+      Tab label depends on manage_prayers. When false, label is just
+      "Discursos". When true, it wraps to 2 lines: "Discursos e Oracoes".
+    needs_confirmation: false
+
+  - id: A-6
+    status: confirmed
+    assumption: |
+      The next Sunday card in the Speeches tab is expanded via tap on
+      the card header. Expanding triggers lazy-creation of speech records
+      for that Sunday (network call). After creation, SpeechSlot components
+      appear for positions 1, 2, 3.
+    reason: |
+      Verified from speeches.tsx. SundayCard onToggle calls handleToggle
+      which triggers ensureSpeeches (lazy creation). SpeechSlot components
+      are rendered inside the expanded card.
+    needs_confirmation: false
+
+  - id: A-7
+    status: confirmed
+    assumption: |
+      SundayCard component in speeches.tsx does NOT currently accept a
+      testID prop. The SundayCardProps interface needs to be extended with
+      an optional testID prop, and speeches.tsx needs to pass
+      testID={`speeches-card-${item.date}`} to each SundayCard.
+    reason: |
+      Verified from SundayCard.tsx SundayCardProps interface (lines 32-67).
+      No testID prop exists. Same pattern as Phase 2's agenda card testID.
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []
+  # No inconsistencies found with SPEC_CONSOLIDATED.
+  # Phase 3 is an additive extension of F017_E2E (Phase 1) and F018_E2E (Phase 2).
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+
+features:
+
+  - id: F019_E2E
+    name: "E2E Testing — Phase 3 (Speeches + Members Flows)"
+    area: e2e_testing
+    description: |
+      Extends the Maestro E2E testing infrastructure from Phase 2 with:
+      1. testID props on SpeechSlot elements (speaker, topic, status, remove,
+         clear-topic buttons — all dynamic per position)
+      2. testID props on MemberSelectorModal (search input, close button)
+      3. testID props on StatusChangeModal (close button, option items per status)
+      4. testID props on TopicSelectorModal (search input, close button)
+      5. testID prop on SundayCard (via prop forwarding from speeches.tsx)
+      6. testID props on Members screen (add, back, search, editor fields,
+         save, cancel buttons)
+      7. testID on SwipeableCard action buttons (edit, delete)
+      8. testID on SettingsItem (via prop addition, used for members navigation)
+      9. Two new Maestro flow files:
+         - 05-speeches.yaml: Login -> Settings -> add member -> Speeches tab ->
+           expand Sunday -> assign speaker -> verify status -> change status ->
+           open/close topic modal -> collapse
+         - 06-members.yaml: Login -> Settings -> Discursantes -> add member ->
+           verify -> edit member (swipe) -> verify -> delete member (swipe) ->
+           verify removal
+
+      Continues from Phase 1+2 conventions: testID = {screen}-{element}-{type}
+      kebab-case. Tests run against production Supabase with RLS isolation.
+      Each flow logs in with credentials from 01-register.
+
+    sub_features:
+
+      # ----- SF1: testID on SpeechSlot -----
+      - id: SF1
+        name: "Add testID to SpeechSlot elements"
+        file: "src/components/SpeechSlot.tsx"
+        description: |
+          Add testID to key interactive elements in SpeechSlot. All testIDs
+          are dynamic using the position prop:
+          - Speaker field Pressable: speech-slot-{position}-speaker-button
+          - Topic field Pressable: speech-slot-{position}-topic-button
+          - Status section Pressable: speech-slot-{position}-status-button
+          - Remove speaker (X) Pressable: speech-slot-{position}-remove-button
+          - Clear topic (X) Pressable: speech-slot-{position}-clear-topic-button
+          - 2nd speech toggle Switch: speech-slot-2-toggle (position 2 only)
+        changes:
+          - element: "Speaker field (Pressable, line 232)"
+            testID: "speech-slot-{position}-speaker-button"
+            component: Pressable
+            rationale: "Primary interaction to open MemberSelectorModal"
+          - element: "Topic field (Pressable, line 269)"
+            testID: "speech-slot-{position}-topic-button"
+            component: Pressable
+            rationale: "Opens TopicSelectorModal"
+          - element: "Status section (Pressable, line 190)"
+            testID: "speech-slot-{position}-status-button"
+            component: Pressable
+            rationale: "Opens StatusChangeModal"
+          - element: "Remove speaker X (Pressable, line 254)"
+            testID: "speech-slot-{position}-remove-button"
+            component: Pressable
+            rationale: "Removes speaker assignment"
+          - element: "Clear topic X (Pressable, line 291)"
+            testID: "speech-slot-{position}-clear-topic-button"
+            component: Pressable
+            rationale: "Clears topic assignment"
+          - element: "2nd speech toggle (Switch, line 180)"
+            testID: "speech-slot-2-toggle"
+            component: Switch
+            rationale: "Only for position 2, controls 2nd speech visibility"
+        acceptance_criteria:
+          - given: "SpeechSlot renders for position 1 in expanded Sunday card"
+            when: "Maestro queries for testID 'speech-slot-1-speaker-button'"
+            then: "The speaker field Pressable is found and can be tapped"
+          - given: "SpeechSlot renders for position 1 with speaker assigned"
+            when: "Maestro queries for testID 'speech-slot-1-status-button'"
+            then: "The status section Pressable is found and can be tapped to open StatusChangeModal"
+          - given: "SpeechSlot renders for position 1 (non-prayer)"
+            when: "Maestro queries for testID 'speech-slot-1-topic-button'"
+            then: "The topic field Pressable is found and can be tapped"
+
+      # ----- SF2: testID on MemberSelectorModal -----
+      - id: SF2
+        name: "Add testID to MemberSelectorModal elements"
+        file: "src/components/MemberSelectorModal.tsx"
+        description: |
+          Add testID to MemberSelectorModal search input and close button.
+          These enable Maestro to search for and select members.
+        changes:
+          - element: "Search input (SearchInput, line 65)"
+            testID: "member-selector-search-input"
+            component: SearchInput
+            rationale: "SearchInput passes testID to inner TextInput via rest spread"
+          - element: "Close button (Pressable, line 73)"
+            testID: "member-selector-close-button"
+            component: Pressable
+            rationale: "Closes the modal"
+          - element: "Member item (Pressable per member, line 84)"
+            testID: "member-selector-item-{member.id}"
+            component: Pressable
+            rationale: "Dynamic per member for targeted selection"
+        acceptance_criteria:
+          - given: "MemberSelectorModal is open"
+            when: "Maestro queries for testID 'member-selector-search-input'"
+            then: "The search input is found and can receive text"
+          - given: "MemberSelectorModal is open"
+            when: "Maestro queries for testID 'member-selector-close-button'"
+            then: "The close button is found and can be tapped"
+
+      # ----- SF3: testID on StatusChangeModal -----
+      - id: SF3
+        name: "Add testID to StatusChangeModal elements"
+        file: "src/components/StatusChangeModal.tsx"
+        description: |
+          Add testID to StatusChangeModal close button and status option items.
+          Option testIDs are dynamic per status value.
+        changes:
+          - element: "Close button (Pressable, line 117)"
+            testID: "status-modal-close-button"
+            component: Pressable
+            rationale: "Closes the modal"
+          - element: "Status option row (Pressable per status, line 99)"
+            testID: "status-modal-option-{status}"
+            component: Pressable
+            rationale: "Dynamic per status: assigned_not_invited, assigned_invited, assigned_confirmed, gave_up"
+          - element: "Current status row (View, line 83)"
+            testID: "status-modal-current"
+            component: View
+            rationale: "Shows current status indicator"
+        acceptance_criteria:
+          - given: "StatusChangeModal is open"
+            when: "Maestro queries for testID 'status-modal-close-button'"
+            then: "The close button is found and can be tapped"
+          - given: "StatusChangeModal is open with current status assigned_not_invited"
+            when: "Maestro queries for testID 'status-modal-option-assigned_confirmed'"
+            then: "The assigned_confirmed option is found and can be tapped"
+
+      # ----- SF4: testID on TopicSelectorModal -----
+      - id: SF4
+        name: "Add testID to TopicSelectorModal elements"
+        file: "src/components/TopicSelectorModal.tsx"
+        description: |
+          Add testID to TopicSelectorModal search input and close button.
+        changes:
+          - element: "Search input (SearchInput, line 80)"
+            testID: "topic-selector-search-input"
+            component: SearchInput
+            rationale: "SearchInput passes testID to inner TextInput via rest spread"
+          - element: "Close button (Pressable, line 87)"
+            testID: "topic-selector-close-button"
+            component: Pressable
+            rationale: "Closes the modal"
+        acceptance_criteria:
+          - given: "TopicSelectorModal is open"
+            when: "Maestro queries for testID 'topic-selector-search-input'"
+            then: "The search input is found and can receive text"
+          - given: "TopicSelectorModal is open"
+            when: "Maestro queries for testID 'topic-selector-close-button'"
+            then: "The close button is found and can be tapped"
+
+      # ----- SF5: testID on SundayCard (speeches context) -----
+      - id: SF5
+        name: "Add testID prop to SundayCard and pass from speeches.tsx"
+        files:
+          - "src/components/SundayCard.tsx"
+          - "src/app/(tabs)/speeches.tsx"
+        description: |
+          Add optional testID prop to SundayCardProps interface. Forward the
+          testID to the root View of SundayCard. In speeches.tsx, pass
+          testID={`speeches-card-${item.date}`} to each SundayCard instance.
+        changes:
+          - element: "SundayCard root View (line 444)"
+            testID: "speeches-card-{date}"
+            component: View
+            rationale: "Dynamic testID per date allows targeting specific Sunday cards"
+          - element: "SundayCard header Pressable (line 454)"
+            testID: "speeches-card-header-{date}"
+            component: Pressable
+            rationale: "Header is the tap target for expand/collapse"
+        acceptance_criteria:
+          - given: "Speeches tab renders with next Sunday card"
+            when: "Maestro queries for testID 'speeches-card-YYYY-MM-DD'"
+            then: "The card root View is found"
+          - given: "Speeches tab renders with next Sunday card"
+            when: "Maestro taps testID 'speeches-card-header-YYYY-MM-DD'"
+            then: "The card expands showing speech slots"
+
+      # ----- SF6: testID on Members screen -----
+      - id: SF6
+        name: "Add testID to Members screen elements"
+        file: "src/app/(tabs)/settings/members.tsx"
+        description: |
+          Add testID to Members screen interactive elements: add button,
+          back button, search input, and MemberEditor form fields.
+        changes:
+          - element: "Add (+) button (Pressable, line 573)"
+            testID: "members-add-button"
+            component: Pressable
+          - element: "Back button (Pressable, line 566)"
+            testID: "members-back-button"
+            component: Pressable
+          - element: "Search input (SearchInput, line 593)"
+            testID: "members-search-input"
+            component: SearchInput
+          - element: "Full name input (TextInput, line 82)"
+            testID: "members-editor-fullname-input"
+            component: TextInput
+          - element: "Informal name input (TextInput, line 99)"
+            testID: "members-editor-informal-input"
+            component: TextInput
+          - element: "Phone input (TextInput, line 117)"
+            testID: "members-editor-phone-input"
+            component: TextInput
+          - element: "Save button (Pressable, line 140)"
+            testID: "members-editor-save-button"
+            component: Pressable
+          - element: "Cancel button (Pressable, line 131)"
+            testID: "members-editor-cancel-button"
+            component: Pressable
+        acceptance_criteria:
+          - given: "Members screen renders"
+            when: "Maestro queries for testID 'members-add-button'"
+            then: "The add button is found and can be tapped"
+          - given: "MemberEditor is open (adding new member)"
+            when: "Maestro queries for testID 'members-editor-fullname-input'"
+            then: "The full name TextInput is found and can receive text"
+          - given: "MemberEditor is open with name filled"
+            when: "Maestro queries for testID 'members-editor-save-button'"
+            then: "The save button is found and can be tapped"
+
+      # ----- SF7: testID on SwipeableCard -----
+      - id: SF7
+        name: "Add testID to SwipeableCard action buttons"
+        file: "src/components/SwipeableCard.tsx"
+        description: |
+          Add testID to the edit and delete action button Pressables.
+          Static testIDs since only one card is revealed at a time.
+        changes:
+          - element: "Edit button (Pressable, line 154)"
+            testID: "swipeable-edit-button"
+            component: Pressable
+          - element: "Delete button (Pressable, line 164)"
+            testID: "swipeable-delete-button"
+            component: Pressable
+        acceptance_criteria:
+          - given: "SwipeableCard is swiped left to reveal actions"
+            when: "Maestro queries for testID 'swipeable-edit-button'"
+            then: "The edit button is found and can be tapped"
+          - given: "SwipeableCard is swiped left to reveal actions"
+            when: "Maestro queries for testID 'swipeable-delete-button'"
+            then: "The delete button is found and can be tapped"
+
+      # ----- SF8: testID on SettingsItem for members navigation -----
+      - id: SF8
+        name: "Add testID prop to SettingsItem and pass for members"
+        file: "src/app/(tabs)/settings/index.tsx"
+        description: |
+          Add optional testID prop to SettingsItemProps interface and
+          forward to the outer Pressable. Pass testID="settings-members-button"
+          from the members SettingsItem call site.
+        changes:
+          - element: "SettingsItem outer Pressable (line 32)"
+            testID: "settings-members-button"
+            component: Pressable
+            rationale: "Enables Maestro to navigate to members screen"
+        acceptance_criteria:
+          - given: "Settings tab renders with Ward Settings group visible"
+            when: "Maestro queries for testID 'settings-members-button'"
+            then: "The members navigation item is found and can be tapped"
+
+      # ----- SF9: Maestro flow 05-speeches.yaml -----
+      - id: SF9
+        name: "Maestro flow: 05-speeches.yaml"
+        file: "e2e/maestro/05-speeches.yaml"
+        description: |
+          End-to-end flow that tests speech assignment + status change.
+          This flow runs AFTER 01-register.yaml to reuse credentials.
+
+          Flow steps:
+          Part A — Login:
+          1. Assert login screen visible
+          2. Enter TEST_EMAIL and TEST_PASSWORD from 01-register output
+          3. Tap login button
+          4. Wait for Home tab visible
+
+          Part B — Navigate to Members and add a test member:
+          5. Tap "Configuracoes" tab (4th tab)
+          6. Wait for Settings screen
+          7. Tap "Discursantes" item (testID: settings-members-button)
+          8. Wait for Members screen title "Discursantes"
+          9. Tap add button (testID: members-add-button)
+          10. Type "E2E Orador" in full name input (testID: members-editor-fullname-input)
+          11. Tap save button (testID: members-editor-save-button)
+          12. Assert "E2E Orador" visible in member list
+          13. Tap back button (testID: members-back-button)
+          14. Wait for Settings screen
+
+          Part C — Navigate to Speeches tab:
+          15. Tap "Discursos" tab (3rd tab)
+          16. Wait for Speeches tab content
+
+          Part D — Expand next Sunday card:
+          17. Compute next Sunday date via evalScript
+          18. Tap next Sunday card header (testID: speeches-card-header-{NEXT_SUNDAY})
+          19. Wait for speech slots to load (extendedWaitUntil speech-slot-1-speaker-button)
+
+          Part E — Assign speaker to 1st speech:
+          20. Tap 1st speech speaker field (testID: speech-slot-1-speaker-button)
+          21. Wait for MemberSelectorModal
+          22. Assert "E2E Orador" visible in member list
+          23. Tap on "E2E Orador" text
+          24. Wait for modal to close
+          25. Assert "E2E Orador" text visible in speech slot 1
+
+          Part F — Change status:
+          26. Tap status section (testID: speech-slot-1-status-button)
+          27. Wait for StatusChangeModal ("Alterar status")
+          28. Tap "Designado/Confirmado" option (testID: status-modal-option-assigned_confirmed)
+          29. Wait for modal to close
+          30. Assert "Designado/Confirmado" text visible
+
+          Part G — Open/close topic modal:
+          31. Tap topic field (testID: speech-slot-1-topic-button)
+          32. Wait for TopicSelectorModal
+          33. Assert close button visible (testID: topic-selector-close-button)
+          34. Tap close button
+          35. Wait for modal to close
+
+          Part H — Collapse card:
+          36. Tap card header again to collapse
+          37. Assert speech slots no longer visible
+
+        acceptance_criteria:
+          - given: "User is logged in with no members in ward"
+            when: "Flow 05-speeches executes Part B (add member)"
+            then: "Member 'E2E Orador' is created and visible in members list"
+          - given: "User navigates to Speeches tab with member existing"
+            when: "Flow executes Part E (assign speaker)"
+            then: "MemberSelectorModal shows 'E2E Orador', selection assigns speaker to slot"
+          - given: "Speaker is assigned to speech slot 1"
+            when: "Flow executes Part F (change status)"
+            then: "StatusChangeModal opens, status changed to assigned_confirmed"
+          - given: "Topic field is tapped"
+            when: "Flow executes Part G (topic modal)"
+            then: "TopicSelectorModal opens, close button works"
+
+      # ----- SF10: Maestro flow 06-members.yaml -----
+      - id: SF10
+        name: "Maestro flow: 06-members.yaml"
+        file: "e2e/maestro/06-members.yaml"
+        description: |
+          End-to-end flow that tests member CRUD (add, edit, delete).
+          This flow runs AFTER 01-register.yaml to reuse credentials.
+
+          Flow steps:
+          Part A — Login:
+          1. Assert login screen visible
+          2. Enter TEST_EMAIL and TEST_PASSWORD from 01-register output
+          3. Tap login button
+          4. Wait for Home tab visible
+
+          Part B — Navigate to Members screen:
+          5. Tap "Configuracoes" tab (4th tab)
+          6. Wait for Settings screen
+          7. Tap "Discursantes" item (testID: settings-members-button)
+          8. Wait for Members screen title "Discursantes"
+
+          Part C — Add new member:
+          9. Tap add button (testID: members-add-button)
+          10. Wait for MemberEditor to appear
+          11. Type "E2E Membro Teste" in full name input (testID: members-editor-fullname-input)
+          12. Type "Teste" in informal name input (testID: members-editor-informal-input)
+          13. Tap save button (testID: members-editor-save-button)
+          14. Assert "E2E Membro Teste" visible in member list
+
+          Part D — Edit member (swipe + edit):
+          15. Swipe left on "E2E Membro Teste" row to reveal actions
+          16. Wait for edit button to appear
+          17. Tap edit button (testID: swipeable-edit-button)
+          18. Wait for MemberEditor to appear pre-filled
+          19. Clear and type "E2E Membro Editado" in full name input
+          20. Tap save button (testID: members-editor-save-button)
+          21. Assert "E2E Membro Editado" visible in member list
+          22. Assert "E2E Membro Teste" NOT visible (old name gone)
+
+          Part E — Delete member (swipe + delete):
+          23. Swipe left on "E2E Membro Editado" row
+          24. Wait for delete button to appear
+          25. Tap delete button (testID: swipeable-delete-button)
+          26. Wait for confirmation alert "Tem certeza que deseja excluir este membro?"
+          27. Tap "Excluir" on alert
+          28. Assert "E2E Membro Editado" NOT visible (member removed)
+
+          Part F — Verify empty state:
+          29. Assert empty state or remaining members visible
+          30. Navigate back to Settings
+
+        acceptance_criteria:
+          - given: "User navigates to Members screen"
+            when: "Flow 06-members executes Part C (add)"
+            then: "Member 'E2E Membro Teste' is created and visible in list"
+          - given: "Member exists in list"
+            when: "Flow executes Part D (swipe + edit)"
+            then: "SwipeableCard reveals edit button, member name updated to 'E2E Membro Editado'"
+          - given: "Edited member exists in list"
+            when: "Flow executes Part E (swipe + delete)"
+            then: "Confirmation alert appears, member is removed from list after confirm"
+
+# =============================================================================
+# BUSINESS RULES (Phase 3 E2E-specific)
+# =============================================================================
+
+business_rules:
+
+  - id: BR_E2E_P3_001
+    rule: "Phase 3 flows require Phase 1 registered credentials"
+    description: |
+      Flows 05 and 06 start by logging in with TEST_EMAIL and TEST_PASSWORD
+      from 01-register output. They do NOT register a new user/ward.
+
+  - id: BR_E2E_P3_002
+    rule: "SpeechSlot testIDs use dynamic position suffix"
+    description: |
+      SpeechSlot testIDs use the position prop as suffix:
+      speech-slot-{position}-speaker-button, speech-slot-{position}-topic-button, etc.
+      Position values: 0 (opening prayer), 1 (1st speech), 2 (2nd speech),
+      3 (last speech), 4 (closing prayer). With managePrayers=false, only
+      positions 1, 2, 3 are visible.
+
+  - id: BR_E2E_P3_003
+    rule: "StatusChangeModal option testIDs use status value suffix"
+    description: |
+      StatusChangeModal option Pressable testIDs use the status enum value:
+      status-modal-option-{status}. Values: assigned_not_invited,
+      assigned_invited, assigned_confirmed, gave_up.
+
+  - id: BR_E2E_P3_004
+    rule: "Flow 05 is self-contained for member creation"
+    description: |
+      Flow 05 (speeches) creates its own test member ("E2E Orador") by
+      navigating to Settings -> Members -> Add before going to the Speeches
+      tab. This makes it independent of flow 06 execution order.
+
+  - id: BR_E2E_P3_005
+    rule: "SwipeableCard action button testIDs are static"
+    description: |
+      swipeable-edit-button and swipeable-delete-button are static testIDs
+      because only one SwipeableCard can be revealed at a time (managed by
+      activeId state in the parent component).
+
+  - id: BR_E2E_P3_006
+    rule: "SettingsItem testID added via prop extension"
+    description: |
+      SettingsItem component (private in settings/index.tsx) gets a new
+      optional testID prop in its interface, forwarded to the outer Pressable.
+      Only the members item passes testID="settings-members-button".
+
+# =============================================================================
+# DESIGN DECISIONS (Phase 3 E2E-specific)
+# =============================================================================
+
+design_decisions:
+
+  - id: DD_E2E_P3_001
+    decision: "Dynamic testID for SpeechSlot using position prop"
+    rationale: |
+      Multiple SpeechSlot instances render per expanded card. Dynamic testIDs
+      with position suffix (speech-slot-1-speaker-button) provide unique
+      identifiers without requiring parent context. Follows the dynamic
+      testID pattern established in Phase 2 (agenda-card-{date}).
+
+  - id: DD_E2E_P3_002
+    decision: "Flow 05 creates member before speech assignment"
+    rationale: |
+      A new ward has no members. Rather than depending on flow 06 (member CRUD)
+      running first, flow 05 navigates to Settings -> Members -> Add to create
+      "E2E Orador" before navigating to Speeches tab. This ensures flow
+      independence and makes each flow self-contained.
+
+  - id: DD_E2E_P3_003
+    decision: "Topic modal open/close test without selection"
+    rationale: |
+      New ward may have no topics in active collections. Testing that the
+      TopicSelectorModal opens and closes validates the interaction path
+      without depending on topic data. If topics exist, the flow could be
+      extended in Phase 4 to select one.
+
+  - id: DD_E2E_P3_004
+    decision: "SundayCard header gets separate testID from card root"
+    rationale: |
+      The card root View (speeches-card-{date}) and the header Pressable
+      (speeches-card-header-{date}) need separate testIDs. The root is
+      for assertVisible checks, while the header is the tap target for
+      expand/collapse. This matches Maestro's need to tap a specific element.
+
+  - id: DD_E2E_P3_005
+    decision: "Static testIDs for SwipeableCard edit/delete buttons"
+    rationale: |
+      Only one SwipeableCard is revealed at a time (managed by parent activeId).
+      Static testIDs are sufficient and simpler than dynamic per-member IDs.
+      The flow targets the visible buttons after swiping a specific member row.
+
+  - id: DD_E2E_P3_006
+    decision: "SettingsItem testID prop addition (additive change)"
+    rationale: |
+      SettingsItem is a private component only used in settings/index.tsx.
+      Adding an optional testID prop is the minimal change needed. The prop
+      is only passed for the members item; other SettingsItem instances
+      remain unchanged.
+
+# =============================================================================
+# EDGE CASES (Phase 3 E2E-specific)
+# =============================================================================
+
+edge_cases:
+
+  - id: EC_E2E_P3_001
+    description: |
+      Next Sunday date varies between test runs. Flow 05 computes the next
+      Sunday date dynamically via evalScript (same pattern as flow 04-agenda).
+      The testID speeches-card-header-${nextSunday} targets the correct card.
+
+  - id: EC_E2E_P3_002
+    description: |
+      Speech lazy-creation takes network time. After tapping the Sunday card
+      header to expand, Maestro must wait for SpeechSlot elements to appear
+      (extendedWaitUntil for speech-slot-1-speaker-button) before interacting.
+
+  - id: EC_E2E_P3_003
+    description: |
+      MemberSelectorModal shows empty list initially (no members in new ward).
+      Flow 05 adds a member first, so the modal will show at least "E2E Orador"
+      when opened. If somehow the member is not found, flow will fail at the
+      assertion step with a clear error.
+
+  - id: EC_E2E_P3_004
+    description: |
+      StatusChangeModal only opens when status is not "not_assigned". After
+      assigning a speaker, status auto-changes to "assigned_not_invited".
+      The flow must wait for the speaker assignment to complete before
+      attempting to open the StatusChangeModal.
+
+  - id: EC_E2E_P3_005
+    description: |
+      SwipeableCard swipe gesture may be unreliable in Maestro. The Pan
+      gesture has a 20px threshold and spring animation. Maestro's swipeLeft
+      command should work, but may need retry or longer swipe distance.
+      After swipe, wait for action buttons to appear before tapping.
+
+  - id: EC_E2E_P3_006
+    description: |
+      Member deletion shows a native Alert dialog (not a custom modal).
+      Maestro handles native alerts via tapOn for button text. The confirm
+      button text is "Excluir" (pt-BR for Delete). If the member has future
+      speeches, the alert message includes a warning count but the button
+      text remains "Excluir".
+
+  - id: EC_E2E_P3_007
+    description: |
+      MemberEditor auto-fills informal_name on full_name blur. When typing
+      "E2E Orador" and tabbing/blurring the name field, informal_name auto-fills
+      to "E2E". The flow does not need to manually set informal_name in flow 05.
+
+  - id: EC_E2E_P3_008
+    description: |
+      Keyboard may cover MemberEditor fields on smaller screens. Maestro
+      should use hideKeyboard after text input if needed, and the
+      KeyboardAvoidingView in members.tsx handles iOS padding.
+
+  - id: EC_E2E_P3_009
+    description: |
+      Next Sunday might be a conference type (non-expandable in Speeches tab).
+      This is the same edge case as Phase 2 (EC_E2E_P2_002). The flow should
+      handle this by checking if the card is expandable and potentially
+      targeting the following Sunday instead.
+
+  - id: EC_E2E_P3_010
+    description: |
+      Flow 05 and flow 06 both add members. If both flows run in sequence,
+      the members created by flow 05 ("E2E Orador") will still exist when
+      flow 06 runs. Flow 06 creates its own member ("E2E Membro Teste"),
+      edits it, and deletes it. No conflict between the two flows.
+
+  - id: EC_E2E_P3_011
+    description: |
+      The Speeches tab FlatList scrolls to the highlighted (next) Sunday.
+      The target card may already be visible without scrolling. If not,
+      Maestro should use scrollUntilVisible to find the card by its testID.
+
+  - id: EC_E2E_P3_012
+    description: |
+      SpeechSlot position 2 may have the 2nd speech toggle disabled by
+      default. When has_second_speech is true (default), position 2 slot
+      is visible and interactive. The flow targets position 1 to avoid
+      this edge case entirely.
+
+# =============================================================================
+# FILES TO MODIFY
+# =============================================================================
+
+files_to_modify:
+  - path: "src/components/SpeechSlot.tsx"
+    changes: |
+      Add testID to 6 elements (speaker Pressable, topic Pressable, status
+      Pressable, remove Pressable, clear-topic Pressable — all dynamic
+      with position; 2nd speech toggle Switch for position 2 only)
+
+  - path: "src/components/MemberSelectorModal.tsx"
+    changes: |
+      Add testID to 3 elements (SearchInput, close Pressable, member item
+      Pressable — dynamic per member.id)
+
+  - path: "src/components/StatusChangeModal.tsx"
+    changes: |
+      Add testID to 3 elements (close Pressable, option Pressable — dynamic
+      per status value, current status View)
+
+  - path: "src/components/TopicSelectorModal.tsx"
+    changes: |
+      Add testID to 2 elements (SearchInput, close Pressable)
+
+  - path: "src/components/SundayCard.tsx"
+    changes: |
+      Add testID prop to SundayCardProps interface. Forward testID to root
+      View. Add headerTestID derived from testID for header Pressable.
+
+  - path: "src/app/(tabs)/speeches.tsx"
+    changes: |
+      Pass testID={`speeches-card-${item.date}`} to each SundayCard instance.
+
+  - path: "src/app/(tabs)/settings/members.tsx"
+    changes: |
+      Add testID to 8 elements (add button, back button, SearchInput,
+      fullName TextInput, informalName TextInput, phone TextInput,
+      save Pressable, cancel Pressable)
+
+  - path: "src/components/SwipeableCard.tsx"
+    changes: |
+      Add testID to 2 elements (edit button Pressable, delete button Pressable)
+
+  - path: "src/app/(tabs)/settings/index.tsx"
+    changes: |
+      Add testID prop to SettingsItemProps interface and forward to Pressable.
+      Pass testID="settings-members-button" to members SettingsItem.
+
+# =============================================================================
+# FILES TO CREATE
+# =============================================================================
+
+files_to_create:
+  - path: "e2e/maestro/05-speeches.yaml"
+    description: |
+      Maestro flow: Login -> Settings -> add member -> Speeches tab ->
+      expand Sunday -> assign speaker -> change status -> open/close topic
+      modal -> collapse card
+
+  - path: "e2e/maestro/06-members.yaml"
+    description: |
+      Maestro flow: Login -> Settings -> Discursantes -> add member ->
+      verify -> swipe + edit -> verify -> swipe + delete + confirm -> verify
+
+# =============================================================================
+# IMPACT ANALYSIS
+# =============================================================================
+
+impact_analysis:
+  existing_features_affected: []
+  existing_tests_affected: []
+  notes: |
+    Adding testID props has ZERO functional impact (same as Phase 1 and 2).
+    testID is a React Native prop used only by testing frameworks.
+
+    Modifications to SundayCard (adding testID prop) are additive only.
+    Modifications to SettingsItem (adding testID prop) are additive only.
+
+    The 2 new YAML files are outside src/ and don't affect the app bundle.
+
+    Phase 1 flows (01-register, 02-login-logout) are NOT modified.
+    Phase 2 flows (03-home-presentation, 04-agenda) are NOT modified.
+
+    SettingsItem testID addition: Only the members call site passes testID.
+    Other SettingsItem instances remain unchanged (no testID prop passed).
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true   # Read SPEC_CONSOLIDATED before starting
+  GATE-02: true   # Identified ambiguities (OQ-1 through OQ-6)
+  GATE-03: true   # Listed ALL open questions with IDs
+  GATE-04: true   # Listed ALL assumptions with IDs
+  GATE-05: true   # No inconsistencies with SPEC_CONSOLIDATED found
+  GATE-06: true   # Status set correctly
+
+validation_gate_2:
+  GATE-07: true   # All open questions resolved
+  GATE-08: true   # All assumptions confirmed
+  GATE-09: true   # Status updated to complete
+  GATE-10: true   # SPEC_CONSOLIDATED to be updated with F019_E2E
+  GATE-11: true   # Zero placeholders in SPEC
+  GATE-12: true   # Zero unresolved open questions

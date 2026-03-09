@@ -7,8 +7,8 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-08"
-  total_features: 66
+  last_updated: "2026-03-09"
+  total_features: 67
   total_business_rules: 49
   total_design_decisions: 66
 
@@ -1574,6 +1574,46 @@ features:
       - given: "AgendaForm is expanded"
         when: "Maestro flow 04-agenda assigns opening hymn via search '2'"
         then: "Hymn selected, opening hymn field shows hymn number and title"
+
+  - id: F019_E2E
+    name: "E2E Testing — Phase 3 (Speeches + Members Flows)"
+    area: e2e_testing
+    description: |
+      Extends F018_E2E with testID props on SpeechSlot (speaker, topic, status,
+      remove, clear-topic — dynamic per position), MemberSelectorModal (search,
+      close), StatusChangeModal (close, option items per status), TopicSelectorModal
+      (search, close), SundayCard (root + header via prop forwarding from
+      speeches.tsx), Members screen (add, back, search, editor fields, save,
+      cancel), SwipeableCard (edit, delete buttons), and SettingsItem (testID
+      prop for members navigation). Two new Maestro flows: 05-speeches.yaml
+      (Login -> add member via Settings -> Speeches tab -> expand Sunday ->
+      assign speaker -> change status -> open/close topic modal -> collapse)
+      and 06-members.yaml (Login -> Settings -> Members CRUD: add, swipe-edit,
+      swipe-delete with confirm). Phase 3 flows reuse credentials from
+      01-register. Dynamic testIDs: speech-slot-{position}-*, speeches-card-{date},
+      status-modal-option-{status}. [CR-284]
+    acceptance_criteria:
+      - given: "User is logged in with no members in ward"
+        when: "Maestro flow 05-speeches adds member via Settings then assigns to speech"
+        then: "Member 'E2E Orador' created, assigned to 1st speech slot, name visible"
+      - given: "Speaker is assigned to speech slot"
+        when: "Maestro flow 05-speeches opens StatusChangeModal and selects confirmed"
+        then: "Status changes to 'Designado/Confirmado'"
+      - given: "User navigates to Members screen"
+        when: "Maestro flow 06-members adds member 'E2E Membro Teste'"
+        then: "Member appears in list"
+      - given: "Member exists in list"
+        when: "Maestro flow 06-members swipes member, taps edit, modifies name"
+        then: "Member name updated to 'E2E Membro Editado'"
+      - given: "Edited member exists in list"
+        when: "Maestro flow 06-members swipes member, taps delete, confirms"
+        then: "Member removed from list"
+      - given: "SpeechSlot renders at position 1"
+        when: "Maestro queries for testID 'speech-slot-1-speaker-button'"
+        then: "The speaker field Pressable is found and can be tapped"
+      - given: "SwipeableCard is swiped left to reveal actions"
+        when: "Maestro queries for testID 'swipeable-edit-button'"
+        then: "The edit button is found and can be tapped"
 
 # =============================================================================
 # BUSINESS RULES

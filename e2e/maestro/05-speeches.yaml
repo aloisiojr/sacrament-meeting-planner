@@ -1,0 +1,150 @@
+appId: com.alouisio.sacramentmeetingplanner
+---
+# 05-speeches: Add member -> Speeches tab -> assign speaker -> change status -> topic modal
+
+# ---- Part A: Login ----
+
+- assertVisible:
+    id: "login-submit-button"
+
+- tapOn:
+    id: "login-email-input"
+- inputText: ${output.TEST_EMAIL}
+
+- tapOn:
+    id: "login-password-input"
+- inputText: ${output.TEST_PASSWORD}
+
+- tapOn:
+    id: "login-submit-button"
+
+- extendedWaitUntil:
+    visible: "Início"
+    timeout: 10000
+
+# ---- Part B: Navigate to Members and add test member ----
+
+- tapOn: "Configurações"
+
+- extendedWaitUntil:
+    visible:
+      id: "settings-members-button"
+    timeout: 5000
+
+- tapOn:
+    id: "settings-members-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "members-add-button"
+    timeout: 5000
+
+- tapOn:
+    id: "members-add-button"
+
+- tapOn:
+    id: "members-editor-fullname-input"
+- inputText: "E2E Orador"
+
+- tapOn:
+    id: "members-editor-save-button"
+
+- extendedWaitUntil:
+    visible: "E2E Orador"
+    timeout: 5000
+
+- tapOn:
+    id: "members-back-button"
+
+# ---- Part C: Navigate to Speeches tab ----
+
+- tapOn: "Discursos"
+
+- extendedWaitUntil:
+    visible: "Discursos"
+    timeout: 5000
+
+# ---- Part D: Expand next Sunday card ----
+
+# Compute next Sunday date dynamically
+- evalScript: >
+    ${(() => {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = day === 0 ? 0 : 7 - day;
+      const next = new Date(now.getTime() + diff * 86400000);
+      output.NEXT_SUNDAY = next.toISOString().split('T')[0];
+    })()}
+
+- tapOn:
+    id: "speeches-card-header-${output.NEXT_SUNDAY}"
+
+- extendedWaitUntil:
+    visible:
+      id: "speech-slot-1-speaker-button"
+    timeout: 15000
+
+# ---- Part E: Assign speaker to 1st speech ----
+
+- tapOn:
+    id: "speech-slot-1-speaker-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "member-selector-search-input"
+    timeout: 5000
+
+- assertVisible: "E2E Orador"
+
+- tapOn: "E2E Orador"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "member-selector-search-input"
+    timeout: 5000
+
+- assertVisible: "E2E Orador"
+
+# ---- Part F: Change status ----
+
+- tapOn:
+    id: "speech-slot-1-status-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "status-modal-close-button"
+    timeout: 5000
+
+- tapOn:
+    id: "status-modal-option-assigned_confirmed"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "status-modal-close-button"
+    timeout: 5000
+
+# ---- Part G: Open/close topic modal ----
+
+- tapOn:
+    id: "speech-slot-1-topic-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "topic-selector-close-button"
+    timeout: 5000
+
+- tapOn:
+    id: "topic-selector-close-button"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "topic-selector-close-button"
+    timeout: 5000
+
+# ---- Part H: Collapse card ----
+
+- tapOn:
+    id: "speeches-card-header-${output.NEXT_SUNDAY}"
+
+- assertNotVisible:
+    id: "speech-slot-1-speaker-button"

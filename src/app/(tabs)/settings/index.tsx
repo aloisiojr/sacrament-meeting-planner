@@ -298,6 +298,7 @@ export default function SettingsScreen() {
               label={t('settings.users')}
               onPress={() => router.push('/(tabs)/settings/users')}
               colors={colors}
+              testID="settings-users-button"
             />
           )}
           {hasPermission('history:read') && (
@@ -312,11 +313,13 @@ export default function SettingsScreen() {
             value={LANGUAGE_LABELS[currentAppLanguage]}
             onPress={() => setAppLanguageModalVisible(true)}
             colors={colors}
+            testID="settings-app-language-button"
           />
           <SettingsItem
             label={t('settings.theme')}
             onPress={() => router.push('/(tabs)/settings/theme')}
             colors={colors}
+            testID="settings-theme-button"
           />
           <SettingsItem
             label={t('settings.about')}
@@ -363,6 +366,7 @@ export default function SettingsScreen() {
                 onPress={() => handleAppLanguageSelect(lang)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: lang === currentAppLanguage }}
+                testID={`settings-app-language-${lang}-option`}
               >
                 <Text style={[styles.languageText, { color: colors.text }]}>
                   {LANGUAGE_LABELS[lang]}

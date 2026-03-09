@@ -1,30 +1,16 @@
-appId: com.alouisio.sacramentmeetingplanner
+appId: com.sacramentmeetingmanager.app
 ---
 # 06-members: Members CRUD — add, edit (swipe), delete (swipe)
 
-# ---- Part A: Login ----
+# ---- Setup: Register a new ward ----
+- runFlow: helpers/register-ward.yaml
 
-- assertVisible:
-    id: "login-submit-button"
+# User is now logged in on Home tab
 
-- tapOn:
-    id: "login-email-input"
-- inputText: ${output.TEST_EMAIL}
+# ---- Part A: Navigate to Members ----
 
 - tapOn:
-    id: "login-password-input"
-- inputText: ${output.TEST_PASSWORD}
-
-- tapOn:
-    id: "login-submit-button"
-
-- extendedWaitUntil:
-    visible: "Início"
-    timeout: 10000
-
-# ---- Part B: Navigate to Members ----
-
-- tapOn: "Configurações"
+    id: "tab-settings"
 
 - extendedWaitUntil:
     visible:
@@ -39,7 +25,7 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "members-add-button"
     timeout: 5000
 
-# ---- Part C: Add new member ----
+# ---- Part B: Add new member ----
 
 - tapOn:
     id: "members-add-button"
@@ -59,7 +45,7 @@ appId: com.alouisio.sacramentmeetingplanner
     visible: "E2E Membro Teste"
     timeout: 5000
 
-# ---- Part D: Edit member (swipe + edit) ----
+# ---- Part C: Edit member (swipe + edit) ----
 
 - swipe:
     from:
@@ -79,8 +65,9 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "members-editor-fullname-input"
     timeout: 3000
 
-- clearText:
+- tapOn:
     id: "members-editor-fullname-input"
+- eraseText: 50
 - inputText: "E2E Membro Editado"
 
 - tapOn:
@@ -92,7 +79,7 @@ appId: com.alouisio.sacramentmeetingplanner
 
 - assertNotVisible: "E2E Membro Teste"
 
-# ---- Part E: Delete member (swipe + delete) ----
+# ---- Part D: Delete member (swipe + delete) ----
 
 - swipe:
     from:
@@ -107,13 +94,14 @@ appId: com.alouisio.sacramentmeetingplanner
 - tapOn:
     id: "swipeable-delete-button"
 
+# Confirm delete in native Alert (pt-BR after clearState)
 - tapOn: "Excluir"
 
 - extendedWaitUntil:
     notVisible: "E2E Membro Editado"
     timeout: 5000
 
-# ---- Part F: Navigate back to Settings ----
+# ---- Part E: Navigate back to Settings ----
 
 - tapOn:
     id: "members-back-button"

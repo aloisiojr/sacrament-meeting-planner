@@ -29,7 +29,7 @@ export default function ThemeScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="theme-back-button">
           <Text style={[styles.backButton, { color: colors.primary }]}>
             {t('common.back')}
           </Text>
@@ -54,6 +54,7 @@ export default function ThemeScreen() {
               onPress={() => handleSelect(mode)}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected }}
+              testID={`theme-${mode}-option`}
             >
               <Text style={[styles.itemText, { color: colors.text }]}>
                 {t(`theme.${mode}`)}

@@ -1,30 +1,16 @@
-appId: com.alouisio.sacramentmeetingplanner
+appId: com.sacramentmeetingmanager.app
 ---
 # 05-speeches: Add member -> Speeches tab -> assign speaker -> change status -> topic modal
 
-# ---- Part A: Login ----
+# ---- Setup: Register a new ward ----
+- runFlow: helpers/register-ward.yaml
 
-- assertVisible:
-    id: "login-submit-button"
+# User is now logged in on Home tab
 
-- tapOn:
-    id: "login-email-input"
-- inputText: ${output.TEST_EMAIL}
+# ---- Part A: Navigate to Members and add test member ----
 
 - tapOn:
-    id: "login-password-input"
-- inputText: ${output.TEST_PASSWORD}
-
-- tapOn:
-    id: "login-submit-button"
-
-- extendedWaitUntil:
-    visible: "Início"
-    timeout: 10000
-
-# ---- Part B: Navigate to Members and add test member ----
-
-- tapOn: "Configurações"
+    id: "tab-settings"
 
 - extendedWaitUntil:
     visible:
@@ -56,17 +42,18 @@ appId: com.alouisio.sacramentmeetingplanner
 - tapOn:
     id: "members-back-button"
 
-# ---- Part C: Navigate to Speeches tab ----
+# ---- Part B: Navigate to Speeches tab ----
 
-- tapOn: "Discursos"
+- tapOn:
+    id: "tab-speeches"
 
 - extendedWaitUntil:
-    visible: "Discursos"
+    visible:
+      id: "tab-speeches"
     timeout: 5000
 
-# ---- Part D: Expand next Sunday card ----
+# ---- Part C: Expand next Sunday card ----
 
-# Compute next Sunday date dynamically
 - evalScript: >
     ${(() => {
       const now = new Date();
@@ -84,7 +71,7 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "speech-slot-1-speaker-button"
     timeout: 15000
 
-# ---- Part E: Assign speaker to 1st speech ----
+# ---- Part D: Assign speaker to 1st speech ----
 
 - tapOn:
     id: "speech-slot-1-speaker-button"
@@ -105,7 +92,7 @@ appId: com.alouisio.sacramentmeetingplanner
 
 - assertVisible: "E2E Orador"
 
-# ---- Part F: Change status ----
+# ---- Part E: Change status ----
 
 - tapOn:
     id: "speech-slot-1-status-button"
@@ -123,7 +110,7 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "status-modal-close-button"
     timeout: 5000
 
-# ---- Part G: Open/close topic modal ----
+# ---- Part F: Open/close topic modal ----
 
 - tapOn:
     id: "speech-slot-1-topic-button"
@@ -141,7 +128,7 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "topic-selector-close-button"
     timeout: 5000
 
-# ---- Part H: Collapse card ----
+# ---- Part G: Collapse card ----
 
 - tapOn:
     id: "speeches-card-header-${output.NEXT_SUNDAY}"

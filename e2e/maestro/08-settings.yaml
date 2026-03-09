@@ -1,129 +1,118 @@
-appId: com.alouisio.sacramentmeetingplanner
+appId: com.sacramentmeetingmanager.app
 ---
 # 08-settings: Theme change + language round-trip
 
-# ---- Part A: Login ----
+# ---- Setup: Register a new ward ----
+- runFlow: helpers/register-ward.yaml
 
-# Assert login screen visible
-- assertVisible:
-    id: "login-submit-button"
+# User is now logged in on Home tab (pt-BR after clearState)
 
-# Enter email from 01-register output
+# ---- Part A: Navigate to Settings ----
+
 - tapOn:
-    id: "login-email-input"
-- inputText: ${output.TEST_EMAIL}
+    id: "tab-settings"
 
-# Enter password
-- tapOn:
-    id: "login-password-input"
-- inputText: ${output.TEST_PASSWORD}
-
-# Tap login
-- tapOn:
-    id: "login-submit-button"
-
-# Wait for Home tab
 - extendedWaitUntil:
-    visible: "Início"
-    timeout: 10000
-
-# ---- Part B: Navigate to Settings ----
-
-# Navigate to Settings tab
-- tapOn: "Configurações"
-
-# Wait for Settings screen
-- extendedWaitUntil:
-    visible: "Configurações"
+    visible:
+      id: "settings-theme-button"
     timeout: 5000
 
-# ---- Part C: Theme changes ----
+# ---- Part B: Theme changes ----
 
-# Open theme screen
-- tapOn: "Tema Claro/Escuro"
+- tapOn:
+    id: "settings-theme-button"
 
-# Wait for theme screen with options
+# Wait for theme screen
 - extendedWaitUntil:
-    visible: "Automático"
+    visible:
+      id: "theme-automatic-option"
     timeout: 5000
 
 # Select light theme
-- tapOn: "Claro"
+- tapOn:
+    id: "theme-light-option"
 
 # Select dark theme
-- tapOn: "Escuro"
+- tapOn:
+    id: "theme-dark-option"
 
 # Return to Settings
-- tapOn: "Voltar"
+- tapOn:
+    id: "theme-back-button"
 
 # Wait for Settings screen
 - extendedWaitUntil:
-    visible: "Configurações"
+    visible:
+      id: "settings-theme-button"
     timeout: 5000
 
-# ---- Part D: Language change to en-US ----
+# ---- Part C: Language change to en-US ----
 
-# Open language modal
-- tapOn: "Idioma do App"
+- tapOn:
+    id: "settings-app-language-button"
 
-# Wait for language options
+# Wait for language modal
 - extendedWaitUntil:
-    visible: "English"
+    visible:
+      id: "settings-app-language-en-US-option"
     timeout: 5000
 
 # Select English
-- tapOn: "English"
+- tapOn:
+    id: "settings-app-language-en-US-option"
 
-# Wait for Settings screen in English
+# Wait for Settings screen to update to English
+# Here we verify language changed by checking en-US text
 - extendedWaitUntil:
     visible: "Settings"
     timeout: 5000
 
-# Verify en-US strings
+# Verify en-US strings (this is the POINT of the test)
 - assertVisible: "Light/Dark Theme"
 - assertVisible: "App Language"
 
-# ---- Part E: Language change back to pt-BR ----
+# ---- Part D: Language change back to pt-BR ----
 
-# Open language modal (now in English)
-- tapOn: "App Language"
+- tapOn:
+    id: "settings-app-language-button"
 
-# Wait for language options
+# Wait for language modal
 - extendedWaitUntil:
-    visible: "Portugues (Brasil)"
+    visible:
+      id: "settings-app-language-pt-BR-option"
     timeout: 5000
 
 # Select Portuguese
-- tapOn: "Portugues (Brasil)"
+- tapOn:
+    id: "settings-app-language-pt-BR-option"
 
-# Wait for Settings screen in Portuguese
+# Wait for Settings screen to update to Portuguese
 - extendedWaitUntil:
     visible: "Configurações"
     timeout: 5000
 
-# Verify pt-BR strings restored
+# Verify pt-BR strings restored (this is the POINT of the test)
 - assertVisible: "Tema Claro/Escuro"
 - assertVisible: "Idioma do App"
 
-# ---- Part F: Restore theme to automatic ----
+# ---- Part E: Restore theme to automatic ----
 
-# Open theme screen
-- tapOn: "Tema Claro/Escuro"
+- tapOn:
+    id: "settings-theme-button"
 
-# Wait for theme screen
 - extendedWaitUntil:
-    visible: "Automático"
+    visible:
+      id: "theme-automatic-option"
     timeout: 5000
 
-# Select automatic
-- tapOn: "Automático"
+- tapOn:
+    id: "theme-automatic-option"
 
-# Return to Settings
-- tapOn: "Voltar"
+- tapOn:
+    id: "theme-back-button"
 
-# ---- Part G: Logout ----
+# ---- Part F: Logout ----
 
-# Scroll to and tap sign-out button
 - scrollUntilVisible:
     element:
       id: "settings-sign-out-button"
@@ -131,10 +120,8 @@ appId: com.alouisio.sacramentmeetingplanner
 - tapOn:
     id: "settings-sign-out-button"
 
-# Confirm sign-out in native Alert
 - tapOn: "Confirmar"
 
-# Wait for login screen
 - extendedWaitUntil:
     visible:
       id: "login-submit-button"

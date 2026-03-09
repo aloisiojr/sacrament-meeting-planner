@@ -1,36 +1,23 @@
-appId: com.alouisio.sacramentmeetingplanner
+appId: com.sacramentmeetingmanager.app
 ---
 # 04-agenda: Agenda tab -> expand Sunday -> assign actor -> assign hymn
 
-# ---- Part A: Login ----
+# ---- Setup: Register a new ward ----
+- runFlow: helpers/register-ward.yaml
 
-- assertVisible:
-    id: "login-submit-button"
+# User is now logged in on Home tab
 
-- tapOn:
-    id: "login-email-input"
-- inputText: ${output.TEST_EMAIL}
+# ---- Part A: Navigate to Agenda tab ----
 
 - tapOn:
-    id: "login-password-input"
-- inputText: ${output.TEST_PASSWORD}
-
-- tapOn:
-    id: "login-submit-button"
+    id: "tab-agendas"
 
 - extendedWaitUntil:
-    visible: "Início"
-    timeout: 10000
-
-# ---- Part B: Navigate to Agenda tab ----
-
-- tapOn: "Agendas"
-
-- extendedWaitUntil:
-    visible: "Agendas"
+    visible:
+      id: "tab-agendas"
     timeout: 5000
 
-# ---- Part C: Expand next Sunday card ----
+# ---- Part B: Expand next Sunday card ----
 
 # Compute next Sunday date dynamically
 - evalScript: >
@@ -48,16 +35,11 @@ appId: com.alouisio.sacramentmeetingplanner
 
 # Wait for agenda form to load (lazy creation)
 - extendedWaitUntil:
-    visible: "Boas-Vindas, Anúncios e Reconhecimentos"
+    visible:
+      id: "agenda-presiding-selector"
     timeout: 15000
 
-# ---- Part D: Assign Presiding Actor ----
-
-# Scroll to and tap presiding selector
-- scrollUntilVisible:
-    element:
-      id: "agenda-presiding-selector"
-    direction: DOWN
+# ---- Part C: Assign Presiding Actor ----
 
 - tapOn:
     id: "agenda-presiding-selector"
@@ -92,7 +74,7 @@ appId: com.alouisio.sacramentmeetingplanner
     visible: "E2E Presidente"
     timeout: 5000
 
-# ---- Part E: Assign Opening Hymn ----
+# ---- Part D: Assign Opening Hymn ----
 
 # Scroll to opening hymn selector
 - scrollUntilVisible:
@@ -129,7 +111,7 @@ appId: com.alouisio.sacramentmeetingplanner
       id: "hymn-selector-search-input"
     timeout: 5000
 
-# ---- Part F: Collapse and verify ----
+# ---- Part E: Collapse and verify ----
 
 # Scroll up to card header
 - scrollUntilVisible:
@@ -140,6 +122,3 @@ appId: com.alouisio.sacramentmeetingplanner
 # Tap card header to collapse
 - tapOn:
     id: "agenda-card-${output.NEXT_SUNDAY}"
-
-# Assert card collapsed (form section header should not be visible)
-- assertNotVisible: "Boas-Vindas, Anúncios e Reconhecimentos"

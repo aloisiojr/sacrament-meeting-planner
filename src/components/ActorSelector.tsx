@@ -245,13 +245,14 @@ export function ActorSelector({
           {/* Search */}
           <View style={styles.searchRow}>
             <SearchInput
+              testID="actor-selector-search-input"
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
               placeholder={t('common.search')}
               autoCapitalize="words"
             />
-            <Pressable onPress={handleClose} style={styles.closeBtn}>
+            <Pressable testID="actor-selector-close-button" onPress={handleClose} style={styles.closeBtn}>
               <Text style={[styles.closeText, { color: colors.primary }]}>{t('common.close')}</Text>
             </Pressable>
           </View>
@@ -259,6 +260,7 @@ export function ActorSelector({
           {/* Add button / input */}
           {!showAddInput ? (
             <Pressable
+              testID="actor-selector-add-button"
               style={[styles.addButton, { borderColor: colors.primary }]}
               onPress={() => setShowAddInput(true)}
             >
@@ -269,6 +271,7 @@ export function ActorSelector({
           ) : (
             <View style={styles.addRow}>
               <TextInput
+                testID="actor-selector-add-input"
                 style={[styles.addInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBackground }]}
                 value={addingName}
                 onChangeText={setAddingName}
@@ -280,6 +283,7 @@ export function ActorSelector({
                 returnKeyType="done"
               />
               <Pressable
+                testID="actor-selector-add-confirm"
                 style={[styles.addConfirm, { backgroundColor: addingName.trim() ? colors.primary : colors.surfaceVariant }]}
                 onPress={handleAdd}
                 disabled={!addingName.trim()}

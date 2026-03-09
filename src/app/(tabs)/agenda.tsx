@@ -397,6 +397,7 @@ function AgendaSundayCard({
       ]}
     >
       <Pressable
+        testID={`agenda-card-${date}`}
         style={styles.cardHeader}
         onPress={expandable ? onToggle : undefined}
         accessibilityRole="button"
@@ -536,6 +537,7 @@ function AgendaSundayCard({
 
         {expandable && isExpanded && (
           <Pressable
+            testID={`agenda-play-${date}`}
             onPress={() => router.push({ pathname: '/presentation', params: { date } })}
             hitSlop={8}
             accessibilityRole="button"

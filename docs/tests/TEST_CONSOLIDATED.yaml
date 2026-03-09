@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 21
+version: 22
 last_updated: "2026-03-08"
 
 summary:
-  total_test_files: 65
-  total_tests: 1707
+  total_test_files: 66
+  total_tests: 1789
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -19,9 +19,10 @@ summary:
   # Note: F068+F069+F070 added 98 tests (tester): EditableListField generalization, drag reorder, zebra striping
   # Note: F071 added 39 tests (coder): CR-281 multiline fix, CR-282 activationDistance, CR-283 recognized_names rework
   # Note: F071 added 96 tests (tester): CR-281/282/283 behavioral tests + flaky useSpeechCounts fix
+  # Note: F017_E2E added 82 tests (tester): CR-284 E2E testing infrastructure validation + 2 pre-existing test fixes
   framework: vitest
   categories:
-    module_named: 57
+    module_named: 58
     integration: 6
   infrastructure:
     setup: 1
@@ -854,9 +855,9 @@ module_tests:
     module: "src/components/EditableListField.tsx, src/components/ActorSelector.tsx, src/components/AgendaForm.tsx, src/hooks/usePresentationMode.ts"
     covers:
       - "CR-281 S016-01: inline edit TextInput props (4 tests)"
-      - multiline, blurOnSubmit, editInput paddingVertical, autoFocus
-      - "CR-282 S016-02: DraggableFlatList activationDistance (2 tests)"
-      - activationDistance={9999}, scrollEnabled={false} preserved
+      - multiline, blurOnSubmit, editInput paddingVertical, autoFocus removed (updated)
+      - "CR-282 S016-02: DraggableFlatList drag control (2 tests)"
+      - dragHitSlop (replaced activationDistance), scrollEnabled={false} preserved
       - "CR-283 S016-03: i18n key agenda.addPresence (4 tests)"
       - pt-BR, en-US, es-LA, SundayAgenda.recognized_names type string|null
       - "CR-283 S016-04: migration 032 (4 tests)"
@@ -905,6 +906,25 @@ module_tests:
       - "CR-283 EC-283-05: actor for current name not in list (2 tests)"
       - "CR-283 EC-038: migration 032 NULL handling (4 tests)"
       - "All 4 bullet_list fields coexist in presentation (2 tests)"
+
+  - file: src/__tests__/f017-e2e-testing.test.ts
+    tests: 82
+    module: "src/app/(auth)/login.tsx, src/app/(auth)/register.tsx, src/app/(tabs)/settings/index.tsx, e2e/maestro/*.yaml, e2e/README.md"
+    covers:
+      - "Register validation logic (10 tests): valid fields, empty name, whitespace name, empty email, empty stake, empty ward, short password, exact 6 char password, mismatched passwords, validation order"
+      - "Login testIDs (8 tests): 6 testID count, each testID present, naming convention"
+      - "Register testIDs (12 tests): 12 source testID count, 10 static + 2 dynamic templates, each testID present, dynamic role/language templates"
+      - "Settings testID (2 tests): settings-sign-out-button present, naming convention"
+      - "01-register flow structure (10 tests): file exists, appId, unique email generation, password storage, testID targeting, pt-BR assertions, tab labels, Discursos label, timeouts, default role/language"
+      - "02-login-logout flow structure (14 tests): file exists, appId, 3 parts, login testIDs, credentials from output, Home assertion, Settings navigation, sign-out testID, native Alert handling, scroll, login screen return, invalid credentials, error message, error testID, timeouts"
+      - "README documentation (7 tests): file exists, Prerequisites, Maestro CLI, run commands, testID convention, Supabase, execution order"
+      - "testID naming convention (3 tests): kebab-case, screen prefixes, type suffixes"
+      - "Cross-validation (2 tests): all flow testIDs exist in source for both 01-register and 02-login-logout"
+      - "pt-BR assertion strings (4 tests): loginFailed text, login button, register title, validation error keys"
+      - "Unique email generation (2 tests): timestamp pattern, output storage for cross-flow reuse"
+      - "KeyboardAvoidingView (2 tests): login screen uses KAV, register screen uses KAV"
+      - "Flow file naming ADR-053 (3 tests): 01-register exists, 02-login-logout exists, zero-padded prefix"
+      - "Pre-existing test fixes (2 tests): autoFocus removed, activationDistance replaced by dragHitSlop"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4218,9 +4238,20 @@ gaps:
   # 96 tester tests: behavioral tests covering all ACs and ECs with no fs.readFileSync.
   #   CR-281: 13 tests (4 ACs + 2 ECs). CR-282: 11 tests (4 ACs + 2 ECs).
   #   CR-283: 72 tests (12 ACs + 5 ECs + 2 presentation coexistence).
+  # NOTE: 2 coder tests updated by tester (autoFocus removed, activationDistance -> dragHitSlop).
+
+  # F017_E2E gaps
+  # All ACs covered: AC-SF1-01 to AC-SF1-03, AC-SF2-01 to AC-SF2-04, AC-SF3-01,
+  #   AC-SF4-01 to AC-SF4-03, AC-SF5-01 to AC-SF5-03, AC-SF6-01. 14 ACs total.
+  # All edge cases covered: EC_E2E_001, EC_E2E_002, EC_E2E_003, EC_E2E_004, EC_E2E_005. 5 ECs total.
+  # 82 tester tests: 10 validation, 8 login testIDs, 12 register testIDs, 2 settings testID,
+  #   10 register flow, 14 login-logout flow, 7 README, 3 naming convention,
+  #   2 cross-validation, 4 i18n, 2 unique email, 2 KeyboardAvoidingView, 3 file naming,
+  #   + 2 pre-existing test fixes in f071.
+  # No gaps.
 
 stats:
-  total_tests: 1707
-  passing: 1707
+  total_tests: 1789
+  passing: 1789
   failing: 0
   skipped: 0

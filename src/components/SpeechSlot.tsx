@@ -178,6 +178,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           {/* F118: Toggle switch for position 2 (hidden for prayer slots) */}
           {position === 2 && !isPrayer && onToggleSecondSpeech && (
             <Switch
+              testID="speech-slot-2-toggle"
               value={isSecondSpeechEnabled !== false}
               onValueChange={onToggleSecondSpeech}
               disabled={!isBispado}
@@ -191,6 +192,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
             style={styles.statusSection}
             onPress={handleStatusPress}
             disabled={isObserver || status === 'not_assigned'}
+            testID={`speech-slot-${position}-status-button`}
           >
             <Text style={[styles.statusText, { color: colors.textSecondary }]}>
               {t(`speechStatus.${status}`)}
@@ -235,6 +237,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
               disabled={!canAssign || !speech}
               accessibilityRole="button"
               accessibilityLabel={t('speeches.selectSpeaker')}
+              testID={`speech-slot-${position}-speaker-button`}
             >
               <Text
                 style={[
@@ -256,6 +259,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={t('speeches.unassign')}
+                  testID={`speech-slot-${position}-remove-button`}
                 >
                   <XIcon size={24} color={colors.error} />
                 </Pressable>
@@ -272,6 +276,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 disabled={!canAssign || !speech}
                 accessibilityRole="button"
                 accessibilityLabel={t('speeches.selectTopic')}
+                testID={`speech-slot-${position}-topic-button`}
               >
                 <Text
                   style={[
@@ -292,6 +297,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                     hitSlop={8}
                     onPress={handleClearTopic}
                     accessibilityLabel={t('common.delete')}
+                    testID={`speech-slot-${position}-clear-topic-button`}
                   >
                     <XIcon size={20} color={colors.error} />
                   </Pressable>

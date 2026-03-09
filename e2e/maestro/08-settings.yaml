@@ -1,0 +1,141 @@
+appId: com.alouisio.sacramentmeetingplanner
+---
+# 08-settings: Theme change + language round-trip
+
+# ---- Part A: Login ----
+
+# Assert login screen visible
+- assertVisible:
+    id: "login-submit-button"
+
+# Enter email from 01-register output
+- tapOn:
+    id: "login-email-input"
+- inputText: ${output.TEST_EMAIL}
+
+# Enter password
+- tapOn:
+    id: "login-password-input"
+- inputText: ${output.TEST_PASSWORD}
+
+# Tap login
+- tapOn:
+    id: "login-submit-button"
+
+# Wait for Home tab
+- extendedWaitUntil:
+    visible: "Início"
+    timeout: 10000
+
+# ---- Part B: Navigate to Settings ----
+
+# Navigate to Settings tab
+- tapOn: "Configurações"
+
+# Wait for Settings screen
+- extendedWaitUntil:
+    visible: "Configurações"
+    timeout: 5000
+
+# ---- Part C: Theme changes ----
+
+# Open theme screen
+- tapOn: "Tema Claro/Escuro"
+
+# Wait for theme screen with options
+- extendedWaitUntil:
+    visible: "Automático"
+    timeout: 5000
+
+# Select light theme
+- tapOn: "Claro"
+
+# Select dark theme
+- tapOn: "Escuro"
+
+# Return to Settings
+- tapOn: "Voltar"
+
+# Wait for Settings screen
+- extendedWaitUntil:
+    visible: "Configurações"
+    timeout: 5000
+
+# ---- Part D: Language change to en-US ----
+
+# Open language modal
+- tapOn: "Idioma do App"
+
+# Wait for language options
+- extendedWaitUntil:
+    visible: "English"
+    timeout: 5000
+
+# Select English
+- tapOn: "English"
+
+# Wait for Settings screen in English
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 5000
+
+# Verify en-US strings
+- assertVisible: "Light/Dark Theme"
+- assertVisible: "App Language"
+
+# ---- Part E: Language change back to pt-BR ----
+
+# Open language modal (now in English)
+- tapOn: "App Language"
+
+# Wait for language options
+- extendedWaitUntil:
+    visible: "Portugues (Brasil)"
+    timeout: 5000
+
+# Select Portuguese
+- tapOn: "Portugues (Brasil)"
+
+# Wait for Settings screen in Portuguese
+- extendedWaitUntil:
+    visible: "Configurações"
+    timeout: 5000
+
+# Verify pt-BR strings restored
+- assertVisible: "Tema Claro/Escuro"
+- assertVisible: "Idioma do App"
+
+# ---- Part F: Restore theme to automatic ----
+
+# Open theme screen
+- tapOn: "Tema Claro/Escuro"
+
+# Wait for theme screen
+- extendedWaitUntil:
+    visible: "Automático"
+    timeout: 5000
+
+# Select automatic
+- tapOn: "Automático"
+
+# Return to Settings
+- tapOn: "Voltar"
+
+# ---- Part G: Logout ----
+
+# Scroll to and tap sign-out button
+- scrollUntilVisible:
+    element:
+      id: "settings-sign-out-button"
+    direction: DOWN
+- tapOn:
+    id: "settings-sign-out-button"
+
+# Confirm sign-out in native Alert
+- tapOn: "Confirmar"
+
+# Wait for login screen
+- extendedWaitUntil:
+    visible:
+      id: "login-submit-button"
+    timeout: 10000

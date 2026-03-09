@@ -131,6 +131,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
     ({ data }: { data: string[] }) => {
       setEditingIndex(null);
       setEditText('');
+      isEditingRef.current = true;
       saveItems(data);
     },
     [saveItems]
